@@ -105,28 +105,9 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
     //
     // However, for constraint interfaces like `__BuiltinFloatingPointType` and
     // `__BuiltinIntegerType`, we want to be more conservative about implicit
-    // conversions to prevent ambiguous overloads when both integer and float
-    // variants exist (e.g., CoopVec max functions).
+    // conversions when dealing with cross-family conversions to prevent
+    // ambiguous overloads when both integer and float variants exist.
     //
-    if (auto interfaceDeclRefType = as<DeclRefType>(interfaceType))
-    {
-        if (auto interfaceDecl = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>())
-        {
-            auto interfaceName = interfaceDecl.getName();
-            if (interfaceName)
-            {
-                bool isFloatInterface = interfaceName->text == UnownedStringSlice("__BuiltinFloatingPointType");
-                bool isIntInterface = interfaceName->text == UnownedStringSlice("__BuiltinIntegerType");
-
-                if (isFloatInterface || isIntInterface)
-                {
-                    // For these specific constraint interfaces, only allow direct conformance.
-                    // Don't perform implicit conversions that could lead to ambiguous overloads.
-                    return nullptr;
-                }
-            }
-        }
-    }
 
     // A robust/correct solution here might be to enumerate set of types types `S`
     // such that for each type `X` in `S`:
