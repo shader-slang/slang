@@ -321,6 +321,13 @@ Type* TupleType::getTypePack() const
     return as<Type>(_getGenericTypeArg(getDeclRefBase(), 0));
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShortStringType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+IntVal* ShortStringType::getLength()
+{
+    return as<IntVal>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArrayExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Type* ArrayExpressionType::getElementType()
