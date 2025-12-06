@@ -332,6 +332,25 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
 
     case SLANG_HOST_VM:
         return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Host, 0);
+
+    case SLANG_LLVM_HOST_ASSEMBLY:
+        return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Host, 0);
+
+    case SLANG_LLVM_HOST_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Host, 0);
+
+    case SLANG_LLVM_HOST_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Host, 0);
+
+    case SLANG_LLVM_SHADER_ASSEMBLY:
+        return Desc::make(Kind::Assembly, Payload::LLVMIR, Style::Kernel, 0);
+
+    case SLANG_LLVM_SHADER_OBJECT_CODE:
+        return Desc::make(Kind::ObjectCode, Payload::UniversalCPU, Style::Kernel, 0);
+
+    case SLANG_LLVM_SHADER_HOST_CALLABLE:
+        return Desc::make(Kind::HostCallable, Payload::HostCPU, Style::Kernel, 0);
+
     default:
         break;
     }
@@ -591,7 +610,8 @@ static const KindExtension g_cpuKindExts[] = {
 
 /* static */ bool ArtifactDescUtil::isCpuLikeTarget(const ArtifactDesc& desc)
 {
-    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary))
+    if (isDerivedFrom(desc.kind, ArtifactKind::CompileBinary) ||
+        isDerivedFrom(desc.kind, ArtifactKind::ObjectCode))
     {
         return isDerivedFrom(desc.payload, ArtifactPayload::CPULike);
     }
@@ -599,6 +619,11 @@ static const KindExtension g_cpuKindExts[] = {
     {
         // We'll assume C/C++ are targetting CPU, although that is perhaps somewhat arguable.
         return desc.payload == Payload::C || desc.payload == Payload::Cpp;
+    }
+    else if (isDerivedFrom(desc.kind, ArtifactKind::Assembly))
+    {
+        // We'll assume LLVM IR is targeting CPU (even more arguable...)
+        return desc.payload == Payload::LLVMIR;
     }
 
     return false;

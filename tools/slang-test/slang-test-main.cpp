@@ -1216,6 +1216,12 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_METAL:
     case SLANG_WGSL:
     case SLANG_HOST_VM:
+    case SLANG_LLVM_HOST_ASSEMBLY:
+    case SLANG_LLVM_HOST_OBJECT_CODE:
+    case SLANG_LLVM_HOST_HOST_CALLABLE:
+    case SLANG_LLVM_SHADER_ASSEMBLY:
+    case SLANG_LLVM_SHADER_OBJECT_CODE:
+    case SLANG_LLVM_SHADER_HOST_CALLABLE:
         {
             return 0;
         }
@@ -1380,6 +1386,11 @@ static SlangResult _extractRenderTestRequirements(
         target = SLANG_WGSL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
+        break;
+    case RenderApiType::LLVM:
+        target = SLANG_LLVM_SHADER_HOST_CALLABLE;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+        passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 

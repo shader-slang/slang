@@ -1955,21 +1955,28 @@ __magic_type(NativeStringType)
 __intrinsic_type($(kIROp_NativeStringType))
 struct NativeString
 {
-    [require(cpp)]
+    [require(cpp_llvm)]
     int getLength()
     {
         __target_switch
         {
         case cpp: __intrinsic_asm "int(strlen($0))";
+        case llvm:
+            Ptr<int8_t> str = Ptr<int8_t>(getBuffer());
+            int len = 0;
+            while(str[len] != 0)
+                len++;
+            return len;
         }
     }
 
-    [require(cpp)]
+    [require(cpp_llvm)]
     Ptr<void> getBuffer()
     {
         __target_switch
         {
         case cpp: __intrinsic_asm "(void*)((const char*)($0))";
+        case llvm: __intrinsic_asm "ret $0";
         }
     }
 
@@ -2770,7 +2777,7 @@ __prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
 __generic<T>
 __intrinsic_op(0)
 [KnownBuiltin( $((int)KnownBuiltinDeclName::OperatorAddressOf))]
-[require(cpp_cuda_spirv)]
+[require(cpp_cuda_spirv_llvm)]
 __prefix Ptr<T, Access::ReadWrite, AddressSpace::Device> operator&(__ref T value);
 
 __generic<$(ptrTypeParameterList), TInt : __BuiltinIntegerType>
@@ -3221,27 +3228,33 @@ int __SyntaxError()
 /// Can't be called in the C/C++ style. Need to use __size_of<some_type>() as opposed to sizeof(some_type).
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __sizeOf()
 {
-    __intrinsic_asm "sizeof($[0])", T;
+    __target_switch
+    {
+    case cpp: __intrinsic_asm "sizeof($[0])", T;
+    case cuda: __intrinsic_asm "sizeof($[0])", T;
+    case llvm: __intrinsic_asm "ret i32 $[S0]", T;
+    }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __sizeOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "sizeof($T0)";
     case cuda: __intrinsic_asm "sizeof($T0)";
+    case llvm: __intrinsic_asm "ret i32 $S0";
     }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __alignOf()
 {
     __target_switch
@@ -3249,18 +3262,22 @@ int __alignOf()
     case cuda :
     case cpp :
         __intrinsic_asm "alignof($[0])", T;
+    case llvm:
+        return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }
 }
 
 __generic<T>
 [__readNone]
-[require(cpp_cuda)]
+[require(cpp_cuda_llvm)]
 int __alignOf(T v)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "alignof($T0)";
     case cuda: __intrinsic_asm "alignof($T0)";
+    case llvm:
+        return __sizeOf<Tuple<int8_t, T> >() - __sizeOf<T>();
     }
 }
 

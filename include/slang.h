@@ -642,6 +642,14 @@ typedef uint32_t SlangSizeT;
         SLANG_HOST_VM,     ///< Bytecode that can be interpreted by the Slang VM
         SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
         SLANG_CUDA_HEADER, ///< Cuda header
+
+        SLANG_LLVM_HOST_ASSEMBLY,        ///< LLVM IR assembly
+        SLANG_LLVM_HOST_OBJECT_CODE,     ///< Object code generated via LLVM
+        SLANG_LLVM_HOST_HOST_CALLABLE,   ///< Host callable code via LLVM
+        SLANG_LLVM_SHADER_ASSEMBLY,      ///< LLVM IR assembly (kernel/shader)
+        SLANG_LLVM_SHADER_OBJECT_CODE,   ///< Object code generated via LLVM (kernel/shader)
+        SLANG_LLVM_SHADER_HOST_CALLABLE, ///< Host callable code via LLVM (kernel/shader)
+
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -794,6 +802,7 @@ typedef uint32_t SlangSizeT;
         SLANG_SOURCE_LANGUAGE_SPIRV,
         SLANG_SOURCE_LANGUAGE_METAL,
         SLANG_SOURCE_LANGUAGE_WGSL,
+        SLANG_SOURCE_LANGUAGE_LLVM,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -1076,6 +1085,10 @@ typedef uint32_t SlangSizeT;
         ValidateIRDetailed,          // bool, enable detailed IR validation
         DumpIRBefore,                // string, pass name to dump IR before
         DumpIRAfter,                 // string, pass name to dump IR after
+
+        LLVMTargetTriple, // string
+        LLVMCPU,          // string
+        LLVMFeatures,     // string
 
         CountOf,
     };

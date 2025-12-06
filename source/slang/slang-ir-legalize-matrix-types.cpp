@@ -40,7 +40,7 @@ struct MatrixTypeLoweringContext
         workListSet.add(inst);
     }
 
-    bool shouldLowerTarget()
+    bool shouldLowerMatrixType(IRMatrixType* matrixType)
     {
         auto target = targetProgram->getTargetReq()->getTarget();
         switch (target)
@@ -54,20 +54,23 @@ struct MatrixTypeLoweringContext
         case CodeGenTarget::Metal:
         case CodeGenTarget::MetalLib:
         case CodeGenTarget::MetalLibAssembly:
+            {
+                auto elementType = matrixType->getElementType();
+                return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
+                       as<IRIntType>(elementType);
+            }
+        case CodeGenTarget::LLVMHostAssembly:
+        case CodeGenTarget::LLVMHostObjectCode:
+        case CodeGenTarget::LLVMHostHostCallable:
+        case CodeGenTarget::LLVMShaderAssembly:
+        case CodeGenTarget::LLVMShaderObjectCode:
+        case CodeGenTarget::LLVMShaderHostCallable:
+            // Always lower all matrices on LLVM; we'd need to break them up
+            // like this for data layout reasons anyway.
             return true;
         default:
             return false;
         }
-    }
-
-    bool shouldLowerMatrixType(IRMatrixType* matrixType)
-    {
-        if (!shouldLowerTarget())
-            return false;
-
-        auto elementType = matrixType->getElementType();
-        return as<IRBoolType>(elementType) || as<IRUIntType>(elementType) ||
-               as<IRIntType>(elementType);
     }
 
     IRInst* legalizeMatrixTypeDeclaration(IRInst* inst)

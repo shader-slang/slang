@@ -53,6 +53,12 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     WGSLSPIRVAssembly = SLANG_WGSL_SPIRV_ASM,
     WGSLSPIRV = SLANG_WGSL_SPIRV,
     HostVM = SLANG_HOST_VM,
+    LLVMHostAssembly = SLANG_LLVM_HOST_ASSEMBLY,
+    LLVMHostObjectCode = SLANG_LLVM_HOST_OBJECT_CODE,
+    LLVMHostHostCallable = SLANG_LLVM_HOST_HOST_CALLABLE,
+    LLVMShaderAssembly = SLANG_LLVM_SHADER_ASSEMBLY,
+    LLVMShaderObjectCode = SLANG_LLVM_SHADER_OBJECT_CODE,
+    LLVMShaderHostCallable = SLANG_LLVM_SHADER_HOST_CALLABLE,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 
@@ -80,6 +86,7 @@ bool isCUDATarget(TargetRequest* targetReq);
 
 // Are we generating code for a CPU target
 bool isCPUTarget(TargetRequest* targetReq);
+bool isCPUTarget(CodeGenTarget codeGenTarget);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);
@@ -87,6 +94,10 @@ bool isWGPUTarget(CodeGenTarget target);
 
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);
+
+// Are we generating code for LLVM IR
+bool isLLVMTarget(TargetRequest* targetReq);
+bool isLLVMTarget(CodeGenTarget target);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
