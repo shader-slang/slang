@@ -149,6 +149,59 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
             if (!canConvertImplicitly(conversionCost))
                 continue;
 
+            // For constraint interfaces like __BuiltinFloatingPointType and __BuiltinIntegerType,
+            // avoid cross-family conversions (int->float, float->int) to prevent ambiguous overloads
+            if (auto interfaceDeclRefType = as<DeclRefType>(interfaceType))
+            {
+                if (auto interfaceDecl = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>())
+                {
+                    auto interfaceName = interfaceDecl.getName();
+                    if (interfaceName)
+                    {
+                        bool isFloatInterface = interfaceName->text == UnownedStringSlice("__BuiltinFloatingPointType");
+                        bool isIntInterface = interfaceName->text == UnownedStringSlice("__BuiltinIntegerType");
+
+                        if (isFloatInterface || isIntInterface)
+                        {
+                            // Check if this candidate type is from the same family as expected
+                            bool candidateIsFloat = false;
+                            bool candidateIsInt = false;
+                            bool sourceIsFloat = false;
+                            bool sourceIsInt = false;
+
+                            // Check the candidate type (what we're trying to convert TO)
+                            if (auto candidateBasicType = as<BasicExpressionType>(candidateType))
+                            {
+                                auto candidateBaseType = candidateBasicType->getBaseType();
+                                candidateIsFloat = (candidateBaseType == BaseType::Float || candidateBaseType == BaseType::Half || candidateBaseType == BaseType::Double);
+                                candidateIsInt = (candidateBaseType == BaseType::Int || candidateBaseType == BaseType::UInt ||
+                                                candidateBaseType == BaseType::Int8 || candidateBaseType == BaseType::UInt8 ||
+                                                candidateBaseType == BaseType::Int16 || candidateBaseType == BaseType::UInt16 ||
+                                                candidateBaseType == BaseType::Int64 || candidateBaseType == BaseType::UInt64);
+                            }
+
+                            // Check the source type (what we're trying to convert FROM)
+                            if (auto sourceBasicType = as<BasicExpressionType>(type))
+                            {
+                                auto sourceBaseType = sourceBasicType->getBaseType();
+                                sourceIsFloat = (sourceBaseType == BaseType::Float || sourceBaseType == BaseType::Half || sourceBaseType == BaseType::Double);
+                                sourceIsInt = (sourceBaseType == BaseType::Int || sourceBaseType == BaseType::UInt ||
+                                             sourceBaseType == BaseType::Int8 || sourceBaseType == BaseType::UInt8 ||
+                                             sourceBaseType == BaseType::Int16 || sourceBaseType == BaseType::UInt16 ||
+                                             sourceBaseType == BaseType::Int64 || sourceBaseType == BaseType::UInt64);
+                            }
+
+                            // Disallow cross-family conversions: int->float for FloatInterface, float->int for IntInterface
+                            if ((isFloatInterface && candidateIsFloat && sourceIsInt) ||
+                                (isIntInterface && candidateIsInt && sourceIsFloat))
+                            {
+                                continue; // Skip this candidate
+                            }
+                        }
+                    }
+                }
+            }
+
             // At this point, we have a candidate type that is usable.
             //
             // If this is our first viable candidate, then it is our best one:
