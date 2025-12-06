@@ -1166,7 +1166,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerTuples, sink);
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.

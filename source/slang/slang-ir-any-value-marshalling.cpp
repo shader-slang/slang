@@ -2,9 +2,11 @@
 
 #include "../core/slang-math.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
@@ -15,6 +17,7 @@ namespace Slang
 struct AnyValueMarshallingContext
 {
     IRModule* module;
+    TargetProgram* targetProgram;
 
     // We will use a single work list of instructions that need
     // to be considered for lowering.
@@ -22,8 +25,8 @@ struct AnyValueMarshallingContext
     InstWorkList workList;
     InstHashSet workListSet;
 
-    AnyValueMarshallingContext(IRModule* module)
-        : module(module), workList(module), workListSet(module)
+    AnyValueMarshallingContext(IRModule* module, TargetProgram* targetProgram)
+        : module(module), targetProgram(targetProgram), workList(module), workListSet(module)
     {
     }
 
@@ -113,6 +116,10 @@ struct AnyValueMarshallingContext
         uint32_t intraFieldOffset;
         IRType* uintPtrType;
         IRInst* anyValueVar;
+        TargetProgram* targetProgram;
+
+        TargetProgram* getTargetProgram() const { return targetProgram; }
+
         // Defines what to do with basic typed data elements.
         virtual void marshalBasicType(
             IRBuilder* builder,
@@ -123,6 +130,12 @@ struct AnyValueMarshallingContext
             IRBuilder* builder,
             IRType* dataType,
             IRInst* concreteTypedVar) = 0;
+        // Defines what to do with variable-size data (like DescriptorHandle with target-dependent size).
+        virtual void marshalVariableSizeData(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteTypedVar,
+            IRIntegerValue sizeInBytes) = 0;
 
         void ensureOffsetAt4ByteBoundary()
         {
@@ -284,9 +297,21 @@ struct AnyValueMarshallingContext
             }
         case kIROp_DescriptorHandleType:
             {
-                // DescriptorHandle<T> is represented as uint2 (8 bytes) on most targets.
-                // We use marshalResourceHandle which handles 8-byte values by casting to uint2.
-                context->marshalResourceHandle(builder, dataType, concreteTypedVar);
+                // DescriptorHandle<T> size depends on target and element type.
+                // Get the actual size using getNaturalSizeAndAlignment.
+                IRSizeAndAlignment sizeAndAlign;
+                auto result = getNaturalSizeAndAlignment(
+                    context->getTargetProgram()->getOptionSet(),
+                    dataType,
+                    &sizeAndAlign);
+                if (SLANG_SUCCEEDED(result) && sizeAndAlign.size > 0)
+                {
+                    context->marshalVariableSizeData(
+                        builder,
+                        dataType,
+                        concreteTypedVar,
+                        sizeAndAlign.size);
+                }
                 break;
             }
         default:
@@ -530,6 +555,42 @@ struct AnyValueMarshallingContext
                 advanceOffset(8);
             }
         }
+
+        virtual void marshalVariableSizeData(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteVar,
+            IRIntegerValue sizeInBytes) override
+        {
+            SLANG_UNUSED(dataType);
+            // Treat the data as a byte array and copy uint32 fields.
+            // First, align to 4-byte boundary.
+            ensureOffsetAt4ByteBoundary();
+
+            // Calculate the number of uint32 fields needed.
+            auto numFields = (sizeInBytes + 3) / 4;
+
+            // Create a pointer to the source data cast as uint32 array.
+            auto srcVal = builder->emitLoad(concreteVar);
+            auto uintType = builder->getUIntType();
+            auto uintArrayType = builder->getArrayType(uintType, builder->getIntValue(builder->getIntType(), numFields));
+            auto srcBitcast = builder->emitBitCast(uintArrayType, srcVal);
+
+            // Copy each uint32 field.
+            for (IRIntegerValue i = 0; i < numFields; i++)
+            {
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcElement = builder->emitElementExtract(srcBitcast, i);
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr, srcElement);
+                }
+                advanceOffset(4);
+            }
+        }
     };
 
     IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
@@ -574,6 +635,7 @@ struct AnyValueMarshallingContext
         context.fieldOffset = context.intraFieldOffset = 0;
         context.uintPtrType = builder.getPtrType(builder.getUIntType());
         context.anyValueVar = resultVar;
+        context.targetProgram = targetProgram;
         emitMarshallingCode(&builder, &context, concreteTypedVar);
 
         auto load = builder.emitLoad(resultVar);
@@ -799,6 +861,47 @@ struct AnyValueMarshallingContext
                 advanceOffset(8);
             }
         }
+
+        virtual void marshalVariableSizeData(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteVar,
+            IRIntegerValue sizeInBytes) override
+        {
+            // Treat the data as a byte array and read uint32 fields.
+            // First, align to 4-byte boundary.
+            ensureOffsetAt4ByteBoundary();
+
+            // Calculate the number of uint32 fields needed.
+            auto numFields = (sizeInBytes + 3) / 4;
+
+            auto uintType = builder->getUIntType();
+            auto uintArrayType = builder->getArrayType(uintType, builder->getIntValue(builder->getIntType(), numFields));
+
+            // Create a temporary variable to hold the uint32 array.
+            auto tempVar = builder->emitVar(uintArrayType);
+
+            // Read each uint32 field from anyValue into the temp array.
+            for (IRIntegerValue i = 0; i < numFields; i++)
+            {
+                if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto srcVal = builder->emitLoad(srcAddr);
+                    auto dstAddr = builder->emitElementAddress(tempVar, builder->getIntValue(builder->getIntType(), i));
+                    builder->emitStore(dstAddr, srcVal);
+                }
+                advanceOffset(4);
+            }
+
+            // Bitcast the uint32 array to the target type and store it.
+            auto tempVal = builder->emitLoad(tempVar);
+            auto result = builder->emitBitCast(dataType, tempVal);
+            builder->emitStore(concreteVar, result);
+        }
     };
 
     IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueType* anyValueType)
@@ -829,6 +932,7 @@ struct AnyValueMarshallingContext
         context.fieldOffset = context.intraFieldOffset = 0;
         context.uintPtrType = builder.getPtrType(builder.getUIntType());
         context.anyValueVar = anyValueVar;
+        context.targetProgram = targetProgram;
         emitMarshallingCode(&builder, &context, resultVar);
         auto load = builder.emitLoad(resultVar);
         builder.emitReturn(load);
@@ -931,9 +1035,9 @@ struct AnyValueMarshallingContext
     }
 };
 
-void generateAnyValueMarshallingFunctions(IRModule* module)
+void generateAnyValueMarshallingFunctions(IRModule* module, TargetProgram* targetProgram)
 {
-    AnyValueMarshallingContext context(module);
+    AnyValueMarshallingContext context(module, targetProgram);
     context.processModule();
 }
 
