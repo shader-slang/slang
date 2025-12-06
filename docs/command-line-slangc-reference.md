@@ -1162,7 +1162,7 @@ Target
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
-* `object-code`, `shader-object-code` : Object code for host execution (shader style)
+* `object-code`, `shader-object-code` : Object code for host execution (shader style) 
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
@@ -1171,9 +1171,9 @@ Target
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
 * `slangvm`, `slang-vm` : Slang VM byte code 
-* `host-object-code` : Object code for host execution (host style)
-* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style)
-* `llvm-shader-ir` : LLVM IR assembly (shader style)
+* `host-object-code` : Object code for host execution (host style) 
+* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style) 
+* `llvm-shader-ir` : LLVM IR assembly (shader style) 
 
 <a id="stage"></a>
 ## stage
