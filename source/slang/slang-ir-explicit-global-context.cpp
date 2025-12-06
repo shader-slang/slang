@@ -222,7 +222,7 @@ struct IntroduceExplicitGlobalContextPass
                     // skip any global-scope parameters that are varying instead of
                     // uniform.
                     //
-                    if (m_target == CodeGenTarget::CUDASource || isCPUTarget(m_target))
+                    if (isCUDATarget(m_target) || isCPUTarget(m_target))
                     {
                         auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
                         SLANG_ASSERT(layoutDecor);

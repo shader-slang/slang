@@ -3131,7 +3131,12 @@ bool isCPUTargetViaLLVM(TargetRequest* targetReq)
 
 bool isCUDATarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isCUDATarget(targetReq->getTarget());
+}
+
+bool isCUDATarget(CodeGenTarget codeGenTarget)
+{
+    switch (codeGenTarget)
     {
     default:
         return false;

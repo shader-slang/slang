@@ -83,6 +83,7 @@ bool isSPIRV(CodeGenTarget codeGenTarget);
 
 /// Are we generating code for a CUDA API (CUDA / OptiX)?
 bool isCUDATarget(TargetRequest* targetReq);
+bool isCUDATarget(CodeGenTarget codeGenTarget);
 
 // Are we generating code for a CPU target
 bool isCPUTarget(TargetRequest* targetReq);
