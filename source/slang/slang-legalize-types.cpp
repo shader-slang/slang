@@ -494,11 +494,23 @@ struct TupleTypeBuilder
 
     LegalType getResult()
     {
-        // If this is an empty struct, return a none type
-        // This helps get rid of emtpy structs that often trips up the
-        // downstream compiler
+        // If this is an empty struct
         if (!anyOrdinary && !anySpecial && !anyComplex)
+        {
+            // Check if this is a ray payload struct - these need special handling
+            // to avoid crashes in ray tracing intrinsics
+            if (auto structType = as<IRStructType>(type))
+            {
+                if (structType->findDecoration<IRRayPayloadDecoration>())
+                {
+                    // Keep empty ray payload structs as simple types to allow
+                    // ray tracing operations to work correctly
+                    return LegalType::simple(type);
+                }
+            }
+            // For other empty structs, eliminate them as usual
             return LegalType();
+        }
 
         // If we didn't see anything "special"
         // then we can use the type as-is.
