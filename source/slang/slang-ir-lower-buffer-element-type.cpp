@@ -2239,9 +2239,8 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 
             // The CPU targets default to the C buffer layout for compatibility
             // with C/C++.
-            auto defaultTypeOp = isCPUTarget(targetReq)
-                                     ? IRTypeLayoutRuleName::C
-                                     : IRTypeLayoutRuleName::Std140;
+            auto defaultTypeOp =
+                isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
             return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
         }

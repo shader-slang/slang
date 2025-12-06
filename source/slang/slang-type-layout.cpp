@@ -3115,8 +3115,8 @@ bool isCPUTarget(CodeGenTarget codeGenTarget)
 
 bool isCPUTargetViaLLVM(TargetRequest* targetReq)
 {
-    SlangEmitCPUMethod emitCPUMethod =
-        targetReq->getOptionSet().getEnumOption<SlangEmitCPUMethod>(CompilerOptionName::EmitCPUMethod);
+    SlangEmitCPUMethod emitCPUMethod = targetReq->getOptionSet().getEnumOption<SlangEmitCPUMethod>(
+        CompilerOptionName::EmitCPUMethod);
     bool emitViaLLVM = emitCPUMethod == SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM;
     switch (targetReq->getTarget())
     {
@@ -3182,7 +3182,8 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->shouldEmitSPIRVDirectly() || isCPUTargetViaLLVM(targetProgram->getTargetReq()))
+    if (targetProgram->shouldEmitSPIRVDirectly() ||
+        isCPUTargetViaLLVM(targetProgram->getTargetReq()))
     {
         return SourceLanguage::Unknown;
     }

@@ -627,17 +627,17 @@ typedef uint32_t SlangSizeT;
         SLANG_CUDA_SOURCE,           ///< Cuda source
         SLANG_PTX,                   ///< PTX
         SLANG_CUDA_OBJECT_CODE,      ///< Object code that contains CUDA functions.
-        SLANG_OBJECT_CODE,           ///< Object code that can be used for later linking (kernel/shader)
-        SLANG_HOST_CPP_SOURCE,       ///< C++ code for host library or executable.
-        SLANG_HOST_HOST_CALLABLE,    ///< Host callable host code (ie non kernel/shader)
-        SLANG_CPP_PYTORCH_BINDING,   ///< C++ PyTorch binding code.
-        SLANG_METAL,                 ///< Metal shading language
-        SLANG_METAL_LIB,             ///< Metal library
-        SLANG_METAL_LIB_ASM,         ///< Metal library assembly
-        SLANG_HOST_SHARED_LIBRARY,   ///< A shared library/Dll for host code (for hosting CPU/OS)
-        SLANG_WGSL,                  ///< WebGPU shading language
-        SLANG_WGSL_SPIRV_ASM,        ///< SPIR-V assembly via WebGPU shading language
-        SLANG_WGSL_SPIRV,            ///< SPIR-V via WebGPU shading language
+        SLANG_OBJECT_CODE,     ///< Object code that can be used for later linking (kernel/shader)
+        SLANG_HOST_CPP_SOURCE, ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE,  ///< Host callable host code (ie non kernel/shader)
+        SLANG_CPP_PYTORCH_BINDING, ///< C++ PyTorch binding code.
+        SLANG_METAL,               ///< Metal shading language
+        SLANG_METAL_LIB,           ///< Metal library
+        SLANG_METAL_LIB_ASM,       ///< Metal library assembly
+        SLANG_HOST_SHARED_LIBRARY, ///< A shared library/Dll for host code (for hosting CPU/OS)
+        SLANG_WGSL,                ///< WebGPU shading language
+        SLANG_WGSL_SPIRV_ASM,      ///< SPIR-V assembly via WebGPU shading language
+        SLANG_WGSL_SPIRV,          ///< SPIR-V via WebGPU shading language
 
         SLANG_HOST_VM,     ///< Bytecode that can be interpreted by the Slang VM
         SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
