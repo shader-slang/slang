@@ -492,8 +492,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
     // Validate stage-specific semantics for all entry point parameters
     // TODO: This validation could be expanded to cover other stage-specific semantics
-    // (e.g., compute-only: SV_DispatchThreadID/GroupID/GroupIndex, fragment-only: SV_Depth/IsFrontFace,
-    // tessellation-only: SV_DomainLocation/TessFactor, geometry-only: SV_GSInstanceID, etc.)
+    // (e.g., compute-only: SV_DispatchThreadID/GroupID/GroupIndex,
+    // fragment-only: SV_Depth/IsFrontFace,
+    // tessellation-only: SV_DomainLocation/TessFactor,
+    // geometry-only: SV_GSInstanceID, etc.)
     for (const auto& param : entryPointFuncDecl->getParameters())
     {
         if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
