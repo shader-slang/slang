@@ -1104,12 +1104,25 @@ struct WarningTimeline
         const Entry* poppingFrom,
         DiagnosticSink* sink,
         int id,
-        SourceLoc debugLoc)
+        SourceLoc debugLoc,
+        SourceManager* sourceManager = nullptr)
     {
         SourceLoc::RawValue maxKnownLocation =
             entries.getCount() ? entries.getLast().location : SourceLoc::RawValue(0);
-        // Add on top
-        if (location > maxKnownLocation)
+
+        // Check if we're in a different source file (module) than the last entry
+        bool differentSourceFile = false;
+        if (entries.getCount() && sourceManager)
+        {
+            SourceLoc lastEntryLoc = SourceLoc::fromRaw(entries.getLast().location);
+            PathInfo currentPath = sourceManager->getPathInfo(debugLoc);
+            PathInfo lastPath = sourceManager->getPathInfo(lastEntryLoc);
+            differentSourceFile =
+                (currentPath.getMostUniqueIdentity() != lastPath.getMostUniqueIdentity());
+        }
+
+        // Add on top, or if we're in a different source file (module)
+        if (location > maxKnownLocation || differentSourceFile)
         {
             // Add a new entry only if necessary
             if (getLatestSpecifier() != specifier || specifier == PragmaWarningSpecifier::Once)
@@ -1165,7 +1178,8 @@ struct WarningTimeline
         SourceLoc::RawValue pushedLocation,
         DiagnosticSink* sink,
         int id,
-        SourceLoc debugLoc)
+        SourceLoc debugLoc,
+        SourceManager* sourceManager = nullptr)
     {
         const Entry* poppingFrom = findEntry(pushedLocation);
         addEntry(
@@ -1174,7 +1188,8 @@ struct WarningTimeline
             poppingFrom,
             sink,
             id,
-            debugLoc);
+            debugLoc,
+            sourceManager);
     }
 };
 
@@ -1224,11 +1239,11 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
         auto absLoc = getAbsoluteLocation(location);
         PragmaWarningSpecifier prev = timeline.getLatestSpecifier();
         auto lastEntry = timeline.getLatestEntry();
-        timeline.addEntry(absLoc, specifier, nullptr, sink, id, location);
+        timeline.addEntry(absLoc, specifier, nullptr, sink, id, location, sourceManager);
         if (specifier == PragmaWarningSpecifier::Suppress)
         {
             auto nextAbsLoc = getAbsoluteLocation(nextLineEnd);
-            timeline.addEntry(nextAbsLoc, prev, lastEntry, sink, id, nextLineEnd);
+            timeline.addEntry(nextAbsLoc, prev, lastEntry, sink, id, nextLineEnd, sourceManager);
         }
     }
 
@@ -1246,7 +1261,8 @@ struct WarningStateTracker : SourceWarningStateTrackerBase
                 const SourceLoc::RawValue absPushed = getAbsoluteLocation(pushed);
                 for (auto& [id, timeline] : mapDiagnosticIdToTimeline)
                 {
-                    timeline.addEntryForPragmaPop(absLoc, absPushed, sink, id, location);
+                    timeline
+                        .addEntryForPragmaPop(absLoc, absPushed, sink, id, location, sourceManager);
                 }
             }
         }
