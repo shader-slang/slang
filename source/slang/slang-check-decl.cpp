@@ -12551,7 +12551,7 @@ void checkDerivativeAttributeImpl(
 
     SemanticsContext::ExprLocalScope scope;
     auto ctx = visitor->withExprLocalScope(&scope);
-    auto subVisitor = SemanticsVisitor(ctx);
+    auto subVisitor = SemanticsVisitor(ctx.allowStaticReferenceToNonStaticMember());
 
     auto exprToCheck = attr->funcExpr;
 

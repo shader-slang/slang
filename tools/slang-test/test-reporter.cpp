@@ -3,7 +3,6 @@
 
 #include "../../source/core/slang-process-util.h"
 #include "../../source/core/slang-string-util.h"
-#include "../../source/core/slang-test-diagnostics.h"
 #include "options.h"
 
 #include <mutex>
@@ -317,11 +316,26 @@ static void _appendEncodedTeamCityString(const UnownedStringSlice& in, StringBui
 static void _appendTime(double timeInSec, StringBuilder& out)
 {
     SLANG_ASSERT(timeInSec >= 0.0);
-    // Always output in milliseconds for consistency
-    double timeInMs = timeInSec * 1000.0;
-    char buffer[32];
-    snprintf(buffer, sizeof(buffer), "%.3fms", timeInMs);
-    out << buffer;
+    if (timeInSec == 0.0 || timeInSec >= 1.0)
+    {
+        out << timeInSec << "s";
+        return;
+    }
+    timeInSec *= 1000.0f;
+    if (timeInSec > 1.0f)
+    {
+        out << timeInSec << "ms";
+        return;
+    }
+    timeInSec *= 1000.0f;
+    if (timeInSec > 1.0f)
+    {
+        out << timeInSec << "us";
+        return;
+    }
+
+    timeInSec *= 1000.0f;
+    out << timeInSec << "ns";
 }
 
 void TestReporter::_addResult(TestInfo info)
@@ -411,9 +425,7 @@ void TestReporter::_addResult(TestInfo info)
         StringBuilder buffer;
         if (info.executionTime > 0.0f)
         {
-            buffer << "(";
             _appendTime(info.executionTime, buffer);
-            buffer << ")";
         }
         printf(
             "%s test: '%S' %s\n",
@@ -723,82 +735,6 @@ void TestReporter::outputSummary()
                     }
                 }
                 printf("---\n");
-            }
-
-            // Print timing summary if timing diagnostics are enabled
-            if (isDiagnosticEnabled("timing"))
-            {
-                double totalTimeMs = 0.0;
-                double passedTimeMs = 0.0;
-                double failedTimeMs = 0.0;
-                double ignoredTimeMs = 0.0;
-                double expectedFailTimeMs = 0.0;
-
-                for (const auto& testInfo : m_testInfos)
-                {
-                    double timeMs = testInfo.executionTime * 1000.0;
-                    totalTimeMs += timeMs;
-                    switch (testInfo.testResult)
-                    {
-                    case TestResult::Pass:
-                        passedTimeMs += timeMs;
-                        break;
-                    case TestResult::Fail:
-                        failedTimeMs += timeMs;
-                        break;
-                    case TestResult::Ignored:
-                        ignoredTimeMs += timeMs;
-                        break;
-                    case TestResult::ExpectedFail:
-                        expectedFailTimeMs += timeMs;
-                        break;
-                    default:
-                        break;
-                    }
-                }
-
-                printf("\n[TIMING-SUMMARY] Test Execution Timing\n");
-                printf("%-20s %8s %12s %12s\n", "Category", "Count", "Total(ms)", "Avg(ms)");
-                printf("--------------------------------------------------------\n");
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "All tests",
-                    m_totalTestCount,
-                    totalTimeMs,
-                    m_totalTestCount > 0 ? totalTimeMs / m_totalTestCount : 0.0);
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "Passed",
-                    m_passedTestCount,
-                    passedTimeMs,
-                    m_passedTestCount > 0 ? passedTimeMs / m_passedTestCount : 0.0);
-                printf(
-                    "%-20s %8d %12.3f %12.3f\n",
-                    "Failed",
-                    m_failedTestCount,
-                    failedTimeMs,
-                    m_failedTestCount > 0 ? failedTimeMs / m_failedTestCount : 0.0);
-                if (m_expectedFailedTestCount > 0)
-                {
-                    printf(
-                        "%-20s %8d %12.3f %12.3f\n",
-                        "Expected failures",
-                        m_expectedFailedTestCount,
-                        expectedFailTimeMs,
-                        m_expectedFailedTestCount > 0
-                            ? expectedFailTimeMs / m_expectedFailedTestCount
-                            : 0.0);
-                }
-                if (m_ignoredTestCount > 0)
-                {
-                    printf(
-                        "%-20s %8d %12.3f %12.3f\n",
-                        "Ignored",
-                        m_ignoredTestCount,
-                        ignoredTimeMs,
-                        m_ignoredTestCount > 0 ? ignoredTimeMs / m_ignoredTestCount : 0.0);
-                }
-                printf("\n");
             }
 
             break;

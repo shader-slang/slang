@@ -25,10 +25,9 @@ struct ExecuteUnitTestArgs
 
 struct ExecuteToolTestArgs
 {
-    String toolName;    ///< The name of the tool (will be a shared library typically - like
-                        ///< render-test). Doesn't need -tool suffix.
-    List<String> args;  ///< Arguments passed to the tool during exectution
-    String testCommand; ///< Original test command line from test file (for diagnostics/timing)
+    String toolName;   ///< The name of the tool (will be a shared library typically - like
+                       ///< render-test). Doesn't need -tool suffix.
+    List<String> args; ///< Arguments passed to the tool during exectution
 
     static const UnownedStringSlice g_methodName;
     static const StructRttiInfo g_rttiInfo;
@@ -45,8 +44,7 @@ struct ExecutionResult
     String stdError;
     String debugLayer;
     int32_t result = SLANG_OK;
-    int32_t returnCode = 0;     ///< As returned if invoked as command line
-    double executionTimeMs = 0; ///< Execution time in milliseconds
+    int32_t returnCode = 0; ///< As returned if invoked as command line
 
     static const StructRttiInfo g_rttiInfo;
 };
