@@ -1462,6 +1462,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
                 // Explicit NVAPI: use NvHitObject
                 m_writer->emit("NvHitObject");
+                // Ensure NVAPI header is included when using NvHitObject type
+                m_extensionTracker->m_requiresNVAPI = true;
             }
             else if (targetCaps.implies(sm69CapabilitySet))
             {
@@ -1472,6 +1474,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
                 // Fallback to legacy NVAPI
                 m_writer->emit("NvHitObject");
+                // Ensure NVAPI header is included when using NvHitObject type
+                m_extensionTracker->m_requiresNVAPI = true;
             }
             return;
         }
