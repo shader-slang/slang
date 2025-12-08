@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/interfaces-generics
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/06-interfaces-generics.html
 ---
 
 Interfaces and Generics
