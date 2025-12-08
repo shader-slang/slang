@@ -2688,10 +2688,7 @@ static Expr* constructDefaultConstructorForType(
         {
             fromType = atomicType->getElementType();
         }
-        // Use a sub-visitor with the synthesized default init flag set to suppress
-        // warnings about default-initializing resource types.
-        SemanticsVisitor subVisitor(visitor->withInSynthesizedDefaultInit());
-        if (subVisitor._coerceInitializerList(fromType, &outExpr, initListExpr))
+        if (visitor->_coerceInitializerList(fromType, &outExpr, initListExpr))
             return outExpr;
     }
 
@@ -9703,27 +9700,7 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
         // actual type of the parameter.
         //
         initExpr = CheckTerm(initExpr);
-
-        // For synthesized constructor parameters, the default value is derived
-        // from the field initializer, which has already been checked and warned
-        // about. Suppress duplicate warnings by using the synthesized default
-        // init context.
-        bool isSynthesizedCtorParam = false;
-        if (auto ctorDecl = as<ConstructorDecl>(paramDecl->parentDecl))
-        {
-            isSynthesizedCtorParam = ctorDecl->findModifier<SynthesizedModifier>() != nullptr;
-        }
-
-        if (isSynthesizedCtorParam)
-        {
-            SemanticsVisitor subVisitor(withInSynthesizedDefaultInit());
-            initExpr =
-                subVisitor.coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
-        }
-        else
-        {
-            initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
-        }
+        initExpr = coerce(CoercionSite::Initializer, typeExpr.type, initExpr, getSink());
         paramDecl->initExpr = initExpr;
 
         // TODO: a default argument expression needs to
