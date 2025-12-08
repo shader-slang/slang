@@ -2907,6 +2907,16 @@ DIAGNOSTIC(
     Error,
     dynamicDispatchOnPotentiallyUninitializedExistential,
     "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
+DIAGNOSTIC(
+    50102,
+    Note,
+    dynamicDispatchCodeGeneratedHere,
+    "generated dynamic dispatch code for this site. $0 possible types: '$1'")
+DIAGNOSTIC(
+    50103,
+    Note,
+    specializedDynamicDispatchCodeGeneratedHere,
+    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. specialization arguments: '$2'.")
 
 DIAGNOSTIC(
     52000,

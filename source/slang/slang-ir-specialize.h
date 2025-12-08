@@ -15,6 +15,9 @@ struct SpecializationOptions
     // wherever possible to open up more specialization opportunities.
     //
     bool lowerWitnessLookups = false;
+    
+    // Option to report dynamic dispatch sites.
+    bool reportDynamicDispatchSites = false;
 };
 
 /// Specialize generic and interface-based code to use concrete types.

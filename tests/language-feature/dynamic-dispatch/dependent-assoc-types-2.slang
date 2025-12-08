@@ -1,6 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):name=scratchBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> scratchBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -135,6 +136,7 @@ float g(float x)
     let obj = factoryAB(id);
     obj.Data d = obj.DataSerializer::deserialize(buf.withOffset(1));
     return obj.calc(d, x);
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [numthreads(1, 1, 1)]

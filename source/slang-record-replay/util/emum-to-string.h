@@ -154,6 +154,7 @@ static Slang::String CompilerOptionNameToString(const slang::CompilerOptionName 
         CASE(ReportDownstreamTime);
         CASE(ReportPerfBenchmark);
         CASE(ReportCheckpointIntermediates);
+        CASE(ReportDynamicDispatchSites);
         CASE(SkipSPIRVValidation);
         CASE(SourceEmbedStyle);
         CASE(SourceEmbedName);

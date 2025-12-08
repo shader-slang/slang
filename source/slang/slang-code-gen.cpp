@@ -1365,6 +1365,12 @@ bool CodeGenContext::shouldReportCheckpointIntermediates()
         CompilerOptionName::ReportCheckpointIntermediates);
 }
 
+bool CodeGenContext::shouldReportDynamicDispatchSites()
+{
+    return getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::ReportDynamicDispatchSites);
+}
+
 bool CodeGenContext::shouldDumpIntermediates()
 {
     return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIntermediates);

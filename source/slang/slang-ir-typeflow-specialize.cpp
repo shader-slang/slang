@@ -3829,6 +3829,7 @@ struct TypeFlowSpecializationContext
 
         if (changed)
         {
+            IRBuilderSourceLocRAII builderSourceLocRAII(&builder, inst->sourceLoc);
             auto newCall = builder.emitCallInst(calleeFuncType->getResultType(), callee, callArgs);
             inst->replaceUsesWith(newCall);
             inst->removeAndDeallocate();

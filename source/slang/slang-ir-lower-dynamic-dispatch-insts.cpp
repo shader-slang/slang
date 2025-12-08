@@ -568,9 +568,97 @@ struct TagOpsLoweringContext : public InstPassBase
 
 struct DispatcherLoweringContext : public InstPassBase
 {
-    DispatcherLoweringContext(IRModule* module)
+    private:
+        bool m_reportDispatchLocations = false;
+        DiagnosticSink* m_sink = nullptr;
+
+    public:
+    DispatcherLoweringContext(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
         : InstPassBase(module)
+        , m_reportDispatchLocations(reportDispatchLocations)
+        , m_sink(sink)
     {
+    }
+
+    void reportDispatchLocation(IRUse* use, IRWitnessTableSet* witnessTableSet)
+    {
+        if (m_sink)
+        {
+            // Make a string out of all the dispatch table element's concrete type names.
+            StringBuilder tableElementsStr;
+            bool first = true;
+            UInt count = 0;
+            forEachInSet(
+                witnessTableSet,
+                [&](IRInst* table)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        tableElementsStr << ", ";
+                    auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
+                    printDiagnosticArg(tableElementsStr, concreteType);
+                    count++;
+                });
+            
+            m_sink->diagnose(
+                use->getUser()->sourceLoc,
+                Diagnostics::dynamicDispatchCodeGeneratedHere,
+                count,
+                tableElementsStr.getUnownedSlice());
+        }
+    }
+
+    void reportSpecializedDispatchLocation(
+        IRUse* use,
+        IRWitnessTableSet* witnessTableSet,
+        List<IRInst*>& specArgs)
+    {
+        if (m_sink)
+        {
+            // Make a string out of all the dispatch table element's concrete type names.
+            StringBuilder tableElementsStr;
+            bool first = true;
+            UInt count = 0;
+            forEachInSet(
+                witnessTableSet,
+                [&](IRInst* table)
+                {
+                    if (first)
+                        first = false;
+                    else
+                        tableElementsStr << ", ";
+                    auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
+                    printDiagnosticArg(tableElementsStr, concreteType);
+                    count++;
+                });
+            
+            // Make a string out of all specialization arguments.
+            StringBuilder specArgsStr;
+            first = true;
+            for (auto arg : specArgs)
+            {
+                if (as<IRWitnessTable>(arg))
+                {
+                    // Skip witness table args.
+                    continue;
+                }
+
+                if (first)
+                    first = false;
+                else
+                    specArgsStr << ", ";
+
+                printDiagnosticArg(specArgsStr, arg);
+            }
+            
+            m_sink->diagnose(
+                use->getUser()->sourceLoc,
+                Diagnostics::specializedDynamicDispatchCodeGeneratedHere,
+                count,
+                tableElementsStr.getUnownedSlice(),
+                specArgsStr.getUnownedSlice());
+        }
     }
 
     void lowerGetDispatcher(IRGetDispatcher* dispatcher)
@@ -626,6 +714,9 @@ struct DispatcherLoweringContext : public InstPassBase
                 dispatcher,
                 [&](IRUse* use)
                 {
+                    if (m_reportDispatchLocations)
+                        reportDispatchLocation(use, witnessTableSet);
+
                     if (auto callInst = as<IRCall>(use->getUser()))
                     {
                         // Replace callee with the generated dispatchFunc.
@@ -714,6 +805,9 @@ struct DispatcherLoweringContext : public InstPassBase
                 dispatcher,
                 [&](IRUse* use)
                 {
+                    if (m_reportDispatchLocations)
+                        reportSpecializedDispatchLocation(use, witnessTableSet, specArgs);
+
                     if (auto callInst = as<IRCall>(use->getUser()))
                     {
                         // Replace callee with the generated dispatchFunc.
@@ -740,10 +834,10 @@ struct DispatcherLoweringContext : public InstPassBase
     }
 };
 
-bool lowerDispatchers(IRModule* module, DiagnosticSink* sink)
+bool lowerDispatchers(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
 {
     SLANG_UNUSED(sink);
-    DispatcherLoweringContext context(module);
+    DispatcherLoweringContext context(module, sink, reportDispatchLocations);
     context.processModule();
     return true;
 }

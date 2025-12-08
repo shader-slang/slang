@@ -528,6 +528,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports information about checkpoint contexts used for reverse-mode automatic "
          "differentiation."},
+        {OptionKind::ReportDynamicDispatchSites,
+         "-report-dynamic-dispatch-sites",
+         nullptr,
+         "Reports information about dynamic dispatch sites for interface calls."},
         {OptionKind::SkipSPIRVValidation,
          "-skip-spirv-validation",
          nullptr,
@@ -2279,6 +2283,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportDownstreamTime:
         case OptionKind::ReportPerfBenchmark:
         case OptionKind::ReportCheckpointIntermediates:
+        case OptionKind::ReportDynamicDispatchSites:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
