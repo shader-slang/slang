@@ -21019,7 +21019,8 @@ struct HitObject
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_nv, ser_raygen_closesthit_miss)]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     [require(spirv_nv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21034,9 +21035,9 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            HitObject hitObj;
-            __hlslMakeHit(
+        case hlsl_nvapi:
+            HitObject hitObj_nvapi;
+            __hlslMakeHit_NVAPI(
                 AccelerationStructure,
                 InstanceIndex,
                 GeometryIndex,
@@ -21046,8 +21047,22 @@ struct HitObject
                 MultiplierForGeometryContributionToHitGroupIndex,
                 Ray,
                 attributes,
-                hitObj);
-            return hitObj;
+                hitObj_nvapi);
+            return hitObj_nvapi;
+        case hlsl:
+            HitObject hitObj_dxr;
+            __hlslMakeHit_DXR(
+                AccelerationStructure,
+                InstanceIndex,
+                GeometryIndex,
+                PrimitiveIndex,
+                HitKind,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                Ray,
+                attributes,
+                hitObj_dxr);
+            return hitObj_dxr;
         case glsl:
             {
                 // Save the attributes
@@ -21355,7 +21370,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case glsl_nv:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case glsl:
@@ -21416,7 +21431,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
+        case hlsl_nvapi: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
         case glsl_nv:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case glsl:
@@ -21514,6 +21529,7 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
     [require(hlsl_nvapi, ser_nvapi)]
     __generic<payload_t>
     static void __InvokeHLSL_NVAPI(
@@ -22612,9 +22628,9 @@ struct HitObject
         }
     }
 
+    [__requiresNVAPI]
     [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
-    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+    static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
         uint PrimitiveIndex,
@@ -22628,6 +22644,23 @@ struct HitObject
         __target_switch
         {
         case hlsl_nvapi: __intrinsic_asm "NvMakeHit";
+        }
+    }
+
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void __hlslMakeHit_DXR<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        RayDesc Ray,
+        attr_t attributes,
+        out HitObject hitObj)
+    {
+        __target_switch
+        {
         case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
         }
     }

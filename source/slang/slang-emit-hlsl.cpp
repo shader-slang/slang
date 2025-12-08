@@ -1881,18 +1881,9 @@ void HLSLSourceEmitter::handleRequiredCapabilitiesImpl(IRInst* inst)
     }
 }
 
-void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
+void HLSLSourceEmitter::emitFrontMatterImpl(TargetRequest*)
 {
-    // Check if NVAPI is required either by decoration or by capability
-    bool requiresNVAPI = m_extensionTracker->m_requiresNVAPI;
-    if (!requiresNVAPI && targetReq)
-    {
-        auto targetCaps = targetReq->getTargetCaps();
-        auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
-        requiresNVAPI = targetCaps.implies(nvapiCapabilitySet);
-    }
-
-    if (requiresNVAPI)
+    if (m_extensionTracker->m_requiresNVAPI)
     {
         // If the generated code includes implicit NVAPI use,
         // then we need to ensure that NVAPI support is included
