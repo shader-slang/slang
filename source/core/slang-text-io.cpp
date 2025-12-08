@@ -144,7 +144,6 @@ Byte StreamReader::readBufferByte()
 SlangResult StreamReader::readToEnd(String& outString)
 {
     StringBuilder sb(16384);
-
     while (!isEnd())
     {
         auto ch = read();
