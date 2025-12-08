@@ -3311,7 +3311,7 @@ static Modifier* ParseSemantic(Parser* parser)
         BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
         parser->FillPosition(bitWidthMod);
         const auto token = parser->tokenReader.advanceToken();
-        bitWidthMod->width = getIntegerLiteralValue(token);
+        bitWidthMod->width = getIntegerLiteralValue(token, parser->sink);
         return bitWidthMod;
     }
     else if (parser->LookAheadToken(TokenType::CompletionRequest))
@@ -7752,7 +7752,13 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             UnownedStringSlice suffix;
             bool isDecimalBase;
-            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &isDecimalBase);
+            bool hasOverflowed;
+            IntegerLiteralValue value = getIntegerLiteralValue(
+                token,
+                parser->sink,
+                &suffix,
+                &isDecimalBase,
+                &hasOverflowed);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -7832,13 +7838,17 @@ static Expr* parseAtomicExpr(Parser* parser)
                     suffixBaseType = BaseType::Int;
                 }
             }
-            else
+            else if (!hasOverflowed)
             {
                 suffixBaseType = _determineNonSuffixedIntegerLiteralType(
                     value,
                     isDecimalBase,
                     &token,
                     parser->sink);
+            }
+            else
+            {
+                suffixBaseType = BaseType::UInt64;
             }
 
             value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
@@ -8395,7 +8405,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         const auto tok = parser->ReadToken();
-        const auto v = getIntegerLiteralValue(tok);
+        const auto v = getIntegerLiteralValue(tok, parser->sink);
         if (v < 0 || v > 0xffffffff)
             parser->diagnose(tok, Diagnostics::spirvOperandRange);
         return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
