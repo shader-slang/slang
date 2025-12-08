@@ -1771,11 +1771,6 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
-DIAGNOSTIC(
-    30506,
-    Warning,
-    cannotDefaultInitializeResourceType,
-    "cannot default-initialize resource type '$0', leaving uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(
