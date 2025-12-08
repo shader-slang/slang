@@ -1300,8 +1300,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvBindlessTextureNV` 
 * `glsl_nv` 
 * `spirv_nv` 
-* `glsl_ext` 
-* `spirv_ext` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `hlsl_coopvec_poc_sm_6_9` 
