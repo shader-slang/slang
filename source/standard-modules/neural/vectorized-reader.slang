@@ -18,7 +18,7 @@ implementing neural;
 internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IRWArray<T>
+    where BufferType : IArray<T>
 {
     uint4 result = uint4(0, 0, 0, 0);
     const int nBytes = sizeof(T);
@@ -57,7 +57,7 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
 internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint AlignedStride>(BufferType buffer, int baseIndex, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IRWArray<T>
+    where BufferType : IArray<T>
 {
     if (IsAligned)
     {

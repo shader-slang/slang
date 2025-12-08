@@ -38,6 +38,8 @@ public interface IVector<T, int N> : IDifferentiable
     */
     public __init(T[N] data);
 
+    public __init<InputArray : IArray<T>>(InputArray data);
+
     /**
     Copy constructor.
     @param[in] other The vector to copy from.

@@ -85,7 +85,6 @@ internal uint getWaveId()
 // We can't convert T* to uint4* on shared memory in slang, therefore, we will provide two versions of shared memory pointer
 // and implement both of them, and document about the difference between them.
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
-
 // A wrapper of matrix type to access each tile of the matrix
 // Note: The reason we want to make SubgroupSize as a generic parameter instead of using WaveGetLaneCount() is that
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
@@ -95,6 +94,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
+
     // Weight matrix is in shape of M x K
     // Input vector will be collected by each thread in a sub-group to form a matrix in shape of K x N
     // Note, M, K, N are measured in T.
@@ -155,8 +155,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // Tile C = Tile_height of B * AlignedN
     // Note B and C are the same size because their widths are always the same as subGroupSize and
     // their heights are fixed determined by Cooperative matrix shape.
-    static const uint SharedMemSizeInVectorMatA = (AlignedM * T.COLUMN_A) / ElementCountPerVector;
-    static const uint SharedMemSizeInVectorMatB = (T.ROW_B * AlignedN) / ElementCountPerVector;
+    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatA = (AlignedM * T.COLUMN_A) / ElementCountPerVector;
+    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatB = (T.ROW_B * AlignedN) / ElementCountPerVector;
     static const uint SharedMemSizeInVectorMatC = SharedMemSizeInVectorMatB;
 
     static const uint CoopMatASizeInVector = T.SIZE_A / ElementCountPerVector;
@@ -254,11 +254,11 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // Since the input vector is loaded from thread local memory, one thread can only load one
     // column of the matrix B.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVector(
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVector<InputArray: IArray<T>>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
-        T[Uint4AlignedK] inputVector)
+        InputArray inputVector)
     {
         const uint laneId = WaveGetLaneIndex();
         SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * SharedMemSizeInVectorMatB;
@@ -358,7 +358,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static T[Uint4AlignedM] mma<Storage>( T[Uint4AlignedK] inputVector,
+    VISIBILITY_LEVEL static T[Uint4AlignedM] mma<Storage>(T[Uint4AlignedK] inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
@@ -462,6 +462,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         // ptrCPerWarp = ptrC + subgroupIndex * (subGroupSize * AlignedM / ElementCountPerVector);
         T[Uint4AlignedM] outputVector;
         // Get start address of the shared memory for current warp.
+
         SPtr<uint4> ptrPerWarp = ptrC + subgroupIndex * SharedMemSizeInVectorMatC;
         for (int i = 0; i < NTilesRow; i ++)
         {
@@ -489,17 +490,12 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
 
     public static const int Size = N;
 
-    // We will collect the vector by each thread in a sub-group to form a cooperative matrix for acceleration,
-    // the vector size is one dimension of the cooperative matrix, and the other dimension is the batch dimension.
-    internal static const int batchDimension = WaveGetLaneCount();
+    public no_diff SPtr<uint4> sharedMemoryPtr = nullptr;
 
-    internal static const int Row = batchDimension;
-    internal static const int Column = N;
+    internal static const int Uint4AlignedInputSize = MMAHelper<T, N, 0, SubgroupSize>.Uint4AlignedK;
 
-    SPtr<uint4> sharedMemoryPtr;
-
-    [DerivativeMember(Differential.data)]
-    internal T[N] data;
+    // [DerivativeMember(Differential.data)]
+    internal T[Uint4AlignedInputSize] data;
 
     public __init() { data = {}; }
 
@@ -507,12 +503,49 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
     {
         [ForceUnroll]
         for (int i = 0; i < N; i++)
-            data[i] = value;
+        {
+            if (i < N)
+            {
+                this.data[i] = value;
+            }
+            else
+            {
+                this.data[i] = T(0.0f);
+            }
+        }
     }
 
-    public __init(T[N] data) { this.data = data; }
+    public __init(T[N] data)
+    {
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+        {
+            if (i < N)
+            {
+                this.data[i] = data[i];
+            }
+            else
+            {
+                this.data[i] = T(0.0f);
+            }
+        }
+    }
 
-    public __init(This other) { data = other.data; }
+    public __init(T[Uint4AlignedInputSize] data)
+    {
+        this.data = data;
+    }
+
+    public __init(This other) { this.data = other.data; }
+
+    public __init<InputArray : IArray<T>>(InputArray data)
+    {
+        static_assert(data.getCount() >= N, "The size of the input array must match the vector size");
+
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            this.data[i] = data[i];
+    }
 
     public __subscript(int index) -> T
     {
@@ -521,7 +554,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
     }
 
     // Linear transformation without bias
-    [Differentiable]
+    [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
@@ -530,8 +563,28 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
             where Storage.Address == Storage.Differential.Address
             where OutputVector : IVector<T, OutputSize>
     {
-        OutputVector output = OutputVector();
-        return output;
+        // OutputVector output = OutputVector();
+        // return output;
+        typealias MMA = MMAHelper<T, N, OutputSize, SubgroupSize>;
+        SPtr<uint4> shA = sharedMemoryPtr;
+        SPtr<uint4> shB = sharedMemoryPtr + MMA.SharedMemSizeInVectorMatA;
+        SPtr<uint4> shC = shB;
+
+        let outputArray = MMA.mma<Storage>(data, shA, shB, shC, weightStorage, weightAddress);
+        return OutputVector(outputArray);
+    }
+
+    // Backward of linear transformation without bias
+    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Storage> dWeightStorage,
+        no_diff Storage.Address dWeightAddress,
+        OutputVector.Differential doutput)
+            where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
+        where OutputVector : IVector<T, OutputSize>
+    {
     }
 
     [Differentiable]
@@ -548,6 +601,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         OutputVector output = OutputVector();
         return output;
     }
+
     [Differentiable]
     public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
         Address weightAddress)
