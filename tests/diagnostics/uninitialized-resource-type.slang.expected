@@ -1,12 +1,6 @@
 result code = -1
 standard error = {
-tests/diagnostics/uninitialized-resource-type.slang(10): warning 30506: cannot default-initialize resource type 'Texture2D<vector<float,4>>', leaving uninitialized
+tests/diagnostics/uninitialized-resource-type.slang(10): error 30504: cannot use initializer list for type 'Texture2D<vector<float,4>>'
     Texture2D<float4> bar = {};
                             ^
-tests/diagnostics/uninitialized-resource-type.slang(40): warning 41016: use of uninitialized variable 'foo'
-    const let result = process(foo);
-                              ^
-tests/diagnostics/uninitialized-resource-type.slang(40): error 56003: use of uninitialized opaque handle 'Texture2D'.
-    const let result = process(foo);
-                              ^
 }
