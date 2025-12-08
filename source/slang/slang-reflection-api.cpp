@@ -4152,17 +4152,34 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
 
     SlangUInt sizeAlongAxis[3] = {1, 1, 1};
 
+    auto astBuilder = entryPointLayout->program->getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
     // First look for the HLSL case, where we have an attribute attached to the entry point function
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
         for (int i = 0; i < 3; ++i)
         {
-            if (auto cint =
-                    entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
+            if (!numThreadsAttribute->extents[i])
+            {
+                // If the size is specified by a specialization constant, its value is
+                // unknown right now, and we should return 0 to indicate this.
+                if (numThreadsAttribute->specConstExtents[i])
+                    sizeAlongAxis[i] = 0;
+                continue;
+            }
+            // Try to fold numThreadsAttribute->extents[i] into a ConstIntVal. If that
+            // failed, we should report the size as 0 to indicate that its value is not
+            // known yet.
+            sizeAlongAxis[i] = 0;
+            auto substExtent = as<IntVal>(numThreadsAttribute->extents[i]->substitute(
+                astBuilder,
+                SubstitutionSet(entryPointFunc)));
+            if (!substExtent)
+                continue;
+            if (auto cint = entryPointLayout->program->tryFoldIntVal(substExtent))
                 sizeAlongAxis[i] = (SlangUInt)cint->getValue();
-            else if (numThreadsAttribute->extents[i])
-                sizeAlongAxis[i] = 0;
         }
     }
 
