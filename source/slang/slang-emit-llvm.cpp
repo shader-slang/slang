@@ -42,6 +42,21 @@ using namespace slang;
 // With these design choices, only global struct/array constants need to be
 // given an actual aggregate type in LLVM. So they build the type on-demand in
 // `maybeEmitConstant`.
+//
+// So, Slang types are translated to LLVM in three ways:
+//
+// * Value types: types as they appear in SSA values. Value types are not
+//   observable through memory (LLVMTypeTranslator::getValueType())
+//
+// * Storage types: types for values observable through memory. The only context
+//   where these exist are global constants.
+//
+// * Debug types: types for debug metadata. They allow debuggers to show
+//   human-readable type names and contents of variables.
+//   (LLVMTypeTranslator::getDebugType())
+//
+// Outside of global constants, aggregates like structs and arrays in Slang IR
+// never actually become concrete types in LLVM IR.
 
 namespace Slang
 {
@@ -135,8 +150,8 @@ static CharSlice getStringLitAsSlice(IRInst* inst)
 // This class helps with converting types from Slang IR to LLVM IR. It can
 // create types for two different contexts:
 //
-// * getType(): creates types which appear in SSA values and are not observable
-//   through memory.
+// * getValueType(): creates types which appear in SSA values and are not
+//   observable through memory.
 //
 // * getDebugType(): "pretty" types with correct offset annotations so that
 //   debuggers can show the contents of variables.
@@ -199,11 +214,11 @@ public:
         for (UInt i = 0; i < funcType->getParamCount(); ++i)
         {
             IRType* paramType = funcType->getParamType(i);
-            paramTypes.add(getType(paramType));
+            paramTypes.add(getValueType(paramType));
         }
 
         auto resultType = funcType->getResultType();
-        auto llvmReturnType = getType(resultType);
+        auto llvmReturnType = getValueType(resultType);
 
         // If attempting to return an aggregate, turn it into an extra
         // output parameter that is passed with a pointer.
@@ -219,7 +234,7 @@ public:
     }
 
     // Returns the type you must use for passing around SSA values in LLVM IR.
-    LLVMType* getType(IRType* type)
+    LLVMType* getValueType(IRType* type)
     {
         if (valueTypeMap.containsKey(type))
             return valueTypeMap.getValue(type);
@@ -253,7 +268,7 @@ public:
             break;
 
         case kIROp_RateQualifiedType:
-            llvmType = getType(as<IRRateQualifiedType>(type)->getValueType());
+            llvmType = getValueType(as<IRRateQualifiedType>(type)->getValueType());
             break;
 
         case kIROp_PtrType:
@@ -279,7 +294,7 @@ public:
         case kIROp_VectorType:
             {
                 auto vecType = static_cast<IRVectorType*>(type);
-                LLVMType* elemType = getType(vecType->getElementType());
+                LLVMType* elemType = getValueType(vecType->getElementType());
                 auto elemCount = int(getIntVal(vecType->getElementCount()));
                 llvmType = builder->getVectorType(elemCount, elemType);
             }
@@ -904,7 +919,7 @@ struct LLVMEmitter
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                     llvmConstant =
-                        builder->getConstantInt(types->getType(type), litInst->value.intVal);
+                        builder->getConstantInt(types->getValueType(type), litInst->value.intVal);
                 break;
             }
 
@@ -914,7 +929,7 @@ struct LLVMEmitter
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
                     llvmConstant =
-                        builder->getConstantFloat(types->getType(type), litInst->value.floatVal);
+                        builder->getConstantFloat(types->getValueType(type), litInst->value.floatVal);
             }
             break;
 
@@ -961,7 +976,7 @@ struct LLVMEmitter
                 {
                     // To remove padding and alignment requirements from the
                     // vector, lower it as an array.
-                    auto elemType = types->getType(vectorType->getElementType());
+                    auto elemType = types->getValueType(vectorType->getElementType());
                     llvmConstant =
                         builder->getConstantArray(Slice(values.begin(), values.getCount()));
 
@@ -994,7 +1009,7 @@ struct LLVMEmitter
 
                 if (inAggregate)
                 {
-                    auto elemType = types->getType(vectorType->getElementType());
+                    auto elemType = types->getValueType(vectorType->getElementType());
                     auto values = List<LLVMInst*>::makeRepeated(value, elemCount);
                     llvmConstant =
                         builder->getConstantArray(Slice(values.begin(), values.getCount()));
@@ -1164,7 +1179,7 @@ struct LLVMEmitter
             // to be loaded.
             if (!types->isAggregateType(type))
                 llvmValue =
-                    builder->emitLoad(types->getType(type), llvmValue, sizeAndAlignment.alignment);
+                    builder->emitLoad(types->getValueType(type), llvmValue, sizeAndAlignment.alignment);
 
             // Don't cache result if the emitted instruction was
             // deferred, we'll need to be able to generate the inlined
@@ -1310,7 +1325,7 @@ struct LLVMEmitter
         }
     }
 
-    // llvmVal must be using `getType(valType)`. It will be stored in
+    // llvmVal must be using `getValueType(valType)`. It will be stored in
     // llvmPtr. Returns the store instruction.
     LLVMInst* emitStore(
         LLVMInst* llvmPtr,
@@ -1360,7 +1375,7 @@ struct LLVMEmitter
         }
     }
 
-    // Returns the loaded data using `getType(valType)` from llvmPtr.
+    // Returns the loaded data using `getValueType(valType)` from llvmPtr.
     // Returns the load instruction (= loaded value)
     LLVMInst* emitLoad(
         LLVMInst* llvmPtr,
@@ -1375,7 +1390,7 @@ struct LLVMEmitter
         case kIROp_BoolType:
             {
                 // Booleans are i1 in values, but something larger in memory.
-                auto llvmType = types->getType(valType);
+                auto llvmType = types->getValueType(valType);
                 auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
                 auto storageBool =
                     builder->emitLoad(storageType, llvmPtr, sizeAlignment.alignment, isVolatile);
@@ -1413,7 +1428,7 @@ struct LLVMEmitter
             }
         default:
             {
-                auto llvmType = types->getType(valType);
+                auto llvmType = types->getValueType(valType);
                 return builder->emitLoad(llvmType, llvmPtr, sizeAlignment.alignment, isVolatile);
             }
         }
@@ -1460,7 +1475,7 @@ struct LLVMEmitter
 
     LLVMInst* emitArithmetic(IRInst* inst)
     {
-        auto resultType = types->getType(inst->getDataType());
+        auto resultType = types->getValueType(inst->getDataType());
 
         if (inst->getOperandCount() == 1)
         {
@@ -1770,7 +1785,7 @@ struct LLVMEmitter
                 }
                 else
                 {
-                    llvmInst = builder->getPoison(types->getType(type));
+                    llvmInst = builder->getPoison(types->getValueType(type));
                 }
             }
             break;
@@ -1842,7 +1857,7 @@ struct LLVMEmitter
             llvmInst = maybeEmitConstant(inst);
             if (!llvmInst)
             {
-                auto llvmType = types->getType(inst->getDataType());
+                auto llvmType = types->getValueType(inst->getDataType());
 
                 // MakeVector of a scalar is a scalar.
                 if (!as<IRVectorType>(inst->getDataType()))
@@ -1981,7 +1996,7 @@ struct LLVMEmitter
         case kIROp_CastIntToPtr:
             llvmInst = builder->emitCast(
                 findValue(inst->getOperand(0)),
-                types->getType(inst->getDataType()),
+                types->getValueType(inst->getDataType()),
                 isSigned(inst->getOperand(0)),
                 isSignedType(inst->getDataType()));
             break;
@@ -1994,7 +2009,7 @@ struct LLVMEmitter
         case kIROp_BitCast:
             llvmInst = builder->emitBitCast(
                 findValue(inst->getOperand(0)),
-                types->getType(inst->getDataType()));
+                types->getValueType(inst->getDataType()));
             break;
 
         case kIROp_FieldAddress:
@@ -2158,7 +2173,7 @@ struct LLVMEmitter
                 findValue(inst->getOperand(0)),
                 findValue(inst->getOperand(1)),
                 findValue(inst->getOperand(2)),
-                types->getType(inst->getDataType()),
+                types->getValueType(inst->getDataType()),
                 isSigned(inst->getOperand(0)));
             break;
 
@@ -2168,7 +2183,7 @@ struct LLVMEmitter
                 findValue(inst->getOperand(1)),
                 findValue(inst->getOperand(2)),
                 findValue(inst->getOperand(3)),
-                types->getType(inst->getDataType()));
+                types->getValueType(inst->getDataType()));
             break;
 
         case kIROp_Call:
@@ -2756,7 +2771,7 @@ struct LLVMEmitter
                         }
                         else
                         {
-                            auto llvmType = types->getType(type);
+                            auto llvmType = types->getValueType(type);
                             builder->printType(expanded, llvmType);
                         }
                     }
@@ -2820,7 +2835,7 @@ struct LLVMEmitter
                         }
                         else
                         {
-                            auto llvmType = types->getType(argType);
+                            auto llvmType = types->getValueType(argType);
                             builder->printType(expanded, llvmType);
                         }
 
@@ -2850,7 +2865,7 @@ struct LLVMEmitter
             expanded.append("\nret ");
             if (hasReturnValue)
             {
-                auto llvmResultType = types->getType(resultType);
+                auto llvmResultType = types->getValueType(resultType);
                 builder->printType(expanded, llvmResultType);
                 expanded.append(" %result");
             }
