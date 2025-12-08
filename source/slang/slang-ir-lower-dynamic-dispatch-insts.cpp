@@ -568,15 +568,13 @@ struct TagOpsLoweringContext : public InstPassBase
 
 struct DispatcherLoweringContext : public InstPassBase
 {
-    private:
-        bool m_reportDispatchLocations = false;
-        DiagnosticSink* m_sink = nullptr;
+private:
+    bool m_reportDispatchLocations = false;
+    DiagnosticSink* m_sink = nullptr;
 
-    public:
+public:
     DispatcherLoweringContext(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
-        : InstPassBase(module)
-        , m_reportDispatchLocations(reportDispatchLocations)
-        , m_sink(sink)
+        : InstPassBase(module), m_reportDispatchLocations(reportDispatchLocations), m_sink(sink)
     {
     }
 
@@ -600,7 +598,7 @@ struct DispatcherLoweringContext : public InstPassBase
                     printDiagnosticArg(tableElementsStr, concreteType);
                     count++;
                 });
-            
+
             m_sink->diagnose(
                 use->getUser()->sourceLoc,
                 Diagnostics::dynamicDispatchCodeGeneratedHere,
@@ -632,7 +630,7 @@ struct DispatcherLoweringContext : public InstPassBase
                     printDiagnosticArg(tableElementsStr, concreteType);
                     count++;
                 });
-            
+
             // Make a string out of all specialization arguments.
             StringBuilder specArgsStr;
             first = true;
@@ -651,7 +649,7 @@ struct DispatcherLoweringContext : public InstPassBase
 
                 printDiagnosticArg(specArgsStr, arg);
             }
-            
+
             m_sink->diagnose(
                 use->getUser()->sourceLoc,
                 Diagnostics::specializedDynamicDispatchCodeGeneratedHere,
@@ -762,8 +760,8 @@ struct DispatcherLoweringContext : public InstPassBase
                 auto generic =
                     cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
 
-                auto specializedFuncType =
-                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
+                auto specializedFuncType = (IRType*)specializeGeneric(
+                    cast<IRSpecialize>(builder.emitSpecializeInst(
                         builder.getTypeKind(),
                         generic->getDataType(),
                         specArgs.getCount(),
@@ -1439,9 +1437,10 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto tableSet = taggedUnion->getWitnessTableSet();
 
         if (taggedUnion->getTypeSet()->isSingleton())
-            return builder.getTupleType(List<IRType*>(
-                {(IRType*)builder.getSetTagType(tableSet),
-                 (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
+            return builder.getTupleType(
+                List<IRType*>(
+                    {(IRType*)builder.getSetTagType(tableSet),
+                     (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)builder.getSetTagType(tableSet), (IRType*)typeSet}));
