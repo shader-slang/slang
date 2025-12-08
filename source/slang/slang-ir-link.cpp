@@ -1741,13 +1741,21 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
     if (func->getFirstBlock() != nullptr)
         return true;
 
-    // Check for intrinsic decorations
+    // Check for decorations that indicate the function has an external/special implementation
     for (auto decor : func->getDecorations())
     {
         switch (decor->getOp())
         {
+        // Intrinsic decorations
         case kIROp_IntrinsicOpDecoration:
         case kIROp_TargetIntrinsicDecoration:
+        case kIROp_SPIRVOpDecoration:
+        // Autodiff decorations - the function's implementation is provided by the derivative
+        // function
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_PrimalSubstituteDecoration:
             return true;
         default:
             continue;
@@ -1755,16 +1763,10 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
     }
 
     // Check for import decorations on the original inst (for generics)
-    if (inst->findDecoration<IRImportDecoration>())
-        return true;
-    if (inst->findDecoration<IRDllImportDecoration>())
+    if (inst->findDecoration<IRImportDecoration>() ||
+        inst->findDecoration<IRDllImportDecoration>())
         return true;
 
-    // Check for import decorations on the func itself
-    if (func->findDecoration<IRImportDecoration>())
-        return true;
-    if (func->findDecoration<IRDllImportDecoration>())
-        return true;
 
     return false;
 }
