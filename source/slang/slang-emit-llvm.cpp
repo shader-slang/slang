@@ -928,8 +928,9 @@ struct LLVMEmitter
                 auto litInst = static_cast<IRConstant*>(inst);
                 IRBasicType* type = as<IRBasicType>(inst->getDataType());
                 if (type)
-                    llvmConstant =
-                        builder->getConstantFloat(types->getValueType(type), litInst->value.floatVal);
+                    llvmConstant = builder->getConstantFloat(
+                        types->getValueType(type),
+                        litInst->value.floatVal);
             }
             break;
 
@@ -1178,8 +1179,10 @@ struct LLVMEmitter
             // Aggregates are passed around as pointers so they don't need
             // to be loaded.
             if (!types->isAggregateType(type))
-                llvmValue =
-                    builder->emitLoad(types->getValueType(type), llvmValue, sizeAndAlignment.alignment);
+                llvmValue = builder->emitLoad(
+                    types->getValueType(type),
+                    llvmValue,
+                    sizeAndAlignment.alignment);
 
             // Don't cache result if the emitted instruction was
             // deferred, we'll need to be able to generate the inlined
