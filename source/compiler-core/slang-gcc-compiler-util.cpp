@@ -631,12 +631,10 @@ static SlangResult _parseGCCFamilyLine(
     switch (options.targetType)
     {
     case SLANG_HOST_EXECUTABLE:
-    case SLANG_SHADER_SHARED_LIBRARY:
-    case SLANG_SHADER_HOST_CALLABLE:
-    case SLANG_HOST_SHARED_LIBRARY:
         // If Slang was built using Clang or GCC and with sanitizers, the same `-fsanitize=...` flag
-        // used for Slang must also be used when linking executables and shared libraries that we
-        // might be trying to link with Slang libraries.
+        // used for Slang must also be used when linking host executables as we might be trying to
+        // link them with Slang libraries, in which case we must link them with the sanitizer
+        // runtime as well or else they will fail to either link or run.
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #if SLANG_CLANG || SLANG_GCC
@@ -647,14 +645,21 @@ static SlangResult _parseGCCFamilyLine(
 #endif // SLANG_CLANG
 #endif // __has_feature(address_sanitizer)
 #endif // defined(__has_feature)
-        [[fallthrough]];
+        break;
 
     case SLANG_OBJECT_CODE:
-        if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
+        if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind) &&
+            !PlatformUtil::isFamily(PlatformFamily::Microsoft, platformKind))
         {
-            // Position independent
+            // Position-independent code (PIC). If we're on Darwin or Windows, adding this flag has
+            // no effect at best (PIC is forced on or off) and is erroneous at worst:
+            // - When targeting Windows, this flag causes Clang <= 13 to emit an error, and GCC <= 6
+            //   to emit a warning.
+            // - Passing this flag to the Metal compiler (based on Clang) results in Metal failures
+            //   at run-time ("Compiler encountered an internal error" or Mach IPC hanging forever).
             cmdLine.addArg("-fPIC");
         }
+        break;
     }
 
     // Add defines
