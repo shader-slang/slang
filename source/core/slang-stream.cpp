@@ -127,6 +127,18 @@ SlangResult FileStream::_init(
     default:
         break;
     }
+
+    if (File::exists(fileName))
+    {
+        // Check that the path exists and is a file; not a directory.
+        SlangPathType pathType;
+        SLANG_RETURN_ON_FAIL(Path::getPathType(fileName, &pathType));
+        if (pathType != SLANG_PATH_TYPE_FILE)
+        {
+            return SLANG_E_CANNOT_OPEN;
+        }
+    }
+
 #ifdef _WIN32
 
     // NOTE! This works because we know all the characters in the mode

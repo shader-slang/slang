@@ -639,7 +639,9 @@ typedef uint32_t SlangSizeT;
         SLANG_WGSL_SPIRV_ASM,        ///< SPIR-V assembly via WebGPU shading language
         SLANG_WGSL_SPIRV,            ///< SPIR-V via WebGPU shading language
 
-        SLANG_HOST_VM, ///< Bytecode that can be interpreted by the Slang VM
+        SLANG_HOST_VM,     ///< Bytecode that can be interpreted by the Slang VM
+        SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
+        SLANG_CUDA_HEADER, ///< Cuda header
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -1068,6 +1070,12 @@ typedef uint32_t SlangSizeT;
         ForceCLayout, // bool
 
         ExperimentalFeature, // bool, enable experimental features
+
+        ReportDetailedPerfBenchmark, // bool, reports detailed compiler performance benchmark
+                                     // results
+        ValidateIRDetailed,          // bool, enable detailed IR validation
+        DumpIRBefore,                // string, pass name to dump IR before
+        DumpIRAfter,                 // string, pass name to dump IR after
 
         CountOf,
     };

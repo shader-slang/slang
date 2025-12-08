@@ -50,8 +50,8 @@ IRSimplificationOptions IRSimplificationOptions::getFast(TargetProgram* targetPr
 // Run a combination of SSA, SCCP, SimplifyCFG, and DeadCodeElimination pass
 // until no more changes are possible.
 void simplifyIR(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     IRSimplificationOptions options,
     DiagnosticSink* sink)
 {
@@ -110,7 +110,11 @@ void simplifyIR(
     eliminateDeadCode(module, options.deadCodeElimOptions);
 }
 
-void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationOptions options)
+void simplifyNonSSAIR(
+    IRModule* module,
+    TargetProgram* target,
+    IRSimplificationOptions options,
+    DiagnosticSink* sink)
 {
     bool changed = true;
     const int kMaxIterations = 8;
@@ -119,6 +123,7 @@ void simplifyNonSSAIR(TargetProgram* target, IRModule* module, IRSimplificationO
     while (changed && iterationCounter < kMaxIterations)
     {
         changed = false;
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)

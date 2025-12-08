@@ -23,7 +23,7 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
     }
 }
 
-void checkUnsupportedInst(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     for (auto globalInst : module->getGlobalInsts())
     {

@@ -307,6 +307,7 @@ DIAGNOSTIC(
     needToEnableExperimentFeature,
     "'$0' is an experimental module, need to enable"
     "'-experimental-feature' to load this module")
+DIAGNOSTIC(105, Error, nullComponentType, "componentTypes[$0] is `nullptr`")
 
 //
 // 001xx - Downstream Compilers
@@ -2241,6 +2242,12 @@ DIAGNOSTIC(
     mismatchExistentialSlotArgCount,
     "expected $0 existential slot arguments ($1 provided)")
 DIAGNOSTIC(
+    38028,
+    Error,
+    invalidFormOfSpecializationArg,
+    "global specialization argument $0 has an invalid form.")
+
+DIAGNOSTIC(
     38029,
     Error,
     typeArgumentDoesNotConformToInterface,
@@ -2367,6 +2374,11 @@ DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
 DIAGNOSTIC(39010, Error, expectedSpaceIndex, "expected a register space index after 'space'")
 DIAGNOSTIC(39011, Error, invalidComponentMask, "invalid register component mask '$0'.")
 
+DIAGNOSTIC(
+    39012,
+    Warning,
+    requestedBindlessSpaceIndexUnavailable,
+    "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
 DIAGNOSTIC(
     39013,
     Warning,
@@ -2896,6 +2908,11 @@ DIAGNOSTIC(
     noTypeConformancesFoundForInterface,
     "No type conformances are found for interface '$0'. Code generation for current target "
     "requires at least one implementation type present in the linkage.")
+DIAGNOSTIC(
+    50101,
+    Error,
+    dynamicDispatchOnPotentiallyUninitializedExistential,
+    "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
 
 DIAGNOSTIC(
     52000,

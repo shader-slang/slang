@@ -10,7 +10,7 @@ class DiagnosticSink;
 
 // Lower combined texture sampler types to structs.
 void lowerCombinedTextureSamplers(
-    CodeGenContext* codeGenContext,
     IRModule* module,
+    CodeGenContext* codeGenContext,
     DiagnosticSink* sink);
 } // namespace Slang

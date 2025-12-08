@@ -7592,6 +7592,7 @@ bool SemanticsVisitor::checkConformance(
     ContainerDecl* parentDecl)
 {
     auto superType = inheritanceDecl->base.type;
+    DeclRef<Decl> declRefForSubTypeWitness;
 
     if (auto declRefType = as<DeclRefType>(subType))
     {
@@ -7634,6 +7635,16 @@ bool SemanticsVisitor::checkConformance(
             // in an outer interface declaration, and its members
             // (type constraints) represent additional requirements.
             return true;
+        }
+        if (auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+        {
+            // When the sub type is generic, we can't just make a direct declref to inheritanceDecl
+            // because it won't be lowered to a concrete type. Instead, we need to form a
+            // GenericAppDeclRef to represent a concrete type.
+            declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
+                genericApp->getGenericDecl(),
+                genericApp->getArgs(),
+                inheritanceDecl);
         }
         else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
         {
@@ -7678,9 +7689,12 @@ bool SemanticsVisitor::checkConformance(
 
     // Look at the type being inherited from, and validate
     // appropriately.
-
+    if (!declRefForSubTypeWitness)
+    {
+        declRefForSubTypeWitness = makeDeclRef(inheritanceDecl);
+    }
     DeclaredSubtypeWitness* subIsSuperWitness =
-        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, makeDeclRef(inheritanceDecl));
+        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, declRefForSubTypeWitness);
 
     ConformanceCheckingContext context;
     context.conformingType = subType;
@@ -12579,7 +12593,7 @@ void checkDerivativeAttributeImpl(
 
     SemanticsContext::ExprLocalScope scope;
     auto ctx = visitor->withExprLocalScope(&scope);
-    auto subVisitor = SemanticsVisitor(ctx);
+    auto subVisitor = SemanticsVisitor(ctx.allowStaticReferenceToNonStaticMember());
 
     auto exprToCheck = attr->funcExpr;
 
