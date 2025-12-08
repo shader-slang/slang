@@ -258,6 +258,16 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             return cacheResult(false);
     }
 
+    // Opaque types are not C-style.
+    // These types have no well-defined default value (they usually need a separate API call to be
+    // created and/or bound) and thus cannot be default-initialized.
+    {
+        TypeTag tags = getTypeTags(type);
+        const bool isOpaque = ((int)tags & (int)TypeTag::Opaque) != 0;
+        if (isOpaque)
+            return cacheResult(false);
+    }
+
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
     {
@@ -266,7 +276,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             auto elementType = tupleType->getMember(i);
             // Avoid infinite loop in case of circular reference.
             if (isVisit.contains(elementType))
-                return cacheResult(false);
+                continue;
             if (!isCStyleType(elementType, isVisit))
                 return cacheResult(false);
         }
