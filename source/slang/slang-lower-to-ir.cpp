@@ -5475,9 +5475,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         }
         else if (auto resourceType = as<ResourceType>(type))
         {
-            // In practice, a resource type must always be bound to a particular resource,
-            // so we return an undefined value here. We expect later instructions to assign
-            // a valid resource to this value before using it.
+            // A resource type does not have a default value, so we defensively assign poison value.
+            // In practice, we should never get here. If the value remains unassigned after all of
+            // the subsequent IR steps and is used, it should be detected by
+            // detectUninitializedResources.
             return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
         }
         else if (auto declRefType = as<DeclRefType>(type))
