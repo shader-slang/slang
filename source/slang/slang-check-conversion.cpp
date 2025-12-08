@@ -452,13 +452,13 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         // invalid.
         isCStyle = isCStyleType(toType, isVisit);
 
-        // WAR: We currently still has to allow legacy initializer list for array type until we have
-        // more proper solution for array initialization, so if the right hand side is an array
-        // type, we will not report error and fall-back to legacy initializer list logic.
+        // WAR: We currently still have to allow legacy initializer list for array type until we have
+        // a more proper solution for array initialization, so if the right hand side is an array
+        // type, we will not report an error and fall-back to legacy initializer list logic.
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            getSink()->diagnose(
+            diagnoseOnce(
                 fromInitializerListExpr->loc,
                 Diagnostics::cannotUseInitializerListForType,
                 toType);
