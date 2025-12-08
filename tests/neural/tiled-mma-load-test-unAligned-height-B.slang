@@ -58,8 +58,8 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
 void testLoadShB<int K>(uint tid, uint tileIndex)
 {
-    half inputVector[K];
-    for (int i = 0; i < 32; i++)
+    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize>.Uint4AlignedK] = {};
+    for (int i = 0; i < K; i++)
     {
         inputVector[i] = half(tid * 32 + i);
     }
