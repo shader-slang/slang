@@ -2244,6 +2244,12 @@ DIAGNOSTIC(
     "semantic '$0' is not available in $1 shader stage")
 
 DIAGNOSTIC(
+    38028,
+    Error,
+    invalidFormOfSpecializationArg,
+    "global specialization argument $0 has an invalid form.")
+
+DIAGNOSTIC(
     38029,
     Error,
     typeArgumentDoesNotConformToInterface,
