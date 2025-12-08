@@ -1114,10 +1114,10 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             if (File::exists(loc.loc.pathInfo.foundPath))
             {
                 // Canonicalize the path to ensure we always use absolute paths in URIs
-                String canonicalPath = loc.loc.pathInfo.foundPath;
-                if (SLANG_SUCCEEDED(Path::getCanonical(canonicalPath, canonicalPath)))
+                String canonicalFoundPath = loc.loc.pathInfo.foundPath;
+                if (SLANG_SUCCEEDED(Path::getCanonical(canonicalFoundPath, canonicalFoundPath)))
                 {
-                    result.uri = URI::fromLocalFilePath(canonicalPath.getUnownedSlice()).uri;
+                    result.uri = URI::fromLocalFilePath(canonicalFoundPath.getUnownedSlice()).uri;
                 }
                 else
                 {
