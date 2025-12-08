@@ -196,6 +196,21 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
                 argCount,
                 paramCounts.allowed);
         }
+
+        // Add a note showing the candidate signature for context
+        if (auto decl = candidate.item.declRef.getDecl())
+        {
+            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+            getSink()->diagnose(
+                candidate.item.declRef,
+                Diagnostics::overloadCandidate,
+                declString);
+        }
+        else if (candidate.funcType)
+        {
+            // For Flavor::Expr cases where there's no decl, show the function type
+            getSink()->diagnose(context.loc, Diagnostics::overloadCandidate, candidate.funcType);
+        }
     }
 
     return false;
