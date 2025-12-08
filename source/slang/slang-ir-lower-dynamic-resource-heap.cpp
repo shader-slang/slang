@@ -10,11 +10,19 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, Diagno
     HashSet<int> usedSpaces;
     auto processVarLayout = [&](IRVarLayout* varLayout)
     {
+        // Track RegisterSpace offset directly - this is used for flattened params from
+        // ParameterBlocks and determines the DescriptorSet in SPIR-V.
+        if (auto registerSpaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
+        {
+            usedSpaces.add((int)registerSpaceAttr->getOffset());
+        }
+
         UInt spaceOffset = 0;
         if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
         {
             spaceOffset = spaceAttr->getOffset();
         }
+
         for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
         {
             auto kind = sizeAttr->getResourceKind();
