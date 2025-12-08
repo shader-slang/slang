@@ -1122,7 +1122,8 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
                 else
                 {
                     // If canonicalization fails, use the original path
-                    result.uri = URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+                    result.uri =
+                        URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
                 }
             }
             else if (loc.loc.pathInfo.getName() == "core" || loc.loc.pathInfo.getName() == "glsl")
