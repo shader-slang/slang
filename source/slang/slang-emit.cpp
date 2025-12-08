@@ -2005,7 +2005,7 @@ Result linkAndOptimizeIR(
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
-    SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions);
+    SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 
     // We include one final step to (optionally) dump the IR and validate
     // it after all of the optimization passes are complete. This should
