@@ -54,6 +54,14 @@ public struct InlineVector<T, int N> : IVector<T, N>
     */
     public __init(This other) { this.data = other.data; }
 
+    public __init<InputArray : IArray<T>>(InputArray data)
+    {
+        static_assert(data.getCount() >= N, "The size of the input array must match the vector size");
+        [ForceUnroll]
+        for (int i = 0; i < N; i++)
+            this.data[i] = data[i];
+    }
+
     /**
     Element access operator.
     @param[in] index The element index (0-based).
