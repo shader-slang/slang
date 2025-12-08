@@ -2237,6 +2237,12 @@ DIAGNOSTIC(
     mismatchExistentialSlotArgCount,
     "expected $0 existential slot arguments ($1 provided)")
 DIAGNOSTIC(
+    38028,
+    Error,
+    invalidFormOfSpecializationArg,
+    "global specialization argument $0 has an invalid form.")
+
+DIAGNOSTIC(
     38029,
     Error,
     typeArgumentDoesNotConformToInterface,
