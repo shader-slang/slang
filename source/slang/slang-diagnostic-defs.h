@@ -2724,13 +2724,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(45001, Error, unresolvedSymbol, "unresolved external symbol '$0'.")
 
 DIAGNOSTIC(
-    45002,
-    Error,
-    functionDeclarationWithoutDefinition,
-    "function '$0' is declared but not defined. Extensions cannot declare new interface "
-    "requirements; function declarations in extensions must have a body.")
-
-DIAGNOSTIC(
     41201,
     Warning,
     expectDynamicUniformArgument,

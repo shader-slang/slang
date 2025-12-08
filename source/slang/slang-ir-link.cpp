@@ -1565,10 +1565,16 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         if (auto sink = context->shared->sink)
         {
-            sink->diagnose(
-                bestVal->sourceLoc,
-                Diagnostics::functionDeclarationWithoutDefinition,
-                bestVal);
+            sink->diagnose(bestVal->sourceLoc, Diagnostics::unresolvedSymbol, bestVal);
+
+            // Emit notes for all available declarations of this symbol
+            for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+            {
+                sink->diagnose(
+                    ss->irGlobalValue->sourceLoc,
+                    Diagnostics::seeDeclarationOf,
+                    ss->irGlobalValue);
+            }
         }
     }
 
@@ -1763,8 +1769,7 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
     }
 
     // Check for import decorations on the original inst (for generics)
-    if (inst->findDecoration<IRImportDecoration>() ||
-        inst->findDecoration<IRDllImportDecoration>())
+    if (inst->findDecoration<IRImportDecoration>() || inst->findDecoration<IRDllImportDecoration>())
         return true;
 
 
