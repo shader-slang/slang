@@ -2,15 +2,10 @@
 
 // Test 64-bit types - double and int64 each need 2 registers (2 x 32-bit = 64-bit)
 // A struct with 1 double + 1 int64 = 4 registers total (not 2!)
-// This should use direct register access since 4 < 32
-//
-// BUG: Currently 64-bit types are incorrectly treated as 1 register.
-// This test MUST FAIL until the bug is fixed.
-// When fixed, the code should reconstruct 64-bit values from two 32-bit registers:
-//   double = __longlong_as_double((long long)optixGetPayload_1() << 32 | optixGetPayload_0())
-//   int64  = (long long)optixGetPayload_3() << 32 | optixGetPayload_2()
-
-// Correct behavior requires 4 registers (0-3), not 2 (0-1)
+// This uses direct register access since 4 < 32
+// 64-bit values are reconstructed from two consecutive 32-bit registers:
+//   double = __longlong_as_double((long long)high32 << 32 | low32)
+//   int64  = (long long)high32 << 32 | low32
 // CHECK-DAG: optixGetPayload_0
 // CHECK-DAG: optixGetPayload_1
 // CHECK-DAG: optixGetPayload_2
