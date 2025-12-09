@@ -1707,8 +1707,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 int requiredRegisters = countRequiredRegisters(info.type, &builder);
                 const int maxRegisters = 32; // OptiX hardware limit
 
-                // If payload is too large or size unknown, fall back to pointer method
-                if (requiredRegisters < 0 || requiredRegisters > maxRegisters)
+                // If size unknown, fall back to pointer method
+                if (requiredRegisters < 0)
                 {
                     IRPtrType* ptrType = builder.getPtrType(info.type);
                     IRInst* getRayPayload =
@@ -1716,32 +1716,66 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     return LegalizedVaryingVal::makeAddress(getRayPayload);
                 }
 
-                // Payload fits in registers - use direct register access
-                int fetchRegisterIndex = 0;
-                IRInst* getPayloadValue = emitOptiXPayloadFetch(
-                    fetchRegisterIndex,
-                    info.type,
-                    &builder,
-                    nullptr); // No need to pass maxRegisters since we pre-checked
-
-                // Decomposition should not fail at this point
-                if (!getPayloadValue)
+                // If payload fits entirely in registers, use full register method
+                if (requiredRegisters <= maxRegisters)
                 {
-                    // Unexpected failure, fall back to pointer
-                    IRPtrType* ptrType = builder.getPtrType(info.type);
-                    IRInst* getRayPayload =
-                        builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
-                    return LegalizedVaryingVal::makeAddress(getRayPayload);
+                    // Payload fits in registers - use direct register access
+                    int fetchRegisterIndex = 0;
+                    IRInst* getPayloadValue = emitOptiXPayloadFetch(
+                        fetchRegisterIndex,
+                        info.type,
+                        &builder,
+                        nullptr); // No need to pass maxRegisters since we pre-checked
+
+                    // Decomposition should not fail at this point
+                    if (!getPayloadValue)
+                    {
+                        // Unexpected failure, fall back to pointer
+                        IRPtrType* ptrType = builder.getPtrType(info.type);
+                        IRInst* getRayPayload =
+                            builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                        return LegalizedVaryingVal::makeAddress(getRayPayload);
+                    }
+
+                    // For inout parameters, create a local variable, initialize it, and add write-back
+                    // Create a local variable to hold the payload during shader execution
+                    builder.setInsertBefore(m_firstOrdinaryInst);
+                    auto localVar = builder.emitVar(info.type);
+                    builder.emitStore(localVar, getPayloadValue);
+
+                    // Add write-back at the end of the entry point
+                    // Find the return instruction(s) and insert stores before them
+                    for (auto block : m_entryPointFunc->getBlocks())
+                    {
+                        auto terminator = block->getTerminator();
+                        if (terminator && terminator->getOp() == kIROp_Return)
+                        {
+                            builder.setInsertBefore(terminator);
+                            auto finalValue = builder.emitLoad(localVar);
+                            int storeRegisterIndex = 0;
+                            emitOptiXPayloadStore(storeRegisterIndex, finalValue, info.type, &builder);
+                        }
+                    }
+
+                    return LegalizedVaryingVal::makeAddress(localVar);
                 }
 
-                // For inout parameters, create a local variable, initialize it, and add write-back
-                // Create a local variable to hold the payload during shader execution
+                // Payload exceeds 32 registers - MUST use pointer method
+                // OptiX runtime constraint: can't mix register + memory access
+                // When payload > 128 bytes, OptiX puts ALL data in memory
+                // and passes pointer in registers 0-1 (registers 2-31 unused)
+                IRPtrType* ptrType = builder.getPtrType(info.type);
+                IRInst* getRayPayload =
+                    builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+
+                // Optimization: Load into local variable to help CUDA register allocation
+                // This allows PTX/CUDA compiler to keep hot fields in registers
                 builder.setInsertBefore(m_firstOrdinaryInst);
                 auto localVar = builder.emitVar(info.type);
-                builder.emitStore(localVar, getPayloadValue);
+                auto loadedValue = builder.emitLoad(getRayPayload);
+                builder.emitStore(localVar, loadedValue);
 
-                // Add write-back at the end of the entry point
-                // Find the return instruction(s) and insert stores before them
+                // Write back at return points
                 for (auto block : m_entryPointFunc->getBlocks())
                 {
                     auto terminator = block->getTerminator();
@@ -1749,8 +1783,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     {
                         builder.setInsertBefore(terminator);
                         auto finalValue = builder.emitLoad(localVar);
-                        int storeRegisterIndex = 0;
-                        emitOptiXPayloadStore(storeRegisterIndex, finalValue, info.type, &builder);
+                        builder.emitStore(getRayPayload, finalValue);
                     }
                 }
 
