@@ -18623,10 +18623,10 @@ uint PrimitiveIndex()
 
 /// Returns the ray origin in object space of the current instance.
 /// @return Object-space position where the ray originated
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -18644,10 +18644,10 @@ float3 ObjectRayOrigin()
 
 /// Returns the ray direction in object space of the current instance.
 /// @return Object-space direction vector of the ray
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayDirection()
 {
     __target_switch
