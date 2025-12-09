@@ -4482,8 +4482,8 @@ static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
 // Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
 // were added in OptiX 9.0 (not available in 8.0 or 8.1)
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ Matrix<float, 4, 3>
-slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetWorldToObject(
+    OptixTraversableHandle* hitObj)
 {
     float m[12];
     optixHitObjectGetWorldToObjectTransformMatrix(m);
@@ -4497,8 +4497,8 @@ slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* hitObj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ Matrix<float, 4, 3>
-slangOptixHitObjectGetObjectToWorld(OptixTraversableHandle* hitObj)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetObjectToWorld(
+    OptixTraversableHandle* hitObj)
 {
     float m[12];
     optixHitObjectGetObjectToWorldTransformMatrix(m);
