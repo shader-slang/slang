@@ -1732,13 +1732,17 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     {
                         // Unexpected failure, fall back to pointer
                         IRPtrType* ptrType = builder.getPtrType(info.type);
-                        IRInst* getRayPayload =
-                            builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                        IRInst* getRayPayload = builder.emitIntrinsicInst(
+                            ptrType,
+                            kIROp_GetOptiXRayPayloadPtr,
+                            0,
+                            nullptr);
                         return LegalizedVaryingVal::makeAddress(getRayPayload);
                     }
 
-                    // For inout parameters, create a local variable, initialize it, and add write-back
-                    // Create a local variable to hold the payload during shader execution
+                    // For inout parameters, create a local variable, initialize it, and add
+                    // write-back Create a local variable to hold the payload during shader
+                    // execution
                     builder.setInsertBefore(m_firstOrdinaryInst);
                     auto localVar = builder.emitVar(info.type);
                     builder.emitStore(localVar, getPayloadValue);
@@ -1753,7 +1757,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                             builder.setInsertBefore(terminator);
                             auto finalValue = builder.emitLoad(localVar);
                             int storeRegisterIndex = 0;
-                            emitOptiXPayloadStore(storeRegisterIndex, finalValue, info.type, &builder);
+                            emitOptiXPayloadStore(
+                                storeRegisterIndex,
+                                finalValue,
+                                info.type,
+                                &builder);
                         }
                     }
 
