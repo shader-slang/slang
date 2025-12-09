@@ -114,9 +114,9 @@ Dumps IR only before the specified pass. Can be specified multiple times for dif
 
 ```bash
 # Dump IR before the lowerGenerics pass
-slangc.exe -dump-ir-before lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+slangc.exe -dump-ir-before lowerGenerics -target spirv-asm -o tmp.spv test.slang > before.dump
 
-# Dump before multiple passes
+# Dump before multiple passes (useful with split script)
 slangc.exe -dump-ir-before lowerGenerics -dump-ir-before eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 ```
 
@@ -125,9 +125,9 @@ Dumps IR only after the specified pass. Can be specified multiple times for diff
 
 ```bash
 # Dump IR after the lowerGenerics pass
-slangc.exe -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+slangc.exe -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > after.dump
 
-# Dump after multiple passes
+# Dump after multiple passes (useful with split script)
 slangc.exe -dump-ir-after lowerGenerics -dump-ir-after eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 ```
 
@@ -136,10 +136,14 @@ You can combine `-dump-ir-before` and `-dump-ir-after` to dump IR around specifi
 
 ```bash
 # Dump IR before and after lowerGenerics to see exactly what it does
-slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+# For just 2 sections, save directly to file instead of using split script
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > lowerGenerics.dump
+
+# For multiple passes, use split script
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -dump-ir-before eliminateDeadCode -dump-ir-after eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 ```
 
-**Tip**: Use selective dumping with `-dump-ir-before` and `-dump-ir-after` when you already know which pass is problematic. This generates much less output than `-dump-ir` and makes analysis faster.
+**Tip**: Use selective dumping with `-dump-ir-before` and `-dump-ir-after` when you already know which pass is problematic. For just 1-2 passes, save directly to a file. For multiple passes, pipe to `split-ir-dump.py`.
 
 ## Common Workflows
 
@@ -149,8 +153,9 @@ slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target sp
 2. Use binary search through sections to find where IR becomes invalid
 3. Once you identify the problematic pass, use selective dumping to focus on it:
    ```bash
-   slangc.exe -dump-ir-before <pass-name> -dump-ir-after <pass-name> -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+   slangc.exe -dump-ir-before <pass-name> -dump-ir-after <pass-name> -target spirv-asm -o tmp.spv test.slang > pass.dump
    ```
+4. Manually examine the dump to see BEFORE and AFTER sections
 
 ### Understand a Specific Pass
 
@@ -158,10 +163,10 @@ If you already know which pass to investigate:
 
 1. Use selective dumping to see only that pass:
    ```bash
-   slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+   slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > lowerGenerics.dump
    ```
-2. This generates only 2 sections: BEFORE and AFTER the pass
-3. Compare the two files to see exactly what the pass changed
+2. The dump contains only 2 sections: BEFORE and AFTER the pass
+3. Search for `### BEFORE` and `### AFTER` to compare the IR before and after the pass
 
 ### Track an IR Value
 
@@ -183,7 +188,7 @@ cat dump-000/032-AFTER-lowerGenerics.txt
 
 **Better approach**: Use selective dumping from the start:
 ```bash
-slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > lowerGenerics.dump
 ```
 
 ### Use with InstTrace

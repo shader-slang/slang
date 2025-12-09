@@ -166,8 +166,9 @@ When `-dump-ir` is used without `-target`, the compilation process may stop earl
 
 **Selective dumping tip**: When you know which pass is problematic, use `-dump-ir-before` and `-dump-ir-after` to reduce output:
 ```bash
-slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm test.slang
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
 ```
+This generates only 2 sections (BEFORE and AFTER), so saving directly to a file is more practical than using the split script.
 
 The dump prints multiple sections which of each is separated by `### ` header.
 Each section visualizes the IR state on multiple steps during the compilation.
@@ -188,8 +189,11 @@ The IR dump can be huge (thousands of lines with 70+ sections), making it diffic
 # Full dump: Recommended for initial investigation
 slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 
-# Selective dump: When you know which pass to investigate
-slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+# Selective dump for single pass: Save directly to file
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+
+# Selective dump for multiple passes: Use split script
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -dump-ir-before eliminateDeadCode -dump-ir-after eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 
 # Or save to file first
 slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
