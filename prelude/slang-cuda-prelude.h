@@ -4476,6 +4476,39 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
 }
 #endif
 
+// HitObject transform matrix wrappers for SER (Shader Execution Reordering)
+// These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
+// Available in RG, CH, MS, CC, DC stages per OptiX documentation
+#if (OPTIX_VERSION >= 80100)
+static __forceinline__ __device__ Matrix<float, 4, 3>
+slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* Obj)
+{
+    float m[12];
+    optixHitObjectGetWorldToObjectTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
+#if (OPTIX_VERSION >= 80100)
+static __forceinline__ __device__ Matrix<float, 4, 3>
+slangOptixHitObjectGetObjectToWorld(OptixTraversableHandle* Obj)
+{
+    float m[12];
+    optixHitObjectGetObjectToWorldTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
 // OptiX multi-level traversal wrappers
 // These wrappers convert OptiX's float[12] matrix pointer returns to Slang's Matrix type
 __device__ __forceinline__ Matrix<float, 3, 4> _slang_optixGetInstanceTransformFromHandle(
