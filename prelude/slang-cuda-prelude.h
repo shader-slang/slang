@@ -4479,9 +4479,11 @@ slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecord
 // HitObject transform matrix wrappers for SER (Shader Execution Reordering)
 // These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
 // Available in RG, CH, MS, CC, DC stages per OptiX documentation
-#if (OPTIX_VERSION >= 80100)
+// Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
+// were added in OptiX 9.0 (not available in 8.0 or 8.1)
+#if (OPTIX_VERSION >= 90000)
 static __forceinline__ __device__ Matrix<float, 4, 3>
-slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* Obj)
+slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* hitObj)
 {
     float m[12];
     optixHitObjectGetWorldToObjectTransformMatrix(m);
@@ -4494,9 +4496,9 @@ slangOptixHitObjectGetWorldToObject(OptixTraversableHandle* Obj)
 }
 #endif
 
-#if (OPTIX_VERSION >= 80100)
+#if (OPTIX_VERSION >= 90000)
 static __forceinline__ __device__ Matrix<float, 4, 3>
-slangOptixHitObjectGetObjectToWorld(OptixTraversableHandle* Obj)
+slangOptixHitObjectGetObjectToWorld(OptixTraversableHandle* hitObj)
 {
     float m[12];
     optixHitObjectGetObjectToWorldTransformMatrix(m);
