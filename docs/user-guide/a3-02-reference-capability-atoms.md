@@ -206,9 +206,6 @@ Versions
 `hlsl_2018`
 > Represent HLSL compatibility support.
 
-`hlsl_coopvec_poc`
-> Represent compatibility support for the deprecated POC DXC
-
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
 
@@ -1107,11 +1104,6 @@ Compound Capabilities
 `helper_lane`
 > Capabilities required to enable helper-lane demotion
 
-`hlsl_coopvec_poc_sm_6_9`
-> Represent compatibility support for the deprecated POC DXC, but we need to use
-> this capability to be compatible with cooperative_vector in target_switch, so
-> join '_sm_6_9' here.
-
 `hlsl_spirv`
 > HLSL, and SPIRV code-gen targets
 
@@ -1472,6 +1464,9 @@ Other
 
 `SPIRV_1_6`
 > Use `spirv_1_6` instead
+
+`SPV_KHR_variable_pointers`
+> Represents the SPIRV-V Variable Pointers extension.
 
 `all`
 > User should not use this capability

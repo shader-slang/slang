@@ -585,7 +585,7 @@ FIDDLE()
 class ParenExpr : public Expr
 {
     FIDDLE(...)
-    Expr* base = nullptr;
+    FIDDLE() Expr* base = nullptr;
 };
 
 // An expression that constructs a tuple `(arg1, arg2, ...)`

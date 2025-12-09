@@ -1117,12 +1117,14 @@ Target
 * `spirv-asm`, `spirv-assembly` : SPIR-V assembly 
 * `c` : C source code 
 * `cpp`, `c++`, `cxx` : C++ source code 
+* `hpp` : C++ source header 
 * `torch`, `torch-binding`, `torch-cpp`, `torch-cpp-binding` : C++ for pytorch binding 
 * `host-cpp`, `host-c++`, `host-cxx` : C++ source for host execution 
 * `exe`, `executable` : Executable binary 
 * `shader-sharedlib`, `shader-sharedlibrary`, `shader-dll` : Shared library/Dll for shader kernel 
 * `sharedlib`, `sharedlibrary`, `dll` : Shared library/Dll for host execution 
 * `cuda`, `cu` : CUDA source code 
+* `cuh` : CUDA source header 
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
@@ -1196,7 +1198,6 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_3_1` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
-* `hlsl_coopvec_poc` 
 * `optix_coopvec` 
 * `optix_multilevel_traversal` 
 * `vertex` 
@@ -1220,6 +1221,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
+* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
@@ -1294,7 +1296,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
 * `metallib_latest` 
-* `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 
@@ -1653,9 +1654,11 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `spv-asm` : SPIR-V assembly 
 * `c` 
 * `cpp`, `c++`, `cxx` : C++ 
+* `hpp` : C++ Header 
 * `exe` : executable 
 * `dll`, `so` : sharedlibrary/dll 
 * `cu` : CUDA 
+* `cuh` : CUDA Header 
 * `ptx` : PTX 
 * `obj`, `o` : object-code 
 * `zip` : container 

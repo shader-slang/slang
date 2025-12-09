@@ -3542,6 +3542,7 @@ static bool _isPTXTarget(CodeGenTarget target)
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             return true;
