@@ -1166,7 +1166,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerTuples, sink);
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1801,6 +1801,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeMeshOutputTypes);
 
 
+    calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
     // Lower all bit_cast operations on complex types into leaf-level
     // bit_cast on basic types.
     if (requiredLoweringPassSet.bitcast)
