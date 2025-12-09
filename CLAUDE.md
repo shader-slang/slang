@@ -151,14 +151,24 @@ slang-test must run from repository root
 
 ### Debugging tools
 
-#### slangc with `-dump-ir`
+#### slangc with `-dump-ir` options
 
-slangc with `-dump-ir` option is most efficient way to investigate problems that can be observed at IR level.
+slangc provides several options for dumping IR at different stages:
+
+**`-dump-ir`**: Dumps IR after every compilation pass. Most comprehensive but generates a lot of output.
+
+**`-dump-ir-before <pass-name>`**: Dumps IR only before the specified pass. Can be specified multiple times.
+
+**`-dump-ir-after <pass-name>`**: Dumps IR only after the specified pass. Can be specified multiple times.
 
 It will often require a use of `-target` and the most common combination is `-dump-ir -target spirv-asm`.
 When `-dump-ir` is used without `-target`, the compilation process may stop earlier than it should be.
 
-Since it dumps many lines, it will be good to store the result into a file for a further investigation.
+**Selective dumping tip**: When you know which pass is problematic, use `-dump-ir-before` and `-dump-ir-after` to reduce output:
+```bash
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm test.slang
+```
+
 The dump prints multiple sections which of each is separated by `### ` header.
 Each section visualizes the IR state on multiple steps during the compilation.
 It is necessary to differentiate the information on one section from one section, because the issue might be observed at a specific section.
@@ -175,8 +185,11 @@ type legalization, and buffer lowering passes. You may iterate this process mult
 The IR dump can be huge (thousands of lines with 70+ sections), making it difficult for LLMs and humans to analyze. Use `extras/split-ir-dump.py` to split the dump into separate files, one per compilation pass:
 
 ```bash
-# Recommended: Pipe directly to the script
+# Full dump: Recommended for initial investigation
 slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Selective dump: When you know which pass to investigate
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 
 # Or save to file first
 slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
