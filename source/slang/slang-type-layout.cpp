@@ -306,7 +306,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
+    ObjectLayoutInfo GetDescriptorHandleLayout(
         LayoutResourceKind varyingKind,
         Type* elementType,
         const TypeLayoutContext& context) override
@@ -317,7 +317,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uintInfo = GetScalarLayout(BaseType::UInt);
         auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
-        return SimpleLayoutInfo(varyingKind, uint2Info.size, uint2Info.alignment);
+        return ObjectLayoutInfo(SimpleLayoutInfo(varyingKind, uint2Info.size, uint2Info.alignment));
     }
 };
 
@@ -376,7 +376,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
+    ObjectLayoutInfo GetDescriptorHandleLayout(
         LayoutResourceKind varyingKind,
         Type* elementType,
         const TypeLayoutContext& context) override
@@ -389,7 +389,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64);
-            return SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment);
+            return ObjectLayoutInfo(SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment));
         }
 
         // For non-bindless GLSL/SPIRV targets, fall back to default layout
@@ -574,7 +574,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
+    ObjectLayoutInfo GetDescriptorHandleLayout(
         LayoutResourceKind varyingKind,
         Type* elementType,
         const TypeLayoutContext& context) override
@@ -600,8 +600,17 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
         // Get the object layout to get size
         auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
-        // Return the object size as a varying layout with the specified resource kind
-        return SimpleLayoutInfo(varyingKind, objLayout.getSimple().size);
+
+        // For combined texture samplers, objLayout will have multiple layoutInfos (texture + sampler)
+        // For other types, it will have a single layoutInfo
+        // We need to convert all uniform layout infos to the requested varying kind
+        ObjectLayoutInfo result;
+        for (const auto& layoutInfo : objLayout.layoutInfos)
+        {
+            // Replace the resource kind with the requested varyingKind while keeping the size
+            result.layoutInfos.add(SimpleLayoutInfo(varyingKind, layoutInfo.size));
+        }
+        return result;
     }
 };
 
@@ -768,7 +777,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 
-    SimpleLayoutInfo GetDescriptorHandleLayout(
+    ObjectLayoutInfo GetDescriptorHandleLayout(
         LayoutResourceKind varyingKind,
         Type* elementType,
         const TypeLayoutContext& context) override
@@ -794,8 +803,17 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 
         // Get the object layout to get size
         auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
-        // Return the object size as a varying layout with the specified resource kind
-        return SimpleLayoutInfo(varyingKind, objLayout.getSimple().size);
+
+        // For combined texture samplers, objLayout will have multiple layoutInfos (texture + sampler)
+        // For other types, it will have a single layoutInfo
+        // We need to convert all uniform layout infos to the requested varying kind
+        ObjectLayoutInfo result;
+        for (const auto& layoutInfo : objLayout.layoutInfos)
+        {
+            // Replace the resource kind with the requested varyingKind while keeping the size
+            result.layoutInfos.add(SimpleLayoutInfo(varyingKind, layoutInfo.size));
+        }
+        return result;
     }
 };
 
@@ -5797,11 +5815,17 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             if (directionMask & kEntryPointParameterDirection_Output)
                 varyingKind = LayoutResourceKind::VaryingOutput;
 
-            auto info = varyingRules[rr]->simpleRules->GetDescriptorHandleLayout(
+            auto objLayoutInfo = varyingRules[rr]->simpleRules->GetDescriptorHandleLayout(
                 varyingKind,
                 descriptorHandleType->getElementType(),
                 context);
-            typeLayout->addResourceUsage(info.kind, info.size);
+
+            // For combined texture samplers, objLayoutInfo may contain multiple layoutInfos
+            // (e.g., one for texture and one for sampler)
+            for (const auto& layoutInfo : objLayoutInfo.layoutInfos)
+            {
+                typeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
+            }
         }
 
         return typeLayout;
