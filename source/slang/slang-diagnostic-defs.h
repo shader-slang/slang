@@ -2916,7 +2916,8 @@ DIAGNOSTIC(
     50103,
     Note,
     specializedDynamicDispatchCodeGeneratedHere,
-    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. specialization arguments: '$2'.")
+    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. "
+    "specialization arguments: '$2'.")
 
 DIAGNOSTIC(
     52000,

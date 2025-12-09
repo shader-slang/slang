@@ -923,10 +923,10 @@ typedef uint32_t SlangSizeT;
         InputFilesRemain,
         EmitIr,                        // bool
         ReportDownstreamTime,          // bool
-        ReportPerfBenchmark,              // bool
-        ReportCheckpointIntermediates,    // bool
-        ReportDynamicDispatchSites,       // bool
-        SkipSPIRVValidation,              // bool
+        ReportPerfBenchmark,           // bool
+        ReportCheckpointIntermediates, // bool
+        ReportDynamicDispatchSites,    // bool
+        SkipSPIRVValidation,           // bool
         SourceEmbedStyle,
         SourceEmbedName,
         SourceEmbedLanguage,

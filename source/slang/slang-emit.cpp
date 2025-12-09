@@ -953,7 +953,8 @@ Result linkAndOptimizeIR(
             //
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
-            specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
+            specOptions.reportDynamicDispatchSites =
+                codeGenContext->shouldReportDynamicDispatchSites();
             changed |=
                 SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
@@ -2245,10 +2246,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 

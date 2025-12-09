@@ -15,7 +15,7 @@ struct SpecializationOptions
     // wherever possible to open up more specialization opportunities.
     //
     bool lowerWitnessLookups = false;
-    
+
     // Option to report dynamic dispatch sites.
     bool reportDynamicDispatchSites = false;
 };
