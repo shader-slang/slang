@@ -198,13 +198,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
         }
 
         // Add a note showing the candidate signature for context
-        if (auto decl = candidate.item.declRef.getDecl())
+        if (candidate.item.declRef.getDecl())
         {
             String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-            getSink()->diagnose(
-                candidate.item.declRef,
-                Diagnostics::overloadCandidate,
-                declString);
+            getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
         }
         else if (candidate.funcType)
         {
