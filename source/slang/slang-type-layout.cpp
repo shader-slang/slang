@@ -312,15 +312,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         const TypeLayoutContext& context) override
     {
         SLANG_UNUSED(elementType);
-
-        // Check if SPIRV with spvBindlessTextureNV extension is enabled
-        if (context.targetReq &&
-            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
-        {
-            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
-            auto uint64Info = GetScalarLayout(BaseType::UInt64);
-            return SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment);
-        }
+        SLANG_UNUSED(context);
 
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uintInfo = GetScalarLayout(BaseType::UInt);
@@ -382,6 +374,26 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of a `struct` must be rounded up to be a multiple of its alignment.
         //
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    SimpleLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind varyingKind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+
+        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
+            auto uint64Info = GetScalarLayout(BaseType::UInt64);
+            return SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment);
+        }
+
+        // For non-bindless GLSL/SPIRV targets, fall back to default layout
+        return Super::GetDescriptorHandleLayout(varyingKind, elementType, context);
     }
 };
 
