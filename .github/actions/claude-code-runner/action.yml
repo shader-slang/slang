@@ -39,6 +39,14 @@ inputs:
     default: "claude"
 
   # Environment and setup
+  prompt:
+    description: "Direct prompt for Claude (for workflow_dispatch testing)"
+    required: false
+    default: ""
+  claude-code-executable-path:
+    description: "Path to pre-installed Claude Code executable (for Windows)"
+    required: false
+    default: ""
   custom-instructions:
     description: "Custom instructions for Claude"
     required: true
@@ -97,6 +105,19 @@ outputs:
 runs:
   using: "composite"
   steps:
+    # Windows-specific setup: Add bash to PATH
+    - name: Add bash to PATH (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
+        Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
+
+    # Windows-specific setup: MSVC dev tools
+    - name: Set up MSVC dev tools (Windows)
+      if: runner.os == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1
+
     # Validate environment and inputs
     - name: Validate Environment
       shell: bash
@@ -109,8 +130,7 @@ runs:
           exit 1
         fi
 
-        # Install required tools
-        command -v jq >/dev/null 2>&1 || { echo "::error::jq is required but not installed"; exit 1; }
+        # Check required tools (curl only - jq replaced with portable parsing)
         command -v curl >/dev/null 2>&1 || { echo "::error::curl is required but not installed"; exit 1; }
 
         echo "✅ Environment validation passed"
@@ -124,11 +144,15 @@ runs:
 
         echo "🔐 Generating authentication token..."
 
+        # Use portable temp directory (works on both Linux and Windows)
+        TEMP_DIR="${RUNNER_TEMP:-/tmp}"
+        TOKEN_FILE="$TEMP_DIR/token_response.json"
+
         # Set up error handling
         cleanup() {
           local exit_code=$?
           echo "🧹 Cleaning up temporary files..."
-          rm -f /tmp/token_response.json 2>/dev/null || true
+          rm -f "$TOKEN_FILE" 2>/dev/null || true
           if [ $exit_code -ne 0 ]; then
             echo "::error::Authentication failed - check your credentials and endpoint"
           fi
@@ -137,13 +161,14 @@ runs:
         trap cleanup EXIT
 
         # Generate token with comprehensive error handling (using Basic auth like original)
-        HTTP_CODE=$(curl -s -w "%{http_code}" -o /tmp/token_response.json --fail-with-body \
+        # Note: Use 'base64 | tr -d' instead of 'base64 -w0' for Windows Git Bash compatibility
+        HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TOKEN_FILE" --fail-with-body \
           --max-time 30 \
           --retry 3 \
           --retry-delay 2 \
           --location "${{ inputs.llmgw-token-url }}" \
           --header 'Content-Type: application/x-www-form-urlencoded' \
-          --header "Authorization: Basic $(echo -n ${{ inputs.llmgw-id }}:${{ inputs.llmgw-secret }} | base64 -w0)" \
+          --header "Authorization: Basic $(echo -n ${{ inputs.llmgw-id }}:${{ inputs.llmgw-secret }} | base64 | tr -d '\n\r')" \
           --data-urlencode 'grant_type=client_credentials' \
           --data-urlencode 'scope=awsanthropic-readwrite azureopenai-readwrite' \
           2>/dev/null)
@@ -151,19 +176,21 @@ runs:
         # Check HTTP response code
         if [ "$HTTP_CODE" -ne 200 ]; then
           echo "::error::Authentication failed with HTTP code: $HTTP_CODE"
-          if [ -f /tmp/token_response.json ]; then
-            echo "::error::Response: $(cat /tmp/token_response.json | head -c 200)"
+          if [ -f "$TOKEN_FILE" ]; then
+            echo "::error::Response: $(cat "$TOKEN_FILE" | head -c 200)"
           fi
           exit 1
         fi
 
         # Extract and validate token
-        if [ ! -f /tmp/token_response.json ]; then
+        if [ ! -f "$TOKEN_FILE" ]; then
           echo "::error::No response file generated"
           exit 1
         fi
 
-        ANTHROPIC_AUTH_TOKEN=$(jq -r '.access_token // empty' /tmp/token_response.json 2>/dev/null)
+        # Parse JSON without jq (portable for Windows Git Bash)
+        # Extract access_token value from JSON response
+        ANTHROPIC_AUTH_TOKEN=$(grep -o '"access_token"[[:space:]]*:[[:space:]]*"[^"]*"' "$TOKEN_FILE" | sed 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' 2>/dev/null || true)
 
         # Validate token format and length
         if [ -z "$ANTHROPIC_AUTH_TOKEN" ] || [ "$ANTHROPIC_AUTH_TOKEN" = "null" ]; then
@@ -183,8 +210,8 @@ runs:
         # Set outputs
         echo "token=$ANTHROPIC_AUTH_TOKEN" >> $GITHUB_OUTPUT
 
-        # Set token expiry if available
-        TOKEN_EXPIRES=$(jq -r '.expires_in // empty' /tmp/token_response.json 2>/dev/null)
+        # Set token expiry if available (parse without jq)
+        TOKEN_EXPIRES=$(grep -o '"expires_in"[[:space:]]*:[[:space:]]*[0-9]*' "$TOKEN_FILE" | sed 's/.*"expires_in"[[:space:]]*:[[:space:]]*\([0-9]*\).*/\1/' 2>/dev/null || true)
         if [ -n "$TOKEN_EXPIRES" ]; then
           echo "::add-mask::$TOKEN_EXPIRES"
           echo "token-expires=$TOKEN_EXPIRES" >> $GITHUB_OUTPUT
@@ -193,7 +220,7 @@ runs:
         echo "✅ Authentication token generated and masked successfully"
 
         # Clean up response file
-        rm -f /tmp/token_response.json
+        rm -f "$TOKEN_FILE"
 
     # Configure authentication
     - name: Configure Authentication
@@ -228,10 +255,13 @@ runs:
 
         echo "🧹 Performing security cleanup..."
 
+        # Use portable temp directory
+        TEMP_DIR="${RUNNER_TEMP:-/tmp}"
+
         # Clear any temporary files that might contain sensitive data
-        find /tmp -name "*token*" -type f -delete 2>/dev/null || true
-        find /tmp -name "*auth*" -type f -delete 2>/dev/null || true
-        find /tmp -name "*response*" -type f -delete 2>/dev/null || true
+        find "$TEMP_DIR" -name "*token*" -type f -delete 2>/dev/null || true
+        find "$TEMP_DIR" -name "*auth*" -type f -delete 2>/dev/null || true
+        find "$TEMP_DIR" -name "*response*" -type f -delete 2>/dev/null || true
 
         # Clear environment variables (belt and suspenders approach)
         unset ANTHROPIC_API_KEY 2>/dev/null || true
@@ -262,9 +292,7 @@ runs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### Setup" >> $GITHUB_STEP_SUMMARY
         echo "- **Setup Commands**: ${{ inputs.setup-commands != '' && '✅ Executed' || '⏭️ Skipped' }}" >> $GITHUB_STEP_SUMMARY
-        if [ "${{ inputs.setup-commands }}" != "" ]; then
-          echo "- **Setup Result**: ${{ steps.setup-commands.outcome || 'Unknown' }}" >> $GITHUB_STEP_SUMMARY
-        fi
+        echo "- **Setup Result**: ${{ steps.setup-commands.outcome || 'Skipped' }}" >> $GITHUB_STEP_SUMMARY
         echo "- **Security Cleanup**: ✅ Completed" >> $GITHUB_STEP_SUMMARY
 
     # Execute Claude Code Action (v1)
@@ -273,10 +301,20 @@ runs:
     - name: Execute Claude Code Action
       id: claude-action
       uses: anthropics/claude-code-action@v1
+      env:
+        # Use Bedrock with bearer token auth (not AWS SigV4)
+        # AWS_BEARER_TOKEN_BEDROCK enables bearer token auth for Bedrock-compatible endpoints
+        ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
+        AWS_BEARER_TOKEN_BEDROCK: ${{ steps.auth-token.outputs.token }}
       with:
         github_token: ${{ steps.auth-config.outputs.github-token }}
-        use_bedrock: ${{ inputs.use-bedrock }}
+        # Enable Bedrock mode with bearer token authentication
+        use_bedrock: "true"
         trigger_phrase: ${{ inputs.trigger-phrase }}
+        # Direct prompt for workflow_dispatch testing (optional)
+        prompt: ${{ inputs.prompt }}
+        # Path to pre-installed Claude Code executable (for Windows)
+        path_to_claude_code_executable: ${{ inputs.claude-code-executable-path }}
         # Consolidated CLI arguments for v1
         claude_args: |
           --system-prompt "${{ inputs.custom-instructions }}"
@@ -288,13 +326,11 @@ runs:
         settings: |
           {
             "env": {
-              "ANTHROPIC_BEDROCK_BASE_URL": "${{ inputs.bedrock-base-url }}",
               "ANTHROPIC_SMALL_FAST_MODEL": "${{ inputs.small-fast-model }}",
               "AWS_REGION": "${{ inputs.aws-region }}",
               "GITHUB_REPOSITORY": "${{ github.repository }}",
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
-              "ANTHROPIC_API_KEY": "${{ steps.auth-token.outputs.token }}",
               "DISABLE_TELEMETRY": "1"
             }
           }

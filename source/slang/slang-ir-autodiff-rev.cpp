@@ -1435,8 +1435,28 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         {
             args.add(primalSpecialize->getArg(i));
         }
+
+        IRType* typeForSpecialization = nullptr;
+        switch ((*diffBase)->getDataType()->getOp())
+        {
+        case kIROp_TypeKind:
+        case kIROp_GenericKind:
+            typeForSpecialization = (*diffBase)->getDataType();
+            break;
+        case kIROp_Generic:
+            typeForSpecialization = (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                (*diffBase)->getDataType(),
+                args.getCount(),
+                args.getBuffer());
+            break;
+        default:
+            typeForSpecialization = builder->getTypeKind();
+            break;
+        }
+
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            typeForSpecialization,
             *diffBase,
             args.getCount(),
             args.getBuffer());
@@ -1472,7 +1492,11 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         // the generic args to specialize the primal function. This is true for all of our core
         // module functions, but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBaseSpecialize->getBase()->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBaseSpecialize->getBase(),
             args.getCount(),
             args.getBuffer());
@@ -1488,7 +1512,11 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         }
         auto diffCallee = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffCallee->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffCallee,
             args.getCount(),
             args.getBuffer());
