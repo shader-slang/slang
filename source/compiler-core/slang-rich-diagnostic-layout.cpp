@@ -110,8 +110,15 @@ void RichDiagnosticLayout::collectLineInfo(
     if (!m_sourceManager)
         return;
 
-    // Map from (file, line) to LineInfo index
-    Dictionary<std::pair<String, Index>, Index> lineMap;
+    // Helper lambda to find existing line info index
+    auto findLineInfoIndex = [&outLineInfos](const String& filePath, Index lineNumber) -> Index {
+        for (Index i = 0; i < outLineInfos.getCount(); i++)
+        {
+            if (outLineInfos[i].filePath == filePath && outLineInfos[i].lineNumber == lineNumber)
+                return i;
+        }
+        return -1;
+    };
 
     for (const auto& label : diagnostic.labels)
     {
@@ -126,13 +133,12 @@ void RichDiagnosticLayout::collectLineInfo(
         String filePath = humaneLoc.pathInfo.foundPath;
         Index lineNumber = humaneLoc.line;
 
-        auto key = std::make_pair(filePath, lineNumber);
-        Index* existingIdx = lineMap.tryGetValue(key);
+        Index existingIdx = findLineInfoIndex(filePath, lineNumber);
 
-        if (existingIdx)
+        if (existingIdx >= 0)
         {
             // Add label to existing line info
-            LineInfo& lineInfo = outLineInfos[*existingIdx];
+            LineInfo& lineInfo = outLineInfos[existingIdx];
             lineInfo.labels.add(label);
 
             // Calculate column range for this label
@@ -221,9 +227,7 @@ void RichDiagnosticLayout::collectLineInfo(
 
             lineInfo.labelColumns.add(std::make_pair(startCol, endCol));
 
-            Index newIdx = outLineInfos.getCount();
             outLineInfos.add(lineInfo);
-            lineMap[key] = newIdx;
         }
     }
 
