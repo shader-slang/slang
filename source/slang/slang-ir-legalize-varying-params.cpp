@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
@@ -1208,6 +1209,355 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return nullptr;
     }
 
+    // Count how many registers a type will need (dry-run, no IR emission)
+    int countRequiredRegisters(IRType* type, IRBuilder* builder)
+    {
+        if (auto ptrValType = tryGetPointedToType(builder, type))
+            type = ptrValType;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            int total = 0;
+            for (auto field : structType->getFields())
+            {
+                total += countRequiredRegisters(field->getFieldType(), builder);
+            }
+            return total;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return -1; // Unknown size
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            int perElement = countRequiredRegisters(arrayType->getElementType(), builder);
+            if (perElement < 0)
+                return -1;
+            return (int)(elementCount * perElement);
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            if (!rowCountInst)
+                return -1;
+            IRIntegerValue elementCount = rowCountInst->getValue();
+            auto rowType =
+                builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+            int perRow = countRequiredRegisters(rowType, builder);
+            if (perRow < 0)
+                return -1;
+            return (int)(elementCount * perRow);
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return -1;
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            return (int)elementCount; // Each element = 1 register
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            // 64-bit types need 2 registers (each register is 32-bit)
+            auto basicTypeOp = basicType->getOp();
+            if (basicTypeOp == kIROp_DoubleType || basicTypeOp == kIROp_Int64Type ||
+                basicTypeOp == kIROp_UInt64Type)
+            {
+                return 2; // 64-bit = 2 registers
+            }
+            return 1; // 32-bit or smaller = 1 register
+        }
+
+        return -1; // Unknown type
+    }
+
+    IRInst* emitOptiXPayloadFetch(
+        int& ioBasePayloadRegisterIndex,
+        IRType* typeToFetch,
+        IRBuilder* builder,
+        int* maxRegisters = nullptr)
+    {
+        // Check if we've already exceeded the register limit
+        if (maxRegisters && ioBasePayloadRegisterIndex >= *maxRegisters)
+            return nullptr;
+
+        if (auto ptrValType = tryGetPointedToType(builder, typeToFetch))
+            typeToFetch = ptrValType;
+        if (auto structType = as<IRStructType>(typeToFetch))
+        {
+            List<IRInst*> fieldVals;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldVal = emitOptiXPayloadFetch(
+                    ioBasePayloadRegisterIndex,
+                    fieldType,
+                    builder,
+                    maxRegisters);
+                if (!fieldVal)
+                    return nullptr;
+
+                fieldVals.add(fieldVal);
+            }
+            return builder->emitMakeStruct(typeToFetch, fieldVals);
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            auto elementType = arrayType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXPayloadFetch(
+                    ioBasePayloadRegisterIndex,
+                    elementType,
+                    builder,
+                    maxRegisters);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeArray(
+                typeToFetch,
+                elementVals.getCount(),
+                elementVals.getBuffer());
+        }
+        else if (auto matType = as<IRMatrixType>(typeToFetch))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            if (rowCountInst)
+            {
+                auto rowType =
+                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+                IRType* elementType = rowType;
+                IRIntegerValue elementCount = rowCountInst->getValue();
+                List<IRInst*> elementVals;
+                for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+                {
+                    auto elementVal = emitOptiXPayloadFetch(
+                        ioBasePayloadRegisterIndex,
+                        elementType,
+                        builder,
+                        maxRegisters);
+                    if (!elementVal)
+                        return nullptr;
+                    elementVals.add(elementVal);
+                }
+                return builder->emitIntrinsicInst(
+                    typeToFetch,
+                    kIROp_MakeMatrix,
+                    elementVals.getCount(),
+                    elementVals.getBuffer());
+            }
+        }
+        else if (auto vecType = as<IRVectorType>(typeToFetch))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            IRType* elementType = vecType->getElementType();
+            List<IRInst*> elementVals;
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto elementVal = emitOptiXPayloadFetch(
+                    ioBasePayloadRegisterIndex,
+                    elementType,
+                    builder,
+                    maxRegisters);
+                if (!elementVal)
+                    return nullptr;
+                elementVals.add(elementVal);
+            }
+            return builder->emitMakeVector(
+                typeToFetch,
+                elementVals.getCount(),
+                elementVals.getBuffer());
+        }
+        else if (const auto basicType = as<IRBasicType>(typeToFetch))
+        {
+            auto basicTypeOp = basicType->getOp();
+
+            // 64-bit types need 2 registers
+            if (basicTypeOp == kIROp_DoubleType || basicTypeOp == kIROp_Int64Type ||
+                basicTypeOp == kIROp_UInt64Type)
+            {
+                // Check if we have space for 2 registers
+                if (maxRegisters && ioBasePayloadRegisterIndex + 1 >= *maxRegisters)
+                    return nullptr;
+
+                // Fetch low 32 bits (register N)
+                IRIntegerValue idxLow = ioBasePayloadRegisterIndex;
+                auto idxLowInst = builder->getIntValue(builder->getIntType(), idxLow);
+                ioBasePayloadRegisterIndex++;
+                IRInst* argsLow[] = {idxLowInst};
+                auto int32Type = builder->getBasicType(BaseType::Int);
+                IRInst* payloadLow =
+                    builder->emitIntrinsicInst(int32Type, kIROp_GetOptiXPayload, 1, argsLow);
+
+                // Fetch high 32 bits (register N+1)
+                IRIntegerValue idxHigh = ioBasePayloadRegisterIndex;
+                auto idxHighInst = builder->getIntValue(builder->getIntType(), idxHigh);
+                ioBasePayloadRegisterIndex++;
+                IRInst* argsHigh[] = {idxHighInst};
+                IRInst* payloadHigh =
+                    builder->emitIntrinsicInst(int32Type, kIROp_GetOptiXPayload, 1, argsHigh);
+
+                // Combine into 64-bit value
+                // Cast both to uint32 first
+                auto uint32Type = builder->getBasicType(BaseType::UInt);
+                auto lowAsUInt = builder->emitCast(uint32Type, payloadLow);
+                auto highAsUInt = builder->emitCast(uint32Type, payloadHigh);
+
+                // Cast to uint64 for bit manipulation
+                auto uint64Type = builder->getBasicType(BaseType::UInt64);
+                auto lowAs64 = builder->emitCast(uint64Type, lowAsUInt);
+                auto highAs64 = builder->emitCast(uint64Type, highAsUInt);
+
+                // Shift high part left by 32 bits
+                auto shift32 = builder->getIntValue(builder->getIntType(), 32);
+                auto highShifted = builder->emitShl(uint64Type, highAs64, shift32);
+
+                // OR them together: (high << 32) | low
+                auto combined64 = builder->emitBitOr(uint64Type, highShifted, lowAs64);
+
+                // Cast to target type (double, int64, or uint64)
+                auto result = builder->emitCast(typeToFetch, combined64);
+                return result;
+            }
+            else
+            {
+                // 32-bit or smaller types - single register
+                if (maxRegisters && ioBasePayloadRegisterIndex >= *maxRegisters)
+                    return nullptr;
+
+                IRIntegerValue idx = ioBasePayloadRegisterIndex;
+                auto idxInst = builder->getIntValue(builder->getIntType(), idx);
+                ioBasePayloadRegisterIndex++;
+                IRInst* args[] = {idxInst};
+                IRInst* getPayload =
+                    builder->emitIntrinsicInst(typeToFetch, kIROp_GetOptiXPayload, 1, args);
+                return getPayload;
+            }
+        }
+
+        return nullptr;
+    }
+
+    void emitOptiXPayloadStore(
+        int& ioBasePayloadRegisterIndex,
+        IRInst* valueToStore,
+        IRType* typeToStore,
+        IRBuilder* builder)
+    {
+        if (auto ptrValType = tryGetPointedToType(builder, typeToStore))
+            typeToStore = ptrValType;
+        if (auto structType = as<IRStructType>(typeToStore))
+        {
+            Index fieldIndex = 0;
+            for (auto field : structType->getFields())
+            {
+                auto fieldType = field->getFieldType();
+                auto fieldKey = field->getKey();
+                auto fieldVal = builder->emitFieldExtract(fieldType, valueToStore, fieldKey);
+                emitOptiXPayloadStore(ioBasePayloadRegisterIndex, fieldVal, fieldType, builder);
+                fieldIndex++;
+            }
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(typeToStore))
+        {
+            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            auto elementType = arrayType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto indexInst = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(valueToStore, indexInst);
+                emitOptiXPayloadStore(ioBasePayloadRegisterIndex, elementVal, elementType, builder);
+            }
+        }
+        else if (auto matType = as<IRMatrixType>(typeToStore))
+        {
+            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
+            if (rowCountInst)
+            {
+                auto rowType =
+                    builder->getVectorType(matType->getElementType(), matType->getColumnCount());
+                IRType* elementType = rowType;
+                IRIntegerValue elementCount = rowCountInst->getValue();
+                for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+                {
+                    auto indexInst = builder->getIntValue(builder->getIntType(), ii);
+                    auto rowVal = builder->emitElementExtract(valueToStore, indexInst);
+                    emitOptiXPayloadStore(ioBasePayloadRegisterIndex, rowVal, elementType, builder);
+                }
+            }
+        }
+        else if (auto vecType = as<IRVectorType>(typeToStore))
+        {
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            IRIntegerValue elementCount = elementCountInst->getValue();
+            IRType* elementType = vecType->getElementType();
+            for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
+            {
+                auto indexInst = builder->getIntValue(builder->getIntType(), ii);
+                auto elementVal = builder->emitElementExtract(valueToStore, indexInst);
+                emitOptiXPayloadStore(ioBasePayloadRegisterIndex, elementVal, elementType, builder);
+            }
+        }
+        else if (const auto basicType = as<IRBasicType>(typeToStore))
+        {
+            auto basicTypeOp = basicType->getOp();
+
+            // 64-bit types need to be split into 2 registers
+            if (basicTypeOp == kIROp_DoubleType || basicTypeOp == kIROp_Int64Type ||
+                basicTypeOp == kIROp_UInt64Type)
+            {
+                // Cast to uint64 for bit manipulation
+                auto uint64Type = builder->getBasicType(BaseType::UInt64);
+                auto valueAs64 = builder->emitCast(uint64Type, valueToStore);
+
+                // Extract low 32 bits
+                auto uint32Type = builder->getBasicType(BaseType::UInt);
+                auto lowBits = builder->emitCast(uint32Type, valueAs64);
+
+                // Extract high 32 bits by shifting right 32 bits
+                auto shift32 = builder->getIntValue(builder->getIntType(), 32);
+                auto highShifted = builder->emitShr(uint64Type, valueAs64, shift32);
+                auto highBits = builder->emitCast(uint32Type, highShifted);
+
+                // Cast to int32 for SetOptiXPayload
+                auto int32Type = builder->getBasicType(BaseType::Int);
+                auto lowAsInt = builder->emitCast(int32Type, lowBits);
+                auto highAsInt = builder->emitCast(int32Type, highBits);
+
+                // Store low 32 bits to register N
+                IRIntegerValue idxLow = ioBasePayloadRegisterIndex;
+                auto idxLowInst = builder->getIntValue(builder->getIntType(), idxLow);
+                ioBasePayloadRegisterIndex++;
+                IRInst* argsLow[] = {idxLowInst, lowAsInt};
+                builder
+                    ->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayload, 2, argsLow);
+
+                // Store high 32 bits to register N+1
+                IRIntegerValue idxHigh = ioBasePayloadRegisterIndex;
+                auto idxHighInst = builder->getIntValue(builder->getIntType(), idxHigh);
+                ioBasePayloadRegisterIndex++;
+                IRInst* argsHigh[] = {idxHighInst, highAsInt};
+                builder
+                    ->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayload, 2, argsHigh);
+            }
+            else
+            {
+                // 32-bit or smaller types - single register
+                IRIntegerValue idx = ioBasePayloadRegisterIndex;
+                auto idxInst = builder->getIntValue(builder->getIntType(), idx);
+                ioBasePayloadRegisterIndex++;
+                IRInst* args[] = {idxInst, valueToStore};
+                builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayload, 2, args);
+            }
+        }
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         // Because many of the varying parameters are defined
@@ -1351,21 +1701,60 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
-                IRPtrType* ptrType = builder.getPtrType(info.type);
-                IRInst* getRayPayload =
-                    builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
-                return LegalizedVaryingVal::makeAddress(getRayPayload);
-                // Todo: compute how many registers are required for the current payload.
-                // If more than 32, use the above logic.
-                // Otherwise, either use the optix_get_payload or optix_set_payload
-                // intrinsics depending on input/output
-                /*if (info.kind == LayoutResourceKind::VaryingInput) {
+
+                // OptiX supports up to 32 payload registers, each 4 bytes (32 * 4 = 128 bytes).
+                // First, count how many registers this payload needs
+                int requiredRegisters = countRequiredRegisters(info.type, &builder);
+                const int maxRegisters = 32; // OptiX hardware limit
+
+                // If payload is too large or size unknown, fall back to pointer method
+                if (requiredRegisters < 0 || requiredRegisters > maxRegisters)
+                {
+                    IRPtrType* ptrType = builder.getPtrType(info.type);
+                    IRInst* getRayPayload =
+                        builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                    return LegalizedVaryingVal::makeAddress(getRayPayload);
                 }
-                else if (info.kind == LayoutResourceKind::VaryingOutput) {
+
+                // Payload fits in registers - use direct register access
+                int fetchRegisterIndex = 0;
+                IRInst* getPayloadValue = emitOptiXPayloadFetch(
+                    fetchRegisterIndex,
+                    info.type,
+                    &builder,
+                    nullptr); // No need to pass maxRegisters since we pre-checked
+
+                // Decomposition should not fail at this point
+                if (!getPayloadValue)
+                {
+                    // Unexpected failure, fall back to pointer
+                    IRPtrType* ptrType = builder.getPtrType(info.type);
+                    IRInst* getRayPayload =
+                        builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                    return LegalizedVaryingVal::makeAddress(getRayPayload);
                 }
-                else {
-                    return diagnoseUnsupportedUserVal(info);
-                }*/
+
+                // For inout parameters, create a local variable, initialize it, and add write-back
+                // Create a local variable to hold the payload during shader execution
+                builder.setInsertBefore(m_firstOrdinaryInst);
+                auto localVar = builder.emitVar(info.type);
+                builder.emitStore(localVar, getPayloadValue);
+
+                // Add write-back at the end of the entry point
+                // Find the return instruction(s) and insert stores before them
+                for (auto block : m_entryPointFunc->getBlocks())
+                {
+                    auto terminator = block->getTerminator();
+                    if (terminator && terminator->getOp() == kIROp_Return)
+                    {
+                        builder.setInsertBefore(terminator);
+                        auto finalValue = builder.emitLoad(localVar);
+                        int storeRegisterIndex = 0;
+                        emitOptiXPayloadStore(storeRegisterIndex, finalValue, info.type, &builder);
+                    }
+                }
+
+                return LegalizedVaryingVal::makeAddress(localVar);
             }
         case LayoutResourceKind::HitAttributes:
             {

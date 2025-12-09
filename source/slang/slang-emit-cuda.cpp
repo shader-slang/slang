@@ -930,6 +930,52 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")optixGetSbtDataPointer())");
             return true;
         }
+    case kIROp_GetOptiXPayload:
+        {
+            auto registerIndexInst = as<IRIntLit>(inst->getOperand(0));
+            SLANG_ASSERT(registerIndexInst);
+            IRIntegerValue registerIndex = registerIndexInst->getValue();
+
+            auto resultType = inst->getDataType();
+            if (resultType->getOp() == kIROp_FloatType)
+            {
+                m_writer->emit("__int_as_float(optixGetPayload_");
+                m_writer->emit(registerIndex);
+                m_writer->emit("())");
+            }
+            else
+            {
+                m_writer->emit("optixGetPayload_");
+                m_writer->emit(registerIndex);
+                m_writer->emit("()");
+            }
+            return true;
+        }
+    case kIROp_SetOptiXPayload:
+        {
+            auto registerIndexInst = as<IRIntLit>(inst->getOperand(0));
+            SLANG_ASSERT(registerIndexInst);
+            IRIntegerValue registerIndex = registerIndexInst->getValue();
+
+            auto value = inst->getOperand(1);
+            auto valueType = value->getDataType();
+
+            m_writer->emit("optixSetPayload_");
+            m_writer->emit(registerIndex);
+            m_writer->emit("(");
+            if (valueType->getOp() == kIROp_FloatType)
+            {
+                m_writer->emit("__float_as_int(");
+                emitOperand(value, getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                emitOperand(value, getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_DispatchKernel:
         {
             auto dispatchInst = as<IRDispatchKernel>(inst);

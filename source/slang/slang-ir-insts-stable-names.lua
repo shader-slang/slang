@@ -685,7 +685,7 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
-  	["SetBase.TypeSet"] = 684,
+	["SetBase.TypeSet"] = 684,
 	["SetBase.FuncSet"] = 685,
 	["SetBase.WitnessTableSet"] = 686,
 	["SetBase.GenericSet"] = 687,
@@ -715,5 +715,7 @@ return {
 	["UninitializedWitnessTableElement"] = 713,
 	["NoneTypeElement"] = 714,
 	["NoneWitnessTableElement"] = 715,
-	["GetTagForSubSet"] = 716
+	["GetTagForSubSet"] = 716,
+	["getOptiXPayload"] = 717,
+	["setOptiXPayload"] = 718,
 }

@@ -1359,6 +1359,14 @@ local insts = {
 	-- Wrapper for OptiX intrinsics used to load shader binding table record data
 	-- using a pointer.
 	{ getOptiXSbtDataPointer = { struct_name = "GetOptiXSbtDataPtr" } },
+	-- Wrapper for OptiX intrinsics to get a single ray payload register value.
+	-- Takes one argument: the register index (0-31).
+	-- Marked as hoistable (no side effects) to enable CSE/redundancy elimination.
+	{ getOptiXPayload = { operands = { { "registerIndex" } }, hoistable = true } },
+	-- Wrapper for OptiX intrinsics to set a single ray payload register value.
+	-- Takes two arguments: the register index (0-31) and the value to set.
+	-- NOT hoistable because it has side effects (writes to payload register).
+	{ setOptiXPayload = { operands = { { "registerIndex" }, { "value" } } } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{
