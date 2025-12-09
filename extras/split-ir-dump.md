@@ -157,18 +157,6 @@ grep "_debugUID=1234" dump-000/*.txt
 python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang -target spirv
 ```
 
-## Advanced: Reading Dumps Without GPU
-
-If you need IR dumps but don't have GPU access:
-
-```bash
-# CPU compute target
-slangc.exe -dump-ir -target cpp -o test.cpp test.slang | python extras/split-ir-dump.py
-
-# Or just stop early (may not show all passes)
-slangc.exe -dump-ir test.slang | python extras/split-ir-dump.py
-```
-
 ## File Naming Convention
 
 Section files are named: `NNN-SECTION-NAME.txt`
@@ -213,22 +201,12 @@ If you want to overwrite, manually delete the old directory first.
 ```bash
 # Method 1: Direct pipe (recommended)
 $ build/Debug/bin/slangc.exe -dump-ir -target spirv-asm -o tmp.spv tests/render/check-backend-support-on-ci.slang | python extras/split-ir-dump.py
-Creating directory: dump-000
-Found 72 sections
-    1. 001-LOWER-TO-IR.txt                                (  1458 chars)
-    2. 002-AFTER-fixEntryPointCallsites.txt               (  2463 chars)
-    ...
-   72. 072-AFTER-checkUnsupportedInst.txt                 (  2025 chars)
-
-Index created: dump-000\000-INDEX.txt
-
-All sections extracted to: dump-000/
+Results saved to: dump-000/
 
 # Method 2: From file
 $ build/Debug/bin/slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
 $ python extras/split-ir-dump.py test.dump
-Creating directory: dump-001
-...
+Results saved to: dump-001/
 
 # Check the index
 $ cat dump-000/000-INDEX.txt
@@ -236,6 +214,13 @@ IR Dump Section Index
 ======================================================================
 Source: stdin
 Total sections: 72
+
+Sections:
+----------------------------------------------------------------------
+  1. 001-LOWER-TO-IR.txt                                (   33 lines)
+  2. 002-AFTER-fixEntryPointCallsites.txt               (   60 lines)
+  ...
+ 72. 072-AFTER-checkUnsupportedInst.txt                 (   50 lines)
 
 # Read a specific section
 $ cat dump-000/032-AFTER-lowerGenerics.txt
