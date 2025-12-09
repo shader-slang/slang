@@ -22121,6 +22121,7 @@ struct HitObject
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
@@ -22128,6 +22129,7 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
         case glsl_nv: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
         case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
         case spirv_nv:
             return spirv_asm
             {
@@ -22151,6 +22153,7 @@ struct HitObject
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
@@ -22158,6 +22161,7 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
         case glsl_nv: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
         case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
         case spirv_nv:
             return spirv_asm
             {
