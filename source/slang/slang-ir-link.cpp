@@ -60,9 +60,13 @@ struct IRSharedSpecContext
 
     // The "global" specialization environment.
     IRSpecEnv globalEnv;
+
+    // Diagnostic sink for reporting errors during linking.
+    DiagnosticSink* sink = nullptr;
 };
 
 void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv);
+static bool isFunctionDefinedOrImported(IRInst* inst);
 
 struct WitnessTableCloneInfo : RefObject
 {
@@ -1553,6 +1557,27 @@ IRInst* cloneGlobalValueWithLinkage(
         return nullptr;
     }
 
+    // Check that the best value we found is valid: if it's a function,
+    // it should either have a body, be an intrinsic, or be imported.
+    // This catches cases like extension methods declared without a body,
+    // which are not valid (extensions cannot define new requirements).
+    if (!isFunctionDefinedOrImported(bestVal))
+    {
+        if (auto sink = context->shared->sink)
+        {
+            sink->diagnose(bestVal->sourceLoc, Diagnostics::unresolvedSymbol, bestVal);
+
+            // Emit notes for all available declarations of this symbol
+            for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+            {
+                sink->diagnose(
+                    ss->irGlobalValue->sourceLoc,
+                    Diagnostics::seeDeclarationOf,
+                    ss->irGlobalValue);
+            }
+        }
+    }
+
     // Check if we've already cloned this value, for the case where
     // we didn't have an original value (just a name), but we've
     // now found a representative value.
@@ -1694,6 +1719,60 @@ static bool doesFuncHaveDefinition(IRFunc* func)
             continue;
         }
     }
+    return false;
+}
+
+/// Check if a function (or generic containing a function) is properly defined or imported.
+/// Returns true if the value is not a function, or if it has a definition, is an intrinsic,
+/// or is marked as imported.
+static bool isFunctionDefinedOrImported(IRInst* inst)
+{
+    IRFunc* func = nullptr;
+
+    // Handle generic case - unwrap the generic to get the function
+    if (auto generic = as<IRGeneric>(inst))
+    {
+        func = as<IRFunc>(findGenericReturnVal(generic));
+    }
+    else
+    {
+        func = as<IRFunc>(inst);
+    }
+
+    // Not a function, no check needed
+    if (!func)
+        return true;
+
+    // Check if it has a function body
+    if (func->getFirstBlock() != nullptr)
+        return true;
+
+    // Check for decorations that indicate the function has an external/special implementation
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        // Intrinsic decorations
+        case kIROp_IntrinsicOpDecoration:
+        case kIROp_TargetIntrinsicDecoration:
+        case kIROp_SPIRVOpDecoration:
+        // Autodiff decorations - the function's implementation is provided by the derivative
+        // function
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_PrimalSubstituteDecoration:
+            return true;
+        default:
+            continue;
+        }
+    }
+
+    // Check for import decorations on the original inst (for generics)
+    if (inst->findDecoration<IRImportDecoration>() || inst->findDecoration<IRDllImportDecoration>())
+        return true;
+
+
     return false;
 }
 
@@ -2065,6 +2144,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(sharedContext, session, nullptr, targetReq);
+    sharedContext->sink = codeGenContext->getSink();
 
     state->irModule = sharedContext->module;
 
