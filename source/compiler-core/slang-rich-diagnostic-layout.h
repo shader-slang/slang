@@ -33,19 +33,28 @@ public:
     struct Options
     {
         /// Maximum width of source lines before truncation
-        Index maxLineWidth = 120;
+        Index maxLineWidth;
 
         /// Number of context lines to show before/after labeled lines
-        Index contextLines = 0;
+        Index contextLines;
 
         /// Tab size for rendering
-        Index tabSize = 4;
+        Index tabSize;
 
         /// Whether to use Unicode box-drawing characters
-        bool useUnicode = false;
+        bool useUnicode;
 
         /// Whether to group labels on the same line
-        bool groupSameLineLabels = true;
+        bool groupSameLineLabels;
+
+        Options()
+            : maxLineWidth(120)
+            , contextLines(0)
+            , tabSize(4)
+            , useUnicode(false)
+            , groupSameLineLabels(true)
+        {
+        }
     };
 
     RichDiagnosticLayout(SourceManager* sourceManager, Options options = Options())
