@@ -78,6 +78,21 @@
       }
     },
     {
+      "name": "vs2026",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2026 project",
+      "generator": "Visual Studio 18 2026"
+    },
+    {
+      "name": "vs2026-dev",
+      "inherits": "msvc-base",
+      "description": "Visual Studio 2026 project with debug assisting features",
+      "generator": "Visual Studio 18 2026",
+      "cacheVariables": {
+        "SLANG_ENABLE_IR_BREAK_ALLOC": "TRUE"
+      }
+    },
+    {
       "name": "slang-llvm",
       "inherits": "default",
       "description": "Build slang-llvm from the system LLVM",
@@ -138,6 +153,21 @@
     {
       "name": "vs2022-releaseWithDebugInfo",
       "configurePreset": "vs2022",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "vs2026-debug",
+      "configurePreset": "vs2026",
+      "configuration": "Debug"
+    },
+    {
+      "name": "vs2026-release",
+      "configurePreset": "vs2026",
+      "configuration": "Release"
+    },
+    {
+      "name": "vs2026-releaseWithDebugInfo",
+      "configurePreset": "vs2026",
       "configuration": "RelWithDebInfo"
     },
     {
