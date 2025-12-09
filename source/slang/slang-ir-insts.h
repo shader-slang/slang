@@ -2821,6 +2821,124 @@ struct IREmbeddedDownstreamIR : IRInst
     CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(getTargetOperand()->getValue()); }
 };
 
+FIDDLE()
+struct IRSetBase : IRInst
+{
+    FIDDLE(baseInst())
+    UInt getCount() { return getOperandCount(); }
+    IRInst* getElement(UInt idx) { return getOperand(idx); }
+    bool isEmpty() { return getOperandCount() == 0; }
+    bool isSingleton() { return (getOperandCount() == 1) && !isUnbounded(); }
+    bool isUnbounded()
+    {
+        // This is an unbounded set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUnboundedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+
+    bool containsUninitializedElement()
+    {
+        // This is a "potentially uninitialized" set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUninitializedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+};
+
+FIDDLE()
+struct IRWitnessTableSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+
+FIDDLE()
+struct IRTypeSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRSetTagType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+    bool isSingleton() { return getSet()->isSingleton(); }
+};
+
+FIDDLE()
+struct IRTaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRWitnessTableSet* getWitnessTableSet() { return as<IRWitnessTableSet>(getOperand(0)); }
+    IRTypeSet* getTypeSet() { return as<IRTypeSet>(getOperand(1)); }
+    bool isSingleton()
+    {
+        return getTypeSet()->isSingleton() && getWitnessTableSet()->isSingleton();
+    }
+};
+
+FIDDLE()
+struct IRElementOfSetType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRUntaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
 // Generate struct definitions for all IR instructions not explicitly defined in this file
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-ir.h.lua")
@@ -3008,6 +3126,7 @@ public:
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
+    IRVoidLit* getVoidValue(IRType* type);
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
@@ -3513,6 +3632,16 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         IRInst* args[] = {arg0, arg1};
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
+    }
+
+    IRMakeTaggedUnion* emitMakeTaggedUnion(
+        IRType* type,
+        IRInst* typeTag,
+        IRInst* witnessTableTag,
+        IRInst* value)
+    {
+        IRInst* args[] = {typeTag, witnessTableTag, value};
+        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 3, args));
     }
 
     IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
@@ -4035,6 +4164,170 @@ $(type_info.return_type) $(type_info.method_name)(
     IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
     IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
     IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
+    IRGetElementFromTag* emitGetElementFromTag(IRInst* tag)
+    {
+        auto tagType = cast<IRSetTagType>(tag->getDataType());
+        IRInst* set = tagType->getSet();
+        auto elementType =
+            cast<IRElementOfSetType>(emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &set));
+        return cast<IRGetElementFromTag>(
+            emitIntrinsicInst(elementType, kIROp_GetElementFromTag, 1, &tag));
+    }
+
+    IRGetTagFromTaggedUnion* emitGetTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* set = taggedUnionType->getWitnessTableSet();
+        auto tableTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &set));
+
+        return cast<IRGetTagFromTaggedUnion>(
+            emitIntrinsicInst(tableTagType, kIROp_GetTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetTypeTagFromTaggedUnion* emitGetTypeTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto typeTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &typeSet));
+
+        return cast<IRGetTypeTagFromTaggedUnion>(
+            emitIntrinsicInst(typeTagType, kIROp_GetTypeTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetValueFromTaggedUnion* emitGetValueFromTaggedUnion(IRInst* taggedUnion)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(taggedUnion->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto valueOfTypeSetType = cast<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &typeSet));
+
+        return cast<IRGetValueFromTaggedUnion>(
+            emitIntrinsicInst(valueOfTypeSetType, kIROp_GetValueFromTaggedUnion, 1, &taggedUnion));
+    }
+
+    IRGetDispatcher* emitGetDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key)
+    {
+        IRInst* args[] = {witnessTableSet, key};
+        return cast<IRGetDispatcher>(emitIntrinsicInst(funcType, kIROp_GetDispatcher, 2, args));
+    }
+
+    IRGetSpecializedDispatcher* emitGetSpecializedDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key,
+        List<IRInst*> const& specArgs)
+    {
+        List<IRInst*> args;
+        args.add(witnessTableSet);
+        args.add(key);
+        for (auto specArg : specArgs)
+        {
+            args.add(specArg);
+        }
+        return cast<IRGetSpecializedDispatcher>(emitIntrinsicInst(
+            funcType,
+            kIROp_GetSpecializedDispatcher,
+            (UInt)args.getCount(),
+            args.getBuffer()));
+    }
+
+    IRUntaggedUnionType* getUntaggedUnionType(IRInst* operand)
+    {
+        return as<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &operand));
+    }
+
+    IRElementOfSetType* getElementOfSetType(IRInst* operand)
+    {
+        return as<IRElementOfSetType>(
+            emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &operand));
+    }
+
+    IRTaggedUnionType* getTaggedUnionType(IRWitnessTableSet* tables, IRTypeSet* types)
+    {
+        IRInst* operands[] = {tables, types};
+        return as<IRTaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_TaggedUnionType, 2, operands));
+    }
+
+    IRSetTagType* getSetTagType(IRSetBase* collection)
+    {
+        IRInst* operands[] = {collection};
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, operands));
+    }
+
+    IRUnboundedTypeElement* getUnboundedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedTypeElement, 1, &interfaceType));
+    }
+
+    IRUnboundedWitnessTableElement* getUnboundedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRUnboundedFuncElement* getUnboundedFuncElement()
+    {
+        return cast<IRUnboundedFuncElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedFuncElement, 0, nullptr));
+    }
+
+    IRUnboundedGenericElement* getUnboundedGenericElement()
+    {
+        return cast<IRUnboundedGenericElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedGenericElement, 0, nullptr));
+    }
+
+    IRUninitializedTypeElement* getUninitializedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedTypeElement, 1, &interfaceType));
+    }
+
+    IRUninitializedWitnessTableElement* getUninitializedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRNoneTypeElement* getNoneTypeElement()
+    {
+        return cast<IRNoneTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneTypeElement, 0, nullptr));
+    }
+
+    IRNoneWitnessTableElement* getNoneWitnessTableElement()
+    {
+        return cast<IRNoneWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneWitnessTableElement, 0, nullptr));
+    }
+
+    IRGetTagOfElementInSet* emitGetTagOfElementInSet(
+        IRType* tagType,
+        IRInst* element,
+        IRInst* collection)
+    {
+        SLANG_ASSERT(tagType->getOp() == kIROp_SetTagType);
+        IRInst* args[] = {element, collection};
+        return cast<IRGetTagOfElementInSet>(
+            emitIntrinsicInst(tagType, kIROp_GetTagOfElementInSet, 2, args));
+    }
+
+    IRSetTagType* getSetTagType(IRInst* collection)
+    {
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &collection));
+    }
 
     //
     // Decorations
@@ -4811,6 +5104,12 @@ $(type_info.return_type) $(type_info.method_name)(
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
+
+    IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
+
+    IRSetBase* getSingletonSet(IROp op, IRInst* element);
+
+    UInt getUniqueID(IRInst* inst);
 };
 
 // Helper to establish the source location that will be used
