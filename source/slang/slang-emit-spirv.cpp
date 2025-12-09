@@ -8864,10 +8864,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     fieldType,
                     &sizeAlignment);
                 IRIntegerValue size = sizeAlignment.size;
+                SLANG_ASSERT(size == IRSizeAndAlignment::kIndeterminateSize || size >= 0);
                 if (size == IRSizeAndAlignment::kIndeterminateSize)
                     size = 0;
-                else
-                    SLANG_ASSERT(size >= 0);
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;
