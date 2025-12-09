@@ -665,7 +665,7 @@ public:
 #if SLANG_GCC
 // GCC 11 emits many incorrect warnings about the `strcmp` call below, e.g.:
 // ```
-// warning: ‘int strcmp(const char*, const char*)’ of a string of length 2 and an array of size 1
+// warning: `int strcmp(const char*, const char*)` of a string of length 2 and an array of size 1
 // evaluates to nonzero [-Wstring-compare]
 // ```
 #pragma GCC diagnostic push
