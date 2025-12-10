@@ -16,13 +16,22 @@ on:
         default: true
 
 jobs:
-  # Run all GPU tests in nvidia/vulkan image (has working Vulkan + CUDA runtime + NVIDIA GPU support)
+  # Run GPU tests in CUDA container with Vulkan support
+  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
     container:
-      image: nvidia/vulkan:1.3-470
-      options: --gpus all --user root
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -34,11 +43,9 @@ jobs:
           apt-get update && apt-get install -y \
             git \
             libx11-6 \
-            libxcursor1 \
-            libxrandr2 \
-            libxinerama1 \
-            libxi6 \
-            libgl1 \
+            libxext6 \
+            libegl1 \
+            libvulkan1 \
             python3
           git config --global --add safe.directory '*'
 
@@ -70,11 +77,7 @@ jobs:
 
           # Verify GPU is accessible
           echo "=== GPU Info ==="
-          nvidia-smi || echo "nvidia-smi not available"
-
-          # Check Vulkan
-          echo "=== Vulkan Info ==="
-          vulkaninfo --summary 2>/dev/null || echo "vulkaninfo not available"
+          nvidia-smi
 
           # Check CUDA
           echo "=== CUDA libraries ==="
@@ -145,8 +148,16 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     container:
-      image: nvidia/vulkan:1.3-470
-      options: --gpus all --user root
+      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
 
     defaults:
       run:
@@ -155,7 +166,12 @@ jobs:
     steps:
       - name: Install Git and dependencies
         run: |
-          apt-get update && apt-get install -y git libx11-6
+          apt-get update && apt-get install -y \
+            git \
+            libx11-6 \
+            libxext6 \
+            libegl1 \
+            libvulkan1
           git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
