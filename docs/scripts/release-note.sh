@@ -95,7 +95,7 @@ for i in $(seq "$commitsCount"); do
 
   # Check if the PR is marked as a breaking change
   if "$gh" issue view "$pr" --json labels | grep -q 'pr: breaking change'; then
-    breakingChanges+="$line"
+    breakingChanges+="$line"$'\n'
   fi
 done
 if [ "$breakingChanges" = "" ]; then
@@ -103,7 +103,6 @@ if [ "$breakingChanges" = "" ]; then
 else
   echo "$breakingChanges"
 fi
-echo ""
 
 echo "=== All changes for this release ==="
 for i in $(seq "$commitsCount"); do
