@@ -168,7 +168,7 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 
 ### Using Generic Parameters in Attributes
 
-When declaring generic functions with the postfix `<>` syntax, you can reference generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like work group sizes at compile time.
+When declaring generic functions with the postfix `<>` syntax, you can reference generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like workgroup sizes at compile time.
 
 For example:
 ```csharp
