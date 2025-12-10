@@ -145,7 +145,9 @@ static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
     {
         return ShaderParameterKind::RawBuffer;
     }
-    else if (as<HLSLRWByteAddressBufferType>(type) || as<HLSLRasterizerOrderedByteAddressBufferType>(type))
+    else if (
+        as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type))
     {
         return ShaderParameterKind::MutableRawBuffer;
     }
@@ -169,7 +171,8 @@ static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
     {
         return ShaderParameterKind::StructuredBuffer;
     }
-    else if (as<HLSLRWStructuredBufferType>(type) || as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    else if (
+        as<HLSLRWStructuredBufferType>(type) || as<HLSLRasterizerOrderedStructuredBufferType>(type))
     {
         return ShaderParameterKind::MutableStructuredBuffer;
     }
@@ -473,7 +476,8 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64);
-            return ObjectLayoutInfo(SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment));
+            return ObjectLayoutInfo(
+                SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment));
         }
 
         // For non-bindless GLSL/SPIRV targets, fall back to default layout
@@ -4908,7 +4912,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto structuredBufferType = as<HLSLStructuredBufferType>(type))
     {
-        auto info = rules->GetObjectLayout(ShaderParameterKind::StructuredBuffer, context.objectLayoutOptions)
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::StructuredBuffer,
+                            context.objectLayoutOptions)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -4919,7 +4926,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto rwStructuredBufferType = as<HLSLRWStructuredBufferType>(type))
     {
-        auto info = rules->GetObjectLayout(ShaderParameterKind::MutableStructuredBuffer, context.objectLayoutOptions)
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -4928,9 +4938,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             rwStructuredBufferType->getElementType());
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (auto rasterizerOrderedStructuredBufferType = as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    else if (
+        auto rasterizerOrderedStructuredBufferType =
+            as<HLSLRasterizerOrderedStructuredBufferType>(type))
     {
-        auto info = rules->GetObjectLayout(ShaderParameterKind::MutableStructuredBuffer, context.objectLayoutOptions)
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -4941,7 +4956,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto appendStructuredBufferType = as<HLSLAppendStructuredBufferType>(type))
     {
-        auto info = rules->GetObjectLayout(ShaderParameterKind::AppendConsumeStructuredBuffer, context.objectLayoutOptions)
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -4952,7 +4970,10 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto consumeStructuredBufferType = as<HLSLConsumeStructuredBufferType>(type))
     {
-        auto info = rules->GetObjectLayout(ShaderParameterKind::AppendConsumeStructuredBuffer, context.objectLayoutOptions)
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
                         .getSimple();
         auto typeLayout = createStructuredBufferTypeLayout(
             context,
@@ -4961,17 +4982,13 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             consumeStructuredBufferType->getElementType());
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (as<TextureType>(type) ||
-             as<GLSLImageType>(type) ||
-             as<SamplerStateType>(type) ||
-             as<GLSLAtomicUintType>(type) ||
-             as<HLSLByteAddressBufferType>(type) ||
-             as<HLSLRWByteAddressBufferType>(type) ||
-             as<HLSLRasterizerOrderedByteAddressBufferType>(type) ||
-             as<GLSLInputAttachmentType>(type) ||
-             as<RaytracingAccelerationStructureType>(type) ||
-             as<UntypedBufferResourceType>(type) ||
-             as<GLSLShaderStorageBufferType>(type))
+    else if (
+        as<TextureType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type) || as<GLSLImageType>(type) ||
+        as<GLSLShaderStorageBufferType>(type) || as<GLSLAtomicUintType>(type) ||
+        as<GLSLInputAttachmentType>(type) || as<UntypedBufferResourceType>(type) ||
+        as<RaytracingAccelerationStructureType>(type))
     {
         ShaderParameterKind kind = _getShaderParameterKindForResourceType(type);
         return createSimpleTypeLayout(
