@@ -1,7 +1,13 @@
 #include "slang-signal.h"
 
 #include "slang-exception.h"
+#include "slang-platform.h"
 #include "stdio.h"
+
+#if _WIN32 && defined(_MSC_VER)
+#include <cassert>
+#include <windows.h>
+#endif
 
 namespace Slang
 {
@@ -50,13 +56,40 @@ String _getMessage(SignalType type, char const* message)
     const char* const typeText = _getSignalTypeAsText(type);
     buf << typeText << ": " << message;
 
+    g_lastSignalMessage = _getMessage(type, message);
+
     // Can be useful to enable during debug when problem is on CI
     if (false)
     {
-        printf("%s\n", _getMessage(type, message).getBuffer());
+        printf("%s\n", g_lastSignalMessage.getBuffer());
     }
 
-    g_lastSignalMessage = _getMessage(type, message);
+#if _WIN32 && defined(_MSC_VER)
+    if (type == SignalType::AssertFailure)
+    {
+        StringBuilder envValue;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
+        {
+            UnownedStringSlice envSlice = envValue.getUnownedSlice();
+            if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
+            {
+                assert(!"SLANG_ASSERT triggered");
+            }
+            else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("debugbreak")))
+            {
+                if (IsDebuggerPresent())
+                {
+                    __debugbreak();
+                }
+                else
+                {
+                    // Fallback when no debugger is attached
+                    assert(!"SLANG_ASSERT triggered (no debugger attached)");
+                }
+            }
+        }
+    }
+#endif
 
 #if SLANG_HAS_EXCEPTIONS
     switch (type)
