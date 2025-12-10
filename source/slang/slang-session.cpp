@@ -148,6 +148,35 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
+
+    // Auto-enable SER capabilities for raytracing profiles
+    // This ensures backward compatibility with code using HitObject APIs
+    Profile profile(desc.profile);
+    CodeGenTarget format = CodeGenTarget(desc.format);
+    if (profile.getFamily() == ProfileFamily::DX && profile.getVersion() >= ProfileVersion::DX_6_3)
+    {
+        // For D3D targets (HLSL/DXIL) with sm_6_3 to sm_6_8, enable NVAPI for SER
+        // DXR 1.3 native (sm_6_9+) doesn't need NVAPI
+        bool isD3DFormat =
+            (format == CodeGenTarget::HLSL || format == CodeGenTarget::DXBytecode ||
+             format == CodeGenTarget::DXBytecodeAssembly || format == CodeGenTarget::DXIL ||
+             format == CodeGenTarget::DXILAssembly);
+        if (isD3DFormat && profile.getVersion() < ProfileVersion::DX_6_9)
+        {
+            optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
+        }
+
+        // For SPIR-V/GLSL targets with sm_6_3 to sm_6_8, enable NV SER extension
+        // This enables NV-specific SER features like HitObject::MakeHit for Vulkan
+        bool isSpirvFormat =
+            (format == CodeGenTarget::SPIRV || format == CodeGenTarget::SPIRVAssembly ||
+             format == CodeGenTarget::GLSL);
+        if (isSpirvFormat && profile.getVersion() < ProfileVersion::DX_6_9)
+        {
+            optionSet.addCapabilityAtom(CapabilityName::spirv_nv);
+        }
+    }
+
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
@@ -349,23 +378,35 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
 
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
     //
     if (componentTypeCount == 1)
     {
         auto componentType = componentTypes[0];
+        if (componentType == nullptr)
+        {
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, 0);
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         componentType->addRef();
         *outCompositeComponentType = componentType;
         return SLANG_OK;
     }
 
-    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
     List<RefPtr<ComponentType>> childComponents;
     for (Int cc = 0; cc < componentTypeCount; ++cc)
     {
+        if (componentTypes[cc] == nullptr)
+        {
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, cc);
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         childComponents.add(asInternal(componentTypes[cc]));
     }
 
@@ -2039,13 +2080,19 @@ SlangResult Linkage::loadSerializedModuleContents(
     //
     SourceLoc serializedModuleLoc;
     {
-        auto sourceFile =
-            sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
-        if (!sourceFile)
-        {
-            sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
-            sourceManager->addSourceFile(moduleFilePathInfo.getMostUniqueIdentity(), sourceFile);
-        }
+        // For the purposes of diagnostics, we create a source file to represent
+        // the binary module file. We intentionally create this with empty content
+        // to avoid displaying binary data in error messages.
+        //
+        // Note: We do NOT reuse any existing source file for this path, because
+        // an earlier code path (e.g., IncludeSystem::loadFile) may have loaded
+        // the binary module content into a source file, and we don't want to
+        // display that binary data when showing diagnostic source lines.
+        //
+        auto sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
+        sourceManager->addSourceFileIfNotExist(
+            moduleFilePathInfo.getMostUniqueIdentity(),
+            sourceFile);
         auto sourceView =
             sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
         serializedModuleLoc = sourceView->getRange().begin;

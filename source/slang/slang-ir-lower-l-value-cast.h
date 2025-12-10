@@ -21,7 +21,7 @@ namespace Slang
 struct IRModule;
 class TargetProgram;
 
-void lowerLValueCast(TargetProgram* target, IRModule* module);
+void lowerLValueCast(IRModule* module, TargetProgram* target);
 
 } // namespace Slang
 

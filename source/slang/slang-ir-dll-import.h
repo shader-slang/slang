@@ -7,5 +7,5 @@ struct IRModule;
 class DiagnosticSink;
 class TargetProgram;
 /// Generate implementations for functions marked as [DllImport].
-void generateDllImportFuncs(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
+void generateDllImportFuncs(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
 } // namespace Slang

@@ -540,6 +540,7 @@ public:
     static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
 
 protected:
+    virtual bool shouldEmitOnlyHeader() { return false; }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
@@ -765,9 +766,6 @@ protected:
 
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
-
-    // Indicates if we are emiting for DXC cooperative vector POC.
-    bool isCoopvecPoc = false;
 
     // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;

@@ -5473,6 +5473,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
+        else if (auto resourceType = as<ResourceType>(type))
+        {
+            // A resource type does not have a default value, so we defensively assign poison value.
+            // In practice, we should never get here. If the value remains unassigned after all of
+            // the subsequent IR steps and is used, it should be detected by
+            // detectUninitializedResources.
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -10902,10 +10910,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        param.clonedParam->setFullType((IRType*)cloneInst(
-                            &cloneEnv,
-                            &typeBuilder,
-                            param.originalParam->getFullType()));
+
+                        // If the type is present in the generic (i.e. not in module scope),
+                        // then we need to make a clone since it is likely to be dependent on the
+                        // new parameters we just emitted and we want to obtain the effective type
+                        // in the current context.
+                        //
+                        // If it's in the global scope, we're good if we use the same type.
+                        //
+                        if (!as<IRModuleInst>(param.originalParam->getFullType()->getParent()))
+                            param.clonedParam->setFullType((IRType*)cloneInst(
+                                &cloneEnv,
+                                &typeBuilder,
+                                param.originalParam->getFullType()));
+                        else
+                            param.clonedParam->setFullType(param.originalParam->getFullType());
+
                         cloneInstDecorationsAndChildren(
                             &cloneEnv,
                             typeBuilder.getModule(),
@@ -11097,7 +11117,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(
                 inst,
-                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
@@ -11942,33 +11962,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
                 LoweredValInfo extents[3];
-
+                subContext->irBuilder->setInsertBefore(irFunc);
                 for (int i = 0; i < 3; ++i)
                 {
                     extents[i] = numThreadsAttr->specConstExtents[i]
                                      ? emitDeclRef(
-                                           context,
+                                           subContext,
                                            numThreadsAttr->specConstExtents[i],
                                            lowerType(
-                                               context,
+                                               subContext,
                                                getType(
-                                                   context->astBuilder,
+                                                   subContext->astBuilder,
                                                    numThreadsAttr->specConstExtents[i])))
-                                     : lowerVal(context, numThreadsAttr->extents[i]);
+                                     : lowerVal(subContext, numThreadsAttr->extents[i]);
                 }
 
                 numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    getSimpleVal(context, extents[0]),
-                    getSimpleVal(context, extents[1]),
-                    getSimpleVal(context, extents[2])));
+                    getSimpleVal(subContext, extents[0]),
+                    getSimpleVal(subContext, extents[1]),
+                    getSimpleVal(subContext, extents[2])));
                 numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
-                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes)));
+                    getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
             }
             else if (as<ReadNoneAttribute>(modifier))
             {
@@ -12133,7 +12154,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
-                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
@@ -12617,6 +12638,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
         // Once we have both the generic and its arguments,
         // we can emit a `specialize` instruction and use
         // its value as the result.
+        if (genericVal.flavor == LoweredValInfo::Flavor::Ptr)
+            type = context->irBuilder->getPtrType(type);
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,
@@ -13729,6 +13752,28 @@ IREntryPointLayout* lowerEntryPointLayout(
     return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
 }
 
+bool isUnspecializedGenericDeclRef(DeclRef<Decl> declRef)
+{
+    auto genericDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericDeclRef)
+        return false;
+    if (genericDeclRef->getArgCount() == 0)
+        return false;
+    DeclRef<Decl> argDeclRef;
+    if (auto intVal = as<DeclRefIntVal>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = intVal->getDeclRef();
+    }
+    else if (auto type = as<DeclRefType>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = type->getDeclRef();
+    }
+    if (argDeclRef.getDecl() &&
+        argDeclRef.getDecl()->parentDecl == genericDeclRef->getGenericDecl())
+        return true;
+    return false;
+}
+
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
     if (m_irModuleForLayout)
@@ -13839,6 +13884,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // and thus don't have AST-level information for us to work with.
         //
         if (!funcDeclRef)
+            continue;
+
+        // Skip unspecialized functions because we cannot produce IR layouts to
+        // them yet.
+        if (isUnspecializedGenericDeclRef(funcDeclRef))
             continue;
 
         auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));

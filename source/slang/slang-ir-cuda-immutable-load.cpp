@@ -365,7 +365,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     }
 };
 
-void lowerImmutableBufferLoadForCUDA(TargetProgram* targetProgram, IRModule* module)
+void lowerImmutableBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram)
 {
     ImmutableBufferLoadLoweringContext context(module);
     context.targetProgram = targetProgram;

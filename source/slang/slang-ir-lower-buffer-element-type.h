@@ -33,8 +33,8 @@ struct BufferElementTypeLoweringOptions
 // that returns array typed values.
 //
 void lowerBufferElementTypeToStorageType(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
 

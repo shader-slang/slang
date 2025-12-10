@@ -1,7 +1,6 @@
 #include "slang-ir-any-value-inference.h"
 
 #include "../core/slang-func-ptr.h"
-#include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
@@ -90,7 +89,10 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* module)
+void inferAnyValueSizeWhereNecessary(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     // Go through the global insts and collect all interface types.
     // For each interface type, infer its any-value-size, by looking up
@@ -130,9 +132,10 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
             if (interfaceType->findDecoration<IRBuiltinDecoration>())
                 continue;
 
-            // If the interface already has an explicit any-value-size, don't infer anything.
+            /* If the interface already has an explicit any-value-size, don't infer anything.
             if (interfaceType->findDecoration<IRAnyValueSizeDecoration>())
                 continue;
+            */
 
             // Skip interfaces that are not implemented by any type.
             if (!implementedInterfaces.contains(interfaceType))
@@ -213,6 +216,12 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
+        IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt; // Default to max int.
+        if (auto existingAnyValueDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            existingMaxSize = existingAnyValueDecor->getSize();
+        }
+
         IRIntegerValue maxAnyValueSize = -1;
         for (auto implType : mapInterfaceToImplementations[interfaceType])
         {
@@ -223,6 +232,18 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
                 &sizeAndAlignment);
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+
+            // Diagnose if the existing any-value-size is smaller than the inferred size.
+            if (existingMaxSize < sizeAndAlignment.size)
+            {
+                sink->diagnose(implType, Diagnostics::typeDoesNotFitAnyValueSize, implType);
+                sink->diagnoseWithoutSourceView(
+                    implType,
+                    Diagnostics::typeAndLimit,
+                    implType,
+                    sizeAndAlignment.size,
+                    existingMaxSize);
+            }
         }
 
         // Should not encounter interface types without any conforming implementations.
@@ -232,7 +253,10 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
         if (maxAnyValueSize >= 0)
         {
             IRBuilder builder(module);
-            builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+            if (!interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+            {
+                builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+            }
         }
     }
 }
