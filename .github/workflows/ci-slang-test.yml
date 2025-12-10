@@ -163,7 +163,12 @@ jobs:
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 30
-    if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
+    # FIXME 2025-12-10 jhelferty:
+    # Slangpy tests are temporarily disabled until we can make a slangpy
+    # release. Updated tests went into the slangpy-samples repository that are
+    # backwards-incompatible with the old slangpy implementation.
+    # Re-enable after we have made a slangpy release!
+    if: false && inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
         shell: bash
