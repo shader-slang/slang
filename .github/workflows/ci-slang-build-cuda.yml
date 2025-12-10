@@ -11,11 +11,13 @@ on:
         type: string
 
 jobs:
+  # Note: CUDA 12.4 is used because the test runner host driver (550.54.15) doesn't support
+  # newer PTX versions from CUDA 12.9. The container toolkit version must match the host driver.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
     container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
       options: --user root
 
     defaults:

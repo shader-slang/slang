@@ -18,11 +18,13 @@ on:
 jobs:
   # Run GPU tests in CUDA container with Vulkan support
   # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work
+  # Note: CUDA 12.4 is used because the host driver (550.54.15) doesn't support newer PTX versions
+  # from CUDA 12.9. The container toolkit version must match the host driver capabilities.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
     container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
       options: >-
         --gpus all
         --user root
@@ -148,7 +150,7 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     container:
-      image: nvidia/cuda:12.9.1-devel-ubuntu22.04
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
       options: >-
         --gpus all
         --user root
