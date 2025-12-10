@@ -103,7 +103,7 @@ void testLoadShB(uint tid, uint tileIndex)
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
 
     uint subgroupIndex = tid / 32;
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 

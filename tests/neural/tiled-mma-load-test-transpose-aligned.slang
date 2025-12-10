@@ -1,4 +1,4 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -18,52 +18,28 @@ import neural;
 //   Row 30: 960  961  962  963  ...  975  976  977  ...  991
 //   Row 31: 992  993  994  995  ... 1007 1008 1009  ... 1023
 //
-// Since tileA is 32×32 bytes, each thread loads 16 elements per row.
+// In the transpose mode, each tile still load a column of CoopMat of A^T, but the
+// memory layout is in column major. Therefore, each load will results in a
+// AlignedK x WMMA_TileWidth (16 for half type) matrix.
+
 // test1: Expected output for the first tile:
-//
-//   0    1    2    3   ...   15
-//  32   33   34   35   ...   47
-//  ...
-// 960  961  962  963  ...  975
-// 992  993  994  995  ... 1007
-//
+// col0:   0    1    2    3   ...   31
+// col1:  32   33   34   35   ...   63
+// ...
+// col15: 480  481  482  483  ...  511
+
 // test2: Expected output for the second tile:
-//
-//  16   17   18   19   ...   31
-//  48   49   50   51   ...   63
-//  ...
-// 1008 1009 1010 1011  ... 1023
+// col0:  512  513  514  515  ...  543
+// col1:  544  545  546  547  ...  575
+// ...
+// col15: 992  993  994  995  ... 1023
 
-// ============================================================================
-// MATRIX B - Loaded from Thread-Local Vector
-// ============================================================================
-// Each thread constructs a local vector where:
-//   element[i] = tid * 32 + i, for i = 0, 1, 2, ... 31
-//
-// Since tileB is 32×32 bytes, each thread loads 16 elements per column.
-// test1: Expected output for the first tile (column-major):
-//
-//   0   32   ...  960  992
-//   1   33   ...  961  993
-//   2   34   ...  962  994
-//   3   35   ...  963  995
-//  ...
-//  15   47   ...  975 1007
-
-// test2: Expected output for the second tile (column-major):
-//
-//  16   48   ...  1008 1040
-//  17   49   ...  1009 1041
-//  18   50   ...  1010 1042
-//  19   51   ...  1011 1043
-//  ...
-//  31   63   ...  1023 1055
 
 // Make the weight matrix as 32x32 matrix in row major order
 // TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
 RWStructuredBuffer<half> inputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=4):out, name=outputBuffer
+// TEST_INPUT:ubuffer(stride=4, count=2):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
 
@@ -91,36 +67,32 @@ void testLoadShA(uint tid, uint tileIndex)
     Storage storage = Storage(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadShA<Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.LoadShA<Storage>(sharedMemoryA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
-void testLoadShB(uint tid, uint tileIndex)
-{
-    // Construct the input vector as follow:
-    // x = tid * 32 + 0, 1, 2, 3 ... 31
-    half inputVector[InputSize];
-    for (int i = 0; i < InputSize; i++)
-    {
-        inputVector[i] = half(tid * InputSize + i);
-    }
-
-    SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
-    // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
-    GroupMemoryBarrierWithWaveSync();
-}
 
 bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 {
-    // Verify the output is correct, each thread will verify one row/column of the shared memory.
-    // So each thread will check 2 uint4 elements (32 bytes/16 half) in the shared memory.
-    half expected = half(tid * 32 + tileIndex * 16);
+    // Verify the output is correct, each thread will verify one column of the shared memory.
+    // The tile width of A is just 16 for half type.
+    const int WMMA_TileWidth = 16;
+    const int WMMA_TileHeight = 16;
+    if (tid >= WMMA_TileWidth)
+        return true;
+
+    const int AlignedK = ((InputSize + WMMA_TileWidth - 1) / WMMA_TileWidth) * WMMA_TileWidth;
+    const int TileSize = AlignedK * WMMA_TileWidth;
+    const int ElementCountPerVector = sizeof(uint4) / sizeof(half);
+    const int NumVectorsPerColumn = AlignedK / ElementCountPerVector;
+
+    half expected = half(tid * AlignedK + tileIndex * TileSize);
     bool res = true;
-    uint index = tid * 16;  // 16 half per thread
-    for (int i = 0; i < 2; i++)
+    uint indexInTile = tid * NumVectorsPerColumn;  // AlignedK half per thread
+
+    for (int i = 0; i < NumVectorsPerColumn; i++)
     {
-        uint4 values = sharedMem[tid * 2 + i];
+        uint4 values = sharedMem[indexInTile + i];
         uint4 element = values;
         for (int j = 0; j < 4; j++)
         {
@@ -150,49 +122,18 @@ bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
     return res;
 }
 
-void test1(uint tid)
+void test(uint tid, uint tileIndex, uint resIndex)
 {
     if (tid >= SubgroupSize)
         return;
 
-    testLoadShA(tid, 0);
+    testLoadShA(tid, tileIndex);
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
-    bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 0);
+    bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), tileIndex);
     res = WaveActiveAllTrue(res);
     if (tid == 0)
-        outputBuffer[0] = res ? 1 : 0;
-    // BUFFER: 1
-
-    testLoadShB(tid, 0);
-
-    bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 0);
-    res1 = WaveActiveAllTrue(res1);
-    if (tid == 0)
-        outputBuffer[1] = res1 ? 1 : 0;
-    // BUFFER-NEXT: 1
-}
-
-void test2(uint tid)
-{
-    if (tid >= SubgroupSize)
-        return;
-
-    testLoadShA(tid, 1);
-
-    bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 1);
-    res = WaveActiveAllTrue(res);
-    if (tid == 0)
-        outputBuffer[2] = res ? 1 : 0;
-    // BUFFER-NEXT: 1
-
-    testLoadShB(tid, 1);
-
-    bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 1);
-    res1 = WaveActiveAllTrue(res1);
-    if (tid == 0)
-        outputBuffer[3] = res1 ? 1 : 0;
-    // BUFFER-NEXT: 1
+        outputBuffer[resIndex] = res ? 1 : 0;
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
@@ -203,12 +144,13 @@ void serialRead(uint tid, SPtr sharedMem)
     if (tid > 0)
         return;
 
-    for (int id = 0; id < 32; id++)
+    // In transpose mode, tile is in column major, and each length is AlignedK length
+    for (int id = 0; id < 16; id++)
     {
-        printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
+        printf("col: %d\n", id);
+        for (int i = 0; i < 4; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = sharedMem[id * 4 + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
@@ -231,6 +173,8 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    test1(tid);
-    test2(tid);
+    test(tid, 0, 0);
+    // BUFFER: 1
+    test(tid, 1, 1);
+    // BUFFER-NEXT: 1
 }
