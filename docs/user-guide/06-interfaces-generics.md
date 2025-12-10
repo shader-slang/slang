@@ -166,6 +166,36 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 }
 ```
 
+### Using Generic Parameters in Attributes
+
+When declaring generic functions with the postfix `<>` syntax, you can reference generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like work group sizes at compile time.
+
+For example:
+```csharp
+[numthreads(blockSize, blockSize, 1)]
+void computeMain<int blockSize>() 
+{
+    // Shader implementation
+}
+```
+
+This feature allows the host application to control the workgroup size by compiling a specialization of the entry point with a specific value for `blockSize`. Instead of having to write multiple separate entry points with different hardcoded `numthreads` values, you can write a single generic entry point and specialize it as needed:
+
+```csharp
+// Compile a specialization with blockSize = 8
+computeMain<8>();  // This will have [numthreads(8, 8, 1)]
+
+// Compile a specialization with blockSize = 16
+computeMain<16>(); // This will have [numthreads(16, 16, 1)]
+```
+
+This is especially valuable when the optimal workgroup size may vary based on:
+- Target hardware capabilities
+- Problem size
+- Performance tuning requirements
+
+Note that generic value parameters used in attributes must be compile-time constants, so they work well with generic value parameters like `int` or `uint`, but not with generic type parameters.
+
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
 
