@@ -703,7 +703,8 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
 #if SLANG_WINDOWS_FAMILY
                 // Expected sequence on Windows:
                 // CUDA / <version> / bin [ / x64 ]
-                if (pathSplitCount >= 3) {
+                if (pathSplitCount >= 3)
+                {
                     // Figure out if this is 13.0+ and in an x64 subdirectory
                     auto pathOffset = 0;
                     if (pathSplitCount >= 4 && pathSlices[pathSplitCount - 1] == toSlice("x64"))
@@ -720,7 +721,8 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
                             sdkPath = Path::getParentDirectory(sdkPath);
                         }
 
-                        if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
                         {
                             return SLANG_OK;
                         }
@@ -729,7 +731,8 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
 #else
                 // Expected sequence on Linux for cuda 13+:
                 // cuda-<version> / targets / <arch> / lib
-                if (pathSplitCount >= 4) {
+                if (pathSplitCount >= 4)
+                {
                     if (pathSlices[pathSplitCount - 1] == toSlice("lib") &&
                         pathSlices[pathSplitCount - 3] == toSlice("targets") &&
                         pathSlices[pathSplitCount - 4].subString(0, 4) == toSlice("cuda"))
@@ -737,7 +740,8 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
                         // Headers are under <arch> / include
                         const auto sdkPath = Path::getParentDirectory(parentPath);
 
-                        if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
                         {
                             return SLANG_OK;
                         }
@@ -745,13 +749,15 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
                 }
                 // Expected sequence on Linux for cuda 12:
                 // cuda-<version> / lib[64]
-                if (pathSplitCount >= 2) {
+                if (pathSplitCount >= 2)
+                {
                     if (pathSlices[pathSplitCount - 1].subString(0, 3) == toSlice("lib") &&
                         pathSlices[pathSplitCount - 2].subString(0, 4) == toSlice("cuda"))
                     {
                         const auto sdkPath = Path::getParentDirectory(parentPath);
 
-                        if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
                         {
                             return SLANG_OK;
                         }
