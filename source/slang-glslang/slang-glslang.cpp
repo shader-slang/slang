@@ -551,13 +551,7 @@ static int glslang_optimizeSPIRV(
 static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
 {
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
-    std::vector<uint32_t> spirvBuffer;
-    size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
-    if (inputBlobSize > 0)
-    {
-        spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));
-        memcpy(spirvBuffer.data(), request.inputBegin, inputBlobSize);
-    }
+    std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
 
     int err = glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
