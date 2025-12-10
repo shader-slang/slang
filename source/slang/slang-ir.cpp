@@ -2454,6 +2454,16 @@ IRVoidLit* IRBuilder::getVoidValue()
     return (IRVoidLit*)_findOrEmitConstant(keyInst);
 }
 
+IRVoidLit* IRBuilder::getVoidValue(IRType* type)
+{
+    IRConstant keyInst;
+    memset(&keyInst, 0, sizeof(keyInst));
+    keyInst.m_op = kIROp_VoidLit;
+    keyInst.typeUse.usedValue = type;
+    keyInst.value.intVal = 0;
+    return (IRVoidLit*)_findOrEmitConstant(keyInst);
+}
+
 IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
 {
     IRType* capabilityAtomType = getIntType();
@@ -3579,7 +3589,7 @@ IRInst* IRBuilder::emitPackAnyValue(IRType* type, IRInst* value)
 
 IRInst* IRBuilder::emitUnpackAnyValue(IRType* type, IRInst* value)
 {
-    auto inst = createInst<IRPackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
+    auto inst = createInst<IRUnpackAnyValue>(this, kIROp_UnpackAnyValue, type, value);
 
     addInst(inst);
     return inst;
@@ -6565,6 +6575,46 @@ IREntryPointLayout* IRBuilder::getEntryPointLayout(
         operands));
 }
 
+IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
+{
+    // Verify that all operands are global instructions
+    for (auto element : elements)
+        if (element->getParent()->getOp() != kIROp_ModuleInst)
+            SLANG_ASSERT_FAILURE("createSet called with non-global operands");
+
+    List<IRInst*>* sortedElements = getModule()->getContainerPool().getList<IRInst>();
+    for (auto element : elements)
+        sortedElements->add(element);
+
+    // Sort elements by their unique IDs to ensure canonical ordering
+    sortedElements->sort(
+        [&](IRInst* a, IRInst* b) -> bool { return getUniqueID(a) < getUniqueID(b); });
+
+    auto setBaseInst = as<IRSetBase>(
+        emitIntrinsicInst(nullptr, op, sortedElements->getCount(), sortedElements->getBuffer()));
+
+    getModule()->getContainerPool().free(sortedElements);
+
+    return setBaseInst;
+}
+
+IRSetBase* IRBuilder::getSingletonSet(IROp op, IRInst* element)
+{
+    return getSet(op, {element});
+}
+
+UInt IRBuilder::getUniqueID(IRInst* inst)
+{
+    auto uniqueIDMap = getModule()->getUniqueIdMap();
+    auto existingId = uniqueIDMap->tryGetValue(inst);
+    if (existingId)
+        return *existingId;
+
+    auto id = uniqueIDMap->getCount();
+    uniqueIDMap->add(inst, id);
+    return id;
+}
+
 //
 
 struct IRDumpContext
@@ -7998,6 +8048,38 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
+            bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
+            if (userIsSetInst)
+            {
+                // Set insts need their operands sorted
+                auto module = user->getModule();
+                SLANG_ASSERT(module);
+
+                List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
+                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
+                    operands.add(user->getOperand(ii));
+
+                auto getUniqueId = [&](IRInst* inst) -> UInt
+                {
+                    auto uniqueIDMap = module->getUniqueIdMap();
+                    auto existingId = uniqueIDMap->tryGetValue(inst);
+                    if (existingId)
+                        return *existingId;
+
+                    auto id = uniqueIDMap->getCount();
+                    uniqueIDMap->add(inst, id);
+                    return (UInt)id;
+                };
+
+                operands.sort(
+                    [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
+
+                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
+                    user->getOperandUse(ii)->usedValue = operands[ii];
+
+                module->getContainerPool().free(&operands);
+            }
+
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
             _maybeHoistOperand(uu);
@@ -8297,6 +8379,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     if (as<IRSPIRVAsmOperand>(this))
         return false;
 
+    if (as<IRSetBase>(this))
+        return false;
+
     switch (getOp())
     {
     // By default, assume that we might have side effects,
@@ -8485,7 +8570,34 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetPerVertexInputArray:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_GetCurrentStage:
+    case kIROp_GetDispatcher:
+    case kIROp_GetSpecializedDispatcher:
+    case kIROp_GetTagForMappedSet:
+    case kIROp_GetTagForSpecializedSet:
+    case kIROp_GetTagForSuperSet:
+    case kIROp_GetTagForSubSet:
+    case kIROp_GetTagFromSequentialID:
+    case kIROp_GetSequentialIDFromTag:
+    case kIROp_CastInterfaceToTaggedUnionPtr:
+    case kIROp_GetElementFromTag:
+    case kIROp_GetTagFromTaggedUnion:
+    case kIROp_GetTypeTagFromTaggedUnion:
+    case kIROp_GetValueFromTaggedUnion:
+    case kIROp_MakeTaggedUnion:
+    case kIROp_GetTagOfElementInSet:
+    case kIROp_MakeDifferentialPairUserCode:
+    case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+        return false;
+
+    case kIROp_UnboundedFuncElement:
+    case kIROp_UnboundedTypeElement:
+    case kIROp_UnboundedWitnessTableElement:
+    case kIROp_UnboundedGenericElement:
+    case kIROp_UninitializedTypeElement:
+    case kIROp_UninitializedWitnessTableElement:
+    case kIROp_NoneTypeElement:
+    case kIROp_NoneWitnessTableElement:
         return false;
 
     case kIROp_ForwardDifferentiate:
