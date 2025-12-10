@@ -2456,8 +2456,7 @@ IRVoidLit* IRBuilder::getVoidValue()
 
 IRVoidLit* IRBuilder::getVoidValue(IRType* type)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_VoidLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.intVal = 0;
