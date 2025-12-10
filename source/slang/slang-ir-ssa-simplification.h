@@ -36,7 +36,11 @@ void simplifyIR(
     DiagnosticSink* sink = nullptr);
 
 // Run simplifications on IR that is out of SSA form.
-void simplifyNonSSAIR(IRModule* module, TargetProgram* target, IRSimplificationOptions options);
+void simplifyNonSSAIR(
+    IRModule* module,
+    TargetProgram* target,
+    IRSimplificationOptions options,
+    DiagnosticSink* sink = nullptr);
 
 void simplifyFunc(
     TargetProgram* target,

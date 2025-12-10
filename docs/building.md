@@ -57,12 +57,12 @@ cmake --build --preset releaseWithDebugInfo # or --preset debug, or --preset rel
 
 For Visual Studio run:
 ```bash
-cmake --preset vs2022 # or 'vs2019' or `vs2022-dev`
+cmake --preset vs2022 # or 'vs2019' or 'vs2026'
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
 cmake --build --preset releaseWithDebugInfo # to build from the CLI, could also use --preset release or --preset debug
 ```
 
-There also exists a `vs2022-dev` preset which turns on features to aid
+There are also `*-dev` variants like `vs2022-dev` and `vs2026-dev` which turn on features to aid
 debugging.
 
 ### WebAssembly build
@@ -341,7 +341,7 @@ Another option is to build using the Visual Studio generator which can find
 this automatically
 
 ```
-cmake --preset vs2022 # or --preset vs2019
+cmake --preset vs2022 # or --preset vs2019, vs2026
 cmake --build --preset generators # to build from the CLI
 cmake --install build --prefix generators --component generators
 rm -rf build # The Visual Studio generator will complain if this is left over from a previous build
