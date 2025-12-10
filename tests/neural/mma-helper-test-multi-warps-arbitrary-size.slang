@@ -71,7 +71,9 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMat
     // Construct the input vector as follow:
     // x = tid + 1
     // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    half inputVector[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK];
+    const int InSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
+    const int OutSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM;
+    half inputVector[InSize];
 
     for (int i = 0; i < InputSize; i++)
     {
@@ -84,7 +86,9 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMat
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.mma<Storage>(inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize, false
+                        >.mma<Storage, half[InSize], half[OutSize]
+                             >(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrC, 32);
     return res;
 }

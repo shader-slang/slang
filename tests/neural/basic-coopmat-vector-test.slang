@@ -1,4 +1,4 @@
-// //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 // //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 // //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
 
@@ -19,8 +19,8 @@ RWStructuredBuffer<float> parametersFloat;
 RWStructuredBuffer<ElementType> parameters;
 
 // Create a buffer to store the test result
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
-RWStructuredBuffer<uint> testResult;
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=testResult
+RWStructuredBuffer<uint2> testResult;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):name=dInput
 RWStructuredBuffer<ElementType> dInput;
@@ -33,6 +33,7 @@ typealias BufferStorage = StructuredBufferStorage<ElementType>;
 
 static const int InputSize = 4;
 static const int OutputSize = 2;
+static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 
 #define MAX(a, b) (a < b ? a : b)
@@ -41,7 +42,7 @@ static const int ShMemSize = ( MMAHelper<ElementType, InputSize, OutputSize, Sub
                                MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize>.SharedMemSizeInVectorMatB);
 
 groupshared uint4[ShMemSize] shMem;
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
@@ -69,10 +70,10 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
 // }
 
 // Basic test on MatMul without bias, this test covers both forward and backward pass
-bool BasicTestWithoutBias(int tid)
+void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias VectorType = AccelerateVectorCoopMat<ElementType, 4, 32>;
-    typealias OutputVectorType = AccelerateVectorCoopMat<ElementType, 2, 32>;
+    typealias VectorType = AccelerateVectorCoopMat<ElementType, 4, SubgroupSize>;
+    typealias OutputVectorType = AccelerateVectorCoopMat<ElementType, 2, SubgroupSize>;
 
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
     var input = VectorType(inputData);
@@ -84,22 +85,16 @@ bool BasicTestWithoutBias(int tid)
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<VectorType, OutputVectorType>(input, weightStorage, weightAddress);
+    // serialRead(tid, (input.sharedMemoryPtr + 32));
 
-    SPtr ptr = input.sharedMemoryPtr + 32;
-    serialRead(tid, ptr);
-
-    if (tid < 4)
-    {
-        for (int i = 0; i < 2; i++)
-        {
-            printf("%d: %f \n", tid, float(outputVec[i]));
-        }
-        printf("\n");
-    }
-
-    // // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
-    // // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
+    // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
+    // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
+    isPassed = WaveActiveAllTrue(isPassed);
+    if (tid == 0)
+    {
+        testResult[resIndex].x = isPassed ? 1 : 0;
+    }
 
 
     // var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
@@ -121,11 +116,9 @@ bool BasicTestWithoutBias(int tid)
     // isPassed = isPassed &&
     //     dParameters[0] == 1.0 && dParameters[1] == 2.0 && dParameters[2] == 3.0 && dParameters[3] == 4.0 &&
     //     dParameters[4] == 1.0 && dParameters[5] == 2.0 && dParameters[6] == 3.0 && dParameters[7] == 4.0;
-
-    return isPassed;
 }
 
-void serialRead(uint tid, SPtr sharedMem)
+void serialRead(uint tid, SPtr<uint4> sharedMem)
 {
     GroupMemoryBarrierWithWaveSync();
 
@@ -173,42 +166,12 @@ void setupParameters(uint tid)
     }
 }
 
-// struct IntValue : IntType
-// {
-//     property int Value { get { return value; } }
-//     int value;
-// }
-// interface Max2
-// {
-//     associatedtype A : IntType;
-//     associatedtype B : IntType;
-//     associatedtype Result : IntType;
-// }
-
-// extension<T:Max2> T
-//     where T.A.Value < T.B.Value
-// {
-//     typealias Result = T.A;
-// }
-
-// extension<T:Max2> T
-//     where T.A.Value >= T.B.Value
-// {
-//     typealias Result = T.B;
-// }
-
 [shader("compute")]
-[numthreads(32, 1, 1)]
+[numthreads(BatchSize, 1, 1)]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     setupParameters(tid);
     GroupMemoryBarrierWithWaveSync();
-    testResult[0] = BasicTestWithoutBias(tid);
+    BasicTestWithoutBias(tid, 0);
     // BUFFER: 1
-
-    // static const int a = 2;
-    // static const int b = 32;
-    // static const int c = Max<a, b>::value;
-    // int arr[MAX(2, 32)] = {};
-    // testResult[tid] = MMAHelper<ElementType, 4, 2, 32>.SomeTest;
 }
