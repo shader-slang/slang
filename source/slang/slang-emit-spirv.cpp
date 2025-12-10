@@ -8818,7 +8818,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        return builder.getStringValue(toSlice("unamed"));
+        return builder.getStringValue(toSlice("unnamed"));
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;
