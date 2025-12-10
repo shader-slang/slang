@@ -670,9 +670,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
         // Get the object layout to get size
         auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
 
-        // For combined texture samplers, objLayout will have multiple layoutInfos (texture + sampler)
-        // For other types, it will have a single layoutInfo
-        // We need to convert all uniform layout infos to the requested varying kind
+        // objLayout can have multiple layoutInfos, so we need to return the size from each
         ObjectLayoutInfo result;
         for (const auto& layoutInfo : objLayout.layoutInfos)
         {
@@ -858,9 +856,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Get the object layout to get size
         auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
 
-        // For combined texture samplers, objLayout will have multiple layoutInfos (texture + sampler)
-        // For other types, it will have a single layoutInfo
-        // We need to convert all uniform layout infos to the requested varying kind
+        // objLayout can have multiple layoutInfos, so we need to return the size from each
         ObjectLayoutInfo result;
         for (const auto& layoutInfo : objLayout.layoutInfos)
         {
