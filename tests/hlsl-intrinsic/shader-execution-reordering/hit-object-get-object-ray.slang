@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenShader -stage raygeneration
+//TEST:SIMPLE(filecheck=SPIRV): -target spirv -entry rayGenShader -stage raygeneration -capability spirv_nv
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -entry rayGenShader -stage raygeneration
 
 //TEST_INPUT: set sceneBVH = AccelerationStructure
