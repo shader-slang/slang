@@ -394,7 +394,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context) override
     {
@@ -404,7 +404,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uintInfo = GetScalarLayout(BaseType::UInt);
         auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
-        return ObjectLayoutInfo(SimpleLayoutInfo(varyingKind, uint2Info.size, uint2Info.alignment));
+        return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
     }
 };
 
@@ -464,7 +464,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context) override
     {
@@ -477,11 +477,11 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64);
             return ObjectLayoutInfo(
-                SimpleLayoutInfo(varyingKind, uint64Info.size, uint64Info.alignment));
+                SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
         }
 
         // For non-bindless GLSL/SPIRV targets, fall back to default layout
-        return Super::GetDescriptorHandleLayout(varyingKind, elementType, context);
+        return Super::GetDescriptorHandleLayout(kind, elementType, context);
     }
 };
 
@@ -663,25 +663,18 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context) override
     {
+        SLANG_UNUSED(kind);
+
         // For CPU targets, DescriptorHandle<T> has the layout of T
         // Determine ShaderParameterKind from the element type
         ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
 
-        // Get the object layout to get size
-        auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
-
-        // objLayout can have multiple layoutInfos, so we need to return the size from each
-        ObjectLayoutInfo result;
-        for (const auto& layoutInfo : objLayout.layoutInfos)
-        {
-            // Replace the resource kind with the requested varyingKind while keeping the size
-            result.layoutInfos.add(SimpleLayoutInfo(varyingKind, layoutInfo.size));
-        }
-        return result;
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
     }
 };
 
@@ -849,25 +842,18 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context) override
     {
+        SLANG_UNUSED(kind);
+
         // For CUDA targets, DescriptorHandle<T> has the layout of T
         // Determine ShaderParameterKind from the element type
         ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
 
-        // Get the object layout to get size
-        auto objLayout = context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
-
-        // objLayout can have multiple layoutInfos, so we need to return the size from each
-        ObjectLayoutInfo result;
-        for (const auto& layoutInfo : objLayout.layoutInfos)
-        {
-            // Replace the resource kind with the requested varyingKind while keeping the size
-            result.layoutInfos.add(SimpleLayoutInfo(varyingKind, layoutInfo.size));
-        }
-        return result;
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
     }
 };
 

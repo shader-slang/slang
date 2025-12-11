@@ -1356,7 +1356,7 @@ struct SimpleLayoutRulesImpl
 
     // Get layout for DescriptorHandle<T>
     virtual ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context) = 0;
 };
@@ -1433,11 +1433,11 @@ struct LayoutRulesImpl
     }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
-        LayoutResourceKind varyingKind,
+        LayoutResourceKind kind,
         Type* elementType,
         const TypeLayoutContext& context)
     {
-        return simpleRules->GetDescriptorHandleLayout(varyingKind, elementType, context);
+        return simpleRules->GetDescriptorHandleLayout(kind, elementType, context);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
