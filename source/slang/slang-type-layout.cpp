@@ -476,8 +476,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
             auto uint64Info = GetScalarLayout(BaseType::UInt64);
-            return ObjectLayoutInfo(
-                SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
+            return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
         }
 
         // For non-bindless GLSL/SPIRV targets, fall back to default layout
