@@ -85,33 +85,13 @@ jobs:
           echo "=== CUDA libraries ==="
           ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
 
-      - name: Test Slang (Vulkan API)
+      - name: Test Slang
         run: |
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
           slang_test_args=(
             "-category" "full"
-            "-api" "vk"
-            "-expected-failure-list" "tests/expected-failure-github.txt"
-            "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
-            "-skip-reference-image-generation"
-            "-show-adapter-info"
-            "-ignore-abort-msg"
-          )
-
-          if [ "${{ inputs.server-count }}" -gt 1 ]; then
-            slang_test_args+=("-use-test-server")
-            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
-          fi
-
-          "$bin_dir/slang-test" "${slang_test_args[@]}"
-
-      - name: Test Slang (CUDA API)
-        run: |
-          slang_test_args=(
-            "-category" "full"
-            "-api" "cuda"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
