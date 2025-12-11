@@ -701,6 +701,10 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
+    // Track diagnostics that have already been reported to avoid duplicates.
+    // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
+    HashSet<String> m_reportedDiagnosticKeys;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -1266,6 +1270,24 @@ struct SemanticsVisitor : public SemanticsContext
     }
 
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
+
+    /// Diagnose a diagnostic only once per unique key (diagnostic ID + location + parameters).
+    /// Useful for avoiding duplicate warnings in loops over aggregate elements.
+    template<typename... Args>
+    void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
+    {
+        // Key = diagnostic ID + source location + all parameters
+        StringBuilder keyBuilder;
+        keyBuilder << diagnostic.id << "|" << loc.getRaw();
+        if constexpr (sizeof...(args) > 0)
+        {
+            ((keyBuilder << "|" << args), ...); // Fold expression to append all args
+        }
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
 
 public:
     // Translate Types

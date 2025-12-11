@@ -1422,7 +1422,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
+    SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
         SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
@@ -1458,7 +1458,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::IncomingCallableData:
             return SpvStorageClassIncomingCallableDataKHR;
         case AddressSpace::HitObjectAttribute:
-            return SpvStorageClassHitObjectAttributeNV;
+            {
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                    return SpvStorageClassHitObjectAttributeEXT;
+                return SpvStorageClassHitObjectAttributeNV;
+            }
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
         case AddressSpace::ShaderRecordBuffer:
@@ -2213,9 +2218,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeRayQuery(inst);
 
         case kIROp_HitObjectType:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-            return emitOpTypeHitObject(inst);
+            {
+                // Use EXT if target has spvShaderInvocationReorderEXT capability,
+                // otherwise fall back to NV for backward compatibility
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                    return emitOpTypeHitObjectEXT(inst);
+                }
+                else
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                    return emitOpTypeHitObject(inst);
+                }
+            }
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -2531,7 +2552,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    static SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
+    SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
     {
         SpvStorageClass storageClass = SpvStorageClassFunction;
         if (ptrType && ptrType->hasAddressSpace())
@@ -8797,7 +8818,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        return builder.getStringValue(toSlice("unamed"));
+        return builder.getStringValue(toSlice("unnamed"));
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;

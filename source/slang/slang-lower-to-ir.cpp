@@ -5473,6 +5473,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
+        else if (auto resourceType = as<ResourceType>(type))
+        {
+            // A resource type does not have a default value, so we defensively assign poison value.
+            // In practice, we should never get here. If the value remains unassigned after all of
+            // the subsequent IR steps and is used, it should be detected by
+            // detectUninitializedResources.
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -11109,7 +11117,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(
                 inst,
-                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
@@ -12146,7 +12154,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
-                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))

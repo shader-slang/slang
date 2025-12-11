@@ -2035,7 +2035,7 @@ struct LoweredElementTypeContext
         auto baseCast = as<IRCastStorageToLogical>(majorGEP->getBase());
         SLANG_ASSERT(baseCast);
         auto storageBase = baseCast->getOperand(0);
-        auto loweredMatrixType = cast<IRPtrTypeBase>(storageBase->getFullType())->getValueType();
+        auto loweredMatrixType = tryGetPointedToType(&builder, storageBase->getFullType());
         auto matrixTypeInfo =
             getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
         SLANG_ASSERT(matrixTypeInfo);

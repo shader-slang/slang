@@ -15,20 +15,21 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, Diagno
         if (auto varLayout = findVarLayout(inst))
         {
             // Get container space (for ParameterBlocks etc.)
-            auto containerSpace = findRegisterSpaceResourceInfo(varLayout);
-            if (containerSpace >= 0)
-                usedSpaces.add((int)containerSpace);
-    
+            auto registerSpace = findRegisterSpaceResourceInfo(varLayout);
+            if (registerSpace >= 0)
+                usedSpaces.add((int)registerSpace);
+
             // Get base offset for nested resources
             UInt spaceOffset = 0;
-            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+            if (auto spaceAttr =
+                    varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
                 spaceOffset = spaceAttr->getOffset();
-    
-            // Get direct binding spaces
+
             for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
             {
                 if (!ShaderBindingRange::isUsageTracked(sizeAttr->getResourceKind()))
                     continue;
+                // Get the binding information from this attribute and insert it into the list
                 if (auto offsetAttr = varLayout->findOffsetAttr(sizeAttr->getResourceKind()))
                     usedSpaces.add((int)(spaceOffset + offsetAttr->getSpace()));
             }

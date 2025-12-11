@@ -247,8 +247,13 @@ jobs:
 
       - name: Clone slangpy-samples
         run: |
+          # 2025-12-10 jhelferty: Use slang-ci branch instead of main. The API
+          # on main is currently under active development, and a number of
+          # backwards- incompatible changes were introduced. For now, we will
+          # use a dedicated branch "slang-ci", and manually update it after we
+          # make a slangpy release.
           echo "Cloning slangpy-samples repository..."
-          git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+          git clone --depth 1 --branch slang-ci https://github.com/shader-slang/slangpy-samples.git
 
       - name: Install slangpy-samples dependencies
         run: |
