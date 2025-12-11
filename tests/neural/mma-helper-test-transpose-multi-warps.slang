@@ -212,18 +212,21 @@ void computeMain(uint tid : SV_DispatchThreadID)
         fillWeightMatrix<8, 8>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<8, 8>(tid, 1);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<16, 16>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<16, 16>(tid, 2);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<32, 32>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<32, 32>(tid, 3);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {

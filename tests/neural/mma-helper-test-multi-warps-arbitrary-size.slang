@@ -184,30 +184,35 @@ void computeMain(uint tid : SV_DispatchThreadID)
         fillWeightMatrix<3, 5>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<3, 5>(tid, 0);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<11, 18>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<11, 18>(tid, 1);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<23, 9>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<23, 9>(tid, 2);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<35, 3>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<35, 3>(tid, 3);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<17, 64>(tid);
         GroupMemoryBarrierWithGroupSync();
         test<17, 64>(tid, 4);
+        GroupMemoryBarrierWithGroupSync();
     }
     // BUFFER: 1
     // BUFFER-NEXT: 1
