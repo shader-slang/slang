@@ -127,6 +127,15 @@ uint WaveGetLaneCount();
 
 uint WaveGetLaneIndex();
 
+uint WaveGetNumWaves();  // Number of waves in workgroup (equivalent to GLSL gl_NumSubgroups)
+
+// Lane masks (equivalent to GLSL gl_SubgroupXxMask)
+uint4 WaveGetLaneEqMask();  // Mask with only current lane's bit set
+uint4 WaveGetLaneGeMask();  // Mask with bits set for lanes >= current lane
+uint4 WaveGetLaneGtMask();  // Mask with bits set for lanes > current lane
+uint4 WaveGetLaneLeMask();  // Mask with bits set for lanes <= current lane
+uint4 WaveGetLaneLtMask();  // Mask with bits set for lanes < current lane
+
 bool WaveIsFirstLane();
 
 // Ballot
@@ -162,6 +171,16 @@ bool WaveActiveAllEqual<T>(T value);
 T WavePrefixProduct<T>(T expr);
 
 T WavePrefixSum<T>(T expr);
+
+T WavePrefixMin<T>(T expr);
+
+T WavePrefixMax<T>(T expr);
+
+T WavePrefixBitAnd<T>(T expr);
+
+T WavePrefixBitOr<T>(T expr);
+
+T WavePrefixBitXor<T>(T expr);
 
 // Communication
 
@@ -402,6 +421,10 @@ bool WaveMaskAllEqual<T>(WaveMask mask, T value);
 T WaveMaskPrefixProduct<T>(WaveMask mask, T expr);
 
 T WaveMaskPrefixSum<T>(WaveMask mask, T expr);
+
+T WaveMaskPrefixMin<T>(WaveMask mask, T expr);
+
+T WaveMaskPrefixMax<T>(WaveMask mask, T expr);
 
 T WaveMaskPrefixBitAnd<T>(WaveMask mask, T expr);
 
