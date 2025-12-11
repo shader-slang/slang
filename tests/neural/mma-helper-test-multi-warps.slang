@@ -188,6 +188,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         GroupMemoryBarrierWithGroupSync();
         test<4, 4>(tid, 0);
         identityWeightMatrix<4>(tid, true);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
@@ -196,6 +197,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         GroupMemoryBarrierWithGroupSync();
         test<8, 8>(tid, 1);
         identityWeightMatrix<8>(tid, true);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
@@ -203,6 +205,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         GroupMemoryBarrierWithGroupSync();
         test<16, 16>(tid, 2);
         identityWeightMatrix<16>(tid, true);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
@@ -210,6 +213,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         GroupMemoryBarrierWithGroupSync();
         test<32, 32>(tid, 3);
         identityWeightMatrix<32>(tid, true);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     {
@@ -217,6 +221,7 @@ void computeMain(uint tid : SV_DispatchThreadID)
         GroupMemoryBarrierWithGroupSync();
         test<64, 64>(tid, 4);
         identityWeightMatrix<64>(tid, true);
+        GroupMemoryBarrierWithGroupSync();
     }
 
     // BUFFER: 1
