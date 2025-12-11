@@ -3623,9 +3623,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     getNonSemanticDebugInfoExtInst(),
                     funcDebugScope);
                 // Emit a DebugLine immediately after the DebugScope to ensure every
-                // DebugScope block has at least one DebugLine, even if the block has
-                // no ordinary IR instructions.
-                IRDebugLocationDecoration* locDecor = irBlock->findDecoration<IRDebugLocationDecoration>();
+                // DebugScope block has at least one DebugLine. Try to get location from
+                // the first ordinary instruction in the block, or use a default location.
+                IRInst* firstInst = irBlock->getFirstOrdinaryInst();
+                IRDebugLocationDecoration* locDecor =
+                    firstInst ? firstInst->findDecoration<IRDebugLocationDecoration>() : nullptr;
                 if (locDecor)
                 {
                     emitOpDebugLine(
@@ -3713,7 +3715,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitPhi(spvBlock, irParam);
                 }
             }
-            
+
             // Before emitting the ordinary instructions, ensure we have a DebugLine
             // after any DebugScope that was emitted for this block.
             // This must come after OpPhi instructions but before other instructions.
@@ -3723,7 +3725,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 maybeEmitPendingDebugLine(spvBlock, irBlock->getFirstOrdinaryInst());
             }
-            
+
             for (auto irInst : irBlock->getOrdinaryInsts())
             {
                 // Any instructions local to the block will be emitted as children
@@ -3742,7 +3744,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     break;
                 }
             }
-            
+
             // If we still have a pending DebugScope (from an IRDebugScope instruction),
             // emit a DebugLine now to ensure it's not left without a DebugLine.
             if (m_pendingDebugScopeParent)
@@ -4190,7 +4192,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             maybeEmitPendingDebugLine(parent, inst);
             break;
         }
-        
+
         SpvInst* result = nullptr;
         switch (inst->getOp())
         {
@@ -8613,12 +8615,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 // Try to get source location from the instruction or the pending scope instruction
                 IRInst* sourceInst = inst ? inst : m_pendingDebugScopeSourceInst;
-                
+
                 // Try to get debug location decoration
                 IRDebugLocationDecoration* locDecor = nullptr;
                 if (sourceInst)
                     locDecor = sourceInst->findDecoration<IRDebugLocationDecoration>();
-                
+
                 // If we have location information, emit a DebugLine
                 if (locDecor)
                 {
@@ -8650,7 +8652,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         zero);
                 }
             }
-            
+
             // Clear the pending debug scope
             m_pendingDebugScopeParent = nullptr;
             m_pendingDebugScopeSourceInst = nullptr;
@@ -8662,11 +8664,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
-        
+
         // Clear the pending debug scope since we're emitting a DebugLine
         m_pendingDebugScopeParent = nullptr;
         m_pendingDebugScopeSourceInst = nullptr;
-        
+
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -8709,11 +8711,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             getNonSemanticDebugInfoExtInst(),
             scope,
             inlinedAt);
-        
+
         // Mark that we need a DebugLine to follow this DebugScope
         m_pendingDebugScopeParent = parent;
         m_pendingDebugScopeSourceInst = debugScope;
-        
+
         return result;
     }
 
@@ -8777,7 +8779,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Clear any pending debug scope when emitting DebugNoScope
         m_pendingDebugScopeParent = nullptr;
         m_pendingDebugScopeSourceInst = nullptr;
-        
+
         return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
     }
 
