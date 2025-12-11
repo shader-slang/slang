@@ -3676,7 +3676,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitPhi(spvBlock, irParam);
                 }
             }
-            
+
             // After emitting Phi nodes, check if this block is a loop's target block.
             // If so, emit the loop header block contents now to maintain source order.
             IRInst* loopInst = nullptr;
@@ -3695,7 +3695,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     pendingLoopInsts.removeAt(loopIndex);
                 }
             }
-            
+
             for (auto irInst : irBlock->getOrdinaryInsts())
             {
                 // Any instructions local to the block will be emitted as children
@@ -3717,7 +3717,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         // Emit any remaining loop header blocks that weren't emitted inline.
-        // This handles cases where the loop's target block comes before the loop instruction in the block list.
+        // This handles cases where the loop's target block comes before the loop instruction in the
+        // block list.
         for (auto loopInst : pendingLoopInsts)
         {
             SpvInst* headerBlock = nullptr;
