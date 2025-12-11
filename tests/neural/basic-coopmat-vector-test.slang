@@ -44,6 +44,7 @@ static const int ShMemSize = ( MMAHelper<ElementType, InputSize, OutputSize, Sub
 groupshared uint4[ShMemSize] shMem;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
+[Differentiable]
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     BufferStorage weightStorage,
@@ -72,11 +73,11 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias VectorType = AccelerateVectorCoopMat<ElementType, 4, SubgroupSize>;
-    typealias OutputVectorType = AccelerateVectorCoopMat<ElementType, 2, SubgroupSize>;
+    typealias InVectorType = AccelerateVectorCoopMat<ElementType, 4, SubgroupSize>;
+    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, 2, SubgroupSize>;
 
     ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
-    var input = VectorType(inputData);
+    var input = InVectorType(inputData);
     input.sharedMemoryPtr = __getAddress(shMem[0]);
 
     BufferStorage weightStorage = BufferStorage(parameters);
@@ -84,7 +85,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     BufferStorage.Address weightAddress = 0;
 
     // Run the forward pass
-    let outputVec = TestInlineVectorMatMul<VectorType, OutputVectorType>(input, weightStorage, weightAddress);
+    let outputVec = TestInlineVectorMatMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
     // serialRead(tid, (input.sharedMemoryPtr + 32));
 
     // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
@@ -97,15 +98,24 @@ void BasicTestWithoutBias(int tid, int resIndex)
     }
 
 
-    // var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
-    // let dRes = AccelerateVectorCoopMat<ElementType, 2, 32>(1.0f);
-    // var dPair = diffPair(input);
+    var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
+    let dRes = OutVectorType(1.0f);
+    var dPair = diffPair(input);
 
-    // // Run the backward pass
-    // // dInput = W^T * dOutput
-    // // dInput = {3, 7, 11, 15}
-    // bwd_diff(TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
-    //             (dPair, weightDiffPair, weightAddress, dRes);
+    // Run the backward pass
+    // dInput = W^T * dOutput
+    // dInput = {3, 7, 11, 15}
+    bwd_diff(TestInlineVectorMatMul<InVectorType, OutVectorType>)
+                (dPair, weightDiffPair, weightAddress, dRes);
+
+    if (tid == 0)
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            printf("%.1f ", float(dPair.d[i]));
+        }
+        printf("\n");
+    }
 
     // isPassed = isPassed &&
     //     dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;

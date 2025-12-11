@@ -92,7 +92,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMat
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
     let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize, false
-                        >.mma<Storage, half[InSize], half[OutSize]
+                        >.mma<half, Storage, half[InSize], half[OutSize]
                              >(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrB, 16);
     return res;
