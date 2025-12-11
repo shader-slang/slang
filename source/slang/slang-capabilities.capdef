@@ -683,24 +683,29 @@ def spvFragmentBarycentricKHR : SPV_KHR_fragment_shader_barycentric;
 def spvFragmentFullyCoveredEXT : SPV_EXT_fragment_fully_covered;
 
 /// Represents the SPIR-V capability for group non-uniform ballot operations.
+/// Also supported on CUDA through warp intrinsics.
 /// [EXT]
-def spvGroupNonUniformBallot : _spirv_1_3;
+alias spvGroupNonUniformBallot = _spirv_1_3 | _cuda_sm_7_0;
 
 /// Represents the SPIR-V capability for group non-uniform shuffle operations.
+/// Also supported on CUDA through warp intrinsics.
 /// [EXT]
-def spvGroupNonUniformShuffle : _spirv_1_3;
+alias spvGroupNonUniformShuffle = _spirv_1_3 | _cuda_sm_7_0;
 
 /// Represents the SPIR-V capability for group non-uniform arithmetic operations.
+/// Also supported on CUDA through warp intrinsics.
 /// [EXT]
-def spvGroupNonUniformArithmetic : _spirv_1_3;
+alias spvGroupNonUniformArithmetic = _spirv_1_3 | _cuda_sm_7_0;
 
 /// Represents the SPIR-V capability for group non-uniform quad operations.
+/// Also supported on CUDA through warp intrinsics.
 /// [EXT]
-def spvGroupNonUniformQuad : _spirv_1_3;
+alias spvGroupNonUniformQuad = _spirv_1_3 | _cuda_sm_7_0;
 
 /// Represents the SPIR-V capability for group non-uniform vote operations.
+/// Also supported on CUDA through warp intrinsics.
 /// [EXT]
-def spvGroupNonUniformVote : _spirv_1_3;
+alias spvGroupNonUniformVote = _spirv_1_3 | _cuda_sm_7_0;
 
 /// Represents the SPIR-V capability for group non-uniform partitioned operations.
 /// [EXT]

@@ -6,9 +6,9 @@
 
 // CHECK_IGNORE_CAPS-NOT: warning 41012
 
-// SPIRV: warning 41012
-// SPIRV-NOT: spirv_1_2
-// SPIRV-SAME: spvGroupNonUniformBallot
+// spvGroupNonUniformBallot is now an alias to _spirv_1_3, so targeting spirv_1_3
+// already satisfies the requirement - no warning expected.
+// SPIRV-NOT: warning 41012
 
 // GLSL: warning 41012
 // GLSL-NOT: GLSL_400

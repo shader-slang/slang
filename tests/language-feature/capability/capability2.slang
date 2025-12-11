@@ -47,7 +47,7 @@ struct Impl1 : IFoo
 struct Impl2 : IFoo, IFoo2
 {
     // error here because explicit requirement is on `method1`
-    // CHECK: error 36104:{{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36104:{{.*}}spirv_1_3
     void method1()
     {
         useRayQueryKHR();
@@ -56,7 +56,7 @@ struct Impl2 : IFoo, IFoo2
 
     // error here because capabilities are explicitly tagged on
     // the requirement parent `IFoo`
-    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
+    // CHECK: error 36104: {{.*}}spirv_1_3
     void method2()
     {
         useAtomicFloat16();

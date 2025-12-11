@@ -751,24 +751,29 @@ Extensions
 
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
+> Also supported on CUDA through warp intrinsics.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+> Also supported on CUDA through warp intrinsics.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
 
 `spvGroupNonUniformQuad`
 > Represents the SPIR-V capability for group non-uniform quad operations.
+> Also supported on CUDA through warp intrinsics.
 
 `spvGroupNonUniformRotateKHR`
 > Represents the SPIR-V capability for group non-uniform rotate operations.
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+> Also supported on CUDA through warp intrinsics.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
+> Also supported on CUDA through warp intrinsics.
 
 `spvImageFootprintNV`
 > Represents the SPIR-V capability for image footprint.
