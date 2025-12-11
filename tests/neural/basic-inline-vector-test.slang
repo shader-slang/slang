@@ -85,12 +85,12 @@ bool BasicTestWithoutBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, weightAddress, dRes);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
@@ -132,12 +132,12 @@ bool BasicTestWithBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, biasDiffPair, weightAddress, biasAddress, dOutput);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]

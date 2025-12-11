@@ -107,7 +107,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.Uint4AlignedK] t
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.mma<Storage, half[InSize], half[OutSize]>( inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>( inputVector, ptrA, ptrB, ptrC, storage, 0);
     return res;
 }
 

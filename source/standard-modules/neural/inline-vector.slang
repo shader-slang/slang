@@ -22,6 +22,9 @@ public struct InlineVector<T, int N> : IVector<T, N>
     /// The compile-time size of the vector.
     public static const int Size = N;
 
+    internal typealias InternalDataType = T[N];
+
+    public int getCount() {return N;}
     /**
     Internal storage for vector elements.
     @remarks Marked as derivative member to enable automatic differentiation.
@@ -72,6 +75,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
         get() { return this.data[index]; }
         set() { this.data[index] = newValue; }
     }
+
+    internal InternalDataType getInternalData() { return this.data; }
 
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]
@@ -139,7 +144,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where OutputVector : IVector<T, OutputSize>
     {
         // Derivative of the input is transposed weight matrix times the output differential
-        var d = dthis.d;
+        This.Differential d = {};
 
         [MaxIters(OutputSize)]
         for (int j = 0; j < OutputSize; j++)
@@ -147,9 +152,11 @@ public struct InlineVector<T, int N> : IVector<T, N>
             T.Differential dy = doutput[j];
 
             [ForceUnroll]
+            // N is the column count of the weight matrix.
             for (int i = 0; i < N; i++)
             {
-                Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i * OutputSize + j);
+                // On the transpose, we just perform linear combination of each row for the cache friendly.
+                Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i + j * N);
                 T.Differential prod = T.Differential.dmul(dWeightStorage.p.read(elementOffset), dy);
                 d[i] = T.Differential.dadd(d[i], prod);
             }
@@ -255,7 +262,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
       where OutputVector.Differential : IVector<T.Differential, OutputSize>
     {
         // dInput = dW^T * dOutput
-        var d = dthis.d;
+        This.Differential d = {};
         [MaxIters(OutputSize)]
         for (int j = 0; j < OutputSize; j++)
         {
@@ -263,7 +270,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
             [ForceUnroll]
             for (int i = 0; i < N; i++)
             {
-                T.Differential prod = T.Differential.dmul(dparameters.p[i * OutputSize + j], dy);
+                T.Differential prod = T.Differential.dmul(dparameters.p[i + j * N], dy);
                 d[i] = T.Differential.dadd(d[i], prod);
             }
         }

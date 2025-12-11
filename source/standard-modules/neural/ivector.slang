@@ -12,7 +12,7 @@ and linear algebra operations for neural network computations.
 @see `InlineVector`
 @category neural
 */
-public interface IVector<T, int N> : IDifferentiable
+public interface IVector<T, int N> : IDifferentiable, IRWArray<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -22,6 +22,8 @@ public interface IVector<T, int N> : IDifferentiable
     /// The differential type for automatic differentiation.
     /// @remarks Ensures the differential is also a vector with the same structure.
     public associatedtype Differential : IVector<T.Differential, N>;
+
+    internal associatedtype InternalDataType : IArray<T>;
 
     /// Default constructor - initializes vector to zero.
     public __init();
@@ -56,6 +58,8 @@ public interface IVector<T, int N> : IDifferentiable
         get;
         set;
     }
+
+    internal InternalDataType getInternalData();
 
     /**
     Evaluates a linear transformation: output = W * input.

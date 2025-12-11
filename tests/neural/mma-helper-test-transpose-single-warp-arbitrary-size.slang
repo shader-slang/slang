@@ -109,7 +109,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK] testMat
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialReadA<InputSize, OutputSize>(tid);
     // serialRead(tid, ptrC, 32);
     return res;
