@@ -40,8 +40,8 @@ groupshared uint4 s_sharedMemoryB[256];
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 typealias HalfPtr = Ptr<half, Access::ReadWrite, AddressSpace::GroupShared>;
 
-// Initialize the weight as the pattern: i-th row is filled with all (i+1),
-// i starts from 0.
+// Initialize the weight with the pattern:
+// each column is filled with -1 0 1 * column_index in a cycle.
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = false)
 {
     // int scaleFactor = (tid % 3 == 0) ? -1 : ((tid % 3 == 1) ? 0 : 1);
@@ -57,7 +57,7 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
         int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
         for (int i = 0; i < InputSize; i++)
         {
-            int index = row * OutputSize + i;
+            int index = row * InputSize + i;
             if (clear)
                 inputBuffer[index] = half(0);
             else
@@ -83,17 +83,20 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
     }
 }
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize>(uint tid)
+half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<half>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    const int InSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    const int OutSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM;
+    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>;
+    const int OutSize = MMA.Uint4AlignedK;
+    const int InSize = MMA.Uint4AlignedM;
+
     half inputVector[InSize] = {};
-    for (int i = 0; i < InputSize; i++)
+
+    for (int i = 0; i < OutputSize; i++)
     {
         inputVector[i] = half(tid + 1);
     }
@@ -141,6 +144,7 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
         printf("\n");
     }
 }
+
 // This function is just used for debugging, not for verification. So keep it here.
 void serialReadA(uint tid)
 {
@@ -162,11 +166,11 @@ void serialReadA(uint tid)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    let outputVector = testMatVecMul<InputSize, OutputSize>(tid);
+    let outputVector = testMatTransposeVecMul<InputSize, OutputSize>(tid);
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0 ) ? 0 : -1;
-    for (int i = 0; i < OutputSize; i++)
+    for (int i = 0; i < InputSize; i++)
     {
         float expected = scaleFactor * (i + 1.0f) * (tid + 1.0f);
         if (outputVector[i] != half(expected))
