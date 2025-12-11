@@ -1115,7 +1115,8 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             {
                 // Canonicalize the path to ensure we always use absolute paths in URIs
                 String canonicalFoundPath;
-                if (SLANG_SUCCEEDED(Path::getCanonical(loc.loc.pathInfo.foundPath, canonicalFoundPath)))
+                if (SLANG_SUCCEEDED(
+                        Path::getCanonical(loc.loc.pathInfo.foundPath, canonicalFoundPath)))
                 {
                     result.uri = URI::fromLocalFilePath(canonicalFoundPath.getUnownedSlice()).uri;
                 }
@@ -2264,6 +2265,31 @@ void LanguageServer::updateSearchPaths(const JSONValue& value)
         List<String> searchPaths;
         if (SLANG_SUCCEEDED(converter.convert(value, &searchPaths)))
         {
+            // Check for relative paths and warn the user
+            List<String> relativePaths;
+            for (const auto& path : searchPaths)
+            {
+                if (!Path::isAbsolute(path))
+                {
+                    relativePaths.add(path);
+                }
+            }
+            
+            if (relativePaths.getCount() > 0)
+            {
+                StringBuilder msgBuilder;
+                msgBuilder << "Warning: slang.additionalSearchPaths contains relative path(s): ";
+                for (Index i = 0; i < relativePaths.getCount(); i++)
+                {
+                    if (i > 0)
+                        msgBuilder << ", ";
+                    msgBuilder << "'" << relativePaths[i] << "'";
+                }
+                msgBuilder << ". Relative paths may not work as expected. Please use absolute paths.";
+                logMessage(1, msgBuilder.produceString()); // 2 = Warning
+                logMessage(2, msgBuilder.produceString()); // 2 = Warning
+            }
+            
             if (m_core.m_workspace->updateSearchPaths(searchPaths))
             {
                 sendRefreshRequests(m_connection);
