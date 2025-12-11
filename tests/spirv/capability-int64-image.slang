@@ -5,7 +5,7 @@
 // CHECK-DAG: OpCapability Shader{{$}}
 // CHECK-DAG: OpExtension "SPV_EXT_shader_image_int64"
 
-uniform Texture2D<uint64_t> image;
+uniform DescriptorHandle<Texture2D<uint64_t>> image;
 uniform uint64_t* outval;
 
 [shader("compute")]
