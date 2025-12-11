@@ -1260,11 +1260,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvFragmentShaderPixelInterlockEXT` 
 * `spvFragmentBarycentricKHR` 
 * `spvFragmentFullyCoveredEXT` 
-* `spvGroupNonUniformBallot` 
-* `spvGroupNonUniformShuffle` 
-* `spvGroupNonUniformArithmetic` 
-* `spvGroupNonUniformQuad` 
-* `spvGroupNonUniformVote` 
 * `spvGroupNonUniformPartitionedNV` 
 * `spvGroupNonUniformRotateKHR` 
 * `spvRayTracingMotionBlurNV` 
@@ -1346,6 +1341,11 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
 * `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
+* `spvGroupNonUniformBallot` 
+* `spvGroupNonUniformShuffle` 
+* `spvGroupNonUniformArithmetic` 
+* `spvGroupNonUniformQuad` 
+* `spvGroupNonUniformVote` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
