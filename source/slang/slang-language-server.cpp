@@ -1114,8 +1114,8 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             if (File::exists(loc.loc.pathInfo.foundPath))
             {
                 // Canonicalize the path to ensure we always use absolute paths in URIs
-                String canonicalFoundPath = loc.loc.pathInfo.foundPath;
-                if (SLANG_SUCCEEDED(Path::getCanonical(canonicalFoundPath, canonicalFoundPath)))
+                String canonicalFoundPath;
+                if (SLANG_SUCCEEDED(Path::getCanonical(loc.loc.pathInfo.foundPath, canonicalFoundPath)))
                 {
                     result.uri = URI::fromLocalFilePath(canonicalFoundPath.getUnownedSlice()).uri;
                 }
@@ -2552,8 +2552,8 @@ LanguageServerResult<List<Location>> LanguageServerCore::tryGotoMacroDefinition(
     results.setCount(1);
     auto& result = results[0];
     // Canonicalize the path to ensure we always use absolute paths in URIs
-    String canonicalPath = humaneLoc.pathInfo.foundPath;
-    if (SLANG_SUCCEEDED(Path::getCanonical(canonicalPath, canonicalPath)))
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(humaneLoc.pathInfo.foundPath, canonicalPath)))
     {
         result.uri = URI::fromLocalFilePath(canonicalPath.getUnownedSlice()).uri;
     }
@@ -2589,8 +2589,8 @@ LanguageServerResult<List<Location>> LanguageServerCore::tryGotoFileInclude(
             results.setCount(1);
             auto& result = results[0];
             // Canonicalize the path to ensure we always use absolute paths in URIs
-            String canonicalPath = include.path;
-            if (SLANG_SUCCEEDED(Path::getCanonical(canonicalPath, canonicalPath)))
+            String canonicalPath;
+            if (SLANG_SUCCEEDED(Path::getCanonical(include.path, canonicalPath)))
             {
                 result.uri = URI::fromLocalFilePath(canonicalPath.getUnownedSlice()).uri;
             }
