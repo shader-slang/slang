@@ -257,12 +257,14 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // So implement as this for now. We can profiling the application later, if it turns out to be a bottleneck,
     // we can consider using more than one warp in the future.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadShA<Storage>(
+    VISIBILITY_LEVEL static void LoadShA<U, Storage>(
             SPtr<uint4> sharedMemoryA,
             int tileIndex,
             Storage weightStorage,
             Storage.Address weightAddress)
-            where Storage : IStorage<T>
+                where U : __BuiltinFloatingPointType
+                where U.Differential == U
+                where Storage : IStorage<U>
     {
         uint indexInVectorizedTile = WaveGetLaneIndex();
 
@@ -424,17 +426,32 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         // Columns are actually corresponding to the inactive threads, where there are no thread-local data at all.
     }
 
+    [require(cooperative_matrix, subgroup_basic)]
+    VISIBILITY_LEVEL static void someTestFunc<U, Storage>(
+        SPtr<uint4> sharedMemoryC,
+        Storage weightStorage,
+        Storage.Address weightAddress)
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where Storage : IStorage<U>
+    {
+
+    }
+
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
-    [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static OutArrayType mma<Storage, InArrayType : IArray<T>, OutArrayType : IRWArray<T>>( InArrayType inputVector,
+        [require(cooperative_matrix, subgroup_basic)]
+        VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
         Storage weightStorage,
-        Storage.Address weightAddress
-        )
-            where Storage : IStorage<T>
+        Storage.Address weightAddress)
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where Storage : IStorage<U>
+            where InArrayType : IArray<T>
+            where OutArrayType : IRWArray<T>
     {
         SPtr<uint4> ptrA[EnableDoubleBuffer ? 2 : 1];
         SPtr<uint4> ptrB[EnableDoubleBuffer ? 2 : 1];
@@ -453,7 +470,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             ptrB[0] = sharedMemoryB;
             ptrB[1] = sharedMemoryB + SharedMemSizeInVectorMatB;
             // PreLoad for the first iteration
-            LoadShA<Storage>(ptrA[0], 0, weightStorage, weightAddress);
+            LoadShA<U, Storage>(ptrA[0], 0, weightStorage, weightAddress);
             LoadSharedMemoryFromLocalVector(ptrB[0], 0, subgroupIndex, inputVector);
         }
 
@@ -481,7 +498,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 // swap to next buffer to load new data.
                 bufferIndex = bufferIndex ^ 1;
                 // Load the another buffer and do the math so we can hide the latency of the load.
-                LoadShA<Storage>(ptrA[bufferIndex], tileIndex, weightStorage, weightAddress);
+                LoadShA<U, Storage>(ptrA[bufferIndex], tileIndex, weightStorage, weightAddress);
                 LoadSharedMemoryFromLocalVector(ptrB[bufferIndex], tileIndex, subgroupIndex, inputVector);
 
                 // swap back to the previous buffer to perform the math.
@@ -489,7 +506,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             }
             else
             {
-                LoadShA<Storage>(ptrA[0], tileIndex, weightStorage, weightAddress);
+                LoadShA<U, Storage>(ptrA[0], tileIndex, weightStorage, weightAddress);
                 LoadSharedMemoryFromLocalVector(ptrB[0], tileIndex, subgroupIndex, inputVector);
                 // For single buffer, we always need to sync the workgroup so the data is ready for all threads.
                 // The reason that we have to sync the whole workgroup is that for matrix A, the tile is shared by
@@ -570,9 +587,11 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
     public no_diff SPtr<uint4> sharedMemoryPtr;
 
     internal static const int Uint4AlignedInputSize = MMAHelper<T, N, 0, SubgroupSize>.Uint4AlignedK;
+    internal typealias InternalDataType = T[Uint4AlignedInputSize];
 
     // [DerivativeMember(Differential.data)]
     internal T[Uint4AlignedInputSize] data;
+    public int getCount() { return N; }
 
     public __init() { data = {}; }
 
@@ -628,6 +647,8 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         set { data[index] = newValue; }
     }
 
+    internal InternalDataType getInternalData() { return this.data; }
+
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
@@ -640,12 +661,12 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
     {
         typealias MMA = MMAHelper<T, N, OutputSize, SubgroupSize, false>;
         SPtr<uint4> shA = sharedMemoryPtr;
-        SPtr<uint4> shB = sharedMemoryPtr + MMA.SharedMemSizeInVectorMatA;
+        SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
 
         const int AlignedOutSize = MMA.Uint4AlignedM;
 
-        let outputArray = MMA.mma<Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>(data, shA, shB, shC, weightStorage, weightAddress);
+        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>(data, shA, shB, shC, weightStorage, weightAddress);
         return OutputVector(outputArray);
     }
 
@@ -658,8 +679,29 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T, OutputSize>
+            where OutputVector.Differential : IVector<T.Differential, OutputSize>
     {
+        typealias MMA = MMAHelper<T.Differential, N, OutputSize, SubgroupSize, true>;
+
+        SPtr<uint4> shA = dthis.p.sharedMemoryPtr;
+        SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
+        SPtr<uint4> shC = shB;
+
+        // In backward, output size is K dimension.
+        const int AlignedOutSize = MMA.Uint4AlignedK;
+        const int AlignedInputSize = MMA.Uint4AlignedM;
+
+        // This.Differential is the derivative of the input vector, which is the output
+        // of the mma operation.
+        // This.Differential outArray;
+
+        // dIn = W^T * dOut;
+        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential
+                            >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+
+        This.Differential dInput = This.Differential(outArray);
+        dthis = DifferentialPair<This>(dthis.p, dInput);
     }
 
     [Differentiable]
