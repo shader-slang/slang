@@ -8638,7 +8638,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else if (m_defaultDebugSource)
                 {
                     // Emit a default DebugLine at line 0 if we don't have location info
-                    IRBuilder builder(sourceInst ? sourceInst : m_pendingDebugScopeSourceInst);
+                    IRBuilder builder(sourceInst);
                     auto zero = builder.getIntValue(builder.getUIntType(), 0);
                     emitOpDebugLine(
                         m_pendingDebugScopeParent,
