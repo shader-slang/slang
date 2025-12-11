@@ -3940,7 +3940,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         auto name = getName(debugVar);
         auto varType = tryGetPointedToType(&builder, debugVar->getDataType());
-        auto debugType = emitDebugType(varType);
+
+        // For local variables with matrix types, we need to ensure the debug type
+        // reflects row-major layout, as that's how SPIR-V stores local matrices
+        // regardless of the global matrix layout flag (which only affects uniform storage).
+        SpvInst* debugType = nullptr;
+        if (auto matrixType = as<IRMatrixType>(varType))
+        {
+            if (getIntVal(matrixType->getLayout()) == kMatrixLayoutMode_ColumnMajor)
+            {
+                // Local matrix variables are always row-major in SPIR-V,
+                // so use a row-major debug type instead of the cached column-major one
+                debugType = emitDebugTypeForLocalMatrix(matrixType);
+            }
+            else
+            {
+                debugType = emitDebugType(varType);
+            }
+        }
+        else
+        {
+            debugType = emitDebugType(varType);
+        }
 
         auto spvDebugLocalVar = emitOpDebugLocalVariable(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -9133,6 +9154,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0), // Size (unknown)
             builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout),
             List<SpvInst*>()); // No members
+    }
+
+    // Helper function to create debug type for a matrix with forced row-major layout.
+    // This is used for local variables, which always use row-major layout in SPIR-V
+    // regardless of the global matrix layout flag.
+    SpvInst* emitDebugTypeForLocalMatrix(IRMatrixType* matrixType)
+    {
+        IRBuilder builder(matrixType);
+
+        // For local variables, matrices are always stored as row-major in SPIR-V
+        // So we build the debug type as row-major regardless of the type's layout
+        IRType* innerVectorType =
+            builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+        IRInst* count = matrixType->getRowCount();
+        bool isColumnMajor = false;
+
+        auto elementType = emitDebugType(innerVectorType);
+        return emitOpDebugTypeMatrix(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            m_voidType,
+            getNonSemanticDebugInfoExtInst(),
+            elementType,
+            builder.getIntValue(builder.getUIntType(), getIntVal(count)),
+            builder.getBoolValue(isColumnMajor));
     }
 
     SpvInst* emitDebugType(IRType* type)
