@@ -1341,6 +1341,20 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
+        // For DXIL/HLSL with NVAPI: add dummy fields to empty ray payloads,
+        // then unwrap ForceVarIntoRayPayloadStructTemporarily instructions
+        if (isD3DTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
+            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+        }
+
+        // For SPIRV: also add dummy fields to empty ray payloads
+        if (isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
+        }
+
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -1362,6 +1376,9 @@ Result linkAndOptimizeIR(
         // What used to be individual variables/parameters/arguments/etc.
         // then become multiple variables/parameters/arguments/etc.
         //
+        // Note: For DXIL, legalizeNonStructParameterToStructForHLSL is called earlier
+        // (before legalizeExistentialTypeLayout) to unwrap ForceVarIntoRayPayloadStructTemporarily.
+
         SLANG_PASS(legalizeResourceTypes, targetProgram, sink);
 
         // We also need to legalize empty types for Metal targets.
@@ -1699,9 +1716,9 @@ Result linkAndOptimizeIR(
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
         SLANG_PASS(legalizeLogicalAndOr, targetProgram);
 
-    // Legalize non struct parameters that are expected to be structs for HLSL.
-    if (isD3DTarget(targetRequest))
-        SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+    // Note: legalizeNonStructParameterToStructForHLSL is now called earlier in the pipeline
+    // (before legalizeExistentialTypeLayout) to ensure ForceVarIntoRayPayloadStructTemporarily
+    // is unwrapped before empty struct parameters are removed.
 
     // Create aliases for all dynamic resource parameters.
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))

@@ -2084,6 +2084,58 @@ static LegalVal legalizeInst(
         // out structured buffer
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
+    case kIROp_ForceVarIntoRayPayloadStructTemporarily:
+        // When the wrapped ray payload is empty (legalized to none), this wrapper
+        // should also be eliminated. This happens with empty ray payload structs
+        // on non-D3D targets where we don't add a dummy field.
+        if (type.flavor == LegalType::Flavor::none)
+            return LegalVal();
+        SLANG_UNEXPECTED("non-simple operand in ForceVarIntoRayPayloadStructTemporarily");
+        break;
+    case kIROp_SPIRVAsm:
+    case kIROp_SPIRVAsmInst:
+    case kIROp_SPIRVAsmOperandInst:
+    case kIROp_SPIRVAsmOperandRayPayloadFromLocation:
+    case kIROp_SPIRVAsmOperandRayAttributeFromLocation:
+    case kIROp_SPIRVAsmOperandRayCallableFromLocation:
+    case kIROp_SPIRVAsmOperandBuiltinVar:
+    case kIROp_GenericAsm:
+        {
+            // Assembly instructions (SPIRV or generic/HLSL) may reference empty types (e.g., empty
+            // ray payloads). Reconstruct with flattened operands, skipping any that were
+            // eliminated.
+            auto builder = context->builder;
+            ShortList<IRInst*> flatArgs;
+            for (Index aa = 0; aa < (Index)args.getCount(); ++aa)
+            {
+                auto arg = args[aa];
+                if (arg.flavor == LegalVal::Flavor::none)
+                    continue;
+                else if (arg.flavor == LegalVal::Flavor::simple)
+                    flatArgs.add(arg.getSimple());
+                else
+                    SLANG_UNEXPECTED("unexpected non-simple operand in SPIRV asm");
+            }
+
+            IRType* resultType = nullptr;
+            if (type.flavor == LegalType::Flavor::simple)
+                resultType = type.getSimple();
+            else if (type.flavor == LegalType::Flavor::none)
+                resultType = builder->getVoidType();
+            else
+                SLANG_UNEXPECTED("unexpected result type for SPIRV asm");
+
+            auto newInst = builder->emitIntrinsicInst(
+                resultType,
+                inst->getOp(),
+                flatArgs.getCount(),
+                flatArgs.getArrayView().getBuffer());
+
+            for (auto child : inst->getDecorationsAndChildren())
+                child->insertAtEnd(newInst);
+
+            return type.flavor == LegalType::Flavor::none ? LegalVal() : LegalVal::simple(newInst);
+        }
     default:
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
