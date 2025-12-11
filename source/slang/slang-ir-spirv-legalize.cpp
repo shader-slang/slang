@@ -1116,13 +1116,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MeshOutputRef:
                 // This is a direct reference to a mesh output element
                 return true;
-            
+
             case kIROp_GetElementPtr:
             case kIROp_FieldAddress:
                 // Follow the base pointer
                 current = current->getOperand(0);
                 continue;
-            
+
             case kIROp_Param:
                 // Check if this parameter has mesh output decorations
                 {
@@ -1135,17 +1135,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     }
                 }
                 return false;
-            
+
             case kIROp_GlobalParam:
                 // Check if this global parameter is a mesh output
-                // Mesh outputs are marked with GLPositionOutputDecoration or have specific import names
+                // Mesh outputs are marked with GLPositionOutputDecoration or have specific import
+                // names
                 {
                     auto globalParam = as<IRGlobalParam>(current);
-                    
+
                     // Check for position output decoration
                     if (globalParam->findDecoration<IRGLPositionOutputDecoration>())
                         return true;
-                    
+
                     // Check for import decorations that indicate mesh outputs
                     if (auto importDecor = globalParam->findDecoration<IRImportDecoration>())
                     {
@@ -1161,12 +1162,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     }
                 }
                 return false;
-            
+
             case kIROp_Var:
             case kIROp_GlobalVar:
                 // Reached a variable that's not a mesh output
                 return false;
-            
+
             default:
                 // For other instructions, we can't determine the source
                 return false;
@@ -1178,7 +1179,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processLoad(IRLoad* loadInst)
     {
         auto ptr = loadInst->getPtr();
-        
+
         // Check if we're loading from a mesh output
         if (isMeshOutputPointer(ptr))
         {
