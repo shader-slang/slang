@@ -1,4 +1,4 @@
-name: CI CUDA Build Workflow
+name: CI Container Build Workflow
 
 on:
   workflow_call:
@@ -11,8 +11,8 @@ on:
         type: string
 
 jobs:
-  # Note: CUDA 12.4 is used because the test runner host driver (550.54.15) doesn't support
-  # newer PTX versions from CUDA 12.9. The container toolkit version must match the host driver.
+  # Uses nvidia/cuda container for CUDA support. CUDA 12.4 is used because the test runner
+  # host driver (550.54.15) doesn't support newer PTX versions from CUDA 12.9+.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
@@ -142,9 +142,8 @@ jobs:
             exit 1
           fi
 
-      # Upload artifact with -cuda suffix to differentiate from regular Linux builds
       - uses: actions/upload-artifact@v4
         with:
-          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
           path: artifacts-staging/
           retention-days: 1

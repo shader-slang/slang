@@ -10,18 +10,223 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
-  # TEMP: Only run Linux GPU tests for faster iteration
-  # Linux GPU builds (container-based CUDA builds on GitHub-hosted runners)
-  build-linux-release-gcc-x86_64-gpu:
-    uses: ./.github/workflows/ci-slang-build-cuda.yml
+  filter:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.filter.outputs.should-run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: "2"
+      - id: filter
+        run: |
+          # This step prevents subsequent steps from running if only documentation was changed
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git fetch origin ${{ github.base_ref }}
+            BASE=origin/${{ github.base_ref }}
+          else
+            BASE=HEAD^1
+          fi
+
+          shouldRun=true
+          if files="$(git diff --name-only $BASE...HEAD)"; then
+            # Git diff succeeded, check if non-documentation files were changed
+            if echo "$files" | grep -qvE '^(docs/|LICENSES/|LICENSE$|CONTRIBUTING\.md$|README\.md$)'; then
+              shouldRun=true
+            else
+              echo "Only documentation files changed, skipping remaining steps"
+              shouldRun=false
+            fi
+          else
+            echo "Git diff failed, conservatively running tests"
+            shouldRun=true
+          fi
+          echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
+
+  # Linux builds (containerized builds on GitHub-hosted runners)
+  build-linux-debug-gcc-x86_64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build-container.yml
+    with:
+      config: debug
+      runs-on: '["ubuntu-22.04"]'
+
+  build-linux-release-gcc-x86_64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build-container.yml
     with:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
-  # Linux GPU tests (self-hosted runner with NVIDIA GPU, containerized)
-  test-linux-release-gcc-x86_64-gpu:
-    needs: [build-linux-release-gcc-x86_64-gpu]
-    uses: ./.github/workflows/ci-slang-test-cuda.yml
+  build-linux-release-gcc-wasm:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: wasm
+      config: release
+      runs-on: '["ubuntu-22.04"]'
+
+  # macOS builds
+  build-macos-debug-clang-aarch64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+
+  build-macos-release-clang-aarch64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  # Windows builds (self-hosted)
+  build-windows-debug-cl-x86_64-gpu:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
+  build-windows-release-cl-x86_64-gpu:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
+  # Linux tests (self-hosted GPU runner, containerized)
+  test-linux-debug-gcc-x86_64:
+    needs: [filter, build-linux-debug-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test-container.yml
+    with:
+      config: debug
+      server-count: 4
+
+  test-linux-release-gcc-x86_64:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test-container.yml
     with:
       config: release
       server-count: 4
+
+  # macOS tests
+  test-macos-debug-clang-aarch64:
+    needs: [filter, build-macos-debug-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: debug
+      runs-on: '["macos-latest"]'
+      test-category: smoke
+      server-count: 3
+
+  test-macos-release-clang-aarch64:
+    needs: [filter, build-macos-release-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      test-category: full
+      full-gpu-tests: true
+      server-count: 3
+
+  # Windows GPU tests (self-hosted)
+  test-windows-debug-cl-x86_64-gpu:
+    needs: [filter, build-windows-debug-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      test-category: full
+      full-gpu-tests: true
+
+  test-windows-release-cl-x86_64-gpu:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      test-category: full
+      full-gpu-tests: true
+
+  check-ci:
+    needs:
+      [
+        test-windows-release-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu,
+        test-macos-release-clang-aarch64,
+        test-macos-debug-clang-aarch64,
+        test-linux-release-gcc-x86_64,
+        test-linux-debug-gcc-x86_64,
+      ]
+    runs-on: ubuntu-latest
+    if: always() # Always run, even if dependencies fail
+    steps:
+      - name: Check CI Results
+        run: |
+          echo "=== CI Results Summary ==="
+          echo "Windows Release GPU: ${{ needs.test-windows-release-cl-x86_64-gpu.result }}"
+          echo "Windows Debug GPU: ${{ needs.test-windows-debug-cl-x86_64-gpu.result }}"
+          echo "macOS Release ARM64: ${{ needs.test-macos-release-clang-aarch64.result }}"
+          echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
+          echo "Linux Release GPU: ${{ needs.test-linux-release-gcc-x86_64.result }}"
+          echo "Linux Debug GPU: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+
+          # Check if any required jobs failed (allow success or skipped)
+          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+            echo "One or more CI jobs failed or were cancelled"
+            exit 1
+          fi
+
+          echo "All CI jobs completed successfully (passed or skipped)!"

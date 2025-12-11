@@ -1,4 +1,4 @@
-name: CI CUDA Test Workflow
+name: CI Container Test Workflow
 
 on:
   workflow_call:
@@ -16,10 +16,9 @@ on:
         default: true
 
 jobs:
-  # Run GPU tests in CUDA container with Vulkan support
-  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work
-  # Note: CUDA 12.4 is used because the host driver (550.54.15) doesn't support newer PTX versions
-  # from CUDA 12.9. The container toolkit version must match the host driver capabilities.
+  # Run GPU tests in container with Vulkan and CUDA support.
+  # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
+  # CUDA 12.4 is used because the host driver (550.54.15) doesn't support newer PTX versions.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
@@ -59,7 +58,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
           path: artifacts
 
       - name: Setup test environment
@@ -164,7 +163,7 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}-cuda
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
           path: artifacts
 
       - name: Setup test environment
