@@ -3066,6 +3066,12 @@ DIAGNOSTIC(
     outputSpvIsEmpty,
     "output SPIR-V contains no exported symbols. Please make sure to specify at least one "
     "entrypoint.")
+DIAGNOSTIC(
+    57005,
+    Error,
+    meshShaderOutputCannotBeRead,
+    "mesh shader output variables cannot be read in SPIR-V. Reading from mesh shader outputs "
+    "violates SPIR-V specification (VUID-StandaloneSpirv-MeshEXT-07107).")
 
 // GLSL Compatibility
 DIAGNOSTIC(

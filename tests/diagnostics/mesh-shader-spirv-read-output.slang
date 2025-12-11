@@ -7,6 +7,9 @@ struct msOutput {
 
 uniform uint iTime;
 
+// Global to prevent optimization
+RWStructuredBuffer<float> output;
+
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 void main(out indices uint3 triangleBox[1], out vertices msOutput triangleVertex[3]) {
@@ -15,11 +18,14 @@ void main(out indices uint3 triangleBox[1], out vertices msOutput triangleVertex
 
     SetMeshOutputCounts(3, 1);
     triangleBox[0] = uint3(0, 1, 1);
+    
     // CHECK: {{.*}}error 57005{{.*}}mesh shader output
     uiColor = triangleBox[0].x + iTime;
+    output[0] = uiColor; // Use the value to prevent optimization
 
     // CHECK: {{.*}}error 57005{{.*}}mesh shader output
     finalColor = triangleVertex[0].position.x;
+    output[1] = finalColor; // Use the value to prevent optimization
 
     triangleVertex[0].position = float4(1, 0.5, 0.0, 1.0);
     triangleVertex[0].color = float3(1, 0.0, 0.0);
