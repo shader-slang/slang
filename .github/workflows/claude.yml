@@ -143,6 +143,43 @@ jobs:
       - name: Checkout of submodules
         run: git submodule update --init --recursive --depth=1
 
+      # Workaround for anthropics/claude-code-action#46: fork PRs fail because
+      # the action tries to fetch the branch from origin, but fork branches
+      # only exist on the fork. This step adds the fork as an additional fetch
+      # URL for origin so the action's fetch succeeds.
+      - name: Setup fork PR remote
+        if: github.event.issue.pull_request != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.issue.number }}"
+
+          # Get PR details
+          PR_INFO=$(gh pr view $PR_NUMBER --json headRefName,headRepositoryOwner,headRepository)
+          HEAD_REF=$(echo "$PR_INFO" | jq -r '.headRefName')
+          HEAD_OWNER=$(echo "$PR_INFO" | jq -r '.headRepositoryOwner.login // empty')
+          HEAD_REPO=$(echo "$PR_INFO" | jq -r '.headRepository.name // empty')
+
+          # Check if this is a fork PR
+          if [ -n "$HEAD_OWNER" ] && [ "$HEAD_OWNER" != "${{ github.repository_owner }}" ]; then
+            echo "Fork PR detected from ${HEAD_OWNER}/${HEAD_REPO}, branch: ${HEAD_REF}"
+
+            # Add fork as additional remote fetch URL
+            FORK_URL="https://github.com/${HEAD_OWNER}/${HEAD_REPO}.git"
+            echo "Adding fork URL to origin: ${FORK_URL}"
+            git remote set-url --add origin "${FORK_URL}"
+
+            # Fetch the fork branch so it's available locally
+            echo "Fetching branch ${HEAD_REF} from fork..."
+            git fetch origin "${HEAD_REF}"
+
+            echo "Fork remote setup complete"
+          else
+            echo "Not a fork PR (owner: ${HEAD_OWNER:-same}), no remote changes needed"
+          fi
+
       - name: Format Setup and Environment Preparation
         if: runner.os != 'Windows'
         uses: ./.github/actions/format-setup
