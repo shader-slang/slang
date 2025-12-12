@@ -1430,20 +1430,55 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
         }
     }
 
-    // As a matter of validity in the IR, we expect one
-    // of the two to be an ancestor (in the non-block case),
-    // because otherwise we'd be violating the basic dominance
-    // assumptions.
+    // In most cases, one of the two operands will be an ancestor of the other,
+    // which maintains the basic dominance assumptions of the IR.
     //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // However, in some edge cases (e.g., when dealing with generic interface
+    // methods that reference static constants in where clauses), the operands
+    // may come from sibling scopes that don't have a direct ancestor-descendant
+    // relationship. In such cases, we need to find their common ancestor.
     //
     if (!parentNonBlock)
     {
-        parentNonBlock = leftNonBlock;
+        // Neither is an ancestor of the other, so find the common ancestor.
+        // First, compute the depth of each instruction by walking up to the root.
+        Int leftDepth = 0;
+        for (auto ll = leftNonBlock; ll; ll = ll->getParent())
+            leftDepth++;
+
+        Int rightDepth = 0;
+        for (auto rr = rightNonBlock; rr; rr = rr->getParent())
+            rightDepth++;
+
+        // Bring both to the same depth by walking up from the deeper one.
+        auto leftAtMinDepth = leftNonBlock;
+        auto rightAtMinDepth = rightNonBlock;
+
+        while (leftDepth > rightDepth)
+        {
+            leftAtMinDepth = leftAtMinDepth->getParent();
+            leftDepth--;
+        }
+        while (rightDepth > leftDepth)
+        {
+            rightAtMinDepth = rightAtMinDepth->getParent();
+            rightDepth--;
+        }
+
+        // Now walk up from both until we find a common ancestor.
+        while (leftAtMinDepth != rightAtMinDepth)
+        {
+            leftAtMinDepth = leftAtMinDepth->getParent();
+            rightAtMinDepth = rightAtMinDepth->getParent();
+
+            // If we've walked all the way to the root and still haven't found
+            // a common ancestor, something is very wrong.
+            SLANG_ASSERT(leftAtMinDepth && rightAtMinDepth);
+        }
+
+        parentNonBlock = leftAtMinDepth;
     }
+    SLANG_ASSERT(parentNonBlock);
 
     IRInst* parent = parentNonBlock;
 
