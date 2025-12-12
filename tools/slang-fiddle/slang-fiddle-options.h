@@ -9,6 +9,12 @@ using namespace Slang;
 
 //
 
+enum class FiddleMode
+{
+    Default,    // Default: Generate .fiddle files for C++ code
+    TestGen     // Generate test files from .slang templates
+};
+
 struct Options
 {
 public:
@@ -46,6 +52,34 @@ public:
             {
                 outputPathPrefix = expectArg(argCursor, argEnd);
             }
+            else if (arg == UnownedTerminatedStringSlice("--mode"))
+            {
+                auto modeStr = expectArg(argCursor, argEnd);
+                if (!modeStr)
+                {
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                }
+                else if (strcmp(modeStr, "default") == 0)
+                {
+                    fiddleMode = FiddleMode::Default;
+                }
+                else if (strcmp(modeStr, "test-gen") == 0)
+                {
+                    fiddleMode = FiddleMode::TestGen;
+                }
+                else
+                {
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, String("--mode ") + modeStr);
+                }
+            }
+            else if (arg == UnownedTerminatedStringSlice("--output-dir"))
+            {
+                testGenOutputDir = expectArg(argCursor, argEnd);
+            }
+            else if (arg == UnownedTerminatedStringSlice("--input"))
+            {
+                testGenInputFile = expectArg(argCursor, argEnd);
+            }
             else
             {
                 sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
@@ -57,5 +91,10 @@ public:
     String inputPathPrefix = "";
     String outputPathPrefix = "";
     List<String> inputPaths;
+
+    // Test generation mode options
+    FiddleMode fiddleMode = FiddleMode::Default;
+    String testGenOutputDir = "";
+    String testGenInputFile = "";
 };
 } // namespace fiddle
