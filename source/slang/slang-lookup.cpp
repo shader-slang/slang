@@ -942,7 +942,7 @@ static void _lookUpInScopes(
                 }
                 else
                 {
-                    assert(aggTypeDeclBaseRef.as<AggTypeDecl>());
+                    SLANG_ASSERT(aggTypeDeclBaseRef.as<AggTypeDecl>());
                     if (auto interfaceBase = as<InterfaceDecl>(aggTypeDeclBaseRef.getDecl()))
                     {
                         // When looking up inside an interface type, we are actually looking up

@@ -4430,7 +4430,7 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
                 auto arg = expr->arguments[0];
                 if (auto intLitArg = as<IntegerLiteralExpr>(arg))
                 {
-                    if (getIntegerLiteralValue(intLitArg->token) == 0)
+                    if (getIntegerLiteralValue(intLitArg->token, getSink()) == 0)
                     {
                         // At this point we have confirmed that the cast
                         // has the right form, so we want to apply our special case.
