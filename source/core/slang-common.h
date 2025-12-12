@@ -365,7 +365,7 @@ public:
     do                                    \
     {                                     \
         if (!(VALUE)) [[unlikely]]        \
-            SLANG_ASSERT_FAILURE(#VALUE); \
+            ::Slang::handleAssert(#VALUE);\
     } while (0)
 #else
 #define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
