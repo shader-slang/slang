@@ -209,8 +209,8 @@ jobs:
           echo "Windows Debug GPU: ${{ needs.test-windows-debug-cl-x86_64-gpu.result }}"
           echo "macOS Release ARM64: ${{ needs.test-macos-release-clang-aarch64.result }}"
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
-          echo "Linux Release GPU: ${{ needs.test-linux-release-gcc-x86_64.result }}"
-          echo "Linux Debug GPU: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+          echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
+          echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
