@@ -4046,7 +4046,7 @@ __forceinline__ __device__ void optixTrace(
             pr);
 
         // Read back updated payload registers
-        pr.readFromPayloadRegs();
+        // Native optixTrace updates regs in place
         pr.unpack(*Payload);
     } else {
         // Pointer-based fallback for large payloads
@@ -4243,7 +4243,7 @@ __forceinline__ __device__ void optixTraverse(
             pr);
 
         // Read back updated payload registers
-        pr.readFromPayloadRegs();
+        // Native optixTrace updates regs in place
         pr.unpack(*Payload);
     } else {
         // Pointer-based fallback for large payloads
@@ -4301,7 +4301,7 @@ __forceinline__ __device__ void optixTraverse(
             pr);
 
         // Read back updated payload registers
-        pr.readFromPayloadRegs();
+        // Native optixTrace updates regs in place
         pr.unpack(*Payload);
     } else {
         // Pointer-based fallback for large payloads
