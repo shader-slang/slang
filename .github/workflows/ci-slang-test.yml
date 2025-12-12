@@ -247,13 +247,31 @@ jobs:
 
       - name: Clone slangpy-samples
         run: |
-          # Clone slangpy-samples from main branch. This assumes that the main
-          # branch is kept compatible with the latest slangpy release on PyPI.
-          # TODO: In the future, tag slangpy-samples repo with version numbers
-          # matching slangpy releases (e.g., v1.2.3), and checkout the
-          # corresponding tag here to ensure compatibility.
+          # Clone slangpy-samples and checkout the tag matching the installed
+          # slangpy version. This ensures compatibility between the slangpy
+          # release and the samples. Falls back to main if no matching tag exists.
           echo "Cloning slangpy-samples repository..."
-          git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+
+          # Detect installed slangpy version
+          SLANGPY_VERSION=$(python -c "import slangpy; print(slangpy.__version__)" 2>/dev/null || echo "unknown")
+          echo "Installed slangpy version: $SLANGPY_VERSION"
+
+          # Clone with shallow history but fetch all tags
+          git clone --depth 1 --tags https://github.com/shader-slang/slangpy-samples.git
+          cd slangpy-samples
+
+          # Try to checkout matching version tag (v-prefixed), fallback to main
+          if [ "$SLANGPY_VERSION" != "unknown" ]; then
+            if git checkout "v${SLANGPY_VERSION}" 2>/dev/null; then
+              echo "Successfully checked out version tag v${SLANGPY_VERSION}"
+            else
+              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, using main branch"
+            fi
+          else
+            echo "Warning: Could not detect slangpy version, using main branch"
+          fi
+
+          cd ..
 
       - name: Install slangpy-samples dependencies
         run: |
