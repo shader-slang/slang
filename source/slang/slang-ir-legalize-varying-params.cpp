@@ -1270,12 +1270,64 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         return 0;
     }
 
+    // Check if a type contains any sub-32-bit types (bool, int8, int16, half).
+    // These types cannot be used with register-based payload because the prelude
+    // packs them byte-by-byte, but we read whole registers at a time.
+    bool containsSubWordTypes(IRType* type, IRBuilder* builder)
+    {
+        if (auto ptrValType = tryGetPointedToType(builder, type))
+            type = ptrValType;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            for (auto field : structType->getFields())
+            {
+                if (containsSubWordTypes(field->getFieldType(), builder))
+                    return true;
+            }
+            return false;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            return containsSubWordTypes(arrayType->getElementType(), builder);
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            return containsSubWordTypes(matType->getElementType(), builder);
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            return containsSubWordTypes(vecType->getElementType(), builder);
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            switch (basicType->getBaseType())
+            {
+            case BaseType::Bool:
+            case BaseType::Int8:
+            case BaseType::UInt8:
+            case BaseType::Int16:
+            case BaseType::UInt16:
+            case BaseType::Half:
+                return true;
+            default:
+                return false;
+            }
+        }
+        return false;
+    }
+
     // Compute how many uint32 registers a type requires.
-    // Returns 0 if the type is too large (> 32 registers = 128 bytes)
-    // or if it cannot be flattened to registers.
+    // Returns 0 if the type is too large (> 32 registers = 128 bytes),
+    // if it cannot be flattened to registers, or if it contains sub-32-bit types.
     // Uses C++ sizeof rules to match the prelude's PayloadRegisters<T>.
     int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
     {
+        // Reject types with sub-32-bit members (bool, int8, int16, half)
+        // because the C++ packing doesn't match our register-at-a-time reading.
+        if (containsSubWordTypes(type, builder))
+            return 0;
+
         int sizeBytes = getTypeCppSize(type, builder);
         if (sizeBytes == 0)
             return 0;
@@ -1315,6 +1367,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         else if (auto arrayType = as<IRArrayTypeBase>(typeToFetch))
         {
             auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return nullptr;
             IRIntegerValue elementCount = elementCountInst->getValue();
             auto elementType = arrayType->getElementType();
             List<IRInst*> elementVals;
@@ -1356,6 +1410,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         else if (auto vecType = as<IRVectorType>(typeToFetch))
         {
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return nullptr;
             IRIntegerValue elementCount = elementCountInst->getValue();
             IRType* elementType = vecType->getElementType();
             List<IRInst*> elementVals;
@@ -1462,7 +1518,6 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
         if (auto structType = as<IRStructType>(type))
         {
-            Index fieldIndex = 0;
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
@@ -1472,12 +1527,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 auto fieldKey = field->getKey();
                 auto fieldVal = builder->emitFieldExtract(fieldType, value, fieldKey);
                 emitOptiXPayloadWrite(ioByteOffset, fieldVal, fieldType, builder);
-                fieldIndex++;
             }
         }
         else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCountInst)
+                return;
             IRIntegerValue elementCount = elementCountInst->getValue();
             auto elementType = arrayType->getElementType();
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
@@ -1515,6 +1571,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         else if (auto vecType = as<IRVectorType>(type))
         {
             auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return;
             IRIntegerValue elementCount = elementCountInst->getValue();
             auto elementType = vecType->getElementType();
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)

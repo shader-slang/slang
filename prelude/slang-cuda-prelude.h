@@ -3886,6 +3886,9 @@ static __forceinline__ __device__ void* getOptiXRayPayloadPtr()
     return unpackOptiXRayPayloadPointer(u0, u1);
 }
 
+// Maximum number of 32-bit registers for OptiX payload (32 registers = 128 bytes)
+static constexpr size_t kMaxOptiXPayloadRegisters = 32;
+
 // Helper to pack/unpack payload to/from registers for small payloads (<= 128 bytes)
 template<typename T, size_t N = (sizeof(T) + 3) / 4>
 struct PayloadRegisters
@@ -3920,7 +3923,11 @@ __forceinline__ __device__ void optixTraceWithRegs(
     PayloadRegisters<T, N>& pr)
 {
     // Call optixTrace with the appropriate number of payload registers
-    if constexpr (N == 1) {
+    if constexpr (N == 0) {
+        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
+            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex);
+    } else if constexpr (N == 1) {
         optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
             InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
@@ -3966,7 +3973,7 @@ __forceinline__ __device__ void optixTraceWithRegs(
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
             pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
             pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15]);
-    } else if constexpr (N <= 32) {
+    } else if constexpr (N <= kMaxOptiXPayloadRegisters) {
         optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
             InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
@@ -3990,7 +3997,7 @@ __forceinline__ __device__ void optixTrace(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters) {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4116,7 +4123,11 @@ __forceinline__ __device__ void optixTraverseWithRegs(
     PayloadRegisters<T, N>& pr)
 {
     // Call optixTraverse with the appropriate number of payload registers
-    if constexpr (N == 1) {
+    if constexpr (N == 0) {
+        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
+            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex);
+    } else if constexpr (N == 1) {
         optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
             InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
@@ -4162,7 +4173,7 @@ __forceinline__ __device__ void optixTraverseWithRegs(
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
             pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
             pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15]);
-    } else if constexpr (N <= 32) {
+    } else if constexpr (N <= kMaxOptiXPayloadRegisters) {
         optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
             InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
             MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
@@ -4187,7 +4198,7 @@ __forceinline__ __device__ void optixTraverse(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters) {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4245,7 +4256,7 @@ __forceinline__ __device__ void optixTraverse(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters) {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4618,7 +4629,9 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 template<typename T, size_t N = (sizeof(T) + 3) / 4>
 __forceinline__ __device__ void optixInvokeWithRegs(PayloadRegisters<T, N>& pr)
 {
-    if constexpr (N == 1) {
+    if constexpr (N == 0) {
+        optixInvoke();
+    } else if constexpr (N == 1) {
         optixInvoke(pr.regs[0]);
     } else if constexpr (N == 2) {
         optixInvoke(pr.regs[0], pr.regs[1]);
@@ -4637,7 +4650,7 @@ __forceinline__ __device__ void optixInvokeWithRegs(PayloadRegisters<T, N>& pr)
     } else if constexpr (N <= 16) {
         optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
             pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15]);
-    } else if constexpr (N <= 32) {
+    } else if constexpr (N <= kMaxOptiXPayloadRegisters) {
         optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
             pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15],
             pr.regs[16], pr.regs[17], pr.regs[18], pr.regs[19], pr.regs[20], pr.regs[21], pr.regs[22], pr.regs[23],
@@ -4653,7 +4666,7 @@ static __forceinline__ __device__ void optixInvoke(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters) {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
