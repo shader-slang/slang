@@ -3892,50 +3892,76 @@ struct PayloadRegisters
 {
     uint32_t regs[N > 0 ? N : 1];
 
-    __forceinline__ __device__ void pack(const T& payload)
-    {
-        memcpy(regs, &payload, sizeof(T));
-    }
+    __forceinline__ __device__ void pack(const T& payload) { memcpy(regs, &payload, sizeof(T)); }
 
-    __forceinline__ __device__ void unpack(T& payload)
-    {
-        memcpy(&payload, regs, sizeof(T));
-    }
+    __forceinline__ __device__ void unpack(T& payload) { memcpy(&payload, regs, sizeof(T)); }
 
     __forceinline__ __device__ void readFromPayloadRegs()
     {
-        if constexpr (N > 0) regs[0] = optixGetPayload_0();
-        if constexpr (N > 1) regs[1] = optixGetPayload_1();
-        if constexpr (N > 2) regs[2] = optixGetPayload_2();
-        if constexpr (N > 3) regs[3] = optixGetPayload_3();
-        if constexpr (N > 4) regs[4] = optixGetPayload_4();
-        if constexpr (N > 5) regs[5] = optixGetPayload_5();
-        if constexpr (N > 6) regs[6] = optixGetPayload_6();
-        if constexpr (N > 7) regs[7] = optixGetPayload_7();
-        if constexpr (N > 8) regs[8] = optixGetPayload_8();
-        if constexpr (N > 9) regs[9] = optixGetPayload_9();
-        if constexpr (N > 10) regs[10] = optixGetPayload_10();
-        if constexpr (N > 11) regs[11] = optixGetPayload_11();
-        if constexpr (N > 12) regs[12] = optixGetPayload_12();
-        if constexpr (N > 13) regs[13] = optixGetPayload_13();
-        if constexpr (N > 14) regs[14] = optixGetPayload_14();
-        if constexpr (N > 15) regs[15] = optixGetPayload_15();
-        if constexpr (N > 16) regs[16] = optixGetPayload_16();
-        if constexpr (N > 17) regs[17] = optixGetPayload_17();
-        if constexpr (N > 18) regs[18] = optixGetPayload_18();
-        if constexpr (N > 19) regs[19] = optixGetPayload_19();
-        if constexpr (N > 20) regs[20] = optixGetPayload_20();
-        if constexpr (N > 21) regs[21] = optixGetPayload_21();
-        if constexpr (N > 22) regs[22] = optixGetPayload_22();
-        if constexpr (N > 23) regs[23] = optixGetPayload_23();
-        if constexpr (N > 24) regs[24] = optixGetPayload_24();
-        if constexpr (N > 25) regs[25] = optixGetPayload_25();
-        if constexpr (N > 26) regs[26] = optixGetPayload_26();
-        if constexpr (N > 27) regs[27] = optixGetPayload_27();
-        if constexpr (N > 28) regs[28] = optixGetPayload_28();
-        if constexpr (N > 29) regs[29] = optixGetPayload_29();
-        if constexpr (N > 30) regs[30] = optixGetPayload_30();
-        if constexpr (N > 31) regs[31] = optixGetPayload_31();
+        if constexpr (N > 0)
+            regs[0] = optixGetPayload_0();
+        if constexpr (N > 1)
+            regs[1] = optixGetPayload_1();
+        if constexpr (N > 2)
+            regs[2] = optixGetPayload_2();
+        if constexpr (N > 3)
+            regs[3] = optixGetPayload_3();
+        if constexpr (N > 4)
+            regs[4] = optixGetPayload_4();
+        if constexpr (N > 5)
+            regs[5] = optixGetPayload_5();
+        if constexpr (N > 6)
+            regs[6] = optixGetPayload_6();
+        if constexpr (N > 7)
+            regs[7] = optixGetPayload_7();
+        if constexpr (N > 8)
+            regs[8] = optixGetPayload_8();
+        if constexpr (N > 9)
+            regs[9] = optixGetPayload_9();
+        if constexpr (N > 10)
+            regs[10] = optixGetPayload_10();
+        if constexpr (N > 11)
+            regs[11] = optixGetPayload_11();
+        if constexpr (N > 12)
+            regs[12] = optixGetPayload_12();
+        if constexpr (N > 13)
+            regs[13] = optixGetPayload_13();
+        if constexpr (N > 14)
+            regs[14] = optixGetPayload_14();
+        if constexpr (N > 15)
+            regs[15] = optixGetPayload_15();
+        if constexpr (N > 16)
+            regs[16] = optixGetPayload_16();
+        if constexpr (N > 17)
+            regs[17] = optixGetPayload_17();
+        if constexpr (N > 18)
+            regs[18] = optixGetPayload_18();
+        if constexpr (N > 19)
+            regs[19] = optixGetPayload_19();
+        if constexpr (N > 20)
+            regs[20] = optixGetPayload_20();
+        if constexpr (N > 21)
+            regs[21] = optixGetPayload_21();
+        if constexpr (N > 22)
+            regs[22] = optixGetPayload_22();
+        if constexpr (N > 23)
+            regs[23] = optixGetPayload_23();
+        if constexpr (N > 24)
+            regs[24] = optixGetPayload_24();
+        if constexpr (N > 25)
+            regs[25] = optixGetPayload_25();
+        if constexpr (N > 26)
+            regs[26] = optixGetPayload_26();
+        if constexpr (N > 27)
+            regs[27] = optixGetPayload_27();
+        if constexpr (N > 28)
+            regs[28] = optixGetPayload_28();
+        if constexpr (N > 29)
+            regs[29] = optixGetPayload_29();
+        if constexpr (N > 30)
+            regs[30] = optixGetPayload_30();
+        if constexpr (N > 31)
+            regs[31] = optixGetPayload_31();
     }
 };
 
@@ -3956,60 +3982,239 @@ __forceinline__ __device__ void optixTraceWithRegs(
     PayloadRegisters<T, N>& pr)
 {
     // Call optixTrace with the appropriate number of payload registers
-    if constexpr (N == 1) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
+    if constexpr (N == 1)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
             pr.regs[0]);
-    } else if constexpr (N == 2) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1]);
-    } else if constexpr (N == 3) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2]);
-    } else if constexpr (N == 4) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3]);
-    } else if constexpr (N == 5) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4]);
-    } else if constexpr (N == 6) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5]);
-    } else if constexpr (N == 7) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6]);
-    } else if constexpr (N == 8) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7]);
-    } else if constexpr (N <= 16) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
-            pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15]);
-    } else if constexpr (N <= 32) {
-        optixTrace(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
-            pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15],
-            pr.regs[16], pr.regs[17], pr.regs[18], pr.regs[19], pr.regs[20], pr.regs[21], pr.regs[22], pr.regs[23],
-            pr.regs[24], pr.regs[25], pr.regs[26], pr.regs[27], pr.regs[28], pr.regs[29], pr.regs[30], pr.regs[31]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= 32)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
     }
 }
 
@@ -4026,7 +4231,8 @@ __forceinline__ __device__ void optixTrace(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= 32)
+    {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4048,7 +4254,9 @@ __forceinline__ __device__ void optixTrace(
         // Read back updated payload registers
         pr.readFromPayloadRegs();
         pr.unpack(*Payload);
-    } else {
+    }
+    else
+    {
         // Pointer-based fallback for large payloads
         uint32_t r0, r1;
         packOptiXRayPayloadPointer((void*)Payload, r0, r1);
@@ -4152,60 +4360,239 @@ __forceinline__ __device__ void optixTraverseWithRegs(
     PayloadRegisters<T, N>& pr)
 {
     // Call optixTraverse with the appropriate number of payload registers
-    if constexpr (N == 1) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
+    if constexpr (N == 1)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
             pr.regs[0]);
-    } else if constexpr (N == 2) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1]);
-    } else if constexpr (N == 3) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2]);
-    } else if constexpr (N == 4) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3]);
-    } else if constexpr (N == 5) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4]);
-    } else if constexpr (N == 6) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5]);
-    } else if constexpr (N == 7) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6]);
-    } else if constexpr (N == 8) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7]);
-    } else if constexpr (N <= 16) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
-            pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15]);
-    } else if constexpr (N <= 32) {
-        optixTraverse(AccelerationStructure, Origin, Direction, TMin, TMax, Time,
-            InstanceInclusionMask, RayFlags, RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex, MissShaderIndex,
-            pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5], pr.regs[6], pr.regs[7],
-            pr.regs[8], pr.regs[9], pr.regs[10], pr.regs[11], pr.regs[12], pr.regs[13], pr.regs[14], pr.regs[15],
-            pr.regs[16], pr.regs[17], pr.regs[18], pr.regs[19], pr.regs[20], pr.regs[21], pr.regs[22], pr.regs[23],
-            pr.regs[24], pr.regs[25], pr.regs[26], pr.regs[27], pr.regs[28], pr.regs[29], pr.regs[30], pr.regs[31]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= 32)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
     }
 }
 
@@ -4223,7 +4610,8 @@ __forceinline__ __device__ void optixTraverse(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= 32)
+    {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4245,7 +4633,9 @@ __forceinline__ __device__ void optixTraverse(
         // Read back updated payload registers
         pr.readFromPayloadRegs();
         pr.unpack(*Payload);
-    } else {
+    }
+    else
+    {
         // Pointer-based fallback for large payloads
         uint32_t r0, r1;
         packOptiXRayPayloadPointer((void*)Payload, r0, r1);
@@ -4281,7 +4671,8 @@ __forceinline__ __device__ void optixTraverse(
 {
     constexpr size_t numRegs = (sizeof(T) + 3) / 4;
 
-    if constexpr (numRegs <= 32) {
+    if constexpr (numRegs <= 32)
+    {
         // Register-based approach for small payloads
         PayloadRegisters<T> pr;
         pr.pack(*Payload);
@@ -4303,7 +4694,9 @@ __forceinline__ __device__ void optixTraverse(
         // Read back updated payload registers
         pr.readFromPayloadRegs();
         pr.unpack(*Payload);
-    } else {
+    }
+    else
+    {
         // Pointer-based fallback for large payloads
         uint32_t r0, r1;
         packOptiXRayPayloadPointer((void*)Payload, r0, r1);
