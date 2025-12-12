@@ -68,6 +68,7 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
     case RenderApiType::Metal:
         return rhi::DeviceType::Metal;
     case RenderApiType::CPU:
+    case RenderApiType::LLVM:
         return rhi::DeviceType::CPU;
     case RenderApiType::CUDA:
         return rhi::DeviceType::CUDA;
@@ -339,11 +340,14 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
             {
                 // Look up the rendering API if set
                 UnownedStringSlice argName = argSlice.tail(1);
-                DeviceType deviceType = _toRenderType(RenderApiUtil::findApiTypeByName(argName));
+                RenderApiType renderApi = RenderApiUtil::findApiTypeByName(argName);
+                DeviceType deviceType = _toRenderType(renderApi);
 
                 if (deviceType != DeviceType::Default)
                 {
                     outOptions.deviceType = deviceType;
+                    if (renderApi == RenderApiType::LLVM)
+                        outOptions.useLLVMDirectly = true;
                     continue;
                 }
 

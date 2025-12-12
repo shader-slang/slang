@@ -79,6 +79,10 @@ PassThroughMode getDownstreamCompilerRequiredForTarget(CodeGenTarget target)
     case CodeGenTarget::CSource:
     case CodeGenTarget::Metal:
     case CodeGenTarget::WGSL:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
         {
             return PassThroughMode::None;
         }

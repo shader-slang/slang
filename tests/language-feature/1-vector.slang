@@ -2,6 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-llvm -shaderobj
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

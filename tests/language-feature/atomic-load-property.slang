@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type
+// TODO: Atomics not supported on LLVM yet.
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -llvm
 
 struct AtomicCounter
 {
