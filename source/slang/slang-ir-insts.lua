@@ -1359,6 +1359,13 @@ local insts = {
 	-- Wrapper for OptiX intrinsics used to load shader binding table record data
 	-- using a pointer.
 	{ getOptiXSbtDataPointer = { struct_name = "GetOptiXSbtDataPtr" } },
+	-- Read a uint32 value from OptiX payload register N (0-31).
+	-- Operand 0: register index (int literal)
+	{ getOptiXPayloadRegister = { min_operands = 1 } },
+	-- Write a uint32 value to OptiX payload register N (0-31).
+	-- Operand 0: register index (int literal)
+	-- Operand 1: value to write (uint32)
+	{ setOptiXPayloadRegister = { min_operands = 2 } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{

@@ -1,10 +1,18 @@
 // optix-ignore-hit.slang
+// Tests that any-hit shaders correctly:
+// 1. Read payload from registers (register-based approach for small payloads)
+// 2. Write payload back before optixIgnoreIntersection() call
+// 3. Emit proper OptiX intrinsics
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry anyHitShader
 //TEST:SIMPLE(filecheck=CHECK-PTX): -target ptx -Xnvrtc -I"./external/optix-dev/include/"
-//CHECK: HitBuffer_insert_0(((HitBuffer_0 *)getOptiXRayPayloadPtr()), hit_0.t_0);
-//CHECK: optixIgnoreIntersection
 
-//CHECK-PTX: _optix_get_ray_tmax
+// CHECK: optixGetPayload_0
+// CHECK: HitBuffer_insert_0
+// CHECK: optixSetPayload_0
+// CHECK: optixIgnoreIntersection
+// CHECK: optixSetPayload_0
+
+// CHECK-PTX: _optix_get_ray_tmax
 
 struct HitBuffer
 {
@@ -13,7 +21,7 @@ struct HitBuffer
     void insert(float t) { last = t; }
 }
 
-struct RayHit 
+struct RayHit
 {
     float t;
     int instanceID;
@@ -22,19 +30,23 @@ struct RayHit
 [shader("anyhit")]
 void anyHitShader(inout HitBuffer rayHitBuffer)
 {
+    // Save original value for comparison
+    float originalLast = rayHitBuffer.last;
+
     // Create a hit with current intersection data
     float currentT = RayTCurrent();
     int instanceID = InstanceID();
     RayHit hit = { currentT, instanceID };
-    
+
     // Modify the inout parameter
     rayHitBuffer.insert(hit.t);
-    
+
     // CHECK-PTX: _optix_ignore_intersection
-    // Early exit - should not lose the modification to inout rayHitBuffer
-    if (hit.t < rayHitBuffer.last)
+    // Early exit - compare against ORIGINAL value, not the modified one
+    // This condition can now actually be true (when current hit is closer)
+    if (hit.t < originalLast)
         IgnoreHit();
-    
-    // This line should never execute if IgnoreHit() is called,
-    // but parameter changes should still propagate back
+
+    // This line executes if IgnoreHit() is not called
+    // Payload write-back happens here via optixSetPayload
 }
