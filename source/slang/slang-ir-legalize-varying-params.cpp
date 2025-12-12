@@ -1116,41 +1116,115 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
-    // Compute how many uint32 registers a type requires.
-    // Returns 0 if the type is too large (> 32 registers = 128 bytes)
-    // or if it cannot be flattened to registers.
-    int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
+    // Get the C++ alignment of a type in bytes.
+    // This must match the alignment rules used by CUDA C++.
+    int getTypeCppAlignment(IRType* type, IRBuilder* builder)
     {
         if (auto ptrValType = tryGetPointedToType(builder, type))
             type = ptrValType;
 
         if (auto structType = as<IRStructType>(type))
         {
-            int total = 0;
+            // Struct alignment is the max alignment of its fields
+            int maxAlign = 1;
             for (auto field : structType->getFields())
             {
-                int fieldCount = computePayloadRegisterCount(field->getFieldType(), builder);
-                if (fieldCount == 0)
-                    return 0;
-                total += fieldCount;
-                if (total > kMaxPayloadRegisters)
-                    return 0;
+                int fieldAlign = getTypeCppAlignment(field->getFieldType(), builder);
+                if (fieldAlign > maxAlign)
+                    maxAlign = fieldAlign;
             }
-            return total;
+            return maxAlign;
+        }
+        else if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            return getTypeCppAlignment(arrayType->getElementType(), builder);
+        }
+        else if (auto matType = as<IRMatrixType>(type))
+        {
+            // Matrix alignment is same as vector alignment
+            return getTypeCppAlignment(matType->getElementType(), builder) *
+                   int(as<IRIntLit>(matType->getColumnCount())->getValue());
+        }
+        else if (auto vecType = as<IRVectorType>(type))
+        {
+            // CUDA vector types (float2, float3, float4, etc.) have special alignment:
+            // - float2/int2/etc: 8-byte aligned
+            // - float3: 4-byte aligned (not power of 2)
+            // - float4/int4/etc: 16-byte aligned
+            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
+            if (!elementCountInst)
+                return 4;
+            int elementCount = int(elementCountInst->getValue());
+            int elementAlign = getTypeCppAlignment(vecType->getElementType(), builder);
+
+            if (elementCount == 3)
+            {
+                // float3/int3 has same alignment as element (4 bytes for float3)
+                return elementAlign;
+            }
+            else
+            {
+                // float2 -> 8, float4 -> 16, double2 -> 16, double4 -> 32
+                return elementAlign * elementCount;
+            }
+        }
+        else if (auto basicType = as<IRBasicType>(type))
+        {
+            switch (basicType->getBaseType())
+            {
+            case BaseType::Int:
+            case BaseType::UInt:
+            case BaseType::Float:
+            case BaseType::Bool:
+            // 16-bit types are promoted to 32-bit in OptiX payload registers
+            case BaseType::Int16:
+            case BaseType::UInt16:
+            case BaseType::Half:
+                return 4;
+            case BaseType::Int64:
+            case BaseType::UInt64:
+            case BaseType::Double:
+                return 8;
+            default:
+                return 4;
+            }
+        }
+        return 4;
+    }
+
+    // Get the C++ size of a type in bytes (including internal padding).
+    // Note: 16-bit types are treated as 32-bit since OptiX payload registers are 32-bit.
+    int getTypeCppSize(IRType* type, IRBuilder* builder)
+    {
+        if (auto ptrValType = tryGetPointedToType(builder, type))
+            type = ptrValType;
+
+        if (auto structType = as<IRStructType>(type))
+        {
+            int offset = 0;
+            int maxAlign = 1;
+            for (auto field : structType->getFields())
+            {
+                int fieldAlign = getTypeCppAlignment(field->getFieldType(), builder);
+                int fieldSize = getTypeCppSize(field->getFieldType(), builder);
+                if (fieldAlign > maxAlign)
+                    maxAlign = fieldAlign;
+                // Align offset to field alignment
+                offset = (offset + fieldAlign - 1) & ~(fieldAlign - 1);
+                offset += fieldSize;
+            }
+            // Struct size is padded to struct alignment
+            offset = (offset + maxAlign - 1) & ~(maxAlign - 1);
+            return offset;
         }
         else if (auto arrayType = as<IRArrayTypeBase>(type))
         {
             auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
             if (!elementCountInst)
                 return 0;
-            IRIntegerValue elementCount = elementCountInst->getValue();
-            int elementRegs = computePayloadRegisterCount(arrayType->getElementType(), builder);
-            if (elementRegs == 0)
-                return 0;
-            int total = int(elementCount) * elementRegs;
-            if (total > kMaxPayloadRegisters)
-                return 0;
-            return total;
+            int elementCount = int(elementCountInst->getValue());
+            int elementSize = getTypeCppSize(arrayType->getElementType(), builder);
+            return elementCount * elementSize;
         }
         else if (auto matType = as<IRMatrixType>(type))
         {
@@ -1160,13 +1234,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 return 0;
             int rows = int(rowCountInst->getValue());
             int cols = int(colCountInst->getValue());
-            int elementRegs = computePayloadRegisterCount(matType->getElementType(), builder);
-            if (elementRegs == 0)
-                return 0;
-            int total = rows * cols * elementRegs;
-            if (total > kMaxPayloadRegisters)
-                return 0;
-            return total;
+            int elementSize = getTypeCppSize(matType->getElementType(), builder);
+            return rows * cols * elementSize;
         }
         else if (auto vecType = as<IRVectorType>(type))
         {
@@ -1174,44 +1243,53 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             if (!elementCountInst)
                 return 0;
             int elementCount = int(elementCountInst->getValue());
-            int elementRegs = computePayloadRegisterCount(vecType->getElementType(), builder);
-            if (elementRegs == 0)
-                return 0;
-            int total = elementCount * elementRegs;
-            if (total > kMaxPayloadRegisters)
-                return 0;
-            return total;
+            int elementSize = getTypeCppSize(vecType->getElementType(), builder);
+            return elementCount * elementSize;
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            // 32-bit types: 1 register
-            // 64-bit types: 2 registers
-            // 16-bit types: 1 register (stored as 32-bit)
             switch (basicType->getBaseType())
             {
             case BaseType::Int:
             case BaseType::UInt:
             case BaseType::Float:
+            case BaseType::Bool:
+            // 16-bit types occupy a full 32-bit register in OptiX payload
             case BaseType::Int16:
             case BaseType::UInt16:
             case BaseType::Half:
-            case BaseType::Bool:
-                return 1;
+                return 4;
             case BaseType::Int64:
             case BaseType::UInt64:
             case BaseType::Double:
-                return 2;
+                return 8;
             default:
-                return 0; // Unsupported type
+                return 0;
             }
         }
         return 0;
     }
 
+    // Compute how many uint32 registers a type requires.
+    // Returns 0 if the type is too large (> 32 registers = 128 bytes)
+    // or if it cannot be flattened to registers.
+    // Uses C++ sizeof rules to match the prelude's PayloadRegisters<T>.
+    int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
+    {
+        int sizeBytes = getTypeCppSize(type, builder);
+        if (sizeBytes == 0)
+            return 0;
+        int regCount = (sizeBytes + 3) / 4;
+        if (regCount > kMaxPayloadRegisters)
+            return 0;
+        return regCount;
+    }
+
     // Emit code to read a value from payload registers.
-    // ioBaseRegisterIndex is incremented as registers are consumed.
+    // ioByteOffset is the current byte offset, aligned to the type's alignment before reading.
+    // This must match C++ struct layout rules for compatibility with the prelude's PayloadRegisters.
     IRInst* emitOptiXPayloadRead(
-        int& ioBaseRegisterIndex,
+        int& ioByteOffset,
         IRType* typeToFetch,
         IRBuilder* builder)
     {
@@ -1224,7 +1302,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
-                auto fieldVal = emitOptiXPayloadRead(ioBaseRegisterIndex, fieldType, builder);
+                // Align to field alignment before reading
+                int fieldAlign = getTypeCppAlignment(fieldType, builder);
+                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
+                auto fieldVal = emitOptiXPayloadRead(ioByteOffset, fieldType, builder);
                 if (!fieldVal)
                     return nullptr;
                 fieldVals.add(fieldVal);
@@ -1239,7 +1320,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             List<IRInst*> elementVals;
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
             {
-                auto elementVal = emitOptiXPayloadRead(ioBaseRegisterIndex, elementType, builder);
+                auto elementVal = emitOptiXPayloadRead(ioByteOffset, elementType, builder);
                 if (!elementVal)
                     return nullptr;
                 elementVals.add(elementVal);
@@ -1260,7 +1341,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 List<IRInst*> rowVals;
                 for (IRIntegerValue ii = 0; ii < rowCount; ++ii)
                 {
-                    auto rowVal = emitOptiXPayloadRead(ioBaseRegisterIndex, rowType, builder);
+                    auto rowVal = emitOptiXPayloadRead(ioByteOffset, rowType, builder);
                     if (!rowVal)
                         return nullptr;
                     rowVals.add(rowVal);
@@ -1280,7 +1361,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             List<IRInst*> elementVals;
             for (IRIntegerValue ii = 0; ii < elementCount; ++ii)
             {
-                auto elementVal = emitOptiXPayloadRead(ioBaseRegisterIndex, elementType, builder);
+                auto elementVal = emitOptiXPayloadRead(ioByteOffset, elementType, builder);
                 if (!elementVal)
                     return nullptr;
                 elementVals.add(elementVal);
@@ -1290,7 +1371,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
         else if (auto basicType = as<IRBasicType>(typeToFetch))
         {
             auto uintType = builder->getBasicType(BaseType::UInt);
-            IRInst* regIdx = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
+            int regIdx = ioByteOffset / 4;
+            IRInst* regIdxInst = builder->getIntValue(builder->getIntType(), regIdx);
 
             switch (basicType->getBaseType())
             {
@@ -1298,14 +1380,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             case BaseType::UInt:
                 {
                     // Direct read - register holds the value
-                    ioBaseRegisterIndex++;
-                    return builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx);
+                    ioByteOffset += 4;
+                    return builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
                 }
             case BaseType::Float:
                 {
                     // Read as uint, then bitcast to float
-                    ioBaseRegisterIndex++;
-                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx);
+                    ioByteOffset += 4;
+                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
                     return builder->emitBitCast(typeToFetch, uintVal);
                 }
             case BaseType::Int16:
@@ -1314,8 +1396,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             case BaseType::Bool:
                 {
                     // Read as uint, then cast to the target type
-                    ioBaseRegisterIndex++;
-                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx);
+                    // Note: These take a full register (4 bytes) in payload
+                    ioByteOffset += 4;
+                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
                     return builder->emitCast(typeToFetch, uintVal);
                 }
             case BaseType::Int64:
@@ -1323,11 +1406,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Read low and high parts
                     auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx);
-                    ioBaseRegisterIndex++;
-                    IRInst* regIdx2 = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
-                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2);
-                    ioBaseRegisterIndex++;
+                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    ioByteOffset += 4;
+                    int regIdx2 = ioByteOffset / 4;
+                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
+                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2Inst);
+                    ioByteOffset += 4;
                     // Combine: (high << 32) | low
                     auto lowExt = builder->emitCast(uint64Type, lowVal);
                     auto highExt = builder->emitCast(uint64Type, highVal);
@@ -1342,11 +1426,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Read as uint64, then bitcast to double
                     auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx);
-                    ioBaseRegisterIndex++;
-                    IRInst* regIdx2 = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
-                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2);
-                    ioBaseRegisterIndex++;
+                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    ioByteOffset += 4;
+                    int regIdx2 = ioByteOffset / 4;
+                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
+                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2Inst);
+                    ioByteOffset += 4;
                     auto lowExt = builder->emitCast(uint64Type, lowVal);
                     auto highExt = builder->emitCast(uint64Type, highVal);
                     auto shift = builder->getIntValue(uint64Type, 32);
@@ -1362,9 +1447,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     }
 
     // Emit code to write a value to payload registers.
-    // ioBaseRegisterIndex is incremented as registers are consumed.
+    // ioByteOffset is the current byte offset, aligned to the type's alignment before writing.
+    // This must match C++ struct layout rules for compatibility with the prelude's PayloadRegisters.
     void emitOptiXPayloadWrite(
-        int& ioBaseRegisterIndex,
+        int& ioByteOffset,
         IRInst* value,
         IRType* type,
         IRBuilder* builder)
@@ -1380,9 +1466,12 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             for (auto field : structType->getFields())
             {
                 auto fieldType = field->getFieldType();
+                // Align to field alignment before writing
+                int fieldAlign = getTypeCppAlignment(fieldType, builder);
+                ioByteOffset = (ioByteOffset + fieldAlign - 1) & ~(fieldAlign - 1);
                 auto fieldKey = field->getKey();
                 auto fieldVal = builder->emitFieldExtract(fieldType, value, fieldKey);
-                emitOptiXPayloadWrite(ioBaseRegisterIndex, fieldVal, fieldType, builder);
+                emitOptiXPayloadWrite(ioByteOffset, fieldVal, fieldType, builder);
                 fieldIndex++;
             }
         }
@@ -1395,7 +1484,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 auto idx = builder->getIntValue(builder->getIntType(), ii);
                 auto elementVal = builder->emitElementExtract(elementType, value, idx);
-                emitOptiXPayloadWrite(ioBaseRegisterIndex, elementVal, elementType, builder);
+                emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
             }
         }
         else if (auto matType = as<IRMatrixType>(type))
@@ -1407,15 +1496,18 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 IRIntegerValue rowCount = rowCountInst->getValue();
                 IRIntegerValue colCount = colCountInst->getValue();
                 auto elementType = matType->getElementType();
+                auto rowType = builder->getVectorType(elementType, matType->getColumnCount());
                 for (IRIntegerValue row = 0; row < rowCount; ++row)
                 {
+                    auto rowIdx = builder->getIntValue(builder->getIntType(), row);
+                    // First extract the row (which is a vector)
+                    auto rowVal = builder->emitElementExtract(rowType, value, rowIdx);
                     for (IRIntegerValue col = 0; col < colCount; ++col)
                     {
-                        auto rowIdx = builder->getIntValue(builder->getIntType(), row);
                         auto colIdx = builder->getIntValue(builder->getIntType(), col);
-                        auto elementVal = builder->emitElementExtract(elementType, value, rowIdx);
-                        elementVal = builder->emitElementExtract(elementType, elementVal, colIdx);
-                        emitOptiXPayloadWrite(ioBaseRegisterIndex, elementVal, elementType, builder);
+                        // Then extract the element from the row vector
+                        auto elementVal = builder->emitElementExtract(elementType, rowVal, colIdx);
+                        emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
                     }
                 }
             }
@@ -1429,12 +1521,13 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             {
                 auto idx = builder->getIntValue(builder->getIntType(), ii);
                 auto elementVal = builder->emitElementExtract(elementType, value, idx);
-                emitOptiXPayloadWrite(ioBaseRegisterIndex, elementVal, elementType, builder);
+                emitOptiXPayloadWrite(ioByteOffset, elementVal, elementType, builder);
             }
         }
         else if (auto basicType = as<IRBasicType>(type))
         {
-            IRInst* regIdx = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
+            int regIdx = ioByteOffset / 4;
+            IRInst* regIdxInst = builder->getIntValue(builder->getIntType(), regIdx);
             IRInst* uintVal = nullptr;
 
             switch (basicType->getBaseType())
@@ -1463,13 +1556,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     auto highVal64 = builder->emitShr(uint64Type, valAs64, shift);
                     auto highVal = builder->emitCast(uintType, highVal64);
 
-                    IRInst* lowArgs[] = {regIdx, lowVal};
+                    IRInst* lowArgs[] = {regIdxInst, lowVal};
                     builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, lowArgs);
-                    ioBaseRegisterIndex++;
-                    IRInst* regIdx2 = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
-                    IRInst* highArgs[] = {regIdx2, highVal};
+                    ioByteOffset += 4;
+                    int regIdx2 = ioByteOffset / 4;
+                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
+                    IRInst* highArgs[] = {regIdx2Inst, highVal};
                     builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, highArgs);
-                    ioBaseRegisterIndex++;
+                    ioByteOffset += 4;
                     return;
                 }
             case BaseType::Double:
@@ -1482,13 +1576,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     auto highVal64 = builder->emitShr(uint64Type, valAs64, shift);
                     auto highVal = builder->emitCast(uintType, highVal64);
 
-                    IRInst* lowArgs[] = {regIdx, lowVal};
+                    IRInst* lowArgs[] = {regIdxInst, lowVal};
                     builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, lowArgs);
-                    ioBaseRegisterIndex++;
-                    IRInst* regIdx2 = builder->getIntValue(builder->getIntType(), ioBaseRegisterIndex);
-                    IRInst* highArgs[] = {regIdx2, highVal};
+                    ioByteOffset += 4;
+                    int regIdx2 = ioByteOffset / 4;
+                    IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
+                    IRInst* highArgs[] = {regIdx2Inst, highVal};
                     builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, highArgs);
-                    ioBaseRegisterIndex++;
+                    ioByteOffset += 4;
                     return;
                 }
             default:
@@ -1497,9 +1592,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
             if (uintVal)
             {
-                IRInst* args[] = {regIdx, uintVal};
+                IRInst* args[] = {regIdxInst, uintVal};
                 builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, args);
-                ioBaseRegisterIndex++;
+                ioByteOffset += 4;
             }
         }
     }
