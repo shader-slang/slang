@@ -551,6 +551,7 @@ static UnownedStringSlice _getNVRTCBaseName()
 // newest (in version number)
 static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
 {
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
     // First try the instance path (if supported on platform)
     {
         StringBuilder instancePath;
@@ -570,6 +571,13 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
         {
             // Look for candidates in the directory
             visitor.findInDirectory(Path::combine(buf, "bin"));
+
+            // Since CUDA 13.0, cuda dlls have been moved to bin\x64
+            String bin64Dir = Path::combine(buf, "bin\\x64");
+            if (File::exists(bin64Dir))
+            {
+                visitor.findInDirectory(bin64Dir);
+            }
         }
     }
 
@@ -609,6 +617,13 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
                     {
                         // Okay lets search it
                         visitor.findInDirectory(path);
+
+                        // Since CUDA 13.0, cuda dlls have been moved to bin\x64
+                        String bin64Dir = Path::combine(buf, "bin\\x64");
+                        if (File::exists(bin64Dir))
+                        {
+                            visitor.findInDirectory(bin64Dir);
+                        }
                     }
                 }
             }
@@ -619,6 +634,11 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
     visitor.sortCandidates();
 
     return SLANG_OK;
+#else
+    SLANG_UNUSED(visitor);
+
+    return SLANG_E_NOT_FOUND;
+#endif
 }
 
 static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
@@ -673,28 +693,77 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
                 return SLANG_OK;
             }
 
-            // See if the shared library is in the SDK, as if so we know how to find
-            // the includes
-            // TODO(JS):
-            // This directory structure is correct for windows perhaps could be
-            // different elsewhere.
+            // See if the shared library is in the CUDA SDK install path as, if so, we know how to
+            // find the includes from there
             {
                 List<UnownedStringSlice> pathSlices;
                 Path::split(parentPath.getUnownedSlice(), pathSlices);
-
-                // This -2 split holds the version number.
                 const auto pathSplitCount = pathSlices.getCount();
-                if (pathSplitCount >= 3 && pathSlices[pathSplitCount - 1] == toSlice("bin") &&
-                    pathSlices[pathSplitCount - 3] == toSlice("CUDA"))
-                {
-                    // We want to make sure that one of these paths is CUDA...
-                    const auto sdkPath = Path::getParentDirectory(parentPath);
 
-                    if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+#if SLANG_WINDOWS_FAMILY
+                // Expected sequence on Windows:
+                // CUDA / <version> / bin [ / x64 ]
+                if (pathSplitCount >= 3)
+                {
+                    // Figure out if this is 13.0+ and in an x64 subdirectory
+                    auto pathOffset = 0;
+                    if (pathSplitCount >= 4 && pathSlices[pathSplitCount - 1] == toSlice("x64"))
                     {
-                        return SLANG_OK;
+                        pathOffset = 1;
+                    }
+                    // Check for CUDA directory pattern
+                    if (pathSlices[pathSplitCount - pathOffset - 1] == toSlice("bin") &&
+                        pathSlices[pathSplitCount - pathOffset - 3] == toSlice("CUDA"))
+                    {
+                        auto sdkPath = Path::getParentDirectory(parentPath);
+                        if (pathOffset == 1)
+                        {
+                            sdkPath = Path::getParentDirectory(sdkPath);
+                        }
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
                     }
                 }
+#else
+                // Expected sequence on Linux for cuda 13+:
+                // cuda-<version> / targets / <arch> / lib
+                if (pathSplitCount >= 4)
+                {
+                    if (pathSlices[pathSplitCount - 1] == toSlice("lib") &&
+                        pathSlices[pathSplitCount - 3] == toSlice("targets") &&
+                        pathSlices[pathSplitCount - 4].subString(0, 4) == toSlice("cuda"))
+                    {
+                        // Headers are under <arch> / include
+                        const auto sdkPath = Path::getParentDirectory(parentPath);
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
+                    }
+                }
+                // Expected sequence on Linux for cuda 12:
+                // cuda-<version> / lib[64]
+                if (pathSplitCount >= 2)
+                {
+                    if (pathSlices[pathSplitCount - 1].subString(0, 3) == toSlice("lib") &&
+                        pathSlices[pathSplitCount - 2].subString(0, 4) == toSlice("cuda"))
+                    {
+                        const auto sdkPath = Path::getParentDirectory(parentPath);
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
+                    }
+                }
+#endif
             }
         }
     }
