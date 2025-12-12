@@ -14,15 +14,44 @@ using namespace Slang;
 // Test that the IModule::findAndCheckEntryPoint API supports discovering
 // entrypoints without a [shader] attribute.
 
+// Cross-platform environment variable helpers
+#ifdef _WIN32
+#define SET_SPIRV_VALIDATION() _putenv("SLANG_RUN_SPIRV_VALIDATION=1")
+#define UNSET_SPIRV_VALIDATION() _putenv("SLANG_RUN_SPIRV_VALIDATION=")
+#else
+#define SET_SPIRV_VALIDATION() setenv("SLANG_RUN_SPIRV_VALIDATION", "1", 1)
+#define UNSET_SPIRV_VALIDATION() unsetenv("SLANG_RUN_SPIRV_VALIDATION")
+#endif
+
 SLANG_UNIT_TEST(findAndCheckEntryPoint)
 {
+    // Enable SPIR-V validation
+    SET_SPIRV_VALIDATION();
+
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
-        float4 fragMain(float4 pos:SV_Position) : SV_Target
+        struct BokehSplat
         {
-            return pos;
+            uint2 color;
+        };
+
+        struct DoFSplatParams
+        {
+            float bokehArea;
+            float anisotropy;
+            uint pad0;
+            uint pad1;
+            RWStructuredBuffer<BokehSplat> BokehBuffer;
+        };
+        ParameterBlock<DoFSplatParams> gDoFSplatParams;
+
+        // Test absence of attribute [shader("...")] intentionally
+        float4 fragMain(float4 pos:SV_Position, uint instanceIndex: SV_InstanceID) : SV_Target
+        {
+            BokehSplat bokeh = gDoFSplatParams.BokehBuffer[instanceIndex];
+            return float4(bokeh.color, 0, 1);
         }
-        )";
+    )";
 
     auto moduleName = "moduleG" + String(Process::getId());
     String userSource = "import " + moduleName + ";\n" + userSourceBody;
@@ -68,8 +97,28 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
 
     ComPtr<slang::IBlob> code;
     linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
+
+    // Check for validation errors
+    if (diagnosticBlob)
+    {
+        const char* diagText = (const char*)diagnosticBlob->getBufferPointer();
+        if (strstr(diagText, "Validation of generated SPIR-V failed"))
+        {
+            SLANG_CHECK(false); // Fail the test on validation error
+        }
+    }
+
+
     SLANG_CHECK(code != nullptr);
     SLANG_CHECK(code->getBufferSize() != 0);
+
+    FILE* f = fopen("check-entrypoint.spv", "wb");
+    fwrite(code->getBufferPointer(), 1, code->getBufferSize(), f);
+    fclose(f);
+    printf("check-entrypoint.spv created\n");
+
+    // Restore environment variable to not affect other tests
+    UNSET_SPIRV_VALIDATION();
 }
 
 // This test reproduces issue #6507, where it was noticed that compilation of
