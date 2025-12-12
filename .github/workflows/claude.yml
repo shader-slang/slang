@@ -55,26 +55,17 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
-      # Install gh CLI and jq on Windows (not pre-installed on self-hosted runners)
-      - name: Install gh CLI and jq (Windows)
+      # Install jq on Windows (not pre-installed on self-hosted runners)
+      # Creates wrappers for both cmd.exe and bash compatibility
+      # See: https://github.com/anthropics/claude-code-action/issues/712
+      - name: Install jq (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $toolsDir = "C:\Windows\ServiceProfiles\NetworkService\.local\bin"
           New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
 
-          # Install gh CLI
-          $ghVersion = "2.63.2"
-          $ghUrl = "https://github.com/cli/cli/releases/download/v${ghVersion}/gh_${ghVersion}_windows_amd64.zip"
-          $ghZip = "$env:RUNNER_TEMP\gh.zip"
-          $ghExtract = "$env:RUNNER_TEMP\gh"
-          Invoke-WebRequest -Uri $ghUrl -OutFile $ghZip
-          Expand-Archive -Path $ghZip -DestinationPath $ghExtract -Force
-          Copy-Item "$ghExtract\gh_${ghVersion}_windows_amd64\bin\gh.exe" "$toolsDir\gh.exe"
-          Write-Host "gh CLI installed at $toolsDir\gh.exe"
-
-          # Install jq with bash wrapper (fixes cmd.exe quoting issues)
-          # See: https://github.com/anthropics/claude-code-action/issues/712
+          # Download jq
           $jqUrl = "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-win64.exe"
           $jqExe = "$env:RUNNER_TEMP\jq-windows.exe"
           Invoke-WebRequest -Uri $jqUrl -OutFile $jqExe
@@ -94,7 +85,7 @@ jobs:
 
           Write-Host "jq wrappers installed at $toolsDir"
 
-          # Add tools directory to PATH so subsequent steps can find gh and jq
+          # Add tools directory to PATH
           Add-Content -Path $env:GITHUB_PATH -Value $toolsDir
 
       # Install Claude Code on Windows (the action's install.sh doesn't support Windows)
@@ -160,24 +151,25 @@ jobs:
       - name: Checkout of submodules
         run: git submodule update --init --recursive --depth=1
 
-      # Workaround for anthropics/claude-code-action#46: fork PRs fail because
-      # the action tries to fetch the branch from origin, but fork branches
-      # only exist on the fork. This step adds the fork as an additional fetch
-      # URL for origin so the action's fetch succeeds.
+      # Workaround for fork PRs: the action tries to fetch the branch from origin,
+      # but fork branches only exist on the fork. This step adds the fork as an
+      # additional fetch URL for origin so the action's fetch succeeds.
       - name: Setup fork PR remote
         if: github.event.issue.pull_request != ''
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           PR_NUMBER="${{ github.event.issue.number }}"
 
-          # Get PR details
-          PR_INFO=$(gh pr view $PR_NUMBER --json headRefName,headRepositoryOwner,headRepository)
-          HEAD_REF=$(echo "$PR_INFO" | jq -r '.headRefName')
-          HEAD_OWNER=$(echo "$PR_INFO" | jq -r '.headRepositoryOwner.login // empty')
-          HEAD_REPO=$(echo "$PR_INFO" | jq -r '.headRepository.name // empty')
+          # Get PR details via GitHub API (gh CLI not available on self-hosted runners)
+          PR_INFO=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+
+          HEAD_REF=$(echo "$PR_INFO" | jq -r '.head.ref')
+          HEAD_OWNER=$(echo "$PR_INFO" | jq -r '.head.repo.owner.login // empty')
+          HEAD_REPO=$(echo "$PR_INFO" | jq -r '.head.repo.name // empty')
 
           # Check if this is a fork PR
           if [ -n "$HEAD_OWNER" ] && [ "$HEAD_OWNER" != "${{ github.repository_owner }}" ]; then
