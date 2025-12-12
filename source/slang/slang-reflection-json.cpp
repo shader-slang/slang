@@ -115,7 +115,7 @@ static void emitReflectionVarBindingInfoJSON(
 
         default:
             writer << "unknown";
-            assert(!"unhandled case");
+            SLANG_ASSERT(!"unhandled case");
             break;
         }
         writer << "\"";
@@ -435,7 +435,7 @@ static void emitReflectionScalarTypeInfoJSON(PrettyWriter& writer, SlangScalarTy
     {
     default:
         writer << "unknown";
-        assert(!"unhandled case");
+        SLANG_ASSERT(!"unhandled case");
         break;
 #define CASE(TAG, ID)                                                          \
     case static_cast<SlangScalarType>(slang::TypeReflection::ScalarType::TAG): \
@@ -475,7 +475,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
     {
     default:
         writer << "unknown";
-        assert(!"unhandled case");
+        SLANG_ASSERT(!"unhandled case");
         break;
 
 #define CASE(SHAPE, NAME)             \
@@ -522,7 +522,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         {
         default:
             writer << "unknown";
-            assert(!"unhandled case");
+            SLANG_ASSERT(!"unhandled case");
             break;
 
         case SLANG_RESOURCE_ACCESS_READ:

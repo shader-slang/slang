@@ -4798,7 +4798,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass);
+        SLANG_ASSERT(syntaxClass);
     }
     else
     {
