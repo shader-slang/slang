@@ -14,9 +14,7 @@ struct IRModule;
 
 // Recursively visit the entire module, and diagnose an error whenever an ExtractExistentialType is
 // being used as a specialization argument to a generic function or type.
-void addDecorationsForGenericsSpecializedWithExistentialsRec(
-    IRInst* parent,
-    DiagnosticSink* sink)
+void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(parent))
     {

@@ -2196,6 +2196,14 @@ struct TypeFlowSpecializationContext
 
             IRBuilder builder(module);
             auto setOp = getSetOpFromType(inst->getDataType());
+
+            // There are a few types of specializations (particularly with generics that return
+            // values), that we don't handle in the type-flow pass. We'll just avoid specializing
+            // these.
+            //
+            if (setOp == kIROp_Invalid)
+                return none();
+
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, specializedSet));
             module->getContainerPool().free(&specializedSet);
             module->getContainerPool().free(&specializationArgs);
