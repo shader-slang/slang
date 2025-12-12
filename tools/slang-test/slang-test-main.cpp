@@ -14,6 +14,7 @@
 #include "../../source/core/slang-std-writers.h"
 #include "../../source/core/slang-string-escape-util.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/core/slang-test-diagnostics.h"
 #include "../../source/core/slang-token-reader.h"
 #include "../../source/core/slang-type-text-util.h"
 #include "slang-com-helper.h"
@@ -46,6 +47,7 @@
 #include "../../prelude/slang-cpp-types.h"
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 #if defined(_WIN32)
@@ -54,6 +56,22 @@ SLANG_RHI_EXPORT_AGILITY_SDK
 #endif
 
 using namespace Slang;
+
+// Helper function to check if phase-level timing is enabled
+static bool isPhaseTimingEnabled()
+{
+    static bool enabled = Slang::isDiagnosticEnabled("timing-phases");
+    return enabled;
+}
+
+// Helper to output phase timing (only when timing-phases is enabled)
+static void reportPhaseTiming(const char* phaseName, double durationMs)
+{
+    if (isPhaseTimingEnabled())
+    {
+        fprintf(stderr, "[TIMING] %s completed: %.3fms\n", phaseName, durationMs);
+    }
+}
 
 // Constants for slang-test specific options
 static const char* kPreserveEmbeddedSourceOption = "-preserve-embedded-source";
@@ -917,7 +935,15 @@ Result spawnAndWaitExe(
             commandLine.begin());
     }
 
+    // Time the process execution phase
+    auto execStartTime = std::chrono::steady_clock::now();
     Result res = ProcessUtil::execute(cmdLine, outRes);
+    auto execEndTime = std::chrono::steady_clock::now();
+    auto execDurationMs =
+        std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime).count() /
+        1000.0;
+    reportPhaseTiming("exe:process-execute", execDurationMs);
+
     if (SLANG_FAILED(res))
     {
         //        fprintf(stderr, "failed to run test '%S'\n", testPath.ToWString());
@@ -962,7 +988,16 @@ Result spawnAndWaitSharedLibrary(
             testCmdLine.toString().getBuffer());
     }
 
+    // Time the function lookup phase
+    auto lookupStartTime = std::chrono::steady_clock::now();
     auto func = context->getInnerMainFunc(context->options.binDir, exeName);
+    auto lookupEndTime = std::chrono::steady_clock::now();
+    auto lookupDurationMs =
+        std::chrono::duration_cast<std::chrono::microseconds>(lookupEndTime - lookupStartTime)
+            .count() /
+        1000.0;
+    reportPhaseTiming("sharedlib:function-lookup", lookupDurationMs);
+
     if (func)
     {
         StringBuilder stdErrorString;
@@ -996,8 +1031,16 @@ Result spawnAndWaitSharedLibrary(
             args.add(cmdArg.getBuffer());
         }
 
+        // Time the execution phase
+        auto execStartTime = std::chrono::steady_clock::now();
         SlangResult res =
             func(&stdWriters, context->getSession(), int(args.getCount()), args.begin());
+        auto execEndTime = std::chrono::steady_clock::now();
+        auto execDurationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(execEndTime - execStartTime)
+                .count() /
+            1000.0;
+        reportPhaseTiming("sharedlib:execution", execDurationMs);
 
         StdWriters::setSingleton(prevStdWriters);
 
@@ -1142,6 +1185,11 @@ static Result _executeRPC(
     outRes.standardError = exeRes.stdError;
     outRes.standardOutput = exeRes.stdOut;
     outRes.debugLayer = exeRes.debugLayer;
+    outRes.executionTimeMs = exeRes.executionTimeMs;
+
+    // Drain test-server stderr (phase timing diagnostics) before returning
+    // so it appears before the test result
+    context->drainTestServerStderr();
 
     return SLANG_OK;
 }
@@ -1171,6 +1219,7 @@ Result spawnAndWaitTestServer(
 
     args.toolName = exeName;
     args.args = inCmdLine.m_args;
+    args.testCommand = testPath;
 
     return _executeRPC(
         context,
@@ -1622,6 +1671,9 @@ ToolReturnCode spawnAndWait(
 
     const auto finalSpawnType = context->getFinalSpawnType(spawnType);
 
+    // Start timing the test execution
+    auto startTime = std::chrono::steady_clock::now();
+
     SlangResult spawnResult = SLANG_FAIL;
     switch (finalSpawnType)
     {
@@ -1646,6 +1698,14 @@ ToolReturnCode spawnAndWait(
     default:
         break;
     }
+
+    // Calculate execution time
+    auto endTime = std::chrono::steady_clock::now();
+    auto durationMs =
+        std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() / 1000.0;
+
+    // Report execution time (measured locally)
+    context->getTestReporter()->addExecutionTime(durationMs / 1000.0);
 
     if (SLANG_FAILED(spawnResult))
     {
