@@ -4407,6 +4407,13 @@ static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTra
 }
 #endif
 
+#if (OPTIX_VERSION >= 80000)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTime(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTime();
+}
+#endif
+
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ uint
 slangOptixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
