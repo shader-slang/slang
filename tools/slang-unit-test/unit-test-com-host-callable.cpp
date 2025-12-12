@@ -130,19 +130,21 @@ struct ComTestContext
         SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
 
         {
-            const SlangPassThrough cppCompilers[] = {
-                SLANG_PASS_THROUGH_VISUAL_STUDIO,
-                SLANG_PASS_THROUGH_GCC,
-                SLANG_PASS_THROUGH_CLANG,
-            };
+            const SlangPassThrough currentCppCompiler =
+#if SLANG_VC
+                SLANG_PASS_THROUGH_VISUAL_STUDIO
+#elif SLANG_CLANG
+                SLANG_PASS_THROUGH_CLANG
+#elif SLANG_GCC
+                SLANG_PASS_THROUGH_GCC
+#else
+#error "Unsupported compiler"
+#endif
+                ;
             // Do we have a C++ compiler
-            for (const auto compiler : cppCompilers)
+            if (SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(currentCppCompiler)))
             {
-                if (SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(compiler)))
-                {
-                    cppCompiler = compiler;
-                    break;
-                }
+                cppCompiler = currentCppCompiler;
             }
         }
 

@@ -1899,8 +1899,8 @@ void writeSerializedModuleAST(
         // (which is more or less just a pair of pointers, to the two
         // values described above).
         //
-        Fossil::SerialWriter writer(blobBuilder);
         ASTSerialWriteContext context(moduleDecl, sourceLocWriter);
+        Fossil::SerialWriter writer(blobBuilder);
         ASTSerialWriteContext::ASTSerializer serializer(&writer, &context);
 
         // Once we have our `serializer`, we can finally invoke
