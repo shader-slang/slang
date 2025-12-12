@@ -1339,11 +1339,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     // Emit code to read a value from payload registers.
     // ioByteOffset is the current byte offset, aligned to the type's alignment before reading.
-    // This must match C++ struct layout rules for compatibility with the prelude's PayloadRegisters.
-    IRInst* emitOptiXPayloadRead(
-        int& ioByteOffset,
-        IRType* typeToFetch,
-        IRBuilder* builder)
+    // This must match C++ struct layout rules for compatibility with the prelude's
+    // PayloadRegisters.
+    IRInst* emitOptiXPayloadRead(int& ioByteOffset, IRType* typeToFetch, IRBuilder* builder)
     {
         if (auto ptrValType = tryGetPointedToType(builder, typeToFetch))
             typeToFetch = ptrValType;
@@ -1422,7 +1420,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     return nullptr;
                 elementVals.add(elementVal);
             }
-            return builder->emitMakeVector(typeToFetch, elementVals.getCount(), elementVals.getBuffer());
+            return builder->emitMakeVector(
+                typeToFetch,
+                elementVals.getCount(),
+                elementVals.getBuffer());
         }
         else if (auto basicType = as<IRBasicType>(typeToFetch))
         {
@@ -1437,13 +1438,21 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Direct read - register holds the value
                     ioByteOffset += 4;
-                    return builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    return builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
                 }
             case BaseType::Float:
                 {
                     // Read as uint, then bitcast to float
                     ioByteOffset += 4;
-                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    auto uintVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
                     return builder->emitBitCast(typeToFetch, uintVal);
                 }
             case BaseType::Int16:
@@ -1454,7 +1463,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     // Read as uint, then cast to the target type
                     // Note: These take a full register (4 bytes) in payload
                     ioByteOffset += 4;
-                    auto uintVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    auto uintVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
                     return builder->emitCast(typeToFetch, uintVal);
                 }
             case BaseType::Int64:
@@ -1462,11 +1475,19 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Read low and high parts
                     auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    auto lowVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
                     ioByteOffset += 4;
                     int regIdx2 = ioByteOffset / 4;
                     IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2Inst);
+                    auto highVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdx2Inst);
                     ioByteOffset += 4;
                     // Combine: (high << 32) | low
                     auto lowExt = builder->emitCast(uint64Type, lowVal);
@@ -1482,11 +1503,19 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 {
                     // Read as uint64, then bitcast to double
                     auto uint64Type = builder->getBasicType(BaseType::UInt64);
-                    auto lowVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdxInst);
+                    auto lowVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
                     ioByteOffset += 4;
                     int regIdx2 = ioByteOffset / 4;
                     IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
-                    auto highVal = builder->emitIntrinsicInst(uintType, kIROp_GetOptiXPayloadRegister, 1, &regIdx2Inst);
+                    auto highVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdx2Inst);
                     ioByteOffset += 4;
                     auto lowExt = builder->emitCast(uint64Type, lowVal);
                     auto highExt = builder->emitCast(uint64Type, highVal);
@@ -1504,12 +1533,9 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
 
     // Emit code to write a value to payload registers.
     // ioByteOffset is the current byte offset, aligned to the type's alignment before writing.
-    // This must match C++ struct layout rules for compatibility with the prelude's PayloadRegisters.
-    void emitOptiXPayloadWrite(
-        int& ioByteOffset,
-        IRInst* value,
-        IRType* type,
-        IRBuilder* builder)
+    // This must match C++ struct layout rules for compatibility with the prelude's
+    // PayloadRegisters.
+    void emitOptiXPayloadWrite(int& ioByteOffset, IRInst* value, IRType* type, IRBuilder* builder)
     {
         if (auto ptrValType = tryGetPointedToType(builder, type))
             type = ptrValType;
@@ -1615,12 +1641,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     auto highVal = builder->emitCast(uintType, highVal64);
 
                     IRInst* lowArgs[] = {regIdxInst, lowVal};
-                    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, lowArgs);
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        lowArgs);
                     ioByteOffset += 4;
                     int regIdx2 = ioByteOffset / 4;
                     IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
                     IRInst* highArgs[] = {regIdx2Inst, highVal};
-                    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, highArgs);
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        highArgs);
                     ioByteOffset += 4;
                     return;
                 }
@@ -1635,12 +1669,20 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     auto highVal = builder->emitCast(uintType, highVal64);
 
                     IRInst* lowArgs[] = {regIdxInst, lowVal};
-                    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, lowArgs);
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        lowArgs);
                     ioByteOffset += 4;
                     int regIdx2 = ioByteOffset / 4;
                     IRInst* regIdx2Inst = builder->getIntValue(builder->getIntType(), regIdx2);
                     IRInst* highArgs[] = {regIdx2Inst, highVal};
-                    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, highArgs);
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        highArgs);
                     ioByteOffset += 4;
                     return;
                 }
@@ -1651,7 +1693,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             if (uintVal)
             {
                 IRInst* args[] = {regIdxInst, uintVal};
-                builder->emitIntrinsicInst(builder->getVoidType(), kIROp_SetOptiXPayloadRegister, 2, args);
+                builder->emitIntrinsicInst(
+                    builder->getVoidType(),
+                    kIROp_SetOptiXPayloadRegister,
+                    2,
+                    args);
                 ioByteOffset += 4;
             }
         }
@@ -1736,13 +1782,14 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             // Find the TempCallArgVar with matching type - this has the modified value
             IRVar* actualVar = findTempCallArgVar(info.payloadType);
             if (!actualVar)
-                actualVar = info.localVar;  // Fallback to our tracked variable
+                actualVar = info.localVar; // Fallback to our tracked variable
 
             // Insert write-backs before return statements
             for (auto block : m_entryPointFunc->getBlocks())
             {
                 auto terminator = block->getTerminator();
-                if (terminator && (terminator->getOp() == kIROp_Return || terminator->getOp() == kIROp_MissingReturn))
+                if (terminator && (terminator->getOp() == kIROp_Return ||
+                                   terminator->getOp() == kIROp_MissingReturn))
                 {
                     builder.setInsertBefore(terminator);
                     auto payloadVal = builder.emitLoad(actualVar);
@@ -2070,8 +2117,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     {
                         // Fallback if read fails
                         IRPtrType* ptrType = builder.getPtrType(info.type);
-                        IRInst* getRayPayload =
-                            builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
+                        IRInst* getRayPayload = builder.emitIntrinsicInst(
+                            ptrType,
+                            kIROp_GetOptiXRayPayloadPtr,
+                            0,
+                            nullptr);
                         return LegalizedVaryingVal::makeAddress(getRayPayload);
                     }
 
