@@ -404,10 +404,13 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
 
     CommaTrackerRAII commaTracker(writer);
 
-    if (auto name = var->getName())
+    if (var->getVariable())
     {
-        writer.maybeComma();
-        emitReflectionNameInfoJSON(writer, name);
+        if (auto name = var->getName())
+        {
+            writer.maybeComma();
+            emitReflectionNameInfoJSON(writer, name);
+        }
     }
 
     writer.maybeComma();
@@ -421,7 +424,10 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
         emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
     }
 
-    emitReflectionModifierInfoJSON(writer, var->getVariable());
+    if (auto variable = var->getVariable())
+    {
+        emitReflectionModifierInfoJSON(writer, variable);
+    }
 
     emitReflectionVarBindingInfoJSON(writer, var);
     writer.dedent();
@@ -1033,13 +1039,16 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
 
     CommaTrackerRAII commaTracker(writer);
 
-    if (auto name = param->getName())
+    if (param->getVariable())
     {
-        writer.maybeComma();
-        emitReflectionNameInfoJSON(writer, name);
-    }
+        if (auto name = param->getName())
+        {
+            writer.maybeComma();
+            emitReflectionNameInfoJSON(writer, name);
+        }
 
-    emitReflectionModifierInfoJSON(writer, param->getVariable());
+        emitReflectionModifierInfoJSON(writer, param->getVariable());
+    }
 
     emitReflectionVarBindingInfoJSON(writer, param);
 
