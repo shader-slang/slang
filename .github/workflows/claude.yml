@@ -55,30 +55,47 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
-      # Install jq with a bash wrapper to fix Windows cmd quoting issues
-      # See: https://github.com/anthropics/claude-code-action/issues/712
-      - name: Install jq with bash wrapper (Windows)
+      # Install gh CLI and jq on Windows (not pre-installed on self-hosted runners)
+      - name: Install gh CLI and jq (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          # Download jq for Windows to a temp location
+          $toolsDir = "C:\Windows\ServiceProfiles\NetworkService\.local\bin"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+
+          # Install gh CLI
+          $ghVersion = "2.63.2"
+          $ghUrl = "https://github.com/cli/cli/releases/download/v${ghVersion}/gh_${ghVersion}_windows_amd64.zip"
+          $ghZip = "$env:RUNNER_TEMP\gh.zip"
+          $ghExtract = "$env:RUNNER_TEMP\gh"
+          Invoke-WebRequest -Uri $ghUrl -OutFile $ghZip
+          Expand-Archive -Path $ghZip -DestinationPath $ghExtract -Force
+          Copy-Item "$ghExtract\gh_${ghVersion}_windows_amd64\bin\gh.exe" "$toolsDir\gh.exe"
+          Write-Host "gh CLI installed at $toolsDir\gh.exe"
+
+          # Install jq with bash wrapper (fixes cmd.exe quoting issues)
+          # See: https://github.com/anthropics/claude-code-action/issues/712
           $jqUrl = "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-win64.exe"
           $jqExe = "$env:RUNNER_TEMP\jq-windows.exe"
           Invoke-WebRequest -Uri $jqUrl -OutFile $jqExe
 
-          # Convert to Unix path for bash
+          # Convert to Unix path for bash wrapper
           $jqExeUnix = $jqExe -replace '\\', '/' -replace '^([A-Za-z]):', '/$1'
 
-          # Create jq.cmd wrapper in Claude's install directory (writable, in PATH)
-          # The wrapper routes through bash where single-quoted args work correctly
-          $claudeDir = "C:\Windows\ServiceProfiles\NetworkService\.local\bin"
-          New-Item -ItemType Directory -Force -Path $claudeDir | Out-Null
-          $cmdWrapper = "$claudeDir\jq.cmd"
+          # Create jq.cmd wrapper that routes through bash for proper quoting
+          $cmdWrapper = "$toolsDir\jq.cmd"
           $wrapperContent = "@echo off`r`n`"C:\Program Files\Git\bin\bash.exe`" -c '`"$jqExeUnix`" `"`$@`"' _ %*"
           Set-Content -Path $cmdWrapper -Value $wrapperContent -Encoding ASCII
 
-          Write-Host "jq wrapper installed at $cmdWrapper"
-          Write-Host "jq executable at $jqExe"
+          # Create jq bash script (no extension) for Git Bash compatibility
+          $bashWrapper = "$toolsDir\jq"
+          $bashContent = "#!/bin/bash`n`"$jqExeUnix`" `"`$@`""
+          Set-Content -Path $bashWrapper -Value $bashContent -NoNewline -Encoding ASCII
+
+          Write-Host "jq wrappers installed at $toolsDir"
+
+          # Add tools directory to PATH so subsequent steps can find gh and jq
+          Add-Content -Path $env:GITHUB_PATH -Value $toolsDir
 
       # Install Claude Code on Windows (the action's install.sh doesn't support Windows)
       - name: Install Claude Code (Windows)
