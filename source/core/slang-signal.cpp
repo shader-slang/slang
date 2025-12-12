@@ -68,7 +68,8 @@ String _getMessage(SignalType type, char const* message)
     if (type == SignalType::AssertFailure)
     {
         StringBuilder envValue;
-        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
+        if (SLANG_SUCCEEDED(
+                PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
         {
             UnownedStringSlice envSlice = envValue.getUnownedSlice();
             if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
