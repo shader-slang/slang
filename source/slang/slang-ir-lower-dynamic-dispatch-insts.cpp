@@ -760,8 +760,8 @@ public:
                 auto generic =
                     cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
 
-                auto specializedFuncType = (IRType*)specializeGeneric(
-                    cast<IRSpecialize>(builder.emitSpecializeInst(
+                auto specializedFuncType =
+                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
                         builder.getTypeKind(),
                         generic->getDataType(),
                         specArgs.getCount(),
@@ -1437,10 +1437,9 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto tableSet = taggedUnion->getWitnessTableSet();
 
         if (taggedUnion->getTypeSet()->isSingleton())
-            return builder.getTupleType(
-                List<IRType*>(
-                    {(IRType*)builder.getSetTagType(tableSet),
-                     (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
+            return builder.getTupleType(List<IRType*>(
+                {(IRType*)builder.getSetTagType(tableSet),
+                 (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)builder.getSetTagType(tableSet), (IRType*)typeSet}));
