@@ -925,6 +925,7 @@ typedef uint32_t SlangSizeT;
         ReportDownstreamTime,          // bool
         ReportPerfBenchmark,           // bool
         ReportCheckpointIntermediates, // bool
+        ReportDynamicDispatchSites,    // bool
         SkipSPIRVValidation,           // bool
         SourceEmbedStyle,
         SourceEmbedName,

@@ -1256,7 +1256,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink);
+                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
                 }
             }
 
