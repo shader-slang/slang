@@ -1886,12 +1886,22 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 IRBuilder builder(m_module);
                 builder.setInsertBefore(m_firstOrdinaryInst);
 
-                // Compute how many registers are required for this payload type
-                int registerCount = computePayloadRegisterCount(info.type, &builder);
+                // Only use register-based payload for hit/miss/anyhit shaders
+                // Raygen shaders pass payload TO TraceRay, not receive it FROM registers
+                bool useRegisterBasedPayload = (m_stage == Stage::AnyHit) ||
+                                               (m_stage == Stage::ClosestHit) ||
+                                               (m_stage == Stage::Miss);
 
-                if (registerCount == 0 || registerCount > kMaxPayloadRegisters)
+                // Compute how many registers are required for this payload type
+                int registerCount = 0;
+                if (useRegisterBasedPayload)
+                    registerCount = computePayloadRegisterCount(info.type, &builder);
+
+                if (!useRegisterBasedPayload || registerCount == 0 ||
+                    registerCount > kMaxPayloadRegisters)
                 {
-                    // Fallback to pointer packing for large or unsupported payloads
+                    // Fallback to pointer packing for large/unsupported payloads or non-callee
+                    // stages
                     IRPtrType* ptrType = builder.getPtrType(info.type);
                     IRInst* getRayPayload =
                         builder.emitIntrinsicInst(ptrType, kIROp_GetOptiXRayPayloadPtr, 0, nullptr);
