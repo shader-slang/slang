@@ -3691,7 +3691,6 @@ struct TypeFlowSpecializationContext
             }
             else if (isSetSpecializedGeneric(setTag->getSet()->getElement(0)))
             {
-                callee = setTag->getSet()->getElement(0);
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
 
@@ -3716,6 +3715,7 @@ struct TypeFlowSpecializationContext
                     // Add in the arguments for the set specialization.
                     //
                     addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
+                    callee = setTag->getSet()->getElement(0);
                     auto funcType = getEffectiveFuncType(callee);
                     callee = builder.replaceOperand(&callee->typeUse, funcType);
                 }

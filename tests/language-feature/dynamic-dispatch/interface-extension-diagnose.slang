@@ -1,7 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone -std 2026
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+
+#lang slang 2025
 
 interface IInterface
 {
@@ -41,7 +43,7 @@ IInterface factoryAB(uint id, float x)
 
 float calcTwice(IInterface obj, float y)
 {
-    // CHECK: ([[# @LINE+1]]): error 33181
+    // CHECK: ([[# @LINE+1]]): error 33180
     return obj.calcTwice(y);
 }
 
