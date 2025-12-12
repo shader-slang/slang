@@ -3229,6 +3229,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_SetOptiXPayloadRegister:
         emitInstStmt(inst);
         break;
 
