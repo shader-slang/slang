@@ -3830,9 +3830,20 @@ void tryReplaceUsesOfStageInput(
                     default:
                         {
                             auto materialized = materializeValue(&builder, val);
-                            auto tmpVar = builder.emitVar(materialized->getDataType());
-                            builder.emitStore(tmpVar, materialized);
-                            use->set(tmpVar);
+                            if (as<IRPtrTypeBase>(originalVal->getDataType()))
+                            {
+                                // The original value was a pointer type, so the use expects a
+                                // pointer. Create a temporary variable and provide its address.
+                                auto tmpVar = builder.emitVar(materialized->getDataType());
+                                builder.emitStore(tmpVar, materialized);
+                                use->set(tmpVar);
+                            }
+                            else
+                            {
+                                // The original value was not a pointer, so the use expects a
+                                // value.
+                                use->set(materialized);
+                            }
                         }
                         break;
                     }
@@ -3861,11 +3872,18 @@ void tryReplaceUsesOfStageInput(
                         user->replaceUsesWith(materializedInner);
                         user->removeAndDeallocate();
                     }
-                    else
+                    else if (as<IRPtrTypeBase>(originalVal->getDataType()))
                     {
+                        // The original value was a pointer type, so the use expects a pointer.
+                        // Create a temporary variable and provide its address.
                         auto tmpVar = builder.emitVar(materializedInner->getDataType());
                         builder.emitStore(tmpVar, materializedInner);
                         use->set(tmpVar);
+                    }
+                    else
+                    {
+                        // The original value was not a pointer, so the use expects a value.
+                        use->set(materializedInner);
                     }
                 });
             break;
