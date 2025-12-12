@@ -111,14 +111,14 @@ jobs:
             exit 1
           fi
 
-      # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
+      # Clone dxvk-remix with all submodules (testing fix branch)
       - name: Clone dxvk-remix repository
         run: |
-          echo "Cloning dxvk-remix repository..."
-          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          echo "Cloning dxvk-remix repository (testing SER capability fix)..."
+          git clone --recursive --depth 1 --branch add-explicit-ser-cap https://github.com/jvepsalainen-nv/dxvk-remix.git
           cd dxvk-remix
           commit=$(git rev-parse HEAD)
-          echo "Using dxvk-remix commit: $commit"
+          echo "Using dxvk-remix commit: $commit (add-explicit-ser-cap branch)"
 
       # Cache packman packages between runs to save ~2-5 minutes
       - name: Cache Packman packages
