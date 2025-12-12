@@ -34,7 +34,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
-    assert(val);
+    SLANG_ASSERT(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
@@ -1453,7 +1453,30 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("NvHitObject");
+            // Check if NVAPI is explicitly enabled first
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
+            auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
+
+            if (targetCaps.implies(nvapiCapabilitySet))
+            {
+                // Explicit NVAPI: use NvHitObject
+                m_writer->emit("NvHitObject");
+                // Ensure NVAPI header is included when using NvHitObject type
+                m_extensionTracker->m_requiresNVAPI = true;
+            }
+            else if (targetCaps.implies(sm69CapabilitySet))
+            {
+                // DXR 1.3 standard: use dx::HitObject namespace
+                m_writer->emit("dx::HitObject");
+            }
+            else
+            {
+                // Fallback to legacy NVAPI
+                m_writer->emit("NvHitObject");
+                // Ensure NVAPI header is included when using NvHitObject type
+                m_extensionTracker->m_requiresNVAPI = true;
+            }
             return;
         }
     case kIROp_TextureFootprintType:

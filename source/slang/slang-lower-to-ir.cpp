@@ -846,7 +846,7 @@ LoweredValInfo emitCallToVal(
                 auto callee = getSimpleVal(context, funcVal);
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
-                assert(throwAttr);
+                SLANG_ASSERT(throwAttr);
 
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
                 auto succBlock = builder->createBlock();
@@ -5473,6 +5473,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
+        else if (auto resourceType = as<ResourceType>(type))
+        {
+            // A resource type does not have a default value, so we defensively assign poison value.
+            // In practice, we should never get here. If the value remains unassigned after all of
+            // the subsequent IR steps and is used, it should be detected by
+            // detectUninitializedResources.
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -5885,7 +5893,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
@@ -6587,7 +6595,7 @@ struct DestinationDrivenRValueExprLoweringVisitor
     void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
@@ -11109,7 +11117,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(
                 inst,
-                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
@@ -11776,7 +11784,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // We need to lower the function
                     FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
-                    assert(patchConstantFunc);
+                    SLANG_ASSERT(patchConstantFunc);
 
                     // Convert the patch constant function into IRInst
                     IRInst* irPatchConstantFunc =
@@ -12146,7 +12154,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
-                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
