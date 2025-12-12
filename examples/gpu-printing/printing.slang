@@ -184,6 +184,16 @@ void println<T : IPrintable>(T value)
 // We can therefore making the exisint Slang `uint` type be
 // printable.
 
+uint32_t getStringHash<int N>(ShortString<N> string)
+{
+    uint32_t hash = 0;
+    for(uint i = 0; i < N; ++i)
+    {
+        hash = uint32_t(string[i]) + (hash << 6) + (hash << 16) - hash;
+    }
+    return hash;
+}
+
 extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrintable here`
 {
     // Printing a `uint` uses up two words in the buffer
@@ -200,7 +210,8 @@ extension uint : IPrintable // <-- Note: we are adding a conformance to `IPrinta
     }
 }
 
-extension String : IPrintable
+__generic<int N>
+extension ShortString<N> : IPrintable
 {
     uint getPrintWordCount() { return 2; }
 
@@ -289,7 +300,8 @@ void println<A : IPrintable, B : IPrintable, C : IPrintable>(
 // HLSL's printf.
 //
 
-uint _beginPrintf(String format, uint wordCount)
+__generic<int N>
+uint _beginPrintf(ShortString<N> format, uint wordCount)
 {
     // A printf command will start with the usual command header word,
     // along with a word for the (hashed) format string. These
@@ -331,8 +343,8 @@ extension uint : IPrintf
         buffer[offset++] = this;
     }
 }
-
-extension String : IPrintf
+__generic<int N>
+extension ShortString<N> : IPrintf
 {
     uint getPrintfWordCount() { return 1; }
 
@@ -344,14 +356,14 @@ extension String : IPrintf
 
 
 // A `printf()` with no format arguments can just call back to `_beginPrintf()`
-void printf_(String format)
+void printf_<int N>(ShortString<N> format)
 {
     _beginPrintf(format, 0);
 }
 
 // The `printf()` cases with one or more format arguments are all quite similar.
 
-void printf_<A : IPrintf>(String format, A a)
+void printf_<A : IPrintf, int N>(ShortString<N> format, A a)
 {
     // We need to compute the words required by each format argument
     // and sum them up.
@@ -370,7 +382,7 @@ void printf_<A : IPrintf>(String format, A a)
     a.writePrintfWords(gPrintBuffer, wordOffset); wordOffset += aCount;
 }
 
-void printf_<A : IPrintf, B : IPrintf>(String format, A a, B b)
+void printf_<A : IPrintf, B : IPrintf, int N>(ShortString<N> format, A a, B b)
 {
     uint wordCount = 0;
     uint aCount = a.getPrintfWordCount(); wordCount += aCount;

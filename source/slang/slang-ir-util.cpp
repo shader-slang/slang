@@ -128,6 +128,7 @@ IROp getTypeStyle(IROp op)
     case kIROp_UInt64Type:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
+    case kIROp_CharType:
         {
             // All int like
             return kIROp_IntType;

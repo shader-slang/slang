@@ -2,6 +2,7 @@
 #include "slang-ir-layout.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-lower-short-string.h"
 #include "slang-ir-util.h"
 
 // This file implements facilities for computing and caching layout
@@ -362,6 +363,22 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
             return SLANG_OK;
+        }
+        break;
+    case kIROp_ShortStringType:
+        {
+            ShortStringsOptions options(optionSet.getTarget());
+            if (options.targetSupportsStringLiterals)
+            {
+                // The short string will be emitted as a string literal stored in the data segment
+                // But we only keep a pointer to it: const char * str = "...";
+                *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
+                return SLANG_OK;
+            }
+            else
+            {
+                // ShortStringType will be lowered to some array type which layout is handled.
+            }
         }
         break;
     case kIROp_ScalarBufferLayoutType:
