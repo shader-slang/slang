@@ -8,6 +8,8 @@
 #include "slang-core-diagnostics.h"
 #include "slang-name-convention-util.h"
 #include "slang-name.h"
+#include "slang-rich-diagnostic.h"
+#include "slang-rich-diagnostic-layout.h"
 
 namespace Slang
 {
@@ -880,5 +882,41 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
     sink.getBlobIfNeeded(outDiagnostics);
 }
 
+bool DiagnosticSink::diagnoseRich(const RichDiagnostic& diagnostic)
+{
+    // Use the layout engine to render the rich diagnostic
+    RichDiagnosticLayout layout(m_sourceManager);
+    String rendered = layout.render(diagnostic);
+
+    // Update error count based on severity
+    if (diagnostic.severity >= Severity::Error)
+    {
+        m_errorCount++;
+    }
+
+    // Output the rendered diagnostic
+    if (writer)
+    {
+        writer->write(rendered.getBuffer(), rendered.getLength());
+    }
+    else
+    {
+        outputBuffer.append(rendered);
+    }
+
+    // Forward to parent sink if set
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseRich(diagnostic);
+    }
+
+    // Handle fatal diagnostics
+    if (diagnostic.severity >= Severity::Fatal)
+    {
+        SLANG_ABORT_COMPILATION(rendered.getBuffer());
+    }
+
+    return true;
+}
 
 } // namespace Slang
