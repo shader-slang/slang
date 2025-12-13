@@ -250,7 +250,7 @@ extern "C"
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(
+static int glslang_optimizeSPIRV(
     spv_target_env targetEnv,
     const glslang_CompileRequest_1_2& request,
     std::vector<SPIRVOptimizationDiagnostic>& outDiags,
@@ -261,7 +261,7 @@ static void glslang_optimizeSPIRV(
     // If there is no optimization then we are done
     if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
     {
-        return;
+        return 0;
     }
 
     const auto debugInfoType = request.debugInfoType;
@@ -521,39 +521,39 @@ static void glslang_optimizeSPIRV(
         std::vector<unsigned int> optSpirv;
 
         // Optimize
-        if (optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
+        if (!optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
         {
-            assert(optSpirv.size() > 0);
-
-            // If a CompactIdsPass wasn't run, then we should run one if the
-            // generated SPIRV is using IDs beyond kDefaultMaxIdBound.
-            // The 4th entry in the header is the bound of the module.
-            if (!compactPassRun && optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
-            {
-                spvtools::Optimizer optimizer2(targetEnv);
-                optimizer2.SetMessageConsumer(messageConsumer);
-                optimizer2.RegisterPass(spvtools::CreateCompactIdsPass());
-                optimizer2.Run(optSpirv.data(), optSpirv.size(), &ioSpirv, spvOptOptions);
-            }
-            else
-            {
-                // Make the ioSpirv the optimized spirv
-                ioSpirv.swap(optSpirv);
-            }
-            assert(ioSpirv.size() > 0);
+            return SLANG_FAIL;
         }
+
+        assert(optSpirv.size() > 0);
+
+        // If a CompactIdsPass wasn't run, then we should run one if the
+        // generated SPIRV is using IDs beyond kDefaultMaxIdBound.
+        // The 4th entry in the header is the bound of the module.
+        if (!compactPassRun && optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
+        {
+            spvtools::Optimizer optimizer2(targetEnv);
+            optimizer2.SetMessageConsumer(messageConsumer);
+            optimizer2.RegisterPass(spvtools::CreateCompactIdsPass());
+            optimizer2.Run(optSpirv.data(), optSpirv.size(), &ioSpirv, spvOptOptions);
+        }
+        else
+        {
+            // Make the ioSpirv the optimized spirv
+            ioSpirv.swap(optSpirv);
+        }
+        assert(ioSpirv.size() > 0);
     }
+    return 0;
 }
 
 static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
 {
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
-    std::vector<uint32_t> spirvBuffer;
-    size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
-    spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));
-    memcpy(spirvBuffer.data(), request.inputBegin, inputBlobSize);
+    std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
 
-    glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
+    int err = glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
     {
         request.outputFunc(
@@ -571,7 +571,7 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
                 request.diagnosticUserData);
         }
     }
-    return SLANG_OK;
+    return err;
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
