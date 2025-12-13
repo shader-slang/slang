@@ -52,7 +52,7 @@ void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
-    assert(val);
+    SLANG_ASSERT(val);
 
     m_writer->emit("[[");
     m_writer->emit(name);

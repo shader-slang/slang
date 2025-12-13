@@ -55,6 +55,39 @@ jobs:
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\bin"
           Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\Git\usr\bin"
 
+      # Install jq on Windows (not pre-installed on self-hosted runners)
+      # Creates wrappers for both cmd.exe and bash compatibility
+      # See: https://github.com/anthropics/claude-code-action/issues/712
+      - name: Install jq (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $toolsDir = "C:\Windows\ServiceProfiles\NetworkService\.local\bin"
+          New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+
+          # Download jq
+          $jqUrl = "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-win64.exe"
+          $jqExe = "$env:RUNNER_TEMP\jq-windows.exe"
+          Invoke-WebRequest -Uri $jqUrl -OutFile $jqExe
+
+          # Convert to Unix path for bash wrapper
+          $jqExeUnix = $jqExe -replace '\\', '/' -replace '^([A-Za-z]):', '/$1'
+
+          # Create jq.cmd wrapper that routes through bash for proper quoting
+          $cmdWrapper = "$toolsDir\jq.cmd"
+          $wrapperContent = "@echo off`r`n`"C:\Program Files\Git\bin\bash.exe`" -c '`"$jqExeUnix`" `"`$@`"' _ %*"
+          Set-Content -Path $cmdWrapper -Value $wrapperContent -Encoding ASCII
+
+          # Create jq bash script (no extension) for Git Bash compatibility
+          $bashWrapper = "$toolsDir\jq"
+          $bashContent = "#!/bin/bash`n`"$jqExeUnix`" `"`$@`""
+          Set-Content -Path $bashWrapper -Value $bashContent -NoNewline -Encoding ASCII
+
+          Write-Host "jq wrappers installed at $toolsDir"
+
+          # Add tools directory to PATH
+          Add-Content -Path $env:GITHUB_PATH -Value $toolsDir
+
       # Install Claude Code on Windows (the action's install.sh doesn't support Windows)
       - name: Install Claude Code (Windows)
         id: install-claude
@@ -108,10 +141,6 @@ jobs:
             exit 1
           }
 
-      # Note: jq is not installed on Windows - the claude-code-action has a bug with
-      # Windows cmd quoting for jq commands. The action's output formatting will show
-      # a warning but Claude itself runs successfully.
-
       # Format setup and environment preparation
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -121,6 +150,44 @@ jobs:
 
       - name: Checkout of submodules
         run: git submodule update --init --recursive --depth=1
+
+      # Workaround for fork PRs: the action tries to fetch the branch from origin,
+      # but fork branches only exist on the fork. This step adds the fork as an
+      # additional fetch URL for origin so the action's fetch succeeds.
+      - name: Setup fork PR remote
+        if: github.event.issue.pull_request != ''
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PR_NUMBER="${{ github.event.issue.number }}"
+
+          # Get PR details via GitHub API (gh CLI not available on self-hosted runners)
+          PR_INFO=$(curl -s -H "Authorization: token ${GITHUB_TOKEN}" \
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUMBER}")
+
+          HEAD_REF=$(echo "$PR_INFO" | jq -r '.head.ref')
+          HEAD_OWNER=$(echo "$PR_INFO" | jq -r '.head.repo.owner.login // empty')
+          HEAD_REPO=$(echo "$PR_INFO" | jq -r '.head.repo.name // empty')
+
+          # Check if this is a fork PR
+          if [ -n "$HEAD_OWNER" ] && [ "$HEAD_OWNER" != "${{ github.repository_owner }}" ]; then
+            echo "Fork PR detected from ${HEAD_OWNER}/${HEAD_REPO}, branch: ${HEAD_REF}"
+
+            # Add fork as additional remote fetch URL
+            FORK_URL="https://github.com/${HEAD_OWNER}/${HEAD_REPO}.git"
+            echo "Adding fork URL to origin: ${FORK_URL}"
+            git remote set-url --add origin "${FORK_URL}"
+
+            # Fetch the fork branch so it's available locally
+            echo "Fetching branch ${HEAD_REF} from fork..."
+            git fetch origin "${HEAD_REF}"
+
+            echo "Fork remote setup complete"
+          else
+            echo "Not a fork PR (owner: ${HEAD_OWNER:-same}), no remote changes needed"
+          fi
 
       - name: Format Setup and Environment Preparation
         if: runner.os != 'Windows'

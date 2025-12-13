@@ -2578,33 +2578,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    SpvCapability getImageFormatCapability(SpvImageFormat format)
-    {
-        switch (format)
-        {
-        case SpvImageFormatUnknown:
-        case SpvImageFormatRgba32f:
-        case SpvImageFormatRgba16f:
-        case SpvImageFormatR32f:
-        case SpvImageFormatRgba8:
-        case SpvImageFormatRgba8Snorm:
-        case SpvImageFormatRgba32i:
-        case SpvImageFormatRgba16i:
-        case SpvImageFormatRgba8i:
-        case SpvImageFormatR32i:
-        case SpvImageFormatRgba32ui:
-        case SpvImageFormatRgba16ui:
-        case SpvImageFormatRgba8ui:
-        case SpvImageFormatR32ui:
-            return SpvCapabilityShader;
-        case SpvImageFormatR64ui:
-        case SpvImageFormatR64i:
-            return SpvCapabilityInt64ImageEXT;
-        default:
-            return SpvCapabilityStorageImageExtendedFormats;
-        }
-    }
-
     void setImageFormatCapabilityAndExtension(
         SpvImageFormat format,
         SpvCapability_ setCapabilityMask)
@@ -2861,6 +2834,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The op itself
         //
         auto sampledElementType = getSPIRVSampledElementType(sampledType);
+
+        // If the sampled element type is a 64-bit integer, we need the Int64ImageEXT capability
+        // regardless of the image format.
+        if (sampledElementType->getOp() == kIROp_Int64Type ||
+            sampledElementType->getOp() == kIROp_UInt64Type)
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_image_int64"));
+            requireSPIRVCapability(SpvCapabilityInt64ImageEXT);
+        }
+
         if (inst->isCombined())
         {
             auto imageType = emitOpTypeImage(

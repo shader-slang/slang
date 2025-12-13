@@ -821,7 +821,7 @@ struct AssignValsFromLayoutContext
                 dstCursor,
                 (ShaderInputLayout::AccelerationStructureVal*)srcVal.Ptr());
         default:
-            assert(!"Unhandled type");
+            SLANG_ASSERT(!"Unhandled type");
             return SLANG_FAIL;
         }
     }
@@ -898,7 +898,7 @@ SlangResult RenderTestApp::initialize(
         switch (m_options.shaderType)
         {
         default:
-            assert(!"unexpected test shader type");
+            SLANG_ASSERT(!"unexpected test shader type");
             return SLANG_FAIL;
 
         case Options::ShaderProgramType::Compute:
@@ -1405,7 +1405,7 @@ Result RenderTestApp::update()
                 auto i = binding.entryIndex;
                 const auto& layoutBinding = m_shaderInputLayout.entries[i];
 
-                assert(layoutBinding.isOutput);
+                SLANG_ASSERT(layoutBinding.isOutput);
                 
                 if (binding.resource && binding.resource->isBuffer())
                 {
@@ -1509,7 +1509,7 @@ static void initializeRenderDoc()
         pRENDERDOC_GetAPI RENDERDOC_GetAPI =
             (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
         int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
-        assert(ret == 1);
+        SLANG_ASSERT(ret == 1);
     }
 }
 static void renderDocBeginFrame()

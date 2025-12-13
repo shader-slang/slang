@@ -2003,7 +2003,7 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
                     // HLSL concept
                     auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
-                    assert(layoutVal != nullptr);
+                    SLANG_ASSERT(layoutVal != nullptr);
                     bindingToInstMapUnsorted
                         .getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>())
                         .add(inst);

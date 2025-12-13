@@ -397,7 +397,7 @@ static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
         case '\t':
             {
                 char const* argEnd = cursor;
-                assert(argBegin != argEnd);
+                SLANG_ASSERT(argBegin != argEnd);
 
                 outArg = UnownedStringSlice(argBegin, argEnd);
                 *ioCursor = cursor;

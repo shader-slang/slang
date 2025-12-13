@@ -43,7 +43,7 @@ IRFuncType* NativeCallMarshallingContext::getNativeFuncType(
     IRFuncType* declaredFuncType)
 {
     List<IRInst*> nativeParamTypes;
-    assert(declaredFuncType->getOp() == kIROp_FuncType);
+    SLANG_ASSERT(declaredFuncType->getOp() == kIROp_FuncType);
     for (UInt i = 0; i < declaredFuncType->getParamCount(); ++i)
     {
         auto paramType = declaredFuncType->getParamType(i);

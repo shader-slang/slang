@@ -111,7 +111,7 @@ struct DllImportContext
 
     void processFunc(IRFunc* func, IRDllImportDecoration* dllImportDecoration)
     {
-        assert(func->getFirstBlock() == nullptr);
+        SLANG_ASSERT(func->getFirstBlock() == nullptr);
 
         IRBuilder builder(module);
         NativeCallMarshallingContext marshalContext;
