@@ -5,47 +5,34 @@
 
 namespace Slang
 {
+
+Index findRegisterSpaceResourceInfo(IRVarLayout* layout);
 UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     HashSet<int> usedSpaces;
-    auto processVarLayout = [&](IRVarLayout* varLayout)
-    {
-        UInt spaceOffset = 0;
-        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
-        {
-            spaceOffset = spaceAttr->getOffset();
-        }
-        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-        {
-            auto kind = sizeAttr->getResourceKind();
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-            {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = spaceOffset + offsetAttr->getSpace();
-                usedSpaces.add((int)spaceIndex);
-            }
-        }
-    };
-
     for (auto inst : module->getGlobalInsts())
     {
-        if (as<IRGlobalParam>(inst))
+        if (auto varLayout = findVarLayout(inst))
         {
-            auto varLayout = findVarLayout(inst);
-            if (!varLayout)
-                continue;
-            processVarLayout(varLayout);
+            // Get container space (for ParameterBlocks etc.)
+            auto registerSpace = findRegisterSpaceResourceInfo(varLayout);
+            if (registerSpace >= 0)
+                usedSpaces.add((int)registerSpace);
 
-            auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
-            if (!paramGroupTypeLayout)
-                continue;
-            auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
-            if (!containerVarLayout)
-                continue;
-            processVarLayout(containerVarLayout);
+            // Get base offset for nested resources
+            UInt spaceOffset = 0;
+            if (auto spaceAttr =
+                    varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+                spaceOffset = spaceAttr->getOffset();
+
+            for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+            {
+                if (!ShaderBindingRange::isUsageTracked(sizeAttr->getResourceKind()))
+                    continue;
+                // Get the binding information from this attribute and insert it into the list
+                if (auto offsetAttr = varLayout->findOffsetAttr(sizeAttr->getResourceKind()))
+                    usedSpaces.add((int)(spaceOffset + offsetAttr->getSpace()));
+            }
         }
     }
 
