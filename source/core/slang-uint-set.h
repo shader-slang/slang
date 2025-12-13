@@ -66,7 +66,7 @@ public:
     UIntSet() {}
     UIntSet(const UIntSet& other) { m_buffer = other.m_buffer; }
     UIntSet(UIntSet&& other) { *this = (_Move(other)); }
-    UIntSet(UInt maxVal) { resizeAndClear(maxVal); }
+    UIntSet(UInt maxVal) { resizeAndUnsetAll(maxVal); }
 
     UIntSet& operator=(UIntSet&& other);
     UIntSet& operator=(const UIntSet& other);
@@ -79,7 +79,7 @@ public:
     const List<Element>& getBuffer() const { return m_buffer; }
 
     /// Resize such that val can be stored and clear contents
-    void resizeAndClear(UInt val);
+    void resizeAndUnsetAll(UInt val);
     /// Set all of the values up to count, as set
     void setAll();
     /// Resize (but maintain contents) up to bit size.
@@ -89,7 +89,7 @@ public:
     void resizeBackingBufferDirectly(Index size);
 
     /// Clear all of the contents (by clearing the bits)
-    void clear();
+    void unsetAll();
 
     /// Clear all the contents and free memory
     void clearAndDeallocate();
