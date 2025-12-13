@@ -4,7 +4,7 @@
 namespace Slang
 {
 
-bool isValidSlangLanguageVersion(SlangLanguageVersion version)
+bool isValidSlangLanguageVersion(int version)
 {
     switch (version)
     {

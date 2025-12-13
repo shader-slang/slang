@@ -249,7 +249,7 @@ bool maybeDiagnoseWarningOrError(
     }
 }
 
-bool isValidSlangLanguageVersion(SlangLanguageVersion version);
+bool isValidSlangLanguageVersion(int version);
 bool isValidGLSLVersion(int version);
 
 } // namespace Slang
