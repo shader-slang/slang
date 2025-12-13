@@ -578,38 +578,16 @@ static bool _isStructDefault(const StructRttiInfo* type, const void* src)
     // setting the count if it is <= capacity just sets the count (ie things aren't released(!)).
 
     List<Byte>& dstList = *(List<Byte>*)dst;
-    const Index oldCount = dstList.getCount();
-    if (oldCount == count)
-    {
-        return SLANG_OK;
-    }
-    if (count < oldCount)
-    {
-        dstList.unsafeShrinkToCount(count);
-        return SLANG_OK;
-    }
 
     const auto typeFuncs = typeMap->getFuncsForType(elementType);
     SLANG_ASSERT(typeFuncs.isValid());
-
-    const Index dstCapacity = dstList.getCapacity();
-    void* oldBuffer = dstList.detachBuffer();
 
     void* newBuffer = ::malloc(count * elementType->m_size);
     // Initialize it all first
     typeFuncs.ctorArray(typeMap, elementType, newBuffer, count);
 
-    typeFuncs.copyArray(typeMap, elementType, newBuffer, oldBuffer, oldCount);
-
     // Attach the new buffer
     dstList.attachBuffer((Byte*)newBuffer, count, count);
-
-    // Free the old buffer
-    if (oldBuffer)
-    {
-        typeFuncs.dtorArray(typeMap, elementType, oldBuffer, dstCapacity);
-        ::free(oldBuffer);
-    }
 
     return SLANG_OK;
 }
