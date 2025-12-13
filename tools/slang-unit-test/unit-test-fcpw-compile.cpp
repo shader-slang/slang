@@ -18,7 +18,8 @@ using namespace Slang;
 SLANG_UNIT_TEST(fcpwCompile)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
@@ -31,16 +32,16 @@ SLANG_UNIT_TEST(fcpwCompile)
     macroDesc.value = "2";
     sessionDesc.preprocessorMacros = &macroDesc;
     ComPtr<slang::ISession> session;
-    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
     auto module =
         session->loadModule("tests/fcpw/bvh-traversal.cs.slang", diagnosticBlob.writeRef());
-    SLANG_CHECK(module != nullptr);
+    SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findEntryPointByName("rayIntersection", entryPoint.writeRef());
-    SLANG_CHECK(entryPoint != nullptr);
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
     slang::IComponentType* components[] = {module, entryPoint.get()};
@@ -49,14 +50,14 @@ SLANG_UNIT_TEST(fcpwCompile)
         2,
         compositeProgram.writeRef(),
         diagnosticBlob.writeRef());
-    SLANG_CHECK(compositeProgram != nullptr);
+    SLANG_CHECK_ABORT(compositeProgram != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK(linkedProgram != nullptr);
+    SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
     ComPtr<slang::IBlob> code;
     linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
-    SLANG_CHECK(code != nullptr);
-    SLANG_CHECK(code->getBufferSize() != 0);
+    SLANG_CHECK_ABORT(code != nullptr);
+    SLANG_CHECK_ABORT(code->getBufferSize() != 0);
 }
