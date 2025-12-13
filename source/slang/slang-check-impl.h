@@ -55,7 +55,15 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
-    uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    uint64_t v = val > 0 ? (uint64_t)val : -(uint64_t)val;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     int result = 1;
     while (v >>= 1)
     {
