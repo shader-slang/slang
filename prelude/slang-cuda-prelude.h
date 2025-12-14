@@ -3886,8 +3886,290 @@ static __forceinline__ __device__ void* getOptiXRayPayloadPtr()
     return unpackOptiXRayPayloadPointer(u0, u1);
 }
 
+// Maximum number of 32-bit registers for OptiX payload (32 registers = 128 bytes)
+static constexpr size_t kMaxOptiXPayloadRegisters = 32;
+
+// Helper to pack/unpack payload to/from registers for small payloads (<= 128 bytes)
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+struct PayloadRegisters
+{
+    uint32_t regs[N > 0 ? N : 1];
+
+    __forceinline__ __device__ void pack(const T& payload) { memcpy(regs, &payload, sizeof(T)); }
+
+    __forceinline__ __device__ void unpack(T& payload) { memcpy(&payload, regs, sizeof(T)); }
+};
+
+// Internal helper to call optixTrace with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraceWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTrace with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTrace(
+__forceinline__ __device__ void optixTrace(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3897,22 +4179,52 @@ __forceinline__ __device__ void* optixTrace(
     RayDesc Ray,
     T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTrace(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraceWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTrace(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 #if (OPTIX_VERSION >= 90000)
@@ -3981,8 +4293,276 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* O
 }
 #endif
 
+// Internal helper to call optixTraverse with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraverseWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTraverse with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3993,26 +4573,56 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTraverse(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -4024,22 +4634,52 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTraverse(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        RayTime,
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 #if (OPTIX_VERSION >= 80100)
@@ -4368,15 +5008,143 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 #endif
 
 #if (OPTIX_VERSION >= 80100)
+// Internal helper to call optixInvoke with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixInvokeWithRegs(PayloadRegisters<T, N>& pr)
+{
+    if constexpr (N == 0)
+    {
+        optixInvoke();
+    }
+    else if constexpr (N == 1)
+    {
+        optixInvoke(pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
     OptixTraversableHandle AccelerationStructure,
     OptixTraversableHandle* HitOrMiss,
-    T Payload)
+    T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixInvoke(r0, r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+        optixInvokeWithRegs<T>(pr);
+        // Read back updated payload registers
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixInvoke(r0, r1);
+    }
 }
 #endif
 
