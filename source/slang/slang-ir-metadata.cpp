@@ -92,7 +92,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
     if (!containerSpaceOffset)
         return;
-    spaceOffset += containerSpaceOffset->getOffset();
+    spaceOffset = containerSpaceOffset->getOffset();
     for (auto sizeAttr : containerVarLayout->getTypeLayout()->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
