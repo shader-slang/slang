@@ -351,7 +351,7 @@ static void validateSemanticForStage(
     DiagnosticSink* sink)
 {
     String semanticNameLower = String(semantic->name.getContent()).toLower();
-    
+
     // Search for variables in the GLSL module that have this semantic
     for (auto memberDecl : glslModule->getModuleDecl()->getMembers())
     {
@@ -401,8 +401,11 @@ static void validateSemanticForStage(
 
         if (result != CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired)
         {
-            sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage,
-                semantic->name, stage);
+            sink->diagnose(
+                param->loc,
+                Diagnostics::semanticNotAvailableInStage,
+                semantic->name,
+                stage);
         }
         return;
     }
@@ -446,7 +449,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
-    // Get the glsl builtin module to check system semantic definitions against the entry point capabilities
+    // Get the glsl builtin module to check system semantic definitions against the entry point
+    // capabilities
     auto glslModule = linkage->getSessionImpl()->getBuiltinModule(slang::BuiltinModuleName::GLSL);
     CapabilitySet entryPointCapability = entryPoint->getProfile().getCapabilityName();
 
