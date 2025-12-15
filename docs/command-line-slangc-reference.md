@@ -300,6 +300,11 @@ Reports compiler performance benchmark results for each intermediate pass (impli
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
 
 
+<a id="report-dynamic-dispatch-sites"></a>
+### -report-dynamic-dispatch-sites
+Reports information about dynamic dispatch sites for interface calls. 
+
+
 <a id="skip-spirv-validation"></a>
 ### -skip-spirv-validation
 Skips spirv validation. 
