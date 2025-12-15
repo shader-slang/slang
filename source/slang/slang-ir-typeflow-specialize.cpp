@@ -2196,6 +2196,14 @@ struct TypeFlowSpecializationContext
 
             IRBuilder builder(module);
             auto setOp = getSetOpFromType(inst->getDataType());
+
+            // There are a few types of specializations (particularly with generics that return
+            // values), that we don't handle in the type-flow pass. We'll just avoid specializing
+            // these.
+            //
+            if (setOp == kIROp_Invalid)
+                return none();
+
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, specializedSet));
             module->getContainerPool().free(&specializedSet);
             module->getContainerPool().free(&specializationArgs);
@@ -3691,14 +3699,34 @@ struct TypeFlowSpecializationContext
             }
             else if (isSetSpecializedGeneric(setTag->getSet()->getElement(0)))
             {
-                // Single element which is a set specialized generic.
-                addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
-                callee = setTag->getSet()->getElement(0);
-
-                auto funcType = getEffectiveFuncType(callee);
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
-                callee = builder.replaceOperand(&callee->typeUse, funcType);
+
+                // Check if the original callee inst has a dis-allow existential specialization
+                // decoration.
+                //
+                if (inst->getCallee()
+                        ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                {
+                    // In Slang 2025 and later, specializing a generic with multiple types is not
+                    // allowed, so we'll throw a diagnostic message.
+                    //
+                    sink->diagnose(
+                        inst->sourceLoc,
+                        Diagnostics::cannotSpecializeGenericWithExistential,
+                        as<IRSpecialize>(callee)->getBase());
+                    return false;
+                }
+                else
+                {
+                    // Otherwise, we have a single element which is a set specialized generic.
+                    // Add in the arguments for the set specialization.
+                    //
+                    addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
+                    callee = setTag->getSet()->getElement(0);
+                    auto funcType = getEffectiveFuncType(callee);
+                    callee = builder.replaceOperand(&callee->typeUse, funcType);
+                }
             }
             else
             {

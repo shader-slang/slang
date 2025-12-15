@@ -3455,7 +3455,7 @@ IRInst* specializeGenericImpl(
 
         // We will iterate over the non-parameter ("ordinary")
         // instructions only, because parameters were dealt
-        // with explictly at an earlier point.
+        // with explicitly at an earlier point.
         //
         for (auto ii : bb->getOrdinaryInsts())
         {

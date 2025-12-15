@@ -158,7 +158,7 @@ static SlangResult _compileProgramImpl(
         break;
 
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT(!"unexpected");
         break;
     }
 
