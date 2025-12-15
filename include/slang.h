@@ -925,7 +925,6 @@ typedef uint32_t SlangSizeT;
         ReportDownstreamTime,          // bool
         ReportPerfBenchmark,           // bool
         ReportCheckpointIntermediates, // bool
-        ReportDynamicDispatchSites,    // bool
         SkipSPIRVValidation,           // bool
         SourceEmbedStyle,
         SourceEmbedName,
@@ -1079,6 +1078,8 @@ typedef uint32_t SlangSizeT;
         DumpIRAfter,                 // string, pass name to dump IR after
 
         CountOf,
+
+        ReportDynamicDispatchSites, // bool
     };
 
     enum class CompilerOptionValueKind
