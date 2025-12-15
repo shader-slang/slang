@@ -5622,7 +5622,8 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_nv, ser_raygen_closesthit_miss)]
-[require(spirv_nv, ser_raygen_closesthit_miss)]
+[require(spirv, ser_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectTraceRayNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5655,7 +5656,7 @@ public void hitObjectTraceRayNV(
             Tmax,
             payload);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -5685,7 +5686,8 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
-[require(spirv_nv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectTraceRayMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5720,7 +5722,7 @@ public void hitObjectTraceRayMotionNV(
             currentTime,
             payload);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -5752,7 +5754,8 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_nv, ser_raygen_closesthit_miss)]
-[require(spirv_nv, ser_raygen_closesthit_miss)]
+[require(spirv, ser_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectRecordHitNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5787,7 +5790,7 @@ public void hitObjectRecordHitNV(
             Tmax,
             attributeLocation);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -5818,7 +5821,8 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
-[require(spirv_nv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectRecordHitMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5855,7 +5859,7 @@ public void hitObjectRecordHitMotionNV(
             currentTime,
             attributeLocation);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -5888,7 +5892,8 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_nv, ser_raygen_closesthit_miss)]
-[require(spirv_nv, ser_raygen_closesthit_miss)]
+[require(spirv, ser_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectRecordHitWithIndexNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5921,7 +5926,7 @@ public void hitObjectRecordHitWithIndexNV(
             Tmax,
             attributeLocation);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -5951,7 +5956,8 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
-[require(spirv_nv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectRecordHitWithIndexMotionNV(
     inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
@@ -5986,7 +5992,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
             currentTime,
             attributeLocation);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -6072,7 +6078,8 @@ __glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_nv, ser_raygen_closesthit_miss)]
-[require(spirv_nv, ser_raygen_closesthit_miss)]
+[require(spirv, ser_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderNV)]
 public void hitObjectExecuteShaderNV(
     inout hitObjectNV hitObject,
     constexpr int payload)
@@ -6083,7 +6090,7 @@ public void hitObjectExecuteShaderNV(
     {
         HitObject::__glslInvoke(hitObject, payload);
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -6287,7 +6294,7 @@ public void hitObjectGetAttributesNV(
     {
         __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
     }
-    case spirv_nv:
+    case spirv:
     {
         spirv_asm
         {
@@ -6374,6 +6381,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl, ser_raygen_closesthit_miss)]
 [require(spirv, ser_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderEXT)]
 public void hitObjectTraceRayEXT(
     inout hitObjectEXT hitObject,
     accelerationStructureEXT topLevel,
@@ -6437,6 +6445,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl, ser_motion_raygen_closesthit_miss)]
 [require(spirv, ser_motion_raygen_closesthit_miss)]
+[require(spirv, spvShaderInvocationReorderEXT)]
 public void hitObjectTraceRayMotionEXT(
     inout hitObjectEXT hitObject,
     accelerationStructureEXT topLevel,
@@ -6973,6 +6982,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl, ser_raygen)]
 [require(spirv, ser_raygen)]
+[require(spirv, spvShaderInvocationReorderEXT)]
 public void reorderThreadEXT(uint coherenceHint, uint numCoherenceHintBitsFromLSB)
 {
     __target_switch
@@ -6997,6 +7007,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl, ser_raygen)]
 [require(spirv, ser_raygen)]
+[require(spirv, spvShaderInvocationReorderEXT)]
 public void reorderThreadEXT(hitObjectEXT hitObject)
 {
     __target_switch
@@ -7020,6 +7031,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl, ser_raygen)]
 [require(spirv, ser_raygen)]
+[require(spirv, spvShaderInvocationReorderEXT)]
 public void reorderThreadEXT(hitObjectEXT hitObject, uint coherenceHint, uint numCoherenceHintBitsFromLSB)
 {
     __target_switch
