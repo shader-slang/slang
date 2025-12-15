@@ -101,6 +101,7 @@ protected:
     //
     // TODO(tfoley): These should really belong to the compilation context!
     //
+    ShortStringType* m_stringLiteralType = nullptr;
     Type* m_stringType = nullptr;
     Type* m_nativeStringType = nullptr;
     Type* m_enumTypeType = nullptr;
@@ -571,6 +572,8 @@ public:
         AccessQualifier accessQualifier,
         AddressSpace addrSpace,
         char const* ptrTypeName);
+
+    ShortStringType* getShortStringType(IntVal* length);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
 

@@ -1567,27 +1567,6 @@ bool WGSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         break;
 
-    case kIROp_GetStringHash:
-        {
-            auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
-
-            if (stringLit)
-            {
-                auto slice = stringLit->getStringSlice();
-                emitType(inst->getDataType());
-                m_writer->emit("(");
-                m_writer->emit((int)getStableHashCode32(slice.begin(), slice.getLength()).hash);
-                m_writer->emit(")");
-            }
-            else
-            {
-                // Couldn't handle
-                diagnoseUnhandledInst(inst);
-            }
-            return true;
-        }
-
     case kIROp_Mul:
         {
             if (!as<IRMatrixType>(inst->getOperand(0)->getDataType()) ||

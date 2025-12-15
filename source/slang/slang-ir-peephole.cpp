@@ -3,6 +3,7 @@
 #include "slang-ir-dominators.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-lower-short-string.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-util.h"
 
@@ -306,6 +307,35 @@ struct PeepholeContext : InstPassBase
                 changed = true;
             }
             break;
+        case kIROp_GetStringHash:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                auto slice = strLit->getStringSlice();
+                const auto h = getStableHashCode32(slice.begin(), slice.getLength()).hash;
+                auto replacement = builder.getIntValue(inst->getDataType(), h);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
+        case kIROp_MakeString:
+        case kIROp_GetNativeStr:
+            if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+                IROp type =
+                    inst->getOp() == kIROp_MakeString ? kIROp_StringType : kIROp_NativeStringType;
+                auto replacement = builder.getStringValue(strLit->getStringSlice(), type);
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
+            }
+            break;
         case kIROp_GetResultError:
             if (inst->getOperand(0)->getOp() == kIROp_MakeResultError)
             {
@@ -497,6 +527,26 @@ struct PeepholeContext : InstPassBase
                 inst->replaceUsesWith(inst->getOperand(0)->getOperand(0));
                 maybeRemoveOldInst(inst);
                 changed = true;
+            }
+            else if (auto strLit = as<IRStringLit>(inst->getOperand(0)))
+            {
+                auto index = as<IRIntLit>(as<IRGetElement>(inst)->getIndex());
+                if (index)
+                {
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+                    auto sv = strLit->getStringSlice();
+                    uint32_t c = 0;
+                    if (index->getValue() < sv.getLength())
+                    {
+                        c = sv[index->getValue()];
+                    }
+                    // else diagnose an out of bound error
+                    inst->replaceUsesWith(builder.getIntValue(inst->getDataType(), c));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             else
             {

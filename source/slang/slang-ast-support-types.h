@@ -97,6 +97,8 @@ FIDDLE() namespace Slang
         kConversionCost_UnconstraintGenericParam = 20,
         kConversionCost_SizedArrayToUnsizedArray = 30,
 
+        kConversionCost_StringToString = kConversionCost_SizedArrayToUnsizedArray,
+
         // Convert between matrices of different layout
         kConversionCost_MatrixLayout = 5,
 

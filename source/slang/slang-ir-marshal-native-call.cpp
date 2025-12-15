@@ -102,6 +102,7 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeValue(
     case kIROp_BorrowInParamType:
     case kIROp_OutParamType:
         return marshalRefManagedValueToNativeValue(builder, originalArg, args);
+    case kIROp_ShortStringType:
     case kIROp_StringType:
         {
             auto nativeStr = builder.emitGetNativeString(originalArg);

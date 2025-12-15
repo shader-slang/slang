@@ -1268,12 +1268,28 @@ bool SemanticsVisitor::_coerce(
     }
 
     // Assume string literals are convertible to any string type.
-    if (as<StringLiteralExpr>(fromExpr) && as<StringTypeBase>(toType))
+    if (auto strLit = as<StringLiteralExpr>(fromExpr); strLit && as<StringTypeBase>(toType))
     {
         if (outToExpr)
-            *outToExpr = fromExpr;
+        {
+            if (as<ShortStringType>(toType))
+            {
+                *outToExpr = fromExpr;
+            }
+            else
+            {
+                // Duplicate the string literal, but now typed with "toType"
+                StringLiteralExpr* s = getASTBuilder()->create<StringLiteralExpr>();
+                s->type = toType;
+                s->value = strLit->value;
+                s->token = strLit->token;
+                s->loc = strLit->loc;
+                s->checked = true;
+                *outToExpr = s;
+            }
+        }
         if (outCost)
-            *outCost = kConversionCost_None;
+            *outCost = kConversionCost_StringToString;
         return true;
     }
 

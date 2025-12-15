@@ -86,6 +86,7 @@
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
+#include "slang-ir-lower-short-string.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-metadata.h"
 #include "slang-ir-metal-legalize.h"
@@ -429,6 +430,9 @@ void calcRequiredLoweringPassSet(
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
         break;
+    case kIROp_ShortStringType:
+        result.shortString = true;
+        break;
     }
     if (!result.generics || !result.existentialTypeLayout)
     {
@@ -735,6 +739,8 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
+    ShortStringsOptions shortStrOptions(target);
+
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets
     // that opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
@@ -997,6 +1003,11 @@ Result linkAndOptimizeIR(
                 changed |=
                     SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
             }
+        }
+
+        if (requiredLoweringPassSet.shortString)
+        {
+            lowerShortStringReturnChanged(targetProgram, irModule, shortStrOptions);
         }
 
         if (!changed)

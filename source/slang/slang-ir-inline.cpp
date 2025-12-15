@@ -1064,6 +1064,7 @@ struct TypeInliningPass : InliningPassBase
                 }
                 return false;
             }
+        case kIROp_ShortStringType:
         case kIROp_StringType:
         case kIROp_NativeStringType:
             {

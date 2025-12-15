@@ -1800,6 +1800,12 @@ struct IRGetElement : IRInst
 };
 
 FIDDLE()
+struct IRGetCharFromString : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
 struct IRGetElementPtr : IRInst
 {
     FIDDLE(leafInst())
@@ -3120,7 +3126,9 @@ public:
     IRInst* getIntValue(IRIntegerValue value);
     IRInst* getIntValue(IRType* type, IRIntegerValue value);
     IRInst* getFloatValue(IRType* type, IRFloatingPointValue value);
-    IRStringLit* getStringValue(const UnownedStringSlice& slice);
+    IRStringLit* getStringValue(
+        const UnownedStringSlice& slice,
+        IROp desiredType = kIROp_StringType);
     IRBlobLit* getBlobValue(ISlangBlob* blob);
     IRPtrLit* getPtrValue(IRType* type, void* ptr);
     IRPtrLit* getNullPtrValue(IRType* type);

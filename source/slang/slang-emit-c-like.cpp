@@ -3042,23 +3042,6 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
             m_writer->emit(")");
             break;
         }
-    case kIROp_GetStringHash:
-        {
-            auto getStringHashInst = as<IRGetStringHash>(inst);
-            auto stringLit = getStringHashInst->getStringLit();
-
-            if (stringLit)
-            {
-                auto slice = stringLit->getStringSlice();
-                m_writer->emit(getStableHashCode32(slice.begin(), slice.getLength()).hash);
-            }
-            else
-            {
-                // Couldn't handle
-                diagnoseUnhandledInst(inst);
-            }
-            break;
-        }
     case kIROp_Printf:
         {
             m_writer->emit("printf(");
@@ -4144,7 +4127,10 @@ String CLikeSourceEmitter::_emitLiteralOneWithType(int bitWidth)
         one = "uint16_t(1)";
         break;
     case 32:
-        one = "uint32_t(1)";
+        if (getTarget() == CodeGenTarget::HLSL)
+            one = "uint(1)";
+        else
+            one = "uint32_t(1)";
         break;
     case 64:
         one = "uint64_t(1)";
