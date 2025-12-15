@@ -75,7 +75,7 @@ public:
     {
     }
 
-    ~UnixPipeStream() { close(); }
+    ~UnixPipeStream() { _closeFd(); }
 
 protected:
     /// This read file descriptor non blocking. Doing so will change the behavior of
@@ -91,6 +91,7 @@ protected:
         }
     }
     bool _has(FileAccess access) const { return (Index(access) & Index(m_access)) != 0; }
+    void _closeFd();
 
     bool m_isClosed;     ///< If true this stream has been closed (ie cannot read/write to anymore)
     bool m_isOwned;      ///< True if m_fd is owned by this object.
@@ -209,7 +210,7 @@ void UnixProcess::kill(int32_t returnValue)
 
 /* !!!!!!!!!!!!!!!!!!!!!! UnixPipeStream !!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
-void UnixPipeStream::close()
+void UnixPipeStream::_closeFd()
 {
     if (!m_isClosed)
     {
@@ -222,6 +223,11 @@ void UnixPipeStream::close()
         // Make something hopefully invalid
         m_fd = -1;
     }
+}
+
+void UnixPipeStream::close()
+{
+    _closeFd();
 }
 
 SlangResult UnixPipeStream::flush()
