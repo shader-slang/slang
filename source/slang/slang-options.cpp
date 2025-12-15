@@ -655,7 +655,8 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::Optimization,
          "-O...",
          "-O<optimization-level>",
-         "Set the optimization level. -O0 implies -minimum-slang-optimization and -preserve-params"},
+         "Set the optimization level. -O0 implies -minimum-slang-optimization and "
+         "-preserve-params"},
         {OptionKind::Obfuscate,
          "-obfuscate",
          nullptr,
