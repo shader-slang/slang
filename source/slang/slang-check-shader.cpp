@@ -341,6 +341,73 @@ bool doStructFieldsHaveSemantic(Type* type)
     return doStructFieldsHaveSemanticImpl(type, seenTypes);
 }
 
+// Helper function to validate a single parameter semantic against stage requirements
+static void validateSemanticForStage(
+    ParamDecl* param,
+    HLSLSimpleSemantic* semantic,
+    Module* glslModule,
+    const CapabilitySet& entryPointCapability,
+    Stage stage,
+    DiagnosticSink* sink)
+{
+    String semanticNameLower = String(semantic->name.getContent()).toLower();
+    
+    // Search for variables in the GLSL module that have this semantic
+    for (auto memberDecl : glslModule->getModuleDecl()->getMembers())
+    {
+        auto varDecl = as<VarDeclBase>(memberDecl);
+        if (!varDecl)
+            continue;
+
+        // Check if this variable has a matching semantic
+        bool hasMatchingSemantic = false;
+        for (auto modifier : varDecl->modifiers)
+        {
+            if (auto varSemantic = as<HLSLSimpleSemantic>(modifier))
+            {
+                String varSemanticLower = String(varSemantic->name.getContent()).toLower();
+                if (varSemanticLower == semanticNameLower)
+                {
+                    hasMatchingSemantic = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasMatchingSemantic)
+            continue;
+
+        // Found the variable with this semantic - check its capability requirements
+        CapabilitySet declaredCaps;
+        for (auto mod : varDecl->modifiers)
+        {
+            if (auto requireAttr = as<RequireCapabilityAttribute>(mod))
+            {
+                declaredCaps.unionWith(requireAttr->capabilitySet);
+            }
+        }
+
+        if (declaredCaps.isEmpty())
+            return;
+
+        CapabilityAtomSet failedSet;
+        CheckCapabilityRequirementResult result;
+        CapabilitySet::checkCapabilityRequirement(
+            CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+            entryPointCapability,
+            declaredCaps,
+            failedSet,
+            result);
+
+        if (result != CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired)
+        {
+            sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage,
+                semantic->name, stage);
+        }
+        return;
+    }
+}
+
 
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
@@ -379,75 +446,28 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // Get the glsl builtin module to check system semantic definitions against the entry point capabilities
+    auto glslModule = linkage->getSessionImpl()->getBuiltinModule(slang::BuiltinModuleName::GLSL);
+    CapabilitySet entryPointCapability = entryPoint->getProfile().getCapabilityName();
+
     // Validate that semantics used on parameters are compatible with the entry point's stage
-    // Skip validation if capabilities are being ignored
-    if (!linkage->m_optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+    if (glslModule && !linkage->m_optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
     {
-        // Use the full capability set from the profile, which includes both the stage atom and any required extensions
-        CapabilitySet entryPointCapability = entryPoint->getProfile().getCapabilityName();
-        
-        // Get the glsl builtin module to check system semantic definitions
-        auto glslModule = linkage->getSessionImpl()->getBuiltinModule(slang::BuiltinModuleName::GLSL);
-        
         // Check parameters for stage-incompatible semantics
         for (const auto& param : entryPointFuncDecl->getParameters())
-    {
-        if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
         {
-            String semanticNameLower = String(semantic->name.getContent()).toLower();
-            
-            // Search for variables in the glsl module that have this semantic
-            if (glslModule)
-            {
-                for (auto memberDecl : glslModule->getModuleDecl()->getMembers())
-                {
-                    if (auto varDecl = as<VarDeclBase>(memberDecl))
-                    {
-                        // Check if this variable has a matching semantic
-                        for (auto modifier : varDecl->modifiers)
-                        {
-                            if (auto varSemantic = as<HLSLSimpleSemantic>(modifier))
-                            {
-                                String varSemanticLower = String(varSemantic->name.getContent()).toLower();
-                                if (varSemanticLower == semanticNameLower)
-                                {
-                                    // Found the variable with this semantic - check its capability requirements
-                                    CapabilitySet declaredCaps;
-                                    for (auto mod : varDecl->modifiers)
-                                    {
-                                        if (auto requireAttr = as<RequireCapabilityAttribute>(mod))
-                                        {
-                                            declaredCaps.unionWith(requireAttr->capabilitySet);
-                                        }
-                                    }
-                                    
-                                    if (!declaredCaps.isEmpty())
-                                    {
-                                        CapabilityAtomSet failedSet;
-                                        CheckCapabilityRequirementResult result;
-                                        CapabilitySet::checkCapabilityRequirement(
-                                            CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
-                                            entryPointCapability,
-                                            declaredCaps,
-                                            failedSet,
-                                            result);
-                                        
-                                        if (result != CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired)
-                                        {
-                                            sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage,
-                                                semantic->name, stage);
-                                        }
-                                    }
-                                    goto nextParameter;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-nextParameter:;
+            auto semantic = param->findModifier<HLSLSimpleSemantic>();
+            if (!semantic)
+                continue;
+
+            validateSemanticForStage(
+                param,
+                semantic,
+                glslModule,
+                entryPointCapability,
+                stage,
+                sink);
         }
-    }
     }
 
     // Check if the return type is valid for a shader entry point
