@@ -1299,19 +1299,19 @@ struct IRBlock : IRInst
 
     struct SuccessorList
     {
-        SuccessorList(IRUse* begin, IRUse* end, UInt stride = 1)
+        SuccessorList(IRUse* begin, IRUse* end, Int stride = 1)
             : begin_(begin), end_(end), stride(stride)
         {
         }
         IRUse* begin_;
         IRUse* end_;
-        UInt stride;
+        Int stride;
 
         UInt getCount();
 
         struct Iterator
         {
-            Iterator(IRUse* use, UInt stride)
+            Iterator(IRUse* use, Int stride)
                 : use(use), stride(stride)
             {
             }
@@ -1325,11 +1325,16 @@ struct IRBlock : IRInst
             IREdge getEdge() const { return IREdge(use); }
 
             IRUse* use;
-            UInt stride;
+            Int stride;
         };
 
         Iterator begin() { return Iterator(begin_, stride); }
         Iterator end() { return Iterator(end_, stride); }
+
+        SuccessorList reverse()
+        {
+            return SuccessorList(end_-stride, begin_-stride, -stride);
+        }
     };
 
     PredecessorList getPredecessors();

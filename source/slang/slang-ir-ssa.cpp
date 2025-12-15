@@ -926,14 +926,13 @@ IRBlock* IREdge::getSuccessor() const
     return cast<IRBlock>(getUse()->get());
 }
 
-void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
+void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge, bool copyDebugLine)
 {
-    auto pred = edge.getPredecessor();
     auto succ = edge.getSuccessor();
     auto edgeUse = edge.getUse();
 
     IRBuilder builder(module);
-    builder.setInsertInto(pred);
+    builder.setInsertBefore(succ);
 
     // Create a new block that will sit "along" the edge
     IRBlock* edgeBlock = builder.createBlock();
@@ -947,6 +946,20 @@ void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
     // The edge block should branch (unconditionally)
     // to the successor block.
     builder.setInsertInto(edgeBlock);
+
+    // The new block needs a DebugLine entry, so try to find
+    // one in the successor block and copy that.
+    if (copyDebugLine)
+    {
+        for (auto afterInst : succ->getChildren()) {
+            if (auto debugLine = as<IRDebugLine>(afterInst)) {
+                IRCloneEnv cloneEnv;
+                cloneInst(&cloneEnv, &builder, debugLine);
+                break;
+            }
+        }
+    }
+
     builder.emitBranch(succ);
 
     // Insert the new block into the block list
@@ -955,7 +968,7 @@ void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
     // In principle, the order of this list shouldn't
     // affect the semantics of a program, but we
     // might want to be careful about ordering anyway.
-    edgeBlock->insertAfter(pred);
+    edgeBlock->insertBefore(succ);
 }
 
 bool IREdge::isCritical() const
@@ -1044,7 +1057,7 @@ static void breakCriticalEdges(ConstructSSAContext* context)
 
     for (auto edge : criticalEdges)
     {
-        IRBuilder::insertBlockAlongEdge(context->module, edge);
+        IRBuilder::insertBlockAlongEdge(context->module, edge, true);
     }
 }
 

@@ -6473,6 +6473,8 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
     }
+    ifStatement->afterLoc = tokenReader.peekLoc();
+
     return ifStatement;
 }
 
