@@ -18,12 +18,13 @@ UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, Diagno
             auto containerSpace = findRegisterSpaceResourceInfo(varLayout);
             if (containerSpace >= 0)
                 usedSpaces.add((int)containerSpace);
-    
+
             // Get base offset for nested resources
             UInt spaceOffset = 0;
-            if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+            if (auto spaceAttr =
+                    varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
                 spaceOffset = spaceAttr->getOffset();
-    
+
             // Get direct binding spaces
             for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
             {

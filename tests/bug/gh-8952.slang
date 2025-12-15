@@ -5,8 +5,6 @@
 // (with NO uniform data), the bindless resource heap was incorrectly placed in the same
 // descriptor set as the ParameterBlock, causing descriptor type conflicts.
 //
-// The fix ensures that ParameterBlock's SubElementRegisterSpace is tracked even when
-// there is no container constant buffer (no uniform data).
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly
 
@@ -17,7 +15,13 @@ struct Texture2DHandleBuffer
     StructuredBuffer<Texture2D.Handle> texture2DbufferOfHandles;
 };
 
+struct NestedParameterBlock
+{
+    ParameterBlock<Texture2DHandleBuffer> BLOCK;
+};
+
 ParameterBlock<Texture2DHandleBuffer> BLOCK;
+ParameterBlock<NestedParameterBlock> BLOCK_nested;
 
 RWStructuredBuffer<float4> output;
 
@@ -27,12 +31,17 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 {
     // Use the buffer inside the ParameterBlock
     Texture2D tex = BLOCK.texture2DbufferOfHandles[0];
-    
-    output[0] = tex.Load(int3(0,0,0));
+    Texture2D tex_nested = BLOCK_nested.BLOCK.texture2DbufferOfHandles[0];
+
+    output[0] = tex.Load(int3(0, 0, 0));
+    output[0] = tex_nested.Load(int3(0, 0, 0));
 }
 
 // Verify that the ParameterBlock's resource is in Set 1
-// CHECK: OpDecorate %BLOCK_texture2DbufferOfHandles{{.*}}DescriptorSet 1
+// CHECK-DAG: OpDecorate %BLOCK_texture2DbufferOfHandles{{.*}}DescriptorSet 1
 
-// Verify that the resource heap is in Set 2 (NOT Set 1)
-// CHECK: OpDecorate %__slang_resource_heap{{.*}}DescriptorSet 2
+// Verify that the nested ParameterBlock's resource is in Set 2
+// CHECK-DAG: OpDecorate %BLOCK_nested_BLOCK_texture2DbufferOfHandles{{.*}}DescriptorSet 2
+
+// Verify that the resource heap is in Set 3 (NOT Set 1 or Set 2)
+// CHECK-DAG: OpDecorate %__slang_resource_heap{{.*}}DescriptorSet 3
