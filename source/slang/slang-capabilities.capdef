@@ -1211,7 +1211,7 @@ alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_s
 
 /// Capabilities needed for raytracing-motionblur
 /// [Compound]
-alias motionblur = GL_NV_ray_tracing_motion_blur | cuda;
+alias motionblur = GL_NV_ray_tracing_motion_blur | _sm_6_3 + hlsl_nvapi | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
 alias rayquery = GL_EXT_ray_query | _sm_6_3;

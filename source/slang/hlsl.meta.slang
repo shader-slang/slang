@@ -18146,6 +18146,31 @@ void TraceRay(
     }
 }
 
+// NOTE!
+// The name of the following functions may change when DXR supports
+// a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
+//
+// https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
+
+__generic<payload_t>
+[require(hlsl, raytracing_motionblur)]
+void __traceMotionRayHLSL(
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        RayDesc Ray,
+        float CurrentTime,
+        inout payload_t Payload)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "TraceMotionRay";
+    }
+}
+
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [require(glsl, raytracing_motionblur_raygen_closesthit_miss)]
 void __traceMotionRay(
@@ -18181,7 +18206,7 @@ void __traceMotionRay(
 /// @remarks Extended version of TraceRay with motion blur support
 /// @category raytracing
 [ForceInline]
-[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
+[require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -18196,6 +18221,18 @@ void TraceMotionRay(
 {
     __target_switch
     {
+    case hlsl:
+        __traceMotionRayHLSL(
+            AccelerationStructure,
+            RayFlags,
+            InstanceInclusionMask,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            Ray,
+            CurrentTime,
+            __forceVarIntoRayPayloadStructTemporarily(Payload));
+        return;
     case glsl:
     {
         [__vulkanRayPayload]
@@ -18725,11 +18762,12 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
+[require(glsl_hlsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
     {
+    case hlsl:  __intrinsic_asm "RayCurrentTime";
     case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
     case spirv:
         return spirv_asm
@@ -20816,7 +20854,7 @@ struct HitObject
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -20830,6 +20868,17 @@ struct HitObject
     {
         __target_switch
         {
+        case hlsl:
+            __traceMotionRayHLSL(
+                AccelerationStructure,
+                RayFlags,
+                InstanceInclusionMask,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                MissShaderIndex,
+                Ray,
+                CurrentTime,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
         case glsl_nv:
             {
                 [__vulkanRayPayload]
@@ -21074,6 +21123,7 @@ struct HitObject
     [ForceInline]
     [require(cuda, ser_motion_raygen_closesthit_miss)]
     [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
+    [require(hlsl, ser_motion_raygen_closesthit_miss)]
     [require(spirv_nv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21089,6 +21139,7 @@ struct HitObject
     {
         __target_switch
         {
+        case hlsl: __intrinsic_asm "MakeMotionHit";
         case glsl:
         {
             // Save the attributes
@@ -21372,7 +21423,7 @@ struct HitObject
         /// See MakeMiss but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss(
         uint MissShaderIndex,
         RayDesc Ray,
@@ -21380,6 +21431,7 @@ struct HitObject
     {
         __target_switch
         {
+        case hlsl_nvapi: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
         case glsl_nv:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case glsl:
@@ -22128,7 +22180,7 @@ struct HitObject
     }
 
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
@@ -22136,7 +22188,6 @@ struct HitObject
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
         case glsl:
             __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
-        case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
         case spirv_nv:
             return spirv_asm
             {

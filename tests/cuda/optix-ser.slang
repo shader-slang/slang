@@ -173,14 +173,4 @@ void rayGenerationMain()
 
     outputBuffer[idx] += uint(rayD.TMin > 0);
     outputBuffer[idx] += uint(rayD.TMax < ray.TMin);
-
-    // Test GetCurrentTime for motion hit objects (issue #9018)
-    // CHECK: slangOptixHitObjectGetRayTime
-    // CHECK-PTX: _optix_hitobject_get_ray_time
-    float currentTime0 = motionHitObj[0].GetCurrentTime();
-    // CHECK: slangOptixHitObjectGetRayTime
-    // CHECK-PTX: _optix_hitobject_get_ray_time
-    float currentTime1 = miss[1].GetCurrentTime();
-    outputBuffer[idx] += uint(currentTime0 >= 0.f);
-    outputBuffer[idx] += uint(currentTime1 >= 0.f);
 }
