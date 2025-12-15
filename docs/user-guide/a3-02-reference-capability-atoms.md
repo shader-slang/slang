@@ -876,9 +876,6 @@ Compound Capabilities
 `anyhit_closesthit_intersection_miss`
 > Collection of shader stages
 
-`anyhit_intersection`
-> Collection of shader stages (for OptiX ObjectRayOrigin/Direction which excludes closesthit)
-
 `appendstructuredbuffer`
 > Capabilities required to use AppendStructuredBuffer
 
@@ -1226,10 +1223,6 @@ Compound Capabilities
 
 `raytracing_motionblur_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur and the shader stages of raygen, closesthit, and miss.
-
-`raytracing_object_space_ray`
-> Collection of capabilities for ObjectRayOrigin/ObjectRayDirection.
-> CUDA/OptiX only supports anyhit and intersection stages, while other targets also support closesthit.
 
 `raytracing_position`
 > Collection of capabilities for raytracing + ray_tracing_position_fetch and the shader stages of anyhit and closesthit.

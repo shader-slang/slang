@@ -1363,10 +1363,6 @@ alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | c
 /// [Compound]
 alias anyhit_closesthit = anyhit | closesthit;
 
-/// Collection of shader stages (for OptiX ObjectRayOrigin/Direction which excludes closesthit)
-/// [Compound]
-alias anyhit_intersection = anyhit | intersection;
-
 /// Collection of shader stages
 /// [Compound]
 alias raygen_closesthit_miss = raygen | closesthit | miss;
@@ -2379,12 +2375,6 @@ alias raytracing_lss_ho = raytracing_lss | raygen;
 /// Collection of capabilities for raytracing with the shader stages of anyhit, closesthit, and intersection.
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;
-
-/// Collection of capabilities for ObjectRayOrigin/ObjectRayDirection.
-/// CUDA/OptiX only supports anyhit and intersection stages, while other targets also support closesthit.
-/// [Compound]
-alias raytracing_object_space_ray = cuda + raytracing + anyhit_intersection
-                                  | glsl_hlsl_spirv + raytracing + anyhit_closesthit_intersection;
 
 /// Collection of capabilities for raytracing with the shader stages of raygen, closesthit, and miss.
 /// [Compound]

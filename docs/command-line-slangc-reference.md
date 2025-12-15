@@ -1456,7 +1456,6 @@ A capability describes an optional feature that a target may or may not support.
 * `amplification_mesh` 
 * `raytracing_stages` 
 * `anyhit_closesthit` 
-* `anyhit_intersection` 
 * `raygen_closesthit_miss` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
@@ -1623,7 +1622,6 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_lss` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
-* `raytracing_object_space_ray` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 
 * `raytracing_raygen_closesthit_miss_callable` 

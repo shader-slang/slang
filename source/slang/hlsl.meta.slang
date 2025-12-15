@@ -18623,10 +18623,10 @@ uint PrimitiveIndex()
 
 /// Returns the ray origin in object space of the current instance.
 /// @return Object-space position where the ray originated
-/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
+/// @remarks Transformed by the inverse of the instance transform
 /// @category raytracing
 [NonUniformReturn]
-[require(raytracing_object_space_ray)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -18644,10 +18644,10 @@ float3 ObjectRayOrigin()
 
 /// Returns the ray direction in object space of the current instance.
 /// @return Object-space direction vector of the ray
-/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
+/// @remarks Transformed by the inverse of the instance transform
 /// @category raytracing
 [NonUniformReturn]
-[require(raytracing_object_space_ray)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -22121,7 +22121,6 @@ struct HitObject
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
@@ -22129,7 +22128,6 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
         case glsl_nv: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
         case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
-        case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
         case spirv_nv:
             return spirv_asm
             {
@@ -22153,7 +22151,6 @@ struct HitObject
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
@@ -22161,7 +22158,6 @@ struct HitObject
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
         case glsl_nv: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
         case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
-        case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
         case spirv_nv:
             return spirv_asm
             {
