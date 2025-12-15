@@ -3366,7 +3366,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else
         {
-            constInst = emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), globalConst);
+            constInst = emitCompositeConstruct(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                globalConst);
         }
         maybeEmitPointerDecoration(constInst, globalConst);
         if (layout)
@@ -4046,7 +4048,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto name = getName(globalInst);
         IRBuilder builder(globalInst);
         auto varType = tryGetPointedToType(&builder, globalInst->getDataType());
-        if (varType == nullptr) varType = globalInst->getDataType();
+        if (varType == nullptr)
+            varType = globalInst->getDataType();
         auto debugType = emitDebugType(varType);
 
         // Use default debug source and line info similar to struct debug type emission
