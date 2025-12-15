@@ -379,6 +379,77 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto module = getModule(entryPointFuncDecl);
     auto linkage = entryPoint->getLinkage();
 
+    // Validate that semantics used on parameters are compatible with the entry point's stage
+    // Skip validation if capabilities are being ignored
+    if (!linkage->m_optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+    {
+        // Use the full capability set from the profile, which includes both the stage atom and any required extensions
+        CapabilitySet entryPointCapability = entryPoint->getProfile().getCapabilityName();
+        
+        // Get the glsl builtin module to check system semantic definitions
+        auto glslModule = linkage->getSessionImpl()->getBuiltinModule(slang::BuiltinModuleName::GLSL);
+        
+        // Check parameters for stage-incompatible semantics
+        for (const auto& param : entryPointFuncDecl->getParameters())
+    {
+        if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
+        {
+            String semanticNameLower = String(semantic->name.getContent()).toLower();
+            
+            // Search for variables in the glsl module that have this semantic
+            if (glslModule)
+            {
+                for (auto memberDecl : glslModule->getModuleDecl()->getMembers())
+                {
+                    if (auto varDecl = as<VarDeclBase>(memberDecl))
+                    {
+                        // Check if this variable has a matching semantic
+                        for (auto modifier : varDecl->modifiers)
+                        {
+                            if (auto varSemantic = as<HLSLSimpleSemantic>(modifier))
+                            {
+                                String varSemanticLower = String(varSemantic->name.getContent()).toLower();
+                                if (varSemanticLower == semanticNameLower)
+                                {
+                                    // Found the variable with this semantic - check its capability requirements
+                                    CapabilitySet declaredCaps;
+                                    for (auto mod : varDecl->modifiers)
+                                    {
+                                        if (auto requireAttr = as<RequireCapabilityAttribute>(mod))
+                                        {
+                                            declaredCaps.unionWith(requireAttr->capabilitySet);
+                                        }
+                                    }
+                                    
+                                    if (!declaredCaps.isEmpty())
+                                    {
+                                        CapabilityAtomSet failedSet;
+                                        CheckCapabilityRequirementResult result;
+                                        CapabilitySet::checkCapabilityRequirement(
+                                            CheckCapabilityRequirementOptions::AvailableCanHaveSubsetOfAbstractAtoms,
+                                            entryPointCapability,
+                                            declaredCaps,
+                                            failedSet,
+                                            result);
+                                        
+                                        if (result != CheckCapabilityRequirementResult::AvailableIsASuperSetToRequired)
+                                        {
+                                            sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage,
+                                                semantic->name, stage);
+                                        }
+                                    }
+                                    goto nextParameter;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+nextParameter:;
+        }
+    }
+    }
+
     // Check if the return type is valid for a shader entry point
     auto returnType = entryPointFuncDecl->returnType.type;
     if (returnType)
@@ -485,37 +556,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                             typeString);
                         return;
                     }
-                }
-            }
-        }
-    }
-
-    // Validate stage-specific semantics for all entry point parameters
-    // TODO: This validation could be expanded to cover other stage-specific semantics
-    // (e.g., compute-only: SV_DispatchThreadID/GroupID/GroupIndex,
-    // fragment-only: SV_Depth/IsFrontFace,
-    // tessellation-only: SV_DomainLocation/TessFactor,
-    // geometry-only: SV_GSInstanceID, etc.)
-    for (const auto& param : entryPointFuncDecl->getParameters())
-    {
-        if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
-        {
-            const auto& semanticToken = semantic->name;
-            String lowerName = String(semanticToken.getContent()).toLower();
-
-            // Validate that semantics meant only for the vertex stage are only being
-            // used in that stage
-            if (lowerName == "sv_vertexid" || lowerName == "sv_instanceid" ||
-                lowerName == "sv_vulkanvertexid" || lowerName == "sv_vulkaninstanceid")
-            {
-                if (stage != Stage::Vertex)
-                {
-                    sink->diagnose(
-                        param->loc,
-                        Diagnostics::semanticNotAvailableInStage,
-                        semanticToken.getContent(),
-                        getStageName(stage));
-                    return;
                 }
             }
         }

@@ -118,13 +118,33 @@ public out float4 gl_Position : SV_Position;
 public out float gl_PointSize : SV_PointSize;
 public in float2 gl_PointCoord : SV_PointCoord;
 
+[require(fragment)]
 public in vec4 gl_FragCoord : SV_Position;
+
+[require(fragment)]
 public out float gl_FragDepth : SV_Depth;
+
+[require(fragment)]
 public out int gl_FragStencilRef : SV_StencilRef;
 
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
 public in uvec3 gl_GlobalInvocationID : SV_DispatchThreadID;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
 public in uvec3 gl_WorkGroupID : SV_GroupID;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
 public in uint gl_LocalInvocationIndex : SV_GroupIndex;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
 public in uvec3 gl_LocalInvocationID : SV_GroupThreadID;
 
 internal in int _gl_DeviceIndex : SV_DeviceIndex;
@@ -162,9 +182,19 @@ public property uint3 gl_WorkGroupSize
 // TODO: define overload for tessellation control stage.
 public in int gl_InvocationID : SV_GSInstanceID;
 
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
 internal in int __sv_InstanceIndex : SV_InstanceID;
+
+[require(vertex)]
 internal in int __sv_VertexIndex : SV_VertexID;
+
+[require(vertex)]
 internal in int __sv_VulkanInstanceIndex : SV_VulkanInstanceID;
+
+[require(vertex)]
 internal in int __sv_VulkanVertexIndex : SV_VulkanVertexID;
 
 // SPIRV InstanceIndex builtin for vertex shader
@@ -210,6 +240,7 @@ public in bool gl_FrontFacing : SV_IsFrontFace;
 // TODO: define overload for geometry stage.
 public in int gl_Layer : SV_RenderTargetArrayIndex;
 
+[require(fragment)]
 public in int gl_SampleID : SV_SampleIndex;
 public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
