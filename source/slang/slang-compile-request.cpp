@@ -308,6 +308,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
 
+    // For a new translation unit, we need to reset the WarningStateTracker
+    // to avoid pragma state pollution from previously parsed modules.
+    // This is only done for the first file of the translation unit.
+    // Subsequent files (if any) in the same translation unit, as well as
+    // files included via __include during semantic checking, will reuse
+    // the tracker to preserve pragma states within the module.
+    getSink()->setSourceWarningStateTracker(nullptr);
+
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
         SourceLanguage sourceLanguage = translationUnit->sourceLanguage;

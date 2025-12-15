@@ -945,7 +945,7 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                     inst = next;
                 }
                 branch->removeAndDeallocate();
-                assert(!successor->hasUses());
+                SLANG_ASSERT(!successor->hasUses());
                 successor->removeAndDeallocate();
 
                 break;

@@ -60,6 +60,7 @@ void ParameterRecorder::recordStruct(slang::CompilerOptionValue const& value)
 {
     recordEnumValue(value.kind);
     recordInt32(value.intValue0);
+    recordInt32(value.intValue1);
     recordString(value.stringValue0);
     recordString(value.stringValue1);
 }
