@@ -30,9 +30,6 @@ Targets
 `glsl`
 > Represents the GLSL code generation target.
 
-`glsl_nv`
-> Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-
 `hlsl`
 > Represents the HLSL code generation target.
 
@@ -44,9 +41,6 @@ Targets
 
 `spirv`
 > Represents the SPIR-V code generation target.
-
-`spirv_nv`
-> Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
 
 `textualTarget`
 > Represents a non-assembly code generation target.
@@ -481,9 +475,6 @@ Extensions
 `GL_EXT_shader_image_load_store`
 > Represents the GL_EXT_shader_image_load_store extension.
 
-`GL_EXT_shader_invocation_reorder`
-> Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
-
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
 
@@ -560,7 +551,7 @@ Extensions
 > Represents the GL_NV_shader_atomic_fp16_vector extension.
 
 `GL_NV_shader_invocation_reorder`
-> Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
+> Represents the GL_NV_shader_invocation_reorder extension.
 
 `GL_NV_shader_subgroup_partitioned`
 > Represents the GL_NV_shader_subgroup_partitioned extension.
@@ -597,11 +588,6 @@ Extensions
 
 `SPV_EXT_shader_atomic_float_min_max`
 > Represents the SPIR-V extension for atomic float min/max operations.
-
-`SPV_EXT_shader_invocation_reorder`
-> Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-> Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-> Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
@@ -671,7 +657,7 @@ Extensions
 > Represents the SPIR-V extension for shader image footprint.
 
 `SPV_NV_shader_invocation_reorder`
-> Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
+> Represents the SPIR-V extension for shader invocation reorder.
 > Requires SPV_KHR_ray_tracing.
 
 `SPV_NV_shader_subgroup_partitioned`
@@ -679,9 +665,6 @@ Extensions
 
 `SPV_NV_tensor_addressing`
 > Represents the SPIR-V extension for SPV_NV_tensor_addressing.
-
-`ser_hlsl_native`
-> DXR 1.3 native SER support (SM 6.9, no NVAPI required)
 
 `spvAtomicFloat16AddEXT`
 > Represents the SPIR-V capability for atomic float 16 add operations.
@@ -821,11 +804,8 @@ Extensions
 `spvShaderClockKHR`
 > Represents the SPIR-V capability for shader clock.
 
-`spvShaderInvocationReorderEXT`
-> Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
-
 `spvShaderInvocationReorderNV`
-> Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+> Represents the SPIR-V capability for shader invocation reorder.
 
 `spvShaderNonUniform`
 > Represents the SPIR-V capability for non-uniform resource indexing.
@@ -875,9 +855,6 @@ Compound Capabilities
 
 `anyhit_closesthit_intersection_miss`
 > Collection of shader stages
-
-`anyhit_intersection`
-> Collection of shader stages (for OptiX ObjectRayOrigin/Direction which excludes closesthit)
 
 `appendstructuredbuffer`
 > Capabilities required to use AppendStructuredBuffer
@@ -1227,10 +1204,6 @@ Compound Capabilities
 `raytracing_motionblur_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur and the shader stages of raygen, closesthit, and miss.
 
-`raytracing_object_space_ray`
-> Collection of capabilities for ObjectRayOrigin/ObjectRayDirection.
-> CUDA/OptiX only supports anyhit and intersection stages, while other targets also support closesthit.
-
 `raytracing_position`
 > Collection of capabilities for raytracing + ray_tracing_position_fetch and the shader stages of anyhit and closesthit.
 
@@ -1259,8 +1232,7 @@ Compound Capabilities
 > Collection of shader stages
 
 `ser`
-> Capabilities needed for shader-execution-reordering (all paths)
-> Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
+> Capabilities needed for shader-execution-reordering
 
 `ser_any_closesthit_intersection_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
@@ -1271,15 +1243,6 @@ Compound Capabilities
 `ser_anyhit_closesthit_intersection`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, and intersection.
 
-`ser_dxr`
-> Capabilities needed for shader-execution-reordering (native DXR 1.3 path)
-
-`ser_dxr_raygen`
-> Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen stage.
-
-`ser_dxr_raygen_closesthit_miss`
-> Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen, closesthit, miss stages.
-
 `ser_motion`
 > Capabilities needed for shader-execution-reordering and motion-blur
 
@@ -1288,9 +1251,6 @@ Compound Capabilities
 
 `ser_motion_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
-
-`ser_nvapi`
-> Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
 `ser_raygen`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stage of raygen.

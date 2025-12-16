@@ -166,6 +166,21 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 }
 ```
 
+### Using Generic Parameters in Attributes
+
+Slang allows referencing generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like workgroup sizes at compile time.
+
+For example:
+```csharp
+[numthreads(blockSize, blockSize, 1)]
+void computeMain<int blockSize>() 
+{
+    // Shader implementation
+}
+```
+
+In this example, the generic parameter `blockSize` is used in the `numthreads` attribute. This allows the host application to control the workgroup size by compiling a specialization of the entry point with a specific value for `blockSize`, instead of by resorting to preprocessor macros.
+
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
 

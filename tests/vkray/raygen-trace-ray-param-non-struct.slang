@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry main -capability hlsl_nvapi
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage raygeneration -entry main
 
 RaytracingAccelerationStructure as;
 
@@ -39,17 +39,17 @@ void main()
              someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
-    // Motion blur not supported in HLSL - removed TraceMotionRay test
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = rayPayload{{.*}}.data{{.*}};
-    // CHECK: TraceRay(
+    // CHECK: TraceMotionRay(
     // CHECK: rayPayload{{.*}}.data{{.*}};
-    TraceRay(as,
+    TraceMotionRay(as,
             1,
             0xff,
             0,
             0,
             2,
             ray,
+            0.0f,
             someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
@@ -64,6 +64,20 @@ void main()
              2,
              ray,
              someInData1);
+    outputBuffer1[0] = outputBuffer1[0]+someInData1;
+
+    // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
+    // CHECK: TraceMotionRay(
+    // CHECK: rayPayload{{.*}}.data{{.*}};
+    HitObject::TraceMotionRay(as,
+            1,
+            0xff,
+            0,
+            0,
+            2,
+            ray,
+            0.0f,
+            someInData1);
     outputBuffer1[0] = outputBuffer1[0]+someInData1;
 
     // CHECK: rayPayload{{_[0-9]}}.data{{_[0-9]}} = {{.*}}
