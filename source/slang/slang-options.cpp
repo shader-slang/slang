@@ -1570,29 +1570,6 @@ void OptionsParser::setProfile(RawTarget* rawTarget, Profile profile)
         }
     }
     rawTarget->optionSet.setProfile(profile);
-
-    // Auto-enable hlsl_nvapi for HLSL raytracing profiles < sm_6_9
-    // DXR 1.3 native (sm_6_9+) doesn't need NVAPI, but older profiles do
-    // Only apply to D3D targets (HLSL/DXIL), not SPIRV or other targets
-    bool isD3DFormat = false;
-    switch (rawTarget->format)
-    {
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::DXBytecode:
-    case CodeGenTarget::DXBytecodeAssembly:
-    case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:
-        isD3DFormat = true;
-        break;
-    default:
-        break;
-    }
-    if (isD3DFormat && profile.getFamily() == ProfileFamily::DX &&
-        profile.getVersion() >= ProfileVersion::DX_6_3 &&
-        profile.getVersion() < ProfileVersion::DX_6_9)
-    {
-        rawTarget->optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
-    }
 }
 
 void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)

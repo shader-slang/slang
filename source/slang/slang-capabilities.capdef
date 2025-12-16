@@ -549,16 +549,10 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 /// [EXT]
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
-/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
+/// Represents the SPIR-V extension for shader invocation reorder.
 /// Requires SPV_KHR_ray_tracing.
 /// [EXT]
 def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
-
-/// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
-/// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
-/// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
-/// [EXT]
-def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
 
 /// Represents the SPIR-V extension for cluster acceleration structure.
 /// [EXT]
@@ -734,13 +728,9 @@ def spvRayQueryKHR : SPV_KHR_ray_query;
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
 
-/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+/// Represents the SPIR-V capability for shader invocation reorder.
 /// [EXT]
 def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
-
-/// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
-/// [EXT]
-def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
 
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
@@ -906,7 +896,6 @@ def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
 def _GL_NV_shader_invocation_reorder : _GLSL_460;
-def _GL_EXT_shader_invocation_reorder : _GLSL_460;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
@@ -1151,21 +1140,9 @@ alias GL_NV_ray_tracing_motion_blur = _GL_NV_ray_tracing_motion_blur | spvRayTra
 /// [EXT]
 alias GL_NV_shader_atomic_fp16_vector = _GL_NV_shader_atomic_fp16_vector + _GL_NV_gpu_shader5 | _spirv_1_0;
 
-/// Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
+/// Represents the GL_NV_shader_invocation_reorder extension.
 /// [EXT]
 alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderNV;
-
-/// Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
-/// [EXT]
-alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderEXT;
-
-/// Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def glsl_nv : glsl + GL_NV_shader_invocation_reorder;
-
-/// Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def spirv_nv : spirv + spvShaderInvocationReorderNV;
 
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
@@ -1192,26 +1169,12 @@ alias nvapi = hlsl_nvapi;
 /// Capabilities needed for minimal raytracing support
 /// [Compound]
 alias raytracing = GL_EXT_ray_tracing | _sm_6_3 | cuda;
-/// Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
+/// Capabilities needed for shader-execution-reordering
 /// [Compound]
-alias ser_nvapi = raytracing + hlsl_nvapi;
-
-/// DXR 1.3 native SER support (SM 6.9, no NVAPI required)
-/// [EXT]
-def ser_hlsl_native : _sm_6_9;
-
-/// Capabilities needed for shader-execution-reordering (native DXR 1.3 path)
-/// [Compound]
-alias ser_dxr = raytracing + ser_hlsl_native;
-
-/// Capabilities needed for shader-execution-reordering (all paths)
-/// Includes NVIDIA-specific (NV), cross-vendor standard (EXT), DXR 1.3 native, and CUDA paths
-/// [Compound]
-alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
-
+alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + hlsl_nvapi | cuda;
 /// Capabilities needed for raytracing-motionblur
 /// [Compound]
-alias motionblur = GL_NV_ray_tracing_motion_blur | cuda;
+alias motionblur = GL_NV_ray_tracing_motion_blur | _sm_6_3 + hlsl_nvapi | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
 alias rayquery = GL_EXT_ray_query | _sm_6_3;
@@ -1362,10 +1325,6 @@ alias raytracing_stages = raygen | intersection | anyhit | closesthit | miss | c
 /// Collection of shader stages
 /// [Compound]
 alias anyhit_closesthit = anyhit | closesthit;
-
-/// Collection of shader stages (for OptiX ObjectRayOrigin/Direction which excludes closesthit)
-/// [Compound]
-alias anyhit_intersection = anyhit | intersection;
 
 /// Collection of shader stages
 /// [Compound]
@@ -2380,12 +2339,6 @@ alias raytracing_lss_ho = raytracing_lss | raygen;
 /// [Compound]
 alias raytracing_anyhit_closesthit_intersection = anyhit_closesthit_intersection + raytracing;
 
-/// Collection of capabilities for ObjectRayOrigin/ObjectRayDirection.
-/// CUDA/OptiX only supports anyhit and intersection stages, while other targets also support closesthit.
-/// [Compound]
-alias raytracing_object_space_ray = cuda + raytracing + anyhit_intersection
-                                  | glsl_hlsl_spirv + raytracing + anyhit_closesthit_intersection;
-
 /// Collection of capabilities for raytracing with the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias raytracing_raygen_closesthit_miss = raygen_closesthit_miss + raytracing;
@@ -2441,14 +2394,6 @@ alias ser_motion_raygen_closesthit_miss = raygen_closesthit_miss + ser_motion;
 /// Collection of capabilities for raytracing raytracing + motion blur + shader execution reordering and the shader stage of raygen.
 /// [Compound]
 alias ser_motion_raygen = raygen + ser_motion;
-
-/// Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen, closesthit, miss stages.
-/// [Compound]
-alias ser_dxr_raygen_closesthit_miss = raygen_closesthit_miss + ser_dxr;
-
-/// Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen stage.
-/// [Compound]
-alias ser_dxr_raygen = raygen + ser_dxr;
 
 /// User should not use this capability
 /// [Other]
