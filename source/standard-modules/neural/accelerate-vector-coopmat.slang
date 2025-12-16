@@ -82,6 +82,23 @@ internal uint getWaveId()
     }
 }
 
+[ForceInline]
+internal int getWaveCount()
+{
+    // Note, we always require the threads count is multiple of the subgroup size, therefore we don't need to round up the result.
+    __target_switch
+    {
+    case cuda:
+        uint3 blockDim = cudaBlockDim();
+        int warpsPerBlock = (blockDim.x * blockDim.y * blockDim.z) >> 5;
+        return warpsPerBlock;
+    case spirv:
+        int3 workGroupSize = WorkgroupSize();
+        int subGroupSize = WaveGetLaneCount();
+        return (workGroupSize.x * workGroupSize.y * workGroupSize.z) / subGroupSize;
+    }
+}
+
 // We can't convert T* to uint4* on shared memory in slang, therefore, we will provide two versions of shared memory pointer
 // and implement both of them, and document about the difference between them.
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
@@ -385,6 +402,33 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 # endif
     }
 
+    // Read one complete vector into the shared memory. Different from the LoadSharedMemoryFromLocalVector,
+    // this function is used to load the input vector into the shared memory for the transpose case, where each
+    // tile will not contain the all the vectors in a warp. Instead, only partial warp will load the complete vector
+    // into the shared memory. Compared to the LoadSharedMemoryFromLocalVector, where it loads partial vectors by every thread
+    // in a warp.
+    [require(cooperative_matrix, subgroup_basic)]
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, InputArray : IArray<T>>(
+        SPtr<uint4> sharedMemory,
+        int tileIndex,
+        int subgroupIndex,
+        InputArray inputVector)
+    {
+        const uint laneId = WaveGetLaneIndex();
+        // Due the limitation of the size of shared memory, we cannot load all the vectors in a warp to the shared memory. Instead,
+        // we can only load it in smaller batches (batch size is the WMMA tile in column or row).
+        if (laneId >= BatchSize)
+            return;
+
+        SPtr<uint4> sharedMemorySubgroup = sharedMemory + subgroupIndex * ArraySizeInVector * BatchSize;
+
+        uint index = laneId * ArraySizeInVector;
+        for (uint i = 0; i < ArraySizeInVector; i++)
+        {
+            // We have the assumption that the input array must be aligned to the uint4 vector size.
+            sharedMemorySubgroup[index + i] = readUint4<T>(inputVector, i * ElementCountPerVector);
+        }
+    }
 
     // Load the input vector into shared memory. Each input vector is a column of the matrix B.
     // Since the input vector is loaded from thread local memory, one thread can only load one
@@ -426,16 +470,131 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         // Columns are actually corresponding to the inactive threads, where there are no thread-local data at all.
     }
 
+    internal static void sumReduce<int ROW, int COLUMN>(inout MatC matC[ROW * COLUMN], in int subgroupId, SPtr<uint4> sharedMemoryB)
+    {
+        const int subgroupCount = getWaveCount();
+
+        // perform n/2 ways warp reduce, totally log2(n) steps, where n is the number of subgroups.
+        for (int k = 1; k <= subgroupCount; k << 1)
+        {
+            // (subgroupId / k) calculate which cooperative matrix tile this warp will write to.
+            // The whole shared memory is divided into subgroupCount parts.
+            uint subgroupOffset = (subgroupId / k) * CoopMatCSizeInVector;
+            let ptrPerWarp = sharedMemoryB + subgroupOffset;
+            for (int i = 0; i < ROW; i++)
+            {
+                // Store one row of cooperative matrix to the shared memory.
+                for (int j = 0; j < COLUMN; j++)
+                {
+                    if (subgroupId % (k<<1) == k)
+                    {
+                        // We choose to process one row of cooperative matrices at a time, store the cooperative matrix in column major is more efficient.
+                        // Because in column major, each column of the cooperative matrix is contiguous in the shared memory, so there will not be bank conflict.
+                        matC[i * COLUMN + j].Store<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T.ROW_C / ElementCountPerVector);
+                    }
+                }
+
+                // wait for all subgroups finishing store the cooperative matrix to the shared memory.
+                GroupMemoryBarrierWithGroupSync();
+
+                if (subgroupId % (k<<1) == 0)
+                {
+                    // if current subgroup is the last subgroup one, it means that there is no adjacent subgroup load the add operand for it,
+                    // so we don't need to do any addition for this subgroup.
+                    if (subgroupId != (subgroupCount-1))
+                    {
+                        MatC reduceMatC;
+                        for (int j = 0; j < COLUMN; j++)
+                        {
+                            reduceMatC = MatC.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>( ptrPerWarp + j * CoopMatCSizeInVector, T.ROW_C / ElementCountPerVector);
+                            matC[i * COLUMN + j] = matC[i * COLUMN + j] + reduceMatC;
+                        }
+                    }
+
+                }
+                // wait for all subgroups finishing the addition.
+                GroupMemoryBarrierWithGroupSync();
+            }
+        }
+    }
+
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void someTestFunc<U, Storage>(
-        SPtr<uint4> sharedMemoryC,
+    VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, InArrayTypeA, InArrayTypeB>(
+        SPtr<uint4> sharedMemoryA,
+        SPtr<uint4> sharedMemoryB,
+        InArrayTypeA inputVectorA,
+        InArrayTypeB inputVectorB,
         Storage weightStorage,
         Storage.Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
+            where InArrayTypeA : IArray<T>
+            where InArrayTypeB : IArray<T>
     {
+        const uint subgroupIndex = getWaveId();
 
+        // Batch size is either CoopMatA row count or CoopMatB column count, they are the same.
+        const int BatchSize = T.COLUMN_A;
+        const int CoopMatCRows = (M + T.ROW_A - 1) / T.ROW_A;
+        const int CoopMatCColumns = (K + T.COLUMN_A - 1) / T.COLUMN_A;
+        const int CoopMatCSize = CoopMatCRows * CoopMatCColumns;
+        const int StrideInVectorTileB = CoopMatCColumns * T.COLUMN_B / ElementCountPerVector;
+
+        MatC matC[CoopMatCSize];
+        for (int i = 0; i < CoopMatCSize; i++)
+        {
+            matC[i].fill(T(0.0f));
+        }
+
+        // Perform outer product for each warp.
+        // The shared dimension is the Subgroup size N.
+        for (uint k = 0; k < N; k++)
+        {
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedM>(sharedMemoryA, k, subgroupIndex, inputVectorA);
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedK>(sharedMemoryB, k, subgroupIndex, inputVectorB);
+            GroupMemoryBarrierWithWaveSync();
+            MatA matA[CoopMatCRows];
+            for (uint i = 0; i < CoopMatCRows; i++)
+            {
+                // For matrix A, stride will be the height of the tile. Since, in the outer product, matrix A's height is same as the weight matrix's height,
+                // the stride will be HeightInVectorTileA
+                matA[i] = MatA.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(sharedMemoryA + i * T.ROW_A / ElementCountPerVector, HeightInVectorTileA);
+            }
+
+            for (uint j = 0; j < CoopMatCColumns; j++)
+            {
+                // For matrix B, stride will be the width of the tile. This is different from the forward pass in A*B where the stride is height of tile B.
+                // Since width of the tile B in outer product is K (input vector length), so the stride will be alignedK / ElementCountPerVector.
+                let matB = MatB.Load<linalg.CoopMatMatrixLayout.RowMajor, uint4>( sharedMemoryB + j * T.COLUMN_B / ElementCountPerVector, StrideInVectorTileB);
+                for (uint i = 0; i < CoopMatCRows; i++)
+                {
+                    matC[i * CoopMatCColumns + j] = linalg.coopMatMulAdd<T, false, half, half, T,
+                                            MemoryScope.Subgroup, T.ROW_A, T.COLUMN_A, T.COLUMN_B
+                                            >(matA[i], matB, matC[i * CoopMatCColumns + j]);
+                }
+            }
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+
+        // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
+        sumReduce<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryB);
+
+        if (subgroupIndex == 0)
+        {
+            // Store the result shared memory. We store one row of the cooperative matrix at a time.
+            for (uint i = 0; i < CoopMatCRows; i++)
+            {
+                for (uint j = 0; j < CoopMatCColumns; j++)
+                {
+                    // Save the result to shared memory in row major, because this is cache friendly for global memory access.
+                    // As each row of the tile will be corresponding to the contiguous global memory.
+                    matC[i * CoopMatCColumns + j].Store<linalg.CoopMatMatrixLayout.RowMajor, uint4>( sharedMemoryB + j * T.COLUMN_B / ElementCountPerVector, StrideInVectorTileB);
+                }
+                // TODO: Implement atomic vectorized write to global memory.
+            }
+        }
     }
 
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
@@ -650,6 +809,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
     internal InternalDataType getInternalData() { return this.data; }
 
     // Linear transformation without bias
+    [Differentiable]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
         Storage weightStorage,
@@ -666,7 +826,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
 
         const int AlignedOutSize = MMA.Uint4AlignedM;
 
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>(data, shA, shB, shC, weightStorage, weightAddress);
+        let outputArray = no_diff MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>(data, shA, shB, shC, weightStorage, weightAddress);
         return OutputVector(outputArray);
     }
 
@@ -697,11 +857,16 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         // This.Differential outArray;
 
         // dIn = W^T * dOut;
+#if 1
         let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential
                             >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
-
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
+#else
+        let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
+                            >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+        dthis = DifferentialPair<This>(dthis.p, dInput);
+#endif
     }
 
     [Differentiable]
