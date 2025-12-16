@@ -3198,6 +3198,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_DebugSource:
     case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
     case kIROp_DebugInlinedAt:
@@ -3205,7 +3206,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
+    case kIROp_DebugFuncDecoration:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugLexicalBlock:
         break;
 
     case kIROp_Unmodified:

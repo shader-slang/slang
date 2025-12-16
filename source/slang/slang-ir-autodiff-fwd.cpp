@@ -2230,6 +2230,9 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
+    case kIROp_DebugLexicalBlock:
+    case kIROp_DebugSource:
+    case kIROp_DebugBuildIdentifier:
     case kIROp_GetArrayLength:
     case kIROp_SizeOf:
     case kIROp_AlignOf:
