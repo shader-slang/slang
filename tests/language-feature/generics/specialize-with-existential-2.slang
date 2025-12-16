@@ -1,9 +1,15 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 
 #lang slang 2025
 
 interface IFoo { void doSomething();}
-struct Foo : IFoo{
+struct Foo : IFoo
+{
+    void doSomething() {}
+}
+
+struct AnotherFoo : IFoo
+{
     void doSomething() {}
 }
 
@@ -32,6 +38,7 @@ export struct B : IBar
         return so.call();
     }
 }
+
 RWStructuredBuffer<int> outputBuffer;
 [numthreads(1,1,1)]
 void computeMain(int id : SV_DispatchThreadID)
