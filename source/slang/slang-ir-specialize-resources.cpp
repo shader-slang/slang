@@ -116,7 +116,12 @@ void inlineAllCallsOfFunction(IRFunc* func)
                 return;
             if (call->getCallee() != func)
                 return;
-            inlineCall(call);
+            bool inlined = inlineCall(call);
+            if (!inlined)
+            {
+                // Debug: print when inlining fails
+                fprintf(stderr, "Warning: Failed to inline call to function\n");
+            }
         });
 }
 
@@ -176,7 +181,9 @@ struct ResourceOutputSpecializationPass
 
     bool processModule()
     {
-        specializedFuncs.clear();
+        // Note: specializedFuncs is now initialized from the caller with the persistent set,
+        // so we don't clear it here - we want to remember which functions have already been
+        // successfully specialized to avoid re-processing them.
         bool changed = false;
 
         // The main logic consists of iterating over all functions
@@ -191,6 +198,7 @@ struct ResourceOutputSpecializationPass
 
             changed |= processFunc(func);
         }
+        
         return changed;
     }
 
@@ -198,7 +206,7 @@ struct ResourceOutputSpecializationPass
     {
         // Avoid re-computing by checking our 'processFunc' cache.
         if (specializedFuncs.contains(oldFunc))
-            return true;
+            return false;
         if (unspecializableFuncs->contains(oldFunc))
             return false;
 
@@ -283,7 +291,7 @@ struct ResourceOutputSpecializationPass
             // debug information, but they don't prevent the function from being removed.
             // If oldFunc has IRKeepAlive, this code should be assumed to have a
             // "dynamic" resource value.
-            if (result == SpecializeFuncResult::ThisFuncFailed && hasNonDebugUses(oldFunc))
+            if (failedResult(result) && hasNonDebugUses(oldFunc))
                 unspecializableFuncs->add(oldFunc);
             return false;
         } else {
@@ -354,7 +362,9 @@ struct ResourceOutputSpecializationPass
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
+
         specializedFuncs.add(oldFunc);
+        specializedFuncs.add(newFunc);  // Also add newFunc to prevent re-specialization
 
         // Since we can no longer fail and we are replacing all `Func` uses, 'KeepAlive'
         // can be removed from the oldFunc so DCE can it clean-up.
@@ -1274,7 +1284,8 @@ struct ResourceOutputSpecializationPass
 bool specializeResourceOutputs(
     CodeGenContext* codeGenContext,
     IRModule* module,
-    HashSet<IRFunc*>& unspecializableFuncs)
+    HashSet<IRFunc*>& unspecializableFuncs,
+    HashSet<IRFunc*>& specializedFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
@@ -1297,7 +1308,12 @@ bool specializeResourceOutputs(
     pass.targetRequest = targetRequest;
     pass.module = module;
     pass.unspecializableFuncs = &unspecializableFuncs;
-    return pass.processModule();
+    pass.specializedFuncs = specializedFuncs;  // Initialize with existing set
+    
+    bool result = pass.processModule();
+    
+    specializedFuncs = pass.specializedFuncs;  // Copy back the updated set
+    return result;
 }
 
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
@@ -1317,6 +1333,8 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
     // simplification passes), because each optimization may open up opportunties
     // for the other to apply.
     //
+    HashSet<IRFunc*> specializedFuncs;
+
     for (;;)
     {
         bool changed = true;
@@ -1324,13 +1342,12 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         while (changed)
         {
             changed = false;
-            unspecializableFuncs.clear();
             // Because the legalization may depend on what target
             // we are compiling for (certain things might be okay
             // for D3D targets that are not okay for Vulkan), we
             // pass down the target request along with the IR.
             //
-            changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
+            changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs, specializedFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
             // After specialization of function outputs, we may find that there
@@ -1353,6 +1370,10 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         // Inline unspecializable resource output functions and then continue trying.
         for (auto func : unspecializableFuncs)
             inlineAllCallsOfFunction(func);
+
+        // After inlining, we need to clear the specializedFuncs cache because
+        // the IR has changed and functions may need to be re-specialized.
+        specializedFuncs.clear();
 
         simplifyIR(
             irModule,
