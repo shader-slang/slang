@@ -290,7 +290,7 @@ advanced_option(
 )
 
 advanced_option(
-    SLANG_PROTOTYPE_DIAGNOSTIC_STYLE
+    SLANG_PROTOTYPE_DIAGNOSTICS
     "Enable prototype rich diagnostic formatting system"
     OFF
 )

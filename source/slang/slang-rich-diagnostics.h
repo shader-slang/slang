@@ -1,6 +1,6 @@
 #pragma once
 
-#ifdef SLANG_PROTOTYPE_DIAGNOSTIC_STYLE
+#ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
 #include "slang-diagnostic.h"
 #include "slang-source-loc.h"
@@ -11,9 +11,6 @@
 
 namespace Slang
 {
-
-// Forward declarations for rich diagnostic types
-struct RichDiagnostic;
 
 // Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
@@ -43,4 +40,4 @@ struct $(class_name)
 
 } // namespace Slang
 
-#endif // SLANG_PROTOTYPE_DIAGNOSTIC_STYLE
+#endif // SLANG_PROTOTYPE_DIAGNOSTICS
