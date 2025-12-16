@@ -279,6 +279,10 @@ jobs:
           echo "Copying new slang libraries..."
           cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
+          # Create symlink for the old library version that slangpy extension was linked against
+          echo "Creating symlink for slangpy compatibility..."
+          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.21.2"
+
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
 
