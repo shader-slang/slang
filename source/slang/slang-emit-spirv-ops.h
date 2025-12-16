@@ -316,15 +316,6 @@ SpvInst* emitOpTypeHitObject(IRInst* inst)
         kResultID);
 }
 
-SpvInst* emitOpTypeHitObjectEXT(IRInst* inst)
-{
-    return emitInstMemoized(
-        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-        inst,
-        SpvOpTypeHitObjectEXT,
-        kResultID);
-}
-
 // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpTypeArray
 template<typename T1, typename T2>
 SpvInst* emitOpTypeArray(IRInst* inst, const T1& elementType, const T2& length)

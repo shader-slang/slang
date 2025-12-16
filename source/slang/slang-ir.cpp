@@ -104,15 +104,15 @@ void IRUse::debugValidate()
     auto uv = this->usedValue;
     if (!uv)
     {
-        assert(!nextUse);
-        assert(!prevLink);
+        SLANG_ASSERT(!nextUse);
+        SLANG_ASSERT(!prevLink);
         return;
     }
 
     auto pp = &uv->firstUse;
     for (auto u = uv->firstUse; u;)
     {
-        assert(u->prevLink == pp);
+        SLANG_ASSERT(u->prevLink == pp);
 
         pp = &u->nextUse;
         u = u->nextUse;
@@ -2058,7 +2058,7 @@ HashCode IRInstKey::_getHashCode()
 
 UnownedStringSlice IRConstant::getStringSlice()
 {
-    assert(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
+    SLANG_ASSERT(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
     // If the transitory decoration is set, then this is uses the transitoryStringVal for the text
     // storage. This is typically used when we are using a transitory IRInst held on the stack (such
     // that it can be looked up in cached), that just points to a string elsewhere, and NOT the
@@ -2286,10 +2286,13 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
             IRConstant::StringValue& dstString = irValue->value.stringVal;
 
             dstString.numChars = uint32_t(sliceSize);
-            // Turn into pointer to avoid warning of array overrun
-            char* dstChars = dstString.chars;
-            // Copy the chars
-            memcpy(dstChars, slice.begin(), sliceSize);
+            if (sliceSize > 0)
+            {
+                // Turn into pointer to avoid warning of array overrun
+                char* dstChars = dstString.chars;
+                // Copy the chars
+                memcpy(dstChars, slice.begin(), sliceSize);
+            }
 
             break;
         }
