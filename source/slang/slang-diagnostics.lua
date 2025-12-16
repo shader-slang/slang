@@ -28,7 +28,7 @@
 -- "invalid conversion from {from : type} to {to : type}"
 -- "wrong number of arguments, expected {expected : int} got {got : int}"
 
-diagnostics = {
+local diagnostics = {
 	{
 		name = "function return type mismatch",
 		code = 30007,
@@ -49,7 +49,7 @@ diagnostics = {
 
 -- Helper function to parse interpolated message strings
 -- Converts "text {param : type} more text" into structured format
-function parse_message(message)
+local function parse_message(message)
 	local parts = {}
 	local pos = 1
 
@@ -102,8 +102,9 @@ function parse_message(message)
 end
 
 -- Helper function to validate diagnostic schema
-function validate_diagnostic(diag, index)
+local function validate_diagnostic(diag, index)
 	local errors = {}
+	local diagnostic_name = diag.name or ("diagnostic[" .. index .. "]")
 
 	-- Check required fields
 	if not diag.name or type(diag.name) ~= "string" then
@@ -111,49 +112,49 @@ function validate_diagnostic(diag, index)
 	end
 
 	if not diag.code or type(diag.code) ~= "number" then
-		table.insert(errors, "diagnostic[" .. index .. "].code must be a number")
+		table.insert(errors, diagnostic_name .. ".code must be a number")
 	end
 
 	if not diag.severity or type(diag.severity) ~= "string" then
-		table.insert(errors, "diagnostic[" .. index .. "].severity must be a string")
+		table.insert(errors, diagnostic_name .. ".severity must be a string")
 	elseif not (diag.severity == "error" or diag.severity == "warning") then
-		table.insert(errors, "diagnostic[" .. index .. "].severity must be one of: error, warning")
+		table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning")
 	end
 
 	if not diag.message or type(diag.message) ~= "string" then
-		table.insert(errors, "diagnostic[" .. index .. "].message must be a string")
+		table.insert(errors, diagnostic_name .. ".message must be a string")
 	end
 
 	if not diag.primary_span or type(diag.primary_span) ~= "table" then
-		table.insert(errors, "diagnostic[" .. index .. "].primary_span must be a table")
+		table.insert(errors, diagnostic_name .. ".primary_span must be a table")
 	else
 		if not diag.primary_span.location or type(diag.primary_span.location) ~= "string" then
-			table.insert(errors, "diagnostic[" .. index .. "].primary_span.location must be a string")
+			table.insert(errors, diagnostic_name .. ".primary_span.location must be a string")
 		end
 		if not diag.primary_span.message or type(diag.primary_span.message) ~= "string" then
-			table.insert(errors, "diagnostic[" .. index .. "].primary_span.message must be a string")
+			table.insert(errors, diagnostic_name .. ".primary_span.message must be a string")
 		end
 	end
 
 	-- Check optional secondary_spans
 	if diag.secondary_spans then
 		if type(diag.secondary_spans) ~= "table" then
-			table.insert(errors, "diagnostic[" .. index .. "].secondary_spans must be a table")
+			table.insert(errors, diagnostic_name .. ".secondary_spans must be a table")
 		else
 			for i, span in ipairs(diag.secondary_spans) do
 				if type(span) ~= "table" then
-					table.insert(errors, "diagnostic[" .. index .. "].secondary_spans[" .. i .. "] must be a table")
+					table.insert(errors, diagnostic_name .. ".secondary_spans[" .. i .. "] must be a table")
 				else
 					if not span.location or type(span.location) ~= "string" then
 						table.insert(
 							errors,
-							"diagnostic[" .. index .. "].secondary_spans[" .. i .. "].location must be a string"
+							diagnostic_name .. ".secondary_spans[" .. i .. "].location must be a string"
 						)
 					end
 					if not span.message or type(span.message) ~= "string" then
 						table.insert(
 							errors,
-							"diagnostic[" .. index .. "].secondary_spans[" .. i .. "].message must be a string"
+							diagnostic_name .. ".secondary_spans[" .. i .. "].message must be a string"
 						)
 					end
 				end
@@ -165,7 +166,7 @@ function validate_diagnostic(diag, index)
 end
 
 -- Function to process and validate all diagnostics
-function process_diagnostics(diagnostics_table)
+local function process_diagnostics(diagnostics_table)
 	local processed = {}
 	local all_errors = {}
 
@@ -175,6 +176,7 @@ function process_diagnostics(diagnostics_table)
 	end
 
 	for i, diag in ipairs(diagnostics_table) do
+		local diagnostic_name = diag.name or ("diagnostic[" .. i .. "]")
 		local errors = validate_diagnostic(diag, i)
 		if #errors > 0 then
 			for _, err in ipairs(errors) do
@@ -184,7 +186,7 @@ function process_diagnostics(diagnostics_table)
 			-- Parse the message
 			local success, message_parts = pcall(parse_message, diag.message)
 			if not success then
-				table.insert(all_errors, "diagnostic[" .. i .. "].message: " .. message_parts)
+				table.insert(all_errors, diagnostic_name .. ".message: " .. message_parts)
 			else
 				local processed_diag = {
 					name = diag.name,
