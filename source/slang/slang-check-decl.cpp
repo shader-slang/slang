@@ -12769,18 +12769,12 @@ void checkDerivativeAttributeImpl(
                     calleeDeclRef->declRef.template as<FunctionDeclBase>();
                 auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
 
-                if (!funcThisType)
-                {
-                    // The function is not static but not an instance member of a class either (it's
-                    // most likely a global function).
-                    return;
-                }
-
                 // If the function is a member function, we need to check that the
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType &&
+                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         attr,
