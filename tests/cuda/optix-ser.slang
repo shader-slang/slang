@@ -38,7 +38,7 @@ uint calcValue(HitObject hit)
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
         // CHECK: slangOptixHitObjectSetSbtRecordIndex({{.*}}0U)
-        hit.SetShaderTableIndex(0);
+        uint setShaderTableIndex = hit.SetShaderTableIndex(0);
 
         // CHECK: optixHitObjectGetSbtDataPointer()+(0U)
         uint ialbedo = hit.LoadLocalRootTableConstant(0);
@@ -53,6 +53,7 @@ uint calcValue(HitObject hit)
         r += objSomeValues.a;
         r += clusterID;
         r += shaderTableIndex;
+        r += setShaderTableIndex;
         r += ialbedo;
     }
 
