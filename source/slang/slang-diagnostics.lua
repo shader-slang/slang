@@ -33,7 +33,7 @@ local diagnostics = {
 		name = "function return type mismatch",
 		code = 30007,
 		severity = "error",
-		message = "expression type '{expression_type : type}' does not match function's return type '{return_type : type}'",
+		message = "expression type '{expression_type : type}' does not match function's return type '{return_type : string}'",
 		primary_span = {
 			location = "expression_location",
 			message = "expression type",
@@ -189,14 +189,29 @@ local function process_diagnostics(diagnostics_table)
 		else
 			-- Check for duplicate names
 			if diag.name and seen_names[diag.name] then
-				table.insert(all_errors, "duplicate diagnostic name '" .. diag.name .. "' at index " .. i .. ", previously seen at index " .. seen_names[diag.name])
+				table.insert(
+					all_errors,
+					"duplicate diagnostic name '"
+						.. diag.name
+						.. "' at index "
+						.. i
+						.. ", previously seen at index "
+						.. seen_names[diag.name]
+				)
 			else
 				seen_names[diag.name] = i
 			end
 
 			-- Check for duplicate codes
 			if diag.code and seen_codes[diag.code] then
-				table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code .. ", previously used by diagnostic at index " .. seen_codes[diag.code])
+				table.insert(
+					all_errors,
+					diagnostic_name
+						.. " has duplicate code "
+						.. diag.code
+						.. ", previously used by diagnostic at index "
+						.. seen_codes[diag.code]
+				)
 			else
 				seen_codes[diag.code] = i
 			end
