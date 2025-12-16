@@ -15,21 +15,29 @@ namespace Slang
 // Forward declarations for rich diagnostic types
 struct RichDiagnostic;
 
-// Usage example for generated structures:
+// Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
-$(lua_module.generateUsageComments())
+% local diagnostics = lua_module.getDiagnostics()
+% for _, diagnostic in ipairs(diagnostics) do
+%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
+%     local params = lua_module.getUniqueParams(diagnostic)
+struct $(class_name)
+{
+%     for _, param in ipairs(params) do
+    $(param.cpp_type) $(param.name);
+%     end
+    SourceLoc $(diagnostic.primary_span.location);
+%     if diagnostic.secondary_spans then
+%         for _, span in ipairs(diagnostic.secondary_spans) do
+    SourceLoc $(span.location);
+%         end
+%     end
+};
+
+% end
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
-#include "slang-rich-diagnostics.h.fiddle"
-#endif // FIDDLE END
-
-// Generate parameter and builder structures for all diagnostics
-#if 0 // FIDDLE TEMPLATE:
-% local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
-$(lua_module.generateAllDiagnostics())
-#else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 1
 #include "slang-rich-diagnostics.h.fiddle"
 #endif // FIDDLE END
 
