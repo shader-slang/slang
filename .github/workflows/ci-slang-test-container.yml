@@ -263,6 +263,10 @@ jobs:
           # Try to uninstall existing slangpy
           python3 -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
 
+          # Pin numpy to 1.x to avoid pickle security issues in slangpy-samples tests
+          # TODO: Remove this pin once slangpy-samples is updated to use allow_pickle=True
+          python3 -m pip install "numpy<2.0" --user
+
           # Install slangpy
           python3 -m pip install --verbose slangpy --user
 
