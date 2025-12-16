@@ -29,7 +29,7 @@ function M.getCppType(lua_type)
     elseif lua_type == "int" then
         return "int"
     else
-        return lua_type -- fallback
+        error("Unknown type '" .. lua_type .. "' in diagnostic parameter. Supported types: string, type, int")
     end
 end
 
