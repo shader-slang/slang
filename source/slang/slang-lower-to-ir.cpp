@@ -13175,9 +13175,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
         {
             // We do not allow specializing a generic function with an existential type.
-            checkForIllegalGenericSpecializationWithExistentialType(
-                module,
-                compileRequest->getSink());
+            addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
 

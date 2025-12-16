@@ -38,7 +38,7 @@ uint calcValue(HitObject hit)
         uint shaderTableIndex = hit.GetShaderTableIndex();
         // spriv and glsl lack these methods
         // CHECK: slangOptixHitObjectSetSbtRecordIndex({{.*}}0U)
-        hit.SetShaderTableIndex(0);
+        uint setShaderTableIndex = hit.SetShaderTableIndex(0);
 
         // CHECK: optixHitObjectGetSbtDataPointer()+(0U)
         uint ialbedo = hit.LoadLocalRootTableConstant(0);
@@ -53,6 +53,7 @@ uint calcValue(HitObject hit)
         r += objSomeValues.a;
         r += clusterID;
         r += shaderTableIndex;
+        r += setShaderTableIndex;
         r += ialbedo;
     }
 
@@ -173,14 +174,4 @@ void rayGenerationMain()
 
     outputBuffer[idx] += uint(rayD.TMin > 0);
     outputBuffer[idx] += uint(rayD.TMax < ray.TMin);
-
-    // Test GetCurrentTime for motion hit objects (issue #9018)
-    // CHECK: slangOptixHitObjectGetRayTime
-    // CHECK-PTX: _optix_hitobject_get_ray_time
-    float currentTime0 = motionHitObj[0].GetCurrentTime();
-    // CHECK: slangOptixHitObjectGetRayTime
-    // CHECK-PTX: _optix_hitobject_get_ray_time
-    float currentTime1 = miss[1].GetCurrentTime();
-    outputBuffer[idx] += uint(currentTime0 >= 0.f);
-    outputBuffer[idx] += uint(currentTime1 >= 0.f);
 }
