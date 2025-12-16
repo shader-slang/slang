@@ -1,0 +1,17 @@
+result code = -1
+standard error = {
+tests/diagnostics/int-literal-errors.slang(10): error 10012: integer literal is too large to be represented in any integer type
+    uint64_t tooLargeForAnyType1 = 18446744073709551616; // UINT64_MAX + 1
+                                   ^~~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal-errors.slang(11): error 10012: integer literal is too large to be represented in any integer type
+    uint64_t tooLargeForAnyType2 = 184467440737095516150; // UINT64_MAX * 10
+                                   ^~~~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal-errors.slang(12): error 10012: integer literal is too large to be represented in any integer type
+    uint64_t tooLargeForAnyType3 = 0x10000000000000000; // UINT64_MAX + 1
+                                   ^~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal-errors.slang(13): error 10012: integer literal is too large to be represented in any integer type
+    uint64_t tooLargeForAnyType4 = 0xffffffffffffffff0; // UINT64_MAX * 16
+                                   ^~~~~~~~~~~~~~~~~~~
+}
+standard output = {
+}

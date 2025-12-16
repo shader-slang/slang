@@ -179,8 +179,10 @@ typedef double FloatingPointLiteralValue;
 
 IntegerLiteralValue getIntegerLiteralValue(
     Token const& token,
+    DiagnosticSink* sink,
     UnownedStringSlice* outSuffix = 0,
-    bool* outIsDecimalBase = 0);
+    bool* outIsDecimalBase = 0,
+    bool* outHasOverflowed = 0);
 FloatingPointLiteralValue getFloatingPointLiteralValue(
     Token const& token,
     UnownedStringSlice* outSuffix = 0);

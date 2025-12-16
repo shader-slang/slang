@@ -2646,7 +2646,10 @@ bool isDefaultInitializable(VarDeclBase* varDecl)
     return true;
 }
 
-static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type)
+static Expr* constructDefaultConstructorForType(
+    SemanticsVisitor* visitor,
+    Type* type,
+    SourceLoc loc)
 {
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
@@ -2677,6 +2680,7 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
     if (visitor->isCStyleType(type, visitSet))
     {
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->loc = loc;
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
         Expr* outExpr = nullptr;
         auto fromType = type;
@@ -2699,7 +2703,8 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto defaultInitExpr =
+            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
         return defaultInitExpr;
     }
@@ -7584,6 +7589,7 @@ bool SemanticsVisitor::checkConformance(
     ContainerDecl* parentDecl)
 {
     auto superType = inheritanceDecl->base.type;
+    DeclRef<Decl> declRefForSubTypeWitness;
 
     if (auto declRefType = as<DeclRefType>(subType))
     {
@@ -7626,6 +7632,16 @@ bool SemanticsVisitor::checkConformance(
             // in an outer interface declaration, and its members
             // (type constraints) represent additional requirements.
             return true;
+        }
+        if (auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase))
+        {
+            // When the sub type is generic, we can't just make a direct declref to inheritanceDecl
+            // because it won't be lowered to a concrete type. Instead, we need to form a
+            // GenericAppDeclRef to represent a concrete type.
+            declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
+                genericApp->getGenericDecl(),
+                genericApp->getArgs(),
+                inheritanceDecl);
         }
         else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
         {
@@ -7670,9 +7686,12 @@ bool SemanticsVisitor::checkConformance(
 
     // Look at the type being inherited from, and validate
     // appropriately.
-
+    if (!declRefForSubTypeWitness)
+    {
+        declRefForSubTypeWitness = makeDeclRef(inheritanceDecl);
+    }
     DeclaredSubtypeWitness* subIsSuperWitness =
-        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, makeDeclRef(inheritanceDecl));
+        m_astBuilder->getDeclaredSubtypeWitness(subType, superType, declRefForSubTypeWitness);
 
     ConformanceCheckingContext context;
     context.conformingType = subType;
@@ -12551,7 +12570,7 @@ void checkDerivativeAttributeImpl(
 
     SemanticsContext::ExprLocalScope scope;
     auto ctx = visitor->withExprLocalScope(&scope);
-    auto subVisitor = SemanticsVisitor(ctx);
+    auto subVisitor = SemanticsVisitor(ctx.allowStaticReferenceToNonStaticMember());
 
     auto exprToCheck = attr->funcExpr;
 
@@ -13596,9 +13615,8 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
-        expr->loc = varDecl->loc;
         return expr;
     }
 

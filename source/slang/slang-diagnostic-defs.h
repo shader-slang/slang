@@ -2237,6 +2237,12 @@ DIAGNOSTIC(
     mismatchExistentialSlotArgCount,
     "expected $0 existential slot arguments ($1 provided)")
 DIAGNOSTIC(
+    38028,
+    Error,
+    invalidFormOfSpecializationArg,
+    "global specialization argument $0 has an invalid form.")
+
+DIAGNOSTIC(
     38029,
     Error,
     typeArgumentDoesNotConformToInterface,
@@ -2581,6 +2587,7 @@ DIAGNOSTIC(
     "capabilities are: '$2'")
 DIAGNOSTIC(41015, Warning, usingUninitializedOut, "use of uninitialized out parameter '$0'")
 DIAGNOSTIC(41016, Warning, usingUninitializedVariable, "use of uninitialized variable '$0'")
+DIAGNOSTIC(41016, Warning, usingUninitializedValue, "use of uninitialized value of type '$0'")
 DIAGNOSTIC(
     41017,
     Warning,

@@ -34,7 +34,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
-    assert(val);
+    SLANG_ASSERT(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
@@ -1176,7 +1176,7 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     // although we should not expect to run into types that don't
     // have a sugared form.
     //
-    m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
+    m_writer->emit("vector<");
     emitType(elementType);
     m_writer->emit(",");
     m_writer->emit(elementCount);
@@ -1469,7 +1469,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopVectorType:
         {
             auto coopVecType = (IRCoopVectorType*)type;
-            m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
+            m_writer->emit("vector<");
             emitType(coopVecType->getElementType());
             m_writer->emit(",");
             m_writer->emit(getIntVal(coopVecType->getElementCount()));
