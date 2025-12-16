@@ -2326,6 +2326,9 @@ local insts = {
 					struct_name = "ExperimentalModuleDecoration"
 				},
 			},
+			{
+				DisallowSpecializationWithExistentialsDecoration = { },
+			}
 		},
 	},
 	-- Decoration
