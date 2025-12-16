@@ -2,9 +2,14 @@
 
 #ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
-#include "slang-diagnostic.h"
-#include "slang-source-loc.h"
-#include "slang-string.h"
+#include "../compiler-core/slang-diagnostic-sink.h"
+#include "../core/slang-basic.h"
+
+// Forward declaration for Type
+namespace Slang
+{
+class Type;
+}
 
 //
 #include "slang-rich-diagnostics.h.fiddle"
@@ -49,15 +54,10 @@ struct $(class_name)
     SourceLoc $(span.location);
 %         end
 %     end
+
+    GenericDiagnostic toGenericDiagnostic() const;
 };
 
-% end
-
-// Generate conversion functions to GenericDiagnostic
-% for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
-%     local function_name = lua_module.toSnakeCase(diagnostic.name)
-GenericDiagnostic convertTo$(class_name:gsub("Params", ""))(const $(class_name)& params);
 % end
 
 #else // FIDDLE OUTPUT:

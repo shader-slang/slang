@@ -2,6 +2,8 @@
 
 #ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
+#include "slang-ast-type.h"
+
 //
 #include "slang-rich-diagnostics.cpp.fiddle"
 
@@ -10,39 +12,38 @@ namespace Slang
 namespace Diagnostics
 {
 
-// Generate conversion function implementations
+// Generate member function implementations
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
 %     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
-%     local diagnostic_class = class_name:gsub("Params", "")
 %     local params = lua_module.getUniqueParams(diagnostic)
-GenericDiagnostic convertTo$(diagnostic_class)(const $(class_name)& params)
+GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 {
     GenericDiagnostic result;
     result.code = $(diagnostic.code);
     result.severity = "$(diagnostic.severity)";
     
-    // Build message by interpolating parameters
-    String message = "";
+    // Build message by interpolating parameters using StringBuilder
+    StringBuilder messageBuilder;
 %     for _, part in ipairs(diagnostic.message_parts) do
 %         if part.type == "text" then
-    message = message + "$(part.content:gsub('"', '\\"'))";
+    messageBuilder << "$(part.content:gsub('"', '\\"'))";
 %         elseif part.type == "interpolation" then
 %             if part.param_type == "string" then
-    message = message + params.$(part.param_name);
+    messageBuilder << $(part.param_name);
 %             elseif part.param_type == "type" then
-    message = message + params.$(part.param_name)->toString();
+    messageBuilder << $(part.param_name)->toString();
 %             elseif part.param_type == "int" then
-    message = message + String(params.$(part.param_name));
+    messageBuilder << $(part.param_name);
 %             end
 %         end
 %     end
-    result.message = message;
+    result.message = messageBuilder.produceString();
     
     // Set primary span
-    result.primarySpan.location = params.$(diagnostic.primary_span.location);
+    result.primarySpan.location = $(diagnostic.primary_span.location);
     result.primarySpan.message = "$(diagnostic.primary_span.message)";
     
 %     if diagnostic.secondary_spans then
@@ -50,7 +51,7 @@ GenericDiagnostic convertTo$(diagnostic_class)(const $(class_name)& params)
 %         for _, span in ipairs(diagnostic.secondary_spans) do
     {
         DiagnosticSpan span;
-        span.location = params.$(span.location);
+        span.location = $(span.location);
         span.message = "$(span.message)";
         result.secondarySpans.add(span);
     }
