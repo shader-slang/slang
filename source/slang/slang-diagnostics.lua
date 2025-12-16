@@ -175,6 +175,10 @@ local function process_diagnostics(diagnostics_table)
 		return nil, all_errors
 	end
 
+	-- Track names and codes for uniqueness validation
+	local seen_names = {}
+	local seen_codes = {}
+
 	for i, diag in ipairs(diagnostics_table) do
 		local diagnostic_name = diag.name or ("diagnostic[" .. i .. "]")
 		local errors = validate_diagnostic(diag, i)
@@ -183,6 +187,20 @@ local function process_diagnostics(diagnostics_table)
 				table.insert(all_errors, err)
 			end
 		else
+			-- Check for duplicate names
+			if diag.name and seen_names[diag.name] then
+				table.insert(all_errors, "duplicate diagnostic name '" .. diag.name .. "' at index " .. i .. ", previously seen at index " .. seen_names[diag.name])
+			else
+				seen_names[diag.name] = i
+			end
+
+			-- Check for duplicate codes
+			if diag.code and seen_codes[diag.code] then
+				table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code .. ", previously used by diagnostic at index " .. seen_codes[diag.code])
+			else
+				seen_codes[diag.code] = i
+			end
+
 			-- Parse the message
 			local success, message_parts = pcall(parse_message, diag.message)
 			if not success then
