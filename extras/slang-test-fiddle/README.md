@@ -197,6 +197,15 @@ A fix was added to preserve newlines after `$identifier` splices at line endings
 
 ## Workflow Example
 
+### Generate All Examples at Once
+
+```bash
+# Generate tests from all example templates to generated-tests/
+./extras/slang-test-fiddle/examples/generate-examples.sh
+```
+
+### Generate from Individual Template
+
 ```bash
 # Generate tests from template
 ./build/generators/Release/bin/slang-fiddle \

@@ -1,7 +1,7 @@
 // simple-numeric-test.slang
 // Example: Generate tests for multiple numeric types
 //
-// Generates to: tests/fiddle/numeric-ops/
+// Generates to: <output-dir>/numeric-ops/
 // Note: Skips 'double' for CPU tests (known limitation with -output-using-type)
 
 #if 0 // FIDDLE TEMPLATE:

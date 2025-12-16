@@ -4,7 +4,7 @@
 // This demonstrates a complex test generation scenario similar to
 // extras/generate-tests-capabilities-for-texture-types.py
 //
-// Generates to: tests/fiddle/texture-capabilities/
+// Generates to: <output-dir>/texture-capabilities/
 
 #if 0 // FIDDLE TEMPLATE:
 %-- Backend configuration
@@ -86,7 +86,7 @@ void fragMain()
 // POSITIVE-NOT: {{(error|warning).*}}:
 // POSITIVE: result code = 0
 // POSITIVE-NOT: {{(error|warning).*}}:
-// POSITIVE-LABEL: main
+// POSITIVE-LABEL: fragMain
 // POSITIVE-NOT: {{(error|warning).*}}:
 
     int ret = 0;

@@ -1,7 +1,7 @@
 // advanced-numeric-ops.slang
 // Example: Generate tests for multiple types and operations
 //
-// Generates to: tests/fiddle/numeric-permutations/
+// Generates to: <output-dir>/numeric-permutations/
 // Note: Skips 'double' for CPU tests (known limitation with -output-using-type)
 
 #if 0 // FIDDLE TEMPLATE:

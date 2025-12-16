@@ -4,7 +4,7 @@
 // This is a FIDDLE replacement for the Metal tests in:
 // extras/generate-tests-capabilities-for-texture-types.py
 //
-// Generates to: tests/fiddle/texture-capabilities/
+// Generates to: <output-dir>/texture-capabilities-full/
 
 #if 0 // FIDDLE TEMPLATE:
 %-- Texture types lookup
@@ -185,7 +185,7 @@ void computeMain()
     outputBuffer[0] = 0x12345 + ret;
 }
 // POSITIVE_RESULT: 12345
-%    emit_test_file("texture-capabilities/gen-types-metal-" .. cleanType .. ".slang")
+%    emit_test_file("texture-capabilities-full/gen-types-metal-" .. cleanType .. ".slang")
 %end
 #else // FIDDLE OUTPUT:
 #endif // FIDDLE END
