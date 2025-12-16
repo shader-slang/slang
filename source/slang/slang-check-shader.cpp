@@ -356,16 +356,17 @@ static void validateSemanticForStage(
     // Special case: mesh shader output types (OutputVertices, OutputIndices, OutputPrimitives)
     // are always outputs even without an explicit 'out' modifier
     bool isMeshOutputType = as<MeshOutputType>(param->type.type) != nullptr;
-    
-    bool paramIsInput = param->findModifier<InModifier>() != nullptr || 
-                        (!param->findModifier<OutModifier>() && !isMeshOutputType);  // Default is input unless mesh output
+
+    bool paramIsInput = param->findModifier<InModifier>() != nullptr ||
+                        (!param->findModifier<OutModifier>() &&
+                         !isMeshOutputType); // Default is input unless mesh output
     bool paramIsOutput = param->findModifier<OutModifier>() != nullptr || isMeshOutputType;
 
     // Search for variables in the GLSL module that have this semantic
     // We need to check all declarations to see if any match both direction and stage
     bool foundAnyDeclaration = false;
     bool foundDirectionMatch = false;
-    
+
     for (auto memberDecl : glslModule->getModuleDecl()->getMembers())
     {
         auto varDecl = as<VarDeclBase>(memberDecl);
@@ -399,14 +400,14 @@ static void validateSemanticForStage(
         // Direction must match (both input, both output, or param is inout)
         bool directionMatches = false;
         if (paramIsInput && !paramIsOutput && varIsInput && !varIsOutput)
-            directionMatches = true;  // Both are input-only
+            directionMatches = true; // Both are input-only
         else if (paramIsOutput && !paramIsInput && varIsOutput && !varIsInput)
-            directionMatches = true;  // Both are output-only
+            directionMatches = true; // Both are output-only
         else if (paramIsInput && paramIsOutput)
-            directionMatches = true;  // Parameter is inout, accept either direction
+            directionMatches = true; // Parameter is inout, accept either direction
 
         if (!directionMatches)
-            continue;  // Wrong direction, keep searching
+            continue; // Wrong direction, keep searching
 
         foundDirectionMatch = true;
 
@@ -439,20 +440,12 @@ static void validateSemanticForStage(
     if (foundDirectionMatch)
     {
         // Found declarations with correct direction but wrong stage
-        sink->diagnose(
-            param->loc,
-            Diagnostics::semanticNotAvailableInStage,
-            semantic->name,
-            stage);
+        sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage, semantic->name, stage);
     }
     else if (foundAnyDeclaration)
     {
         // Found declarations but none match the direction - this is also an error
-        sink->diagnose(
-            param->loc,
-            Diagnostics::semanticNotAvailableInStage,
-            semantic->name,
-            stage);
+        sink->diagnose(param->loc, Diagnostics::semanticNotAvailableInStage, semantic->name, stage);
     }
 }
 
