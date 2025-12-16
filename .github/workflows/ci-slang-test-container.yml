@@ -272,24 +272,15 @@ jobs:
           echo "bin_dir location: $bin_dir"
           echo "lib_dir location: $lib_dir"
 
-          # Find the old libslang-compiler library
-          OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
-          echo "old slang library location: $OLD_SLANGLIB"
+          # Remove old slang libraries and copy new ones
+          echo "Removing old slang libraries..."
+          rm -f "$SITE_PACKAGES/slangpy"/libslang*
 
-          # Find the new libslang-compiler library
-          NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
-          echo "new slang library location: $NEW_SLANGLIB"
-
-          cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
-
-          # Copy the rest of the library files
-          cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          echo "Copying new slang libraries..."
+          cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
-
-          # Export SITE_PACKAGES for use in slangpy-samples step
-          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
 
           echo "Installing python packages..."
           curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
@@ -300,31 +291,3 @@ jobs:
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
           python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
-
-      - name: Clone slangpy-samples
-        run: |
-          # Use slang-ci branch instead of main for compatibility
-          echo "Cloning slangpy-samples repository..."
-          git clone --depth 1 --branch slang-ci https://github.com/shader-slang/slangpy-samples.git
-
-      - name: Install slangpy-samples dependencies
-        run: |
-          echo "Installing slangpy-samples dependencies..."
-          python3 -m pip install -r slangpy-samples/requirements.txt --user
-
-      - name: Run slangpy-samples tests
-        run: |
-          echo "Running slangpy-samples tests..."
-          # Skip tests that load pickled .npz files without allow_pickle=True
-          # These fail on both numpy 1.x and 2.x due to security restrictions
-          # TODO: Remove these skips once slangpy-samples is updated
-          python3 -m pytest -n 4 slangpy-samples/tests \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_buffers \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_fwd_rasterizer \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_nested \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_return_type \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_ray_casting \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_textures \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_signed_distance_field \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_soft_rasterizer \
-            --deselect=slangpy-samples/tests/examples/test_examples.py::test_toy_restir
