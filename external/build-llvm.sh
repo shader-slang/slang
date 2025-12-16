@@ -134,6 +134,9 @@ cmake_arguments_for_slang=(
   -DLLVM_ENABLE_PROJECTS=clang
   "-DLLVM_TARGETS_TO_BUILD=X86;ARM;AArch64"
   -DLLVM_BUILD_TOOLS=0
+  # slang-llvm is built with RTTI enabled to support UndefinedBehaviorSanitizer's vptr checks, so
+  # LLVM should be built with RTTI as well
+  -DLLVM_ENABLE_RTTI=1
   # Get LLVM to use the static linked version of the msvc runtime
   "-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded$<$<CONFIG:Debug>:Debug>"
   "-DLLVM_USE_CRT_RELEASE=MT"
