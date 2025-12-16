@@ -846,7 +846,7 @@ LoweredValInfo emitCallToVal(
                 auto callee = getSimpleVal(context, funcVal);
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
-                assert(throwAttr);
+                SLANG_ASSERT(throwAttr);
 
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
                 auto succBlock = builder->createBlock();
@@ -5893,7 +5893,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
@@ -6595,7 +6595,7 @@ struct DestinationDrivenRValueExprLoweringVisitor
     void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
@@ -11784,7 +11784,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // We need to lower the function
                     FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
-                    assert(patchConstantFunc);
+                    SLANG_ASSERT(patchConstantFunc);
 
                     // Convert the patch constant function into IRInst
                     IRInst* irPatchConstantFunc =
@@ -13175,9 +13175,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
         {
             // We do not allow specializing a generic function with an existential type.
-            checkForIllegalGenericSpecializationWithExistentialType(
-                module,
-                compileRequest->getSink());
+            addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
 
