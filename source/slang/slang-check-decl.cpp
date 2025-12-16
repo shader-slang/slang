@@ -12765,15 +12765,16 @@ void checkDerivativeAttributeImpl(
 
                 DeclRef<FunctionDeclBase> funcDeclRef = defaultFuncDeclRef.as<FunctionDeclBase>();
                 auto funcThisType = getTypeForThisExpr(visitor, funcDeclRef);
+                DeclRef<FunctionDeclBase> calleeFuncDeclRef =
+                    calleeDeclRef->declRef.template as<FunctionDeclBase>();
+                auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
+
                 if (!funcThisType)
                 {
                     // The function is not static but not an instance member of a class either (it's
                     // most likely a global function).
                     return;
                 }
-                DeclRef<FunctionDeclBase> calleeFuncDeclRef =
-                    calleeDeclRef->declRef.template as<FunctionDeclBase>();
-                auto derivativeFuncThisType = getTypeForThisExpr(visitor, calleeFuncDeclRef);
 
                 // If the function is a member function, we need to check that the
                 // `this` type matches the expected type. This will ensure that after lowering
