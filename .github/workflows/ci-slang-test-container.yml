@@ -194,4 +194,123 @@ jobs:
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
 
-  # Skip slangpy tests - requires LLVM which is disabled in CUDA builds
+  test-slangpy:
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 30
+    if: inputs.config == 'release'
+    container:
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Install Git, Python and dependencies
+        run: |
+          apt-get update && apt-get install -y \
+            git \
+            python3 \
+            python3-pip \
+            curl \
+            libx11-6 \
+            libxext6 \
+            libegl1 \
+            libvulkan1
+          git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          bin_dir="$PWD/artifacts/${cmake_config}/bin"
+          lib_dir="$PWD/artifacts/${cmake_config}/lib"
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+          echo "lib_dir=$lib_dir" >> $GITHUB_ENV
+
+          chmod +x "$bin_dir"/* 2>/dev/null || true
+          echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+      - name: Run slangpy tests
+        run: |
+          python3 --version
+          echo "Cleaning up existing installations and installing slangpy..."
+
+          # Try to uninstall existing slangpy
+          python3 -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+
+          # Install slangpy
+          python3 -m pip install --verbose slangpy --user
+
+          # Get site packages directory
+          SITE_PACKAGES=$(python3 -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
+
+          # Find the old libslang-compiler library
+          OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
+          echo "old slang library location: $OLD_SLANGLIB"
+
+          # Find the new libslang-compiler library
+          NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
+          echo "new slang library location: $NEW_SLANGLIB"
+
+          cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
+
+          # Copy the rest of the library files
+          cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          # Export SITE_PACKAGES for use in slangpy-samples step
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python3 -m pip install -r requirements-dev.txt --user
+          python3 -m pip install pytest-github-actions-annotate-failures --user
+          python3 -m pip install pytest-xdist --user
+
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+
+      - name: Clone slangpy-samples
+        run: |
+          # Use slang-ci branch instead of main for compatibility
+          echo "Cloning slangpy-samples repository..."
+          git clone --depth 1 --branch slang-ci https://github.com/shader-slang/slangpy-samples.git
+
+      - name: Install slangpy-samples dependencies
+        run: |
+          echo "Installing slangpy-samples dependencies..."
+          python3 -m pip install -r slangpy-samples/requirements.txt --user
+
+      - name: Run slangpy-samples tests
+        run: |
+          echo "Running slangpy-samples tests..."
+          python3 -m pytest -n 4 slangpy-samples/tests
