@@ -146,25 +146,40 @@ function M.generateAllDiagnostics()
     return table.concat(lines, "\n")
 end
 
--- Generate helper factory functions
-function M.generateFactoryFunctions()
+-- Generate usage example comments
+function M.generateUsageComments()
     local lines = {}
     
-    table.insert(lines, "// Factory functions for creating diagnostic builders")
-    table.insert(lines, "namespace RichDiagnostics {")
-    table.insert(lines, "")
+    table.insert(lines, "// Example usage of generated diagnostic structures:")
+    table.insert(lines, "//")
     
-    for _, diagnostic in ipairs(diagnostics_module) do
+    if #diagnostics_module > 0 then
+        local diagnostic = diagnostics_module[1] -- Use first diagnostic as example
         local builder_class = toPascalCase(diagnostic.name) .. "Builder"
-        local function_name = toSnakeCase(diagnostic.name)
         
-        table.insert(lines, "inline " .. builder_class .. " " .. function_name .. "(DiagnosticSink* sink) {")
-        table.insert(lines, "    return " .. builder_class .. "(sink);")
-        table.insert(lines, "}")
-        table.insert(lines, "")
+        table.insert(lines, "// " .. builder_class .. " builder(sink);")
+        
+        -- Show parameter setters
+        local seen_params = {}
+        for _, part in ipairs(diagnostic.message_parts) do
+            if part.type == "interpolation" and not seen_params[part.param_name] then
+                seen_params[part.param_name] = true
+                table.insert(lines, "// builder." .. part.param_name .. "(value);")
+            end
+        end
+        
+        -- Show location setters  
+        table.insert(lines, "// builder." .. diagnostic.primary_span.location .. "(loc);")
+        if diagnostic.secondary_spans then
+            for _, span in ipairs(diagnostic.secondary_spans) do
+                table.insert(lines, "// builder." .. span.location .. "(loc);")
+            end
+        end
+        
+        table.insert(lines, "// builder.build();")
     end
     
-    table.insert(lines, "} // namespace RichDiagnostics")
+    table.insert(lines, "")
     
     return table.concat(lines, "\n")
 end
