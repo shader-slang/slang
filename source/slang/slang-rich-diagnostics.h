@@ -12,6 +12,25 @@
 namespace Slang
 {
 
+// Generic diagnostic representation for layout rendering
+struct DiagnosticSpan
+{
+    SourceLoc location;
+    String message;
+};
+
+struct GenericDiagnostic
+{
+    int code;
+    String severity;
+    String message;
+    DiagnosticSpan primarySpan;
+    List<DiagnosticSpan> secondarySpans;
+};
+
+namespace Diagnostics
+{
+
 // Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
@@ -33,11 +52,20 @@ struct $(class_name)
 };
 
 % end
+
+// Generate conversion functions to GenericDiagnostic
+% for _, diagnostic in ipairs(diagnostics) do
+%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
+%     local function_name = lua_module.toSnakeCase(diagnostic.name)
+GenericDiagnostic convertTo$(class_name:gsub("Params", ""))(const $(class_name)& params);
+% end
+
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-rich-diagnostics.h.fiddle"
 #endif // FIDDLE END
 
+} // namespace Diagnostics
 } // namespace Slang
 
 #endif // SLANG_PROTOTYPE_DIAGNOSTICS
