@@ -9,8 +9,40 @@ void __requireTargetExtension(constexpr String extensionName);
 /// Built-in values or system value semantics represented as in/out global variables.
 /// This allows the built-ins to be arbitrarily used from a global scope without being
 /// explicitly passed as entry point parameters.
+[require(compute)]
+[require(fragment)]
+[require(vertex)]
+[require(geometry)]
+[require(hull)]
+[require(domain)]
+[require(mesh)]
+[require(amplification)]
+[require(raygen)]
+[require(intersection)]
+[require(anyhit)]
+[require(closesthit)]
+[require(miss)]
+[require(callable)]
 in uint __builtinWaveLaneIndex : SV_WaveLaneIndex;
+
+[require(compute)]
+[require(fragment)]
+[require(vertex)]
+[require(geometry)]
+[require(hull)]
+[require(domain)]
+[require(mesh)]
+[require(amplification)]
+[require(raygen)]
+[require(intersection)]
+[require(anyhit)]
+[require(closesthit)]
+[require(miss)]
+[require(callable)]
 in uint __builtinWaveLaneCount : SV_WaveLaneCount;
+
+[require(compute)]
+[require(fragment)]
 in uint __builtinQuadLaneIndex : SV_QuadLaneIndex;
 
 //@public:

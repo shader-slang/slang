@@ -114,8 +114,19 @@ public typealias f16mat2 = f16mat2x2;
 public typealias f16mat3 = f16mat3x3;
 public typealias f16mat4 = f16mat4x4;
 
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(mesh)]
+[require(amplification)]
 public out float4 gl_Position : SV_Position;
+
+[require(vertex)]
+[require(geometry)]
 public out float gl_PointSize : SV_PointSize;
+
+[require(fragment)]
 public in float2 gl_PointCoord : SV_PointCoord;
 
 [require(fragment)]
@@ -180,6 +191,8 @@ public property uint3 gl_WorkGroupSize
 }
 
 // TODO: define overload for tessellation control stage.
+[require(geometry)]
+[require(hull)]
 public in int gl_InvocationID : SV_GSInstanceID;
 
 [require(vertex)]
@@ -235,22 +248,55 @@ public property int gl_VertexIndex
     }
 }
 
+[require(fragment)]
+[require(geometry)]
 public in bool gl_FrontFacing : SV_IsFrontFace;
 
 // TODO: define overload for geometry stage.
+[require(fragment)]
+[require(geometry)]
 public in int gl_Layer : SV_RenderTargetArrayIndex;
 
 [require(fragment)]
 public in int gl_SampleID : SV_SampleIndex;
+
+// SV_ViewID: available in all rasterization stages
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(fragment)]
 public in int gl_ViewIndex : SV_ViewID;
+
+[require(fragment)]
+[require(geometry)]
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
+
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
 public in int gl_BaseVertex : SV_StartVertexLocation;
+
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
 public in int gl_BaseInstance : SV_StartInstanceLocation;
+
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
 public in int gl_DrawID : SV_DrawIndex;
 
+[require(fragment)]
 public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
+
+[require(fragment)]
 public in int2 gl_FragSizeEXT : SV_FragSize;
 
+[require(fragment)]
 public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 
@@ -4942,6 +4988,10 @@ public property uint3 gl_LaunchSizeEXT
 // __gl_PrimitiveID being picked up as a global variable regardless
 // of the stage used below. Using int __gl_PrimitiveID leads to a
 // casting conflict due to the spirv implementation of PrimitiveIndex().
+[require(fragment)]
+[require(geometry)]
+[require(hull)]
+[require(domain)]
 internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 
 public property int gl_PrimitiveID
