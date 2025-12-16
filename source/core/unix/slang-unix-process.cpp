@@ -75,7 +75,7 @@ public:
     {
     }
 
-    ~UnixPipeStream() { close(); }
+    ~UnixPipeStream() SLANG_OVERRIDE { close(); }
 
 protected:
     /// This read file descriptor non blocking. Doing so will change the behavior of
