@@ -276,7 +276,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
         }
 
         // Derivative of the weights is the outer product of the input and the output differential
-        // dW = dOutput * dInput^T
+        // dW = dOutput * Input^T
         [MaxIters(OutputSize)]
         for (int row = 0; row < OutputSize; row++)
         {
