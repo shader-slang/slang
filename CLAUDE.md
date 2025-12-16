@@ -151,14 +151,25 @@ slang-test must run from repository root
 
 ### Debugging tools
 
-#### slangc with `-dump-ir`
+#### slangc with `-dump-ir` options
 
-slangc with `-dump-ir` option is most efficient way to investigate problems that can be observed at IR level.
+slangc provides several options for dumping IR at different stages:
+
+**`-dump-ir`**: Dumps IR after every compilation pass. Most comprehensive but generates a lot of output.
+
+**`-dump-ir-before <pass-name>`**: Dumps IR only before the specified pass. Can be specified multiple times.
+
+**`-dump-ir-after <pass-name>`**: Dumps IR only after the specified pass. Can be specified multiple times.
 
 It will often require a use of `-target` and the most common combination is `-dump-ir -target spirv-asm`.
 When `-dump-ir` is used without `-target`, the compilation process may stop earlier than it should be.
 
-Since it dumps many lines, it will be good to store the result into a file for a further investigation.
+**Selective dumping tip**: When you know which pass is problematic, use `-dump-ir-before` and `-dump-ir-after` to reduce output:
+```bash
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+```
+This generates only 2 sections (BEFORE and AFTER), so saving directly to a file is more practical than using the split script.
+
 The dump prints multiple sections which of each is separated by `### ` header.
 Each section visualizes the IR state on multiple steps during the compilation.
 It is necessary to differentiate the information on one section from one section, because the issue might be observed at a specific section.
@@ -169,6 +180,41 @@ to string. You can then write that string to a temp file with `File::writeAllTex
 When checking the IR dump, look for type consistency or logical errors in the IR to locate the potential transformation
 pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
 type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
+
+#### extras/split-ir-dump.py
+
+The IR dump can be huge (thousands of lines with 70+ sections), making it difficult for LLMs and humans to analyze. Use `extras/split-ir-dump.py` to split the dump into separate files, one per compilation pass:
+
+```bash
+# Full dump: Recommended for initial investigation
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Selective dump for single pass: Save directly to file
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+
+# Selective dump for multiple passes: Use split script
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -dump-ir-before eliminateDeadCode -dump-ir-after eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Or save to file first
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
+python extras/split-ir-dump.py test.dump
+```
+
+**IMPORTANT**: When using `-dump-ir` with targets like `spirv-asm`, always use `-o <file>` to redirect the compiled output. Otherwise, the SPIRV/CUDA code will be mixed with the IR dump on stdout.
+
+This creates a `dump-XXX/` directory with:
+- `000-INDEX.txt` - Overview of all sections
+- `001-LOWER-TO-IR.txt` - Initial IR generation
+- `002-AFTER-fixEntryPointCallsites.txt` - After first pass
+- ... (one file per pass)
+
+Use this to:
+- Binary search through passes to find where IR becomes invalid
+- Track how a specific value/instruction transforms through the pipeline
+- Compare before/after states of specific optimization passes
+- Provide focused context to LLMs for analysis
+
+See `extras/split-ir-dump.md` for complete documentation.
 
 #### InstTrace
 
