@@ -34,7 +34,14 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %             if part.param_type == "string" then
     messageBuilder << $(part.param_name);
 %             elseif part.param_type == "type" then
-    messageBuilder << $(part.param_name)->toString();
+    if ($(part.param_name))
+    {
+        messageBuilder << $(part.param_name)->toString();
+    }
+    else
+    {
+        messageBuilder << "<unknown type>";
+    }
 %             elseif part.param_type == "int" then
     messageBuilder << $(part.param_name);
 %             end
