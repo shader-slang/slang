@@ -197,7 +197,7 @@ jobs:
   test-slangpy:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
-    if: always()
+    if: always() && inputs.config == 'release'
     container:
       image: nvidia/cuda:12.4.1-devel-ubuntu22.04
       options: >-
