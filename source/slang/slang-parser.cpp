@@ -4798,7 +4798,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass);
+        SLANG_ASSERT(syntaxClass);
     }
     else
     {
@@ -8500,7 +8500,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
@@ -8596,7 +8596,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
+        ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
