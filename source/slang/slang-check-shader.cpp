@@ -1885,7 +1885,7 @@ Type* Linkage::specializeType(
         unspecializedType,
         SourceLoc());
 
-    assert(specializationParams.getCount() == argCount);
+    SLANG_ASSERT(specializationParams.getCount() == argCount);
 
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)

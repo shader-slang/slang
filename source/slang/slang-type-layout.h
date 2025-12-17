@@ -20,6 +20,7 @@ enum class BaseType;
 class Type;
 
 struct IRLayout;
+struct TypeLayoutContext;
 
 //
 
@@ -1352,6 +1353,12 @@ struct SimpleLayoutRulesImpl
     // Do structured buffers need a separate binding for the counter buffer?
     // (DirectX is the exception in managing these together)
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
+
+    // Get layout for DescriptorHandle<T>
+    virtual ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1423,6 +1430,14 @@ struct LayoutRulesImpl
     bool DoStructuredBuffersNeedSeparateCounterBuffer()
     {
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context)
+    {
+        return simpleRules->GetDescriptorHandleLayout(kind, elementType, context);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
