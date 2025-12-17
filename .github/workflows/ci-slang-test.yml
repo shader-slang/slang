@@ -256,22 +256,18 @@ jobs:
           SLANGPY_VERSION=$(python -c "import slangpy; print(slangpy.__version__)" 2>/dev/null || echo "unknown")
           echo "Installed slangpy version: $SLANGPY_VERSION"
 
-          # Clone with shallow history but fetch all tags
-          git clone --depth 1 --tags https://github.com/shader-slang/slangpy-samples.git
-          cd slangpy-samples
-
-          # Try to checkout matching version tag (v-prefixed), fallback to main
+          # Try to clone specific version tag directly, fallback to main if it fails
           if [ "$SLANGPY_VERSION" != "unknown" ]; then
-            if git checkout "v${SLANGPY_VERSION}" 2>/dev/null; then
-              echo "Successfully checked out version tag v${SLANGPY_VERSION}"
+            if git clone --branch "v${SLANGPY_VERSION}" --depth 1 https://github.com/shader-slang/slangpy-samples.git 2>/dev/null; then
+              echo "Successfully cloned version tag v${SLANGPY_VERSION}"
             else
-              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, using main branch"
+              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, cloning main branch"
+              git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
             fi
           else
-            echo "Warning: Could not detect slangpy version, using main branch"
+            echo "Warning: Could not detect slangpy version, cloning main branch"
+            git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
           fi
-
-          cd ..
 
       - name: Install slangpy-samples dependencies
         run: |
