@@ -16301,8 +16301,8 @@ uint WaveGetNumWaves()
                 return (totalThreads + waveSize - 1) / waveSize;
             }
         default:
-            // For non-compute stages, return 1 as there's typically one subgroup per invocation group
-            return 1;
+            static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
+            return 0; // unreachable, but needed to satisfy compiler
         }
     }
 }
@@ -16327,7 +16327,16 @@ uint4 WaveGetLaneEqMask()
             result:$$uint4 = OpLoad builtin(SubgroupEqMask:uint4)
         };
     default:
-        return uint4(1u << WaveGetLaneIndex(), 0, 0, 0);
+        // Handle lane indices 0-127 across all 4 components of uint4
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        return uint4(
+            component == 0 ? (1u << bit) : 0u,
+            component == 1 ? (1u << bit) : 0u,
+            component == 2 ? (1u << bit) : 0u,
+            component == 3 ? (1u << bit) : 0u
+        );
     }
 }
 
@@ -16351,7 +16360,30 @@ uint4 WaveGetLaneGeMask()
             result:$$uint4 = OpLoad builtin(SubgroupGeMask:uint4)
         };
     default:
-        return uint4(~0u << WaveGetLaneIndex(), 0, 0, 0);
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes >= laneIndex, but only within the actual wave size
+        uint laneIndex = WaveGetLaneIndex();
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;  // which component contains the last lane
+        uint waveBit = (waveSize - 1) & 31;   // bit position of last lane
+        // Use ~0u when waveBit == 31 to avoid shift overflow
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        uint4 geMask = uint4(
+            0 < component ? 0u : (0 == component ? (~0u << bit) : ~0u),
+            1 < component ? 0u : (1 == component ? (~0u << bit) : ~0u),
+            2 < component ? 0u : (2 == component ? (~0u << bit) : ~0u),
+            3 < component ? 0u : (3 == component ? (~0u << bit) : ~0u)
+        );
+        return geMask & validMask;
     }
 }
 
@@ -16375,8 +16407,31 @@ uint4 WaveGetLaneGtMask()
             result:$$uint4 = OpLoad builtin(SubgroupGtMask:uint4)
         };
     default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes > laneIndex, but only within the actual wave size
         uint laneIndex = WaveGetLaneIndex();
-        return uint4(laneIndex >= 31 ? 0u : (~0u << (laneIndex + 1)), 0, 0, 0);
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;
+        uint waveBit = (waveSize - 1) & 31;
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        // For the current component: if bit < 31, set bits above; if bit == 31, set 0
+        uint currentMask = bit >= 31 ? 0u : (~0u << (bit + 1));
+        uint4 gtMask = uint4(
+            0 < component ? 0u : (0 == component ? currentMask : ~0u),
+            1 < component ? 0u : (1 == component ? currentMask : ~0u),
+            2 < component ? 0u : (2 == component ? currentMask : ~0u),
+            3 < component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+        return gtMask & validMask;
     }
 }
 
@@ -16400,8 +16455,19 @@ uint4 WaveGetLaneLeMask()
             result:$$uint4 = OpLoad builtin(SubgroupLeMask:uint4)
         };
     default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes <= laneIndex
         uint laneIndex = WaveGetLaneIndex();
-        return uint4(laneIndex >= 31 ? ~0u : ((1u << (laneIndex + 1)) - 1), 0, 0, 0);
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit (inclusive)
+        uint currentMask = bit >= 31 ? ~0u : ((1u << (bit + 1)) - 1);
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
     }
 }
 
@@ -16425,7 +16491,19 @@ uint4 WaveGetLaneLtMask()
             result:$$uint4 = OpLoad builtin(SubgroupLtMask:uint4)
         };
     default:
-        return uint4((1u << WaveGetLaneIndex()) - 1, 0, 0, 0);
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes < laneIndex
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit-1 (exclusive of bit)
+        uint currentMask = (1u << bit) - 1;
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
     }
 }
 
@@ -16564,10 +16642,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixProduct";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixProduct(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixProduct, expr);
     }
 }
 
@@ -16647,10 +16722,7 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixSum";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixSum(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixSum, expr);
     }
 }
 
@@ -16715,10 +16787,7 @@ matrix<T,N,M> WavePrefixMin(matrix<T,N,M> expr)
     case cuda:
         return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixMin(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMin, expr);
     }
 }
 
@@ -16783,10 +16852,7 @@ matrix<T,N,M> WavePrefixMax(matrix<T,N,M> expr)
     case cuda:
         return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixMax(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMax, expr);
     }
 }
 
@@ -16851,10 +16917,7 @@ matrix<T,N,M> WavePrefixBitAnd(matrix<T,N,M> expr)
     case hlsl:
         return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixBitAnd(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitAnd, expr);
     }
 }
 
@@ -16919,10 +16982,7 @@ matrix<T,N,M> WavePrefixBitOr(matrix<T,N,M> expr)
     case hlsl:
         return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixBitOr(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitOr, expr);
     }
 }
 
@@ -16987,10 +17047,7 @@ matrix<T,N,M> WavePrefixBitXor(matrix<T,N,M> expr)
     case hlsl:
         return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixBitXor(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitXor, expr);
     }
 }
 
