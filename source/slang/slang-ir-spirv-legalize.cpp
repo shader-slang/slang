@@ -1382,14 +1382,17 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so we need to create an intermediate block if this is the case.
         IRBuilder builder(inst);
 
-        auto addIntermediateBlock = [&](auto &replaceBlock){
+        auto addIntermediateBlock = [&](auto& replaceBlock)
+        {
             builder.setInsertBefore(inst->getAfterBlock());
             auto newBlock = builder.emitBlock();
 
             // Add an IRDebugLine to the block we're creating. Find the first
             // IRDebugLine in the 'after' block, and copy that.
-            for (auto afterInst : inst->getAfterBlock()->getChildren()) {
-                if (auto debugLine = as<IRDebugLine>(afterInst)) {
+            for (auto afterInst : inst->getAfterBlock()->getChildren())
+            {
+                if (auto debugLine = as<IRDebugLine>(afterInst))
+                {
                     IRCloneEnv cloneEnv;
                     cloneInst(&cloneEnv, &builder, debugLine);
                     break;

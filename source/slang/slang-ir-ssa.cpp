@@ -951,8 +951,10 @@ void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge, bool 
     // one in the successor block and copy that.
     if (copyDebugLine)
     {
-        for (auto afterInst : succ->getChildren()) {
-            if (auto debugLine = as<IRDebugLine>(afterInst)) {
+        for (auto afterInst : succ->getChildren())
+        {
+            if (auto debugLine = as<IRDebugLine>(afterInst))
+            {
                 IRCloneEnv cloneEnv;
                 cloneInst(&cloneEnv, &builder, debugLine);
                 break;
