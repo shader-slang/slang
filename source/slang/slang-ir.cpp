@@ -2286,10 +2286,13 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
             IRConstant::StringValue& dstString = irValue->value.stringVal;
 
             dstString.numChars = uint32_t(sliceSize);
-            // Turn into pointer to avoid warning of array overrun
-            char* dstChars = dstString.chars;
-            // Copy the chars
-            memcpy(dstChars, slice.begin(), sliceSize);
+            if (sliceSize > 0)
+            {
+                // Turn into pointer to avoid warning of array overrun
+                char* dstChars = dstString.chars;
+                // Copy the chars
+                memcpy(dstChars, slice.begin(), sliceSize);
+            }
 
             break;
         }
@@ -2456,8 +2459,7 @@ IRVoidLit* IRBuilder::getVoidValue()
 
 IRVoidLit* IRBuilder::getVoidValue(IRType* type)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_VoidLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.intVal = 0;
