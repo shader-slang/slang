@@ -220,15 +220,18 @@ function(set_default_compile_options target)
             # instead (`-shared-libsan`).
             target_compile_options(
                 ${target}
-                PRIVATE -fsanitize=address -shared-libsan
+                PRIVATE -fsanitize=address,undefined -shared-libsan
             )
             target_link_options(
                 ${target}
-                PUBLIC -fsanitize=address -shared-libsan
+                PUBLIC -fsanitize=address,undefined -shared-libsan
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            target_compile_options(${target} PRIVATE -fsanitize=address)
-            target_link_options(${target} PUBLIC -fsanitize=address)
+            target_compile_options(
+                ${target}
+                PRIVATE -fsanitize=address,undefined
+            )
+            target_link_options(${target} PUBLIC -fsanitize=address,undefined)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)
             target_link_options(${target} PRIVATE /INCREMENTAL:NO)

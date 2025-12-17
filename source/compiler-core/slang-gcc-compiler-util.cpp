@@ -638,7 +638,7 @@ static SlangResult _parseGCCFamilyLine(
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
 #if SLANG_CLANG || SLANG_GCC
-        cmdLine.addArg("-fsanitize=address");
+        cmdLine.addArg("-fsanitize=address,undefined");
 #endif // SLANG_CLANG || SLANG_GCC
 #if SLANG_CLANG
         cmdLine.addArg("-shared-libsan");
