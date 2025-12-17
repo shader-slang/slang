@@ -1,6 +1,8 @@
 // slang-ir-layout.cpp
 #include "slang-ir-layout.h"
 
+#include "slang-capability.h"
+#include "slang-compiler-options.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 
@@ -369,6 +371,63 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
+            // TODO: move this to a helper function
+            auto target = optionSet.getTarget();
+
+            // Check for spvBindlessTextureNV capability
+            bool hasBindlessTextureNV = false;
+            for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
+            {
+                if (atomVal.kind == CompilerOptionValueKind::Int &&
+                    atomVal.intValue == (int)CapabilityName::spvBindlessTextureNV)
+                {
+                    hasBindlessTextureNV = true;
+                    break;
+                }
+            }
+
+            if (hasBindlessTextureNV)
+            {
+                // For spvBindlessTextureNV, DescriptorHandle<T> is uint64_t
+                *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+                return SLANG_OK;
+            }
+
+            // Check for bindless targets (CPU, CUDA, Metal)
+            bool isBindlessTarget = false;
+            switch (target)
+            {
+            case CodeGenTarget::CPPSource:
+            case CodeGenTarget::HostCPPSource:
+            case CodeGenTarget::HostExecutable:
+            case CodeGenTarget::HostSharedLibrary:
+            case CodeGenTarget::HostHostCallable:
+            case CodeGenTarget::ShaderHostCallable:
+            case CodeGenTarget::ShaderSharedLibrary:
+            case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
+            case CodeGenTarget::PTX:
+            case CodeGenTarget::Metal:
+            case CodeGenTarget::MetalLib:
+            case CodeGenTarget::MetalLibAssembly:
+                isBindlessTarget = true;
+                break;
+            default:
+                break;
+            }
+
+            if (isBindlessTarget)
+            {
+                // On bindless targets, DescriptorHandle<T> has the layout of T
+                // For resource types, this is typically 8 bytes with 8-byte alignment
+                auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
+                return calcSizeAndAlignment(
+                    optionSet,
+                    descriptorHandleType->getResourceType(),
+                    outSizeAndAlignment);
+            }
+
+            // Non-bindless targets: DescriptorHandle<T> is uint2 (8 bytes, 4-byte alignment)
             IRBuilder builder(type);
             builder.setInsertBefore(type);
             auto uintType = builder.getUIntType();
