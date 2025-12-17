@@ -1331,10 +1331,7 @@ struct IRBlock : IRInst
         Iterator begin() { return Iterator(begin_, stride); }
         Iterator end() { return Iterator(end_, stride); }
 
-        SuccessorList reverse()
-        {
-            return SuccessorList(end_-stride, begin_-stride, -stride);
-        }
+        SuccessorList reverse() { return SuccessorList(end_ - stride, begin_ - stride, -stride); }
     };
 
     PredecessorList getPredecessors();

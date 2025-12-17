@@ -348,21 +348,22 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
 {
     if (branchBlock != condBranch->getAfterBlock())
     {
-        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr; inst = inst->getNextInst())
+        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr;
+             inst = inst->getNextInst())
         {
             switch (inst->getOp())
             {
-                case kIROp_DebugLine:
-                    continue;
+            case kIROp_DebugLine:
+                continue;
 
-                case kIROp_UnconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 {
                     auto br = as<IRUnconditionalBranch>(inst);
                     return br->getTargetBlock() == condBranch->getAfterBlock();
                 }
 
-                default:
-                    return false;
+            default:
+                return false;
             }
         }
     }
@@ -446,17 +447,17 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
         {
             switch (inst->getOp())
             {
-                case kIROp_DebugLine:
-                    continue;
+            case kIROp_DebugLine:
+                continue;
 
-                case kIROp_UnconditionalBranch:
+            case kIROp_UnconditionalBranch:
                 {
                     auto br = as<IRUnconditionalBranch>(inst);
                     return br->getTargetBlock() == switchInst->getBreakLabel();
                 }
 
-                default:
-                    return false;
+            default:
+                return false;
             }
         }
     }
@@ -582,18 +583,18 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
         for (;;)
         {
             auto block = as<IRBlock>(targetUse->get());
-            IRUnconditionalBranch *branch = nullptr;
+            IRUnconditionalBranch* branch = nullptr;
             for (auto inst = block->getFirstInst(); inst && !branch; inst = inst->next)
             {
                 switch (inst->getOp())
                 {
-                    case kIROp_DebugLine:
-                        continue;
-                    case kIROp_UnconditionalBranch:
-                        branch = as<IRUnconditionalBranch>(inst);
-                        break;
-                    default:
-                        return;
+                case kIROp_DebugLine:
+                    continue;
+                case kIROp_UnconditionalBranch:
+                    branch = as<IRUnconditionalBranch>(inst);
+                    break;
+                default:
+                    return;
                 }
             }
             // We can't fuse the block if there are phi arguments.

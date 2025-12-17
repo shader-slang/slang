@@ -357,9 +357,8 @@ void computePostorder(
     PostorderComputationContext context;
     context.order = &outOrder;
 
-    auto getSuccessors = [=](IRBlock* block) {
-        return mirrored ? block->getSuccessors().reverse() : block->getSuccessors();
-    };
+    auto getSuccessors = [=](IRBlock* block)
+    { return mirrored ? block->getSuccessors().reverse() : block->getSuccessors(); };
 
     if (code->getFirstBlock())
         context.walk(code->getFirstBlock(), getSuccessors);
