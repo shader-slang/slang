@@ -1,10 +1,10 @@
 // slang-ir-layout.cpp
 #include "slang-ir-layout.h"
 
-#include "slang-capability.h"
 #include "slang-compiler-options.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -371,7 +371,6 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
-            // TODO: move this to a helper function
             auto target = optionSet.getTarget();
 
             // Check for spvBindlessTextureNV capability
@@ -394,32 +393,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             }
 
             // Check for bindless targets (CPU, CUDA, Metal)
-            bool isBindlessTarget = false;
-            switch (target)
-            {
-            case CodeGenTarget::CPPSource:
-            case CodeGenTarget::HostCPPSource:
-            case CodeGenTarget::HostExecutable:
-            case CodeGenTarget::HostSharedLibrary:
-            case CodeGenTarget::HostHostCallable:
-            case CodeGenTarget::ShaderHostCallable:
-            case CodeGenTarget::ShaderSharedLibrary:
-            case CodeGenTarget::CUDASource:
-            case CodeGenTarget::CUDAHeader:
-            case CodeGenTarget::PTX:
-            case CodeGenTarget::Metal:
-            case CodeGenTarget::MetalLib:
-            case CodeGenTarget::MetalLibAssembly:
-                isBindlessTarget = true;
-                break;
-            default:
-                break;
-            }
-
-            if (isBindlessTarget)
+            if (areResourceTypesBindlessOnTarget(target))
             {
                 // On bindless targets, DescriptorHandle<T> has the layout of T
-                // For resource types, this is typically 8 bytes with 8-byte alignment
                 auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
                 return calcSizeAndAlignment(
                     optionSet,
@@ -454,6 +430,23 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     default:
         break;
     }
+
+    // Handle StructuredBuffer types
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        auto target = optionSet.getTarget();
+        // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
+        // (T* data + size_t count = 16 bytes, 8-byte alignment)
+        if (isCPUTarget(target) || isCUDATarget(target))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+            return SLANG_OK;
+        }
+        // On other targets (including Metal), use default resource size (8 bytes)
+        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        return SLANG_OK;
+    }
+
     if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
