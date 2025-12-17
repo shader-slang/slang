@@ -356,10 +356,8 @@ public:
         PathInfo inputPathInfo = PathInfo::makeFromString(inputPath);
         SourceFile* inputSourceFile =
             sourceManager.createSourceFileWithString(inputPathInfo, inputText);
-        SourceView* inputSourceView = sourceManager.createSourceView(
-            inputSourceFile,
-            nullptr,
-            SourceLoc());
+        SourceView* inputSourceView =
+            sourceManager.createSourceView(inputSourceFile, nullptr, SourceLoc());
 
         // Parse templates from the file (normal FIDDLE processing)
         RefPtr<TextTemplateFile> textTemplateFile = parseTextTemplate(inputSourceView);

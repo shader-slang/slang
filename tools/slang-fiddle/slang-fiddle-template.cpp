@@ -110,7 +110,10 @@ public:
         stmts.add(stmt);
     }
 
-    void addScriptSpliceExpr(char const* sourceBegin, char const* sourceEnd, bool hasTrailingNewline = false)
+    void addScriptSpliceExpr(
+        char const* sourceBegin,
+        char const* sourceEnd,
+        bool hasTrailingNewline = false)
     {
         auto stmt = RefPtr(new TextTemplateSpliceStmt());
         stmt->scriptExprSource = UnownedStringSlice(sourceBegin, sourceEnd);
@@ -206,7 +209,7 @@ public:
                         hasTrailingNewline = true;
                         if (*_cursor == '\r' && *(_cursor + 1) == '\n')
                             _cursor++; // Skip \r in \r\n
-                        _cursor++; // Skip the newline
+                        _cursor++;     // Skip the newline
                         isAtStartOfLine = true;
                         currentLineBegin = _cursor;
                     }

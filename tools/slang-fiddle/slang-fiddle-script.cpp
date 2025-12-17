@@ -176,7 +176,10 @@ int _emitTestFile(lua_State* L)
         SlangResult dirResult = Path::createDirectory(outputDir);
         if (SLANG_FAILED(dirResult))
         {
-            return luaL_error(L, "emit_test_file(): failed to create directory: %s", outputDir.getBuffer());
+            return luaL_error(
+                L,
+                "emit_test_file(): failed to create directory: %s",
+                outputDir.getBuffer());
         }
     }
 

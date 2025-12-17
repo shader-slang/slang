@@ -11,8 +11,8 @@ using namespace Slang;
 
 enum class FiddleMode
 {
-    Default,    // Default: Generate .fiddle files for C++ code
-    TestGen     // Generate test files from .slang templates
+    Default, // Default: Generate .fiddle files for C++ code
+    TestGen  // Generate test files from .slang templates
 };
 
 struct Options
@@ -69,7 +69,10 @@ public:
                 }
                 else
                 {
-                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, String("--mode ") + modeStr);
+                    sink.diagnose(
+                        SourceLoc(),
+                        Diagnostics::unknownOption,
+                        String("--mode ") + modeStr);
                 }
             }
             else if (arg == UnownedTerminatedStringSlice("--output-dir"))
