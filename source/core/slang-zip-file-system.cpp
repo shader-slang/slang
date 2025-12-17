@@ -206,7 +206,7 @@ void ZipFileSystemImpl::_rebuildMap()
 
     const mz_uint entryCount = mz_zip_reader_get_num_files(&m_archive);
 
-    m_removedSet.resizeAndClear(0);
+    m_removedSet.resizeAndUnsetAll(0);
 
     for (mz_uint i = 0; i < entryCount; ++i)
     {
@@ -352,7 +352,7 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                         SLANG_RETURN_ON_FAIL(_copyToAndInitWriter(writer));
 
                         // In the process we have removed anything that was deleted
-                        m_removedSet.clear();
+                        m_removedSet.unsetAll();
                         // Don't need the read data anymore
                         m_data.deallocate();
 
@@ -387,7 +387,7 @@ SlangResult ZipFileSystemImpl::_requireModeImpl(Mode newMode)
                         SLANG_RETURN_ON_FAIL(_copyToAndInitWriter(writer));
 
                         // In the process we have removed anything that was deleted
-                        m_removedSet.clear();
+                        m_removedSet.unsetAll();
 
                         // Get rid of the old writer
                         mz_zip_writer_end(&m_archive);

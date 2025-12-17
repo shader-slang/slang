@@ -281,14 +281,13 @@ SlangResult GlslangDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
 
     // Set the diagnostics result
+    diagnostics->setRaw(SliceUtil::asCharSlice(diagnosticOutput));
     diagnostics->setResult(invokeResult);
 
     ArtifactUtil::addAssociated(artifact, diagnostics);
 
     if (SLANG_FAILED(invokeResult))
     {
-        diagnostics->setRaw(SliceUtil::asCharSlice(diagnosticOutput));
-
         SliceAllocator allocator;
 
         SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(

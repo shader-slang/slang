@@ -258,6 +258,16 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             return cacheResult(false);
     }
 
+    // Opaque types are not C-style.
+    // These types have no well-defined default value (they usually need a separate API call to be
+    // created and/or bound) and thus cannot be default-initialized.
+    {
+        TypeTag tags = getTypeTags(type);
+        const bool isOpaque = ((int)tags & (int)TypeTag::Opaque) != 0;
+        if (isOpaque)
+            return cacheResult(false);
+    }
+
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
     {
@@ -266,7 +276,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             auto elementType = tupleType->getMember(i);
             // Avoid infinite loop in case of circular reference.
             if (isVisit.contains(elementType))
-                return cacheResult(false);
+                continue;
             if (!isCStyleType(elementType, isVisit))
                 return cacheResult(false);
         }
@@ -442,13 +452,13 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         // invalid.
         isCStyle = isCStyleType(toType, isVisit);
 
-        // WAR: We currently still has to allow legacy initializer list for array type until we have
-        // more proper solution for array initialization, so if the right hand side is an array
-        // type, we will not report error and fall-back to legacy initializer list logic.
+        // WAR: We currently still have to allow legacy initializer list for array type until we
+        // have a more proper solution for array initialization, so if the right hand side is an
+        // array type, we will not report an error and fall-back to legacy initializer list logic.
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            getSink()->diagnose(
+            diagnoseOnce(
                 fromInitializerListExpr->loc,
                 Diagnostics::cannotUseInitializerListForType,
                 toType);
