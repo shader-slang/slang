@@ -127,7 +127,7 @@ public:
     //
 
     /// Required alignment for the starting offset of a chunk.
-    static const UInt32 kChunkAlignment = 2;
+    static const UInt32 kChunkAlignment = 8;
 
     //
     // Every chunk starts with a *header*, which includes
