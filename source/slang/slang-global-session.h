@@ -368,6 +368,8 @@ private:
     /// The AST builder that will be used for builtin modules.
     ///
     RefPtr<ASTBuilder> m_rootASTBuilder;
+
+    ASTBuilder* m_previousASTBuilder;
 };
 
 /* Returns SLANG_OK if pass through support is available */

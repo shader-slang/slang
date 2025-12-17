@@ -18,6 +18,7 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerUtilBase
 
     /// Runs the exe, and extracts the version info into outDesc
     static SlangResult calcVersion(const ExecutableLocation& exe, DownstreamCompilerDesc& outDesc);
+    static SlangResult calcVersion(CommandLine exe, DownstreamCompilerDesc& outDesc);
 
     /// Calculate gcc family compilers (including clang) cmdLine arguments from options
     static SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine);
@@ -36,6 +37,9 @@ struct GCCDownstreamCompilerUtil : public DownstreamCompilerUtilBase
     /// Note! Invoke/s the compiler  to determine the compiler version number.
     static SlangResult createCompiler(
         const ExecutableLocation& exe,
+        ComPtr<IDownstreamCompiler>& outCompiler);
+    static SlangResult createCompiler(
+        const CommandLine& cmdLine,
         ComPtr<IDownstreamCompiler>& outCompiler);
 
     /// Finds GCC compiler/s and adds them to the set

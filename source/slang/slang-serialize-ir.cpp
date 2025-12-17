@@ -735,8 +735,8 @@ void writeSerializedModuleIR(
 #else
     BlobBuilder blobBuilder;
     {
-        Fossil::SerialWriter writer(blobBuilder);
         IRSerialWriteContext context{sourceLocWriter};
+        Fossil::SerialWriter writer(blobBuilder);
         IRWriteSerializer serializer(&writer, &context);
         serialize(serializer, moduleInfo);
     }
