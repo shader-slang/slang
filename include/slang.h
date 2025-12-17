@@ -3015,7 +3015,12 @@ struct VariableLayoutReflection
             (SlangReflectionVariableLayout*)this);
     }
 
-    char const* getName() { return getVariable()->getName(); }
+    char const* getName()
+    {
+        if (auto var = getVariable())
+            return var->getName();
+        return nullptr;
+    }
 
     Modifier* findModifier(Modifier::ID id) { return getVariable()->findModifier(id); }
 
