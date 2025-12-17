@@ -127,15 +127,6 @@ uint WaveGetLaneCount();
 
 uint WaveGetLaneIndex();
 
-uint WaveGetNumWaves();  // Number of waves in workgroup (equivalent to GLSL gl_NumSubgroups)
-
-// Lane masks (equivalent to GLSL gl_SubgroupXxMask)
-uint4 WaveGetLaneEqMask();  // Mask with only current lane's bit set
-uint4 WaveGetLaneGeMask();  // Mask with bits set for lanes >= current lane
-uint4 WaveGetLaneGtMask();  // Mask with bits set for lanes > current lane
-uint4 WaveGetLaneLeMask();  // Mask with bits set for lanes <= current lane
-uint4 WaveGetLaneLtMask();  // Mask with bits set for lanes < current lane
-
 bool WaveIsFirstLane();
 
 // Ballot
@@ -171,16 +162,6 @@ bool WaveActiveAllEqual<T>(T value);
 T WavePrefixProduct<T>(T expr);
 
 T WavePrefixSum<T>(T expr);
-
-T WavePrefixMin<T>(T expr);
-
-T WavePrefixMax<T>(T expr);
-
-T WavePrefixBitAnd<T>(T expr);
-
-T WavePrefixBitOr<T>(T expr);
-
-T WavePrefixBitXor<T>(T expr);
 
 // Communication
 
@@ -223,6 +204,20 @@ T WaveShuffle<T>(T value, int lane);
 uint4 WaveGetActiveMulti();
 
 uint4 WaveGetConvergedMulti();
+
+uint WaveGetNumWaves();  // Number of waves in workgroup (equivalent to GLSL gl_NumSubgroups)
+
+// Prefix (exclusive scan operations, equivalent to GLSL subgroupExclusive*)
+
+T WavePrefixMin<T>(T expr);   // Exclusive prefix minimum
+
+T WavePrefixMax<T>(T expr);   // Exclusive prefix maximum
+
+T WavePrefixBitAnd<T>(T expr);  // Exclusive prefix bitwise AND
+
+T WavePrefixBitOr<T>(T expr);   // Exclusive prefix bitwise OR
+
+T WavePrefixBitXor<T>(T expr);  // Exclusive prefix bitwise XOR
 
 // Barriers 
 
@@ -379,6 +374,18 @@ WaveMask WaveGetConvergedMask();
 WaveMask WaveGetActiveMask();
 
 bool WaveMaskIsFirstLane(WaveMask mask);
+
+// Lane masks (equivalent to GLSL gl_SubgroupXxMask)
+
+uint4 WaveGetLaneEqMask();  // Mask with only current lane's bit set
+
+uint4 WaveGetLaneGeMask();  // Mask with bits set for lanes >= current lane
+
+uint4 WaveGetLaneGtMask();  // Mask with bits set for lanes > current lane
+
+uint4 WaveGetLaneLeMask();  // Mask with bits set for lanes <= current lane
+
+uint4 WaveGetLaneLtMask();  // Mask with bits set for lanes < current lane
 
 // Ballot
 
