@@ -2252,7 +2252,6 @@ private:
                 semanticDecor->removeAndDeallocate();
             }
             SLANG_ASSERT(typeLayout);
-            typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
@@ -2264,10 +2263,12 @@ private:
             }
             else
             {
-                // If there's no layout offset for this field, we still need to add a semantic
-                // decoration to ensure WGSL can emit a @location attribute. Use a simple
-                // sequential index based on the field position.
-                // Note: This is a fallback and the offset should ideally be set properly.
+                // Fallback: If there's no layout offset for this field, we still need to add a
+                // semantic decoration to ensure WGSL can emit a @location attribute. This can
+                // happen when the varLayout passed to this function doesn't have offset information
+                // for all fields (e.g., when layout is for an original struct but we're processing
+                // a flattened struct, or when dealing with implicit varying parameters).
+                // Use a sequential index based on the field position as a reasonable default.
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)index);
             }
             index++;
