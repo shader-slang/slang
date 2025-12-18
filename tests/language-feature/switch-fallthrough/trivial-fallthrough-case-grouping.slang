@@ -3,9 +3,18 @@
 // Test "trivial fall-through" where multiple case labels share the same block.
 // This is currently supported in Slang.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+
+// CHECK:      64
+// CHECK-NEXT: 65
+// CHECK-NEXT: CA
+// CHECK-NEXT: CB
+// CHECK-NEXT: CC
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: FFFFFFFF
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

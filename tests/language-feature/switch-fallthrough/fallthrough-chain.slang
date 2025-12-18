@@ -5,10 +5,15 @@
 //
 // This is currently NOT supported in Slang but is planned for implementation.
 
-// Enable tests
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+
+// CHECK:      D2
+// CHECK-NEXT: 69
+// CHECK-NEXT: 23
+// CHECK-NEXT: 7
+// CHECK-NEXT: FFFFFFFF
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

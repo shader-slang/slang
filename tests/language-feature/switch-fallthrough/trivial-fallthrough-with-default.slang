@@ -2,9 +2,18 @@
 //
 // Test trivial fall-through where a case label shares block with default.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+
+// CHECK:      64
+// CHECK-NEXT: 3E7
+// CHECK-NEXT: C8
+// CHECK-NEXT: 3E7
+// CHECK-NEXT: 3E7
+// CHECK-NEXT: 3E7
+// CHECK-NEXT: 3E7
+// CHECK-NEXT: 3E7
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

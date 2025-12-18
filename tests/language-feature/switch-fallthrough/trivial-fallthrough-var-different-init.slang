@@ -4,9 +4,14 @@
 // pass different initial values to shared code. This tests the IRParam/IRVar
 // lowering for case grouping.
 
-//TEST(compute):COMPARE_COMPUTE: -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+
+// CHECK:      D2
+// CHECK-NEXT: 69
+// CHECK-NEXT: 23
+// CHECK-NEXT: 7
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
