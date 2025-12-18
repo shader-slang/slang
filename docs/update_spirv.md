@@ -8,75 +8,28 @@ There are three directories under `external` that are related to SPIR-V:
 In order to use the latest or custom SPIR-V, they need to be updated.
 
 
-## Fork `shader-slang/SPIRV-Tools` repo and update it
+## Update SPIRV-Tools
 
-Currently Slang uses [shader-slang/SPIRV-Tools](https://github.com/shader-slang/SPIRV-Tools) forked from [KhronosGroup/SPIRV-Tools](https://github.com/KhronosGroup/SPIRV-Tools).
-In order for Slang to use the latest changes from `KhronosGroup/SPIRV-Tools`, `shader-slang/SPIRV-Tools` needs to be updated.
+On the Slang repo, you need to update to use the latest commit of SPIRV-Tools and SPIRV-Headers.
 
-1. Fork `shader-slang/SPIRV-Tools` to your personal github organization like `your-name/SPIRV-Tools`.
-1. Clone it on your local machine.
+1. Create a branch for the update.
    ```
-   git clone https://github.com/your-name/SPIRV-Tools.git # replace `your-name` to the actual URL
-   ```
-1. Fetch from `KhronosGroup/SPIRV-Tools`.
-   ```
-   git remote add khronos https://github.com/KhronosGroup/SPIRV-Tools.git
-   git fetch khronos
-   ```
-1. Create a branch for a Pull Request.
-   ```
-   git checkout -b merge/update
-   ```
-1. Rebase to khronos/main
-   ```
-   git rebase khronos/main # use ToT
-   ```
-1. Push to Github.
-   ```
-   git push origin merge/update
+   # This doc will use "update_spirv" as a branch name,
+   # but you can use a different name.
+   git checkout -b update_spirv
    ```
 
-The steps above will create a branch called `merge/update`. You can use a different name but this document will use the name.
+1. Synchronize and update submodules.
+   ```
+   git submodule sync
+   git submodule update --init --recursive
+   ```
 
-
-## Modify `.gitmodules` and use the `merge/update` branch
-
-Before creating a Pull Request for `merge/update`, you should test and make sure everything works.
-
-On a Slang repo side, you need to create a branch for the following changes.
-```
-git clone https://github.com/your-name/slang.git # replace `your-name` to the actual URL
-cd slang
-git checkout -b update_spirv
-```
-
-Open `.gitmodules` and modify the setting to the following,
-```
-[submodule "external/spirv-tools"]
-	path = external/spirv-tools
-	url = https://github.com/your-name/SPIRV-Tools.git
-[submodule "external/spirv-headers"]
-	path = external/spirv-headers
-	url = https://github.com/KhronosGroup/SPIRV-Headers.git
-```
-Note that you need to replace `your-name` with the actual URL from the previous step.
-
-Apply the URL changes with the following commands,
-```
-git submodule sync
-git submodule update --init --recursive
-
-cd spirv-headers
-git fetch
-git checkout origin/main # use ToT
-cd ..
-
-cd external
-cd spirv-tools
-git fetch
-git checkout merge/update # use merger/update branch
-```
-
+1. Update the SPIRV-Tools submodule to the latest version.
+   ```
+   git -C external/spirv-tools fetch
+   git -C external/spirv-tools checkout origin/main
+   ```
 
 ## Build spirv-tools
 
@@ -89,43 +42,50 @@ cd spirv-tools
 python3.exe utils\git-sync-deps # this step may require you to register your ssh public key to gitlab.khronos.org
 cmake.exe . -B build
 cmake.exe --build build --config Release
+
+# Go back to repository root
+cd ../..
 ```
 
+## Update SPIRV-Headers
 
-## Copy the generated files from `spirv-tools` to `spirv-tools-generated`
+1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
+   ```
+   git -C external/spirv-headers fetch
+   git -C external/spirv-tools/external/spirv-headers log -1 --oneline
+   git -C external/spirv-headers checkout [commit hash from the previous command]
+   ```
+   Alternatively you can get the hash value of spirv-headers with the following command,
+   ```
+   grep spirv_headers_revision external/spirv-tools/DEPS
+   ```
 
-Copy some of generated files from `external/spirv-tools/build/` to `external/spirv-tools-generated/`.
-The following files are ones you need to copy at the moment, but the list may change in the future.
+Note that the update of SPIRV-Headers should be done after running `python3.exe utils\git-sync-deps`, because the python script will update `external/spirv-tools/external/spirv-headers` to whichever commit the current SPIRV-Tools depends on.
+
+
+## Copy the generated files from `spirv-tools/build/` to `spirv-tools-generated/`
+
+Copy the generated header files from `external/spirv-tools/build/` to `external/spirv-tools-generated/`.
 ```
-DebugInfo.h
-NonSemanticShaderDebugInfo100.h
-OpenCLDebugInfo100.h
-build-version.inc
-core.insts-unified1.inc
-debuginfo.insts.inc
-enum_string_mapping.inc
-extension_enum.inc
-generators.inc
-glsl.std.450.insts.inc
-nonsemantic.clspvreflection.insts.inc
-nonsemantic.shader.debuginfo.100.insts.inc
-nonsemantic.vkspreflection.insts.inc
-opencl.debuginfo.100.insts.inc
-opencl.std.insts.inc
-operand.kinds-unified1.inc
-spv-amd-gcn-shader.insts.inc
-spv-amd-shader-ballot.insts.inc
-spv-amd-shader-explicit-vertex-parameter.insts.inc
-spv-amd-shader-trinary-minmax.insts.inc
+rm external/spirv-tools-generated/*.h
+rm external/spirv-tools-generated/*.inc
+cp external/spirv-tools/build/*.h external/spirv-tools-generated/
+cp external/spirv-tools/build/*.inc external/spirv-tools-generated/
 ```
 
 
 ## Build Slang and run slang-test
 
+After SPIRV submodules are updated, you need to build and test.
+```
+# Make sure to clean up data generated from the previous SPIRV
+rm -fr build
+```
+
 There are many ways to build Slang executables. Refer to the [document](https://github.com/shader-slang/slang/blob/master/docs/building.md) for more detail.
 For a quick reference, you can build with the following commands,
 ```
-cmake.exe --preset vs2019
+cmake.exe --preset vs2022
 cmake.exe --build --preset release
 ```
 
@@ -139,57 +99,133 @@ It is often the case that some of tests fail, because of the changes on SPIRV-He
 You need to properly resolve them before proceed.
 
 
-## Create A Pull Request on `shader-slang/SPIRV-Tools`
+## Commit and create a Pull Request
 
-After testing is done, you should create a Pull Request on `shader-slang/SPIRV-Tools` repo.
+After testing is done, you need to stage and commit the updated submodule references and any generated files.
+Note that when you want to use new commit IDs of the submodules, you have to stage with git-add command for the directory of the submodule itself.
 
-1. The git-push command will show you a URL for creating a Pull Request like following,
-   > https://github.com/your-name/SPIRV-Tools/pull/new/merge/update # replace `your-name` to the actual URL
-
-   Create a Pull Request.
-1. Wait for all workflows to pass.
-1. Merge the PR and take a note of the commit ID for the next step.
-
-Note that this process will update `shader-slang/SPIRV-Tools` repo, but your merge is not used by `slang` repo yet.
-
-
-## Create a Pull Request on `shader-slang/slang`
-
-After the PR is merged to `shader-slang/SPIRV-Tools`, `slang` needs to start using it.
-
-On the clone of Slang repo, revert the changes in `.gitmodules` if modified.
 ```
-# revert the change in .gitmodules
-git checkout .gitmodules
-git submodule sync
-git submodule update --init --recursive
+git add external/spirv-headers
+git add external/spirv-tools
+git add external/spirv-tools-generated
+
+# Add any other changes needed to resolve test failures
+
+git commit -m "Update SPIRV-Tools and SPIRV-Headers to latest versions"
+git push origin update_spirv # Use your own branch name as needed
 ```
 
-You need to stage and commit the latest commit IDs of spirv-tools and spirv-headers.
-Note that when you want to use a new commit IDs of the submodules, you have to stage with git-add command for the directly of the submodule itself.
+Once all changes are pushed to GitHub, you can create a Pull Request on the main Slang repository.
+
+## CI Validation
+
+The Slang CI system includes an automated check that verifies the generated files in `external/spirv-tools-generated/` are up-to-date whenever changes are made to `external/spirv-tools` or `external/spirv-headers`.
+
+### What the CI Check Does
+
+When you create a Pull Request that modifies the SPIRV submodules, the CI will:
+
+1. Detect changes to `external/spirv-tools` or `external/spirv-headers`
+2. Verify that the `spirv-headers` commit matches what `spirv-tools/DEPS` expects
+3. Automatically regenerate the files that should be in `external/spirv-tools-generated/`
+4. Compare the regenerated files with the committed files
+5. **Fail the CI** if there are any discrepancies or mismatches
+
+This ensures that:
+- The `spirv-headers` version is compatible with `spirv-tools`
+- All generated files are correctly synchronized with the SPIRV-Tools version
+
+### When Does the CI Check Run?
+
+The check only runs when:
+- A pull request modifies `external/spirv-tools/**`
+- A pull request modifies `external/spirv-headers/**`
+- A pull request modifies `external/spirv-tools-generated/**`
+- The workflow or check script itself is modified
+
+This path filtering prevents unnecessary builds and keeps CI fast.
+
+### What Files Are Validated?
+
+The check verifies that the following generated files are present and up-to-date:
+- `*.inc` files (e.g., `build-version.inc`, `core_tables_body.inc`, etc.)
+- `*.h` files (e.g., `DebugInfo.h`, `OpenCLDebugInfo100.h`, etc.)
+
+The `README.md` file in `external/spirv-tools-generated/` is excluded from validation.
+
+### If the CI Check Fails
+
+If you see a failure from the "Check SPIRV Generated Files" job, it means the generated files are out of sync. The CI output will show:
+
+- Which files are missing
+- Which files have differences
+- Which files are orphaned (should be removed)
+
+To fix the issue, follow the instructions in the CI output, or re-run the steps in the [Copy the generated files](#copy-the-generated-files-from-spirv-toolsbuild-to-spirv-tools-generated) section above.
+
+#### Common Failure Scenarios
+
+**Scenario 1: Missing Files**
 ```
-cd external
-
-# Add changes in spirv-tools-generated
-git add spirv-tools-generated
-
-# Add commit ID of spirv-headers
-cd spirv-headers
-git fetch
-git checkout origin/main # Use ToT
-cd ..
-git add spirv-headers
-
-# Add commit ID of spirv-tools
-cd spirv-tools
-git fetch
-git checkout merge/update # Use merge/update branch
-cd ..
-git add spirv-tools
-
-# Add more if there are other changes to resolve the test failures.
-
-git commit
-git push origin update_spirv
+ERROR: Missing file in spirv-tools-generated: new_file.inc
 ```
-Once all changes are pushed to GitHub, you can create a Pull Request on `shader-slang/slang`.
+This means a new file is now generated by SPIRV-Tools but hasn't been added to the repository.
+
+**Fix:** Follow the copy steps in the error message to add the new file.
+
+---
+
+**Scenario 2: Outdated Files**
+```
+ERROR: File differs: build-version.inc
+```
+This means the file exists but its content doesn't match what SPIRV-Tools would generate.
+
+**Fix:** Regenerate and replace the file following the instructions in the CI output.
+
+---
+
+**Scenario 3: Orphaned Files**
+```
+ERROR: Orphaned file in spirv-tools-generated: old_file.inc
+```
+This means a file exists in the repository but is no longer generated by SPIRV-Tools.
+
+**Fix:** Remove the file with `git rm external/spirv-tools-generated/old_file.inc`
+
+---
+
+**Scenario 4: spirv-headers Commit Mismatch**
+```
+ERROR: spirv-headers commit mismatch!
+ERROR:   Expected (from spirv-tools/DEPS): 6bb105b6c4b3a246e1e6bb96366fe14c6dbfde83
+ERROR:   Actual (submodule):                1234567890abcdef1234567890abcdef12345678
+```
+This means the `spirv-headers` submodule commit doesn't match what `spirv-tools` expects in its DEPS file.
+
+**Fix:** Update `spirv-headers` to the expected commit:
+```bash
+git -C external/spirv-headers fetch
+git -C external/spirv-headers checkout 6bb105b6c4b3a246e1e6bb96366fe14c6dbfde83
+git add external/spirv-headers
+```
+
+---
+
+**Scenario 5: Submodule Not Updated**
+
+If you updated generated files but forgot to update the submodule reference:
+```bash
+git add external/spirv-tools
+git add external/spirv-tools-generated
+```
+
+### Testing Locally
+
+You can run the same check locally before pushing to catch issues early:
+
+```bash
+bash extras/check-spirv-generated.sh
+```
+
+This script will verify that your generated files match what would be produced by building SPIRV-Tools with the current submodule version.

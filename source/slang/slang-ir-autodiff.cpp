@@ -1721,17 +1721,17 @@ IRType* DifferentiableTypeConformanceContext::differentiateType(
             SLANG_UNIMPLEMENTED_X("Impl");
         }
 
-    case kIROp_OutType:
+    case kIROp_OutParamType:
         if (auto diffValueType =
-                differentiateType(builder, as<IROutType>(primalType)->getValueType()))
-            return builder->getOutType(diffValueType);
+                differentiateType(builder, as<IROutParamType>(primalType)->getValueType()))
+            return builder->getOutParamType(diffValueType);
         else
             return nullptr;
 
-    case kIROp_InOutType:
+    case kIROp_BorrowInOutParamType:
         if (auto diffValueType =
-                differentiateType(builder, as<IRInOutType>(primalType)->getValueType()))
-            return builder->getInOutType(diffValueType);
+                differentiateType(builder, as<IRBorrowInOutParamType>(primalType)->getValueType()))
+            return builder->getBorrowInOutParamType(diffValueType);
         else
             return nullptr;
 
@@ -3301,8 +3301,8 @@ struct AutoDiffPass : public InstPassBase
         {
         case kIROp_ArrayType:
         case kIROp_UnsizedArrayType:
-        case kIROp_InOutType:
-        case kIROp_OutType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_OutParamType:
         case kIROp_PtrType:
         case kIROp_DifferentialPairType:
         case kIROp_DifferentialPairUserCodeType:
@@ -3695,7 +3695,7 @@ protected:
     DifferentialPairTypeBuilder pairBuilderStorage;
 };
 
-void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_UNUSED(target);
 
@@ -3743,8 +3743,8 @@ void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSi
 }
 
 bool processAutodiffCalls(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     IRAutodiffPassOptions const&)
 {
@@ -3868,7 +3868,7 @@ void releaseNullDifferentialType(AutoDiffSharedContext* context)
     }
 }
 
-bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
+bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target)
 {
     bool modified = false;
 

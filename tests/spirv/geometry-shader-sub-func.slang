@@ -36,7 +36,7 @@ void main(
     {
         CoarseVertex coarseVertex = coarseVertices[ii];
         RasterVertex rasterVertex;
-        rasterVertex.position   = coarseVertex.position;
+        rasterVertex.position = coarseVertex.position;
         rasterVertex.color      = coarseVertex.color;
         rasterVertex.id         = coarseVertex.id + primitiveID;
         appendVertex(outputStream, rasterVertex);

@@ -357,38 +357,29 @@ struct SimpleLegalVarChain
     IRVarLayout* varLayout = nullptr;
 };
 
-/// A "chain" of variable declarations that can handle both primary and "pending" data.
+/// A "chain" of variable declarations
 ///
 /// In the presence of interface-type fields, a single variable may
 /// have data that sits in two distinct allocations, and may have
 /// `VarLayout`s that represent offseting into each of those
 /// allocations.
 ///
-/// A `LegalVarChain` tracks two distinct `SimpleVarChain`s: one for
-/// the primary/ordinary data allocation, and one for any pending
-/// data.
+/// A `LegalVarChain` tracks the primary/ordinary data allocation.
 ///
-/// It is okay if the primary/pending chains have different numbers
-/// of links in them.
-///
-/// Offsets for particular resource kinds in the primary or pending
-/// data allocation can be queried on the appropriate sub-chain.
+/// Offsets for particular resource kinds in the primary data
+/// allocation can be queried on the appropriate sub-chain.
 ///
 struct LegalVarChain
 {
     // The chain of variables that represents the primary allocation.
     SimpleLegalVarChain* primaryChain = nullptr;
-
-    // The chain of variables that represents the pending allocation.
-    SimpleLegalVarChain* pendingChain = nullptr;
 };
 
 /// RAII type for adding a link to a `LegalVarChain` as needed.
 ///
 /// This type handles the bookkeeping for creating a `LegalVarChain`
-/// that links in one more variable. It will add a link to each of
-/// the primary and pending sub-chains if and only if there is non-null
-/// layout information for the primary/pending case.
+/// that links in one more variable. It will add a link to the primary
+/// sub-chain if there is non-null layout information.
 ///
 /// Typical usage in a recursive function is:
 ///
@@ -422,18 +413,10 @@ struct LegalVarChainLink : LegalVarChain
             primaryLink.next = parent.primaryChain;
             primaryLink.varLayout = varLayout;
             primaryChain = &primaryLink;
-
-            if (auto pendingVarLayout = varLayout->getPendingVarLayout())
-            {
-                pendingLink.next = parent.pendingChain;
-                pendingLink.varLayout = pendingVarLayout;
-                pendingChain = &pendingLink;
-            }
         }
     }
 
     SimpleLegalVarChain primaryLink;
-    SimpleLegalVarChain pendingLink;
 };
 
 IRVarLayout* createVarLayout(
@@ -701,11 +684,11 @@ LegalType createLegalUniformBufferTypeForExistentials(
     IRInst* layoutOperand);
 
 
-void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool isResourceType(IRType* type);
 

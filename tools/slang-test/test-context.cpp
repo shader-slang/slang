@@ -130,6 +130,8 @@ TestContext::InnerMainFunc TestContext::getInnerMainFunc(const String& dirPath, 
             loader->loadPlatformSharedLibrary(path.begin(), tool.m_sharedLibrary.writeRef())))
     {
         tool.m_func = (InnerMainFunc)tool.m_sharedLibrary->findFuncByName("innerMain");
+        tool.m_cleanDeviceCacheFunc =
+            (CleanDeviceCacheFunc)tool.m_sharedLibrary->findFuncByName("cleanDeviceCache");
     }
 
     m_sharedLibTools.add(name, tool);
@@ -150,6 +152,17 @@ void TestContext::setInnerMainFunc(const String& name, InnerMainFunc func)
         tool.m_func = func;
         m_sharedLibTools.add(name, tool);
     }
+}
+
+TestContext::CleanDeviceCacheFunc TestContext::getCleanDeviceCacheFunc(const String& name)
+{
+    SharedLibraryTool* tool = m_sharedLibTools.tryGetValue(name);
+    if (tool)
+    {
+        return tool->m_cleanDeviceCacheFunc;
+    }
+
+    return nullptr;
 }
 
 DownstreamCompilerSet* TestContext::getCompilerSet()
@@ -183,6 +196,12 @@ SlangResult TestContext::_createJSONRPCConnection(RefPtr<JSONRPCConnection>& out
     {
         CommandLine cmdLine;
         cmdLine.setExecutableLocation(ExecutableLocation(exeDirectoryPath, "test-server"));
+
+        if (options.ignoreAbortMsg)
+        {
+            cmdLine.addArg("-ignore-abort-msg");
+        }
+
         SLANG_RETURN_ON_FAIL(Process::create(
             cmdLine,
             Process::Flag::AttachDebugger | Process::Flag::DisableStdErrRedirection,

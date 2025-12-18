@@ -14,6 +14,7 @@
 #include "slang-com-helper.h"
 #include "slang-include-system.h"
 #include "slang-source-loc.h"
+#include "slang-tag-version.h"
 
 // Enable calling through to `glslang` on
 // all platforms.
@@ -280,14 +281,13 @@ SlangResult GlslangDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
 
     // Set the diagnostics result
+    diagnostics->setRaw(SliceUtil::asCharSlice(diagnosticOutput));
     diagnostics->setResult(invokeResult);
 
     ArtifactUtil::addAssociated(artifact, diagnostics);
 
     if (SLANG_FAILED(invokeResult))
     {
-        diagnostics->setRaw(SliceUtil::asCharSlice(diagnosticOutput));
-
         SliceAllocator allocator;
 
         SlangResult diagnosticParseRes = ArtifactDiagnosticUtil::parseColonDelimitedDiagnostics(
@@ -488,8 +488,18 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
 
 #endif
 
-    SLANG_RETURN_ON_FAIL(
-        DownstreamCompilerUtil::loadSharedLibrary(path, loader, nullptr, "slang-glslang", library));
+    // Load the slang-glslang library with versioned name on Mac/Linux
+#if SLANG_WINDOWS_FAMILY
+    String libraryName = "slang-glslang";
+#else
+    String libraryName = String("slang-glslang-") + SLANG_VERSION_NUMERIC;
+#endif
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
+        path,
+        loader,
+        nullptr,
+        libraryName.getBuffer(),
+        library));
 
     SLANG_ASSERT(library);
     if (!library)

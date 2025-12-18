@@ -9,8 +9,11 @@
 // CHECK-SPIRV: OpExtension "SPV_KHR_fragment_shader_barycentric"
 
 // CHECK-SPIRV: OpEntryPoint Fragment %main "main"
-// CHECK-SPIRV: OpDecorate %{{.*}} BuiltIn BaryCoordKHR
-// CHECK-SPIRV: OpDecorate %{{.*}} BuiltIn BaryCoordNoPerspKHR
+
+// CHECK-SPIRV-DAG: OpDecorate %{{.*}} BuiltIn BaryCoordKHR
+
+// CHECK-SPIRV-DAG: OpDecorate %{{.*}} BuiltIn BaryCoordNoPerspKHR
+
 // CHECK-SPIRV: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_0
 // CHECK-SPIRV: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_1
 // CHECK-SPIRV: %{{.*}} = OpAccessChain %_ptr_Input_{{.*}} %{{.*}} %uint_2

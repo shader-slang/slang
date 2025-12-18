@@ -127,6 +127,18 @@ SlangResult FileStream::_init(
     default:
         break;
     }
+
+    if (File::exists(fileName))
+    {
+        // Check that the path exists and is a file; not a directory.
+        SlangPathType pathType;
+        SLANG_RETURN_ON_FAIL(Path::getPathType(fileName, &pathType));
+        if (pathType != SLANG_PATH_TYPE_FILE)
+        {
+            return SLANG_E_CANNOT_OPEN;
+        }
+    }
+
 #ifdef _WIN32
 
     // NOTE! This works because we know all the characters in the mode
@@ -248,12 +260,31 @@ SlangResult FileStream::read(void* buffer, size_t length, size_t& outBytesRead)
         // If we have reached the end, then reading nothing is ok.
         if (!m_endReached)
         {
-            // If we are not at the end of the file we should be able to read some bytes
-            if (!feof(m_handle))
+            // Verify EOF using file position.
+            Int64 currentPos = getPosition();
+            Int64 currentSize = 0;
+
+// Save position, seek to end, get size, restore position
+#if defined(_WIN32) || defined(__CYGWIN__)
+            _fseeki64(m_handle, 0, SEEK_END);
+            currentSize = _ftelli64(m_handle);
+            _fseeki64(m_handle, currentPos, SEEK_SET);
+#else
+            fseeko(m_handle, 0, SEEK_END);
+            currentSize = ftello(m_handle);
+            fseeko(m_handle, currentPos, SEEK_SET);
+#endif
+
+            if (currentPos >= currentSize)
             {
+                // Confirmed at EOF
+                m_endReached = true;
+            }
+            else
+            {
+                // Not at EOF but got 0 bytes - genuine error
                 return SLANG_FAIL;
             }
-            m_endReached = true;
         }
     }
     return SLANG_OK;

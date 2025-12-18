@@ -12,14 +12,14 @@ struct FunctionParameterSpecializationCondition : FunctionCallSpecializeConditio
 {
     TargetRequest* targetRequest = nullptr;
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* /*arg*/)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* /*arg*/, IRCall* /*callInst*/)
     {
         IRType* type = param->getDataType();
         return as<IRFuncType>(type);
     }
 };
 
-bool specializeHigherOrderParameters(CodeGenContext* codeGenContext, IRModule* module)
+bool specializeHigherOrderParameters(IRModule* module, CodeGenContext* codeGenContext)
 {
     bool result = false;
     FunctionParameterSpecializationCondition condition;

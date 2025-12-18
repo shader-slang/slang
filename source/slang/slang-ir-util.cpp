@@ -17,6 +17,14 @@ bool isPointerOfType(IRInst* type, IROp opCode)
     return false;
 }
 
+bool isUserPointerType(IRInst* type)
+{
+    auto ptrType = as<IRPtrType>(type);
+    if (!ptrType)
+        return false;
+    return ptrType->getAddressSpace() == AddressSpace::UserPointer;
+}
+
 IRType* getVectorElementType(IRType* type)
 {
     if (auto vectorType = as<IRVectorType>(type))
@@ -175,8 +183,29 @@ IRInst* specializeWithGeneric(
     {
         genArgs.add(param);
     }
+
+    // Default to type kind for now.
+    IRType* typeForSpecialization = builder.getTypeKind();
+
+    auto dataType = genericToSpecialize->getDataType();
+    if (dataType)
+    {
+        if (dataType->getOp() == kIROp_TypeKind || dataType->getOp() == kIROp_GenericKind)
+        {
+            typeForSpecialization = (genericToSpecialize)->getDataType();
+        }
+        else if (dataType->getOp() == kIROp_Generic)
+        {
+            typeForSpecialization = (IRType*)builder.emitSpecializeInst(
+                builder.getTypeKind(),
+                (genericToSpecialize)->getDataType(),
+                genArgs.getCount(),
+                genArgs.getBuffer());
+        }
+    }
+
     return builder.emitSpecializeInst(
-        builder.getTypeKind(),
+        typeForSpecialization,
         genericToSpecialize,
         (UInt)genArgs.getCount(),
         genArgs.getBuffer());
@@ -304,8 +333,8 @@ bool isWrapperType(IRInst* inst)
     case kIROp_VectorType:
     case kIROp_MatrixType:
     case kIROp_PtrType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_HLSLStructuredBufferType:
     case kIROp_HLSLRWStructuredBufferType:
     case kIROp_HLSLRasterizerOrderedStructuredBufferType:
@@ -469,31 +498,31 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "int";
         break;
     case kIROp_Int8Type:
-        sb << "int8";
+        sb << "int8_t";
         break;
     case kIROp_Int16Type:
-        sb << "int16";
+        sb << "int16_t";
         break;
     case kIROp_Int64Type:
-        sb << "int64";
+        sb << "int64_t";
         break;
     case kIROp_IntPtrType:
-        sb << "intptr";
+        sb << "intptr_t";
         break;
     case kIROp_UIntType:
         sb << "uint";
         break;
     case kIROp_UInt8Type:
-        sb << "uint8";
+        sb << "uint8_t";
         break;
     case kIROp_UInt16Type:
-        sb << "uint16";
+        sb << "uint16_t";
         break;
     case kIROp_UInt64Type:
-        sb << "uint64";
+        sb << "uint64_t";
         break;
     case kIROp_UIntPtrType:
-        sb << "uintptr";
+        sb << "uintptr_t";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -634,7 +663,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "AtomicCounter";
         break;
     case kIROp_RaytracingAccelerationStructureType:
-        sb << "RayTracingAccelerationStructure";
+        sb << "RaytracingAccelerationStructure";
         break;
     case kIROp_HitObjectType:
         sb << "HitObject";
@@ -792,33 +821,253 @@ IRInst* getRootAddr(IRInst* addr, List<IRInst*>& outAccessChain, List<IRInst*>* 
     return addr;
 }
 
+
+IRInst* getRootBufferOrAddr(IRInst* addr)
+{
+    auto rootAddr = getRootAddr(addr);
+    if (as<IRRWStructuredBufferGetElementPtr>(rootAddr))
+    {
+        auto bufferHandle = rootAddr->getOperand(0);
+        // Check if the bufferHandle itself is a load from a global parameter.
+        if (auto load = as<IRLoad>(bufferHandle))
+        {
+            auto newRoot = getRootAddr(load->getPtr());
+            if (newRoot->getOp() == kIROp_GlobalParam)
+                return newRoot;
+        }
+    }
+    return rootAddr;
+}
+
+// The aliasing class of an address. This is used to determine
+// if two addresses may alias.
+enum class AddressAliasingClass
+{
+    Unknown,
+    UserPointer,      // A user pointer into global memory
+    Var,              // A thread-local or groupshared var.
+    ConstantBuffer,   // A constant buffer or parameter block.
+    BoundBuffer,      // A bound buffer.
+    BoundTexture,     // A bound texture resource.
+    DescriptorHandle, // A bindless buffer or resource.
+};
+
+AddressAliasingClass getAliasingClass(IRInst* addr)
+{
+    if (auto globalParam = as<IRGlobalParam>(addr))
+    {
+        auto type = unwrapArray(globalParam->getDataType());
+        if (!type)
+            return AddressAliasingClass::Unknown;
+        switch (type->getOp())
+        {
+        case kIROp_TextureType:
+            return AddressAliasingClass::BoundTexture;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        case kIROp_HLSLByteAddressBufferType:
+        case kIROp_HLSLRWByteAddressBufferType:
+        case kIROp_HLSLRasterizerOrderedByteAddressBufferType:
+        case kIROp_GLSLShaderStorageBufferType:
+            return AddressAliasingClass::BoundBuffer;
+        case kIROp_ConstantBufferType:
+        case kIROp_ParameterBlockType:
+            return AddressAliasingClass::ConstantBuffer;
+        case kIROp_PtrType:
+            if (isUserPointerType(type))
+                return AddressAliasingClass::UserPointer;
+            return AddressAliasingClass::Unknown;
+        case kIROp_DynamicResourceType:
+            return AddressAliasingClass::DescriptorHandle;
+        default:
+            return AddressAliasingClass::Unknown;
+        }
+    }
+    else if (as<IRVar>(addr))
+        return AddressAliasingClass::Var;
+    else if (as<IRGlobalVar>(addr))
+        return AddressAliasingClass::Var;
+    else if (as<IRRWStructuredBufferGetElementPtr>(addr))
+        return AddressAliasingClass::DescriptorHandle;
+    else if (as<IRCastDescriptorHandleToResource>(addr))
+        return AddressAliasingClass::DescriptorHandle;
+
+    auto type = addr->getDataType();
+    if (isUserPointerType(type))
+        return AddressAliasingClass::UserPointer;
+    return AddressAliasingClass::Unknown;
+}
+
+bool canAddrClassesAlias(AddressAliasingClass c1, AddressAliasingClass c2)
+{
+    if (c1 == AddressAliasingClass::Unknown || c2 == AddressAliasingClass::Unknown)
+        return true;
+
+    switch (c1)
+    {
+    case AddressAliasingClass::Unknown:
+        return true;
+    case AddressAliasingClass::UserPointer:
+    case AddressAliasingClass::Var:
+        // A users pointer or var can only alias with another
+        // object that is either a user pointer or var.
+        //
+        // Generally, a var should never alias with anything else that isn't a var,
+        // if we never allow the user to take address of a local var.
+        // We don't allow taking addresses of a local var on most GPU targets, but
+        // we currently do expose an internal intrinsic to do so when targeting CPU.
+        // We should consider disallowing this across the board, or enable more aggresive
+        // criteria when targeting GPU backends.
+        // For now we stay conservative and just report true even when addr1 is var and
+        // addr2 is not rooted from a var.
+        //
+        return c2 == AddressAliasingClass::UserPointer || c2 == AddressAliasingClass::Var;
+    case AddressAliasingClass::BoundBuffer:
+    case AddressAliasingClass::BoundTexture:
+        // A bound resource can only alias with another
+        // object that is a bound resource or descriptor handle
+        return c2 == c1 || c2 == AddressAliasingClass::DescriptorHandle;
+
+    case AddressAliasingClass::DescriptorHandle:
+        // Can alias with any other resource.
+        switch (c2)
+        {
+        case AddressAliasingClass::BoundBuffer:
+        case AddressAliasingClass::BoundTexture:
+        case AddressAliasingClass::DescriptorHandle:
+            return true;
+        default:
+            return false;
+        }
+    case AddressAliasingClass::ConstantBuffer:
+        // Constant buffer cannot alias with anything.
+        return false;
+    }
+    // For any other unknown case, assume they may alias.
+    return true;
+}
+
+// Has `var` being used in a way that may allow it to alias with a user pointer?
+bool canVarAliasWithUserPointer(TargetRequest* target, IRInst* var)
+{
+    if (target && !isCPUTarget(target))
+    {
+        // We don't allow taking the address of a variable on anything other
+        // than the CPU target. Therefore a var can never alias with a user
+        // pointer on these targets.
+        return false;
+    }
+
+    SLANG_UNUSED(var);
+    return true;
+}
+
 // A simple and conservative address aliasing check.
-bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2)
+bool canAddressesPotentiallyAlias(
+    TargetRequest* target,
+    IRGlobalValueWithCode* func,
+    IRInst* addr1,
+    IRInst* addr2)
 {
     if (addr1 == addr2)
         return true;
 
-    // Two variables can never alias.
-    addr1 = getRootAddr(addr1);
-    addr2 = getRootAddr(addr2);
+    auto root1 = getRootBufferOrAddr(addr1);
+    auto root2 = getRootBufferOrAddr(addr2);
 
-    // Global addresses can alias with anything.
-    if (!isChildInstOf(addr1, func))
-        return true;
+    auto addr1Class = getAliasingClass(root1);
+    auto addr2Class = getAliasingClass(root2);
 
-    if (!isChildInstOf(addr2, func))
-        return true;
-
-    if (addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Var && addr1 != addr2)
+    if (!canAddrClassesAlias(addr1Class, addr2Class))
         return false;
+
+    if (addr1Class == addr2Class)
+    {
+        // For these classes of addresses, the identity of the root
+        // determines whether or not the addresse can alias.
+        // Note that we assume two different bound resources can never
+        // alias, and two different variables can never alias.
+        switch (addr1Class)
+        {
+        case AddressAliasingClass::Var:
+        case AddressAliasingClass::BoundBuffer:
+        case AddressAliasingClass::BoundTexture:
+        case AddressAliasingClass::ConstantBuffer:
+            if (root1 != root2)
+                return false;
+            break;
+        }
+    }
 
     // A param and a var can never alias.
-    if (addr1->getOp() == kIROp_Param && addr1->getParent() == func->getFirstBlock() &&
-            addr2->getOp() == kIROp_Var ||
-        addr1->getOp() == kIROp_Var && addr2->getOp() == kIROp_Param &&
-            addr2->getParent() == func->getFirstBlock())
+    if (root1->getOp() == kIROp_Param && root1->getParent() == func->getFirstBlock() &&
+            root2->getOp() == kIROp_Var ||
+        root1->getOp() == kIROp_Var && root2->getOp() == kIROp_Param &&
+            root2->getParent() == func->getFirstBlock())
         return false;
+
+    // If one addr is user pointer and one addr is a var,
+    // they can never alias, if the user code never took the address of
+    // the var.
+    if (addr1Class == AddressAliasingClass::Var && addr2Class == AddressAliasingClass::UserPointer)
+    {
+        return canVarAliasWithUserPointer(target, root1);
+    }
+    if (addr2Class == AddressAliasingClass::Var && addr1Class == AddressAliasingClass::UserPointer)
+    {
+        return canVarAliasWithUserPointer(target, root2);
+    }
+
+    // If two addrs are rooted from the same object but found to statically differ in access chain,
+    // then they cannot alias.
+    if (root1 == root2)
+    {
+        List<IRInst*> accessChain1;
+        List<IRInst*> accessChain2;
+
+        // Since getRootBufferOrAddr has a different behavior around
+        // RWStructuredBufferGetElementPtr compared to getRootAddr,
+        // we need to call getRootAddr here again to get a simpler access chain
+        // that we can handle here, so that we don't need to handle the nuance
+        // of whether or not to trace past any RWStructuredBufferGetElementPtr.
+        //
+        root1 = getRootAddr(addr1, accessChain1, nullptr);
+        root2 = getRootAddr(addr2, accessChain2, nullptr);
+        if (root1 != root2)
+            return true;
+        for (Index i = 0; i < Math::Min(accessChain1.getCount(), accessChain2.getCount()); i++)
+        {
+            auto node1 = accessChain1[i];
+            auto node2 = accessChain2[i];
+            if (as<IRStructKey>(node1) && as<IRStructKey>(node2))
+            {
+                // Two different field keys means the two addresses cannot alias.
+                // TODO: If we are going to support union types, we need to exclude that
+                // here.
+                if (node1 != node2)
+                    return false;
+                // If the keys are the same, continue looking further down the access chain.
+                continue;
+            }
+            // Two different constant indices means the two addresses cannot alias.
+            auto index1 = as<IRIntLit>(node1);
+            auto index2 = as<IRIntLit>(node2);
+            if (index1 && index2 && index1->getValue() != index2->getValue())
+                return false;
+            // In all other cases, such as when either one of the indices is
+            // a untime value, we treat the two indices as potentially being the same.
+            return true;
+        }
+    }
     return true;
+}
+
+bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2)
+{
+    return canAddressesPotentiallyAlias(nullptr, func, addr1, addr2);
 }
 
 bool isPtrLikeOrHandleType(IRInst* type)
@@ -836,11 +1085,11 @@ bool isPtrLikeOrHandleType(IRInst* type)
     case kIROp_ComPtrType:
     case kIROp_RawPointerType:
     case kIROp_RTTIPointerType:
-    case kIROp_OutType:
-    case kIROp_InOutType:
+    case kIROp_OutParamType:
+    case kIROp_BorrowInOutParamType:
     case kIROp_PtrType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
     case kIROp_GLSLShaderStorageBufferType:
         return true;
     }
@@ -943,13 +1192,13 @@ bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, I
     return false;
 }
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module)
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module)
 {
     IRInst* undefInst = nullptr;
 
     for (auto inst : module->getModuleInst()->getChildren())
     {
-        if (inst->getOp() == kIROp_Undefined && inst->getDataType() &&
+        if (inst->getOp() == kIROp_Poison && inst->getDataType() &&
             inst->getDataType()->getOp() == kIROp_VoidType)
         {
             undefInst = inst;
@@ -960,7 +1209,7 @@ IRInst* getUndefInst(IRBuilder builder, IRModule* module)
     {
         auto voidType = builder.getVoidType();
         builder.setInsertAfter(voidType);
-        undefInst = builder.emitUndefined(voidType);
+        undefInst = builder.emitPoison(voidType);
     }
     return undefInst;
 }
@@ -999,7 +1248,7 @@ IRInst* emitLoopBlocks(
     auto ifBreakBlock = loopBuilder.emitBlock();
     loopBreakBlock = loopBuilder.emitBlock();
     auto loopContinueBlock = loopBuilder.emitBlock();
-    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopHeadBlock, 1, &initVal);
+    builder->emitLoop(loopHeadBlock, loopBreakBlock, loopContinueBlock, 1, &initVal);
     loopBuilder.setInsertInto(loopHeadBlock);
     auto loopParam = loopBuilder.emitParam(initVal->getFullType());
     auto cmpResult = loopBuilder.emitLess(loopParam, finalVal);
@@ -1141,15 +1390,15 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
             if (isBitSet(options, SideEffectAnalysisOptions::UseDominanceTree))
                 dom = module->findOrCreateDominatorTree(parentFunc);
 
-            // If the pointer argument is a local variable (thus can't alias with other addresses)
-            // and it is never read from in the function, we can safely treat the call as having
-            // no side-effect.
-            // This is a conservative test, but is sufficient to detect the most common case where
-            // a temporary variable is used as the inout argument and the result stored in the temp
-            // variable isn't being used elsewhere in the parent func.
+            // If the pointer argument is a local variable (thus can't alias with other
+            // addresses) and it is never read from in the function, we can safely treat the
+            // call as having no side-effect. This is a conservative test, but is sufficient to
+            // detect the most common case where a temporary variable is used as the inout
+            // argument and the result stored in the temp variable isn't being used elsewhere in
+            // the parent func.
             //
-            // A more aggresive test can check all other address uses reachable from the call site
-            // and see if any of them are aliasing with the argument.
+            // A more aggresive test can check all other address uses reachable from the call
+            // site and see if any of them are aliasing with the argument.
             for (auto use = arg->firstUse; use; use = use->nextUse)
             {
                 if (as<IRDecoration>(use->getUser()))
@@ -1173,7 +1422,7 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
                         if (!funcType)
                             return false;
                         if (funcType->getParamCount() > i &&
-                            as<IROutType>(funcType->getParamType(i)))
+                            as<IROutParamType>(funcType->getParamType(i)))
                             continue;
 
                         // We are an argument to an inout parameter.
@@ -1323,8 +1572,8 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
         }
     }
 
-    // If the callee has no side effect, check if any of its associated functions have side effect.
-    // If so, we want to keep the callee around.
+    // If the callee has no side effect, check if any of its associated functions have side
+    // effect. If so, we want to keep the callee around.
     //
     // Typically, once the relevant pass has completed, the association is removed,
     // and at that point we can remove the function.
@@ -1482,6 +1731,7 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
+    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;
@@ -1577,7 +1827,7 @@ IRPtrTypeBase* isMutablePointerType(IRInst* inst)
 {
     switch (inst->getOp())
     {
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInParamType:
         return nullptr;
     default:
         return asRelevantPtrType(inst);
@@ -1741,7 +1991,7 @@ List<IRBlock*> collectBlocksInRegion(
                 continue;
             if (!dom->dominates(firstBlock, succ))
                 continue;
-            if (!as<IRUnreachable>(breakBlock->getTerminator()))
+            if (!as<IRUnreachableBase>(breakBlock->getTerminator()))
             {
                 if (dom->dominates(breakBlock, succ))
                     continue;
@@ -1912,23 +2162,23 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
     case kIROp_IntType:
         return UnownedStringSlice::fromLiteral("int");
     case kIROp_Int8Type:
-        return UnownedStringSlice::fromLiteral("int8");
+        return UnownedStringSlice::fromLiteral("int8_t");
     case kIROp_Int16Type:
-        return UnownedStringSlice::fromLiteral("int16");
+        return UnownedStringSlice::fromLiteral("int16_t");
     case kIROp_Int64Type:
-        return UnownedStringSlice::fromLiteral("int64");
+        return UnownedStringSlice::fromLiteral("int64_t");
     case kIROp_IntPtrType:
-        return UnownedStringSlice::fromLiteral("intptr");
+        return UnownedStringSlice::fromLiteral("intptr_t");
     case kIROp_UIntType:
         return UnownedStringSlice::fromLiteral("uint");
     case kIROp_UInt8Type:
-        return UnownedStringSlice::fromLiteral("uint8");
+        return UnownedStringSlice::fromLiteral("uint8_t");
     case kIROp_UInt16Type:
-        return UnownedStringSlice::fromLiteral("uint16");
+        return UnownedStringSlice::fromLiteral("uint16_t");
     case kIROp_UInt64Type:
-        return UnownedStringSlice::fromLiteral("uint64");
+        return UnownedStringSlice::fromLiteral("uint64_t");
     case kIROp_UIntPtrType:
-        return UnownedStringSlice::fromLiteral("uintptr");
+        return UnownedStringSlice::fromLiteral("uintptr_t");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -2128,6 +2378,56 @@ IRType* getIRVectorBaseType(IRType* type)
     return as<IRVectorType>(type)->getElementType();
 }
 
+IRType* getElementType(IRBuilder& builder, IRType* valueType)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto arrayType = as<IRArrayTypeBase>(valueType))
+    {
+        return arrayType->getElementType();
+    }
+    else if (auto vectorType = as<IRVectorType>(valueType))
+    {
+        return vectorType->getElementType();
+    }
+    else if (auto basicType = as<IRBasicType>(valueType))
+    {
+        return basicType;
+    }
+    else if (auto coopVecType = as<IRCoopVectorType>(valueType))
+    {
+        return coopVecType->getElementType();
+    }
+    else if (auto matrixType = as<IRMatrixType>(valueType))
+    {
+        return builder.getVectorType(matrixType->getElementType(), matrixType->getColumnCount());
+    }
+    else if (auto coopMatType = as<IRCoopMatrixType>(valueType))
+    {
+        return coopMatType->getElementType();
+    }
+    else if (auto hlslInputPatchType = as<IRHLSLInputPatchType>(valueType))
+    {
+        return hlslInputPatchType->getElementType();
+    }
+    return nullptr;
+}
+
+IRType* getFieldType(IRType* valueType, IRStructKey* key)
+{
+    valueType = (IRType*)unwrapAttributedType(valueType);
+    if (auto structType = as<IRStructType>(valueType))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (field->getKey() == key)
+            {
+                return field->getFieldType();
+            }
+        }
+    }
+    return nullptr;
+}
+
 Int getSpecializationConstantId(IRGlobalParam* param)
 {
     auto layout = findVarLayout(param);
@@ -2196,13 +2496,12 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
                 !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
                 continue;
 
-            // Normally, if the common dominator is not `block`, we can simply move the definition
-            // to the common dominator.
-            // An exception is when the common dominator is the target block of a
-            // loop.
-            // Another exception is when a var in the loop condition block is accessed both inside
-            // and outside the loop. It is technically visible, but effects on the 'var' are not
-            // visible outside the loop, so we'll need to hoist it out of the loop.
+            // Normally, if the common dominator is not `block`, we can simply move the
+            // definition to the common dominator. An exception is when the common dominator is
+            // the target block of a loop. Another exception is when a var in the loop condition
+            // block is accessed both inside and outside the loop. It is technically visible,
+            // but effects on the 'var' are not visible outside the loop, so we'll need to hoist
+            // it out of the loop.
             //
             // Note that after normalization, loops are in the form of:
             // ```
@@ -2343,9 +2642,9 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     // Returns true for ops that can be declared as an operation under `OpSpecConstantOp`.
     //
     // Integer arithmetic and comparison operations can be `OpSpecConstantOp` with the `Shader`
-    // capability, while floating-point arithmetic and comparison operations require the `Kernel`
-    // capability. We only support `Shader` capability for now, return false when floating-point
-    // arithmetic/comparison is encountered.
+    // capability, while floating-point arithmetic and comparison operations require the
+    // `Kernel` capability. We only support `Shader` capability for now, return false when
+    // floating-point arithmetic/comparison is encountered.
     switch (op)
     {
     case kIROp_Add:
@@ -2475,12 +2774,101 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;
     }
+}
+
+bool isPointerToImmutableLocation(IRInst* loc)
+{
+    switch (loc->getOp())
+    {
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_RWStructuredBufferGetElementPtr:
+    case kIROp_ImageSubscript:
+        return isPointerToImmutableLocation(loc->getOperand(0));
+    default:
+        break;
+    }
+
+    auto type = loc->getDataType();
+    if (!type)
+        return false;
+
+    switch (type->getOp())
+    {
+    case kIROp_HLSLStructuredBufferType:
+    case kIROp_HLSLByteAddressBufferType:
+    case kIROp_ConstantBufferType:
+    case kIROp_ParameterBlockType:
+        return true;
+    default:
+        break;
+    }
+
+    if (auto textureType = as<IRTextureType>(type))
+        return textureType->getAccess() == SLANG_RESOURCE_ACCESS_READ;
+
+    if (auto ptrType = as<IRPtrTypeBase>(type))
+    {
+        switch (ptrType->getAddressSpace())
+        {
+        case AddressSpace::BuiltinInput:
+        case AddressSpace::Input:
+        case AddressSpace::MetalObjectData:
+        case AddressSpace::Uniform:
+        case AddressSpace::UniformConstant:
+            return true;
+        }
+        if (ptrType->getAccessQualifier() == AccessQualifier::Immutable)
+            return true;
+    }
+    return false;
+}
+
+bool isGenericParameter(IRInst* inst)
+{
+    // The generic parameter must be in the first block
+    bool isParam = inst->getOp() == kIROp_Param;
+    bool isGeneric = false;
+    if (auto irBlock = as<IRBlock>(inst->parent))
+    {
+        isGeneric = as<IRGeneric>(irBlock->getParent()) != nullptr;
+    }
+    return isParam && isGeneric;
+}
+
+bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
+{
+    bool isSameBlock = (inst->getParent() == useOfInst->getParent());
+    return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
+{
+    SLANG_UNUSED(usageLoc);
+
+    if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+    {
+        return decor->getSize();
+    }
+
+    // We could conceivably make it an error to have an interface
+    // without an `[anyValueSize(...)]` attribute, but then we risk
+    // producing error messages even when doing 100% static specialization.
+    //
+    // It is simpler to use a reasonable default size and treat any
+    // type without an explicit attribute as using that size.
+    //
+    return kDefaultAnyValueSize;
 }
 
 } // namespace Slang

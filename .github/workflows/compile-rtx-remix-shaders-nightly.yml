@@ -1,0 +1,324 @@
+name: RTX Remix Shaders (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 3 AM UTC (after coverage runs)
+    - cron: "0 3 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # Read slang repo
+  issues: write # To create issues on failure (optional)
+
+jobs:
+  rtx-remix-shader-test:
+    runs-on: windows-2022
+    timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Slang repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: 0 # Need full history for version tags
+
+      # Explicitly fetch tags for version detection
+      # actions/checkout doesn't always fetch tags properly
+      - name: Fetch version tags
+        run: |
+          git fetch --tags --force
+          echo "Available tags:"
+          git tag -l "v20*" | head -10
+
+      # Add bash to PATH on Windows (for consistency with main CI)
+      # Only add Git\bin, not usr\bin which contains GNU tools that conflict with MSVC
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+
+      # Python 3.9+ required by Meson
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Meson build system
+      - name: Install Meson
+        run: pip install meson==1.9.1
+
+      # Ninja should be pre-installed on windows-2022
+      - name: Verify Ninja
+        run: ninja --version
+
+      # Set up MSVC environment (required even for Ninja builds on Windows)
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      # Cache Slang build artifacts to speed up subsequent runs
+      - name: Cache Slang build
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/
+          key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            slang-build-${{ runner.os }}-
+          enableCrossOsArchive: false
+
+      # Build Slang from checked-out source
+      # Note: We only need slangc.exe, so skip the packaging step to avoid CPack errors
+      - name: Build Slang
+        run: |
+          echo "Building Slang..."
+          echo "CMake version: $(cmake --version | head -1)"
+
+          startTime=$(date +%s)
+
+          # Configure with default preset (Ninja Multi-Config)
+          # Disable unnecessary components to speed up build
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_REPLAYER=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_ENABLE_SLANGRT=OFF \
+            -DSLANG_ENABLE_SLANG_GLSLANG=ON \
+            -DSLANG_ENABLE_TESTS=OFF
+
+          # Build only (skip packaging to avoid gfx.slang install error)
+          cmake --build --preset release
+
+          endTime=$(date +%s)
+          duration=$(( (endTime - startTime) / 60 ))
+          echo "Slang build completed in $duration minutes"
+
+          # Verify slangc was built
+          slangcPath="build/Release/bin/slangc.exe"
+          if [ -f "$slangcPath" ]; then
+            echo "slangc built successfully at: $slangcPath"
+            "$slangcPath" -version
+          else
+            echo "Failed to build slangc"
+            exit 1
+          fi
+
+      # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
+      - name: Clone dxvk-remix repository
+        run: |
+          echo "Cloning dxvk-remix repository..."
+          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          cd dxvk-remix
+          commit=$(git rev-parse HEAD)
+          echo "Using dxvk-remix commit: $commit"
+
+      # Cache packman packages between runs to save ~2-5 minutes
+      - name: Cache Packman packages
+        uses: actions/cache@v4
+        with:
+          path: C:\packman-repo
+          key: packman-${{ hashFiles('dxvk-remix/packman-external.xml') }}
+          restore-keys: |
+            packman-
+          enableCrossOsArchive: false
+
+      # Download shader compilation tools via packman
+      # First run: ~2-5 min (downloads ~340MB)
+      # Cached run: ~30 seconds
+      - name: Download external dependencies (packman)
+        run: |
+          echo "Downloading packman dependencies..."
+          cd dxvk-remix
+          ./scripts-common/packman/packman.cmd pull packman-external.xml
+        shell: bash
+
+      # Replace packman's Slang binaries with locally built version
+      # Keep packman's directory structure intact (including junctions)
+      # Just overwrite the executables and DLLs
+      - name: Replace packman Slang binaries with built version
+        shell: pwsh
+        run: |
+          Write-Host "Replacing packman Slang binaries with locally built version..."
+
+          $remixSlangDir = "dxvk-remix\external\slang"
+
+          if (-not (Test-Path $remixSlangDir)) {
+            Write-Error "Packman Slang directory not found at: $remixSlangDir"
+            exit 1
+          }
+
+          Write-Host "Found packman Slang at: $remixSlangDir"
+
+          # Show original version
+          $originalSlangc = Join-Path $remixSlangDir "slangc.exe"
+          if (Test-Path $originalSlangc) {
+            Write-Host "`nOriginal packman slangc version:"
+            $originalVersion = (& $originalSlangc -version 2>&1 | Out-String).Trim()
+            Write-Host $originalVersion
+          }
+
+          # Copy our built Slang binaries, overwriting packman's files
+          # This preserves the directory structure (including junctions)
+          $builtSlangBin = Resolve-Path "build\Release\bin"
+          Write-Host "`nOverwriting Slang binaries from: $builtSlangBin"
+          Copy-Item -Path "$builtSlangBin\*" -Destination $remixSlangDir -Recurse -Force
+
+          # Verify replacement succeeded
+          Write-Host "`nVerifying replacement..."
+
+          # Check that key files exist
+          # Note: slang.dll is deprecated, slang-compiler.dll is the new primary library
+          $requiredFiles = @("slangc.exe", "slang-compiler.dll", "slang-glslang.dll")
+          foreach ($file in $requiredFiles) {
+            $filePath = Join-Path $remixSlangDir $file
+            if (-not (Test-Path $filePath)) {
+              Write-Error "ERROR: Required file not found after copy: $file"
+              exit 1
+            }
+          }
+
+          # List all copied Slang DLLs for verification
+          Write-Host "`nCopied Slang files:"
+          Get-ChildItem -Path $remixSlangDir -Filter "slang*" | ForEach-Object { Write-Host "  $($_.Name)" }
+
+          # Verify version changed
+          $newSlangc = Join-Path $remixSlangDir "slangc.exe"
+          $newVersion = (& $newSlangc -version 2>&1 | Out-String).Trim()
+          Write-Host "New slangc version:"
+          Write-Host $newVersion
+
+          if ($originalVersion -and ($newVersion -eq $originalVersion)) {
+            Write-Error "ERROR: Slangc version unchanged after replacement!"
+            exit 1
+          }
+
+          # Check that version looks valid (not just a timestamp)
+          if ($newVersion -match '^\d{10,}$') {
+            Write-Error "ERROR: Slangc version appears invalid (timestamp only: $newVersion)"
+            Write-Error "This suggests the build failed to detect Git version tags"
+            exit 1
+          }
+
+          Write-Host "`nVerified: dxvk-remix will use the locally built Slang"
+
+      # Build shaders using build_shaders_only.ps1
+      # This script handles both configuration and compilation
+      - name: Build shaders using build_shaders_only.ps1
+        shell: pwsh
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: 1
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: 1
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Building RTX Remix shaders using build_shaders_only.ps1..."
+          Write-Host "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
+
+          Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')"
+          $startTime = Get-Date
+
+          cd dxvk-remix
+          .\build_shaders_only.ps1
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Shader build failed with exit code $LASTEXITCODE"
+          }
+
+          $duration = (Get-Date) - $startTime
+          Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
+          Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
+
+      # Verify build output
+      - name: Verify shader compilation
+        run: |
+          echo "Verifying shader compilation output..."
+          cd dxvk-remix/_BuildShadersOnly/src/dxvk/rtx_shaders
+
+          # Trim whitespace from wc output using xargs
+          headers=$(find . -maxdepth 1 -name "*.h" | wc -l | xargs)
+          spvFiles=$(find . -maxdepth 1 -name "*.spv" | wc -l | xargs)
+          totalSize=$(du -sm . 2>/dev/null | cut -f1 || echo "unknown")
+
+          echo "Compiled shader headers (.h): $headers"
+          echo "SPIR-V binary files (.spv): $spvFiles"
+          echo "Total output size: $totalSize MB"
+
+          # Validate that shaders were actually generated
+          # Note: Exact counts may vary as RTX Remix evolves
+          if [ "${headers:-0}" -eq 0 ] || [ "${spvFiles:-0}" -eq 0 ]; then
+            echo "ERROR: No shader files generated"
+            echo "This indicates shader compilation failed completely"
+            exit 1
+          fi
+
+          # Sanity check: RTX Remix should have at least some reasonable number of shaders
+          # Shader count is expected to stay stable or increase over time
+          if [ "${headers:-0}" -lt 100 ] || [ "${spvFiles:-0}" -lt 100 ]; then
+            echo "ERROR: Unexpectedly low shader count: $headers headers, $spvFiles .spv files"
+            echo "Expected at least 100 shaders - this may indicate a partial build failure"
+            exit 1
+          fi
+
+          echo ""
+          echo "RTX Remix shader compilation successful!"
+          echo "All $headers shader variants compiled correctly"
+
+      # Upload build logs on failure for debugging
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtx-remix-shader-build-logs
+          path: |
+            dxvk-remix/_BuildShadersOnly/meson-logs/
+          retention-days: 2
+
+      # Report results
+      - name: Report results
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          if [ "$BUILD_RESULT" = "success" ]; then
+            echo "RTX Remix shader test PASSED"
+            echo "Slang compiler changes are compatible with RTX Remix shaders"
+          else
+            echo "RTX Remix shader test FAILED"
+            echo "Slang compiler changes may have broken RTX Remix shader compilation"
+            echo "Review build logs for details"
+          fi
+          echo "================================================"
+        env:
+          BUILD_RESULT: ${{ job.status }}
+
+      # Slack notifications (for scheduled runs only)
+      - name: Success notification
+        id: slack-notify-success
+        if: ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "RTX-Remix-Nightly": ":green-check-mark: RTX Remix nightly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Failure notification
+        id: slack-notify-failure
+        if: ${{ github.event_name == 'schedule' && !success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "RTX-Remix-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nRTX Remix nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

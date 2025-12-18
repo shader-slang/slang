@@ -52,7 +52,7 @@ void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
-    assert(val);
+    SLANG_ASSERT(val);
 
     m_writer->emit("[[");
     m_writer->emit(name);
@@ -290,9 +290,35 @@ static IRImageSubscript* isTextureAccess(IRInst* inst)
     return as<IRImageSubscript>(getRootAddr(inst->getOperand(0)));
 }
 
+void MetalSourceEmitter::emitImageOperandWithAccessor(IRInst* imageOperand)
+{
+    emitOperand(imageOperand, getInfo(EmitOp::Postfix));
+
+    // Check if the image operand is a pointer type
+    if (as<IRPtrTypeBase>(imageOperand->getDataType()))
+    {
+        m_writer->emit("->");
+    }
+    else
+    {
+        m_writer->emit(".");
+    }
+}
+
 void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
 {
-    auto resourceType = as<IRResourceTypeBase>(inst->getImage()->getDataType());
+    auto imageDataType = inst->getImage()->getDataType();
+    auto resourceType = as<IRResourceTypeBase>(imageDataType);
+
+    // If the image data type is a pointer, get the value type
+    if (!resourceType)
+    {
+        if (auto ptrType = as<IRPtrTypeBase>(imageDataType))
+        {
+            resourceType = as<IRResourceTypeBase>(ptrType->getValueType());
+        }
+    }
+
     if (auto textureType = as<IRTextureType>(resourceType))
     {
         if (as<IRVectorType>(textureType->getElementType()))
@@ -303,7 +329,7 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
                 "atomic operation on non-scalar texture");
         }
     }
-    bool isArray = getIntVal(resourceType->getIsArrayInst()) != 0;
+    bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
     if (isArray)
     {
         emitOperand(inst->getCoord(), getInfo(EmitOp::Postfix));
@@ -375,8 +401,7 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         bool isImageOp = false;
         if (auto imageSubscript = isTextureAccess(inst))
         {
-            emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-            m_writer->emit(".");
+            emitImageOperandWithAccessor(imageSubscript->getImage());
             m_writer->emit(imageFunc);
             m_writer->emit("(");
             emitAtomicImageCoord(imageSubscript);
@@ -439,8 +464,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_load(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_load(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -465,8 +490,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_store(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_store(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -515,8 +540,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(";\n");
             if (imageSubscript)
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_compare_exchange_weak(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_compare_exchange_weak(");
                 emitAtomicImageCoord(imageSubscript);
             }
             else
@@ -588,8 +613,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_fetch_add(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_fetch_add(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -616,8 +641,8 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             bool isImageOp = false;
             if (auto imageSubscript = isTextureAccess(inst))
             {
-                emitOperand(imageSubscript->getImage(), getInfo(EmitOp::Postfix));
-                m_writer->emit(".atomic_fetch_sub(");
+                emitImageOperandWithAccessor(imageSubscript->getImage());
+                m_writer->emit("atomic_fetch_sub(");
                 emitAtomicImageCoord(imageSubscript);
                 isImageOp = true;
             }
@@ -1155,13 +1180,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_PtrType:
-    case kIROp_InOutType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
         {
             auto ptrType = cast<IRPtrTypeBase>(type);
-            if (type->getOp() == kIROp_ConstRefType)
+            if (type->getOp() == kIROp_BorrowInParamType)
             {
                 m_writer->emit("const ");
             }
@@ -1253,7 +1278,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit("uint32_t device*");
             break;
         case kIROp_RaytracingAccelerationStructureType:
-            m_writer->emit("acceleration_structure<instancing>");
+            m_writer->emit(
+                "metal::raytracing::acceleration_structure<metal::raytracing::instancing>");
             break;
         default:
             SLANG_DIAGNOSE_UNEXPECTED(getSink(), SourceLoc(), "unhandled buffer type");

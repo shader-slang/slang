@@ -1,6 +1,7 @@
 name: VK-GL-CTS Nightly
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "00 07 * * *"
 concurrency:
@@ -23,7 +24,7 @@ jobs:
             warnings-as-errors: true
             test-category: full
             full-gpu-tests: false
-            runs-on: [Windows, self-hosted]
+            runs-on: [Windows, self-hosted, regression-test, vulkancts]
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 180
     defaults:
@@ -44,13 +45,24 @@ jobs:
           build-llvm: true
       - name: Build Slang
         run: |
+          # Prepare ccache launcher arguments if ccache is available
+          cmake_launcher_defines=()
+          if [[ -n "${ccache_symlinks_path:-}" ]]; then
+            echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+            echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
+          else
+            echo "ℹ️  ccache_symlinks_path not set - building without ccache"
+          fi
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=${{matrix.warnings-as-errors}} \
             -DSLANG_ENABLE_CUDA=1 \
             -DSLANG_ENABLE_EXAMPLES=0 \
             -DSLANG_ENABLE_GFX=1 \
-            -DSLANG_ENABLE_TESTS=1
+            -DSLANG_ENABLE_TESTS=1 \
+            "${cmake_launcher_defines[@]}"
           cmake --workflow --preset "${{matrix.config}}"
       - uses: robinraju/release-downloader@v1.11
         with:
@@ -70,7 +82,7 @@ jobs:
         run: |
           Expand-Archive VK-GL-CTS_WithSlang-0.0.7-win64.zip
 
-          copy ${{ github.workspace }}\build\Release\bin\slang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang.dll
+          copy ${{ github.workspace }}\build\Release\bin\slang-compiler.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-compiler.dll
           copy ${{ github.workspace }}\build\Release\bin\slang-glslang.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glslang.dll
           copy ${{ github.workspace }}\build\Release\bin\slang-glsl-module.dll ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\slang-glsl-module.dll
           copy ${{ github.workspace }}\build\Release\bin\test-server.exe ${{ github.workspace }}\VK-GL-CTS_WithSlang-0.0.7-win64\test-server.exe
@@ -99,7 +111,7 @@ jobs:
 
       - name: success notification
         id: slack-notify-success
-        if: ${{ success() }}
+        if: ${{ github.event_name == 'schedule' && success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -110,7 +122,7 @@ jobs:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
       - name: failure notification
         id: slack-notify-failure
-        if: ${{ !success() }}
+        if: ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |

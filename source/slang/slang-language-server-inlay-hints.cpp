@@ -76,7 +76,7 @@ List<LanguageServerProtocol::InlayHint> getInlayHints(
                             lblSb << "inout ";
                         else if (param->hasModifier<RefModifier>())
                             lblSb << "ref ";
-                        else if (param->hasModifier<ConstRefModifier>())
+                        else if (param->hasModifier<BorrowModifier>())
                             lblSb << "constref ";
                         lblSb << name->text;
                         lblSb << ":";

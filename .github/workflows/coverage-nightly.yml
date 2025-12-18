@@ -1,0 +1,178 @@
+name: Coverage (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: "0 2 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read # Read slang repo
+  pull-requests: write # For PR comments (if needed)
+  # Note: GITHUB_TOKEN automatically has write access to other org repos
+
+jobs:
+  coverage-linux:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: linux
+      compiler: clang-18
+      platform: x86_64
+      config: relwithdebinfo
+      runs-on: '["ubuntu-22.04"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
+  coverage-macos:
+    uses: ./.github/workflows/ci-slang-coverage.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: relwithdebinfo
+      runs-on: '["macos-latest"]'
+      build-llvm: true
+      deploy-pages: false
+      server-count: 1
+    secrets: inherit
+
+  merge-and-deploy:
+    needs: [coverage-linux, coverage-macos]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "0"
+
+      - name: Download Coverage Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: coverage-artifacts
+
+      - name: Organize Coverage Data
+        run: |
+          # Create organized structure
+          mkdir -p coverage-reports/{linux,macos}
+
+          # Extract Linux coverage
+          if [ -d "coverage-artifacts/coverage-linux-x86_64" ]; then
+            cp coverage-artifacts/coverage-linux-x86_64/coverage-summary.json coverage-reports/linux/
+            cp -r coverage-artifacts/coverage-linux-x86_64/coverage-html coverage-reports/linux/
+          fi
+
+          # Extract macOS coverage
+          if [ -d "coverage-artifacts/coverage-macos-aarch64" ]; then
+            cp coverage-artifacts/coverage-macos-aarch64/coverage-summary.json coverage-reports/macos/
+            cp -r coverage-artifacts/coverage-macos-aarch64/coverage-html coverage-reports/macos/
+          fi
+
+          echo "Organized coverage data:"
+          ls -R coverage-reports/
+
+      - name: Combine Platform Summaries
+        run: |
+          # Create combined summary JSON
+          REPORT_DATE=$(date -u +"%Y-%m-%d")
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+
+          # Read platform summaries
+          LINUX_JSON=$(cat coverage-reports/linux/coverage-summary.json || echo "{}")
+          MACOS_JSON=$(cat coverage-reports/macos/coverage-summary.json || echo "{}")
+
+          # Create combined summary (platforms only for now, merged TBD)
+          cat > coverage-reports/combined-summary.json <<EOF
+          {
+            "date": "${REPORT_DATE}",
+            "commit": "${COMMIT_SHORT}",
+            "platforms": {
+              "linux": ${LINUX_JSON},
+              "macos": ${MACOS_JSON}
+            }
+          }
+          EOF
+
+          echo "Combined summary:"
+          cat coverage-reports/combined-summary.json
+
+      - name: Checkout Coverage Reports Repository
+        uses: actions/checkout@v4
+        with:
+          repository: "shader-slang/slang-coverage-reports"
+          path: "coverage-repo"
+          token: ${{ secrets.SLANG_COVERAGE_REPORTS_PAT }}
+
+      - name: Deploy Multi-Platform Coverage
+        run: |
+          REPORT_DATE=$(date -u +"%Y-%m-%d")
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          FULL_COMMIT=$(git rev-parse HEAD)
+          REPORT_DIR="reports/history/${REPORT_DATE}-${COMMIT_SHORT}"
+
+          cd coverage-repo
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Create directory structure
+          mkdir -p "${REPORT_DIR}"/{linux,macos}
+          mkdir -p reports/latest/{linux,macos}
+
+          # Copy Linux coverage
+          cp -r ../coverage-reports/linux/coverage-html/* "${REPORT_DIR}/linux/"
+          cp ../coverage-reports/linux/coverage-summary.json "${REPORT_DIR}/linux/"
+
+          # Copy macOS coverage
+          cp -r ../coverage-reports/macos/coverage-html/* "${REPORT_DIR}/macos/"
+          cp ../coverage-reports/macos/coverage-summary.json "${REPORT_DIR}/macos/"
+
+          # Copy combined summary
+          cp ../coverage-reports/combined-summary.json "${REPORT_DIR}/"
+
+          # Update latest
+          rm -rf reports/latest/{linux,macos}/*
+          cp -r ../coverage-reports/linux/coverage-html/* reports/latest/linux/
+          cp ../coverage-reports/linux/coverage-summary.json reports/latest/linux/
+          cp -r ../coverage-reports/macos/coverage-html/* reports/latest/macos/
+          cp ../coverage-reports/macos/coverage-summary.json reports/latest/macos/
+          cp ../coverage-reports/combined-summary.json reports/latest/
+
+          # Cleanup old reports (keep last 7 days + monthly snapshots)
+          if [ -f "tools/cleanup-old-reports.sh" ]; then
+            echo "Running cleanup to maintain repository size..."
+            bash tools/cleanup-old-reports.sh
+          fi
+
+          # Generate historical index
+          bash ../tools/coverage/generate-history-index.sh reports/history
+
+          # Generate root landing page (with reports/ prefix in links)
+          bash ../tools/coverage/generate-landing-page.sh reports index.html
+
+          # Generate data exports (CSV and JSON)
+          bash ../tools/coverage/generate-data-export.sh reports/history
+
+          # Commit and push if there are changes
+          git add reports/ index.html
+          if ! git diff --cached --quiet; then
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            git commit -m "Add multi-platform coverage report for ${REPORT_DATE} (${COMMIT_SHORT})" \
+                       -m "Generated from shader-slang/slang@${FULL_COMMIT}" \
+                       -m "Platforms: Linux (x86_64), macOS (aarch64)" \
+                       -m "Date: ${TIMESTAMP}"
+
+            git push origin main
+            echo "Multi-platform coverage report deployed successfully"
+          else
+            echo "No changes to coverage report"
+          fi

@@ -7,6 +7,10 @@
 #include "slang-syntax.h"
 #include "slang.h"
 
+#include <algorithm>
+#include <compare>
+#include <limits>
+
 namespace Slang
 {
 
@@ -16,6 +20,7 @@ enum class BaseType;
 class Type;
 
 struct IRLayout;
+struct TypeLayoutContext;
 
 //
 
@@ -27,8 +32,11 @@ enum class LayoutRulesFamily
 };
 #endif
 
-// A "size" that can either be a simple finite size or
-// the special case of an infinite/unbounded size.
+struct LayoutOffset;
+
+// A "size" that can either be a simple finite size,
+// the special case of an infinite/unbounded size, or
+// the special case of an invalid size.
 //
 struct LayoutSize
 {
@@ -42,8 +50,10 @@ struct LayoutSize
     LayoutSize(RawValue size)
         : raw(size)
     {
-        SLANG_ASSERT(size != RawValue(-1));
+        SLANG_ASSERT(size != s_infiniteValue && size != s_invalidValue);
     }
+
+    explicit LayoutSize(LayoutOffset offset);
 
     static LayoutSize fromRaw(RawValue raw)
     {
@@ -55,47 +65,93 @@ struct LayoutSize
     static LayoutSize infinite()
     {
         LayoutSize result;
-        result.raw = RawValue(-1);
+        result.raw = s_infiniteValue;
         return result;
     }
 
-    bool isInfinite() const { return raw == RawValue(-1); }
-
-    bool isFinite() const { return raw != RawValue(-1); }
-    RawValue getFiniteValue() const
+    static LayoutSize invalid()
     {
-        SLANG_ASSERT(isFinite());
-        return raw;
+        LayoutSize result;
+        result.raw = s_invalidValue;
+        return result;
     }
 
-    bool operator==(LayoutSize that) const { return raw == that.raw; }
+    bool isInfinite() const { return raw == s_infiniteValue; }
+    bool isInvalid() const { return raw == s_invalidValue; }
+    bool isValid() const { return raw != s_invalidValue; }
+    bool isFinite() const { return raw != s_infiniteValue && raw != s_invalidValue; }
+    LayoutOffset getFiniteValue() const;
+    RawValue getFiniteValueOr(RawValue fallback) const;
 
-    bool operator!=(LayoutSize that) const { return raw != that.raw; }
+    RawValue unsafeGetRaw() const { return raw; }
 
-    bool operator>(LayoutSize that) const
+    std::partial_ordering compare(RawValue that) const
     {
-        if (that.isFinite())
+        if (this->isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
         {
-            if (this->isFinite())
-                return this->raw > that.raw;
-            return true;
+            return std::partial_ordering::greater;
         }
         else
         {
-            if (that.isInfinite())
-                return false;
-            return true;
+            if (this->raw < that)
+                return std::partial_ordering::less;
+            else if (this->raw > that)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
         }
     }
 
+    std::partial_ordering compare(LayoutSize that) const
+    {
+        if (this->isInvalid() || that.isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->isInfinite())
+        {
+            if (that.isInfinite())
+                return std::partial_ordering::equivalent;
+            else
+                return std::partial_ordering::greater;
+        }
+        else if (that.isInfinite())
+        {
+            return std::partial_ordering::less;
+        }
+        else
+        {
+            // Both are finite
+            if (this->raw < that.raw)
+                return std::partial_ordering::less;
+            else if (this->raw > that.raw)
+                return std::partial_ordering::greater;
+            else
+                return std::partial_ordering::equivalent;
+        }
+    }
+
+
     void operator+=(LayoutSize right)
     {
-        if (isInfinite())
+        if (isInvalid() || right.isInvalid())
         {
+            *this = LayoutSize::invalid();
+        }
+        else if (isInfinite())
+        {
+            // Infinite + anything = infinite
         }
         else if (right.isInfinite())
         {
             *this = LayoutSize::infinite();
+        }
+        else if (raw > s_maxFiniteValue - right.raw)
+        {
+            // Check for overflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -105,6 +161,12 @@ struct LayoutSize
 
     void operator*=(LayoutSize right)
     {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutSize::invalid();
+            return;
+        }
+
         // Deal with zero first, so that anything (even the "infinite" value) times zero is zero.
         if (raw == 0)
         {
@@ -129,14 +191,31 @@ struct LayoutSize
             return;
         }
 
-        // Finally deal with the case where both sides are finite
-        *this = LayoutSize(raw * right.raw);
+        // Finally deal with the case where both sides are finite - check for overflow
+        if (raw > s_maxFiniteValue / right.raw)
+        {
+            *this = LayoutSize::invalid();
+        }
+        else
+        {
+            *this = LayoutSize(raw * right.raw);
+        }
     }
 
     void operator-=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
         {
+            // Invalid remains invalid
+        }
+        else if (isInfinite())
+        {
+            // Infinite - anything = infinite
+        }
+        else if (raw < right)
+        {
+            // Check for underflow
+            *this = LayoutSize::invalid();
         }
         else
         {
@@ -146,14 +225,30 @@ struct LayoutSize
 
     void operator/=(RawValue right)
     {
-        if (isInfinite())
+        if (isInvalid())
         {
+            // Invalid remains invalid
+        }
+        else if (right == 0)
+        {
+            // Division by zero
+            *this = LayoutSize::invalid();
+        }
+        else if (isInfinite())
+        {
+            // Infinite / anything non-zero = infinite
         }
         else
         {
             *this = LayoutSize(raw / right);
         }
     }
+
+private:
+    static const RawValue s_infiniteValue = RawValue(-1);
+    static const RawValue s_invalidValue = RawValue(-2);
+    static const RawValue s_maxFiniteValue = s_invalidValue - 1;
+    friend struct LayoutOffset;
     RawValue raw;
 };
 
@@ -185,37 +280,289 @@ inline LayoutSize operator/(LayoutSize left, LayoutSize::RawValue right)
     return result;
 }
 
+
+// An offset that can either be a valid finite offset or
+// the special case of an invalid offset.
+//
+struct LayoutOffset
+{
+    typedef size_t RawValue;
+
+    LayoutOffset()
+        : raw(0)
+    {
+    }
+
+    LayoutOffset(RawValue offset)
+        : raw(offset)
+    {
+        SLANG_ASSERT(offset != s_invalidValue);
+    }
+
+    explicit LayoutOffset(LayoutSize size)
+    {
+        if (size.isInfinite() || size.isInvalid())
+            *this = LayoutOffset::invalid();
+        raw = size.raw;
+    }
+
+    static LayoutOffset invalid()
+    {
+        LayoutOffset result;
+        result.raw = s_invalidValue;
+        return result;
+    }
+
+    static LayoutOffset fromRaw(RawValue raw)
+    {
+        LayoutOffset ret;
+        ret.raw = raw;
+        return ret;
+    }
+
+    bool isInvalid() const { return raw == s_invalidValue; }
+
+    bool isValid() const { return raw != s_invalidValue; }
+    RawValue getValidValue() const
+    {
+        SLANG_ASSERT(isValid());
+        return raw;
+    }
+
+    RawValue getValidValueOr(RawValue other) const
+    {
+        if (isValid())
+            return raw;
+        return other;
+    }
+
+    RawValue unsafeGetRaw() const { return raw; }
+
+    std::partial_ordering compare(RawValue that) const
+    {
+        if (this->isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->raw < that)
+            return std::partial_ordering::less;
+        else if (this->raw > that)
+            return std::partial_ordering::greater;
+        else
+            return std::partial_ordering::equivalent;
+    }
+
+    std::partial_ordering compare(LayoutOffset that) const
+    {
+        if (this->isInvalid() || that.isInvalid())
+            return std::partial_ordering::unordered;
+
+        if (this->raw < that.raw)
+            return std::partial_ordering::less;
+        else if (this->raw > that.raw)
+            return std::partial_ordering::greater;
+        else
+            return std::partial_ordering::equivalent;
+    }
+
+    void operator+=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (raw > s_maxValidValue - right.raw)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right.raw);
+        }
+    }
+
+    // Signed addition
+    void operator+=(Index right)
+    {
+        if (isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right > 0 && raw > s_maxValidValue - right)
+        {
+            // Check for positive overflow
+            *this = LayoutOffset::invalid();
+        }
+        else if (right < 0 && (Index)raw < 0 - right)
+        {
+            // Check for negative overflow (underflow)
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw + right);
+        }
+    }
+
+    void operator*=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right.raw != 0 && raw > s_maxValidValue / right.raw)
+        {
+            // Check for overflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw * right.raw);
+        }
+    }
+
+    void operator-=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (raw < right.raw)
+        {
+            // Check for underflow
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw - right.raw);
+        }
+    }
+
+    void operator/=(LayoutOffset right)
+    {
+        if (isInvalid() || right.isInvalid())
+        {
+            *this = LayoutOffset::invalid();
+        }
+        else if (right.raw == 0)
+        {
+            // Division by zero
+            *this = LayoutOffset::invalid();
+        }
+        else
+        {
+            *this = LayoutOffset(raw / right.raw);
+        }
+    }
+
+private:
+    static const RawValue s_invalidValue = LayoutSize::s_invalidValue;
+    static const RawValue s_maxValidValue = s_invalidValue - 1;
+    friend struct LayoutSize;
+    RawValue raw;
+};
+
+inline LayoutOffset LayoutSize::getFiniteValue() const
+{
+    SLANG_ASSERT(!isInfinite());
+    return LayoutOffset{*this};
+}
+
+inline LayoutSize::RawValue LayoutSize::getFiniteValueOr(RawValue fallback) const
+{
+    if (isInfinite() || isInvalid())
+        return fallback;
+    return raw;
+}
+
+inline LayoutSize::LayoutSize(LayoutOffset offset)
+{
+    *this = LayoutSize::fromRaw(offset.raw);
+}
+
 inline LayoutSize maximum(LayoutSize left, LayoutSize right)
 {
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutSize::invalid();
+
     if (left.isInfinite() || right.isInfinite())
         return LayoutSize::infinite();
 
-    return LayoutSize(Math::Max(left.getFiniteValue(), right.getFiniteValue()));
+    auto leftOffset = left.getFiniteValue();
+    auto rightOffset = right.getFiniteValue();
+    if (leftOffset.isInvalid() || rightOffset.isInvalid())
+        return LayoutSize::invalid();
+
+    return LayoutSize(std::max(leftOffset.getValidValue(), rightOffset.getValidValue()));
 }
 
-inline bool operator>(LayoutSize left, LayoutSize::RawValue right)
+
+inline LayoutOffset operator+(LayoutOffset left, LayoutOffset right)
 {
-    return left.isInfinite() || (left.getFiniteValue() > right);
+    LayoutOffset result(left);
+    result += right;
+    return result;
 }
 
-inline bool operator<=(LayoutSize left, LayoutSize::RawValue right)
+inline LayoutOffset operator+(LayoutOffset left, LayoutOffset::RawValue right)
 {
-    return left.isFinite() && (left.getFiniteValue() <= right);
+    return left + LayoutOffset{right};
 }
+
+inline LayoutOffset operator*(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result *= right;
+    return result;
+}
+
+inline LayoutOffset operator*(LayoutOffset left, LayoutOffset::RawValue right)
+{
+    return left * LayoutOffset{right};
+}
+
+
+inline LayoutOffset operator-(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result -= right;
+    return result;
+}
+
+inline LayoutOffset operator/(LayoutOffset left, LayoutOffset right)
+{
+    LayoutOffset result(left);
+    result /= right;
+    return result;
+}
+
+inline LayoutOffset maximum(LayoutOffset left, LayoutOffset right)
+{
+    if (left.isInvalid() || right.isInvalid())
+        return LayoutOffset::invalid();
+
+    return LayoutOffset(std::max(left.getValidValue(), right.getValidValue()));
+}
+
 
 // Layout appropriate to "just memory" scenarios,
 // such as laying out the members of a constant buffer.
 struct UniformLayoutInfo
 {
     LayoutSize size;
-    size_t alignment;
+    LayoutOffset alignment;
 
     UniformLayoutInfo()
         : size(0), alignment(1)
     {
     }
 
-    UniformLayoutInfo(LayoutSize size, size_t alignment)
+    UniformLayoutInfo(LayoutSize size, LayoutOffset alignment)
+        : size(size), alignment(alignment)
+    {
+    }
+
+    UniformLayoutInfo(LayoutSize size, UInt alignment)
         : size(size), alignment(alignment)
     {
     }
@@ -226,14 +573,14 @@ struct UniformLayoutInfo
 // consecutive elements).
 struct UniformArrayLayoutInfo : UniformLayoutInfo
 {
-    size_t elementStride;
+    LayoutOffset elementStride;
 
     UniformArrayLayoutInfo()
         : elementStride(0)
     {
     }
 
-    UniformArrayLayoutInfo(LayoutSize size, size_t alignment, size_t elementStride)
+    UniformArrayLayoutInfo(LayoutSize size, LayoutOffset alignment, LayoutOffset elementStride)
         : UniformLayoutInfo(size, alignment), elementStride(elementStride)
     {
     }
@@ -314,7 +661,7 @@ struct SimpleLayoutInfo
     LayoutSize size;
 
     // only useful in the uniform case
-    size_t alignment;
+    LayoutOffset alignment;
 
     SimpleLayoutInfo()
         : kind(LayoutResourceKind::None), size(0), alignment(1)
@@ -328,7 +675,12 @@ struct SimpleLayoutInfo
     {
     }
 
-    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, size_t alignment = 1)
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, UInt alignment = 1)
+        : kind(kind), size(size), alignment(alignment)
+    {
+    }
+
+    SimpleLayoutInfo(LayoutResourceKind kind, LayoutSize size, LayoutOffset alignment)
         : kind(kind), size(size), alignment(alignment)
     {
     }
@@ -351,7 +703,7 @@ struct SimpleLayoutInfo
 struct SimpleArrayLayoutInfo : SimpleLayoutInfo
 {
     // This field is only useful in the uniform case
-    size_t elementStride;
+    LayoutOffset elementStride;
 
     // Convert to layout for uniform data
     UniformArrayLayoutInfo getUniformLayout()
@@ -412,22 +764,8 @@ public:
     // For uniform data, alignment matters, but not for
     // any other resource category, so we don't waste
     // the space storing it in the above array
-    UInt uniformAlignment = 1;
+    LayoutOffset uniformAlignment = 1;
 
-
-    /// The layout for data that is conceptually owned by this type, but which is pending layout.
-    ///
-    /// When a type contains interface/existential fields (recursively), the
-    /// actual data referenced by these fields needs to get allocated somewhere,
-    /// but it cannot go inline at the point where the interface/existential
-    /// type appears, or else the layout of a composite object would change
-    /// when the concrete type(s) we plug in change.
-    ///
-    /// We solve this problem by tracking this data that is "pending" layout,
-    /// and then "flushing" the pending data at appropriate places during
-    /// the layout process.
-    ///
-    RefPtr<TypeLayout> pendingDataTypeLayout;
 
     ResourceInfo* FindResourceInfo(LayoutResourceKind kind)
     {
@@ -454,7 +792,7 @@ public:
 
     void addResourceUsage(ResourceInfo info)
     {
-        if (info.count == 0)
+        if (info.count.compare(LayoutSize(0)) == std::partial_ordering::equivalent)
             return;
 
         findOrAddResourceInfo(info.kind)->count += info.count;
@@ -488,7 +826,7 @@ public:
             SlangBindingType bindingType;
             LayoutResourceKind kind;
             LayoutSize count;
-            Int indexOffset;
+            LayoutOffset indexOffset;
         };
 
         struct DescriptorSetInfo : public RefObject
@@ -511,7 +849,7 @@ public:
         struct SubObjectRangeInfo
         {
             Int bindingRangeIndex = 0;
-            Int spaceOffset = 0;
+            LayoutOffset spaceOffset = 0;
             RefPtr<VarLayout> offsetVarLayout;
         };
 
@@ -575,7 +913,7 @@ public:
         // What is our starting register in that space?
         //
         // (In the case of uniform data, this is a byte offset)
-        UInt index;
+        LayoutOffset index;
     };
     List<ResourceInfo> resourceInfos;
 
@@ -611,7 +949,6 @@ public:
 
     void removeResourceUsage(LayoutResourceKind kind);
 
-    RefPtr<VarLayout> pendingVarLayout;
 
     /// Offset in binding ranges within the parent type
     ///
@@ -670,7 +1007,7 @@ public:
     RefPtr<TypeLayout> elementTypeLayout;
 
     /// The stride in bytes between elements.
-    size_t uniformStride = 0;
+    LayoutOffset uniformStride = 0;
 };
 
 /// Type layout for an array type
@@ -791,7 +1128,6 @@ class ExistentialSpecializedTypeLayout : public TypeLayout
 {
 public:
     RefPtr<TypeLayout> baseTypeLayout;
-    RefPtr<VarLayout> pendingDataVarLayout;
 };
 
 /// Layout for a scoped entity like a program, module, or entry point
@@ -1017,6 +1353,12 @@ struct SimpleLayoutRulesImpl
     // Do structured buffers need a separate binding for the counter buffer?
     // (DirectX is the exception in managing these together)
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
+
+    // Get layout for DescriptorHandle<T>
+    virtual ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1090,6 +1432,14 @@ struct LayoutRulesImpl
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
     }
 
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context)
+    {
+        return simpleRules->GetDescriptorHandleLayout(kind, elementType, context);
+    }
+
     // Forward `ObjectLayoutRulesImpl` interface
 
     ObjectLayoutInfo GetObjectLayout(
@@ -1123,6 +1473,8 @@ struct LayoutRulesFamilyImpl
     virtual LayoutRulesImpl* getHitAttributesParameterRules() = 0;
 
     virtual LayoutRulesImpl* getShaderRecordConstantBufferRules() = 0;
+
+    virtual LayoutRulesImpl* getEntryPointParameterRules() = 0;
 
     virtual LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) = 0;
 };
@@ -1183,11 +1535,11 @@ struct TypeLayoutContext
     // Options passed to object layout
     ObjectLayoutRulesImpl::Options objectLayoutOptions;
 
-    // Mangled names to DeclRefType, this is used to match up 'extern' types to
+    // Mangled names to Type, this is used to match up 'extern' types to
     // their linked in definitions during layout generation
-    std::optional<Dictionary<String, DeclRefType*>> externTypeMap;
+    std::optional<Dictionary<String, Type*>> externTypeMap;
 
-    DeclRefType* lookupExternDeclRefType(DeclRefType* declRefType);
+    Type* lookupExternDeclRefType(DeclRefType* declRefType);
     void buildExternTypeMap();
 
     LayoutRulesImpl* getRules() { return rules; }
@@ -1219,7 +1571,7 @@ struct TypeLayoutContext
     TypeLayoutContext withSpecializationArgsOffsetBy(Int offset) const
     {
         TypeLayoutContext result = *this;
-        if (specializationArgCount > offset)
+        if (offset < specializationArgCount)
         {
             result.specializationArgCount = specializationArgCount - offset;
             result.specializationArgs = specializationArgs + offset;

@@ -341,6 +341,7 @@ bool doStructFieldsHaveSemantic(Type* type)
     return doStructFieldsHaveSemanticImpl(type, seenTypes);
 }
 
+
 // Validate that an entry point function conforms to any additional
 // constraints based on the stage (and profile?) it specifies.
 void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
@@ -376,7 +377,30 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     auto entryPointName = entryPointFuncDecl->getName();
 
     auto module = getModule(entryPointFuncDecl);
-    auto linkage = module->getLinkage();
+    auto linkage = entryPoint->getLinkage();
+
+    // Check if the return type is valid for a shader entry point
+    auto returnType = entryPointFuncDecl->returnType.type;
+    if (returnType)
+    {
+        // Use the existing getTypeTags functionality to check for resource types
+        // Create a temporary SemanticsVisitor to access getTypeTags
+        SharedSemanticsContext shared(linkage, module, sink);
+        SemanticsVisitor visitor(&shared);
+
+        auto typeTags = visitor.getTypeTags(returnType);
+        bool hasResourceOrUnsizedTypes = (((int)typeTags & (int)TypeTag::Opaque) != 0) ||
+                                         (((int)typeTags & (int)TypeTag::Unsized) != 0);
+
+        if (hasResourceOrUnsizedTypes)
+        {
+            sink->diagnose(
+                entryPointFuncDecl,
+                Diagnostics::entryPointCannotReturnResourceType,
+                entryPointName,
+                returnType);
+        }
+    }
 
     // Every entry point needs to have a stage specified either via
     // command-line/API options, or via an explicit `[shader("...")]` attribute.
@@ -531,12 +555,57 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // Attribute and keyword diagnostics. Check for the [[vk::binding]] and [[vk::push_constants]]
+    // attributes, and the register() and packoffset() keywords on entry point parameters. Slang
+    // currently ignores these, which can lead to user confusion whenever the output does not
+    // correspond to what was requested. Conversely, Slang silently generating output that just
+    // happens to align with what's requested can also lead to user confusion, with the user
+    // mistakenly believing that the modifiers are working as intended.
+    //
+    // Note that this only checks when they're used on entry point parameters.
+    for (const auto& param : entryPointFuncDecl->getParameters())
+    {
+        if (param->findModifier<GLSLBindingAttribute>())
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "attribute '[[vk::binding(...)]]'",
+                param->getName());
+        }
+        if (param->findModifier<PushConstantAttribute>())
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "attribute '[[vk::push_constant]]'",
+                param->getName());
+        }
+        if (param->findModifier<HLSLRegisterSemantic>())
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "keyword 'register'",
+                param->getName());
+        }
+        if (param->findModifier<HLSLPackOffsetSemantic>())
+        {
+            sink->diagnose(
+                param,
+                Diagnostics::unhandledModOnEntryPointParameter,
+                "keyword 'packoffset'",
+                param->getName());
+        }
+    }
+
     for (auto target : linkage->targets)
     {
         auto targetCaps = target->getTargetCaps();
         auto stageCapabilitySet = entryPoint->getProfile().getCapabilityName();
         targetCaps.join(stageCapabilitySet);
-        if (targetCaps.isIncompatibleWith(entryPointFuncDecl->inferredCapabilityRequirements))
+        if (targetCaps.isIncompatibleWith(
+                CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}))
         {
             // Incompatable means we don't support a set of abstract atoms.
             // Diagnose that we lack support for 'stage' and 'target' atoms with our provided
@@ -598,11 +667,12 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Only attempt to error if a specific profile or capability is requested
             if ((specificCapabilityRequested || specificProfileRequested) &&
                 targetCaps.atLeastOneSetImpliedInOther(
-                    entryPointFuncDecl->inferredCapabilityRequirements) ==
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements}) ==
                     CapabilitySet::ImpliesReturnFlags::NotImplied)
             {
                 CapabilitySet combinedSets = targetCaps;
-                combinedSets.join(entryPointFuncDecl->inferredCapabilityRequirements);
+                combinedSets.join(
+                    CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
                 if (auto targetCapSet = targetCaps.getAtomSets())
                 {
@@ -639,7 +709,8 @@ bool resolveStageOfProfileWithEntryPoint(
     if (auto entryPointAttr = entryPointFuncDecl->findModifier<EntryPointAttribute>())
     {
         auto entryPointProfileStage = entryPointProfile.getStage();
-        auto entryPointStage = getStageFromAtom(entryPointAttr->capabilitySet.getTargetStage());
+        auto entryPointStage =
+            getStageFromAtom(CapabilitySet{entryPointAttr->capabilitySet}.getTargetStage());
 
         // Ensure every target is specifying the same stage as an entry-point
         // if a profile+stage was set, else user will not be aware that their
@@ -672,7 +743,7 @@ bool resolveStageOfProfileWithEntryPoint(
                 entryPointFuncDecl->getName(),
                 entryPointProfileStage,
                 entryPointStage);
-        entryPointProfile.additionalCapabilities.add(entryPointAttr->capabilitySet);
+        entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
     return false;
@@ -758,7 +829,7 @@ Name* getReflectionName(VarDeclBase* varDecl)
     return varDecl->getName();
 }
 
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramType = getType(astBuilder, paramDeclRef);
     if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -769,24 +840,33 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
-    switch (direction)
+    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
+    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+}
+
+Type* getParamTypeWithModeWrapper(
+    ASTBuilder* astBuilder,
+    Type* paramValueType,
+    ParamPassingMode paramMode)
+{
+    switch (paramMode)
     {
-    case kParameterDirection_In:
-        return result;
-    case kParameterDirection_ConstRef:
-        return astBuilder->getConstRefType(result);
-    case kParameterDirection_Out:
-        return astBuilder->getOutType(result);
-    case kParameterDirection_InOut:
-        return astBuilder->getInOutType(result);
-    case kParameterDirection_Ref:
-        return astBuilder->getRefType(result);
+    case ParamPassingMode::In:
+        return paramValueType;
+    case ParamPassingMode::BorrowIn:
+        return astBuilder->getConstRefParamType(paramValueType);
+    case ParamPassingMode::Out:
+        return astBuilder->getOutParamType(paramValueType);
+    case ParamPassingMode::BorrowInOut:
+        return astBuilder->getBorrowInOutParamType(paramValueType);
+    case ParamPassingMode::Ref:
+        return astBuilder->getRefParamType(paramValueType);
     default:
-        return result;
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramValueType);
     }
 }
 
@@ -1501,6 +1581,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     auto args = inArgs;
     auto argCount = inArgCount;
 
@@ -1555,9 +1637,33 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                 genericArgs.add(specializationArg.expr);
                 continue;
             }
-            auto typeExpr = astBuilder->create<SharedTypeExpr>();
-            typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
-            genericArgs.add(typeExpr);
+            if (auto typeVal = as<Type>(specializationArg.val))
+            {
+                auto typeExpr = astBuilder->create<SharedTypeExpr>();
+                typeExpr->type = astBuilder->getTypeType(typeVal);
+                genericArgs.add(typeExpr);
+            }
+            else if (auto intVal = as<ConstantIntVal>(specializationArg.val))
+            {
+                if (intVal->getType() == astBuilder->getBoolType())
+                {
+                    auto intExpr = astBuilder->create<BoolLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue() != 0;
+                    genericArgs.add(intExpr);
+                }
+                else
+                {
+                    auto intExpr = astBuilder->create<IntegerLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue();
+                    genericArgs.add(intExpr);
+                }
+            }
+            else
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::invalidFormOfSpecializationArg, ii + 1);
+            }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
         auto genExpr = astBuilder->create<VarExpr>();
@@ -1779,7 +1885,7 @@ Type* Linkage::specializeType(
         unspecializedType,
         SourceLoc());
 
-    assert(specializationParams.getCount() == argCount);
+    SLANG_ASSERT(specializationParams.getCount() == argCount);
 
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)

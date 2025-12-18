@@ -211,7 +211,7 @@ SlangResult LanguageServer::parseNextMessage()
                 if (response.result.getKind() == JSONValue::Kind::Array)
                 {
                     auto arr = m_connection->getContainer()->getArray(response.result);
-                    if (arr.getCount() == 13)
+                    if (arr.getCount() == 14)
                     {
                         updatePredefinedMacros(arr[0]);
                         updateSearchPaths(arr[1]);
@@ -219,7 +219,8 @@ SlangResult LanguageServer::parseNextMessage()
                         updateCommitCharacters(arr[3]);
                         updateFormattingOptions(arr[4], arr[5], arr[6], arr[7], arr[8], arr[9]);
                         updateInlayHintOptions(arr[10], arr[11]);
-                        updateTraceOptions(arr[12]);
+                        updateWorkspaceFlavor(arr[12]);
+                        updateTraceOptions(arr[13]);
                     }
                 }
                 break;
@@ -1112,8 +1113,19 @@ LanguageServerResult<List<LanguageServerProtocol::Location>> LanguageServerCore:
             Location result;
             if (File::exists(loc.loc.pathInfo.foundPath))
             {
-                result.uri =
-                    URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+                // Canonicalize the path to ensure we always use absolute paths in URIs
+                String canonicalFoundPath;
+                if (SLANG_SUCCEEDED(
+                        Path::getCanonical(loc.loc.pathInfo.foundPath, canonicalFoundPath)))
+                {
+                    result.uri = URI::fromLocalFilePath(canonicalFoundPath.getUnownedSlice()).uri;
+                }
+                else
+                {
+                    // If canonicalization fails, use the original path
+                    result.uri =
+                        URI::fromLocalFilePath(loc.loc.pathInfo.foundPath.getUnownedSlice()).uri;
+                }
             }
             else if (loc.loc.pathInfo.getName() == "core" || loc.loc.pathInfo.getName() == "glsl")
             {
@@ -2373,6 +2385,30 @@ void LanguageServer::updateTraceOptions(const JSONValue& value)
     }
 }
 
+void LanguageServer::updateWorkspaceFlavor(const JSONValue& value)
+{
+    if (value.isValid())
+    {
+        auto container = m_connection->getContainer();
+        JSONToNativeConverter converter(container, &m_typeMap, m_connection->getSink());
+        String str;
+        if (SLANG_SUCCEEDED(converter.convert(value, &str)))
+        {
+            WorkspaceFlavor flavor = WorkspaceFlavor::Standard;
+            if (str == "standard")
+            {
+                flavor = WorkspaceFlavor::Standard;
+            }
+            else if (str == "vfx")
+            {
+                flavor = WorkspaceFlavor::VFX;
+            }
+
+            m_core.m_workspace->workspaceFlavor = flavor;
+        }
+    }
+}
+
 void LanguageServer::sendConfigRequest()
 {
     ConfigurationParams args;
@@ -2400,6 +2436,8 @@ void LanguageServer::sendConfigRequest()
     item.section = "slang.inlayHints.deducedTypes";
     args.items.add(item);
     item.section = "slang.inlayHints.parameterNames";
+    args.items.add(item);
+    item.section = "slang.workspaceFlavor";
     args.items.add(item);
     item.section = "slangLanguageServer.trace.server";
     args.items.add(item);
@@ -2514,7 +2552,17 @@ LanguageServerResult<List<Location>> LanguageServerCore::tryGotoMacroDefinition(
     List<LanguageServerProtocol::Location> results;
     results.setCount(1);
     auto& result = results[0];
-    result.uri = URI::fromLocalFilePath(humaneLoc.pathInfo.foundPath.getUnownedSlice()).uri;
+    // Canonicalize the path to ensure we always use absolute paths in URIs
+    String canonicalPath;
+    if (SLANG_SUCCEEDED(Path::getCanonical(humaneLoc.pathInfo.foundPath, canonicalPath)))
+    {
+        result.uri = URI::fromLocalFilePath(canonicalPath.getUnownedSlice()).uri;
+    }
+    else
+    {
+        // If canonicalization fails, use the original path
+        result.uri = URI::fromLocalFilePath(humaneLoc.pathInfo.foundPath.getUnownedSlice()).uri;
+    }
     Index outLine, outCol;
     doc->oneBasedUTF8LocToZeroBasedUTF16Loc(humaneLoc.line, humaneLoc.column, outLine, outCol);
     result.range.start.line = (int)outLine;
@@ -2541,7 +2589,17 @@ LanguageServerResult<List<Location>> LanguageServerCore::tryGotoFileInclude(
             List<LanguageServerProtocol::Location> results;
             results.setCount(1);
             auto& result = results[0];
-            result.uri = URI::fromLocalFilePath(include.path.getUnownedSlice()).uri;
+            // Canonicalize the path to ensure we always use absolute paths in URIs
+            String canonicalPath;
+            if (SLANG_SUCCEEDED(Path::getCanonical(include.path, canonicalPath)))
+            {
+                result.uri = URI::fromLocalFilePath(canonicalPath.getUnownedSlice()).uri;
+            }
+            else
+            {
+                // If canonicalization fails, use the original path
+                result.uri = URI::fromLocalFilePath(include.path.getUnownedSlice()).uri;
+            }
             result.range.start.line = 0;
             result.range.start.character = 0;
             result.range.end.line = 0;
@@ -2962,6 +3020,10 @@ void LanguageServer::updateConfigFromJSON(const JSONValue& jsonVal)
         else if (key == "slang.inlayHints.parameterNames")
         {
             updateInlayHintOptions(JSONValue(), kv.value);
+        }
+        else if (key == "slang.workspaceFlavor")
+        {
+            updateWorkspaceFlavor(kv.value);
         }
     }
 }

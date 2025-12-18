@@ -35,4 +35,5 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
 bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex);
 
 bool trimOptimizableTypes(IRModule* module);
+
 } // namespace Slang

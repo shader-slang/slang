@@ -11,6 +11,11 @@ namespace Slang
 struct GenericChildrenMigrationContextImpl;
 struct IRCloneEnv;
 
+constexpr IRIntegerValue kInvalidAnyValueSize = 0xFFFFFFFF;
+constexpr IRIntegerValue kDefaultAnyValueSize = 16;
+constexpr SlangInt kRTTIHeaderSize = 16;
+constexpr SlangInt kRTTIHandleSize = 8;
+
 // A helper class to clone children insts to a different generic parent that has equivalent set of
 // generic parameters. The clone will take care of substitution of equivalent generic parameters and
 // intermediate values between the two generic parents.
@@ -69,6 +74,8 @@ bool isPointerOfType(IRInst* ptrType, IRInst* elementType);
 
 // True if ptrType is a pointer type to a type of opCode
 bool isPointerOfType(IRInst* ptrType, IROp opCode);
+
+bool isUserPointerType(IRInst* type);
 
 // Builds a dictionary that maps from requirement key to requirement value for `interfaceType`.
 Dictionary<IRInst*, IRInst*> buildInterfaceRequirementDict(IRInterfaceType* interfaceType);
@@ -205,6 +212,12 @@ IRInst* getRootAddr(
 
 bool canAddressesPotentiallyAlias(IRGlobalValueWithCode* func, IRInst* addr1, IRInst* addr2);
 
+bool canAddressesPotentiallyAlias(
+    TargetRequest* target,
+    IRGlobalValueWithCode* func,
+    IRInst* addr1,
+    IRInst* addr2);
+
 String dumpIRToString(
     IRInst* root,
     IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
@@ -229,7 +242,10 @@ bool isPtrLikeOrHandleType(IRInst* type);
 
 bool canInstHaveSideEffectAtAddress(IRGlobalValueWithCode* func, IRInst* inst, IRInst* addr);
 
-IRInst* getUndefInst(IRBuilder builder, IRModule* module);
+/// Get a unit-type (aka `void`) value using the `poison` instruction,
+/// which indicates an undefined (and potentially unstable) value.
+///
+IRInst* getUnitPoisonVal(IRBuilder builder, IRModule* module);
 
 // The the equivalent op of (a op b) in (b op' a). For example, a > b is equivalent to b < a. So (<)
 // ==> (>).
@@ -376,6 +392,13 @@ void verifyComputeDerivativeGroupModifiers(
 int getIRVectorElementSize(IRType* type);
 IRType* getIRVectorBaseType(IRType* type);
 
+// Retrieves the element type of a pointer, buffer, array, vector or matrix type.
+// This is the result type of a ElementExtract operation on a value of `type`.
+IRType* getElementType(IRBuilder& builder, IRType* type);
+
+// Find the struct field with `key` and return its type. Return nullptr if not found.
+IRType* getFieldType(IRType* type, IRStructKey* key);
+
 Int getSpecializationConstantId(IRGlobalParam* param);
 
 void legalizeDefUse(IRGlobalValueWithCode* func);
@@ -418,6 +441,32 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+// Returns true if the memory location pointed to by `ptrInst` is immutable.
+// An immutable location is the memory region that can't be modified by the user code.
+// Examples are ConstantBuffer and shader resource contents(e.g. StructuredBuffer).
+// Note that this is to be disguished from the access qualifier of the pointer itself,
+// e.g. a `ptrInst` of type `Ptr<T, Access.Read>` may still point to a mutable location,
+// so this function returns false in that case.
+bool isPointerToImmutableLocation(IRInst* ptrInst);
+
+// Check if `use` is the `baseAddr` operand of a GetElement/FieldExtract inst.
+// This is true if `use` is the first operand of the user inst.
+inline bool isUseBaseAddrOperand(IRUse* use, IRInst* user)
+{
+    return user->getOperandUse(0) == use;
+}
+
+// Check if the inst is a generic parameter.
+bool isGenericParameter(IRInst* inst);
+
+// Usually we want to enforce that an instruction is defined before any of its uses, but
+// if the use is a generic parameter, we can relax this rule when the instruction is the data type
+// of the generic parameter.
+bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
+
 } // namespace Slang
 
 #endif

@@ -20,7 +20,7 @@ set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 # Global CMake options
 #
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
-    cmake_policy(SET CMP0135 OLD)
+    cmake_policy(SET CMP0135 NEW)
 endif()
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -128,6 +128,7 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
@@ -184,6 +185,17 @@ advanced_option(
     SLANG_USE_SYSTEM_GLSLANG
     "Build using system glslang library"
     OFF
+)
+if(WIN32)
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT ON)
+else()
+    set(SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT OFF)
+endif()
+
+advanced_option(
+    SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC
+    "Enable mimalloc for SPIRV-Tools to improve compilation performance"
+    ${SLANG_ENABLE_SPIRV_TOOLS_MIMALLOC_DEFAULT}
 )
 
 option(
@@ -259,6 +271,11 @@ advanced_option(
     "Build using user defined path for lua"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_MIMALLOC_PATH
+    "Build using user defined path for mimalloc"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN
@@ -276,12 +293,12 @@ enum_option(
     SLANG_LIB_TYPE
     # Default
     SHARED
-    "How to build the slang lib:"
+    "How to build the slang-compiler lib:"
     # Options
     SHARED
-    "Build slang as a shared library (default)"
+    "Build slang-compiler as a shared library (default)"
     STATIC
-    "Build slang as a static library"
+    "Build slang-compiler as a static library"
 )
 
 option(
@@ -485,6 +502,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 
 #
@@ -519,14 +537,19 @@ write_basic_package_version_file(
     COMPATIBILITY SameMajorVersion
 )
 
-# Write SlangConfig.cmake which should allow find_pacakage(SLANG) to work correctly
+# Write SlangConfig.cmake which should allow find_package(SLANG) to work correctly
 # SlangConfig.cmake will define slang::slang target that can be linked with using
 # target_link_libraries. It will also define SLANG_EXECUTABLE export variable that
 # should point to slangc if SLANG_ENABLE_SLANGC is ON.
+if(WIN32)
+    set(SLANG_CMAKE_CONFIG_DIR cmake)
+else()
+    set(SLANG_CMAKE_CONFIG_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
+endif()
 configure_package_config_file(
     "${PROJECT_SOURCE_DIR}/cmake/SlangConfig.cmake.in"
     "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-    INSTALL_DESTINATION cmake
+    INSTALL_DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
 
 # Conditionally handle the case for Emscripten where slang does not create
@@ -538,7 +561,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             EXPORT SlangTargets
             FILE ${PROJECT_NAME}Targets.cmake
             NAMESPACE ${PROJECT_NAME}::
-            DESTINATION cmake
+            DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
     endif()
 endif()
@@ -547,5 +570,5 @@ install(
     FILES
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
         "${PROJECT_BINARY_DIR}/${PROJECT_NAME}ConfigVersion.cmake"
-    DESTINATION cmake
+    DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )

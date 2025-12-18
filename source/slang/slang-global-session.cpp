@@ -104,6 +104,7 @@ void Session::init()
     glslLanguageScope->nextSibling = slangLanguageScope;
 
     glslModuleName = getNameObj("glsl");
+    neuralModuleName = getNameObj("neural");
 
     {
         for (Index i = 0; i < Index(SourceLanguage::CountOf); ++i)
@@ -171,7 +172,10 @@ void Session::_initCodeGenTransitionMap()
 
     // For C and C++ we default to use the 'genericCCpp' compiler
     {
-        const CodeGenTarget sources[] = {CodeGenTarget::CSource, CodeGenTarget::CPPSource};
+        const CodeGenTarget sources[] = {
+            CodeGenTarget::CSource,
+            CodeGenTarget::CPPSource,
+            CodeGenTarget::CPPHeader};
         for (auto source : sources)
         {
             // We *don't* add a default for host callable, as we will determine what is suitable
@@ -194,6 +198,7 @@ void Session::_initCodeGenTransitionMap()
 
     // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
@@ -1013,7 +1018,8 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) &&
-        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource ||
+         source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
         if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
@@ -1111,6 +1117,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::parseCommandLineArguments(
         tempReq->getTargetOptionSet(target).serialize(&targetOptionData);
         tdesc.compilerOptionEntryCount = (uint32_t)targetOptionData.entries.getCount();
         tdesc.compilerOptionEntries = targetOptionData.entries.getBuffer();
+        tdesc.format = (SlangCompileTarget)target->getTarget();
+        tdesc.profile = (SlangProfileID)target->getOptionSet().getProfile().raw;
         outData->targets.add(tdesc);
     }
     outDesc->compilerOptionEntryCount = (uint32_t)optionData.entries.getCount();
@@ -1172,8 +1180,14 @@ void Session::addBuiltinSource(
         SLANG_UNEXPECTED("error in Slang core module");
     }
 
-    // Compiling the core module should not yield any warnings.
-    SLANG_ASSERT(sink.outputBuffer.getLength() == 0);
+    if (sink.outputBuffer.getLength())
+    {
+        char const* diagnostics = sink.outputBuffer.getBuffer();
+        fprintf(stderr, "%s", diagnostics);
+
+        PlatformUtil::outputDebugMessage(diagnostics);
+        SLANG_UNEXPECTED("Compiling the core module should not yield any warnings");
+    }
 
     // Extract the AST for the code we just parsed
     auto module = compileRequest->translationUnits[translationUnitIndex]->getModule();

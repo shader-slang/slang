@@ -11,38 +11,14 @@ namespace Slang
 struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
 {
     // This pass is intended to specialize functions
-    // with struct parameters that has array fields
-    // to avoid performance problems for GLSL targets.
-    // Returns true if `type` is an `IRStructType` with array-typed fields.
-    // It will also specialize functions with unsized array parameters into
-    // sized arrays, if the function is called with an argument that has a
-    // sized array type.
+    // with unsized array parameter called with a sized-array argument.
     //
-    bool isStructTypeWithArray(IRType* type)
-    {
-        if (auto structType = as<IRStructType>(type))
-        {
-            for (auto field : structType->getFields())
-            {
-                if (const auto arrayType = as<IRArrayType>(field->getFieldType()))
-                {
-                    return true;
-                }
-                if (auto subStructType = as<IRStructType>(field->getFieldType()))
-                {
-                    if (isStructTypeWithArray(subStructType))
-                        return true;
-                }
-            }
-        }
-        return false;
-    }
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
+        SLANG_UNUSED(param);
         SLANG_UNUSED(arg);
-        if (isKhronosTarget(codeGenContext->getTargetReq()))
-            return isStructTypeWithArray(param->getDataType());
+        SLANG_UNUSED(callInst);
         return false;
     }
 
@@ -50,23 +26,26 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     {
         auto paramType = param->getDataType();
         auto argType = arg->getDataType();
-        if (auto outTypeBase = as<IROutTypeBase>(paramType))
+        if (auto outTypeBase = as<IROutParamTypeBase>(paramType))
         {
             paramType = outTypeBase->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
-        else if (auto refType = as<IRRefType>(paramType))
+        else if (auto refType = as<IRRefParamType>(paramType))
         {
             paramType = refType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
-        else if (auto constRefType = as<IRConstRefType>(paramType))
+        else if (auto constRefType = as<IRBorrowInParamType>(paramType))
         {
             paramType = constRefType->getValueType();
-            SLANG_ASSERT(as<IRPtrTypeBase>(argType));
-            argType = as<IRPtrTypeBase>(argType)->getValueType();
+            IRBuilder builder(paramType);
+            argType = tryGetPointedToType(&builder, argType);
+            SLANG_ASSERT(argType);
         }
         auto arrayType = as<IRUnsizedArrayType>(paramType);
         if (!arrayType)
@@ -84,7 +63,7 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     CodeGenContext* codeGenContext = nullptr;
 };
 
-void specializeArrayParameters(CodeGenContext* codeGenContext, IRModule* module)
+void specializeArrayParameters(IRModule* module, CodeGenContext* codeGenContext)
 {
     ArrayParameterSpecializationCondition condition;
     condition.codeGenContext = codeGenContext;

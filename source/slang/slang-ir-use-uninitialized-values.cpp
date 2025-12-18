@@ -35,7 +35,7 @@ static bool isUninitializedValue(IRInst* inst)
     // Also consider var since it does not
     // automatically mean it will be initialized
     // (at least not as the user may have intended)
-    return (inst->m_op == kIROp_Undefined) || (inst->m_op == kIROp_Var);
+    return (as<IRUndefined>(inst) || (inst->m_op == kIROp_Var));
 }
 
 static bool isUnmodifying(IRFunc* func)
@@ -54,7 +54,7 @@ enum ParameterCheckType
 static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, int index)
 {
     IRType* type = param->getFullType();
-    if (auto out = as<IROutType>(param->getFullType()))
+    if (auto out = as<IROutParamType>(param->getFullType()))
     {
         // Don't check `out Vertices<T>` or `out Indices<T>` parameters
         // in mesh shaders.
@@ -75,7 +75,7 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
 
         return AsOut;
     }
-    else if (auto inout = as<IRInOutType>(type))
+    else if (auto inout = as<IRBorrowInOutParamType>(type))
     {
         // TODO: some way to check if the method
         // is actually used for autodiff
@@ -263,7 +263,10 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     // Consider it as a store if its passed
     // as an out/inout/ref parameter
     auto type = unwrapAttributedType(ftype->getParamType(index));
-    return (as<IROutType>(type) || as<IRInOutType>(type) || as<IRRefType>(type)) ? Store : Load;
+    return (as<IROutParamType>(type) || as<IRBorrowInOutParamType>(type) ||
+            as<IRRefParamType>(type))
+               ? Store
+               : Load;
 }
 
 static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
@@ -637,7 +640,19 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+                // Check if we have a meaningful name for the variable
+                bool hasName = inst->findDecoration<IRNameHintDecoration>() != nullptr ||
+                               inst->findDecoration<IRLinkageDecoration>() != nullptr;
+
+                if (hasName)
+                {
+                    sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+                }
+                else
+                {
+                    // For poison ops and other unnamed instructions, show type instead
+                    sink->diagnose(load, Diagnostics::usingUninitializedValue, type);
+                }
             }
         }
     }

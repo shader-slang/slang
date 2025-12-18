@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 
 struct Output
 {
@@ -8,10 +8,10 @@ struct Output
   float4 Material : SV_Target2;
 }
 
-// CHECK-ASM: define {{.*}} @fragMain
-// CHECK: color(0)
-// CHECK: color(1)
-// CHECK: color(2)
+// METALLIB: define {{.*}} @fragMain
+// METAL: color(0)
+// METAL: color(1)
+// METAL: color(2)
 
 [shader("fragment")]
 Output fragMain()

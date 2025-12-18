@@ -27,7 +27,7 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type)
     {
         return ptrType->getValueType();
     }
-    else if (auto refType = as<RefType>(type))
+    else if (auto refType = as<ExplicitRefType>(type))
     {
         return refType->getValueType();
     }

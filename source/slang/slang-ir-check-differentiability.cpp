@@ -675,7 +675,7 @@ public:
                         auto paramType = calleeFuncType->getParamType(a);
                         if (!isDifferentiableType(diffTypeContext, paramType))
                             continue;
-                        if (as<IROutTypeBase>(paramType))
+                        if (as<IROutParamTypeBase>(paramType))
                         {
                             if (!canAddressHoldDerivative(diffTypeContext, arg))
                             {

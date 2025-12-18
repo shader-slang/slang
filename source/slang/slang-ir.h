@@ -524,6 +524,7 @@ enum class IRTypeLayoutRuleName
     Std430,
     Std140,
     D3DConstantBuffer,
+    MetalParameterBlock,
     C,
     _Count,
 };
@@ -694,6 +695,12 @@ struct IRInst
     // operands of the instruction.
 
     IRUse* getOperands();
+
+    IRUse* getOperandUse(UInt index)
+    {
+        SLANG_ASSERT(index < getOperandCount());
+        return getOperands() + index;
+    }
 
     IRInst* getOperand(UInt index)
     {
@@ -970,17 +977,6 @@ struct IRBasicType : IRType
     BaseType getBaseType() { return BaseType(getOp() - kIROp_FirstBasicType); }
 };
 
-FIDDLE()
-struct IRVoidType : IRBasicType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBoolType : IRBasicType
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRStringTypeBase : IRType
@@ -1116,6 +1112,12 @@ struct IRBoolLit : IRConstant
     bool getValue() { return value.intVal != 0; }
 };
 
+FIDDLE()
+struct IRStringLit : IRConstant
+{
+    FIDDLE(leafInst());
+};
+
 // Get the compile-time constant integer value of an instruction,
 // if it has one, and assert-fail otherwise.
 IRIntegerValue getIntVal(IRInst* inst);
@@ -1125,17 +1127,6 @@ IRIntegerValue getIntVal(IRInst* inst);
 // the actual size.
 IRIntegerValue getArraySizeVal(IRInst* inst);
 
-FIDDLE()
-struct IRStringLit : IRConstant
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBlobLit : IRConstant
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRPtrLit : IRConstant
@@ -1145,11 +1136,6 @@ struct IRPtrLit : IRConstant
     void* getValue() { return value.ptrVal; }
 };
 
-FIDDLE()
-struct IRVoidLit : IRConstant
-{
-    FIDDLE(leafInst())
-};
 
 // A instruction that ends a basic block (usually because of control flow)
 FIDDLE()
@@ -1443,18 +1429,6 @@ struct IRTextureTypeBase : IRResourceType
 };
 
 FIDDLE()
-struct IRTextureType : IRTextureTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGLSLImageType : IRTextureTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRSubpassInputType : IRType
 {
     FIDDLE(leafInst())
@@ -1506,12 +1480,6 @@ struct IRMeshOutputType : IRType
 
 
 FIDDLE()
-struct IRMetalMeshType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRPointerLikeType : IRBuiltinGenericType
 {
     FIDDLE(baseInst())
@@ -1531,12 +1499,10 @@ struct IRUniformParameterGroupType : IRParameterGroupType
     IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
 };
 
-
 FIDDLE()
-struct IRGLSLShaderStorageBufferType : IRBuiltinGenericType
+struct IRGLSLShaderStorageBufferType : IRPointerLikeType
 {
     FIDDLE(leafInst())
-    IRType* getDataLayout() { return (IRType*)getOperand(1); }
 };
 
 FIDDLE()
@@ -1567,31 +1533,6 @@ struct IRArrayTypeBase : IRType
     }
 };
 
-FIDDLE()
-struct IRArrayType : IRArrayTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-
-FIDDLE()
-struct IRAtomicType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-
-FIDDLE()
-struct IRRateQualifiedType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRDescriptorHandleType : IRType
-{
-    FIDDLE(leafInst())
-};
 
 // Unlike the AST-level type system where `TypeType` tracks the
 // underlying type, the "type of types" in the IR is a simple
@@ -1616,65 +1557,6 @@ struct IRDifferentialPairTypeBase : IRType
     IRInst* getWitness() { return (IRInst*)getOperand(1); }
 };
 
-FIDDLE()
-struct IRDifferentialPairType : IRDifferentialPairTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRDifferentialPtrPairType : IRDifferentialPairTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRDifferentialPairUserCodeType : IRDifferentialPairTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBackwardDiffIntermediateContextType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRVectorType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRMatrixType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRArrayListType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRTensorViewType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRTorchTensorType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRSPIRVLiteralType : IRType
-{
-    FIDDLE(leafInst())
-};
 
 FIDDLE()
 struct IRPtrTypeBase : IRType
@@ -1702,23 +1584,6 @@ struct IRPtrTypeBase : IRType
     }
 };
 
-FIDDLE()
-struct IRComPtrType : public IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRNativePtrType : public IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPseudoPtrType : public IRPtrTypeBase
-{
-    FIDDLE(leafInst())
-};
 
 /// The base class of RawPointerType and RTTIPointerType.
 FIDDLE()
@@ -1727,44 +1592,17 @@ struct IRRawPointerTypeBase : IRType
     FIDDLE(baseInst())
 };
 
-/// Represents a pointer to an object of unknown type.
-FIDDLE()
-struct IRRawPointerType : IRRawPointerTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents a pointer to an object whose type is determined at runtime,
-/// with type information available through `rttiOperand`.
-///
-FIDDLE()
-struct IRRTTIPointerType : IRRawPointerTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGlobalHashedStringLiterals : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRGetStringHash : IRInst
-{
-    FIDDLE(leafInst())
-};
-
 /// Get the type pointed to be `ptrType`, or `nullptr` if it is not a pointer(-like) type.
 ///
 /// The given IR `builder` will be used if new instructions need to be created.
 IRType* tryGetPointedToType(IRBuilder* builder, IRType* type);
 
+IRType* tryGetPointedToOrBufferElementType(IRBuilder* builder, IRType* type);
+
 FIDDLE()
 struct IRFuncType : IRType
 {
     FIDDLE(leafInst())
-    IRType* getResultType() { return (IRType*)getOperand(0); }
     UInt getParamCount() { return getOperandCount() - 1; }
     IRType* getParamType(UInt index) { return (IRType*)getOperand(1 + index); }
     IROperandList<IRType> getParamTypes()
@@ -1774,53 +1612,21 @@ struct IRFuncType : IRType
 };
 
 FIDDLE()
-struct IRRayQueryType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRHitObjectType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRCoopVectorType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRCoopMatrixType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRTensorAddressingTensorLayoutType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRTensorAddressingTensorViewType : IRType
 {
     FIDDLE(leafInst())
-    IRInst* getDimension() { return getOperand(0); }
-    IRInst* getHasDimension() { return getOperand(1); }
     IRInst* getPermutation(int index) { return getOperand(2 + index); }
 };
 
 bool isDefinition(IRInst* inVal);
 
 // A structure type is represented as a parent instruction,
-// where the child instructions represent the fields of the
+// where the child instructions repres ent the fields of the
 // struct.
 //
-// The space of fields that a given struct type supports
-// are defined as its "keys", which are global values
-// (that is, they have mangled names that can be used
+// The space of fields that a given st ruct type supports
+// are defined as its "keys", which ar e global values
+// (that is, they have mangled names t hat can be used
 // for linkage).
 //
 FIDDLE()
@@ -1828,6 +1634,7 @@ struct IRStructKey : IRInst
 {
     FIDDLE(leafInst())
 };
+
 //
 // The fields of the struct are then defined as mappings
 // from those keys to the associated type (in the case of
@@ -1879,12 +1686,6 @@ struct IRClassType : IRType
 };
 
 FIDDLE()
-struct IRAssociatedType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRThisType : IRType
 {
     FIDDLE(leafInst())
@@ -1925,48 +1726,10 @@ struct IRConjunctionType : IRType
     IRType* getCaseType(Int index) { return (IRType*)getOperand(index); }
 };
 
-FIDDLE()
-struct IRAttributedType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRTupleTypeBase : IRType
-{
-    FIDDLE(baseInst())
-};
-
-/// Represents a tuple. Tuples are created by `IRMakeTuple` and its elements
-/// are accessed via `GetTupleElement(tupleValue, IRIntLit)`.
-FIDDLE()
-struct IRTupleType : IRTupleTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents a type pack. Type packs behave like tuples, but they have a
-/// "flattening" semantics, so that MakeTypePack(MakeTypePack(T1,T2), T3) is
-/// MakeTypePack(T1,T2,T3).
-FIDDLE()
-struct IRTypePack : IRTupleTypeBase
-{
-    FIDDLE(leafInst())
-};
-
 // A placeholder struct key for tuple type layouts that will be replaced with
 // the actual struct key when the tuple type is materialized into a struct type.
 FIDDLE()
 struct IRIndexedFieldKey : IRInst
-{
-    FIDDLE(leafInst())
-    IRInst* getBaseType() { return getOperand(0); }
-    IRInst* getIndex() { return getOperand(1); }
-};
-
-/// Represents a tuple in target language. TargetTupleType will not be lowered to structs.
-FIDDLE()
-struct IRTargetTupleType : IRType
 {
     FIDDLE(leafInst())
 };
@@ -1980,54 +1743,6 @@ struct IRExpandTypeOrVal : IRType
     IRType* getPatternType() { return (IRType*)(getOperand(0)); }
     UInt getCaptureCount() { return getOperandCount() - 1; }
     IRType* getCaptureType(UInt index) { return (IRType*)(getOperand(index + 1)); }
-};
-
-/// Represents an `Result<T,E>`, used by functions that throws error codes.
-FIDDLE()
-struct IRResultType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents an `Optional<T>`.
-FIDDLE()
-struct IROptionalType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents an enum type
-FIDDLE()
-struct IREnumType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRTypeType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents the IR type for an `IRRTTIObject`.
-FIDDLE()
-struct IRRTTIType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-/// Represents a handle to an RTTI object.
-/// This is lowered as an integer number identifying a type.
-FIDDLE()
-struct IRRTTIHandleType : IRType
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRAnyValueType : IRType
-{
-    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -2044,12 +1759,6 @@ struct IRWitnessTableType : IRWitnessTableTypeBase
 };
 
 FIDDLE()
-struct IRWitnessTableIDType : IRWitnessTableTypeBase
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRBindExistentialsTypeBase : IRType
 {
     FIDDLE(baseInst())
@@ -2058,12 +1767,6 @@ struct IRBindExistentialsTypeBase : IRType
     UInt getExistentialArgCount() { return getOperandCount() - 1; }
     IRUse* getExistentialArgs() { return getOperands() + 1; }
     IRInst* getExistentialArg(UInt index) { return getExistentialArgs()[index].get(); }
-};
-
-FIDDLE()
-struct IRBindExistentialsType : IRBindExistentialsTypeBase
-{
-    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -2139,16 +1842,10 @@ void fixUpFuncType(IRFunc* func, IRType* resultType);
 ///
 void fixUpFuncType(IRFunc* func);
 
-// A generic is akin to a function, but is conceptually executed
-// before runtime, to specialize the code nested within.
-//
-// In practice, a generic always holds only a single block, and ends
-// with a `return` instruction for the value that the generic yields.
-FIDDLE()
-struct IRGeneric : IRGlobalValueWithParams
-{
-    FIDDLE(leafInst())
-};
+/// If the function has a DebugFuncDecoration, replaces the function type in
+/// that decoration to match the current type of the function.
+///
+void fixUpDebugFuncType(IRFunc* func);
 
 // Find the value that is returned from a generic, so that
 // a pass can glean information from it.
@@ -2351,6 +2048,8 @@ public:
 
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
+    Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -2416,8 +2115,8 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 1;
-    const static UInt k_maxSupportedModuleVersion = 1;
+    const static UInt k_minSupportedModuleVersion = 4;
+    const static UInt k_maxSupportedModuleVersion = 5;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2467,6 +2166,12 @@ private:
     Dictionary<IRInst*, IRAnalysis> m_mapInstToAnalysis;
 
     Dictionary<ImmutableHashedString, List<IRInst*>> m_mapMangledNameToGlobalInst;
+
+    /// Hold a mapping for inst -> uniqueID. This mapping is generated on
+    /// demand if passes need them, rather than eagerly storing them on
+    /// insts when unnecessary.
+    ///
+    Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
 };
 
 
@@ -2554,13 +2259,6 @@ struct InstHashSet
     bool contains(IRInst* inst) { return set->contains(inst); }
     void remove(IRInst* inst) { set->remove(inst); }
     void clear() { set->clear(); }
-};
-
-
-FIDDLE()
-struct IRSpecializationDictionaryItem : public IRInst
-{
-    FIDDLE(leafInst())
 };
 
 struct IRDumpOptions

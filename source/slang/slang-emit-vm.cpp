@@ -247,6 +247,17 @@ public:
             operand = addConstantValue(constantInst);
             mapInstToOperand[inst] = operand;
         }
+        else if (auto constantVector = as<IRMakeVector>(inst))
+        {
+            SLANG_ASSERT(constantVector->getOperandCount() > 0);
+            operand = ensureInst(constantVector->getOperand(0));
+            for (UInt i = 1; i < constantVector->getOperandCount(); i++)
+            {
+                ensureInst(constantVector->getOperand(i));
+            }
+            operand.size *= (uint32_t)constantVector->getOperandCount();
+            mapInstToOperand[inst] = operand;
+        }
         else
         {
             SLANG_UNEXPECTED("unsupported global inst for vm bytecode emit");
@@ -356,9 +367,9 @@ public:
         case kIROp_UInt64Type:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
-        case kIROp_OutType:
-        case kIROp_InOutType:
-        case kIROp_RefType:
+        case kIROp_OutParamType:
+        case kIROp_BorrowInOutParamType:
+        case kIROp_RefParamType:
         case kIROp_NativePtrType:
             extCode.scalarType = kSlangByteCodeScalarTypeUnsignedInt;
             extCode.scalarBitWidth = 3;
@@ -481,8 +492,12 @@ public:
     {
         switch (inst->getOp())
         {
-        case kIROp_Undefined:
+        case kIROp_Poison:
+        case kIROp_LoadFromUninitializedMemory:
             {
+                // We basically handle an undefined value by allocating a
+                // temporary and then not initializing it.
+                //
                 ensureWorkingsetMemory(funcBuilder, inst);
             }
             break;
@@ -1068,6 +1083,11 @@ public:
         }
     }
 
+    bool isUnreachableBlock(IRBlock* block)
+    {
+        return as<IRUnreachable>(block->getTerminator()) != nullptr;
+    }
+
     void emitFunction(IRFunc* func)
     {
         VMByteCodeFunctionBuilder funcBuilder;
@@ -1085,6 +1105,9 @@ public:
 
         for (auto block : func->getBlocks())
         {
+            if (isUnreachableBlock(block))
+                continue;
+
             mapBlockToByteOffset[block] = funcBuilder.code.getCount();
 
             for (auto inst : block->getChildren())

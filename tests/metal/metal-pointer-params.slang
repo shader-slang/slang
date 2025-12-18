@@ -1,21 +1,21 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHK_AIR): -target metallib -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=8):out,name=outputBuffer
 RWStructuredBuffer<uint64_t> outputBuffer;
 
-//CHECK: ulong{{.*}}device{{ *\*}} a
-//CHECK-NEXT: long{{.*}}device{{ *\*}} b
-//CHECK-NEXT: uint{{.*}}device{{ *\*}} c
-//CHECK-NEXT: int{{.*}}device{{ *\*}} d
-//CHECK-NEXT: float{{.*}}device{{ *\*}} e
+//METAL: ulong{{.*}}device{{ *\*}} a
+//METAL-NEXT: long{{.*}}device{{ *\*}} b
+//METAL-NEXT: uint{{.*}}device{{ *\*}} c
+//METAL-NEXT: int{{.*}}device{{ *\*}} d
+//METAL-NEXT: float{{.*}}device{{ *\*}} e
 
 // "indirect_argument" means a pointer
-//CHK_AIR: !"ulong", !"a{{[^"]*}}", !"air.indirect_argument"
-//CHK_AIR: !"long", !"b{{[^"]*}}", !"air.indirect_argument"
-//CHK_AIR: !"uint", !"c{{[^"]*}}", !"air.indirect_argument"
-//CHK_AIR: !"int", !"d{{[^"]*}}", !"air.indirect_argument"
-//CHK_AIR: !"float", !"e{{[^"]*}}", !"air.indirect_argument"
+//METALLIB: !"ulong", !"a{{[^"]*}}", !"air.indirect_argument"
+//METALLIB: !"long", !"b{{[^"]*}}", !"air.indirect_argument"
+//METALLIB: !"uint", !"c{{[^"]*}}", !"air.indirect_argument"
+//METALLIB: !"int", !"d{{[^"]*}}", !"air.indirect_argument"
+//METALLIB: !"float", !"e{{[^"]*}}", !"air.indirect_argument"
 
 [numthreads(1,1,1)]
 void computeMain(uniform uint64_t* a, uniform int64_t* b, uniform uint32_t* c, uniform int32_t* d, uniform float* e)

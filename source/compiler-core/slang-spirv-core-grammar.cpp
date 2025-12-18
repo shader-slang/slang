@@ -44,6 +44,7 @@ struct Instruction
     UnownedStringSlice class_;
     SpvWord opcode;
     List<UnownedStringSlice> capabilities;
+    List<UnownedStringSlice> aliases;
     List<Operand> operands;
 };
 SLANG_MAKE_STRUCT_RTTI_INFO(
@@ -52,6 +53,7 @@ SLANG_MAKE_STRUCT_RTTI_INFO(
     SLANG_RTTI_FIELD_IMPL(class_, "class", 0),
     SLANG_RTTI_FIELD(opcode),
     SLANG_OPTIONAL_RTTI_FIELD(capabilities),
+    SLANG_OPTIONAL_RTTI_FIELD(aliases),
     SLANG_OPTIONAL_RTTI_FIELD(operands));
 
 struct Enumerant
@@ -222,6 +224,11 @@ RefPtr<SPIRVCoreGrammarInfo> SPIRVCoreGrammarInfo::loadFromJSON(
     for (const auto& i : spec.instructions)
     {
         res->opcodes.dict.add(i.opname, SpvOp(i.opcode));
+
+        for (auto alias : i.aliases)
+        {
+            res->opcodes.dict.add(alias, SpvOp(i.opcode));
+        }
 
         const auto class_ = i.class_ == "Type-Declaration"    ? OpInfo::TypeDeclaration
                             : i.class_ == "Constant-Creation" ? OpInfo::ConstantCreation

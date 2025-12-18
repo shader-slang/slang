@@ -48,7 +48,7 @@ static SyntaxClassInfo const* kAllSyntaxClasses[] = {
 
 SyntaxClassBase::SyntaxClassBase(ASTNodeType tag)
 {
-    assert(int(tag) >= 0 && int(tag) < SLANG_COUNT_OF(kAllSyntaxClasses));
+    SLANG_ASSERT(int(tag) >= 0 && int(tag) < SLANG_COUNT_OF(kAllSyntaxClasses));
     _info = kAllSyntaxClasses[int(tag)];
 }
 

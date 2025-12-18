@@ -1,46 +1,46 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 
 
-// CHECK:     struct [[pixelOutput:pixelOutput_[0-9]+]]
-// CHECK-NEXT:{
-// CHECK-NEXT:    float4 output{{.*}}{{\[\[}}color(0){{\]\]}};
-// CHECK-NEXT:};
+// METAL:     struct [[pixelOutput:pixelOutput_[0-9]+]]
+// METAL-NEXT:{
+// METAL-NEXT:    float4 output{{.*}}{{\[\[}}color(0){{\]\]}};
+// METAL-NEXT:};
 
-// CHECK:     struct pixelInput{{.*}}
-// CHECK-NEXT:{
-// CHECK-NEXT:    float4 vertexColor{{.*}}  {{\[\[}}user(_SLANG_ATTR){{\]\]}};
-// CHECK-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_SLANG_ATTR_1){{\]\]}};
-// CHECK-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
-// CHECK-NEXT:};
+// METAL:     struct pixelInput{{.*}}
+// METAL-NEXT:{
+// METAL-NEXT:    float4 vertexColor{{.*}}  {{\[\[}}user(_SLANG_ATTR){{\]\]}};
+// METAL-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_SLANG_ATTR_1){{\]\]}};
+// METAL-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
+// METAL-NEXT:};
 
-// CHECK: {{\[\[}}fragment{{\]\]}} [[pixelOutput]] main_fragment(pixelInput{{.*}} {{\[\[}}stage_in{{\]\]}}, float4 position{{.*}} {{\[\[}}position{{\]\]}})
+// METAL: {{\[\[}}fragment{{\]\]}} [[pixelOutput]] main_fragment(pixelInput{{.*}} {{\[\[}}stage_in{{\]\]}}, float4 position{{.*}} {{\[\[}}position{{\]\]}})
 
-// CHECK:     struct FragOut{{.*}}
-// CHECK-NEXT:{
-// CHECK-NEXT:    float4 color{{.*}}{{\[\[}}color(0){{\]\]}};
-// CHECK-NEXT:    float depth{{.*}} {{\[\[}}depth(any){{\]\]}};
-// CHECK-NEXT:};
+// METAL:     struct FragOut{{.*}}
+// METAL-NEXT:{
+// METAL-NEXT:    float4 color{{.*}}{{\[\[}}color(0){{\]\]}};
+// METAL-NEXT:    float depth{{.*}} {{\[\[}}depth(any){{\]\]}};
+// METAL-NEXT:};
 
-// CHECK:     struct [[vertexOutput:main_vertex_Result_[0-9]+]]
-// CHECK-NEXT:{
-// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}position{{\]\]}};
-// CHECK-NEXT:    float4 vertexColor{{.*}} {{\[\[}}user(_SLANG_ATTR){{\]\]}};
-// CHECK-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_SLANG_ATTR_1){{\]\]}};
-// CHECK-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
-// CHECK-NEXT:};
+// METAL:     struct [[vertexOutput:main_vertex_Result_[0-9]+]]
+// METAL-NEXT:{
+// METAL-NEXT:    float4 position{{.*}} {{\[\[}}position{{\]\]}};
+// METAL-NEXT:    float4 vertexColor{{.*}} {{\[\[}}user(_SLANG_ATTR){{\]\]}};
+// METAL-NEXT:    float2 vertexUV{{.*}} {{\[\[}}user(_SLANG_ATTR_1){{\]\]}};
+// METAL-NEXT:    float3 vertexNormal{{.*}} {{\[\[}}user(NORMAL){{\]\]}};
+// METAL-NEXT:};
 
-// CHECK:     struct vertexInput{{.*}}
-// CHECK-NEXT:{
-// CHECK-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}};
-// CHECK-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}};
-// CHECK-NEXT:};
+// METAL:     struct vertexInput{{.*}}
+// METAL-NEXT:{
+// METAL-NEXT:    float4 position{{.*}} {{\[\[}}attribute(0){{\]\]}};
+// METAL-NEXT:    float4 color{{.*}} {{\[\[}}attribute(1){{\]\]}};
+// METAL-NEXT:};
 
-// CHECK: {{\[\[}}vertex{{\]\]}} [[vertexOutput]] main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}})
+// METAL: {{\[\[}}vertex{{\]\]}} [[vertexOutput]] main_vertex(vertexInput{{.*}}{{\[\[}}stage_in{{\]\]}}, uint vid{{.*}}{{\[\[}}vertex_id{{\]\]}}, uint instanceID{{.*}} {{\[\[}}instance_id{{\]\]}})
 
-// CHECK-ASM: define {{.*}} @main_vertex
-// CHECK-ASM: define {{.*}} @main_fragment
-// CHECK-ASM: define {{.*}} @main_fragment1
+// METALLIB: define {{.*}} @main_vertex
+// METALLIB: define {{.*}} @main_fragment
+// METALLIB: define {{.*}} @main_fragment1
 
 struct VIn
 {

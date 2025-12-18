@@ -919,31 +919,16 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
+        auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+        if (!paramValueType)
+        {
+            paramValueType = astBuilder->getErrorType();
+        }
+
         auto paramDecl = paramDeclRef.getDecl();
-        auto paramType = getParamType(astBuilder, paramDeclRef);
-        if (!paramType)
-        {
-            paramType = astBuilder->getErrorType();
-        }
-        if (paramDecl->findModifier<RefModifier>())
-        {
-            paramType = astBuilder->getRefType(paramType);
-        }
-        else if (paramDecl->findModifier<ConstRefModifier>())
-        {
-            paramType = astBuilder->getConstRefType(paramType);
-        }
-        else if (paramDecl->findModifier<OutModifier>())
-        {
-            if (paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
-            {
-                paramType = astBuilder->getInOutType(paramType);
-            }
-            else
-            {
-                paramType = astBuilder->getOutType(paramType);
-            }
-        }
+        auto paramMode = getParamPassingMode(paramDecl);
+        auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
@@ -959,8 +944,7 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType =
-        astBuilder->getOrCreate<FuncType>(paramTypes.getArrayView(), resultType, errorType);
+    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
     return funcType;
 }
 

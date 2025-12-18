@@ -5,8 +5,7 @@
 module "foo";
 
 // CHECK: Module Name: foo
-// This will need bumping whenever we bump the ir module version
-// CHECK: Module Version: 1
+// CHECK: Module Version: {{.+}}
 // Just check that this is in the output with some string
 // CHECK: Compiler Version: {{.+}}
 

@@ -74,7 +74,7 @@ static void appendXmlEncode(const String& in, StringBuilder& out)
         if (cur < end)
         {
             const char encodeChar = *cur++;
-            assert(isXmlEncodeChar(encodeChar));
+            SLANG_ASSERT(isXmlEncodeChar(encodeChar));
             appendXmlEncode(encodeChar, out);
         }
     }
@@ -125,8 +125,8 @@ bool TestReporter::canWriteStdError() const
 void TestReporter::startTest(const char* testName)
 {
     // Must be in a suite
-    assert(m_suiteStack.getCount());
-    assert(!m_inTest);
+    SLANG_ASSERT(m_suiteStack.getCount());
+    SLANG_ASSERT(!m_inTest);
 
     m_inTest = true;
 
@@ -140,8 +140,8 @@ void TestReporter::startTest(const char* testName)
 
 void TestReporter::endTest()
 {
-    assert(m_suiteStack.getCount());
-    assert(m_inTest);
+    SLANG_ASSERT(m_suiteStack.getCount());
+    SLANG_ASSERT(m_inTest);
 
     m_currentInfo.message = m_currentMessage;
 
@@ -152,7 +152,7 @@ void TestReporter::endTest()
 
 void TestReporter::addResult(TestResult result)
 {
-    assert(m_inTest);
+    SLANG_ASSERT(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     if (result == TestResult::Fail && m_expectedFailureList.contains(m_currentInfo.name))
@@ -179,7 +179,7 @@ void TestReporter::addResultWithLocation(
     const char* file,
     int line)
 {
-    assert(m_inTest);
+    SLANG_ASSERT(m_inTest);
 
     std::lock_guard<std::recursive_mutex> lock(m_mutex);
     result = adjustResult(m_currentInfo.name.getUnownedSlice(), result);
@@ -340,10 +340,29 @@ static void _appendTime(double timeInSec, StringBuilder& out)
 
 void TestReporter::_addResult(TestInfo info)
 {
+    // If test result is still uninitialized, no result was ever set for this test
+    // This likely indicates a bug in the test framework usage
+    if (info.testResult == TestResult::Uninitialized)
+    {
+        SLANG_ASSERT(!"Test ended without setting a result - this is likely a bug");
+        // Don't count uninitialized tests in statistics
+        return;
+    }
+
     if (info.testResult == TestResult::Ignored && m_hideIgnored)
     {
         return;
     }
+
+    // If test is pending retry, don't count it in any statistics yet
+    // The test will be re-run and reported again with a final result
+    if (info.testResult == TestResult::PendingRetry)
+    {
+        printf("failed(pending retry) '%S'\n", info.name.toWString().begin());
+        fflush(stdout);
+        return;
+    }
+
     info.testResult = adjustResult(info.name.getUnownedSlice(), info.testResult);
 
     m_totalTestCount++;
@@ -366,7 +385,7 @@ void TestReporter::_addResult(TestInfo info)
         break;
 
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT(!"unexpected");
         break;
     }
 
@@ -399,7 +418,7 @@ void TestReporter::_addResult(TestInfo info)
             resultString = "ignored";
             break;
         default:
-            assert(!"unexpected");
+            SLANG_ASSERT(!"unexpected");
             break;
         }
 
@@ -498,7 +517,7 @@ void TestReporter::_addResult(TestInfo info)
                     break;
                 }
             default:
-                assert(!"unexpected");
+                SLANG_ASSERT(!"unexpected");
                 break;
             }
 
@@ -531,7 +550,7 @@ void TestReporter::_addResult(TestInfo info)
                 break;
 
             default:
-                assert(!"unexpected");
+                SLANG_ASSERT(!"unexpected");
                 break;
             }
 
@@ -585,7 +604,7 @@ void TestReporter::_addResult(TestInfo info)
 void TestReporter::addTest(const String& testName, TestResult testResult)
 {
     // Can't add this way if in test
-    assert(!m_inTest);
+    SLANG_ASSERT(!m_inTest);
 
     TestInfo info;
     info.name = testName;
@@ -787,7 +806,7 @@ void TestReporter::outputSummary()
     case TestOutputMode::XUnit2:
         {
             // https://xunit.github.io/docs/format-xml-v2
-            assert("Not currently supported");
+            SLANG_ASSERT("Not currently supported");
             break;
         }
     case TestOutputMode::TeamCity:
@@ -821,7 +840,7 @@ void TestReporter::startSuite(const String& name)
 
 void TestReporter::endSuite()
 {
-    assert(m_suiteStack.getCount());
+    SLANG_ASSERT(m_suiteStack.getCount());
 
     switch (m_outputMode)
     {

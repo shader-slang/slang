@@ -16,7 +16,7 @@ export T getDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
     __target_switch
     {
     case spirv:
-        if (T.kind != DescriptorKind.Buffer)
+        if (T.kind != DescriptorKind.ConstantBuffer && T.kind != DescriptorKind.StorageBuffer)
             return resourceHeap[((uint2)handleValue).x].asOpaqueDescriptor<T>();
         else
             return defaultGetDescriptorFromHandle(handleValue);

@@ -1041,7 +1041,7 @@ struct PeepholeContext : InstPassBase
                         continue;
                     SLANG_ASSERT(terminator->getArgCount() > paramIndex);
                     auto arg = terminator->getArg(paramIndex);
-                    if (arg->getOp() == kIROp_Undefined)
+                    if (as<IRUndefined>(arg))
                         continue;
                     if (argValue == nullptr)
                         argValue = arg;
@@ -1268,14 +1268,18 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_Load:
             {
-                // Load from undef is undef.
-                if (as<IRLoad>(inst)->getPtr()->getOp() == kIROp_Undefined)
+                // An attempt to load from an undefined pointer value
+                // is undefined behavior and the resulting value is poison
+                // (the value should typically contaminate instructions that
+                // use it, rendering them as poisonous).
+                //
+                if (as<IRUndefined>(as<IRLoad>(inst)->getPtr()))
                 {
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
 
                     builder.setInsertBefore(inst);
-                    auto undef = builder.emitUndefined(inst->getDataType());
+                    auto undef = builder.emitPoison(inst->getDataType());
                     inst->replaceUsesWith(undef);
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1284,8 +1288,17 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_Store:
             {
-                // Store undef is no-op.
-                if (as<IRStore>(inst)->getVal()->getOp() == kIROp_Undefined)
+                // An attempt to store to an undefined pointer value is
+                // undefined behavior (just like a load), so we can conveniently
+                // decide to implement that behavior as a no-op.
+                //
+                // TODO: While it is not the responsibility of a pass like this
+                // to diagnose errors (that is the front-end's job), it might
+                // be best to replace an invalid `store` like this with an
+                // instruction that represents a "panic" or similar exceptional
+                // situation.
+                //
+                if (as<IRUndefined>(as<IRStore>(inst)->getVal()))
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1294,8 +1307,16 @@ struct PeepholeContext : InstPassBase
             }
         case kIROp_DebugValue:
             {
-                // Update debug value with undef is no-op.
-                if (as<IRDebugValue>(inst)->getValue()->getOp() == kIROp_Undefined)
+                // Attempting to update the debug value of a variable with an
+                // undefined value will be treated as a no-op (meaning that the
+                // contents of the variable, as perceived by the user, will not
+                // change).
+                //
+                // TODO: We should probably validate that this is a reasonable
+                // behavior. In many cases a debugger user might like to have an
+                // indication of when the contents of their variable are undefined.
+                //
+                if (as<IRUndefined>(as<IRDebugValue>(inst)->getValue()))
                 {
                     maybeRemoveOldInst(inst);
                     changed = true;
@@ -1309,7 +1330,11 @@ struct PeepholeContext : InstPassBase
 
     bool isConcreteType(IRType* type)
     {
-        return type->parent->getOp() == kIROp_ModuleInst && !as<IRGlobalGenericParam>(type);
+        // The associatedtype is represented as a LookupWitnessMethod, so we will need to check the
+        // type after the lookupWitnessMethod is fully specialized. This is to make something like
+        // this to work: `if (IFoo.AssociatedType is int)`
+        return type->parent->getOp() == kIROp_ModuleInst && !as<IRGlobalGenericParam>(type) &&
+               !as<IRLookupWitnessMethod>(type);
     }
 
     bool processFunc(IRInst* func)

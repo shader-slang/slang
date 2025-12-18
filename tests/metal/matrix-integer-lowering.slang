@@ -1,7 +1,9 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain -DTYPE=int
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain -DTYPE=int
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=int
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=uint
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=int
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -output-using-type -compute -mtl -shaderobj -xslang -DTYPE=uint
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -output-using-type -compute -vk -shaderobj -xslang -DTYPE=int
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -output-using-type -compute -vk -shaderobj -xslang -DTYPE=uint
 
 #ifndef TYPE
 #define TYPE int
@@ -116,87 +118,87 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     
     // Store results
     outputBuffer[0] = val1;
-    // CHECK: 1
+    // BUF: 1
     outputBuffer[1] = val2;
-    // CHECK-NEXT: 8
+    // BUF-NEXT: 8
     outputBuffer[2] = row.x;
-    // CHECK-NEXT: 3
+    // BUF-NEXT: 3
     outputBuffer[3] = row.y;
-    // CHECK-NEXT: 4
+    // BUF-NEXT: 4
     outputBuffer[4] = row3.y;
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[5] = mat_scalar[0][0];
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[6] = mat_add[0][0];
-    // CHECK-NEXT: 3
+    // BUF-NEXT: 3
     outputBuffer[7] = mat_sub[0][0];
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[8] = mat_mul[1][1];
-    // CHECK-NEXT: 28
+    // BUF-NEXT: 28
     outputBuffer[9] = added;
-    // CHECK-NEXT: 10
+    // BUF-NEXT: 10
     outputBuffer[10] = wrapper.mat1[0][0] * wrapper.mat2[0][0];
-    // CHECK-NEXT: 5
+    // BUF-NEXT: 5
     
     // Matrix intrinsic operation results
     outputBuffer[11] = det2x2;
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[12] = det3x3;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[13] = mat_min[0][0];
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[14] = mat_min[1][1];
-    // CHECK-NEXT: 4
+    // BUF-NEXT: 4
     outputBuffer[15] = mat_max[0][0];
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[16] = mat_max[1][1];
-    // CHECK-NEXT: 7
+    // BUF-NEXT: 7
     outputBuffer[17] = all_nonzero;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[18] = all_zero;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[19] = any_nonzero;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[20] = any_zero;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[21] = trans2x2[0][0];
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[22] = trans2x2[1][0];
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[23] = trans2x3[0][0];
-    // CHECK-NEXT: 5
+    // BUF-NEXT: 5
     
     // Bit shift operation results
     outputBuffer[24] = left_shift[0][0];
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[25] = left_shift[0][1];
-    // CHECK-NEXT: 4
+    // BUF-NEXT: 4
     outputBuffer[26] = right_shift[1][0];
-    // CHECK-NEXT: 2
+    // BUF-NEXT: 2
     outputBuffer[27] = right_shift[1][1];
-    // CHECK-NEXT: 4
+    // BUF-NEXT: 4
     
     // Comparison operation results (bool matrices cast to TYPE)
     outputBuffer[28] = TYPE(less_than[0][0]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[29] = TYPE(less_than[0][1]);
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[30] = TYPE(greater_than[0][1]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[31] = TYPE(greater_than[1][1]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[32] = TYPE(less_equal[0][0]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[33] = TYPE(less_equal[0][1]);
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[34] = TYPE(greater_equal[0][1]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[35] = TYPE(greater_equal[1][0]);
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[36] = TYPE(equal_to[0][0]);
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[37] = TYPE(negated[0][0] == expectedBuffer[0]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[38] = TYPE(negated[1][1] == expectedBuffer[1]);
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
 } 

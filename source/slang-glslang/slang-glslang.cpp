@@ -2,7 +2,6 @@
 #include "slang-glslang.h"
 
 #include "SPIRV/GlslangToSpv.h"
-#include "glslang/MachineIndependent/localintermediate.h"
 #include "glslang/Public/ShaderLang.h"
 #include "slang.h"
 #include "spirv-tools/libspirv.h"
@@ -172,7 +171,7 @@ extern "C"
 #endif
         bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
 {
-    spv_target_env target_env = SPV_ENV_UNIVERSAL_1_6;
+    spv_target_env target_env = SPV_ENV_VULKAN_1_4;
 
     spvtools::ValidatorOptions options;
     options.SetScalarBlockLayout(true);
@@ -241,12 +240,17 @@ extern "C"
 #endif
         bool glslang_disassembleSPIRV(const uint32_t* contents, int contentsSize)
 {
-    return glslang_disassembleSPIRVWithResult(contents, contentsSize, nullptr);
+    char* result = nullptr;
+    auto succ = glslang_disassembleSPIRVWithResult(contents, contentsSize, &result);
+    if (result)
+        fprintf(stdout, "%s\n", result);
+    delete result;
+    return succ;
 }
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
-static void glslang_optimizeSPIRV(
+static int glslang_optimizeSPIRV(
     spv_target_env targetEnv,
     const glslang_CompileRequest_1_2& request,
     std::vector<SPIRVOptimizationDiagnostic>& outDiags,
@@ -257,32 +261,32 @@ static void glslang_optimizeSPIRV(
     // If there is no optimization then we are done
     if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
     {
-        return;
+        return 0;
     }
 
     const auto debugInfoType = request.debugInfoType;
 
     spvtools::Optimizer optimizer(targetEnv);
 
-    optimizer.SetMessageConsumer(
-        [&](spv_message_level_t level,
-            const char* source,
-            const spv_position_t& position,
-            const char* message)
+    auto messageConsumer = [&](spv_message_level_t level,
+                               const char* source,
+                               const spv_position_t& position,
+                               const char* message)
+    {
+        SPIRVOptimizationDiagnostic diag;
+        diag.level = level;
+        if (source)
         {
-            SPIRVOptimizationDiagnostic diag;
-            diag.level = level;
-            if (source)
-            {
-                diag.source = source;
-            }
-            diag.position = position;
-            if (message)
-            {
-                diag.message = message;
-            }
-            outDiags.push_back(diag);
-        });
+            diag.source = source;
+        }
+        diag.position = position;
+        if (message)
+        {
+            diag.message = message;
+        }
+        outDiags.push_back(diag);
+    };
+    optimizer.SetMessageConsumer(messageConsumer);
 
     // If debug info is being generated, propagate
     // line information into all SPIR-V instructions. This avoids loss of
@@ -303,8 +307,9 @@ static void glslang_optimizeSPIRV(
     //
     // If a compilation produces a warning like
     // `0:0: ID overflow. Try running compact-ids.`
-    // it might be fixable by raising the multiplier to a larger value.
-    spvOptOptions.set_max_id_bound(kDefaultMaxIdBound * 4);
+    // it might be fixable by raising value to a larger value.
+    spvOptOptions.set_max_id_bound(0x3FFFFFFF);
+    bool compactPassRun = false;
 
     // TODO confirm which passes we want to invoke for each level
     switch (optimizationLevel)
@@ -498,6 +503,7 @@ static void glslang_optimizeSPIRV(
             // We again run compaction to try and ensure the final output uses ids that are in
             // range. On a complex shader, this reduced the amount ids by 5.
             optimizer.RegisterPass(spvtools::CreateCompactIdsPass());
+            compactPassRun = true;
 
             break;
         }
@@ -515,24 +521,39 @@ static void glslang_optimizeSPIRV(
         std::vector<unsigned int> optSpirv;
 
         // Optimize
-        if (optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
+        if (!optimizer.Run(ioSpirv.data(), ioSpirv.size(), &optSpirv, spvOptOptions))
         {
-            assert(optSpirv.size() > 0);
+            return SLANG_FAIL;
+        }
+
+        assert(optSpirv.size() > 0);
+
+        // If a CompactIdsPass wasn't run, then we should run one if the
+        // generated SPIRV is using IDs beyond kDefaultMaxIdBound.
+        // The 4th entry in the header is the bound of the module.
+        if (!compactPassRun && optSpirv.size() > 3 && optSpirv[3] > kDefaultMaxIdBound)
+        {
+            spvtools::Optimizer optimizer2(targetEnv);
+            optimizer2.SetMessageConsumer(messageConsumer);
+            optimizer2.RegisterPass(spvtools::CreateCompactIdsPass());
+            optimizer2.Run(optSpirv.data(), optSpirv.size(), &ioSpirv, spvOptOptions);
+        }
+        else
+        {
             // Make the ioSpirv the optimized spirv
             ioSpirv.swap(optSpirv);
         }
+        assert(ioSpirv.size() > 0);
     }
+    return 0;
 }
 
 static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
 {
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
-    std::vector<uint32_t> spirvBuffer;
-    size_t inputBlobSize = (char*)request.inputEnd - (char*)request.inputBegin;
-    spirvBuffer.resize(inputBlobSize / sizeof(uint32_t));
-    memcpy(spirvBuffer.data(), request.inputBegin, inputBlobSize);
+    std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
 
-    glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
+    int err = glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
     {
         request.outputFunc(
@@ -550,7 +571,7 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
                 request.diagnosticUserData);
         }
     }
-    return SLANG_OK;
+    return err;
 }
 
 static glslang::EShTargetLanguageVersion _makeTargetLanguageVersion(
@@ -805,7 +826,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
             continue;
         if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
         {
-            stageIntermediate->addSourceText(sourceText, sourceTextLength);
+            shader->addSourceText(sourceText, sourceTextLength);
         }
 
         std::vector<unsigned int> spirv;

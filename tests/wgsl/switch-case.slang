@@ -70,17 +70,8 @@ func fs_main(VertexOutput input)->FragmentOutput
     return output;
 }
 
-//WGSL: fn _S9( _S10 : Tuple_0) -> f32
-//WGSL-NEXT: {
-//WGSL-NEXT:     switch(_S10.value1_0.x)
-//WGSL-NEXT:     {
-//WGSL-NEXT:     case u32(0):
-//WGSL-NEXT:         {
-//WGSL-NEXT:             return Circle_getArea_0(unpackAnyValue16_0(_S10.value2_0));
-//WGSL-NEXT:         }
-//WGSL-NEXT:     default :
-//WGSL-NEXT:         {
-//WGSL-NEXT:             return Rectangle_getArea_0(unpackAnyValue16_1(_S10.value2_0));
-//WGSL-NEXT:         }
-//WGSL-NEXT:     }
-//WGSL-NEXT: }
+//WGSL: fn s_dispatch_IShape_getArea_{{[0-9]+}}( _S{{[0-9]+}} : u32, _S{{[0-9]+}} : AnyValue8) -> f32
+//WGSL-NEXT:{
+//WGSL-DAG:            return U_SR14switch_2Dxcase6Circle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});
+//WGSL-DAG:            return U_SR14switch_2Dxcase9Rectangle7getAreap0pf_wtwrapper_0(_S{{[0-9]+}});
+//WGSL:}

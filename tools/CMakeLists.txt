@@ -183,10 +183,21 @@ if(SLANG_ENABLE_GFX)
             (not ${SLANG_OVERRIDE_TINYOBJLOADER_PATH})
         INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/external else ()
         INCLUDE_DIRECTORIES_PUBLIC ${SLANG_OVERRIDE_TINYOBJLOADER_PATH} endif ()
-        INCLUDE_DIRECTORIES_PRIVATE ${NVAPI_INCLUDE_DIRS}
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${NVAPI_INCLUDE_DIRS}
+            ${CMAKE_CURRENT_BINARY_DIR}/../source/slang/slang-version-header
         INSTALL
         EXPORT_SET_NAME SlangTargets
         FOLDER gfx
+    )
+
+    set_target_properties(
+        gfx
+        PROPERTIES
+            VERSION 0.${SLANG_VERSION_NUMERIC}
+            SOVERSION 0.${SLANG_VERSION_NUMERIC}
+            MACHO_COMPATIBILITY_VERSION 0.0.0
+            MACHO_CURRENT_VERSION ${SLANG_VERSION_NUMERIC}
     )
 
     # Since slang-test does not depend on gfx, we just copy the gfx modules to the slangc

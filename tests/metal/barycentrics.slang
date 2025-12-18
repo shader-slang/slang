@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
-//TEST:SIMPLE(filecheck=CHECK-ASM): -target metallib
+//TEST:SIMPLE(filecheck=METAL): -target metal
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib
 
-// CHECK: {{\[\[}}barycentric_coord{{\]\]}}
-// CHECK-ASM: !"air.barycentric_coord"
+// METAL:    {{\[\[}}barycentric_coord{{\]\]}}
+// METALLIB: !"air.barycentric_coord"
 
 [shader("fragment")]
 float4 fragment_main(float4 pos: SV_Position, float3 barycentrics: SV_Barycentrics)

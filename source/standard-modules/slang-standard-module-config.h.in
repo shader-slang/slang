@@ -1,0 +1,15 @@
+#ifndef SLANG_NEURAL_CONFIG_H_INCLUDED
+#define SLANG_NEURAL_CONFIG_H_INCLUDED
+
+// Neural module configuration - generated from slang-neural-config.h.in
+
+// Directory name for the neural module relative to libslang location
+#define SLANG_STANDARD_MODULE_DIR_NAME "@SLANG_STANDARD_MODULE_DIR_NAME@"
+
+// Installation destination for the neural module (for release packages)
+#define SLANG_STANDARD_MODULE_INSTALL_DIR "@SLANG_STANDARD_MODULE_INSTALL_DIR@"
+
+// Module file name for the neural module
+#define SLANG_NEURAL_MODULE_FILE_NAME "@SLANG_NEURAL_MODULE_FILE_NAME@"
+
+#endif // SLANG_NEURAL_CONFIG_H_INCLUDED

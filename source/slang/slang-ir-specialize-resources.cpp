@@ -20,9 +20,10 @@ struct ResourceParameterSpecializationCondition : FunctionCallSpecializeConditio
     TargetRequest* targetRequest = nullptr;
     TargetProgram* targetProgram = nullptr;
 
-    bool doesParamWantSpecialization(IRParam* param, IRInst* arg)
+    bool doesParamWantSpecialization(IRParam* param, IRInst* arg, IRCall* callInst)
     {
         SLANG_UNUSED(arg);
+        SLANG_UNUSED(callInst);
 
         // Whether or not a parameter needs specialization is really
         // a function of its type:
@@ -348,7 +349,7 @@ struct ResourceOutputSpecializationPass
         for (auto param : func->getParams())
         {
             auto paramType = param->getDataType();
-            auto outType = as<IROutTypeBase>(paramType);
+            auto outType = as<IROutParamTypeBase>(paramType);
             if (!outType)
                 continue;
             auto valueType = outType->getValueType();
@@ -402,12 +403,6 @@ struct ResourceOutputSpecializationPass
             return true;
 
         if (as<IRSamplerStateTypeBase>(type))
-            return true;
-
-        if (as<IRRayQueryType>(type))
-            return true;
-
-        if (as<IRHitObjectType>(type))
             return true;
 
         // TODO: more cases here?
@@ -802,11 +797,11 @@ struct ResourceOutputSpecializationPass
         FuncInfo& ioFuncInfo)
     {
         // We only want to specialize in the case where the parameter
-        // is an `out` or `inout` (both inherit from `IROutTypeBase`),
+        // is an `out` or `inout` (both inherit from `IROutParamTypeBase`),
         // and the pointed-to type is a resource.
         //
         auto paramType = param->getDataType();
-        auto outType = as<IROutTypeBase>(paramType);
+        auto outType = as<IROutParamTypeBase>(paramType);
         if (!outType)
             return SpecializeFuncResult::Ok;
         auto valueType = outType->getValueType();
@@ -834,7 +829,7 @@ struct ResourceOutputSpecializationPass
         //
         IRVar* newVar = bodyBuilder.emitVar(valueType);
 
-        if (as<IRInOutType>(outType))
+        if (as<IRBorrowInOutParamType>(outType))
         {
             // If the parameter is an `inout` rather than just
             // an `out`, then we still need a parameter to
@@ -1266,7 +1261,7 @@ bool specializeResourceOutputs(
     return pass.processModule();
 }
 
-bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
+bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
@@ -1305,8 +1300,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
             if (changed)
             {
                 simplifyIR(
-                    codeGenContext->getTargetProgram(),
                     irModule,
+                    codeGenContext->getTargetProgram(),
                     IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
             }
             result |= changed;
@@ -1319,8 +1314,8 @@ bool specializeResourceUsage(CodeGenContext* codeGenContext, IRModule* irModule)
             inlineAllCallsOfFunction(func);
 
         simplifyIR(
-            codeGenContext->getTargetProgram(),
             irModule,
+            codeGenContext->getTargetProgram(),
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
     return result;
@@ -1388,6 +1383,64 @@ bool isIllegalSPIRVParameterType(IRType* type, bool isArray)
 bool isIllegalWGSLParameterType(IRType* type)
 {
     return isIllegalGLSLParameterType(type);
+}
+
+void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
+    IRModule* irModule,
+    CodeGenContext* codeGenContext)
+{
+    SLANG_UNUSED(codeGenContext);
+
+    auto isNonCopyableOpaqueType = [](IRType* type) -> bool
+    {
+        type = unwrapArray(type);
+        if (as<IRRayQueryType>(type))
+            return true;
+        if (as<IRHitObjectType>(type))
+            return true;
+        return false;
+    };
+
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        // We only care about functions.
+        //
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+
+        for (auto param : func->getParams())
+        {
+            // We are only interested in `out` or `inout` parameters.
+            //
+            auto paramType = param->getDataType();
+            auto paramPtrType = as<IROutParamTypeBase>(paramType);
+            if (!paramPtrType)
+                continue;
+
+            // We are only interested in parameter that use non-copyable
+            // opaque types.
+            //
+            auto paramValueType = paramPtrType->getValueType();
+            if (!isNonCopyableOpaqueType(paramValueType))
+                continue;
+
+            // Okay, we've got a parameter with a type that needs to be changed.
+            //
+            // We'll change an `out` or `inout` parameter over to a
+            // `borrow in` parameter, so that the levels of indirection
+            // in the IR stay consistent, but the downstream logic to
+            // emit GLSL won't go adding a modifier to the parameter declaration.
+            //
+            IRBuilder builder(irModule);
+            auto newParamPtrType = builder.getPtrType(
+                kIROp_BorrowInParamType,
+                paramValueType,
+                paramPtrType->getAccessQualifier(),
+                paramPtrType->getAddressSpace());
+            builder.setDataType(param, newParamPtrType);
+        }
+    }
 }
 
 } // namespace Slang

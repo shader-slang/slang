@@ -1,19 +1,28 @@
 #ifndef SLANG_IR_LOWER_BUFFER_ELEMENT_TYPE_H
 #define SLANG_IR_LOWER_BUFFER_ELEMENT_TYPE_H
 
+#include "slang.h"
+
 namespace Slang
 {
 struct IRModule;
 class TargetProgram;
 struct IRTypeLayoutRules;
 struct IRType;
+enum class IRTypeLayoutRuleName;
+
+enum class BufferElementTypeLoweringPolicyKind
+{
+    Default,
+    KhronosTarget,
+    MetalParameterBlock,
+    WGSL
+};
 
 struct BufferElementTypeLoweringOptions
 {
-    bool lowerBufferPointer = false;
-
-    // For WGSL, we can only create arrays that has a stride of 16 bytes for constant buffers.
-    bool use16ByteArrayElementForConstantBuffer = false;
+    BufferElementTypeLoweringPolicyKind loweringPolicyKind =
+        BufferElementTypeLoweringPolicyKind::Default;
 };
 
 // For each struct type S used as element type of a ConstantBuffer, ParameterBlock or
@@ -24,13 +33,15 @@ struct BufferElementTypeLoweringOptions
 // that returns array typed values.
 //
 void lowerBufferElementTypeToStorageType(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
 
 // Returns the type layout rules should be used for a buffer resource type.
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType);
+IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType);
+
 } // namespace Slang
 
 #endif

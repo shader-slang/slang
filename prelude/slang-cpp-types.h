@@ -59,12 +59,12 @@ struct RWStructuredBuffer
 template<typename T>
 struct StructuredBuffer
 {
-    SLANG_FORCE_INLINE const T& operator[](size_t index) const
+    SLANG_FORCE_INLINE T& operator[](size_t index) const
     {
         SLANG_BOUND_CHECK(index, count);
         return data[index];
     }
-    const T& Load(size_t index) const
+    T& Load(size_t index) const
     {
         SLANG_BOUND_CHECK(index, count);
         return data[index];

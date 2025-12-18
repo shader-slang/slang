@@ -142,7 +142,7 @@ public property uint3 gl_NumWorkGroups
 {
     [require(glsl_spirv, GLSL_430_SPIRV_1_0_compute)]
     [require(glsl_spirv, meshshading)]
-    get 
+    get
     {
         return WorkgroupCount();
     }
@@ -215,6 +215,7 @@ public in int gl_ViewIndex : SV_ViewID;
 public in int gl_ViewportIndex : SV_ViewportArrayIndex;
 public in int gl_BaseVertex : SV_StartVertexLocation;
 public in int gl_BaseInstance : SV_StartInstanceLocation;
+public in int gl_DrawID : SV_DrawIndex;
 
 public in int gl_FragInvocationCountEXT : SV_FragInvocationCount;
 public in int2 gl_FragSizeEXT : SV_FragSize;
@@ -349,11 +350,11 @@ public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
     return any(notEqual(left, right));
 }
 
-${{{{
+${
 for (auto type : kBaseTypes) {
     char const* typeName = type.name;
     if (!type.flags) continue;
-}}}}
+$}
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
@@ -369,9 +370,9 @@ public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName
 {
     return any(notEqual(left, right));
 }
-${{{{
+${
 }
-}}}}
+$}
 
 /// Array length
 __generic<T, let N : int>
@@ -726,7 +727,7 @@ public float half2float(uint h)
         {
             e = (((h & uint(0x7c00)) + uint(0x1c000)) << uint(13));
         }
-        return uintBitsToFloat(s | e | m); 
+        return uintBitsToFloat(s | e | m);
     }
 }
 
@@ -1177,7 +1178,7 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
     }
 }
 
-[__readNone] 
+[__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public uint bitCount(uint value)
@@ -1186,7 +1187,7 @@ public uint bitCount(uint value)
 }
 
 __generic<let N:int>
-[__readNone] 
+[__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
@@ -1194,7 +1195,7 @@ public vector<uint,N> bitCount(vector<uint,N> value)
     return countbits(value);
 }
 
-[__readNone] 
+[__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public int bitCount(int value)
@@ -1209,9 +1210,9 @@ public int bitCount(int value)
         return countbits(uint(value));
     }
 }
-    
+
 __generic<let N:int>
-[__readNone] 
+[__readNone]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 public vector<int,N> bitCount(vector<int,N> value)
@@ -1326,44 +1327,9 @@ public typealias usamplerCube = SamplerCube<uint4>;
 public typealias isamplerCube = SamplerCube<int4>;
 public typealias samplerCube = SamplerCube<float4>;
 
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DShadow = _Texture<
-    float,
-    __Shape1D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DShadow = _Texture<
-    float,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeShadow = _Texture<
-    float,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
+public typealias sampler1DShadow = Sampler1DShadow;
+public typealias sampler2DShadow = Sampler2DShadow;
+public typealias samplerCubeShadow = SamplerCubeShadow;
 
 public typealias usampler1DArray = Sampler1DArray<uint4>;
 public typealias isampler1DArray = Sampler1DArray<int4>;
@@ -1377,44 +1343,9 @@ public typealias usamplerCubeArray = SamplerCubeArray<uint4>;
 public typealias isamplerCubeArray = SamplerCubeArray<int4>;
 public typealias samplerCubeArray = SamplerCubeArray<float4>;
 
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler1DArrayShadow = _Texture<
-    float,
-    __Shape1D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias sampler2DArrayShadow = _Texture<
-    float,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<let sampleCount:int=0, let format:int=0>
-public typealias samplerCubeArrayShadow = _Texture<
-    float,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
+public typealias sampler1DArrayShadow = Sampler1DArrayShadow;
+public typealias sampler2DArrayShadow = Sampler2DArrayShadow;
+public typealias samplerCubeArrayShadow = SamplerCubeArrayShadow;
 
 public typealias sampler2DMS = Sampler2DMS<float4>;
 public typealias isampler2DMS = Sampler2DMS<int4>;
@@ -1675,6 +1606,8 @@ public vec2 textureQueryLod(_Texture<
         format
     > sampler, float p)
 {
+    static_assert(__targetHasImplicitDerivatives(),
+                 "GLSL: textureQueryLod() may be invoked only on a stage that has implicit derivatives.");
     __requireComputeDerivative();
     __target_switch
     {
@@ -1708,6 +1641,8 @@ public vec2 textureQueryLod(_Texture<
         format
     > sampler, vector<float,Shape.dimensions> p)
 {
+    static_assert(__targetHasImplicitDerivatives(),
+                 "GLSL: textureQueryLod() may be invoked only on a stage that has implicit derivatives.");
     __requireComputeDerivative();
     __target_switch
     {
@@ -1908,15 +1843,21 @@ __generic<T:ITexelElement>
 [require(cpp_cuda_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> texture(Sampler1D<T> sampler, float p)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement>
 [ForceInline]
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
-public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, constexpr float bias)
+public vector<T.Element,4> texture(Sampler1D<T> sampler, float p, float bias)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.SampleBias(p, bias));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
@@ -1934,7 +1875,10 @@ public vector<T.Element,4> texture(_Texture<
         format
     > sampler, vector<float,Shape.dimensions+isArray> p)
 {
-    return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element, 4>(sampler.Sample(p));
+    else
+        return __vectorReshape2<T.Element, 4>(sampler.SampleLevelZero(p));
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let format:int>
@@ -1950,16 +1894,22 @@ public vector<T.Element,4> texture(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,Shape.dimensions+isArray> p, constexpr float bias)
+    > sampler, vector<float,Shape.dimensions+isArray> p, float bias)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p));
 }
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.x, p.z);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.x, p.z);
+    else
+        return sampler.SampleCmpLevelZero(p.x, p.z);
 }
 
 [ForceInline]
@@ -1968,6 +1918,9 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 {
     float location = p.x;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
 
     __requireComputeDerivative();
     __target_switch
@@ -1988,7 +1941,10 @@ public float texture(sampler1DShadow sampler, vec3 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.xy, p.z);
+    if (__targetHasImplicitDerivatives())
+       return sampler.SampleCmp(p.xy, p.z);
+    else
+       return sampler.SampleCmpLevelZero(p.xy, p.z);
 }
 
 [ForceInline]
@@ -1998,6 +1954,9 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
     vec2 location = p.xy;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2007,7 +1966,7 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2017,7 +1976,10 @@ public float texture(sampler2DShadow sampler, vec3 p, float bias)
 [ForceInline]
 public float texture(samplerCubeShadow sampler, vec4 p)
 {
-    return sampler.SampleCmp(p.xyz, p.w);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
@@ -2027,6 +1989,9 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
     vec3 location = p.xyz;
     float compareValue = p.w;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2036,7 +2001,29 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
+        // TODO: Need to apply bias
+        return sampler.SampleCmp(location, compareValue);
+    }
+}
+
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+[ForceInline]
+public float texture(samplerCubeArrayShadow sampler, vec4 location, float compareValue, float bias)
+{
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
+
+    __requireComputeDerivative();
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "texture";
+    case spirv:
+        return spirv_asm
+        {
+            result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
+        };
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2046,7 +2033,10 @@ public float texture(samplerCubeShadow sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler1DArrayShadow sampler, vec3 p)
 {
-    return sampler.SampleCmp(p.xy, p.z);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xy, p.z);
+    else
+        return sampler.SampleCmpLevelZero(p.xy, p.z);
 }
 
 [ForceInline]
@@ -2055,6 +2045,9 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue);
 
     __requireComputeDerivative();
     __target_switch
@@ -2065,7 +2058,7 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
         {
             result:$$float = OpImageSampleDrefImplicitLod $sampler $location $compareValue Bias $bias;
         };
-    default: 
+    default:
         // TODO: Need to apply bias
         return sampler.SampleCmp(location, compareValue);
     }
@@ -2075,14 +2068,20 @@ public float texture(sampler1DArrayShadow sampler, vec3 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(sampler2DArrayShadow sampler, vec4 p)
 {
-    return sampler.SampleCmp(p.xyz, p.w);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w);
 }
 
 [ForceInline]
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float texture(samplerCubeArrayShadow sampler, vec4 p, float compare)
 {
-    return sampler.SampleCmp(p, compare);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p, compare);
+    else
+        return sampler.SampleCmpLevelZero(p, compare);
 }
 
 // -------------------
@@ -2094,6 +2093,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2111,6 +2113,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec2 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2128,6 +2133,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2145,6 +2153,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler1D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2162,6 +2173,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2179,6 +2193,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec3 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2196,6 +2213,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2213,6 +2233,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler2D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2230,6 +2253,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2247,6 +2273,9 @@ __generic<T:ITexelElement>
 [require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2263,6 +2292,9 @@ public vector<T.Element,4> textureProj(Sampler3D<T> sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2284,6 +2316,9 @@ public float textureProj(sampler1DShadow sampler, vec4 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2305,6 +2340,9 @@ public float textureProj(sampler1DShadow sampler, vec4 p, float bias)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2326,6 +2364,9 @@ public float textureProj(sampler2DShadow sampler, vec4 p)
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProj(sampler2DShadow sampler, vec4 p, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLod(sampler, p, 0.0f);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2388,7 +2429,7 @@ public float textureLod(sampler2DShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xy, p.z);
+        return sampler.SampleCmpLevel(p.xy, p.z, lod);
     }
 }
 
@@ -2407,8 +2448,22 @@ public float textureLod(sampler2DArrayShadow sampler, vec4 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xyz, p.w);
+        return sampler.SampleCmpLevel(p.xyz, p.w, lod);
     }
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(samplerCubeShadow sampler, vec4 p, float lod)
+{
+    return sampler.SampleCmpLevel(p.xyz, p.w, lod);
+}
+
+[ForceInline]
+[require(glsl_hlsl_spirv, texture_shadowlod)]
+public float textureLod(samplerCubeArrayShadow sampler, vec4 p, float compareValue, float lod)
+{
+    return sampler.SampleCmpLevel(p, compareValue, lod);
 }
 
 [ForceInline]
@@ -2426,7 +2481,7 @@ public float textureLod(sampler1DShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.x, p.z);
+        return sampler.SampleCmpLevel(p.x, p.z, lod);
     }
 }
 
@@ -2445,7 +2500,7 @@ public float textureLod(sampler1DArrayShadow sampler, vec3 p, float lod)
         };
     }
     default:
-        return sampler.SampleCmp(p.xy, p.z);
+        return sampler.SampleCmpLevel(p.xy, p.z, lod);
     }
 }
 
@@ -2458,7 +2513,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler1D<T> sampler, float p, constexpr int offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2466,7 +2524,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler2D<T> sampler, vec2 p, constexpr ivec2 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2474,7 +2535,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler3D<T> sampler, vec3 p, constexpr ivec3 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 [ForceInline]
@@ -2483,6 +2547,9 @@ public float textureOffset(sampler2DShadow sampler, vec3 p, constexpr ivec2 offs
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
 
     __requireComputeDerivative();
     __target_switch
@@ -2506,6 +2573,9 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     float location = p.x;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2528,6 +2598,9 @@ public float textureOffset(sampler1DShadow sampler, vec3 p, constexpr int offset
     float location = p.x;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2548,7 +2621,11 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler1DArray<T> sampler, vec2 p, constexpr int offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 __generic<T:ITexelElement>
@@ -2556,7 +2633,10 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureOffset(Sampler2DArray<T> sampler, vec3 p, constexpr ivec2 offset, float bias = 0.0)
 {
-    return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    if (__targetHasImplicitDerivatives())
+        return __vectorReshape2<T.Element,4>(sampler.SampleBias(p, bias, offset));
+    else
+        return __vectorReshape2<T.Element,4>(sampler.SampleLevelZero(p, offset));
 }
 
 [ForceInline]
@@ -2565,6 +2645,9 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 {
     vec2 location = p.xy;
     float compareValue = p.z;
+
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, vector<int,1>(offset));
 
     __requireComputeDerivative();
     __target_switch
@@ -2588,6 +2671,9 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
     vec2 location = p.xy;
     float compareValue = p.z;
 
+    if (!__targetHasImplicitDerivatives())
+        return sampler.SampleCmpLevelZero(location, compareValue, vector<int,1>(offset));
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2607,7 +2693,10 @@ public float textureOffset(sampler1DArrayShadow sampler, vec3 p, constexpr int o
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureOffset(sampler2DArrayShadow sampler, vec4 p, constexpr ivec2 offset)
 {
-    return sampler.SampleCmp(p.xyz, p.w, offset);
+    if (__targetHasImplicitDerivatives())
+        return sampler.SampleCmp(p.xyz, p.w, offset);
+    else
+        return sampler.SampleCmpLevelZero(p.xyz, p.w, offset);
 }
 
 // -------------------
@@ -2727,6 +2816,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2744,6 +2836,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec2 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2761,6 +2856,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2782,6 +2880,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler1D<T> sampler, vec4 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2803,6 +2904,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2820,6 +2924,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec3 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2837,6 +2944,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2858,6 +2968,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler2D<T> sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2879,6 +2992,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2896,6 +3012,9 @@ __generic<T:ITexelElement>
 [require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, constexpr ivec3 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2912,6 +3031,9 @@ public vector<T.Element,4> textureProjOffset(Sampler3D<T> sampler, vec4 p, const
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2933,6 +3055,9 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2954,6 +3079,9 @@ public float textureProjOffset(sampler1DShadow sampler, vec4 p, constexpr int of
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -2975,6 +3103,9 @@ public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 
 [require(glsl_hlsl_spirv, texture_shadowlod)]
 public float textureProjOffset(sampler2DShadow sampler, vec4 p, constexpr ivec2 offset, float bias)
 {
+    if (!__targetHasImplicitDerivatives())
+        return textureProjLodOffset(sampler, p, 0.0f, offset);
+
     __requireComputeDerivative();
     __target_switch
     {
@@ -3220,7 +3351,7 @@ public float textureProjLod(sampler2DShadow sampler, vec4 p, float lod)
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec2 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3236,7 +3367,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec2 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, float lod, constexpr int offset)
 {
     __target_switch
@@ -3256,7 +3387,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler1D<T> sampler, vec4 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec3 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3272,7 +3403,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec3 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, float lod, constexpr ivec2 offset)
 {
     __target_switch
@@ -3292,7 +3423,7 @@ public vector<T.Element,4> textureProjLodOffset(Sampler2D<T> sampler, vec4 p, fl
 
 __generic<T:ITexelElement>
 [ForceInline]
-[require(glsl_hlsl_spirv, texture_sm_4_0_fragment)]
+[require(cpp_glsl_hlsl_spirv, texture_sm_4_0_fragment)]
 public vector<T.Element,4> textureProjLodOffset(Sampler3D<T> sampler, vec4 p, float lod, constexpr ivec3 offset)
 {
     __target_switch
@@ -3891,7 +4022,7 @@ public vector<T.Element,4> textureGatherOffset(_Texture<
         0, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, constexpr vector<int,2> offset, int comp = 0)
+    > sampler, vector<float,2+isArray> p, vector<int,2> offset, int comp = 0)
 {
     switch (comp)
     {
@@ -3915,10 +4046,11 @@ public vec4 textureGatherOffset(_Texture<
         1, // isShadow
         1, // isCombined
         format
-    > sampler, vector<float,2+isArray> p, float refZ, constexpr vector<int,2> offset)
+    > sampler, vector<float,2+isArray> p, float refZ, vector<int,2> offset)
 {
     return sampler.GatherCmp(p, refZ, offset);
 }
+
 
 // -------------------
 // textureGatherOffsets
@@ -4279,7 +4411,7 @@ __generic<T : __BuiltinType>
     }
 }
 
-${{{{
+${
 {
     struct ImageTypeInfo
     {
@@ -4382,7 +4514,7 @@ ${{{{
         auto SPV_PREFIX_IMAGE_PARAMS = SPV_PREFIX_IMAGE_PARAMSBuilder.toString();
         auto SPV_SUFFIX_IMAGE_PARAMS = SPV_SUFFIX_IMAGE_PARAMSBuilder.toString();
         auto SPV_DEFAULT_SAMPLE_VAR_IF_MISSING = SPV_DEFAULT_SAMPLE_VAR_IF_MISSINGBuilder.toString();
-    }}}}
+    $}
 
         __generic<let format:int=0>
         public typealias $(fullTypeName) = _Texture<
@@ -4397,10 +4529,10 @@ ${{{{
             format
         >;
 
-${{{{
+${
         if(targetShape.isRect)
             continue;
-}}}}
+$}
 
         // readonly writeonly in GLSL means an object only allows information queries.
         [__readNone]
@@ -4455,10 +4587,10 @@ ${{{{
             }
         }
 
-${{{{
+${
         if (targetShape.isMS)
         {
-}}}}
+$}
             // readonly writeonly in GLSL means an object only allows information queries.
             [__readNone]
             [ForceInline]
@@ -4476,9 +4608,9 @@ ${{{{
                     };
                 }
             }
-${{{{
+${
         }
-}}}}
+$}
         [ForceInline]
         [require(glsl_spirv, image_loadstore)]
         public $(targetType.type) imageAtomicAdd($(IMAGE_PARAMS), $(targetType.type) data)
@@ -4520,7 +4652,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicExchange %ptr Device Relaxed $data
                 };
             }
             }
@@ -4543,7 +4675,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Min$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
@@ -4566,15 +4698,15 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomic$(targetType.SPVSubTypePrefix)Max$(targetType.SPVAtomicSuffix) %ptr Device Relaxed $data
                 };
             }
             }
         }
-${{{{
+${
         if (!targetType.isInt)
             continue;
-}}}}
+$}
         [ForceInline]
         [require(glsl_spirv, image_loadstore)]
         public $(targetType.type) imageAtomicAnd($(IMAGE_PARAMS), $(targetType.type) data)
@@ -4592,7 +4724,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicAnd %ptr Device Relaxed $data
                 };
             }
             }
@@ -4614,12 +4746,12 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicOr %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicOr %ptr Device Relaxed $data
                 };
             }
             }
         }
-        
+
         [ForceInline]
         [require(glsl_spirv, image_loadstore)]
         public $(targetType.type) imageAtomicXor($(IMAGE_PARAMS), $(targetType.type) data)
@@ -4637,7 +4769,7 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicXor %ptr Device ImageMemory $data
+                    result:$$$(targetType.type) = OpAtomicXor %ptr Device Relaxed $data
                 };
             }
             }
@@ -4659,15 +4791,15 @@ ${{{{
                     OpCapability ImageQuery;
                     %ptrType = OpTypePointer Image $$$(targetType.type);
                     %ptr:%ptrType = OpImageTexelPointer $imageP $P $sample;
-                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device ImageMemory ImageMemory $data $compare
+                    result:$$$(targetType.type) = OpAtomicCompareExchange %ptr Device Relaxed Relaxed $data $compare
                 };
             }
             }
         }
-${{{{
+${
     }
 }
-}}}}
+$}
 
 //// RayTracing
 
@@ -4679,10 +4811,10 @@ public typealias accelerationStructureNV = RaytracingAccelerationStructure;
 
 public typealias hitObjectNV = HitObject;
 
-//GL_EXT_ray_tracing BuiltIn's 
+//GL_EXT_ray_tracing BuiltIn's
 
 [require(any_target, raytracing_allstages)]
-void requireGLSLExtForRayTracingBuiltin() 
+void requireGLSLExtForRayTracingBuiltin()
 {
     __target_switch
     {
@@ -4694,9 +4826,9 @@ void requireGLSLExtForRayTracingBuiltin()
     }
 }
 
-__spirv_version(1.4) 
+__spirv_version(1.4)
 [require(any_target, raytracing_allstages)]
-void setupExtForRayTracingBuiltIn() 
+void setupExtForRayTracingBuiltIn()
 {
     __target_switch
     {
@@ -4707,10 +4839,10 @@ void setupExtForRayTracingBuiltIn()
     }
 }
 
-public property uint3 gl_LaunchIDNV 
+public property uint3 gl_LaunchIDNV
 {
     [require(glsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         setupExtForRayTracingBuiltIn();
         __target_switch
@@ -4721,29 +4853,29 @@ public property uint3 gl_LaunchIDNV
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 result:$$uint3 = OpLoad builtin(LaunchIdNV:uint3);
             };
         }
-        }    
+        }
     }
 }
 
-public property uint3 gl_LaunchIDEXT 
+public property uint3 gl_LaunchIDEXT
 {
     [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         setupExtForRayTracingBuiltIn();
         return DispatchRaysIndex();
     }
 }
 
-public property uint3 gl_LaunchSizeNV 
+public property uint3 gl_LaunchSizeNV
 {
     [require(glsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         setupExtForRayTracingBuiltIn();
         __target_switch
@@ -4754,7 +4886,7 @@ public property uint3 gl_LaunchSizeNV
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 result:$$uint3 = OpLoad builtin(LaunchSizeNV:uint3);
             };
@@ -4763,10 +4895,10 @@ public property uint3 gl_LaunchSizeNV
     }
 }
 
-public property uint3 gl_LaunchSizeEXT 
+public property uint3 gl_LaunchSizeEXT
 {
     [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         setupExtForRayTracingBuiltIn();
         return DispatchRaysDimensions();
@@ -4783,7 +4915,7 @@ internal in uint __gl_PrimitiveID : SV_PrimitiveID;
 public property int gl_PrimitiveID
 {
     [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         __stage_switch
         {
@@ -4801,7 +4933,7 @@ public property int gl_PrimitiveID
 public property int gl_InstanceID
 {
     [require(cuda_glsl_hlsl_spirv, raytracing_allstages)]
-    get 
+    get
     {
         __stage_switch
         {
@@ -4816,17 +4948,17 @@ public property int gl_InstanceID
     }
 }
 
-public property int gl_InstanceCustomIndexEXT 
+public property int gl_InstanceCustomIndexEXT
 {
     [require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
-    get 
+    get
     {
         setupExtForRayTracingBuiltIn();
         return InstanceID();
     }
 }
 
-public property int gl_GeometryIndexEXT 
+public property int gl_GeometryIndexEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -4836,7 +4968,7 @@ public property int gl_GeometryIndexEXT
     }
 }
 
-public property vec3 gl_WorldRayOriginEXT 
+public property vec3 gl_WorldRayOriginEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
@@ -4846,7 +4978,7 @@ public property vec3 gl_WorldRayOriginEXT
     }
 }
 
-public property vec3 gl_WorldRayDirectionEXT 
+public property vec3 gl_WorldRayDirectionEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
@@ -4856,7 +4988,7 @@ public property vec3 gl_WorldRayDirectionEXT
     }
 }
 
-public property vec3 gl_ObjectRayOriginEXT 
+public property vec3 gl_ObjectRayOriginEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -4866,7 +4998,7 @@ public property vec3 gl_ObjectRayOriginEXT
     }
 }
 
-public property vec3 gl_ObjectRayDirectionEXT 
+public property vec3 gl_ObjectRayDirectionEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -4876,7 +5008,7 @@ public property vec3 gl_ObjectRayDirectionEXT
     }
 }
 
-public property float gl_RayTminEXT 
+public property float gl_RayTminEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
@@ -4886,7 +5018,7 @@ public property float gl_RayTminEXT
     }
 }
 
-public property float gl_RayTmaxEXT 
+public property float gl_RayTmaxEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
@@ -4896,7 +5028,7 @@ public property float gl_RayTmaxEXT
     }
 }
 
-public property uint gl_IncomingRayFlagsEXT 
+public property uint gl_IncomingRayFlagsEXT
 {
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection_miss)]
     get
@@ -4906,7 +5038,7 @@ public property uint gl_IncomingRayFlagsEXT
     }
 }
 
-public property float gl_HitTEXT 
+public property float gl_HitTEXT
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit)]
     get
@@ -4920,7 +5052,7 @@ public property float gl_HitTEXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 result:$$float = OpLoad builtin(RayTmaxKHR:float);
             };
@@ -4929,7 +5061,7 @@ public property float gl_HitTEXT
     }
 }
 
-public property uint gl_HitKindEXT 
+public property uint gl_HitKindEXT
 {
 
     [require(glsl_hlsl_spirv, raytracing_anyhit_closesthit)]
@@ -4969,7 +5101,7 @@ public property int gl_ClusterIDNV
 // Corresponds to VK_GEOMETRY_INSTANCE_CLUSTER_ID_NONE_NV in Vulkan
 public static const int gl_ClusterIDNoneNV = -1;
 
-public property mat4x3 gl_ObjectToWorldEXT 
+public property mat4x3 gl_ObjectToWorldEXT
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -4992,7 +5124,7 @@ public property mat4x3 gl_ObjectToWorldEXT
     }
 }
 
-public property mat3x4 gl_ObjectToWorld3x4EXT 
+public property mat3x4 gl_ObjectToWorld3x4EXT
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -5006,7 +5138,7 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 %mat:$$mat4x3 = OpLoad builtin(ObjectToWorldKHR:mat4x3);
                 result:$$mat3x4 = OpTranspose %mat
@@ -5016,7 +5148,7 @@ public property mat3x4 gl_ObjectToWorld3x4EXT
     }
 }
 
-public property mat4x3 gl_WorldToObjectEXT 
+public property mat4x3 gl_WorldToObjectEXT
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -5030,7 +5162,7 @@ public property mat4x3 gl_WorldToObjectEXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 result:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
             };
@@ -5039,7 +5171,7 @@ public property mat4x3 gl_WorldToObjectEXT
     }
 }
 
-public property mat3x4 gl_WorldToObject3x4EXT 
+public property mat3x4 gl_WorldToObject3x4EXT
 {
     [require(glsl_spirv, raytracing_anyhit_closesthit_intersection)]
     get
@@ -5053,7 +5185,7 @@ public property mat3x4 gl_WorldToObject3x4EXT
         }
         case spirv:
         {
-            return spirv_asm 
+            return spirv_asm
             {
                 %mat:$$mat4x3 = OpLoad builtin(WorldToObjectKHR:mat4x3);
                 result:$$mat3x4 = OpTranspose %mat
@@ -5099,9 +5231,9 @@ public void traceRayEXT(
     }
     case spirv:
     {
-        spirv_asm 
+        spirv_asm
         {
-            OpTraceRayKHR 
+            OpTraceRayKHR
                 /**/ $topLevel
                 /**/ $rayFlags
                 /**/ $cullMask
@@ -5152,7 +5284,7 @@ public property int ignoreIntersectionEXT
 __glsl_extension(GL_EXT_ray_tracing)
 [require(glsl_spirv, raytracing_raygen_closesthit_miss_callable)]
 public void executeCallableEXT(
-    uint sbtRecordIndex, 
+    uint sbtRecordIndex,
     int callable /*callableDataEXT and callableDataInEXT*/)
 {
     __target_switch
@@ -5208,9 +5340,9 @@ public void rayQueryInitializeEXT(
     float tMin, vec3 direction, float tMax)
 {
     q.TraceRayInline(
-        topLevel, 
-        rayFlags, 
-        cullMask, 
+        topLevel,
+        rayFlags,
+        cullMask,
         { origin, tMin, direction, tMax });
 }
 
@@ -5298,13 +5430,13 @@ public vec3 rayQueryGetWorldRayDirectionEXT(rayQueryEXT q)
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed) 
+public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayT();
     }
-    else 
+    else
     {
         return q.CandidateTriangleRayT();
     }
@@ -5313,13 +5445,13 @@ public float rayQueryGetIntersectionTEXT(rayQueryEXT q, bool committed)
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed) 
+public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayInstanceCustomIndex();
     }
-    else 
+    else
     {
         return q.CandidateRayInstanceCustomIndex();;
     }
@@ -5328,13 +5460,13 @@ public int rayQueryGetIntersectionInstanceCustomIndexEXT(rayQueryEXT q, bool com
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed) 
+public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayInstanceId();
     }
-    else 
+    else
     {
         return q.CandidateRayInstanceId();
     }
@@ -5343,28 +5475,28 @@ public int rayQueryGetIntersectionInstanceIdEXT(rayQueryEXT q, bool committed)
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed) 
+public uint rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayInstanceShaderBindingTableRecordOffset();
     }
-    else 
+    else
     {
-        return q.CandidateRayInstanceShaderBindingTableRecordOffset();    
+        return q.CandidateRayInstanceShaderBindingTableRecordOffset();
     }
 }
 
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed) 
+public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayGeometryIndex();
     }
-    else 
+    else
     {
         return q.CandidateRayGeometryIndex();
     }
@@ -5373,13 +5505,13 @@ public int rayQueryGetIntersectionGeometryIndexEXT(rayQueryEXT q, bool committed
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed) 
+public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayPrimitiveIndex();
     }
-    else 
+    else
     {
         return q.CandidateRayPrimitiveIndex();
     }
@@ -5388,13 +5520,13 @@ public int rayQueryGetIntersectionPrimitiveIndexEXT(rayQueryEXT q, bool committe
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed) 
+public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayBarycentrics();
     }
-    else 
+    else
     {
         return q.CandidateRayBarycentrics();
     }
@@ -5403,13 +5535,13 @@ public vec2 rayQueryGetIntersectionBarycentricsEXT(rayQueryEXT q, bool committed
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed) 
+public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayFrontFace();
     }
-    else 
+    else
     {
         return q.CandidateRayFrontFace();
     }
@@ -5418,20 +5550,20 @@ public bool rayQueryGetIntersectionFrontFaceEXT(rayQueryEXT q, bool committed)
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q) 
+public bool rayQueryGetIntersectionCandidateAABBOpaqueEXT(rayQueryEXT q)
 {
     return q.CandidateProceduralPrimitiveNonOpaque();
 }
 
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed) 
+public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayObjectRayDirection();
     }
-    else 
+    else
     {
         return q.CandidateRayObjectRayDirection();
     }
@@ -5440,13 +5572,13 @@ public vec3 rayQueryGetIntersectionObjectRayDirectionEXT(rayQueryEXT q, bool com
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed) 
+public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayObjectRayOrigin();
     }
-    else 
+    else
     {
         return q.CandidateRayObjectRayOrigin();
     }
@@ -5455,13 +5587,13 @@ public vec3 rayQueryGetIntersectionObjectRayOriginEXT(rayQueryEXT q, bool commit
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed) 
+public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayObjectToWorld();
     }
-    else 
+    else
     {
         return q.CandidateRayObjectToWorld();
     }
@@ -5470,13 +5602,13 @@ public mat4x3 rayQueryGetIntersectionObjectToWorldEXT(rayQueryEXT q, bool commit
 __glsl_extension(GL_EXT_ray_query)
 [ForceInline]
 [require(glsl_spirv, rayquery)]
-public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed) 
+public mat4x3 rayQueryGetIntersectionWorldToObjectEXT(rayQueryEXT q, bool committed)
 {
-    if (committed) 
+    if (committed)
     {
         return q.CommittedRayWorldToObject();
     }
-    else 
+    else
     {
         return q.CandidateRayWorldToObject();
     }
@@ -5501,7 +5633,7 @@ public void hitObjectTraceRayNV(
     float Tmin,
     vec3 direction,
     float Tmax,
-    constexpr int payload) 
+    constexpr int payload)
     {
     __target_switch
     {
@@ -5550,7 +5682,7 @@ __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectTraceRayMotionNV(
-    inout hitObjectNV hitObject, 
+    inout hitObjectNV hitObject,
     accelerationStructureEXT topLevel,
     uint rayFlags,
     uint cullMask,
@@ -5590,7 +5722,7 @@ public void hitObjectTraceRayMotionNV(
             OpCapability RayTracingMotionBlurNV;
             OpExtension "SPV_NV_ray_tracing_motion_blur";
             OpHitObjectTraceRayMotionNV
-                /**/ &hitObject 
+                /**/ &hitObject
                 /**/ $topLevel
                 /**/ $rayFlags
                 /**/ $cullMask
@@ -5866,8 +5998,8 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectRecordMissNV(
-    inout hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
+    inout hitObjectNV hitObject,
+    uint sbtRecordIndex,
     vec3 origin,
     float Tmin,
     vec3 direction,
@@ -5886,8 +6018,8 @@ __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_spirv, ser_motion_raygen_closesthit_miss)]
 public void hitObjectRecordMissMotionNV(
-    inout hitObjectNV hitObject, 
-    uint sbtRecordIndex, 
+    inout hitObjectNV hitObject,
+    uint sbtRecordIndex,
     vec3 origin,
     float Tmin,
     vec3 direction,
@@ -5917,10 +6049,10 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectExecuteShaderNV(
-    inout hitObjectNV hitObject, 
+    inout hitObjectNV hitObject,
     constexpr int payload)
-{    
-    __target_switch 
+{
+    __target_switch
     {
     case glsl:
     {
@@ -5928,7 +6060,7 @@ public void hitObjectExecuteShaderNV(
     }
     case spirv:
     {
-        spirv_asm 
+        spirv_asm
         {
             OpHitObjectExecuteShaderNV &hitObject __rayPayloadFromLocation(payload)
         };
@@ -5973,7 +6105,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMinNV(hitObjectNV hitObject)
 {
-    return hitObject.GetRayDesc().TMin;  
+    return hitObject.GetRayDesc().TMin;
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -5983,7 +6115,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public float hitObjectGetRayTMaxNV(hitObjectNV hitObject)
 {
-    return hitObject.GetRayDesc().TMax; 
+    return hitObject.GetRayDesc().TMax;
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -6003,7 +6135,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public vec3 hitObjectGetWorldRayDirectionNV(hitObjectNV hitObject)
 {
-    return hitObject.GetRayDesc().Direction; 
+    return hitObject.GetRayDesc().Direction;
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -6043,7 +6175,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public mat4x3 hitObjectGetWorldToObjectNV(hitObjectNV hitObject)
 {
-    return hitObject.GetWorldToObject(); 
+    return hitObject.GetWorldToObject();
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -6102,7 +6234,7 @@ __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
 [ForceInline]
 [require(glsl_spirv, ser_raygen_closesthit_miss)]
 public void hitObjectGetAttributesNV(
-    inout hitObjectNV hitObject, 
+    inout hitObjectNV hitObject,
     constexpr int attributeLocation)
 {
     __target_switch
@@ -6113,9 +6245,9 @@ public void hitObjectGetAttributesNV(
     }
     case spirv:
     {
-        spirv_asm 
+        spirv_asm
         {
-            OpCapability ShaderInvocationReorderNV; 
+            OpCapability ShaderInvocationReorderNV;
             OpHitObjectGetAttributesNV &hitObject __rayAttributeFromLocation(attributeLocation)
         };
     }
@@ -6204,7 +6336,7 @@ public property float gl_CurrentRayTimeNV
     }
 }
 
-__glsl_extension(GL_EXT_ray_tracing) 
+__glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [ForceInline]
 [require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
@@ -6222,7 +6354,7 @@ public void traceRayMotionNV(
     float currentTime,
     constexpr int payload)
 {
-    __target_switch 
+    __target_switch
     {
     case glsl:
     {
@@ -6242,7 +6374,7 @@ public void traceRayMotionNV(
     }
     case spirv:
     {
-        spirv_asm 
+        spirv_asm
         {
             OpCapability RayTracingMotionBlurNV;
             OpExtension "SPV_NV_ray_tracing_motion_blur";
@@ -6315,7 +6447,7 @@ void setupExtForSubgroupBallotBuiltIn() {
 }
 
 public property uint gl_NumSubgroups {
-    
+
     [require(glsl_spirv, subgroup_basic)]
     get {
         setupExtForSubgroupBasicBuiltIn();
@@ -6587,8 +6719,8 @@ public void subgroupMemoryBarrierShared()
         __intrinsic_asm "simdgroup_barrier(mem_flags::mem_threadgroup)";
     case spirv:
         spirv_asm {
-            // SubgroupMemory triggers vulkan validation layer error; 
-            // WorkgroupMemory is the next level of granularity 
+            // SubgroupMemory triggers vulkan validation layer error;
+            // WorkgroupMemory is the next level of granularity
             OpMemoryBarrier Subgroup AcquireRelease|WorkgroupMemory
         };
 
@@ -6596,7 +6728,7 @@ public void subgroupMemoryBarrierShared()
 }
 
 __spirv_version(1.3)
-__glsl_extension(GL_KHR_shader_subgroup_basic) 
+__glsl_extension(GL_KHR_shader_subgroup_basic)
 [ForceInline]
 [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
 public bool subgroupElect()
@@ -6604,7 +6736,7 @@ public bool subgroupElect()
     __target_switch
     {
     case cuda:
-        __intrinsic_asm "( (__activemask() & (__activemask()*-1)) == _getLaneId())";    
+        __intrinsic_asm "( (__activemask() & (__activemask()*-1)) == _getLaneId())";
     default:
         return WaveIsFirstLane();
 
@@ -7576,8 +7708,8 @@ public uvec4 subgroupBallot(bool value)
 // 1. index into comp I want: index = trunc(float(lane)*(1/32))
 // 2. lane & value[index]
 // note: 1/32 wil be converted to multiplication
-// we do 1/32 since 1 uint stores 32 threads 
-// note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a 
+// we do 1/32 since 1 uint stores 32 threads
+// note 2: we have a waveLaneCount check because based on wave lane count we can determine if we can do a
 // fast path or slow path (know index is 0 or non 0)
 // }
 __spirv_version(1.3)
@@ -7607,7 +7739,7 @@ public bool subgroupInverseBallot(uvec4 value)
         __intrinsic_asm "subgroupInverseBallot($0)";
     case spirv:
         return spirv_asm {
-                OpCapability GroupNonUniformBallot; 
+                OpCapability GroupNonUniformBallot;
                 OpGroupNonUniformInverseBallot $$bool result Subgroup $value
         };
     }
@@ -7640,7 +7772,7 @@ public bool subgroupBallotBitExtract(uvec4 value, uint index)
         __intrinsic_asm "subgroupBallotBitExtract($0, $1)";
     case spirv:
         return spirv_asm {
-                OpCapability GroupNonUniformBallot; 
+                OpCapability GroupNonUniformBallot;
                 OpGroupNonUniformBallotBitExtract $$bool result Subgroup $value $index
         };
     }
@@ -7661,7 +7793,7 @@ public uint subgroupBallotBitCount(uvec4 value)
         __intrinsic_asm "subgroupBallotBitCount($0)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallotBitCount $$uint result Subgroup Reduce $value
         };
     }
@@ -7679,7 +7811,7 @@ public uint subgroupBallotInclusiveBitCount(uvec4 value)
         __intrinsic_asm "subgroupBallotInclusiveBitCount($0)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallotBitCount $$uint result Subgroup InclusiveScan $value
         };
     }
@@ -7697,7 +7829,7 @@ public uint subgroupBallotExclusiveBitCount(uvec4 value)
         __intrinsic_asm "subgroupBallotExclusiveBitCount($0)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallotBitCount $$uint result Subgroup ExclusiveScan $value
         };
     }
@@ -7715,7 +7847,7 @@ public uint subgroupBallotFindLSB(uvec4 value)
         __intrinsic_asm "subgroupBallotFindLSB($0)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallotFindLSB $$uint result Subgroup $value
         };
     }
@@ -7733,7 +7865,7 @@ public uint subgroupBallotFindMSB(uvec4 value)
         __intrinsic_asm "subgroupBallotFindMSB($0)";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformBallotFindMSB $$uint result Subgroup $value
         };
     }
@@ -7769,7 +7901,7 @@ __wgsl_extension(subgroups)
         __intrinsic_asm "simd_shuffle_xor($0, ushort($1))";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformShuffleXor $$T result Subgroup $value $mask
         };
     }
@@ -7804,7 +7936,7 @@ public vector<T,N> subgroupShuffleXor(vector<T,N> value, uint mask)
         __intrinsic_asm "simd_shuffle_xor($0, ushort($1))";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformBallot; 
+            OpCapability GroupNonUniformBallot;
             OpGroupNonUniformShuffleXor $$vector<T,N> result Subgroup $value $mask
         };
     }
@@ -7855,7 +7987,7 @@ public T subgroupShuffleDown(T value, uint delta)
         __intrinsic_asm "simd_shuffle_down($0, ushort($1))";
     case spirv:
         return spirv_asm {
-            OpCapability GroupNonUniformShuffleRelative; 
+            OpCapability GroupNonUniformShuffleRelative;
             OpGroupNonUniformShuffleDown $$T result Subgroup $value $delta
         };
     }
@@ -7950,7 +8082,7 @@ public T subgroupClusteredMul(T value, uint clusterSize)
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$T result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    } 
+    }
 }
 
 __generic<T : __BuiltinArithmeticType>
@@ -8071,7 +8203,7 @@ public vector<T,N> subgroupClusteredAdd(vector<T,N> value, uint clusterSize)
         __intrinsic_asm "subgroupClusteredAdd($0, $1)";
     case spirv:
         if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; 
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered;
             OpGroupNonUniformFAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIAdd $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
@@ -8097,7 +8229,7 @@ public vector<T,N> subgroupClusteredMul(vector<T,N> value, uint clusterSize)
         else if (__isInt<T>())
             return spirv_asm {OpCapability GroupNonUniformArithmetic; OpCapability GroupNonUniformClustered; OpGroupNonUniformIMul $$vector<T,N> result Subgroup ClusteredReduce $value $clusterSize};
         else return value;
-    } 
+    }
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
@@ -8675,7 +8807,7 @@ public uvec4 subgroupPartitionNV(T value)
 
 //// GLSL atomic
 
-// The following type internally is a Shader Storage Buffer 
+// The following type internally is a Shader Storage Buffer
 // as per GL_EXT_vulkan_glsl_relaxed
 __magic_type(GLSLAtomicUintType)
 __intrinsic_type($(kIROp_GLSLAtomicUintType))
@@ -8690,7 +8822,7 @@ public struct atomic_uint
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
-void typeRequireChecks_atomic_using_float0_tier() 
+void typeRequireChecks_atomic_using_float0_tier()
 {
     __target_switch
     {
@@ -8700,26 +8832,26 @@ void typeRequireChecks_atomic_using_float0_tier()
             __requireTargetExtension("GL_EXT_shader_atomic_int64");
     }
     case spirv:
-        return; 
+        return;
     }
 }
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
-void typeRequireChecks_atomic_using_float1_tier() 
+void typeRequireChecks_atomic_using_float1_tier()
 {
     __target_switch
     {
     case glsl:
     {
-        if (__type_equals<T, float>()) 
+        if (__type_equals<T, float>())
             __requireTargetExtension("GL_EXT_shader_atomic_float");
         else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
         {
             __requireTargetExtension("GL_EXT_shader_atomic_float2");
             __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types");
         }
-        else if (__type_equals<T, double>()) 
+        else if (__type_equals<T, double>())
             __requireTargetExtension("GL_EXT_shader_atomic_float");
         else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
             __requireTargetExtension("GL_EXT_shader_atomic_int64");
@@ -8731,26 +8863,26 @@ void typeRequireChecks_atomic_using_float1_tier()
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
-void typeRequireChecks_atomic_using_float2_tier() 
+void typeRequireChecks_atomic_using_float2_tier()
 {
     __target_switch
     {
     case glsl:
-    {    
-        if (__type_equals<T, float>()) 
+    {
+        if (__type_equals<T, float>())
             __requireTargetExtension("GL_EXT_shader_atomic_float2");
         else if (__type_equals<T, half>() || __type_equals<T, float16_t>())
         {
             __requireTargetExtension("GL_EXT_shader_atomic_float2");
             __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types");
         }
-        else if (__type_equals<T, double>()) 
+        else if (__type_equals<T, double>())
             __requireTargetExtension("GL_EXT_shader_atomic_float2");
         else if (__type_equals<T, uint64_t>() || __type_equals<T, int64_t>())
              __requireTargetExtension("GL_EXT_shader_atomic_int64");
     }
-    case spirv: 
-        return; 
+    case spirv:
+        return;
     }
 }
 
@@ -8768,16 +8900,16 @@ void typeRequireChecks_atomic_using_add()
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat32AddEXT
             };
         }
-        else if (__type_equals<T, half>() 
+        else if (__type_equals<T, half>()
             || __type_equals<T, float16_t>())
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat16AddEXT
             };
         }
@@ -8785,7 +8917,7 @@ void typeRequireChecks_atomic_using_add()
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat64AddEXT
             };
         }
@@ -8797,7 +8929,7 @@ void typeRequireChecks_atomic_using_add()
                 OpCapability Int64Atomics
             };
         }
-    }    
+    }
     }
 }
 __generic<T : __BuiltinType>
@@ -8814,16 +8946,16 @@ void typeRequireChecks_atomic_using_MinMax()
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat32MinMaxEXT
             };
         }
-        else if (__type_equals<T, half>() 
+        else if (__type_equals<T, half>()
             || __type_equals<T, float16_t>())
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat16MinMaxEXT
             };
         }
@@ -8831,7 +8963,7 @@ void typeRequireChecks_atomic_using_MinMax()
         {
             spirv_asm
             {
-                OpExtension "SPV_EXT_shader_atomic_float_add"; 
+                OpExtension "SPV_EXT_shader_atomic_float_add";
                 OpCapability AtomicFloat64MinMaxEXT
             };
         }
@@ -8839,7 +8971,7 @@ void typeRequireChecks_atomic_using_MinMax()
             || __type_equals<T, int64_t>())
         {
             spirv_asm
-            { 
+            {
                 OpCapability Int64Atomics
             };
         }
@@ -8849,7 +8981,7 @@ void typeRequireChecks_atomic_using_MinMax()
 __generic<T : __BuiltinType>
 [ForceInline]
 [require(glsl_spirv, atomic_glsl)]
-void typeRequireChecks_atomic_using_Logical_CAS() 
+void typeRequireChecks_atomic_using_Logical_CAS()
 {
     __target_switch
     {
@@ -8861,7 +8993,7 @@ void typeRequireChecks_atomic_using_Logical_CAS()
             || __type_equals<T, int64_t>())
         {
             spirv_asm
-            { 
+            {
                 OpCapability Int64Atomics
             };
         }
@@ -8869,7 +9001,7 @@ void typeRequireChecks_atomic_using_Logical_CAS()
     }
 }
 
-${{{{
+${
 static const struct {
     const char* name;
     const char* classType;
@@ -8878,31 +9010,31 @@ static const struct {
     const bool isFloat;
 } atomics[] =
     {
-        { 
+        {
             "uint", "I", "U", "", false
         },
-        { 
+        {
             "uint64_t", "I", "U", "", false
         },
-        { 
+        {
             "int", "I", "S", "", false
         },
-        { 
+        {
             "int64_t", "I", "S", "", false
         },
-        { 
+        {
             "float16_t", "F", "F", "EXT", true
         },
-        { 
+        {
             "float", "F", "F", "EXT", true
         },
-        { 
+        {
             "double", "F", "F", "EXT", true
         },
     };
-for (const auto& item : atomics) 
+for (const auto& item : atomics)
 {
-}}}}
+$}
 
 
 __glsl_version(430)
@@ -8968,10 +9100,10 @@ public $(item.name) atomicExchange(inout $(item.name) mem, $(item.name) data)
     return atomicExchangeWithOrder(mem, data, MemoryOrder::Relaxed);
 }
 
-${{{{
-if(item.isFloat) 
+${
+if(item.isFloat)
     continue;
-}}}}
+$}
 
 
 __glsl_version(430)
@@ -9039,13 +9171,13 @@ public $(item.name) atomicCompSwap(inout $(item.name) mem, $(item.name) compare,
     return atomicCompSwapWithOrder(mem, compare, data, MemoryOrder::Relaxed, MemoryOrder::Relaxed);
 }
 
-${{{{
+${
 }
-}}}}
+$}
 
-// all atomic_uint functions are mangled at compile time, 
+// all atomic_uint functions are mangled at compile time,
 // all types are converted into a field address of a 'uint'
-// relative to the layout(offset) of the atomic_uint 
+// relative to the layout(offset) of the atomic_uint
 
 __glsl_version(430)
 [ForceInline]
@@ -9060,13 +9192,13 @@ public uint atomicCounterIncrement(atomic_uint c)
     {
         return spirv_asm
         {
-            OpAtomicIIncrement $$uint result $c Device UniformMemory
+            OpAtomicIIncrement $$uint result $c Device AtomicCounterMemory
         };
     }
     }
 }
 
-__glsl_version(430) 
+__glsl_version(430)
 [require(glsl, atomic_glsl)]
 [ForceInline] public uint atomicCounterDecrement_GLSL_helper(atomic_uint c)
 {
@@ -9094,7 +9226,7 @@ public uint atomicCounter(atomic_uint c)
     {
         return spirv_asm
         {
-            OpLoad $$uint result $c 
+            OpLoad $$uint result $c
         };
     }
     }
@@ -9119,11 +9251,11 @@ public uint atomicCounterDecrement(atomic_uint c)
         // we want a discarded side effect and then return the new value
         return spirv_asm
         {
-            %discardedValue:$$uint = OpAtomicIDecrement $c Device UniformMemory;
+            %discardedValue:$$uint = OpAtomicIDecrement $c Device AtomicCounterMemory;
             OpLoad $$uint result $c
         };
     }
-    }   
+    }
 }
 
 
@@ -9139,7 +9271,7 @@ public uint atomicCounterAdd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicIAdd $$uint result $c Device UniformMemory $data
+            OpAtomicIAdd $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9161,10 +9293,10 @@ public uint atomicCounterSubtract(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicISub $$uint result $c Device UniformMemory $data
+            OpAtomicISub $$uint result $c Device AtomicCounterMemory $data
         };
     }
-    }   
+    }
 }
 
 
@@ -9180,7 +9312,7 @@ public uint atomicCounterMin(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMin $$uint result $c Device UniformMemory $data
+            OpAtomicUMin $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9199,7 +9331,7 @@ public uint atomicCounterMax(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicUMax $$uint result $c Device UniformMemory $data
+            OpAtomicUMax $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9218,10 +9350,10 @@ public uint atomicCounterAnd(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicAnd $$uint result $c Device UniformMemory $data
+            OpAtomicAnd $$uint result $c Device AtomicCounterMemory $data
         };
     }
-    }   
+    }
 }
 
 
@@ -9237,7 +9369,7 @@ public uint atomicCounterOr(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicOr $$uint result $c Device UniformMemory $data
+            OpAtomicOr $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9256,7 +9388,7 @@ public uint atomicCounterXor(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicXor $$uint result $c Device UniformMemory $data
+            OpAtomicXor $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9275,7 +9407,7 @@ public uint atomicCounterExchange(atomic_uint c, uint data)
     {
         return spirv_asm
         {
-            OpAtomicExchange $$uint result $c Device UniformMemory $data
+            OpAtomicExchange $$uint result $c Device AtomicCounterMemory $data
         };
     }
     }
@@ -9294,7 +9426,7 @@ public uint atomicCounterCompSwap(atomic_uint c, uint compare, uint data)
     {
         return spirv_asm
         {
-            OpAtomicCompareExchange $$uint result $c Device UniformMemory UniformMemory $data $compare
+            OpAtomicCompareExchange $$uint result $c Device AtomicCounterMemory AtomicCounterMemory $data $compare
         };
     }
     }
@@ -9758,7 +9890,7 @@ public void groupMemoryBarrier()
 
 /// Section 8.18. Subpass-Input Functions
 
-${{{{
+${
 struct SubpassLoadEntriesType
 {
     const char* typeName;
@@ -9772,7 +9904,7 @@ static const SubpassLoadEntriesType kSubpassLoadEntries[] =
     };
 for (const auto& subpassLoadEntry : kSubpassLoadEntries)
 {
-}}}}
+$}
     [require(glsl_spirv, subpass)]
     public typealias $(subpassLoadEntry.prefix)subpassInput = __SubpassImpl<
         $(subpassLoadEntry.typeName),
@@ -9784,9 +9916,9 @@ for (const auto& subpassLoadEntry : kSubpassLoadEntries)
         $(subpassLoadEntry.typeName),
         1 // isMS
     >;
-${{{{
+${
 }
-}}}}
+$}
 
     __generic<T>
     [__NoSideEffect]

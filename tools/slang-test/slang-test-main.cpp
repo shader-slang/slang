@@ -37,6 +37,7 @@
 #include "stb_image.h"
 
 #include <math.h>
+#include <random>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -396,7 +397,7 @@ static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
         case '\t':
             {
                 char const* argEnd = cursor;
-                assert(argBegin != argEnd);
+                SLANG_ASSERT(argBegin != argEnd);
 
                 outArg = UnownedStringSlice(argBegin, argEnd);
                 *ioCursor = cursor;
@@ -556,13 +557,43 @@ static SlangResult _gatherTestsForFile(
 
     String fileContents;
 
-    SlangResult readResult = Slang::File::readAllText(filePath, fileContents);
+    TestReporter* testReporter = nullptr;
+    if (context)
+        testReporter = context->getTestReporter();
+
+    // Try reading the file with retries on failure to handle intermittent I/O errors
+    // (commonly seen on macOS in CI environments)
+    SlangResult readResult = SLANG_FAIL;
+    for (int retryCount = 0; retryCount < 3 && SLANG_FAILED(readResult); ++retryCount)
+    {
+        if (retryCount)
+        {
+            if (testReporter)
+            {
+                testReporter->messageFormat(
+                    TestMessageType::Info,
+                    "Retrying to read test file '%s' (attempt %d)",
+                    filePath.getBuffer(),
+                    retryCount + 1);
+            }
+            else
+            {
+                fprintf(
+                    stderr,
+                    "Retrying to read test file '%s' (attempt %d)\n",
+                    filePath.getBuffer(),
+                    retryCount + 1);
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(retryCount * 100));
+        }
+        readResult = Slang::File::readAllText(filePath, fileContents);
+    }
     if (SLANG_FAILED(readResult))
     {
         // Log file reading failure with details (thread-safe)
-        if (context && context->getTestReporter())
+        if (testReporter)
         {
-            context->getTestReporter()->messageFormat(
+            testReporter->messageFormat(
                 TestMessageType::RunError,
                 "Failed to read test file '%s' (error: 0x%08X)",
                 filePath.getBuffer(),
@@ -1177,9 +1208,11 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_GLSL:
     case SLANG_C_SOURCE:
     case SLANG_CPP_SOURCE:
+    case SLANG_CPP_HEADER:
     case SLANG_CPP_PYTORCH_BINDING:
     case SLANG_HOST_CPP_SOURCE:
     case SLANG_CUDA_SOURCE:
+    case SLANG_CUDA_HEADER:
     case SLANG_METAL:
     case SLANG_WGSL:
     case SLANG_HOST_VM:
@@ -3643,6 +3676,16 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
     {
         ioCmdLine.addArg("-enable-debug-layers");
     }
+
+    if (options.ignoreAbortMsg)
+    {
+        ioCmdLine.addArg("-ignore-abort-msg");
+    }
+
+    if (options.cacheRhiDevice)
+    {
+        ioCmdLine.addArg("-cache-rhi-device");
+    }
 }
 
 static SlangResult _extractProfileTime(const UnownedStringSlice& text, double& timeOut)
@@ -3900,7 +3943,7 @@ TestResult runComputeComparisonImpl(
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
-    return std::max(compileResult, bufferResult);
+    return TestReporter::combine(compileResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -4713,6 +4756,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedFileTests.add(fileTestInfo);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    context->getTestReporter()->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -4766,6 +4812,23 @@ static bool shouldRunTest(TestContext* context, String filePath)
     if (!endsWithAllowedExtension(context, filePath))
         return false;
 
+    // Check exclude prefixes first - if any match, skip the test
+    for (auto& excludePrefix : context->options.excludePrefixes)
+    {
+        if (filePath.startsWith(excludePrefix))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is excluded from the test because it is found from the exclusion "
+                    "list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
@@ -4803,6 +4866,19 @@ template<typename F>
 void runTestsInParallel(TestContext* context, int count, const F& f)
 {
     auto originalReporter = context->getTestReporter();
+
+    // Pre-create test-server processes sequentially to avoid concurrent fork() issues.
+    // This eliminates the thundering herd problem when all threads start simultaneously.
+    if (context->options.defaultSpawnType == SpawnType::UseTestServer ||
+        context->options.defaultSpawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        for (int threadId = 0; threadId < context->options.serverCount; threadId++)
+        {
+            context->setThreadIndex(threadId);
+            context->getOrCreateJSONRPCConnection();
+        }
+    }
+
     std::atomic<int> consumePtr;
     consumePtr = 0;
     auto threadFunc = [&](int threadId)
@@ -4840,14 +4916,33 @@ void runTestsInDirectory(TestContext* context)
     List<String> files;
     getFilesInDirectory(context->options.testDir, files);
 
+    // Also add any test prefixes that point to actual files outside the test directory
+    for (const auto& testPrefix : context->options.testPrefixes)
+    {
+        if (File::exists(testPrefix))
+        {
+            // Avoid duplicates - only add if not already in the list
+            if (files.indexOf(testPrefix) == Index(-1))
+            {
+                files.add(testPrefix);
+            }
+        }
+    }
+
     // NTFS on Windows stores files in sorted order but not on Linux/Macos.
     // Because of that, the testing on Linux/Macos were randomly failing, which
     // is a good thing because it reveals problems. But it is useless
-    // if we cannot reproduce the failures deterministrically.
+    // if we cannot reproduce the failures deterministically.
     // https://github.com/shader-slang/slang/issues/7388
-    //
-    // TODO: We need a way to shuffle the list in a deterministic manner.
+
     files.sort();
+
+    // If asked, shuffle the list using seed for deterministic behavior.
+    if (context->options.shuffleTests)
+    {
+        std::mt19937 mt(context->options.shuffleSeed);
+        std::shuffle(files.begin(), files.end(), mt);
+    }
 
     auto processFile = [&](String file)
     {
@@ -5059,6 +5154,9 @@ static SlangResult runUnitTestModule(
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    reporter->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -5127,6 +5225,15 @@ static SlangResult runUnitTestModule(
 
     testModule->destroy();
     return SLANG_OK;
+}
+
+static void cleanupRenderTestDeviceCache(TestContext& context)
+{
+    auto cleanFunc = context.getCleanDeviceCacheFunc("render-test");
+    if (cleanFunc)
+    {
+        cleanFunc();
+    }
 }
 
 SlangResult innerMain(int argc, char** argv)
@@ -5410,6 +5517,10 @@ SlangResult innerMain(int argc, char** argv)
         else
         {
             // If there are too many failed tests, don't bother retrying.
+            printf(
+                "Too many failed tests for retry(%d) - setting all to failed\n",
+                (int)context.failedFileTests.getCount());
+            fflush(stdout);
             for (auto& test : context.failedFileTests)
             {
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
@@ -5420,12 +5531,15 @@ SlangResult innerMain(int argc, char** argv)
         }
 
         reporter.outputSummary();
+
+        cleanupRenderTestDeviceCache(context);
         return reporter.didAllSucceed() ? SLANG_OK : SLANG_FAIL;
     }
 }
 
 int main(int argc, char** argv)
 {
+    // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();
     Slang::RttiInfo::deallocateAll();

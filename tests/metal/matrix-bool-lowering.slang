@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -mtl -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -mtl -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk -shaderobj
 
 //TEST_INPUT:ubuffer(data=[1 0], stride=4):name inputBuffer
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
@@ -83,37 +84,37 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Store results
     outputBuffer[0] = val1;
-    // CHECK: 1
+    // BUF: 1
     outputBuffer[1] = val2;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[2] = row.x;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[3] = row.y;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[4] = row3.y;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[5] = not_mat[0][0];
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[6] = and_mat[0][0];
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[7] = mat1[0][1];
-    // CHECK-NEXT: 1 
+    // BUF-NEXT: 1 
     outputBuffer[8] = mat3[0][1];
-    // CHECK-NEXT: 0 
+    // BUF-NEXT: 0 
     outputBuffer[9] = anded;
-    // CHECK-NEXT: 0 
+    // BUF-NEXT: 0 
     outputBuffer[10] = wrapper.mat1[0][0] || wrapper.mat2[0][0];
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[11] = test_all_true;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[12] = test_all_false;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[13] = test_all_mixed;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[14] = test_any_true;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
     outputBuffer[15] = test_any_false;
-    // CHECK-NEXT: 0
+    // BUF-NEXT: 0
     outputBuffer[16] = test_any_mixed;
-    // CHECK-NEXT: 1
+    // BUF-NEXT: 1
 } 

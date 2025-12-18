@@ -322,92 +322,94 @@ struct InliningPassBase
     DebugInlineInfo emitCalleeDebugInlinedAt(IRCall* call, IRFunc* callee, IRBuilder& builder)
     {
         IRDebugLine* lastDebugLine = nullptr;
-        IRInst* newDebugInlinedAt = nullptr;
-        IRInst* callerDebugFunc = nullptr;
-        IRInst* calleeDebugFunc = nullptr;
 
         if (!callee->findDecoration<IRDebugLocationDecoration>())
         {
             return DebugInlineInfo();
         }
-        else
+
+        // Check if the call inst is part of an existing scope. If yes, then we restore
+        // that scope after the inlining of callee. This case can occur when we have out of
+        // order inlining. See forceinline-basic-block-inline-order.slang test for that use
+        // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
+        // that there's another function that was inlined. We don't want that scope. If the call
+        // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
+        // *before* we see a DebugNoScope
+        IRDebugScope* callDebugScope = nullptr;
+        builder.setInsertAfter(call);
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
         {
-            // Check if the call inst is part of an existing scope. If yes, then we restore
-            // that scope after the inlining of callee. This case can occur when we have out of
-            // order inlining. See forceinline-basic-block-inline-order.slang test for that use
-            // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
-            // that there's another function that was inlined. We don't want that scope. If the call
-            // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
-            // *before* we see a DebugNoScope
-            IRDebugScope* callDebugScope = nullptr;
-            builder.setInsertAfter(call);
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            if (as<IRDebugNoScope>(inst))
             {
-                if (as<IRDebugNoScope>(inst))
-                {
-                    break;
-                }
-                if (as<IRDebugScope>(inst))
-                {
-                    callDebugScope = as<IRDebugScope>(inst);
-                    builder.emitDebugScope(
-                        callDebugScope->getScope(),
-                        callDebugScope->getInlinedAt());
-                    break;
-                }
+                break;
             }
-            if (!callDebugScope)
+            if (as<IRDebugScope>(inst))
             {
-                builder.emitDebugNoScope();
-            }
-
-            IRDebugInlinedAt* callDebugInlinedAt = nullptr;
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
-            {
-                if (as<IRDebugNoScope>(inst))
-                {
-                    break;
-                }
-                if (as<IRDebugInlinedAt>(inst))
-                {
-                    callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
-                    break;
-                }
-            }
-
-            // Find the last IRDebugLine to extract debug info.
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
-            {
-                if (auto debugLine = as<IRDebugLine>(inst))
-                {
-                    lastDebugLine = debugLine;
-                    break;
-                }
-            }
-
-            if (!lastDebugLine)
-                return DebugInlineInfo();
-
-            calleeDebugFunc = findExistingDebugFunc(callee);
-
-            // The caller func is the right lexical scope needed for nsight to show where
-            // the function is getting inlined inside.
-            auto callerFunc = getParentFunc(call);
-            callerDebugFunc = findExistingDebugFunc(callerFunc);
-
-            builder.setInsertBefore(call);
-            newDebugInlinedAt = builder.emitDebugInlinedAt(
-                lastDebugLine->getLineStart(),
-                lastDebugLine->getColStart(),
-                lastDebugLine->getSource(),
-                callerDebugFunc,
-                callDebugInlinedAt);
-
-            if (newDebugInlinedAt && calleeDebugFunc)
-            {
-                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+                callDebugScope = as<IRDebugScope>(inst);
+                builder.emitDebugScope(callDebugScope->getScope(), callDebugScope->getInlinedAt());
+                break;
             }
         }
+        if (!callDebugScope)
+        {
+            builder.emitDebugNoScope();
+        }
+
+        IRDebugInlinedAt* callDebugInlinedAt = nullptr;
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        {
+            if (as<IRDebugNoScope>(inst))
+            {
+                break;
+            }
+            if (as<IRDebugInlinedAt>(inst))
+            {
+                callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
+                break;
+            }
+        }
+
+        // Find the last IRDebugLine to extract debug info.
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        {
+            if (auto debugLine = as<IRDebugLine>(inst))
+            {
+                lastDebugLine = debugLine;
+                break;
+            }
+        }
+
+        if (!lastDebugLine)
+            return DebugInlineInfo();
+
+        auto calleeDebugFunc = findExistingDebugFunc(callee);
+
+        // The caller func is the right lexical scope needed for nsight to show where
+        // the function is getting inlined inside.
+        if (auto callerFunc = getParentFunc(call))
+        {
+            // When `maybeAddDebugLocationDecoration()` failed to find the source
+            // location, IRDebugFuncDecoration is expected to be absent.
+            if (auto callerDebugFunc = findExistingDebugFunc(callerFunc))
+            {
+                builder.setInsertBefore(call);
+                auto newDebugInlinedAt = builder.emitDebugInlinedAt(
+                    lastDebugLine->getLineStart(),
+                    lastDebugLine->getColStart(),
+                    lastDebugLine->getSource(),
+                    callerDebugFunc,
+                    callDebugInlinedAt);
+
+                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+            }
+            else
+            {
+                // It is more likely to be a bug when IRDebugLocationDecoration exists and
+                // IRDebugFuncDecoration doesn't exist.
+                SLANG_ASSERT(nullptr == callerFunc->findDecoration<IRDebugLocationDecoration>());
+            }
+        }
+
         return DebugInlineInfo();
     }
 
@@ -1002,12 +1004,20 @@ struct TypeInliningPass : InliningPassBase
 {
     typedef InliningPassBase Super;
 
-    TypeInliningPass(IRModule* module)
-        : Super(module)
+    TargetProgram* targetProgram;
+
+    bool shouldInlineBorrowRefTypesForSPIRV = false;
+
+    TypeInliningPass(IRModule* module, TargetProgram* inTargetProgram)
+        : Super(module), targetProgram(inTargetProgram)
     {
+        if (targetProgram->shouldEmitSPIRVDirectly())
+        {
+            shouldInlineBorrowRefTypesForSPIRV = true;
+        }
     }
 
-    bool doesTypeRequireInline(IRType* type, IRFunc* callee)
+    bool doesTypeRequireInline(IRType* type, IRInst* arg, IRFunc* callee)
     {
         // TODO(JS):
         // I guess there is a question here about what type around string requires
@@ -1017,11 +1027,42 @@ struct TypeInliningPass : InliningPassBase
         const auto op = type->getOp();
         switch (op)
         {
-        case kIROp_RefType:
+        case kIROp_RefParamType:
             {
                 if (callee->findDecoration<IRNoRefInlineDecoration>())
                     return false;
                 return true;
+            }
+        case kIROp_BorrowInParamType:
+        case kIROp_BorrowInOutParamType:
+            {
+                if (shouldInlineBorrowRefTypesForSPIRV)
+                {
+                    if (!arg)
+                        return true;
+
+                    // If the argument is a refernece to a local variable "memory object",
+                    // we don't need to inline.
+                    auto rootAddr = getRootAddr(arg);
+                    if (as<IRVar>(rootAddr) || as<IRGlobalVar>(rootAddr))
+                        return false;
+
+                    // Otherwise, we should inline the function before emitting SPIR-V,
+                    // because:
+                    // 1) SPIRV does not support expressing a function that takes a pointer
+                    // parameter whose address space is not Function or Private.
+                    // 2) SPIRV does not allow passing a pointer-typed argument that isn't a direct
+                    // reference to a variable "memory object". For example, you cannot pass the
+                    // result of an access chain to a pointer-typed parameter.
+                    //
+                    // Note that despite restriction rule (2) above, we still allow passing
+                    // an access chain to a local variable to a function in the Slang IR, and we
+                    // will introduce an additional copy when we emit SPIR-V. We do this to minimize
+                    // inlining in the Slang IR, and introducing additional copy for things already
+                    // in Function address space is generally less harmful.
+                    return true;
+                }
+                return false;
             }
         case kIROp_StringType:
         case kIROp_NativeStringType:
@@ -1039,7 +1080,7 @@ struct TypeInliningPass : InliningPassBase
     {
         auto callee = info.callee;
 
-        if (doesTypeRequireInline(callee->getResultType(), callee))
+        if (doesTypeRequireInline(callee->getResultType(), nullptr, callee))
         {
             return true;
         }
@@ -1047,7 +1088,7 @@ struct TypeInliningPass : InliningPassBase
         const auto count = Count(callee->getParamCount());
         for (Index i = 0; i < count; ++i)
         {
-            if (doesTypeRequireInline(callee->getParamType(UInt(i)), callee))
+            if (doesTypeRequireInline(callee->getParamType(UInt(i)), info.call->getArg(i), callee))
             {
                 return true;
             }
@@ -1059,36 +1100,12 @@ struct TypeInliningPass : InliningPassBase
 
 } // namespace
 
-Result performTypeInlining(IRModule* module, DiagnosticSink* sink)
+Result performTypeInlining(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    // TODO(JS):
-    // This is perhaps not as efficient as might be desirable.
-    // A more optimized version might not need to pass over all of the module
-    // to find new call sites.
-    //
-    // Another problem here is recursion. Right now Slang compiler doesn't accept recursive input,
-    // but the Slang language is supposed to support recursion on targets that support it.
-    // There are GPU targets that allow recursion such as CUDA.
-    //
-    // Another approach would be (when enabled) when inlining occurs, would be instead of continuing
-    // *after*, to start the checks/inlining from where the inline took place.
-    //
-    while (true)
-    {
-        TypeInliningPass pass(module);
-        if (pass.considerAllCallSites())
-        {
-            // If there was a change try inlining again
-            continue;
-        }
-
-        // Done.
-        break;
-    }
-
-
+    TypeInliningPass pass(module, targetProgram);
+    pass.considerAllCallSites();
     return SLANG_OK;
 }
 
@@ -1230,7 +1247,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
         {
             if (isIllegalGLSLParameterType(param->getDataType()))
                 return true;
-            auto outType = as<IROutTypeBase>(param->getDataType());
+            auto outType = as<IROutParamTypeBase>(param->getDataType());
             if (!outType)
                 continue;
             auto outValueType = outType->getValueType();
@@ -1241,7 +1258,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module)
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
     bool changed = true;
@@ -1249,7 +1266,7 @@ void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRM
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(nullptr, module, IRSimplificationOptions::getFast(targetProgram));
+        simplifyIR(module, nullptr, IRSimplificationOptions::getFast(targetProgram));
     }
 }
 

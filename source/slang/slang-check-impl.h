@@ -701,6 +701,10 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
+    // Track diagnostics that have already been reported to avoid duplicates.
+    // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
+    HashSet<String> m_reportedDiagnosticKeys;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -820,6 +824,10 @@ private:
 
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
+
+    /// The count of loadedModulesList when the candidate extension cache was last built.
+    /// Used to detect when loadedModulesList has changed and the cache needs updating.
+    Index m_candidateExtensionListsBuiltForModuleCount = 0;
 
     /// Add candidate extensions declared in `moduleDecl` to `m_mapTypeDeclToCandidateExtensions`
     void _addCandidateExtensionsFromModule(ModuleDecl* moduleDecl);
@@ -1262,6 +1270,24 @@ struct SemanticsVisitor : public SemanticsContext
     }
 
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
+
+    /// Diagnose a diagnostic only once per unique key (diagnostic ID + location + parameters).
+    /// Useful for avoiding duplicate warnings in loops over aggregate elements.
+    template<typename... Args>
+    void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
+    {
+        // Key = diagnostic ID + source location + all parameters
+        StringBuilder keyBuilder;
+        keyBuilder << diagnostic.id << "|" << loc.getRaw();
+        if constexpr (sizeof...(args) > 0)
+        {
+            ((keyBuilder << "|" << args), ...); // Fold expression to append all args
+        }
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
 
 public:
     // Translate Types
@@ -1913,10 +1939,10 @@ public:
         DeclRef<Decl> candidateMethod; // The method that was considered but failed
         Type* actualType = nullptr;    // For type mismatches: the actual type found
         Type* expectedType = nullptr;  // For type mismatches: the expected type
-        ParameterDirection actualDir =
-            kParameterDirection_In; // For direction mismatches: the actual direction
-        ParameterDirection expectedDir =
-            kParameterDirection_In;     // For direction mismatches: the expected direction
+        ParamPassingMode actualDir =
+            ParamPassingMode::In; // For direction mismatches: the actual direction
+        ParamPassingMode expectedDir =
+            ParamPassingMode::In;       // For direction mismatches: the expected direction
         ParamDecl* paramDecl = nullptr; // For direction mismatches: the parameter declaration
     };
 
@@ -2009,33 +2035,12 @@ public:
         DeclRef<PropertyDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypePropertyRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<PropertyDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
     bool trySynthesizeSubscriptRequirementWitness(
         ConformanceCheckingContext* context,
         const LookupResult& lookupResult,
         DeclRef<SubscriptDecl> requiredMemberDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
-    bool trySynthesizeWrapperTypeSubscriptRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<SubscriptDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<AssocTypeDecl> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeAssociatedConstantRequirementWitness(
-        ConformanceCheckingContext* context,
-        LookupResult const& lookupResult,
-        DeclRef<VarDeclBase> requiredMemberDeclRef,
-        RefPtr<WitnessTable> witnessTable);
 
     /// Attempt to synthesize a declartion that can satisfy `requiredMemberDeclRef` using
     /// `lookupResult`.
@@ -2789,6 +2794,18 @@ public:
         DeclRef<VarDeclBase> const& varRef,
         IntVal* val);
 
+    bool TryUnifyFunctorByStructuralMatch(
+        ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
+        StructDecl* fst,
+        FuncType* snd);
+
+    bool TryUnifyFuncTypesByStructuralMatch(
+        ConstraintSystem& constraints,
+        ValUnificationContext unifyCtx,
+        FuncType* fst,
+        FuncType* snd);
+
     bool TryUnifyTypesByStructuralMatch(
         ConstraintSystem& constraints,
         ValUnificationContext unificationContext,
@@ -3239,7 +3256,7 @@ bool isImmutableBufferType(Type* type);
 
 // Check if `type` is nullable. An `Optional<T>` will occupy the same space as `T`, if `T`
 // is nullable.
-bool isNullableType(Type* type);
+bool doesTypeHaveAnUnusedBitPatternThatCanBeUsedForOptionalRepresentation(Type* type);
 
 EnumDecl* isEnumType(Type* type);
 
@@ -3259,7 +3276,7 @@ void diagnoseMissingCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,
     Decl* decl,
-    CapabilitySet& setToFind);
+    CapabilitySet const& setToFind);
 void diagnoseCapabilityProvenance(
     CompilerOptionSet& optionSet,
     DiagnosticSink* sink,

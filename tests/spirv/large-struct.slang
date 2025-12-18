@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -profile glsl_460
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -xslang -g0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-d3d12 -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cpu -compute -output-using-type
 
@@ -8,7 +8,7 @@
 
 struct WorkData
 {
-    float A[2*2];
+    float A[2*4];
     float B[1024];
     
     float Foo(uint i) { return A[i] * B[i]; }

@@ -1,6 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_SPV): -entry vertexMain -stage vertex -emit-spirv-directly -target spirv
-//TEST:SIMPLE(filecheck=CHECK_SPV_VIA_GLSL): -entry vertexMain -stage vertex -emit-spirv-via-glsl -target spirv
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -entry vertexMain -stage vertex -target glsl
+// TEST:SIMPLE(filecheck=CHECK_GLSL): -entry vertexMain -stage vertex -target glsl
+// TEST:SIMPLE(filecheck=CHECK_SPV): -entry vertexMain -stage vertex -emit-spirv-directly -target spirv
+// TEST:SIMPLE(filecheck=CHECK_SPV_VIA_GLSL): -entry vertexMain -stage vertex -emit-spirv-via-glsl -target spirv
 
 struct Inner1
 {

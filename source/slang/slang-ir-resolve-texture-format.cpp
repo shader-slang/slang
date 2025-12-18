@@ -12,10 +12,10 @@ static IRType* replaceImageElementType(IRInst* originalType, IRInst* newElementT
     case kIROp_ArrayType:
     case kIROp_UnsizedArrayType:
     case kIROp_PtrType:
-    case kIROp_OutType:
-    case kIROp_RefType:
-    case kIROp_ConstRefType:
-    case kIROp_InOutType:
+    case kIROp_OutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
+    case kIROp_BorrowInOutParamType:
         {
             auto newInnerType =
                 replaceImageElementType(originalType->getOperand(0), newElementType);

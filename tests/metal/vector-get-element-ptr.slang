@@ -1,6 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=METAL): -target metal
 
 //TEST(smoke,compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -mtl
+//TEST(smoke,compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -compute -vk
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -14,9 +15,9 @@ void modify(inout int v)
 void computeMain(int3 v : SV_DispatchThreadID)
 {
     int3 u = v;
-    // CHECK: int [[TEMP:[a-zA-Z0-9_]+]] = u{{.*}}.x;
-    // CHECK: modify{{.*}}(&[[TEMP]])
-    // CHECK: u{{.*}}.x = [[TEMP]];
+    // METAL: int [[TEMP:[a-zA-Z0-9_]+]] = [[OUT:[a-zA-Z0-9_]+]].x;
+    // METAL: modify{{.*}}(&[[TEMP]])
+    // METAL: [[OUT]].x = [[TEMP]];
 
     modify(u.x);
     // BUF: 2

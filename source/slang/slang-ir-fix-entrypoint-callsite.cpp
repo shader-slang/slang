@@ -63,6 +63,11 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
             // and the caller is passing a value, we need to wrap the value in a temporary var
             // and pass the temporary var.
             //
+            // TODO(tfoley): Wait, what? The situation this code is trying to fix should
+            // never be allowed to occur in the first place. This code shouldn't be
+            // trying to defend against the bad input; instead we should be *fixing*
+            // the source of the problem.
+            //
             auto funcType = as<IRFuncType>(callee->getDataType());
             SLANG_ASSERT(funcType);
             IRBuilder builder(call);
@@ -76,7 +81,7 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
             {
                 auto paramType = params[i]->getDataType();
                 auto arg = call->getArg(i);
-                if (auto refType = as<IRConstRefType>(paramType))
+                if (auto refType = as<IRBorrowInParamType>(paramType))
                 {
                     if (!as<IRPtrTypeBase>(arg->getDataType()))
                     {

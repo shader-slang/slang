@@ -348,13 +348,22 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
             typeTag = (TypeTag)((int)typeTag | (int)TypeTag::LinkTimeSized);
         }
         if (!sized)
-            typeTag = (TypeTag)((int)typeTag | (int)TypeTag::Unsized);
+        {
+            // Unbounded arrays are both Unsized and NonAddressable
+            typeTag =
+                (TypeTag)((int)typeTag | (int)TypeTag::Unsized | (int)TypeTag::NonAddressable);
+        }
 
         return typeTag;
     }
     if (auto modifiedType = as<ModifiedType>(type))
     {
         return getTypeTags(modifiedType->getBase());
+    }
+    if (as<ParameterBlockType>(type))
+    {
+        // ParameterBlock types are non-addressable
+        return TypeTag::NonAddressable;
     }
     if (auto parameterGroupType = as<UniformParameterGroupType>(type))
     {
@@ -372,7 +381,9 @@ TypeTag SemanticsVisitor::getTypeTags(Type* type)
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto aggTypeDecl = as<AggTypeDecl>(declRefType->getDeclRef()))
+        {
             return aggTypeDecl.getDecl()->typeTags;
+        }
     }
     return TypeTag::None;
 }

@@ -125,12 +125,12 @@ List<ParamInfo> collectParameterInfo(
         info.outVar = nullptr;
         info.outFieldKey = nullptr;
 
-        if (auto outType = as<IROutTypeBase>(param->getDataType()))
+        if (auto outType = as<IROutParamTypeBase>(param->getDataType()))
         {
             // Handle out/inout parameter
             info.valueType = outType->getValueType();
             info.isOut = true;
-            info.isInOut = (outType->getOp() == kIROp_InOutType);
+            info.isInOut = (outType->getOp() == kIROp_BorrowInOutParamType);
 
             // Create field key for out parameter
             String fieldName = "param";

@@ -23,7 +23,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         // A dummy barrier, this tests that we can look up these names without
         // their Scope and MemorySemantics prefixes, and correctly wrap them in
         // OpConstant.
-        OpMemoryBarrier Invocation
+        OpMemoryBarrier Device
             // Test that an unqualified enum works
               AcquireRelease
             // Test that a decimal integer literal works

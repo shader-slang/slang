@@ -38,8 +38,6 @@ struct ByteAddressBufferLegalizationContext
     IRModule* m_module;
     IRBuilder m_builder;
 
-    Dictionary<IRInst*, IRType*> byteAddrBufferToReplace;
-
     // Everything starts with a request to process a module,
     // which delegates to the central recursive walk of the IR.
     //
@@ -941,6 +939,19 @@ struct ByteAddressBufferLegalizationContext
         {
             return getEquivalentStructuredBufferParam(elementType, byteAddressBufferParam);
         }
+        else if (auto castDynamicResource = as<IRCastDynamicResource>(byteAddressBuffer))
+        {
+            // If the underlying structured buffer is a CastDynamicResource,
+            // we can simply cast the dynamic resource into the byte address buffer type instead.
+            auto arg = castDynamicResource->getOperand(0);
+            return m_builder.emitIntrinsicInst(
+                getEquivalentStructuredBufferParamType(
+                    elementType,
+                    byteAddressBuffer->getDataType()),
+                kIROp_CastDynamicResource,
+                1,
+                &arg);
+        }
 
         if (byteAddressBuffer->getOp() == kIROp_GetElement)
         {
@@ -970,6 +981,18 @@ struct ByteAddressBufferLegalizationContext
                 structuredBufferArrayType->getElementType(),
                 structuredBufferArray,
                 index);
+        }
+
+        // Handle IRParam by changing its type to StructuredBuffer
+        if (auto babParam = as<IRParam>(byteAddressBuffer))
+        {
+            IRType* babType = babParam->getDataType();
+            IRType* structuredBufferType =
+                getEquivalentStructuredBufferParamType(elementType, babType);
+
+            // Propagate type change to all uses via replaceUsesWith
+            babType->replaceUsesWith(structuredBufferType);
+            return babParam;
         }
 
         // If we failed to pattern-match the byte-address buffer operand
@@ -1077,6 +1100,9 @@ struct ByteAddressBufferLegalizationContext
         IRType* elementType,
         IRType* byteAddressBufferType)
     {
+        if (as<IRHLSLStructuredBufferTypeBase>(byteAddressBufferType))
+            return byteAddressBufferType;
+
         // Our task in this function is to compute the type for
         // a structure buffer that is equivalent to `byteAddressBufferType`,
         // but with the given `elementType`.
@@ -1538,9 +1564,9 @@ struct ByteAddressBufferLegalizationContext
 
 
 void legalizeByteAddressBufferOps(
+    IRModule* module,
     Session* session,
     TargetProgram* program,
-    IRModule* module,
     DiagnosticSink* sink,
     ByteAddressBufferLegalizationOptions const& options)
 {
@@ -1552,5 +1578,6 @@ void legalizeByteAddressBufferOps(
     context.m_sink = sink;
     context.processModule(module);
 }
+
 
 } // namespace Slang

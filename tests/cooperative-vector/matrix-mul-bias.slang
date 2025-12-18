@@ -1,8 +1,7 @@
-// Fails because VVL 1.4.313.0 has a bug that sees int32_t as uint32_t in validation layers, issue #7715
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
-// Disabled because HLSL doesn't support int8 
+// Disabled because HLSL doesn't support int8
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
 
 // CHECK: type: int32_t
@@ -28,6 +27,10 @@ ByteAddressBuffer bias;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // Expected to fail with Vulkan 1.4.313.0 or below due to a bug in the VVL
+    // The VVL incorrectly reports that the result type in the following command is `VK_COMPONENT_TYPE_UINT32_KHR`.
+    // Tracking the issue in github #7715.
+
     CoopVec<int8_t, 4> vec = coopVecLoad<4, int8_t>(input);
     let result = coopVecMatMulAdd<int32_t, 4, 4>(
         vec,

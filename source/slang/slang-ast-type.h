@@ -687,6 +687,8 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+
+    std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
 
 FIDDLE()
@@ -709,9 +711,10 @@ class PtrType : public PtrTypeBase
     void _toTextOverride(StringBuilder& out);
 };
 
-/// A pointer-like type used to represent a parameter "direction"
+/// A pointer-like type used to represent a parameter-passing mode.
+///
 FIDDLE()
-class ParamDirectionType : public PtrTypeBase
+class ParamPassingModeType : public PtrTypeBase
 {
     FIDDLE(...)
 };
@@ -720,44 +723,66 @@ class ParamDirectionType : public PtrTypeBase
 // logical pointer that is passed for an `out`
 // or `in out` parameter
 FIDDLE(abstract)
-class OutTypeBase : public ParamDirectionType
+class OutParamTypeBase : public ParamPassingModeType
 {
     FIDDLE(...)
 };
 
-// The type for an `out` parameter, e.g., `out T`
+// The type for an output parameter, e.g., `out T`
 FIDDLE()
-class OutType : public OutTypeBase
+class OutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
+using OutType = OutParamType;
 
-// The type for an `in out` parameter, e.g., `in out T`
+// The type for a mutable borrow input/output parameter, e.g., `in out T`
 FIDDLE()
-class InOutType : public OutTypeBase
-{
-    FIDDLE(...)
-};
-
-FIDDLE(abstract)
-class RefTypeBase : public ParamDirectionType
-{
-    FIDDLE(...)
-};
-
-// The type for an `ref` parameter, e.g., `ref T`
-FIDDLE()
-class RefType : public RefTypeBase
+class BorrowInOutParamType : public OutParamTypeBase
 {
     FIDDLE(...)
     void _toTextOverride(StringBuilder& out);
 };
 
-// The type for an `constref` parameter, e.g., `constref T`
+// The type for a by-reference parameter, e.g., `ref T`
 FIDDLE()
-class ConstRefType : public RefTypeBase
+class RefParamType : public ParamPassingModeType
 {
     FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+/// The type for a immutable borrow input parameter, e.g., `borrow T`
+///
+/// Note that, despite the modifier currently used to represent
+/// this case in code, this is *not* comparable to the `ref`
+/// parameter-passing mode, and is instead an input-only
+/// equivalent of `inout`.
+///
+FIDDLE()
+class BorrowInParamType : public ParamPassingModeType
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
+};
+
+/// A reference type that is explicitly named somewhere in code (`Ref<T>`).
+///
+/// The explicit reference types are distinct from the
+/// parameter-passing mode wrapper types like `RefParamType`.
+/// An explicit reference type is a type that code written in
+/// Slang is allowed to name (e.g., by having a function that
+/// returns a `Ref<T>`), even if those uses may only occur
+/// in the core module. In constrast, the parameter-passing
+/// mode wrapper types should only ever be used as part of
+/// the encoding of a `FuncType`.
+///
+FIDDLE()
+class ExplicitRefType : public PtrTypeBase
+{
+    FIDDLE(...)
+    void _toTextOverride(StringBuilder& out);
 };
 
 FIDDLE()
@@ -789,6 +814,23 @@ class NamedExpressionType : public Type
     NamedExpressionType(DeclRef<TypeDefDecl> inDeclRef) { setOperands(inDeclRef); }
 };
 
+/// Adjust a parameter-passing mode to account for the type of a parameter.
+///
+/// The `originalMode` should be the mode that would be used by default;
+/// usually this is a mode returned by `getExplicitlyDeclaredParamPassingMode()`
+/// or something similar.
+///
+/// The `paramType` should be the declared type of the parameter, not including
+/// any of the wrapper types that are used to represent parameter-passing modes.
+///
+/// This function is primarily concerned with adjusting a parameter-passing
+/// mode to account for non-copyable types, which may need different defaults
+/// than a copyable type.
+///
+ParamPassingMode adjustParamPassingModeBasedOnParamType(
+    ParamPassingMode originalMode,
+    Type* paramType);
+
 // A function type is defined by its parameter types
 // and its result type.
 FIDDLE()
@@ -812,11 +854,91 @@ class FuncType : public Type
     OperandView<Type> getParamTypes() { return OperandView<Type>(this, 0, getOperandCount() - 2); }
 
     Index getParamCount() { return m_operands.getCount() - 2; }
-    Type* getParamType(Index index) { return as<Type>(getOperand(index)); }
-    Type* getResultType() { return as<Type>(getOperand(m_operands.getCount() - 2)); }
-    Type* getErrorType() { return as<Type>(getOperand(m_operands.getCount() - 1)); }
 
-    ParameterDirection getParamDirection(Index index);
+    /// Get the type of one of the function's parameters, by index.
+    ///
+    /// The type returned by this function may include a wrapper
+    /// type around what the user-perceived type of the parameter
+    /// is. For example, if a parameter is declared as `out int a`
+    /// then this function would return a type coresponding to
+    /// `OutParam<int>`, using the hidden `OutParam<T>` type defined
+    /// in the core module.
+    ///
+    /// Any code that calls this function should be conscious of
+    /// the possibility of encountering these wrappers, and handle
+    /// them accordingly.
+    ///
+    Type* getParamTypeWithModeWrapper(Index index) { return as<Type>(getOperand(index)); }
+
+    /// Get the type of one of the function's parameters, by index.
+    ///
+    /// The type returned by this funciton is the user-perceived
+    /// type of the parameter, and does not include any wrappers
+    /// that are introduced to indicate the parameter-passing mode.
+    /// For example, a parameter declared as `out int a` will simply
+    /// return the `int` type, the same as would be returned for
+    /// a parameter simply declared as `int a`.
+    ///
+    /// Any code that calls this function should be conscious of
+    /// the possibility that the type returned may not fully
+    /// describe the contract for the given parameter, and should
+    /// make sure to consult `getParamDirection` as well, to get
+    /// a complete picture.
+    ///
+    Type* getParamValueType(Index index);
+
+    /// Get the parameter-passing mode of one of the function's parameters, by index.
+    ///
+    ParamPassingMode getParamPassingMode(Index index);
+
+    /// Combined information on the type and parameter-passing mode of a parameter.
+    ///
+    struct ParamInfo
+    {
+        /// The parameter-passing mode for the parameter.
+        ParamPassingMode mode = ParamPassingMode::In;
+
+        /// The user-perceived type of the parameter.
+        Type* type = nullptr;
+    };
+
+    /// Get combined information on the type and parameter-passing mode of a parameter.
+    ///
+    ParamInfo getParamInfo(Index index)
+    {
+        ParamInfo info;
+        info.mode = getParamPassingMode(index);
+        info.type = getParamValueType(index);
+        return info;
+    }
+
+    /// Get the result type of this function.
+    ///
+    /// This is the type that a call to the function evaluates to if
+    /// the function returns successfully.
+    ///
+    /// A function that conceptually returns no value will have the `Unit`
+    /// type as its result type.
+    ///
+    /// A type that can never return will have the bottom type `Never`
+    /// as its result type.
+    ///
+    Type* getResultType() { return as<Type>(getOperand(m_operands.getCount() - 2)); }
+
+    /// Get the type of errors (if any) that this function can fail with.
+    ///
+    /// Evaluation of a call to a function with this `FuncType` may fail
+    /// with an error of the corresponding error type.
+    ///
+    /// A function that cannot fail with an error will have the bottom
+    /// type `Never` as its error type.
+    ///
+    /// Note that a function that "never fails" at the type system level
+    /// may still fail in various ways that are perceivable to the user.
+    /// The error type of a function only refers to failure modes that
+    /// are being explicitly modeled using the Slang type system.
+    ///
+    Type* getErrorType() { return as<Type>(getOperand(m_operands.getCount() - 1)); }
 
     // Overrides should be public so base classes can access
     void _toTextOverride(StringBuilder& out);
@@ -1057,7 +1179,7 @@ class ModifiedType : public Type
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-Type* removeParamDirType(Type* type);
+bool isCopyableType(Type* type);
 bool isNonCopyableType(Type* type);
 
 } // namespace Slang

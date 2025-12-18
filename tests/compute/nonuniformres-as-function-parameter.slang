@@ -2,6 +2,7 @@
 //TEST:SIMPLE(filecheck=CHECK_GLSL_SPV):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK_GLSL):-target glsl -entry main -stage compute
 //TEST:SIMPLE(filecheck=CHECK_HLSL):-target hlsl -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_CUDA):-target cuda -entry main -stage compute
 RWStructuredBuffer<uint> globalBuffer[] : register(u0, space1);
 RWStructuredBuffer<uint3> outputBuffer;
 
@@ -34,7 +35,7 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint2 pixelIndex : SV_DispatchThreadID)
+void main(uint3 pixelIndex : SV_DispatchThreadID)
 {
 
     // CHECK_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
@@ -81,6 +82,7 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
     // CHECK_HLSL: func_0(globalBuffer_0[NonUniformResourceIndex({{.*}})])
+    // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct = func(buffer);
 
     int bufferIdx2 = pixelIndex.y;
@@ -103,17 +105,19 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 
     // CHECK_GLSL: func_1({{.*}}nonuniformEXT({{.*}}))
     // CHECK_HLSL: func_0(globalBuffer_0[NonUniformResourceIndex({{.*}})])
+    // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct2 = func(buffer2);
 
     // Test case 3: Test the case that we handle the uniformity correctly, the NonUniformResourceIndex will not propagate
     // to the function, so there should no NonUniform decoration appeared.
-    int bufferIdx3 = pixelIndex.y;
+    int bufferIdx3 = pixelIndex.z;
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
-    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
+    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx3
 
     // Test to make sure this command is not decorated with NonUniform:
     // CHECK_SPV-NOT: OpDecorate %[[VAR4]] NonUniform
+    // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct3 = func(buffer3);
 
 
@@ -130,6 +134,7 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     //
     // Since after the nested cast, the index data type is 'uint' now, make sure it calls the same function as the test case 1.
     // CHECK_GLSL: func_0({{.*}}nonuniformEXT({{.*}}))
+    // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     RWStructuredBuffer<uint> buffer4 = globalBuffer[(uint)((int)NonUniformResourceIndex(bufferIdx))];
     MyStruct myStruct4 = func(buffer4);
 

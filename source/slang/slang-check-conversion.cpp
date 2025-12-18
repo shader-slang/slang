@@ -258,6 +258,16 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             return cacheResult(false);
     }
 
+    // Opaque types are not C-style.
+    // These types have no well-defined default value (they usually need a separate API call to be
+    // created and/or bound) and thus cannot be default-initialized.
+    {
+        TypeTag tags = getTypeTags(type);
+        const bool isOpaque = ((int)tags & (int)TypeTag::Opaque) != 0;
+        if (isOpaque)
+            return cacheResult(false);
+    }
+
     // A tuple type is C-style if all of its members are C-style.
     if (auto tupleType = as<TupleType>(type))
     {
@@ -266,7 +276,7 @@ bool SemanticsVisitor::isCStyleType(Type* type, HashSet<Type*>& isVisit)
             auto elementType = tupleType->getMember(i);
             // Avoid infinite loop in case of circular reference.
             if (isVisit.contains(elementType))
-                return cacheResult(false);
+                continue;
             if (!isCStyleType(elementType, isVisit))
                 return cacheResult(false);
         }
@@ -442,13 +452,13 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         // invalid.
         isCStyle = isCStyleType(toType, isVisit);
 
-        // WAR: We currently still has to allow legacy initializer list for array type until we have
-        // more proper solution for array initialization, so if the right hand side is an array
-        // type, we will not report error and fall-back to legacy initializer list logic.
+        // WAR: We currently still have to allow legacy initializer list for array type until we
+        // have a more proper solution for array initialization, so if the right hand side is an
+        // array type, we will not report an error and fall-back to legacy initializer list logic.
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            getSink()->diagnose(
+            diagnoseOnce(
                 fromInitializerListExpr->loc,
                 Diagnostics::cannotUseInitializerListForType,
                 toType);
@@ -559,7 +569,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             auto isLinkTimeVal =
                 as<TypeCastIntVal>(toElementCount) || as<DeclRefIntVal>(toElementCount) ||
-                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementType);
+                as<PolynomialIntVal>(toElementCount) || as<FuncCallIntVal>(toElementCount);
             if (isLinkTimeVal)
             {
                 auto defaultConstructExpr = m_astBuilder->create<DefaultConstructExpr>();
@@ -1465,7 +1475,7 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
-    // matrix type with different layouts are convertible
+    // matrix types with different layouts are convertible
     if (auto fromMatrixType = as<MatrixExpressionType>(fromType))
     {
         if (auto toMatrixType = as<MatrixExpressionType>(toType))
@@ -1491,6 +1501,14 @@ bool SemanticsVisitor::_coerce(
         }
     }
 
+    // We allow a value of a `struct` type to be coerced to a function
+    // type if the `struct` provides an appropriate method for calling
+    // instances of that type.
+    //
+    // TODO(tfoley): This can and should be opened up to work for any
+    // type (or at least any nominal type) that supports the required
+    // operation.
+    //
     if (auto toFuncType = as<FuncType>(toType))
     {
         if (auto fromLambdaType = isDeclRefTypeOf<StructDecl>(fromType))
@@ -1541,6 +1559,16 @@ bool SemanticsVisitor::_coerce(
         // Is toType and fromType the same via some type equality witness?
         // If so there is no need to do any conversion.
         //
+        // Note that this is a somewhat messy case to have, since we *already*
+        // have a check for type equality above this point. For this code to
+        // execute we would need to have a case where the `To` and `From` types
+        // are considered distinct by `Type::equals` but `tryGetSubtypeWitness`
+        // is still able to produce a witness for the equality of the two types.
+        //
+        // TODO(tfoley): Try to set things up so that we can have an invariant
+        // that two types count as equal for `Type::equals` if and only if a
+        // type equality witness for those types can be dervied.
+        //
         if (isTypeEqualityWitness(fromIsToWitness))
         {
             if (outToExpr)
@@ -1562,29 +1590,54 @@ bool SemanticsVisitor::_coerce(
         return _failedCoercion(toType, outToExpr, fromExpr, sink);
     }
 
-    // We allow implicit conversion of a parameter group type like
-    // `ConstantBuffer<X>` or `ParameterBlock<X>` to its element
-    // type `X`.
+    // If the type that we are converting from is a parameter group type
+    // (something like `ConstantBuffer<X>` or `ParameterBlock<X>`) and we
+    // are converting to some type `Y`, then we want to allow for a multi-step
+    // conversion where we first implicitly dereference the parameter group
+    // to get an `X`, and then convert the resulting `X` to a `Y`.
+    //
+    // An important special case of the above is when `X == Y`, in which
+    // case we are just converting, e.g., a `ConstantBuffer<X>` to an `X`.
+    //
+    // TODO(tfoley): When this conditional detects a parameter group type
+    // it funnels the coercion logic into only considering conversions that
+    // involve an automatic dereference. We need to ensure that any other
+    // kinds of conversion that could apply to a parameter group are considered
+    // earlier in this function, or else they will never actually be considered.
+    // Notably, with this logic in place it is impossible for there to be any
+    // conversion operations from a parameter-group type defined in code
+    // (e.g., a constructor for a `DescriptorHandle`-like type that takes
+    // a `ConstantBufer<T>` parameter will never be considered as part of conversion
+    // logic, because we will first extract the `T` and then try to convert *that*).
     //
     if (auto fromParameterGroupType = as<ParameterGroupType>(fromType))
     {
         auto fromElementType = fromParameterGroupType->getElementType();
 
-        // If we convert, e.g., `ConstantBuffer<A> to `A`, we will allow
-        // subsequent conversion of `A` to `B` if such a conversion
-        // is possible.
-        //
-        ConversionCost subCost = kConversionCost_None;
-
         DerefExpr* derefExpr = nullptr;
         if (outToExpr)
         {
+            // TODO(tfoley): The logic here effectively assumes that any
+            // parameter-group type is read-only, because we are not
+            // setting the `isLeftValue` flag of the `QualType` based
+            // on the type of the container. That is, a `StorageBuffer<X>`
+            // and a `ConstantBuffer<X>` would both derive the `QualType`
+            // of the dereferenced expression from `X` alone, and ignore
+            // that one of these should yield an l-value and the other
+            // shouldn't.
+            //
+            // In practice, we should have a centralized function that
+            // handles dereferenencing of any `Expr`, and computes the
+            // correct type for the result, so that the logic here can
+            // exactly mirror other cases of implicit dereference.
+            //
             derefExpr = m_astBuilder->create<DerefExpr>();
             derefExpr->base = fromExpr;
             derefExpr->type = QualType(fromElementType);
             derefExpr->checked = true;
         }
 
+        ConversionCost subCost = kConversionCost_None;
         if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, sink, &subCost))
         {
             return false;
@@ -1595,40 +1648,74 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    if (auto refType = as<RefTypeBase>(toType))
+    // Because (for various bad reasons) we currently support an explicit
+    // `Ref<T>` type (used to define some of our core-module functions),
+    // we have to account for the case where an expression of type `T`
+    // is being coerced to a `Ref<T>`.
+    //
+    if (auto refType = as<ExplicitRefType>(toType))
     {
+        // TODO(tfoley): This logic is deeply and fundamentally incorrect.
+        // It presumes that if an expression of type `T` can coerce to
+        // type `U` then it can also coerce to a *reference* to `U`.
+        // That means that because we support, say, implicit coercion of
+        // an `int` to a `float`, this logic will support implicit coercion
+        // of an `int` l-value to a `Ref<float>`!!!!
+        //
         ConversionCost cost;
         if (!canCoerce(refType->getValueType(), fromType, fromExpr, &cost))
             return false;
-        if (as<RefType>(toType) && !fromExpr->type.isLeftValue)
-            return false;
-        ConversionCost subCost = kConversionCost_GetRef;
 
-        MakeRefExpr* refExpr = nullptr;
+        // Depending on whether the result of the coercion would be an l-value
+        // or not, we may need to restrict the source to be an l-value.
+        //
+        // TODO(tfoley): Here we are again hijacking the `QualType` constructor
+        // to do the direct work. It's still not clear where this logic should
+        // live. In the longer run, I'm hopeful that we will get rid of
+        // the explicit `Ref` type entirely (since it was a design mistake to
+        // begin with), and thus not have to deal with the miserable mess that
+        // it pushes back on various parts of the compiler.
+        //
+        auto qualRefType = QualType(refType);
+        if (qualRefType.isLeftValue && !fromExpr->type.isLeftValue)
+        {
+            // The result type would be an l-value, but the source isn't,
+            // so there is no way to support the conversion.
+            //
+            return false;
+        }
+
+        ConversionCost subCost = kConversionCost_GetRef;
+        if (outCost)
+            *outCost = subCost;
+
         if (outToExpr)
         {
-            refExpr = m_astBuilder->create<MakeRefExpr>();
+            auto refExpr = m_astBuilder->create<MakeRefExpr>();
             refExpr->base = fromExpr;
-            refExpr->type = QualType(refType);
-            refExpr->type.isLeftValue = false;
+            refExpr->type = qualRefType;
             refExpr->checked = true;
             *outToExpr = refExpr;
         }
-        if (outCost)
-            *outCost = subCost;
+
         return true;
     }
 
+    // TODO(tfoley): I was told that explicit `Ref` types should not
+    // be seen by most of the compiler because they would be automatically
+    // eliminated via `maybeOpenRef()` before other code needs to deal
+    // with them... but that doesn't seem to be the case given how much
+    // code here in type coercion is having to account for the possibility
+    // of `Ref` types.
 
-    // Allow implicit dereferencing a reference type.
-    if (auto fromRefType = as<RefTypeBase>(fromType))
+    // If we find ourselves in a situation where we need to coerce an
+    // expression of type `Ref<T>`, we will first unwrap the reference
+    // to get an expression of type `T` and then coerce *that*.
+    //
+    if (auto fromRefType = as<ExplicitRefType>(fromType))
     {
         auto fromValueType = fromRefType->getValueType();
 
-        // If we convert, e.g., `ConstantBuffer<A> to `A`, we will allow
-        // subsequent conversion of `A` to `B` if such a conversion
-        // is possible.
-        //
         ConversionCost subCost = kConversionCost_None;
 
         Expr* openRefExpr = nullptr;
@@ -1641,6 +1728,26 @@ bool SemanticsVisitor::_coerce(
         {
             return false;
         }
+
+        //
+        // TODO(tfoley): This logic treats the implicit dereferencing
+        // of a `Ref<T>` as an additional conversion cost, so that
+        // a function with an explicit `Ref<T>` parameter would end up
+        // being preferred over one with just a `T`.
+        //
+        // Making that distinction and introducing this cost seems to have
+        // very little benefit, and risks causing developer confusion,
+        // because for the most part references are invisible to the user
+        // (intentionally).
+        //
+        // We don't want to support explicit `Ref<T>` types in parameter
+        // positions anyway (people can use either a `ref` parameter or
+        // an explicit `Ptr<T>`), so the whole thing is moot.
+        //
+        // For that matter, we probably should just remove explicit
+        // `Ref<T>` types from the language, since they were never
+        // intended to be there in the first place.
+        //
 
         if (outCost)
             *outCost = subCost + kConversionCost_ImplicitDereference;
@@ -2006,8 +2113,8 @@ bool SemanticsVisitor::tryCoerceLambdaToFuncType(
     Index paramId = 0;
     for (auto param : invokeFunc->getParameters())
     {
-        auto paramType = getParamTypeWithDirectionWrapper(m_astBuilder, param);
-        auto toParamType = toFuncType->getParamType(paramId);
+        auto paramType = getParamTypeWithModeWrapper(m_astBuilder, param);
+        auto toParamType = toFuncType->getParamTypeWithModeWrapper(paramId);
         if (!paramType->equals(toParamType))
         {
             return false;
@@ -2189,6 +2296,13 @@ Expr* SemanticsVisitor::coerce(
         // clobber the type on `fromExpr`, and an invariant here is that coercion
         // really shouldn't *change* the expression that is passed in, but should
         // introduce new AST nodes to coerce its value to a different type...
+        //
+        // TODO(tfoley): Based on the comment above it seems like my past self
+        // wrote this code, but looking at it now, I'm unsure why we want to return
+        // an expression with an error type when we have the `toType` that is
+        // expected *right there*. It would be good to investigate whether changing
+        // this to return an expression of the expected type would Just Work.
+        //
         return CreateImplicitCastExpr(m_astBuilder->getErrorType(), fromExpr);
     }
 

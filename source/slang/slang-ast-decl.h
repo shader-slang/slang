@@ -377,6 +377,7 @@ enum class TypeTag
     Incomplete = 2,
     LinkTimeSized = 4,
     Opaque = 8,
+    NonAddressable = 16,
 };
 
 // Declaration of a type that represents some sort of aggregate
@@ -386,8 +387,16 @@ class AggTypeDecl : public AggTypeDeclBase
     FIDDLE(...)
     FIDDLE() TypeTag typeTags = TypeTag::None;
 
-    // Used if this type declaration is a wrapper, i.e. struct FooWrapper:IFoo = Foo;
-    TypeExp wrappedType;
+    // When user defines an agg type in the syntax of
+    // `struct FooAlias : IFoo = Foo;`
+    // The user is defining a link-time type alias. In contrast
+    // to an ordinary typealias, a link-time alias is not folded in
+    // the front-end, and resolved during linking.
+    // `aliasedType` is used to store the alised type (in this case `Foo`)
+    // when the agg type decl is declared in the link-time alias syntax.
+    //
+    FIDDLE() TypeExp aliasedType;
+
     bool hasBody = true;
 
     void unionTagsWith(TypeTag other);
@@ -505,6 +514,13 @@ class InheritanceDecl : public TypeConstraintDecl
     // implementations in the type that contains
     // this inheritance declaration.
     FIDDLE() RefPtr<WitnessTable> witnessTable;
+
+    // If the inheritance decl is in a link-time type declaration
+    // (e.g. `export struct Foo : IFoo = FooImpl;`), then we will
+    // store the witness that `FooImpl:IFoo` here.
+    // TODO: If we made `WitnessTable` a `Val`, we should be able
+    // to unify these two cases.
+    FIDDLE() Witness* witnessVal = nullptr;
 
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return base; }
@@ -1014,5 +1030,9 @@ void addSiblingScopeForContainerDecl(
     ContainerDecl* dest,
     ContainerDecl* source);
 void addSiblingScopeForContainerDecl(ASTBuilder* builder, Scope* destScope, ContainerDecl* source);
+
+// Cast `decl` to a valid `ContainerDecl*` if its members will become global scope symbols after
+// lowering to IR. This currently includes: `NamespaceDecl`, `ModuleDecl` and `FileDecl`.
+ContainerDecl* isStaticScopeDecl(Decl* decl);
 
 } // namespace Slang

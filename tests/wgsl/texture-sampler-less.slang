@@ -43,66 +43,14 @@ Sampler2DArray<float4> t2DArray_f32v4;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero, arrayLength=2):name tCubeArray_f32v4
 SamplerCubeArray<float4> tCubeArray_f32v4;
 
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d = _Texture<
-    T,
-    __Shape2D,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepth2d_array = _Texture<
-    T,
-    __Shape2D,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepthcube = _Texture<
-    T,
-    __ShapeCube,
-    0, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
-__generic<T : ITexelElement, let sampleCount:int=0, let format:int=0>
-typealias CombinedDepthcube_array = _Texture<
-    T,
-    __ShapeCube,
-    1, // isArray
-    0, // isMS
-    sampleCount,
-    0, // access
-    1, // isShadow
-    1, // isCombined
-    format
->;
-
 //TEST_INPUT: TextureSampler2D(size=4, content = zero):name d2D
-CombinedDepth2d<float> d2D;
+Sampler2DShadow d2D;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero):name dCube
-CombinedDepthcube<float> dCube;
+SamplerCubeShadow dCube;
 //TEST_INPUT: TextureSampler2D(size=4, content = zero, arrayLength=2):name d2DArray
-CombinedDepth2d_array<float> d2DArray;
+Sampler2DArrayShadow d2DArray;
 //TEST_INPUT: TextureSamplerCube(size=4, content = zero, arrayLength=2):name dCubeArray
-CombinedDepthcube_array<float> dCubeArray;
+SamplerCubeArrayShadow dCubeArray;
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

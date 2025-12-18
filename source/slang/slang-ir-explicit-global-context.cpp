@@ -53,6 +53,7 @@ struct IntroduceExplicitGlobalContextPass
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
 
                 // One important exception is that CUDA *does* support
@@ -224,7 +225,9 @@ struct IntroduceExplicitGlobalContextPass
                     switch (m_target)
                     {
                     case CodeGenTarget::CUDASource:
+                    case CodeGenTarget::CUDAHeader:
                     case CodeGenTarget::CPPSource:
+                    case CodeGenTarget::CPPHeader:
                         {
                             auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
                             SLANG_ASSERT(layoutDecor);
@@ -246,7 +249,8 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if (m_target == CodeGenTarget::CUDASource)
+                    if (m_target == CodeGenTarget::CUDASource ||
+                        m_target == CodeGenTarget::CUDAHeader)
                         continue;
 
                     GlobalParamInfo globalParamInfo;
@@ -294,7 +298,7 @@ struct IntroduceExplicitGlobalContextPass
         // it is responsible for introducing the explicit entry-point
         // parameter that is used for passing in the global param(s).
         //
-        if (m_target != CodeGenTarget::CPPSource)
+        if (m_target != CodeGenTarget::CPPSource && m_target != CodeGenTarget::CPPHeader)
         {
             if (m_globalParams.getCount() == 0 && m_globalVars.getCount() == 0)
             {
@@ -309,6 +313,12 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                m_contextStructType,
+                UnownedTerminatedStringSlice("KernelContext"));
+        }
         builder.addNameHintDecoration(
             m_contextStructType,
             UnownedTerminatedStringSlice("KernelContext"));
@@ -440,6 +450,12 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                key,
+                originalInst->findDecoration<IRNameHintDecoration>()->getName());
+        }
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key
@@ -497,7 +513,8 @@ struct IntroduceExplicitGlobalContextPass
             globalParam.entryPointParam->insertBefore(firstOrdinary);
         }
 
-        if (m_target == CodeGenTarget::CPPSource && m_globalParams.getCount() == 0)
+        if ((m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader) &&
+            m_globalParams.getCount() == 0)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*
@@ -564,6 +581,9 @@ struct IntroduceExplicitGlobalContextPass
                 builder.emitStore(fieldPtr, var);
             }
         }
+
+        // Update entry point function type after potentially adding parameters.
+        fixUpFuncType(entryPointFunc);
     }
 
     void replaceUsesOfGlobalParam(IRGlobalParam* globalParam)
@@ -722,6 +742,9 @@ struct IntroduceExplicitGlobalContextPass
         IRParam* contextParam = builder.createParam(m_contextStructPtrType);
         addKernelContextNameHint(contextParam);
         contextParam->insertBefore(firstBlock->getFirstOrdinaryInst());
+
+        // Update the type of the function to reflect this new parameter.
+        fixUpFuncType(func);
 
         // The new parameter can be registered as the context value
         // to be used for `func` right away.

@@ -1,8 +1,8 @@
 #include "slang-ir-any-value-marshalling.h"
 
 #include "../core/slang-math.h"
-#include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 
@@ -14,7 +14,36 @@ namespace Slang
 // functions.
 struct AnyValueMarshallingContext
 {
-    SharedGenericsLoweringContext* sharedContext;
+    IRModule* module;
+
+    // We will use a single work list of instructions that need
+    // to be considered for lowering.
+    //
+    InstWorkList workList;
+    InstHashSet workListSet;
+
+    AnyValueMarshallingContext(IRModule* module)
+        : module(module), workList(module), workListSet(module)
+    {
+    }
+
+    void addToWorkList(IRInst* inst)
+    {
+        if (!inst)
+            return;
+
+        for (auto ii = inst->getParent(); ii; ii = ii->getParent())
+        {
+            if (as<IRGeneric>(ii))
+                return;
+        }
+
+        if (workListSet.contains(inst))
+            return;
+
+        workList.add(inst);
+        workListSet.add(inst);
+    }
 
     // Stores information about generated `AnyValue` struct types.
     struct AnyValueTypeInfo : RefObject
@@ -54,7 +83,7 @@ struct AnyValueMarshallingContext
         if (auto typeInfo = generatedAnyValueTypes.tryGetValue(size))
             return typeInfo->Ptr();
         RefPtr<AnyValueTypeInfo> info = new AnyValueTypeInfo();
-        IRBuilder builder(sharedContext->module);
+        IRBuilder builder(module);
         builder.setInsertBefore(type);
         auto structType = builder.createStructType();
         info->type = structType;
@@ -498,7 +527,7 @@ struct AnyValueMarshallingContext
 
     IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
     {
-        IRBuilder builder(sharedContext->module);
+        IRBuilder builder(module);
         builder.setInsertBefore(type);
         auto anyValInfo = ensureAnyValueType(anyValueType);
 
@@ -767,7 +796,7 @@ struct AnyValueMarshallingContext
 
     IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueType* anyValueType)
     {
-        IRBuilder builder(sharedContext->module);
+        IRBuilder builder(module);
         builder.setInsertBefore(type);
         auto anyValInfo = ensureAnyValueType(anyValueType);
 
@@ -822,7 +851,7 @@ struct AnyValueMarshallingContext
         auto func = ensureMarshallingFunc(
             operand->getDataType(),
             cast<IRAnyValueType>(packInst->getDataType()));
-        IRBuilder builderStorage(sharedContext->module);
+        IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(packInst);
         auto callInst = builder->emitCallInst(packInst->getDataType(), func.packFunc, 1, &operand);
@@ -836,7 +865,7 @@ struct AnyValueMarshallingContext
         auto func = ensureMarshallingFunc(
             unpackInst->getDataType(),
             cast<IRAnyValueType>(operand->getDataType()));
-        IRBuilder builderStorage(sharedContext->module);
+        IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(unpackInst);
         auto callInst =
@@ -869,37 +898,35 @@ struct AnyValueMarshallingContext
         // since we will re-use that state for any code we
         // generate along the way.
         //
-        sharedContext->addToWorkList(sharedContext->module->getModuleInst());
+        addToWorkList(module->getModuleInst());
 
-        while (sharedContext->workList.getCount() != 0)
+        while (workList.getCount() != 0)
         {
-            IRInst* inst = sharedContext->workList.getLast();
+            IRInst* inst = workList.getLast();
 
-            sharedContext->workList.removeLast();
-            sharedContext->workListSet.remove(inst);
+            workList.removeLast();
+            workListSet.remove(inst);
 
             processInst(inst);
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
-                sharedContext->addToWorkList(child);
+                addToWorkList(child);
             }
         }
 
         // Finally, replace all `AnyValueType` with the actual struct type that implements it.
-        for (auto inst : sharedContext->module->getModuleInst()->getChildren())
+        for (auto inst : module->getModuleInst()->getChildren())
         {
             if (auto anyValueType = as<IRAnyValueType>(inst))
                 processAnyValueType(anyValueType);
         }
-        sharedContext->mapInterfaceRequirementKeyValue.clear();
     }
 };
 
-void generateAnyValueMarshallingFunctions(SharedGenericsLoweringContext* sharedContext)
+void generateAnyValueMarshallingFunctions(IRModule* module)
 {
-    AnyValueMarshallingContext context;
-    context.sharedContext = sharedContext;
+    AnyValueMarshallingContext context(module);
     context.processModule();
 }
 
@@ -1018,12 +1045,14 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         {
             return alignUp(offset, 4) + kRTTIHandleSize;
         }
+    case kIROp_SetTagType:
+        {
+            return alignUp(offset, 4) + 4;
+        }
     case kIROp_InterfaceType:
         {
             auto interfaceType = cast<IRInterfaceType>(type);
-            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(
-                interfaceType,
-                interfaceType->sourceLoc);
+            auto size = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             size += kRTTIHeaderSize;
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
@@ -1041,18 +1070,14 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
         {
             auto thisType = cast<IRThisType>(type);
             auto interfaceType = thisType->getConstraintType();
-            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(
-                interfaceType,
-                interfaceType->sourceLoc);
+            auto size = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
     case kIROp_ExtractExistentialType:
         {
             auto existentialValue = type->getOperand(0);
             auto interfaceType = cast<IRInterfaceType>(existentialValue->getDataType());
-            auto size = SharedGenericsLoweringContext::getInterfaceAnyValueSize(
-                interfaceType,
-                interfaceType->sourceLoc);
+            auto size = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
             return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
         }
     case kIROp_LookupWitnessMethod:
@@ -1087,9 +1112,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
             {
                 anyValueSize = Math::Min(
                     anyValueSize,
-                    SharedGenericsLoweringContext::getInterfaceAnyValueSize(
-                        assocType->getOperand(i),
-                        type->sourceLoc));
+                    getInterfaceAnyValueSize(assocType->getOperand(i), type->sourceLoc));
             }
 
             if (anyValueSize == kInvalidAnyValueSize)
@@ -1097,6 +1120,11 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset)
 
             return alignUp(offset, 4) + alignUp((SlangInt)anyValueSize, 4);
         }
+
+        // treat CoopVec as an opaque handle type
+    case kIROp_CoopVectorType:
+        return alignUp(offset, 4) + 8;
+
     default:
         if (isResourceType(type))
         {

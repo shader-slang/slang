@@ -215,7 +215,7 @@ struct HelloWorld : public WindowedAppBase
     //
     ComPtr<IPipeline> gPipeline;
     ComPtr<IBuffer> gVertexBuffer;
-    const Format format = Format::RGB32Float;
+    const Format vertexFormat = Format::RGB32Float;
 
     // Now that we've covered the function that actually loads and
     // compiles our Slang shade code, we can go through the rest
@@ -233,8 +233,8 @@ struct HelloWorld : public WindowedAppBase
         // First, we create an input layout:
         //
         InputElementDesc inputElements[] = {
-            {"POSITION", 0, format, offsetof(Vertex, position)},
-            {"COLOR", 0, format, offsetof(Vertex, color)},
+            {"POSITION", 0, vertexFormat, offsetof(Vertex, position)},
+            {"COLOR", 0, vertexFormat, offsetof(Vertex, color)},
         };
         auto inputLayout = gDevice->createInputLayout(sizeof(Vertex), &inputElements[0], 2);
         if (!inputLayout)
@@ -244,7 +244,7 @@ struct HelloWorld : public WindowedAppBase
         // vertex data.
         //
         BufferDesc vertexBufferDesc;
-        vertexBufferDesc.format = format;
+        vertexBufferDesc.format = vertexFormat;
         vertexBufferDesc.size = kVertexCount * sizeof(Vertex);
         vertexBufferDesc.elementSize = sizeof(Vertex);
         vertexBufferDesc.usage = BufferUsage::VertexBuffer;
@@ -262,7 +262,7 @@ struct HelloWorld : public WindowedAppBase
         // (PSO) to encapsulate the configuration of the overall graphics pipeline.
         //
         ColorTargetDesc colorTarget;
-        colorTarget.format = format;
+        colorTarget.format = Format::RGBA8Unorm;
         RenderPipelineDesc desc;
         desc.inputLayout = inputLayout;
         desc.program = shaderProgram;

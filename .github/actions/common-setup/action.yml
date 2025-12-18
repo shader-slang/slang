@@ -13,6 +13,9 @@ inputs:
     required: true
   build-llvm:
     required: true
+  use-cached-llvm:
+    default: true
+    required: false
 runs:
   using: composite
   steps:
@@ -25,16 +28,13 @@ runs:
 
     - name: Set up MSVC dev tools on Windows
       uses: ilammy/msvc-dev-cmd@v1
-      with:
-        sdk: "10.0.19041.0"
 
     - name: Install dependencies (Linux only)
+      if: inputs.os == 'linux'
       shell: bash
       run: |
-        if [[ "${{ inputs.os }}" == "linux" ]]; then
-            sudo apt-get update
-            sudo apt-get install -y libx11-dev 
-        fi
+        sudo apt-get update
+        sudo apt-get install -y libx11-dev
 
     - name: Setup Node.js (Linux only)
       if: inputs.os == 'linux'
@@ -93,10 +93,10 @@ runs:
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
-    # Try to restore an LLVM install, and build it otherwise
+    # Try to restore an LLVM install, or build it otherwise
     - uses: actions/cache/restore@v4
       id: cache-llvm
-      if: inputs.build-llvm == 'true'
+      if: inputs.build-llvm == 'true' && inputs.use-cached-llvm == 'true'
       with:
         path: build/llvm-project-install
         # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
@@ -109,7 +109,7 @@ runs:
           --install-prefix "${{github.workspace}}/build/llvm-project-install" \
           --repo "https://${{github.token}}@github.com/llvm/llvm-project"
     - uses: actions/cache/save@v4
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
+      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' && inputs.use-cached-llvm == 'true'
       with:
         path: build/llvm-project-install
         key: ${{ steps.cache-llvm.outputs.cache-primary-key }}

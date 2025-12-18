@@ -191,6 +191,18 @@ SlangResult TestServer::init(int argc, const char* const* argv)
 {
     m_exePath = argv[0];
 
+    // Command-line argument parsing
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "-ignore-abort-msg") == 0)
+        {
+#ifdef _MSC_VER
+            _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+        }
+        // Ignore unknown arguments for now
+    }
+
     String canonicalPath;
     if (SLANG_SUCCEEDED(Path::getCanonical(m_exePath, canonicalPath)))
     {

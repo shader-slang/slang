@@ -1,4 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target metal -fvk-use-entrypoint-name
+//TEST:SIMPLE(filecheck=METAL): -target metal -fvk-use-entrypoint-name
+//TEST:SIMPLE(filecheck=METALLIB): -target metallib -fvk-use-entrypoint-name
 
 struct FirstStruct {
     uint a;
@@ -27,7 +28,8 @@ RWStructuredBuffer<uint> outBuffer;
 //  - Binding offset for global params in global scope are the same for each generated entry point.
 //
 
-// CHECK: main1({{.*}}globalScopeBuffer{{.*}}buffer(0)]], FirstStruct{{.*}}buffer(2)]], SecondStruct{{.*}}buffer(3)]], float{{.*}}buffer(4)]])
+// METAL: main1({{.*}}globalScopeBuffer{{.*}}buffer(0)]], FirstStruct{{.*}}buffer(2)]], SecondStruct{{.*}}buffer(3)]], float{{.*}}buffer(4)]])
+// METALLIB: @main1
 [shader("compute")]
 [numthreads(5, 1, 1)]
 void main1(
@@ -41,9 +43,10 @@ void main1(
 }
 
 
-// CHECK-NOT: FirstStruct
-// CHECK-NOT: SecondStruct
-// CHECK: main2({{.*}}globalScopeBuffer{{.*}}buffer(0)]], ThirdStruct{{.*}}buffer(5)]], FourthStruct{{.*}}buffer(6)]])
+// METAL-NOT: FirstStruct
+// METAL-NOT: SecondStruct
+// METAL: main2({{.*}}globalScopeBuffer{{.*}}buffer(0)]], ThirdStruct{{.*}}buffer(5)]], FourthStruct{{.*}}buffer(6)]])
+// METALLIB: @main2
 [shader("compute")]
 [numthreads(5, 1, 1)]
 void main2(

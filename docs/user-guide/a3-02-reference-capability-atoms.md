@@ -206,9 +206,6 @@ Versions
 `hlsl_2018`
 > Represent HLSL compatibility support.
 
-`hlsl_coopvec_poc`
-> Represent compatibility support for the deprecated POC DXC
-
 `hlsl_nvapi`
 > Represents HLSL NVAPI support.
 
@@ -525,6 +522,15 @@ Extensions
 
 `GL_NV_compute_shader_derivatives`
 > Represents the GL_NV_compute_shader_derivatives extension.
+> 
+> This capability enables the use of implicit derivatives in compute, ray tracing, and mesh stages.
+> 
+> This capability changes the interpretation of GLSL implicit-LOD texture sampling functions as follows, matching
+> the GLSL shader specification:
+> - Derivatives enabled: Implicit-LOD `texture()` functions are assumed to use implicit LOD.
+> - Derivatives disabled: Implicit-LOD `texture()` functions are assumed to use the base texture.
+> 
+> This applies to GLSL as both source and target.
 
 `GL_NV_cooperative_vector`
 > Represents the GL_NV_cooperative_vector extension.
@@ -626,6 +632,9 @@ Extensions
 `SPV_KHR_vulkan_memory_model`
 > Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
 
+`SPV_NV_bindless_texture`
+> Represents the SPIR-V extension for SPV_NV_bindless_texture.
+
 `SPV_NV_cluster_acceleration_structure`
 > Represents the SPIR-V extension for cluster acceleration structure.
 
@@ -674,6 +683,9 @@ Extensions
 
 `spvAtomicFloat64MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 64 min/max operations.
+
+`spvBindlessTextureNV`
+> Represents the SPIR-V capability for the bindless texture.
 
 `spvCooperativeMatrixBlockLoadsNV`
 > Represents the SPIR-V capability for cooperative matrix 2
@@ -935,12 +947,15 @@ Compound Capabilities
 > Capabilities needed to use decodeFunc with cooperative matrix load
 
 `cooperative_matrix_conversion`
-> Capabilities needed to convert cooperative matrices
+> Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 
 `cooperative_matrix_map_element`
 > Capabilities needed to use MapElement operation with cooperative matrix
 
 `cooperative_matrix_reduction`
+> Capabilities needed to use reduction operations with cooperative matrix
+
+`cooperative_matrix_spirv`
 > Capabilities needed to use reduction operations with cooperative matrix
 
 `cooperative_matrix_tensor_addressing`
@@ -1100,6 +1115,20 @@ Compound Capabilities
 
 `image_size`
 > Capabilities required to query image (RWTexture) size info
+
+`implicit_derivatives_sampling`
+> Capabilities required for implicit derivatives sampling.
+> 
+> This capability is required by texture sampling functions such as `_Texture.Sample()`
+> where the level of detail is determined by implicit derivatives.
+> 
+> @remark In GLSL, implicit level-of-detail `texture()` functions use the base texture when
+> the implicit derivatives are unavailable. When this capability is not present, invocations of
+> these functions are translated to invocations of `_Texture.SampleLevelZero()`.
+> 
+> @remark Implicit derivatives for the compute stage can be enabled by declaring capability `GL_NV_compute_shader_derivatives` (GLSL),
+> `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
+> 
 
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
@@ -1304,6 +1333,10 @@ Compound Capabilities
 `texture_querylod`
 > Capabilities required to query texture LOD info
 
+`texture_shadowgrad`
+> Capabilities required for shadow texture sampling with bias and gradients.
+> New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
+
 `texture_shadowlod`
 > Capabilities required to query shadow texture lod info
 
@@ -1432,8 +1465,14 @@ Other
 `SPIRV_1_6`
 > Use `spirv_1_6` instead
 
+`SPV_KHR_variable_pointers`
+> Represents the SPIRV-V Variable Pointers extension.
+
 `all`
 > User should not use this capability
 
 `optix_coopvec`
 > Represents capabilities required for optix cooperative vector support.
+
+`optix_multilevel_traversal`
+> Represents capabilities required for optix multi-level traversal support.

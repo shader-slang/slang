@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build:
     timeout-minutes: 100
-    continue-on-error: true
+    continue-on-error: false
     strategy:
       fail-fast: false
       matrix:
@@ -66,7 +66,10 @@ jobs:
             -DSLANG_ENABLE_CUDA=1 \
             -DSLANG_ENABLE_EXAMPLES=0 \
             -DSLANG_ENABLE_GFX=0 \
-            -DSLANG_ENABLE_TESTS=0
+            -DSLANG_ENABLE_TESTS=0 \
+            -DSLANG_EXCLUDE_DAWN=1 \
+            -DSLANG_EXCLUDE_TINT=1 \
+            -DSLANG_ENABLE_SLANG_RHI=0
           cmake --workflow --preset "${{matrix.config}}"
       - name: Copy Slang to Falcor
         run: |
@@ -78,6 +81,7 @@ jobs:
           cd .\FalcorBin\tests
           python ./testing/run_unit_tests.py --config windows-vs2022-Release -t "-slow"
           cd ../../
+          #Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }
       - name: falcor-image-test
         shell: pwsh
         run: |
@@ -85,3 +89,4 @@ jobs:
           cd .\FalcorBin\tests
           python ./testing/run_image_tests.py --config windows-vs2022-Release --run-only
           cd ../../
+          #Get-ChildItem .\FalcorBin\build\windows-vs2022\bin\Release\FalcorTest*.log -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "=== $($_.FullName) ===" ; Get-Content $_ }

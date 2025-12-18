@@ -1683,13 +1683,14 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
         auto subType = parser->ParseTypeExp();
-        if (AdvanceIf(parser, TokenType::Colon))
+        Token constraintToken;
+        if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
         {
             for (;;)
             {
                 auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
                 constraint->whereTokenLoc = whereToken.loc;
-                parser->FillPosition(constraint);
+                constraint->loc = constraintToken.loc;
                 constraint->sub = subType;
                 constraint->sup = parser->ParseTypeExp();
                 if (optional)
@@ -1703,12 +1704,12 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
                     break;
             }
         }
-        else if (AdvanceIf(parser, TokenType::OpEql))
+        else if (AdvanceIf(parser, TokenType::OpEql, &constraintToken))
         {
             auto constraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             constraint->whereTokenLoc = whereToken.loc;
             constraint->isEqualityConstraint = true;
-            parser->FillPosition(constraint);
+            constraint->loc = constraintToken.loc;
             constraint->sub = subType;
             constraint->sup = parser->ParseTypeExp();
             if (optional)
@@ -2707,14 +2708,14 @@ static Expr* _applyModifiersToTypeExpr(Parser* parser, Expr* typeExpr, Modifiers
     }
 }
 
-/// Apply any type modifier in `ioBaseModifiers` to the given `typeExpr`.
+/// Move any type modifier in `ioBaseModifiers` to the given `typeExpr`.
 ///
 /// If any type modifiers were present, `ioBaseModifiers` will be updated
 /// to only include those modifiers that were not type modifiers (if any).
 ///
 /// If no type modifiers were present, `ioBaseModifiers` will remain unchanged.
 ///
-static Expr* _applyTypeModifiersToTypeExpr(
+static Expr* _moveTypeModifiersToTypeExpr(
     Parser* parser,
     Expr* typeExpr,
     Modifiers& ioBaseModifiers)
@@ -2762,7 +2763,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
             // a pointer to the type modifier into the "link" for
             // the type modifier list, and updating the link to point
             // to the `next` field of the current modifier (since that
-            // fill be the location any further type modifiers need
+            // will be the location any further type modifiers need
             // to be linked).
             //
             *typeModifierLink = typeModifier;
@@ -2791,10 +2792,7 @@ static Expr* _applyTypeModifiersToTypeExpr(
     return _applyModifiersToTypeExpr(parser, typeExpr, typeModifiers);
 }
 
-static TypeSpec _applyModifiersToTypeSpec(
-    Parser* parser,
-    TypeSpec typeSpec,
-    Modifiers const& inModifiers)
+static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Modifiers& modifiers)
 {
     // It is possible that the form of the type specifier will have
     // included a declaration directly (e.g., using `struct { ... }`
@@ -2808,8 +2806,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // and any modifiers that logically belong to the declaration to
         // the declaration.
         //
-        Modifiers modifiers = inModifiers;
-        typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
+        typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
 
         // Any remaining modifiers should instead be applied to the declaration.
         _addModifiers(decl, modifiers);
@@ -2820,7 +2817,7 @@ static TypeSpec _applyModifiersToTypeSpec(
         // This may result in modifiers being applied that do not belong on a type;
         // in that case we rely on downstream semantic checking to diagnose any error.
         //
-        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, inModifiers);
+        typeSpec.expr = _applyModifiersToTypeExpr(parser, typeSpec.expr, modifiers);
     }
 
     return typeSpec;
@@ -2961,7 +2958,7 @@ static TypeSpec _parseTypeSpec(Parser* parser, Modifiers& ioModifiers)
     // or which of them might be type modifiers, so we will delegate
     // figuring that out to a subroutine.
     //
-    typeSpec.expr = _applyTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
+    typeSpec.expr = _moveTypeModifiersToTypeExpr(parser, typeSpec.expr, ioModifiers);
 
     return typeSpec;
 }
@@ -2991,11 +2988,10 @@ static TypeSpec _parseTypeSpec(Parser* parser)
 static DeclBase* ParseDeclaratorDecl(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers const& inModifiers)
+    Modifiers& modifiers)
 {
     SourceLoc startPosition = parser->tokenReader.peekLoc();
 
-    Modifiers modifiers = inModifiers;
     auto typeSpec = _parseTypeSpec(parser, modifiers);
 
     if (typeSpec.expr == nullptr && typeSpec.decl == nullptr)
@@ -3315,7 +3311,7 @@ static Modifier* ParseSemantic(Parser* parser)
         BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
         parser->FillPosition(bitWidthMod);
         const auto token = parser->tokenReader.advanceToken();
-        bitWidthMod->width = getIntegerLiteralValue(token);
+        bitWidthMod->width = getIntegerLiteralValue(token, parser->sink);
         return bitWidthMod;
     }
     else if (parser->LookAheadToken(TokenType::CompletionRequest))
@@ -3979,7 +3975,7 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
             continue;
         break;
     }
-    decl->inferredCapabilityRequirements = CapabilitySet(capNames);
+    decl->inferredCapabilityRequirements = CapabilitySet(capNames).freeze(parser->astBuilder);
     parser->ReadToken(TokenType::Semicolon);
     return decl;
 }
@@ -4249,6 +4245,9 @@ static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
         decl->type = parser->ParseTypeExp();
     }
 
+    auto modifiers = _parseOptSemantics(parser);
+    _addModifiers(decl, modifiers);
+
     if (AdvanceIf(parser, TokenType::OpAssign))
     {
         decl->initExpr = parser->ParseInitExpr();
@@ -4350,6 +4349,8 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
         {
             parser->PushScope(decl);
             parseModernParamList(parser, decl);
+            auto funcScope = parser->currentScope;
+            parser->PopScope();
             if (AdvanceIf(parser, "throws"))
             {
                 decl->errorType = parser->ParseTypeExp();
@@ -4358,8 +4359,6 @@ static NodeBase* parseFuncDecl(Parser* parser, void* /*userData*/)
             {
                 decl->returnType = parser->ParseTypeExp();
             }
-            auto funcScope = parser->currentScope;
-            parser->PopScope();
             maybeParseGenericConstraints(parser, genericParent);
             parser->PushScope(funcScope);
             decl->body = parseOptBody(parser);
@@ -4799,7 +4798,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass);
+        SLANG_ASSERT(syntaxClass);
     }
     else
     {
@@ -4891,7 +4890,8 @@ static void CompleteDecl(
     Parser* parser,
     Decl* decl,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
@@ -4901,7 +4901,18 @@ static void CompleteDecl(
     //
     Decl* declToModify = decl;
     if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        // If `decl` is a generic decl, hookup modifierScope to be nested inside
+        // the generic decl's scope, so that generic parameters can be accessible
+        // from the modifiers.
+        if (modifierScope)
+        {
+            modifierScope->containerDecl = genericDecl;
+            if (genericDecl->ownedScope)
+                modifierScope->parent = genericDecl->ownedScope->parent;
+        }
         declToModify = genericDecl->inner;
+    }
 
     if (as<ModuleDeclarationDecl>(decl))
     {
@@ -5008,7 +5019,8 @@ static void CompleteDecl(
 static DeclBase* ParseDeclWithModifiers(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     DeclBase* decl = nullptr;
 
@@ -5158,7 +5170,7 @@ static DeclBase* ParseDeclWithModifiers(
     {
         if (auto dd = as<Decl>(decl))
         {
-            CompleteDecl(parser, dd, containerDecl, modifiers);
+            CompleteDecl(parser, dd, containerDecl, modifiers, modifierScope);
         }
         else if (auto declGroup = as<DeclGroup>(decl))
         {
@@ -5172,7 +5184,7 @@ static DeclBase* ParseDeclWithModifiers(
 
             for (auto subDecl : declGroup->decls)
             {
-                CompleteDecl(parser, subDecl, containerDecl, modifiers);
+                CompleteDecl(parser, subDecl, containerDecl, modifiers, nullptr);
             }
         }
     }
@@ -5181,8 +5193,22 @@ static DeclBase* ParseDeclWithModifiers(
 
 static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl)
 {
+    // If the decl to be parsed is a generic decl (e.g. a `func<T>(...)`), we need to
+    // to make sure any exprs in the modifiers will have the correct scope so that the
+    // generic parameters can be referenced.
+    // However at this point, we don't even know if the decl is generic or not.
+    // So we will create a temporary scope for the modifiers, and then hookup the temp
+    // scope with the generic decl's scope once it is parsed.
+    Scope* modifierScope = parser->astBuilder->create<Scope>();
+    modifierScope->parent = parser->currentScope;
+    ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+    modifierScope->containerDecl = scopeDecl;
+    scopeDecl->ownedScope = modifierScope;
+    auto oldScope = parser->currentScope;
+    parser->currentScope = modifierScope;
     Modifiers modifiers = ParseModifiers(parser);
-    return ParseDeclWithModifiers(parser, containerDecl, modifiers);
+    parser->currentScope = oldScope;
+    return ParseDeclWithModifiers(parser, containerDecl, modifiers, modifierScope);
 }
 
 static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
@@ -5505,13 +5531,19 @@ Decl* Parser::ParseStruct()
             parseOptionalInheritanceClause(this, rs);
             if (AdvanceIf(this, TokenType::OpAssign))
             {
-                rs->wrappedType = ParseTypeExp();
+                rs->aliasedType = ParseTypeExp();
                 PushScope(rs);
                 PopScope();
-                ReadToken(TokenType::Semicolon);
+                if (!LookAheadToken(TokenType::Semicolon))
+                {
+                    this->diagnose(
+                        this->tokenReader.peekToken().loc,
+                        Diagnostics::unexpectedTokenExpectedTokenType,
+                        "';'");
+                }
                 return rs;
             }
-            if (AdvanceIf(this, TokenType::Semicolon))
+            if (LookAheadToken(TokenType::Semicolon))
             {
                 rs->hasBody = false;
                 return rs;
@@ -6305,7 +6337,7 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
 
     FillPosition(varDeclrStatement);
-    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
+    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers, nullptr);
     varDeclrStatement->decl = decl;
 
     if (as<VarDeclBase>(decl))
@@ -7720,7 +7752,13 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             UnownedStringSlice suffix;
             bool isDecimalBase;
-            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &isDecimalBase);
+            bool hasOverflowed;
+            IntegerLiteralValue value = getIntegerLiteralValue(
+                token,
+                parser->sink,
+                &suffix,
+                &isDecimalBase,
+                &hasOverflowed);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -7800,13 +7838,17 @@ static Expr* parseAtomicExpr(Parser* parser)
                     suffixBaseType = BaseType::Int;
                 }
             }
-            else
+            else if (!hasOverflowed)
             {
                 suffixBaseType = _determineNonSuffixedIntegerLiteralType(
                     value,
                     isDecimalBase,
                     &token,
                     parser->sink);
+            }
+            else
+            {
+                suffixBaseType = BaseType::UInt64;
             }
 
             value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
@@ -8363,7 +8405,7 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         const auto tok = parser->ReadToken();
-        const auto v = getIntegerLiteralValue(tok);
+        const auto v = getIntegerLiteralValue(tok, parser->sink);
         if (v < 0 || v > 0xffffffff)
             parser->diagnose(tok, Diagnostics::spirvOperandRange);
         return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
@@ -8450,7 +8492,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
@@ -8546,7 +8588,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
+        ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -9388,7 +9430,16 @@ static NodeBase* parseBuiltinRequirementModifier(Parser* parser, void* /*userDat
     return modifier;
 }
 
-static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
+enum class MagicTypeModifierKind
+{
+    Type,
+    Enum,
+};
+
+static NodeBase* parseMagicTypeModifierImpl(
+    Parser* parser,
+    void* /*userData*/,
+    MagicTypeModifierKind kind)
 {
     MagicTypeModifier* modifier = parser->astBuilder->create<MagicTypeModifier>();
     parser->ReadToken(TokenType::LParent);
@@ -9398,8 +9449,14 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
         modifier->tag =
             uint32_t(stringToInt(parser->ReadToken(TokenType::IntegerLiteral).getContent()));
     }
-    auto syntaxClass = parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName));
-    if (syntaxClass)
+
+    if (kind == MagicTypeModifierKind::Enum)
+    {
+        modifier->magicNodeType = getSyntaxClass<EnumTypeType>();
+    }
+    else if (
+        auto syntaxClass =
+            parser->astBuilder->findSyntaxClass(getName(parser, modifier->magicName)))
     {
         modifier->magicNodeType = syntaxClass;
     }
@@ -9408,6 +9465,16 @@ static NodeBase* parseMagicTypeModifier(Parser* parser, void* /*userData*/)
     parser->ReadToken(TokenType::RParent);
 
     return modifier;
+}
+
+static NodeBase* parseMagicTypeModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Type);
+}
+
+static NodeBase* parseMagicEnumModifier(Parser* parser, void* userData)
+{
+    return parseMagicTypeModifierImpl(parser, userData, MagicTypeModifierKind::Enum);
 }
 
 static NodeBase* parseIntrinsicTypeModifier(Parser* parser, void* /*userData*/)
@@ -9554,7 +9621,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("out", getSyntaxClass<OutModifier>()),
     _makeParseModifier("inout", getSyntaxClass<InOutModifier>()),
     _makeParseModifier("__ref", getSyntaxClass<RefModifier>()),
-    _makeParseModifier("__constref", getSyntaxClass<ConstRefModifier>()),
+    _makeParseModifier("__constref", getSyntaxClass<BorrowModifier>()),
     _makeParseModifier("const", getSyntaxClass<ConstModifier>()),
     _makeParseModifier("__builtin", getSyntaxClass<BuiltinModifier>()),
     _makeParseModifier("highp", getSyntaxClass<GLSLPrecisionModifier>()),
@@ -9634,6 +9701,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseModifier("__builtin_requirement", parseBuiltinRequirementModifier),
 
     _makeParseModifier("__magic_type", parseMagicTypeModifier),
+    _makeParseModifier("__magic_enum", parseMagicEnumModifier),
     _makeParseModifier("__intrinsic_type", parseIntrinsicTypeModifier),
     _makeParseModifier("__implicit_conversion", parseImplicitConversionModifier),
 

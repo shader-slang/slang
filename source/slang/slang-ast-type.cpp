@@ -4,6 +4,7 @@
 #include "slang-ast-builder.h"
 #include "slang-ast-dispatch.h"
 #include "slang-ast-modifier.h"
+#include "slang-check.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -13,6 +14,7 @@ namespace Slang
 
 bool isAbstractTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
@@ -22,6 +24,7 @@ bool isAbstractTypePack(Type* type)
 
 bool isTypePack(Type* type)
 {
+    type = unwrapModifiedType(type);
     if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
@@ -450,15 +453,19 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 2);
 }
 
-AccessQualifier tryGetAccessQualifierValue(Val* val)
+std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val)
 {
-    AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
-
     if (auto cintVal = as<ConstantIntVal>(val))
     {
-        accessQualifier = (AccessQualifier)(cintVal->getValue());
+        return AccessQualifier(cintVal->getValue());
     }
-    return accessQualifier;
+    return std::optional<AccessQualifier>();
+}
+
+std::optional<AccessQualifier> PtrTypeBase::tryGetAccessQualifierValue()
+{
+    auto accessQualifierArg = this->getAccessQualifier();
+    return Slang::tryGetAccessQualifierValue(accessQualifierArg);
 }
 
 AddressSpace tryGetAddressSpaceValue(Val* addrSpaceVal)
@@ -477,23 +484,23 @@ void maybePrintAddrSpaceOperand(StringBuilder& out, AddressSpace addrSpace)
     switch (addrSpace)
     {
     case AddressSpace::Generic:
-        out << toSlice(", AddressSpace::Generic");
+        out << toSlice(", AddressSpace.Generic");
         break;
     case AddressSpace::UserPointer:
         // We expose UserPointer as Device to users
-        out << toSlice(", AddressSpace::Device");
+        out << toSlice(", AddressSpace.Device");
         break;
     case AddressSpace::GroupShared:
-        out << toSlice(", AddressSpace::GroupShared");
+        out << toSlice(", AddressSpace.GroupShared");
         break;
     case AddressSpace::Global:
-        out << toSlice(", AddressSpace::Global");
+        out << toSlice(", AddressSpace.Global");
         break;
     case AddressSpace::ThreadLocal:
-        out << toSlice(", AddressSpace::ThreadLocal");
+        out << toSlice(", AddressSpace.ThreadLocal");
         break;
     case AddressSpace::Uniform:
-        out << toSlice(", AddressSpace::Uniform");
+        out << toSlice(", AddressSpace.Uniform");
         break;
     default:
         break;
@@ -505,10 +512,13 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     switch (accessQualifier)
     {
     case AccessQualifier::ReadWrite:
-        out << toSlice(", Access::ReadWrite");
+        out << toSlice(", Access.ReadWrite");
         break;
     case AccessQualifier::Read:
-        out << toSlice(", Access::Read");
+        out << toSlice(", Access.Read");
+        break;
+    case AccessQualifier::Immutable:
+        out << toSlice(", Access.Immutable");
         break;
     default:
         break;
@@ -517,22 +527,42 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
 
 void PtrType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ptr<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
 }
 
-void RefType::_toTextOverride(StringBuilder& out)
+void ExplicitRefType::_toTextOverride(StringBuilder& out)
 {
-    auto accessQualifier = tryGetAccessQualifierValue(getAccessQualifier());
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
     out << toSlice("Ref<") << getValueType();
-    maybePrintAccessQualifierOperand(out, accessQualifier);
+    if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
+        maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
     out << toSlice(">");
+}
+
+void OutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("out ") << getValueType();
+}
+
+void BorrowInOutParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("inout ") << getValueType();
+}
+
+void RefParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("ref ") << getValueType();
+}
+
+void BorrowInParamType::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("borrow ") << getValueType();
 }
 
 
@@ -556,30 +586,44 @@ Type* NamedExpressionType::_createCanonicalTypeOverride()
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FuncType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-ParameterDirection FuncType::getParamDirection(Index index)
+ParamPassingMode getParamPassingModeFromPossiblyWrappedParamType(Type* paramType)
 {
-    auto paramType = getParamType(index);
-    if (as<RefType>(paramType))
+    if (as<RefParamType>(paramType))
     {
-        return kParameterDirection_Ref;
+        return ParamPassingMode::Ref;
     }
-    else if (as<ConstRefType>(paramType))
+    else if (as<BorrowInParamType>(paramType))
     {
-        return kParameterDirection_ConstRef;
+        return ParamPassingMode::BorrowIn;
     }
-    else if (as<InOutType>(paramType))
+    else if (as<BorrowInOutParamType>(paramType))
     {
-        return kParameterDirection_InOut;
+        return ParamPassingMode::BorrowInOut;
     }
     else if (as<OutType>(paramType))
     {
-        return kParameterDirection_Out;
+        return ParamPassingMode::Out;
     }
     else
     {
-        return kParameterDirection_In;
+        return ParamPassingMode::In;
     }
 }
+
+ParamPassingMode FuncType::getParamPassingMode(Index index)
+{
+    auto paramType = getParamTypeWithModeWrapper(index);
+    return getParamPassingModeFromPossiblyWrappedParamType(paramType);
+}
+
+Type* FuncType::getParamValueType(Index index)
+{
+    auto paramType = getParamTypeWithModeWrapper(index);
+    if (auto wrappedParamType = as<ParamPassingModeType>(paramType))
+        return wrappedParamType->getValueType();
+    return paramType;
+}
+
 
 void FuncType::_toTextOverride(StringBuilder& out)
 {
@@ -591,7 +635,7 @@ void FuncType::_toTextOverride(StringBuilder& out)
         {
             out << toSlice(", ");
         }
-        out << getParamType(pp);
+        out << getParamTypeWithModeWrapper(pp);
     }
     out << ") -> " << getResultType();
 
@@ -615,7 +659,8 @@ Val* FuncType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet s
     List<Type*> substParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        auto substParamType = as<Type>(getParamType(pp)->substituteImpl(astBuilder, subst, &diff));
+        auto substParamType =
+            as<Type>(getParamTypeWithModeWrapper(pp)->substituteImpl(astBuilder, subst, &diff));
         if (auto typePack = as<ConcreteTypePack>(substParamType))
         {
             // Unwrap the ConcreteTypePack and add each element as a parameter
@@ -650,7 +695,7 @@ Type* FuncType::_createCanonicalTypeOverride()
     List<Type*> canParamTypes;
     for (Index pp = 0; pp < getParamCount(); pp++)
     {
-        canParamTypes.add(getParamType(pp)->getCanonicalType());
+        canParamTypes.add(getParamTypeWithModeWrapper(pp)->getCanonicalType());
     }
 
     FuncType* canType = getCurrentASTBuilder()->getFuncType(
@@ -1361,14 +1406,9 @@ Val* TextureTypeBase::getFormat()
     return as<Type>(_getGenericTypeArg(this, 8));
 }
 
-Type* removeParamDirType(Type* type)
+bool isCopyableType(Type* type)
 {
-    for (auto paramDirType = as<ParamDirectionType>(type); paramDirType;)
-    {
-        type = paramDirType->getValueType();
-        paramDirType = as<ParamDirectionType>(type);
-    }
-    return type;
+    return !isNonCopyableType(type);
 }
 
 bool isNonCopyableType(Type* type)

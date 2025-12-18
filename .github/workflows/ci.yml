@@ -43,26 +43,20 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Linux builds
+  # Linux builds (containerized builds on GitHub-hosted runners)
   build-linux-debug-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
+    uses: ./.github/workflows/ci-slang-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-release-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
+    uses: ./.github/workflows/ci-slang-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
       runs-on: '["ubuntu-22.04"]'
 
@@ -123,32 +117,22 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  # Linux tests
+  # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
-      runs-on: '["ubuntu-22.04"]'
-      test-category: smoke
-      server-count: 1
+      server-count: 4
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
-      runs-on: '["ubuntu-22.04"]'
-      test-category: full
-      server-count: 1
+      server-count: 4
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -228,15 +212,21 @@ jobs:
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
 
-          # Check if all required jobs succeeded
-          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" != "success" ]] || \
-             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" != "success" ]] || \
-             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" != "success" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" != "success" ]]; then
-            echo "❌ One or more CI jobs failed or were cancelled"
+          # Check if any required jobs failed (allow success or skipped)
+          if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+            echo "One or more CI jobs failed or were cancelled"
             exit 1
           fi
 
-          echo "✅ All CI jobs passed successfully!"
+          echo "All CI jobs completed successfully (passed or skipped)!"

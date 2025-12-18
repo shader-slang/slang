@@ -59,7 +59,7 @@ IRFuncType* BackwardDiffPrimalTranscriber::differentiateFunctionType(
             (IRType*)specializeWithGeneric(*builder, intermediateType, as<IRGeneric>(outerGeneric));
     }
 
-    auto outType = builder->getOutType(intermediateType);
+    auto outType = builder->getOutParamType(intermediateType);
     List<IRType*> paramTypes;
     for (UInt i = 0; i < funcType->getParamCount(); i++)
     {
@@ -308,7 +308,7 @@ static IRType* _getPrimalTypeFromNoDiffType(
     IRType* origType)
 {
     IRType* valueType = origType;
-    auto ptrType = as<IROutTypeBase>(valueType);
+    auto ptrType = as<IROutParamTypeBase>(valueType);
     if (ptrType)
         valueType = ptrType->getValueType();
 
@@ -354,7 +354,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
     IRBuilder* builder,
     IRType* paramType)
 {
-    if (auto outType = as<IROutType>(paramType))
+    if (auto outType = as<IROutParamType>(paramType))
     {
         auto valueType = outType->getValueType();
         auto diffValueType = differentiateType(builder, valueType);
@@ -363,7 +363,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
 
     auto maybeConvertInOutTypeToValueType = [](IRType* type)
     {
-        if (auto inoutType = as<IRInOutType>(type))
+        if (auto inoutType = as<IRBorrowInOutParamType>(type))
             return inoutType->getValueType();
         return type;
     };
@@ -376,7 +376,7 @@ IRType* BackwardDiffTranscriberBase::transcribeParamTypeForPropagateFunc(
     if (diffPairType)
     {
         if (!asRelevantPtrType(diffPairType) && !as<IRDifferentialPtrPairType>(diffPairType))
-            return builder->getInOutType(diffPairType);
+            return builder->getBorrowInOutParamType(diffPairType);
         return diffPairType;
     }
     auto primalType = (IRType*)findOrTranscribePrimalInst(builder, paramType);
@@ -515,7 +515,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
 
             // Fetch primal values to use as arguments in primal func call.
             IRInst* primalArg = param;
-            if (!as<IROutType>(primalParamType) && !as<IRConstRefType>(primalParamType))
+            if (!as<IROutParamType>(primalParamType) && !as<IRBorrowInParamType>(primalParamType))
             {
                 // As long as the primal parameter is not an out or constref type,
                 // we need to fetch the primal value from the parameter.
@@ -537,7 +537,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
                 // value of the temp var, otherwise the temp var will be uninitialized which could
                 // cause undefined behavior in the primal function.
                 //
-                if (!as<IROutType>(primalParamType))
+                if (!as<IROutParamType>(primalParamType))
                     builder.emitStore(tempVar, primalArg);
 
                 primalArgs.add(tempVar);
@@ -588,7 +588,7 @@ InstPair BackwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRF
 
     auto primalFuncType = builder.getFuncType(primalTypes, primalResultType);
     primalArgs.add(intermediateVar);
-    primalTypes.add(builder.getOutType(intermediateType));
+    primalTypes.add(builder.getOutParamType(intermediateType));
     auto primalFunc =
         builder.emitBackwardDifferentiatePrimalInst(primalFuncType, specializedOriginalFunc);
     builder.emitCallInst(primalResultType, primalFunc, primalArgs);
@@ -1066,8 +1066,8 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
 
         // Common logic that computes all the important types we care about.
         IRDifferentialPairType* diffPairType = as<IRDifferentialPairType>(fwdParam->getDataType());
-        auto inoutType = as<IRInOutType>(fwdParam->getDataType());
-        auto outType = as<IROutType>(fwdParam->getDataType());
+        auto inoutType = as<IRBorrowInOutParamType>(fwdParam->getDataType());
+        auto outType = as<IROutParamType>(fwdParam->getDataType());
         if (inoutType)
             diffPairType = as<IRDifferentialPairType>(inoutType->getValueType());
         else if (outType)
@@ -1094,7 +1094,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                 auto diffParam = builder->emitParam(diffType);
                 copyNameHintAndDebugDecorations(diffParam, fwdParam);
                 result.propagateFuncParams.add(diffParam);
-                primalRefReplacement = builder->emitParam(builder->getOutType(primalType));
+                primalRefReplacement = builder->emitParam(builder->getOutParamType(primalType));
                 copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
                 // Create a local var for read access in pre-transpose code.
@@ -1178,7 +1178,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             SLANG_RELEASE_ASSERT(diffPairType);
 
             // Create inout version.
-            auto inoutDiffPairType = builder->getInOutType(diffPairType);
+            auto inoutDiffPairType = builder->getBorrowInOutParamType(diffPairType);
             primalRefReplacement = builder->emitParam(primalType);
             copyNameHintAndDebugDecorations(primalRefReplacement, fwdParam);
 
@@ -1217,7 +1217,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
             SLANG_ASSERT(inoutType && diffPairType);
 
             // Process differentiable inout parameters.
-            auto primalParam = builder->emitParam(builder->getInOutType(primalType));
+            auto primalParam = builder->emitParam(builder->getBorrowInOutParamType(primalType));
             copyNameHintAndDebugDecorations(primalParam, fwdParam);
             result.primalFuncParams.add(primalParam);
 
@@ -1435,8 +1435,28 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         {
             args.add(primalSpecialize->getArg(i));
         }
+
+        IRType* typeForSpecialization = nullptr;
+        switch ((*diffBase)->getDataType()->getOp())
+        {
+        case kIROp_TypeKind:
+        case kIROp_GenericKind:
+            typeForSpecialization = (*diffBase)->getDataType();
+            break;
+        case kIROp_Generic:
+            typeForSpecialization = (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                (*diffBase)->getDataType(),
+                args.getCount(),
+                args.getBuffer());
+            break;
+        default:
+            typeForSpecialization = builder->getTypeKind();
+            break;
+        }
+
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            typeForSpecialization,
             *diffBase,
             args.getCount(),
             args.getBuffer());
@@ -1472,7 +1492,11 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         // the generic args to specialize the primal function. This is true for all of our core
         // module functions, but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBaseSpecialize->getBase()->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBaseSpecialize->getBase(),
             args.getCount(),
             args.getBuffer());
@@ -1488,7 +1512,11 @@ InstPair BackwardDiffTranscriberBase::transcribeSpecialize(
         }
         auto diffCallee = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffCallee->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffCallee,
             args.getCount(),
             args.getBuffer());

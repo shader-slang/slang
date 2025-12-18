@@ -133,10 +133,10 @@ void GLSLLivenessContext::_replaceMarker(IRLiveRangeMarker* markerInst)
     {
         // We didn't find a function for the type, so lets create one. It has a signature of
         //
-        // void func(Ref<ReferencedType> target, int sizeInBytes)
+        // void func(ref ReferencedType target, int sizeInBytes)
 
         IRType* paramTypes[] = {
-            m_builder.getRefType(
+            m_builder.getRefParamType(
                 referencedType,
                 AddressSpace::Generic), ///< Use a reference to the referenced type
             m_spirvIntLiteralType,      ///< The size type

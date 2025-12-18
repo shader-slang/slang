@@ -13,19 +13,11 @@ using namespace Slang;
 ShaderObjectLayoutImpl::SubObjectRangeOffset::SubObjectRangeOffset(
     slang::VariableLayoutReflection* varLayout)
 {
-    if (auto pendingLayout = varLayout->getPendingDataLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getOffset(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
 }
 
 ShaderObjectLayoutImpl::SubObjectRangeStride::SubObjectRangeStride(
     slang::TypeLayoutReflection* typeLayout)
 {
-    if (auto pendingLayout = typeLayout->getPendingDataTypeLayout())
-    {
-        pendingOrdinaryData = (uint32_t)pendingLayout->getSize(SLANG_PARAMETER_CATEGORY_UNIFORM);
-    }
 }
 
 bool ShaderObjectLayoutImpl::isBindingRangeRootParameter(
@@ -113,7 +105,9 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
     for (SlangInt r = 0; r < bindingRangeCount; ++r)
     {
         slang::BindingType slangBindingType = typeLayout->getBindingRangeType(r);
-        uint32_t count = (uint32_t)typeLayout->getBindingRangeBindingCount(r);
+        SlangInt count = typeLayout->getBindingRangeBindingCount(r);
+        SLANG_ASSERT(count != SLANG_UNBOUNDED_SIZE && count != SLANG_UNKNOWN_SIZE);
+
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(r);
 
@@ -224,37 +218,18 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
     {
         SlangInt bindingRangeIndex = typeLayout->getSubObjectRangeBindingRangeIndex(r);
         auto slangBindingType = typeLayout->getBindingRangeType(bindingRangeIndex);
-        auto count = (uint32_t)typeLayout->getBindingRangeBindingCount(bindingRangeIndex);
+        SlangInt count = typeLayout->getBindingRangeBindingCount(bindingRangeIndex);
+        SLANG_ASSERT(count != SLANG_UNBOUNDED_SIZE && count != SLANG_UNKNOWN_SIZE);
+
         slang::TypeLayoutReflection* slangLeafTypeLayout =
             typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
 
-        // A sub-object range can either represent a sub-object of a known
-        // type, like a `ConstantBuffer<Foo>` or `ParameterBlock<Foo>`
-        // (in which case we can pre-compute a layout to use, based on
-        // the type `Foo`) *or* it can represent a sub-object of some
-        // existential type (e.g., `IBar`) in which case we cannot
-        // know the appropraite type/layout of sub-object to allocate.
-        //
         RefPtr<ShaderObjectLayoutImpl> subObjectLayout;
-        if (slangBindingType == slang::BindingType::ExistentialValue)
-        {
-            if (auto pendingTypeLayout = slangLeafTypeLayout->getPendingDataTypeLayout())
-            {
-                createForElementType(
-                    m_renderer,
-                    m_session,
-                    pendingTypeLayout,
-                    subObjectLayout.writeRef());
-            }
-        }
-        else
-        {
-            createForElementType(
-                m_renderer,
-                m_session,
-                slangLeafTypeLayout->getElementTypeLayout(),
-                subObjectLayout.writeRef());
-        }
+        createForElementType(
+            m_renderer,
+            m_session,
+            slangLeafTypeLayout->getElementTypeLayout(),
+            subObjectLayout.writeRef());
 
         SubObjectRangeInfo subObjectRange;
         subObjectRange.bindingRangeIndex = bindingRangeIndex;
@@ -367,29 +342,6 @@ Result ShaderObjectLayoutImpl::Builder::setElementTypeLayout(
                     subObjectLayout->getTotalResourceDescriptorCountWithoutOrdinaryDataBuffer();
                 objectCounts.sampler = subObjectLayout->getTotalSamplerDescriptorCount();
                 objectCounts.rootParam = subObjectRange.layout->getChildRootParameterCount();
-
-                // Note: In the implementation for some other graphics API (e.g.,
-                // Vulkan) there needs to be more work done to handle the fact that
-                // "pending" data from interface-type sub-objects get allocated to a
-                // distinct offset after all the "primary" data. We are consciously
-                // ignoring that issue here, and the physical layout of a shader object
-                // into the D3D12 binding state may end up interleaving
-                // resources/samplers for "primary" and "pending" data.
-                //
-                // If this choice ever causes issues, we can revisit the approach here.
-
-                // An interface-type range that includes ordinary data can
-                // increase the size of the ordinary data buffer we need to
-                // allocate for the parent object.
-                //
-                uint32_t ordinaryDataEnd =
-                    subObjectRange.offset.pendingOrdinaryData +
-                    (uint32_t)count * subObjectRange.stride.pendingOrdinaryData;
-
-                if (ordinaryDataEnd > m_totalOrdinaryDataSize)
-                {
-                    m_totalOrdinaryDataSize = ordinaryDataEnd;
-                }
             }
             break;
         }
@@ -677,7 +629,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
     BindingRegisterOffsetPair offset(varLayout);
     auto elementOffset = offset;
     elementOffset.primary.spaceOffset = 0;
-    elementOffset.pending.spaceOffset = 0;
     addAsValue(varLayout->getTypeLayout(), physicalDescriptorSetIndex, offset, elementOffset);
 }
 
@@ -786,7 +737,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
         subObjectRangeElementOffset +=
             BindingRegisterOffsetPair(typeLayout->getSubObjectRangeOffset(subObjectRangeIndex));
         subObjectRangeElementOffset.primary.spaceOffset = elementOffset.primary.spaceOffset;
-        subObjectRangeElementOffset.pending.spaceOffset = elementOffset.pending.spaceOffset;
 
         switch (bindingType)
         {
@@ -829,8 +779,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
                 BindingRegisterOffsetPair subDescriptorSetOffset;
                 subDescriptorSetOffset.primary.spaceOffset =
                     subObjectRangeContainerOffset.primary.spaceOffset;
-                subDescriptorSetOffset.pending.spaceOffset =
-                    subObjectRangeContainerOffset.pending.spaceOffset;
 
                 auto subPhysicalDescriptorSetIndex = addDescriptorSet();
 
@@ -853,26 +801,6 @@ void RootShaderObjectLayoutImpl::RootSignatureDescBuilder::addAsValue(
                     subPhysicalDescriptorSetIndex,
                     offsetForChildrenThatNeedNewSpace,
                     offsetForOrindaryChildren);
-            }
-            break;
-
-        case slang::BindingType::ExistentialValue:
-            {
-                // Any nested binding ranges in the sub-object will "leak" into the
-                // binding ranges for the surrounding context.
-                //
-                auto specializedTypeLayout = subObjectTypeLayout->getPendingDataTypeLayout();
-                if (specializedTypeLayout)
-                {
-                    BindingRegisterOffsetPair pendingOffset;
-                    pendingOffset.primary = subObjectRangeElementOffset.pending;
-
-                    addAsValue(
-                        specializedTypeLayout,
-                        physicalDescriptorSetIndex,
-                        pendingOffset,
-                        pendingOffset);
-                }
             }
             break;
         }

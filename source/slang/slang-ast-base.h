@@ -673,12 +673,7 @@ class DeclRefBase : public Val
     SourceLoc getNameLoc() const;
     SourceLoc getLoc() const;
     DeclRefBase* getParent();
-    String toString() const
-    {
-        StringBuilder sb;
-        const_cast<DeclRefBase*>(this)->toText(sb);
-        return sb.produceString();
-    }
+    String toString() const;
     DeclRefBase* getBase();
     void toText(StringBuilder& out);
 };
@@ -774,7 +769,7 @@ public:
     DeclRefBase* getDefaultDeclRef();
 
     FIDDLE() NameLoc nameAndLoc;
-    FIDDLE() CapabilitySet inferredCapabilityRequirements;
+    FIDDLE() CapabilitySetVal* inferredCapabilityRequirements = nullptr;
 
     RefPtr<MarkupEntry> markup;
 

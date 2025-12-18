@@ -376,8 +376,8 @@ struct DifferentiableTypeConformanceContext
             case kIROp_VectorType:
             case kIROp_ArrayType:
             case kIROp_PtrType:
-            case kIROp_OutType:
-            case kIROp_InOutType:
+            case kIROp_OutParamType:
+            case kIROp_BorrowInOutParamType:
                 origType = (IRType*)origType->getOperand(0);
                 continue;
             default:
@@ -396,8 +396,8 @@ struct DifferentiableTypeConformanceContext
             case kIROp_VectorType:
             case kIROp_ArrayType:
             case kIROp_PtrType:
-            case kIROp_OutType:
-            case kIROp_InOutType:
+            case kIROp_OutParamType:
+            case kIROp_BorrowInOutParamType:
                 origType = (IRType*)origType->getOperand(0);
                 continue;
             default:
@@ -573,15 +573,15 @@ struct IRAutodiffPassOptions
     // Nothing for now...
 };
 
-void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool processAutodiffCalls(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     IRAutodiffPassOptions const& options = IRAutodiffPassOptions());
 
-bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
+bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target);
 
 // Utility methods
 

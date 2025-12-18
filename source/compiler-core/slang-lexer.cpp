@@ -725,10 +725,12 @@ static int _readOptionalBase(char const** ioCursor)
 
 IntegerLiteralValue getIntegerLiteralValue(
     Token const& token,
+    DiagnosticSink* sink,
     UnownedStringSlice* outSuffix,
-    bool* outIsDecimalBase)
+    bool* outIsDecimalBase,
+    bool* outHasOverflowed)
 {
-    IntegerLiteralValue value = 0;
+    uint64_t value = 0;
 
     const UnownedStringSlice content = token.getContent();
 
@@ -736,6 +738,7 @@ IntegerLiteralValue getIntegerLiteralValue(
     char const* end = content.end();
 
     int base = _readOptionalBase(&cursor);
+    bool hasOverflowed = false;
 
     for (;;)
     {
@@ -743,7 +746,14 @@ IntegerLiteralValue getIntegerLiteralValue(
         if (digit < 0)
             break;
 
+        if (value > (UINT64_MAX - digit) / base)
+            hasOverflowed = true;
         value = value * base + digit;
+    }
+
+    if (hasOverflowed)
+    {
+        diagnose(sink, token.getLoc(), LexerDiagnostics::integerLiteralTooLargeForAnyType);
     }
 
     if (outSuffix)
@@ -754,6 +764,11 @@ IntegerLiteralValue getIntegerLiteralValue(
     if (outIsDecimalBase)
     {
         *outIsDecimalBase = (base == 10);
+    }
+
+    if (outHasOverflowed)
+    {
+        *outHasOverflowed = hasOverflowed;
     }
 
     return value;
@@ -1934,8 +1949,10 @@ TokenList Lexer::lexAllTokens()
 
     const int offset = sourceView->getRange().getOffset(tok.loc);
 
-    SLANG_ASSERT(offset >= 0 && offset <= in.getLength());
-    SLANG_ASSERT(Index(offset + tok.charsCount) <= in.getLength());
+    if (offset < 0 || offset >= in.getLength())
+        return UnownedStringSlice();
+    if (Index(offset + tok.charsCount) > in.getLength())
+        return UnownedStringSlice();
 
     return UnownedStringSlice(in.begin() + offset, in.begin() + offset + tok.charsCount);
 }

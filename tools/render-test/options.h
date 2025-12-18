@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #ifndef SLANG_HANDLE_RESULT_FAIL
-#define SLANG_HANDLE_RESULT_FAIL(x) assert(!"failure")
+#define SLANG_HANDLE_RESULT_FAIL(x) SLANG_ASSERT(!"failure")
 #endif
 
 #include "../../source/compiler-core/slang-command-line-args.h"
@@ -95,6 +95,9 @@ struct Options
     bool showAdapterInfo = false;
 
     bool skipSPIRVValidation = false;
+
+    // Whether to enable RHI device caching (default: false in render-test)
+    bool cacheRhiDevice = false;
 
     Slang::List<Slang::String> capabilities;
 

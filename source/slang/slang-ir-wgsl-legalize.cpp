@@ -4,6 +4,8 @@
 #include "slang-ir-legalize-binary-operator.h"
 #include "slang-ir-legalize-global-values.h"
 #include "slang-ir-legalize-varying-params.h"
+#include "slang-ir-specialize-address-space.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -223,6 +225,93 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
     GlobalInstInliningContext().inlineGlobalValuesAndRemoveIfUnused(module);
+}
+
+struct WGSLAddressSpaceAssigner : InitialAddressSpaceAssigner
+{
+    virtual bool tryAssignAddressSpace(IRInst* inst, AddressSpace& outAddressSpace) override
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Var:
+            if (as<IRBlock>(inst->getParent()))
+                outAddressSpace = AddressSpace::Function;
+            else
+                outAddressSpace = AddressSpace::ThreadLocal;
+            return true;
+        case kIROp_RWStructuredBufferGetElementPtr:
+            outAddressSpace = AddressSpace::Global;
+            return true;
+        case kIROp_Load:
+            {
+                auto addrSpace = getAddressSpaceFromVarType(inst->getDataType());
+                if (addrSpace != AddressSpace::Generic)
+                {
+                    outAddressSpace = addrSpace;
+                    return true;
+                }
+            }
+            return false;
+        default:
+            return false;
+        }
+    }
+
+    virtual AddressSpace getAddressSpaceFromVarType(IRInst* type) override
+    {
+        if (as<IRUniformParameterGroupType>(type))
+        {
+            return AddressSpace::Uniform;
+        }
+        if (as<IRByteAddressBufferTypeBase>(type))
+        {
+            return AddressSpace::Global;
+        }
+        if (as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            return AddressSpace::Global;
+        }
+        if (as<IRGLSLShaderStorageBufferType>(type))
+        {
+            return AddressSpace::Global;
+        }
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (ptrType->hasAddressSpace())
+                return ptrType->getAddressSpace();
+            return AddressSpace::Generic;
+        }
+        return AddressSpace::Generic;
+    }
+
+    virtual AddressSpace getLeafInstAddressSpace(IRInst* inst) override
+    {
+        if (as<IRGroupSharedRate>(inst->getRate()))
+            return AddressSpace::GroupShared;
+        switch (inst->getOp())
+        {
+        case kIROp_RWStructuredBufferGetElementPtr:
+            return AddressSpace::Global;
+        case kIROp_Var:
+            if (as<IRBlock>(inst->getParent()))
+                return AddressSpace::Function;
+            else
+                return AddressSpace::ThreadLocal;
+            break;
+        default:
+            break;
+        }
+        auto type = unwrapAttributedType(inst->getDataType());
+        if (!type)
+            return AddressSpace::Generic;
+        return getAddressSpaceFromVarType(type);
+    }
+};
+
+void specializeAddressSpaceForWGSL(IRModule* module)
+{
+    WGSLAddressSpaceAssigner wgslAddressSpaceAssigner;
+    specializeAddressSpace(module, &wgslAddressSpaceAssigner);
 }
 
 } // namespace Slang

@@ -112,13 +112,13 @@ function(set_default_compile_options target)
             -Wno-invalid-offsetof
             -Wno-newline-eof
             -Wno-return-std-move
+            # Allow unused variables with a pattern of `if (auto v = as<...>(...))`.
+            # This pattern is very common in Slang code base.
+            -Wno-unused-but-set-variable
             # Allowed warnings:
             # If a function returns an address/reference to a local, we want it to
             # produce an error, because it probably means something very bad.
             -Werror=return-local-addr
-            # Allow unused variables with a pattern of `if (auto v = as<...>(...))`.
-            # This pattern is very common in Slang code base.
-            -Wno-error=unused-but-set-variable
             # Some warnings which are on by default in MSVC
             -Wnarrowing
         )
@@ -135,7 +135,6 @@ function(set_default_compile_options target)
                 -Wno-sign-compare
                 -Wno-unused-function
                 -Wno-unused-value
-                -Wno-unused-but-set-variable
                 -Wno-implicit-fallthrough
                 -Wno-missing-field-initializers
                 -Wno-strict-aliasing
@@ -228,5 +227,21 @@ function(set_default_compile_options target)
             /INCREMENTAL:NO
             -fsanitize=address
         )
+    endif()
+
+    if(SLANG_ENABLE_COVERAGE)
+        # Coverage instrumentation for Clang/GCC
+        # Both flags must be used together for source mapping to work
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(
+                ${target}
+                PRIVATE -fprofile-instr-generate -fcoverage-mapping
+            )
+            target_link_options(
+                ${target}
+                BEFORE
+                PUBLIC -fprofile-instr-generate
+            )
+        endif()
     endif()
 endfunction()

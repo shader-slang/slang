@@ -20,7 +20,6 @@ namespace SLANG_PRELUDE_NAMESPACE
 #define SLANG_PRELUDE_PI 3.14159265358979323846
 #endif
 
-
 union Union32
 {
     uint32_t u;
@@ -61,94 +60,6 @@ SLANG_FORCE_INLINE float _bitCastUIntToFloat(uint32_t ui)
     return u.f;
 }
 
-// ----------------------------- F16 -----------------------------------------
-
-
-// This impl is based on FloatToHalf that is in Slang codebase
-SLANG_FORCE_INLINE uint32_t f32tof16(const float value)
-{
-    const uint32_t inBits = _bitCastFloatToUInt(value);
-
-    // bits initially set to just the sign bit
-    uint32_t bits = (inBits >> 16) & 0x8000;
-    // Mantissa can't be used as is, as it holds last bit, for rounding.
-    uint32_t m = (inBits >> 12) & 0x07ff;
-    uint32_t e = (inBits >> 23) & 0xff;
-
-    if (e < 103)
-    {
-        // It's zero
-        return bits;
-    }
-    if (e == 0xff)
-    {
-        // Could be a NAN or INF. Is INF if *input* mantissa is 0.
-
-        // Remove last bit for rounding to make output mantissa.
-        m >>= 1;
-
-        // We *assume* float16/float32 signaling bit and remaining bits
-        // semantics are the same. (The signalling bit convention is target specific!).
-        // Non signal bit's usage within mantissa for a NAN are also target specific.
-
-        // If the m is 0, it could be because the result is INF, but it could also be because all
-        // the bits that made NAN were dropped as we have less mantissa bits in f16.
-
-        // To fix for this we make non zero if m is 0 and the input mantissa was not.
-        // This will (typically) produce a signalling NAN.
-        m += uint32_t(m == 0 && (inBits & 0x007fffffu));
-
-        // Combine for output
-        return (bits | 0x7c00u | m);
-    }
-    if (e > 142)
-    {
-        // INF.
-        return bits | 0x7c00u;
-    }
-    if (e < 113)
-    {
-        m |= 0x0800u;
-        bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
-        return bits;
-    }
-    bits |= ((e - 112) << 10) | (m >> 1);
-    bits += m & 1;
-    return bits;
-}
-
-static const float g_f16tof32Magic = _bitCastIntToFloat((127 + (127 - 15)) << 23);
-
-SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
-{
-    const uint32_t sign = (value & 0x8000) << 16;
-    uint32_t exponent = (value & 0x7c00) >> 10;
-    uint32_t mantissa = (value & 0x03ff);
-
-    if (exponent == 0)
-    {
-        // If mantissa is 0 we are done, as output is 0.
-        // If it's not zero we must have a denormal.
-        if (mantissa)
-        {
-            // We have a denormal so use the magic to do exponent adjust
-            return _bitCastIntToFloat(sign | ((value & 0x7fff) << 13)) * g_f16tof32Magic;
-        }
-    }
-    else
-    {
-        // If the exponent is NAN or INF exponent is 0x1f on input.
-        // If that's the case, we just need to set the exponent to 0xff on output
-        // and the mantissa can just stay the same. If its 0 it's INF, else it is NAN and we just
-        // copy the bits
-        //
-        // Else we need to correct the exponent in the normalized case.
-        exponent = (exponent == 0x1F) ? 0xff : (exponent + (-15 + 127));
-    }
-
-    return _bitCastUIntToFloat(sign | (exponent << 23) | (mantissa << 13));
-}
-
 // ----------------------------- F32 -----------------------------------------
 
 // Helpers
@@ -171,6 +82,9 @@ float F32_atan(float f);
 float F32_sinh(float f);
 float F32_cosh(float f);
 float F32_tanh(float f);
+float F32_asinh(float f);
+float F32_acosh(float f);
+float F32_atanh(float f);
 float F32_log2(float f);
 float F32_log(float f);
 float F32_log10(float f);
@@ -377,9 +291,9 @@ SLANG_FORCE_INLINE float F32_rsqrt(float f)
 {
     return 1.0f / F32_sqrt(f);
 }
-SLANG_FORCE_INLINE float F32_sign(float f)
+SLANG_FORCE_INLINE int F32_sign(float f)
 {
-    return (f == 0.0f) ? f : ((f < 0.0f) ? -1.0f : 1.0f);
+    return (f == 0.0f) ? 0 : ((f < 0.0f) ? -1 : 1);
 }
 SLANG_FORCE_INLINE float F32_frac(float f)
 {
@@ -420,6 +334,9 @@ double F64_atan(double f);
 double F64_sinh(double f);
 double F64_cosh(double f);
 double F64_tanh(double f);
+double F64_asinh(double f);
+double F64_acosh(double f);
+double F64_atanh(double f);
 double F64_log2(double f);
 double F64_log(double f);
 double F64_log10(double f);
@@ -605,9 +522,9 @@ SLANG_FORCE_INLINE double F64_rsqrt(double f)
 {
     return 1.0 / F64_sqrt(f);
 }
-SLANG_FORCE_INLINE double F64_sign(double f)
+SLANG_FORCE_INLINE int F64_sign(double f)
 {
-    return (f == 0.0) ? f : ((f < 0.0) ? -1.0 : 1.0);
+    return (f == 0.0) ? 0 : ((f < 0.0) ? -1 : 1);
 }
 SLANG_FORCE_INLINE double F64_frac(double f)
 {
@@ -640,6 +557,403 @@ SLANG_FORCE_INLINE double F64_calcSafeRadians(double radians)
     return (a * (SLANG_PRELUDE_PI * 2));
 }
 
+// ----------------------------- F16 -----------------------------------------
+
+// This impl is based on FloatToHalf that is in Slang codebase
+SLANG_FORCE_INLINE uint32_t f32tof16(const float value)
+{
+    const uint32_t inBits = _bitCastFloatToUInt(value);
+
+    // bits initially set to just the sign bit
+    uint32_t bits = (inBits >> 16) & 0x8000;
+    // Mantissa can't be used as is, as it holds last bit, for rounding.
+    uint32_t m = (inBits >> 12) & 0x07ff;
+    uint32_t e = (inBits >> 23) & 0xff;
+
+    if (e < 103)
+    {
+        // It's zero
+        return bits;
+    }
+    if (e == 0xff)
+    {
+        // Could be a NAN or INF. Is INF if *input* mantissa is 0.
+
+        // Remove last bit for rounding to make output mantissa.
+        m >>= 1;
+
+        // We *assume* float16/float32 signaling bit and remaining bits
+        // semantics are the same. (The signalling bit convention is target specific!).
+        // Non signal bit's usage within mantissa for a NAN are also target specific.
+
+        // If the m is 0, it could be because the result is INF, but it could also be because all
+        // the bits that made NAN were dropped as we have less mantissa bits in f16.
+
+        // To fix for this we make non zero if m is 0 and the input mantissa was not.
+        // This will (typically) produce a signalling NAN.
+        m += uint32_t(m == 0 && (inBits & 0x007fffffu));
+
+        // Combine for output
+        return (bits | 0x7c00u | m);
+    }
+    if (e > 142)
+    {
+        // INF.
+        return bits | 0x7c00u;
+    }
+    if (e < 113)
+    {
+        m |= 0x0800u;
+        bits |= (m >> (114 - e)) + ((m >> (113 - e)) & 1);
+        return bits;
+    }
+    bits |= ((e - 112) << 10) | (m >> 1);
+    bits += m & 1;
+    return bits;
+}
+
+static const float g_f16tof32Magic = _bitCastIntToFloat((127 + (127 - 15)) << 23);
+
+SLANG_FORCE_INLINE float f16tof32(const uint32_t value)
+{
+    const uint32_t sign = (value & 0x8000) << 16;
+    uint32_t exponent = (value & 0x7c00) >> 10;
+    uint32_t mantissa = (value & 0x03ff);
+
+    if (exponent == 0)
+    {
+        // If mantissa is 0 we are done, as output is 0.
+        // If it's not zero we must have a denormal.
+        if (mantissa)
+        {
+            // We have a denormal so use the magic to do exponent adjust
+            return _bitCastIntToFloat(sign | ((value & 0x7fff) << 13)) * g_f16tof32Magic;
+        }
+    }
+    else
+    {
+        // If the exponent is NAN or INF exponent is 0x1f on input.
+        // If that's the case, we just need to set the exponent to 0xff on output
+        // and the mantissa can just stay the same. If its 0 it's INF, else it is NAN and we just
+        // copy the bits
+        //
+        // Else we need to correct the exponent in the normalized case.
+        exponent = (exponent == 0x1F) ? 0xff : (exponent + (-15 + 127));
+    }
+
+    return _bitCastUIntToFloat(sign | (exponent << 23) | (mantissa << 13));
+}
+
+#ifndef SLANG_LLVM
+#if __cplusplus >= 202302L
+#include <stdfloat> // C++23
+#else
+// Define __STDC_WANT_IEC_60559_TYPES_EXT__ for compilers with reliable _Float16 support:
+// - Clang 15+
+// - GCC 12+
+#if (defined(__clang__) && __clang_major__ >= 15) || (defined(__GNUC__) && __GNUC__ >= 12)
+#ifndef __STDC_WANT_IEC_60559_TYPES_EXT__
+#define __STDC_WANT_IEC_60559_TYPES_EXT__
+#endif
+#include <float.h>
+#endif // __STDC_WANT_IEC_60559_TYPES_EXT__
+#endif // (defined(__clang__) && __clang_major__ >= 15) || (defined(__GNUC__) && __GNUC__ >= 12)
+#endif // C++23
+
+#ifdef FLT16_MIN
+typedef _Float16 half;
+#elif __STDCPP_FLOAT16_T__ == 1
+typedef std::float16_t half;
+#else
+uint32_t f32tof16(const float value);
+float f16tof32(const uint32_t value);
+struct half
+{
+    uint16_t data;
+
+    half() = default;
+    explicit half(float f) { store(f); }
+
+    SLANG_FORCE_INLINE void store(float f) { data = f32tof16(f); }
+    SLANG_FORCE_INLINE float load() const { return f16tof32(data); }
+
+    half operator+(half other) const { return half(load() + other.load()); }
+    half operator-(half other) const { return half(load() - other.load()); }
+    half operator*(half other) const { return half(load() * other.load()); }
+    half operator/(half other) const { return half(load() / other.load()); }
+    half& operator+=(half other)
+    {
+        store(load() + other.load());
+        return *this;
+    }
+    half& operator-=(half other)
+    {
+        store(load() - other.load());
+        return *this;
+    }
+    half& operator*=(half other)
+    {
+        store(load() * other.load());
+        return *this;
+    }
+    half& operator/=(half other)
+    {
+        store(load() / other.load());
+        return *this;
+    }
+
+    bool operator<(half other) const { return load() < other.load(); }
+    bool operator>(half other) const { return load() > other.load(); }
+    bool operator<=(half other) const { return load() <= other.load(); }
+    bool operator>=(half other) const { return load() >= other.load(); }
+    bool operator==(half other) const { return load() == other.load(); }
+    bool operator!=(half other) const { return load() != other.load(); }
+
+    explicit operator float() const { return load(); }
+};
+#endif
+
+half U16_ashalf(uint16_t x);
+
+union Union16
+{
+    uint16_t u;
+    int16_t i;
+    half h;
+};
+
+SLANG_FORCE_INLINE uint16_t F16_asuint(half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.u;
+}
+
+SLANG_FORCE_INLINE int16_t F16_asint(half h)
+{
+    Union16 u;
+    u.h = h;
+    return u.i;
+}
+
+SLANG_FORCE_INLINE half F16_ceil(half f)
+{
+    return half(F32_ceil(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_floor(half f)
+{
+    return half(F32_floor(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_round(half f)
+{
+    return half(F32_round(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sin(half f)
+{
+    return half(F32_sin(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_cos(half f)
+{
+    return half(F32_cos(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_tan(half f)
+{
+    return half(F32_tan(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_asin(half f)
+{
+    return half(F32_asin(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_acos(half f)
+{
+    return half(F32_acos(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_atan(half f)
+{
+    return half(F32_atan(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sinh(half f)
+{
+    return half(F32_sinh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_cosh(half f)
+{
+    return half(F32_cosh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_tanh(half f)
+{
+    return half(F32_tanh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_asinh(half f)
+{
+    return half(F32_asinh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_acosh(half f)
+{
+    return half(F32_acosh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_atanh(half f)
+{
+    return half(F32_atanh(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log2(half f)
+{
+    return half(F32_log2(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log(half f)
+{
+    return half(F32_log(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_log10(half f)
+{
+    return half(F32_log10(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_exp2(half f)
+{
+    return half(F32_exp2(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_exp(half f)
+{
+    return half(F32_exp(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_abs(half f)
+{
+    return U16_ashalf(F16_asuint(f) & 0x7FFF);
+}
+
+SLANG_FORCE_INLINE half F16_trunc(half f)
+{
+    return half(F32_trunc(float(f)));
+}
+
+SLANG_FORCE_INLINE half F16_sqrt(half f)
+{
+    return half(F32_sqrt(float(f)));
+}
+
+SLANG_FORCE_INLINE bool F16_isnan(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u & 0x7C00) == 0x7C00 && (u & 0x3FF) != 0;
+}
+
+SLANG_FORCE_INLINE bool F16_isfinite(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u & 0x7C00) != 0x7C00;
+}
+
+SLANG_FORCE_INLINE bool F16_isinf(half f)
+{
+    uint16_t u = F16_asuint(f);
+    return (u & 0x7C00) == 0x7C00 && (u & 0x3FF) == 0;
+}
+
+SLANG_FORCE_INLINE half F16_min(half a, half b)
+{
+    if (F16_isnan(a))
+        return b;
+    if (F16_isnan(b))
+        return a;
+    return a < b ? a : b;
+}
+
+SLANG_FORCE_INLINE half F16_max(half a, half b)
+{
+    if (F16_isnan(a))
+        return b;
+    if (F16_isnan(b))
+        return a;
+    return a > b ? a : b;
+}
+
+SLANG_FORCE_INLINE half F16_pow(half a, half b)
+{
+    return half(F32_pow(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_fmod(half a, half b)
+{
+    return half(F32_fmod(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_remainder(half a, half b)
+{
+    return half(F32_remainder(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_atan2(half a, half b)
+{
+    return half(F32_atan2(float(a), float(b)));
+}
+
+SLANG_FORCE_INLINE half F16_frexp(half x, int* e)
+{
+    return half(F32_frexp(float(x), e));
+}
+
+SLANG_FORCE_INLINE half F16_modf(half x, half* ip)
+{
+    float ipf;
+    float res = F32_modf(float(x), &ipf);
+    *ip = half(ipf);
+    return half(res);
+}
+
+SLANG_FORCE_INLINE half F16_fma(half a, half b, half c)
+{
+    return half(F32_fma(float(a), float(b), float(c)));
+}
+
+SLANG_FORCE_INLINE half F16_calcSafeRadians(half radians)
+{
+    // Put 0 to 2pi cycles to cycle around 0 to 1
+    float a = float(radians) * (1.0f / float(SLANG_PRELUDE_PI * 2));
+    // Get truncated fraction, as value in  0 - 1 range
+    a = a - F32_floor(a);
+    // Convert back to 0 - 2pi range
+    return half(a * float(SLANG_PRELUDE_PI * 2));
+}
+
+SLANG_FORCE_INLINE half F16_rsqrt(half f)
+{
+    return half(1.0f / F32_sqrt(float(f)));
+}
+
+SLANG_FORCE_INLINE int F16_sign(half f)
+{
+    uint16_t u = F16_asuint(f);
+    if ((u & 0x7FFF) == 0)
+        return 0;
+    return (u & 0x8000) != 0 ? -1 : 1;
+}
+
+SLANG_FORCE_INLINE half F16_frac(half h)
+{
+    float f = float(h);
+    return half(f - F32_floor(f));
+}
+
 // ----------------------------- U16 -----------------------------------------
 SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
 {
@@ -656,6 +970,13 @@ SLANG_FORCE_INLINE uint32_t U16_countbits(uint16_t v)
     }
     return c;
 #endif
+}
+
+SLANG_FORCE_INLINE half U16_ashalf(uint16_t x)
+{
+    Union16 u;
+    u.u = x;
+    return u.h;
 }
 
 // ----------------------------- I16 -----------------------------------------
