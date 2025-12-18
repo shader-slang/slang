@@ -4798,7 +4798,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass);
+        SLANG_ASSERT(syntaxClass);
     }
     else
     {
@@ -8255,7 +8255,7 @@ static Expr* parsePostfixExpr(Parser* parser)
     }
 }
 
-static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+static IntegerLiteralValue _foldIntegerPrefixOp(TokenType tokenType, IntegerLiteralValue value)
 {
     switch (tokenType)
     {
@@ -8264,7 +8264,15 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        return -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8492,7 +8500,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
@@ -8588,7 +8596,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
+        ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -8758,7 +8766,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                 // Need to get the basic type, so we can fit to underlying type
                 if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))

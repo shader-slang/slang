@@ -289,6 +289,12 @@ advanced_option(
     OFF
 )
 
+advanced_option(
+    SLANG_PROTOTYPE_DIAGNOSTICS
+    "Enable prototype rich diagnostic formatting system"
+    OFF
+)
+
 enum_option(
     SLANG_LIB_TYPE
     # Default
