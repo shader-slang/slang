@@ -4415,6 +4415,20 @@ warning(
 )
 
 err(
+    "attempt-to-read-from-mesh-shader-output",
+    54005,
+    "cannot read values from mesh shader outputs",
+    span { loc = "inst:IRInst", message = "Cannot read values from mesh shader outputs" }
+)
+
+err(
+    "invalid-parameter-passing-mode-for-write-only-reference",
+    54006,
+    "Invalid parameter passing mode for argument which is write-only.",
+    span { loc = "location", message = "Paramater passing mode requires a read from this value." }
+)
+
+err(
     "invalid-torch-kernel-return-type",
     55101,
     "invalid pytorch kernel return type",

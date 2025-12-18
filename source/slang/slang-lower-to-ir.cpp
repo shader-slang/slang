@@ -24,6 +24,7 @@
 #include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
+#include "slang-ir-mesh-output-reads.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-operator-shift-overflow.h"
@@ -2992,7 +2993,25 @@ void addArg(
             //
             if (paramPassingMode != ParamPassingMode::Out)
             {
-                assign(context, tempVar, argVal);
+                // This parameter passing mode requires that we're able to read
+                // from argVal. If we can't (which we determine by checking if
+                // there are no getters), then issue an error.
+                if (argVal.flavor == LoweredValInfo::Flavor::BoundStorage &&
+                    getMembersOfType<GetterDecl>(
+                        context->astBuilder,
+                        argVal.getBoundStorageInfo()->declRef,
+                        MemberFilterStyle::Instance)
+                        .isEmpty())
+                {
+                    context->getSink()->diagnose(
+                        Diagnostics::InvalidParameterPassingModeForWriteOnlyReference{
+                            .location = loc});
+                    return;
+                }
+                else
+                {
+                    assign(context, tempVar, argVal);
+                }
             }
 
             // We can pass the address of the temporary variable directly
@@ -13226,6 +13245,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // We do not allow specializing a generic function with an existential type.
             addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
+
+        // Reading from mesh shader outputs is not allowed.
+        checkForMeshOutputReads(module, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the
