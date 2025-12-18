@@ -48,6 +48,46 @@ String _getMessage(SignalType type, char const* message)
     return buf.produceString();
 }
 
+// Special handler for assertions that can optionally return based on environment variable
+void handleAssert(char const* message)
+{
+#if _WIN32 && defined(_MSC_VER)
+    StringBuilder envValue;
+    if (SLANG_SUCCEEDED(
+            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
+    {
+        UnownedStringSlice envSlice = envValue.getUnownedSlice();
+        if (envSlice.caseInsensitiveEquals(
+                UnownedStringSlice::fromLiteral("release-asserts-only")) ||
+            envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("release-assert-only")))
+        {
+            // Ignore the assert and continue execution.
+            // This is to mimic the behavior of Release build with Debug build.
+            return;
+        }
+        else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
+        {
+            assert(!"SLANG_ASSERT triggered");
+        }
+        else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("debugbreak")))
+        {
+            if (IsDebuggerPresent())
+            {
+                SLANG_BREAKPOINT(0);
+            }
+            else
+            {
+                // Fallback when no debugger is attached
+                assert(!"SLANG_ASSERT triggered (no debugger attached)");
+            }
+        }
+    }
+#endif
+
+    // Default behavior: delegate to handleSignal
+    handleSignal(SignalType::AssertFailure, message);
+}
+
 // One point of having as a single function is a choke point both for handling (allowing different
 // handling scenarios) as well as a choke point to set a breakpoint to catch 'signal' types
 [[noreturn]] void handleSignal(SignalType type, char const* message)
@@ -63,34 +103,6 @@ String _getMessage(SignalType type, char const* message)
     {
         printf("%s\n", g_lastSignalMessage.getBuffer());
     }
-
-#if _WIN32 && defined(_MSC_VER)
-    if (type == SignalType::AssertFailure)
-    {
-        StringBuilder envValue;
-        if (SLANG_SUCCEEDED(
-                PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
-        {
-            UnownedStringSlice envSlice = envValue.getUnownedSlice();
-            if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
-            {
-                assert(!"SLANG_ASSERT triggered");
-            }
-            else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("debugbreak")))
-            {
-                if (IsDebuggerPresent())
-                {
-                    __debugbreak();
-                }
-                else
-                {
-                    // Fallback when no debugger is attached
-                    assert(!"SLANG_ASSERT triggered (no debugger attached)");
-                }
-            }
-        }
-    }
-#endif
 
 #if SLANG_HAS_EXCEPTIONS
     switch (type)
