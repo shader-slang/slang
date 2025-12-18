@@ -157,7 +157,6 @@ jobs:
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-ignore-abort-msg"
-            "-enable-debug-layers" "true"
           )
 
           # Add test server arguments if server count > 1
