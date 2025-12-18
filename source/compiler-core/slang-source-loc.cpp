@@ -623,14 +623,26 @@ void SourceFile::setContents(ISlangBlob* blob)
     size_t offset;
     auto type = CharEncoding::determineEncoding(rawContentBegin, rawContentSize, offset);
     SLANG_ASSERT(rawContentSize >= offset);
+    
+    if (0 == offset && CharEncodeType::UTF8 == type)
+    {
+        // Fast-path: If the input is UTF-8 without a BOM, we can use it directly.
+        m_contentBlob = blob;
+    }
+    else
+    {
+        // Slow path: Allocate and decode a new buffer for the data, then move that into m_contentBlob.
+        List<char> decodedBuffer;
+        CharEncoding::getEncoding(type)->decode(
+            rawContentBegin + offset,
+            int(rawContentSize - offset),
+            decodedBuffer);
 
-    List<char> decodedBuffer;
-    CharEncoding::getEncoding(type)->decode(
-        rawContentBegin + offset,
-        int(rawContentSize - offset),
-        decodedBuffer);
-
-    m_contentBlob = RawBlob::create(decodedBuffer.getBuffer(), decodedBuffer.getCount());
+        auto size = decodedBuffer.getCount();
+        ScopedAllocation temp;
+        temp.attach(decodedBuffer.detachBuffer(), size);
+        m_contentBlob = RawBlob::moveCreate(temp);
+    }
 
     char const* decodedContentBegin = (char const*)m_contentBlob->getBufferPointer();
     const UInt decodedContentSize = m_contentBlob->getBufferSize();
