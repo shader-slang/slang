@@ -66,7 +66,7 @@ bool testReadWriteOfObjects(){
         && testPayloadReadWrite()
         && testAttributeReadWrite()
         && testCallableReadWrite();
-        ;       
+        ;
 }
 
 void main()
