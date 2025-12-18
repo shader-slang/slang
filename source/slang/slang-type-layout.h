@@ -1571,7 +1571,7 @@ struct TypeLayoutContext
     TypeLayoutContext withSpecializationArgsOffsetBy(Int offset) const
     {
         TypeLayoutContext result = *this;
-        if (offset < specializationArgCount)
+        if (offset >= 0 && offset < specializationArgCount)
         {
             result.specializationArgCount = specializationArgCount - offset;
             result.specializationArgs = specializationArgs + offset;

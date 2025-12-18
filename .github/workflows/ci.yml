@@ -146,6 +146,7 @@ jobs:
       config: debug
       runs-on: '["macos-latest"]'
       test-category: smoke
+      full-gpu-tests: true
       server-count: 3
 
   test-macos-release-clang-aarch64:
