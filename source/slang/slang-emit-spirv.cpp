@@ -9645,7 +9645,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             }
                         });
                 
-                    // Check if this is an OpImageGather with Offset operand that requires ImageGatherExtended capability
+                    // Check if this is an OpImageGather with Offset operand.
+                    // For constant offsets, the emitter converts Offset to ConstOffset (no capability needed).
+                    // For non-constant offsets, we need to add ImageGatherExtended capability.
                     if (opcode == SpvOpImageGather || opcode == SpvOpImageDrefGather)
                     {
                         // Find the image operands mask and check if it uses Offset
@@ -9686,17 +9688,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         // Only require the capability if we found Offset and the operand is NOT a constant
                         if (foundOffsetMask && offsetOperand)
                         {
-                            // Check if the offset is a constant (OpConstant or OpConstantComposite)
-                            bool isConstant = (offsetOperand->getOp() == kIROp_IntLit ||
-                                             offsetOperand->getOp() == kIROp_FloatLit ||
-                                             offsetOperand->getOp() == kIROp_BoolLit ||
-                                             offsetOperand->getOp() == kIROp_MakeVector ||
-                                             offsetOperand->getOp() == kIROp_MakeArray ||
-                                             offsetOperand->getOp() == kIROp_MakeStruct);
+                            // Helper lambda to recursively check if an IR instruction is a compile-time constant
+                            std::function<bool(IRInst*)> isIRConstant = [&](IRInst* inst) -> bool {
+                                if (!inst) return false;
+                                
+                                switch (inst->getOp())
+                                {
+                                case kIROp_IntLit:
+                                case kIROp_FloatLit:
+                                case kIROp_BoolLit:
+                                case kIROp_StringLit:
+                                    return true;
+                                    
+                                case kIROp_MakeVector:
+                                case kIROp_MakeArray:
+                                case kIROp_MakeStruct:
+                                case kIROp_MakeMatrix:
+                                    // Check if all operands are constant
+                                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                                    {
+                                        if (!isIRConstant(inst->getOperand(i)))
+                                            return false;
+                                    }
+                                    return true;
+                                    
+                                default:
+                                    return false;
+                                }
+                            };
                             
                             // If it's NOT a constant, we need ImageGatherExtended
                             // If it IS a constant, the emitter will convert Offset to ConstOffset automatically
-                            if (!isConstant)
+                            if (!isIRConstant(offsetOperand))
                             {
                                 requireSPIRVCapability(SpvCapabilityImageGatherExtended);
                             }
