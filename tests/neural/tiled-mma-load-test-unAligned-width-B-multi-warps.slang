@@ -1,4 +1,4 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=64
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTHREAD_COUNT=64
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTHREAD_COUNT=64
 
 import neural;
@@ -91,7 +91,7 @@ void invalidateSharedMemory(uint tid, SPtr shmPtr)
     GroupMemoryBarrierWithWaveSync();
 }
 
-void testLoadShB(uint tid, uint tileIndex)
+void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
 {
     half inputVector[InputSize];
     float value = tid * 32;
@@ -103,7 +103,7 @@ void testLoadShB(uint tid, uint tileIndex)
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
 
     uint subgroupIndex = tid / 32;
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -202,7 +202,15 @@ void Test(uint tid, uint tileIndex, int resIndex)
     invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
 
     // Each warp will load its own tile.
-    testLoadShB(tid, tileIndex);
+    __target_switch
+    {
+    case cuda:
+        testLoadShB<TargetEnum.CUDA>(tid, tileIndex);
+        break;
+    case spirv:
+        testLoadShB<TargetEnum.SPIR_V>(tid, tileIndex);
+        break;
+    }
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 
     uint subgroupIndex = tid / 32;

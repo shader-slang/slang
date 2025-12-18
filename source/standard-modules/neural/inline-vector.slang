@@ -22,8 +22,6 @@ public struct InlineVector<T, int N> : IVector<T, N>
     /// The compile-time size of the vector.
     public static const int Size = N;
 
-    internal typealias InternalDataType = T[N];
-
     public int getCount() {return N;}
     /**
     Internal storage for vector elements.
@@ -75,8 +73,6 @@ public struct InlineVector<T, int N> : IVector<T, N>
         get() { return this.data[index]; }
         set() { this.data[index] = newValue; }
     }
-
-    internal InternalDataType getInternalData() { return this.data; }
 
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]

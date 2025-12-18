@@ -89,7 +89,7 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
     }
 }
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize>(uint tid)
+half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<half>;
     Storage storage = Storage(inputBuffer);
@@ -97,7 +97,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>.Uint4AlignedK] t
     // Construct the input vector as follow:
     // x = tid + 1
     // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, true>;
+    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, true>;
     const int OutSize = MMA.Uint4AlignedK;
     const int InSize = MMA.Uint4AlignedM;
     half inputVector[InSize];
@@ -177,7 +177,16 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     const int COL = InputSize;
     const int ROW = OutputSize;
 
-    let outputVector = testMatTransposeVecMul<InputSize, OutputSize>(tid);
+    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] outputVector;
+    __target_switch
+    {
+    case cuda:
+        outputVector = testMatTransposeVecMul<InputSize, OutputSize, TargetEnum.CUDA>(tid);
+        break;
+    case spirv:
+        outputVector = testMatTransposeVecMul<InputSize, OutputSize, TargetEnum.SPIR_V>(tid);
+        break;
+    }
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;

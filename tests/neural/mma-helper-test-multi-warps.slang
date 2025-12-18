@@ -72,15 +72,16 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
     }
 }
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize>(uint tid)
+half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<half>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    const int InSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    const int OutSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM;
+    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>;
+    const int InSize = MMA.Uint4AlignedK;
+    const int OutSize = MMA.Uint4AlignedM;
     half inputVector[InSize];
     for (int i = 0; i < InputSize; i++)
     {
@@ -93,9 +94,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedM] testMat
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMAHelper<half, InputSize, OutputSize, SubgroupSize, false
-                        >.mma<half, Storage, half[InSize], half[OutSize]
-                             >(inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrB, 16);
     return res;
 }
@@ -136,7 +135,16 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    let outputVector = testMatVecMul<InputSize, OutputSize>(tid);
+    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    __target_switch
+    {
+    case cuda:
+        outputVector = testMatVecMul<InputSize, OutputSize, TargetEnum.CUDA>(tid);
+        break;
+    case spirv:
+        outputVector = testMatVecMul<InputSize, OutputSize, TargetEnum.SPIR_V>(tid);
+        break;
+    }
 
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
