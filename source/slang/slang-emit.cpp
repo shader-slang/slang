@@ -1032,7 +1032,7 @@ Result linkAndOptimizeIR(
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
-        SLANG_PASS(lowerResultType, sink);
+        SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
@@ -1166,7 +1166,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerTuples, sink);
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.

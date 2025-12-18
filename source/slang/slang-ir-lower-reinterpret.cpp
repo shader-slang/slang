@@ -60,7 +60,7 @@ struct ReinterpretLoweringContext
         auto operand = inst->getOperand(0);
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
-        SlangInt fromTypeSize = getAnyValueSize(fromType);
+        SlangInt fromTypeSize = getAnyValueSize(targetProgram->getOptionSet(), fromType);
         if (fromTypeSize < 0)
         {
             sink->diagnose(
@@ -68,7 +68,7 @@ struct ReinterpretLoweringContext
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
                 fromType);
         }
-        SlangInt toTypeSize = getAnyValueSize(toType);
+        SlangInt toTypeSize = getAnyValueSize(targetProgram->getOptionSet(), toType);
         if (toTypeSize < 0)
         {
             sink->diagnose(
