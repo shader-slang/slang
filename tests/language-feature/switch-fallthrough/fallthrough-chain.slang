@@ -5,10 +5,10 @@
 //
 // This is currently NOT supported in Slang but is planned for implementation.
 
-// DISABLED until true fall-through is implemented
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+// Enable tests
+//TEST(compute):COMPARE_COMPUTE: -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

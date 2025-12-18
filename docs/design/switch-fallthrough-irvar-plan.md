@@ -1,6 +1,6 @@
 # Implementation Plan: Lower to IRVar for Fall-Through Cases
 
-## Status: In Progress
+## Status: Implemented
 
 ## Overview
 
@@ -16,8 +16,8 @@ When lowering a `switch` statement, detect variables that are used in case block
 - [x] Phase 4: Add NoSSAPromotionDecoration to IR instruction set
 - [x] Phase 5: Make SSA pass respect NoSSAPromotionDecoration
 - [x] Phase 6: Decorate IRVars affected by fall-through during lowering
-- [ ] Phase 7: Modify restructure pass to preserve fall-through structure
-- [ ] Phase 8: Verify tests pass
+- [x] Phase 7: Modify restructure pass to preserve fall-through structure
+- [x] Phase 8: Verify tests pass (6 tests passing)
 
 ---
 

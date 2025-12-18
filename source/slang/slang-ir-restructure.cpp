@@ -560,6 +560,13 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     {
                         caseEndLabel = switchInst->getCaseLabel(caseIndex);
                     }
+                    else if (!defaultLabelHandled && defaultLabel != breakLabel)
+                    {
+                        // If there's no next explicit case, but there's a default
+                        // case that we haven't processed yet, set it as the end label.
+                        // This allows fall-through from the last explicit case to default.
+                        caseEndLabel = defaultLabel;
+                    }
 
                     // Now we can actually generate the region.
                     //
