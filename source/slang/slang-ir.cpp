@@ -8132,7 +8132,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
         auto newSetInst = builder.getSet(setInst->getOp(), elements);
         if (newSetInst != setInst)
         {
-            // setInst was improperly ordered, so we need to replace its uses.
+            // setInst was improperly ordered, so we need to replace its uses
             // and then delete it.
             //
             setInst->replaceUsesWith(newSetInst);
