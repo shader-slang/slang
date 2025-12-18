@@ -24,6 +24,7 @@
 #include "slang-ir-lower-defer.h"
 #include "slang-ir-lower-error-handling.h"
 #include "slang-ir-lower-expand-type.h"
+#include "slang-ir-mesh-output-reads.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-obfuscate-loc.h"
 #include "slang-ir-operator-shift-overflow.h"
@@ -13218,6 +13219,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // We do not allow specializing a generic function with an existential type.
             addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
+
+        // Reading from mesh shader outputs is not allowed.
+        checkForMeshOutputReads(module, compileRequest->getSink());
     }
 
     // The "mandatory" optimization passes may make use of the
