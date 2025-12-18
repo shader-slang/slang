@@ -76,14 +76,14 @@ groupshared uint4 s_sharedMemoryA[TileSize * 2];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-void testLoadShA<int M>(uint tid, uint tileIndex)
+void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
 {
     typealias Storage = StructuredBufferStorage<half>;
 
     Storage storage = Storage(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, M, SubgroupSize, true>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, M, SubgroupSize, Target, true>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -186,7 +186,15 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 void Test<int M>(uint tid, int tileIndex, int resIndex)
 {
     invalidateSharedMemory(tid, __getAddress(s_sharedMemoryA[0]));
-    testLoadShA<M>(tid, tileIndex);
+    __target_switch
+    {
+    case cuda:
+        testLoadShA<TargetEnum.CUDA, M>(tid, tileIndex);
+        break;
+    case spirv:
+        testLoadShA<TargetEnum.SPIR_V, M>(tid, tileIndex);
+        break;
+    }
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
     bool res = verifiedOutput<M>(tid, M, __getAddress(s_sharedMemoryA[0]), tileIndex);

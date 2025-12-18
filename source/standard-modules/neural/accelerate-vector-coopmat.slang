@@ -22,46 +22,10 @@ internal interface CoopMatShape
     internal static const int SIZE_C;
 }
 
-// convenient extension to get the shape of the CoopMat A by just T.row and T.column
-internal extension<T> T : CoopMatShape
-    where T : __BuiltinFloatingPointType
+VISIBILITY_LEVEL enum TargetEnum: uint32_t
 {
-    internal static const int ROW_A = ShapeSelector<T>()[0];    // M
-    internal static const int COLUMN_A = ShapeSelector<T>()[2]; // K
-
-    internal static const int ROW_B = ShapeSelector<T>()[2];    // K
-    internal static const int COLUMN_B = ShapeSelector<T>()[1]; // N
-
-    internal static const int ROW_C = ROW_A;
-    internal static const int COLUMN_C = COLUMN_B;
-
-    internal static const int SIZE_A = ROW_A * COLUMN_A;
-    internal static const int SIZE_B = ROW_B * COLUMN_B;
-    internal static const int SIZE_C = ROW_A * COLUMN_B;
-}
-
-// We will fix the cooperative matrix shape for matrix A, so if the data type is half, we will use 16x16.
-// If the data type is int8/uint8, we will use 16x16 for CUDA and 16x32 for Vulkan.
-[ForceInline]
-internal int[3] ShapeSelector<T:__BuiltinFloatingPointType>()
-{
-    if (sizeof(T) == 2)
-        return {16, 16, 16};
-    else if (sizeof(T) == 1)
-    {
-        __target_switch
-        {
-        case cuda:
-            return {16, 16, 16};
-        case spirv:
-            return {16, 32, 16};
-        }
-    }
-    else
-    {
-        static_assert(false, "Only support half and int8/uint8 for matrix A/B");
-        return {0, 0};
-    }
+    CUDA = 0,
+    SPIR_V = 1,
 }
 
 [ForceInline]
@@ -115,10 +79,21 @@ internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
 //       so if we use it directly in our mma function, some of branches won't be eliminated during compile time.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize, int OutputSize, int SubgroupSize, bool TransposeA = false>
+VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, bool TransposeA = false>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
+    static const int T_ROW_A = 16;
+    static const int T_COLUMN_A = 16;
+    static const int T_ROW_B = T_COLUMN_A;
+    static const int T_COLUMN_B = (Target == TargetEnum.CUDA) ? 16 :
+                                    (sizeof(T) == 1 ? 32 : 16);
+    static const int T_ROW_C = T_ROW_A;
+    static const int T_COLUMN_C = T_COLUMN_B;
+
+    static const int T_SIZE_A = T_ROW_A * T_COLUMN_A;
+    static const int T_SIZE_B = T_ROW_B * T_COLUMN_B;
+    static const int T_SIZE_C = T_ROW_C * T_COLUMN_C;
 
     // Weight matrix is in shape of M x K
     // Input vector will be collected by each thread in a sub-group to form a matrix in shape of K x N
@@ -136,13 +111,13 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     static const bool IsAlignedVector = (K % ElementCountPerVector) == 0;
 
     // For the Tile A, how many cooperative matrices in a row
-    static const int NCoopMatRow = TransposeA ? (K + T.COLUMN_A - 1) / T.COLUMN_A :
-                                                (M + T.ROW_A - 1) / T.ROW_A;
+    static const int NCoopMatRow = TransposeA ? (K + T_COLUMN_A - 1) / T_COLUMN_A :
+                                                (M + T_ROW_A - 1) / T_ROW_A;
 
 
     // Notice that because of our specific workload, NTilesColumn is always warp-size (as long as it's more than half warp) or half warp (<= half warp).
     // For the Tile B, how many cooperative matrices in a column
-    static const int NCoopMatColumn = (N + T.COLUMN_B - 1) / T.COLUMN_B;
+    static const int NCoopMatColumn = (N + T_COLUMN_B - 1) / T_COLUMN_B;
 
     // Total number of cooperative matrices that consist the result of C = A * B
     static const int NCoopMat = NCoopMatRow * NCoopMatColumn;
@@ -157,7 +132,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     VISIBILITY_LEVEL static const int Uint4AlignedM = ((M + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
     // The height of tile A measure in T and uint4.
-    static const uint HeightInElementsTileA = NCoopMatRow * T.ROW_A;
+    static const uint HeightInElementsTileA = NCoopMatRow * T_ROW_A;
     static const uint HeightInVectorTileA = HeightInElementsTileA / ElementCountPerVector;
 
     // In order to achieve the high throughput, we will write data to shared memory in vectorized way.
@@ -165,23 +140,23 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // Since the size in bytes of the tile in one row is T.COLUMN * sizeof(T),
     // the number of vectorized columns in one row of cooperative matrix A is T.COLUMN * sizeof(T) / sizeof(uint4).
     // `1` means one element of uint4.
-    static const uint WidthInVectorTileA = T.COLUMN_A / ElementCountPerVector;
+    static const uint WidthInVectorTileA = T_COLUMN_A / ElementCountPerVector;
 
     // WidthInElementTileA is the number of elements in one row of the tile in original data type.
-    static const uint WidthInElementTileA = T.COLUMN_A;
+    static const uint WidthInElementTileA = T_COLUMN_A;
 
     // Similarly, the number of vectorized rows in one column of cooperative matrix B is T.ROW * sizeof(T) / sizeof(uint4).
     // `1` means one element of uint4
-    static const uint HeightInVectorTileB = T.ROW_B / ElementCountPerVector;
+    static const uint HeightInVectorTileB = T_ROW_B / ElementCountPerVector;
 
     // So HeightInElementTileB is the number of elements in one column of the tile, measured in T.
     static const uint HeightInElementTileB = HeightInVectorTileB * ElementCountPerVector;
 
     // The number of vectorized rows in one column of Cooperative matrix C.
-    static const uint HeightInVectorTileC = T.ROW_C / ElementCountPerVector;
+    static const uint HeightInVectorTileC = T_ROW_C / ElementCountPerVector;
 
     // The height of tile B measure in T and uint4.
-    static const int WidthInElementsTileB = NCoopMatColumn * T.COLUMN_B;
+    static const int WidthInElementsTileB = NCoopMatColumn * T_COLUMN_B;
     static const int WidthInVectorTileB = WidthInElementsTileB / ElementCountPerVector;
 
     // The aligned size of the shared memory for matrix A and B.
@@ -191,14 +166,13 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // Tile C = Tile_height of B * AlignedN
     // Note B and C are the same size because their widths are always the same as subGroupSize and
     // their heights are fixed determined by Cooperative matrix shape.
-    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatA = (HeightInElementsTileA * T.COLUMN_A) / ElementCountPerVector;
-    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatB = (T.ROW_B * WidthInElementsTileB) / ElementCountPerVector;
+    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatA = (HeightInElementsTileA * T_COLUMN_A) / ElementCountPerVector;
+    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatB = (T_ROW_B * WidthInElementsTileB) / ElementCountPerVector;
     static const uint SharedMemSizeInVectorMatC = SharedMemSizeInVectorMatB;
 
-    static const uint CoopMatASizeInVector = T.SIZE_A / ElementCountPerVector;
-    static const uint CoopMatBSizeInVector = T.SIZE_B / ElementCountPerVector;
-    static const uint CoopMatCSizeInVector = T.SIZE_C / ElementCountPerVector;
-
+    static const uint CoopMatASizeInVector = T_SIZE_A / ElementCountPerVector;
+    static const uint CoopMatBSizeInVector = T_SIZE_B / ElementCountPerVector;
+    static const uint CoopMatCSizeInVector = T_SIZE_C / ElementCountPerVector;
 
     // NumLoadsEachThreadMatA is the number of loads each thread needs to perform.
     // N is the number of active threads in the subgroup.
@@ -218,9 +192,9 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     static const uint OffsetPerThreadLoadMatA = N;
 
     // A/B can only be half, so we don't need to use generic parameter here.
-    typealias MatA = linalg.CoopMat< half, MemoryScope.Subgroup, T.ROW_A, T.COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
-    typealias MatB = linalg.CoopMat< half, MemoryScope.Subgroup, T.COLUMN_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
-    typealias MatC = linalg.CoopMat<T, MemoryScope.Subgroup, T.ROW_A, T.COLUMN_B, linalg.CoopMatMatrixUse.MatrixAccumulator>;
+    typealias MatA = linalg.CoopMat< half, MemoryScope.Subgroup, T_ROW_A, T_COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
+    typealias MatB = linalg.CoopMat< half, MemoryScope.Subgroup, T_COLUMN_A, T_COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
+    typealias MatC = linalg.CoopMat<T, MemoryScope.Subgroup, T_ROW_A, T_COLUMN_B, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
     static const bool EnableDoubleBuffer = false;
 
@@ -479,9 +453,9 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     }
 
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void sumReduce<int ROW, int COLUMN, int SIZE>(inout half matC[SIZE], in int subgroupId, SPtr<uint4> sharedMemoryB)
+    internal static void sumReduce<int ROW, int COLUMN>(inout half matC[ROW*COLUMN], in int subgroupId, SPtr<uint4> sharedMemoryB)
     {
-        for (int i = 0; i < SIZE; i++)
+        for (int i = 0; i < ROW * COLUMN; i++)
         {
             matC[i] = half(1);
         }
@@ -552,8 +526,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
         // Batch size is either CoopMatA row count or CoopMatB column count, they are the same.
         // static const int BatchSize = T.COLUMN_A;
-        static const int CoopMatCRows = M;    // T.ROW_A; // / T.ROW_A;
-        static const int CoopMatCColumns = N; // T.COLUMN_A; // / T.COLUMN_A;
+        static const int CoopMatCRows = (M + T_ROW_A - 1) / T_ROW_A;
+        static const int CoopMatCColumns = (K + T_COLUMN_A - 1) / T_COLUMN_A;
         static const int CoopMatCSize = CoopMatCRows * CoopMatCColumns;
         // static const int StrideInVectorTileB = CoopMatCColumns * T.COLUMN_B / ElementCountPerVector;
 
@@ -595,7 +569,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         // GroupMemoryBarrierWithGroupSync();
 
         // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
-        sumReduce<CoopMatCRows, CoopMatCColumns, CoopMatCSize>(matC, 0, sharedMemoryA);
+        sumReduce<CoopMatCRows, CoopMatCColumns>(matC, 0, sharedMemoryA);
 
         // if (subgroupIndex == 0)
         // {
@@ -660,9 +634,9 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             matC[i].fill(T(0.0f));
         }
 
-        for (int k = 0; k < SharedDimensionSize; k += T.COLUMN_A)
+        for (int k = 0; k < SharedDimensionSize; k += T_COLUMN_A)
         {
-            uint tileIndex = k / T.COLUMN_A;
+            uint tileIndex = k / T_COLUMN_A;
 
             if (EnableDoubleBuffer)
             {
@@ -703,7 +677,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 {
                     // Really be careful the stride of tile A in the transpose case. The tile is column major, and the cooperative matrix is stacked in columns of the tile.
                     // So the stride is actually the height the tile. The offset between two cooperative matrices is just height of the cooperative matrix.
-                    matA[i] = MatA.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(ptrA[bufferIndex] + i * T.ROW_A/ElementCountPerVector, HeightInVectorTileA);
+                    matA[i] = MatA.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(ptrA[bufferIndex] + i * T_ROW_A/ElementCountPerVector, HeightInVectorTileA);
                 }
                 else
                 {
@@ -720,7 +694,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 for (uint i = 0; i < NCoopMatRow; i ++)
                 {
                     matC[i * NCoopMatColumn + j] = linalg.coopMatMulAdd<T, false, half, half, T,
-                                            MemoryScope.Subgroup, T.ROW_A, T.COLUMN_A, T.COLUMN_B
+                                            MemoryScope.Subgroup, T_ROW_A, T_COLUMN_A, T_COLUMN_B
                                             >(matA[i], matB, matC[i * NCoopMatColumn + j]);
                 }
             }
@@ -737,7 +711,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         {
             for (int j = 0; j < NCoopMatColumn; j ++)
             {
-                matC[i * NCoopMatColumn + j].Store<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T.ROW_C/ElementCountPerVector);
+                matC[i * NCoopMatColumn + j].Store<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C/ElementCountPerVector);
             }
             // Store one row of tiled result matrix back to the thread-local vector.
             StoreSharedMemoryToLocalVector(ptrC, i, subgroupIndex, outputVector);
@@ -748,6 +722,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         return outputVector;
     }
 }
+
+
 
 // Cooperative matrix is only supported by CUDA and SPIR-V
 [require(cooperative_matrix, subgroup_basic)]
@@ -761,8 +737,8 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
 
     public no_diff SPtr<uint4> sharedMemoryPtr;
 
-    internal static const int Uint4AlignedInputSize = MMAHelper<T, N, 0, SubgroupSize>.Uint4AlignedK;
-    internal typealias InternalDataType = T[Uint4AlignedInputSize];
+    internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(T);
+    internal static const int Uint4AlignedInputSize = ((N + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
     // [DerivativeMember(Differential.data)]
     internal T[Uint4AlignedInputSize] data;
@@ -822,43 +798,35 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         set { data[index] = newValue; }
     }
 
-    internal InternalDataType getInternalData() { return this.data; }
-
-    // Linear transformation without bias
-    [Differentiable]
-    [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    private OutputVector linearTransformOnTarget<int OutputSize, Storage, OutputVector, TargetEnum Target>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+        where Storage : IStorage<T>
+        where Storage.Differential : IStorage<T.Differential>
+        where Storage.Address == Storage.Differential.Address
+        where OutputVector : IVector<T, OutputSize>
     {
-        typealias MMA = MMAHelper<T, N, OutputSize, SubgroupSize, false>;
+        typealias MMA = MMAHelper<T, N, OutputSize, SubgroupSize, Target, false>;
         SPtr<uint4> shA = sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
-
         const int AlignedOutSize = MMA.Uint4AlignedM;
-
-        let outputArray = no_diff MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>(data, shA, shB, shC, weightStorage, weightAddress);
+        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>( data, shA, shB, shC, weightStorage, weightAddress);
         return OutputVector(outputArray);
     }
 
-    // Backward of linear transformation without bias
-    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+    private static void linearTransformBwdOnTarget<int OutputSize, Storage, OutputVector, TargetEnum Target>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
         OutputVector.Differential doutput)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
-            where OutputVector.Differential : IVector<T.Differential, OutputSize>
+        where Storage : IStorage<T>
+        where Storage.Differential : IStorage<T.Differential>
+        where Storage.Address == Storage.Differential.Address
+        where OutputVector : IVector<T, OutputSize>
+        where OutputVector.Differential : IVector<T.Differential, OutputSize>
     {
-        typealias MMA = MMAHelper<T.Differential, N, OutputSize, SubgroupSize, true>;
+        typealias MMA = MMAHelper<T.Differential, N, OutputSize, SubgroupSize, Target, true>;
 
         SPtr<uint4> shA = dthis.p.sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
@@ -875,14 +843,55 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         // dIn = W^T * dOut;
 #if 1
         let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential
-                            >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 #else
         let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
-                            >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 #endif
+    }
+
+    // Linear transformation without bias
+    [Differentiable]
+    [BackwardDerivative(linearTransformBwd)]
+    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+        Storage weightStorage,
+        no_diff Storage.Address weightAddress)
+            where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
+            where OutputVector : IVector<T, OutputSize>
+    {
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<OutputSize, Storage, OutputVector, TargetEnum.CUDA>(weightStorage, weightAddress);
+        case spirv:
+            return no_diff linearTransformOnTarget<OutputSize, Storage, OutputVector, TargetEnum.SPIR_V>(weightStorage, weightAddress);
+        }
+    }
+
+    // Backward of linear transformation without bias
+    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Storage> dWeightStorage,
+        no_diff Storage.Address dWeightAddress,
+        OutputVector.Differential doutput)
+            where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
+            where OutputVector : IVector<T, OutputSize>
+            where OutputVector.Differential : IVector<T.Differential, OutputSize>
+    {
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<OutputSize, Storage, OutputVector, TargetEnum.CUDA>(dthis, dWeightStorage, dWeightAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<OutputSize, Storage, OutputVector, TargetEnum.SPIR_V>(dthis, dWeightStorage, dWeightAddress, doutput);
+        }
     }
 
     [Differentiable]

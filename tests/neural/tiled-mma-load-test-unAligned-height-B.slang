@@ -56,9 +56,9 @@ groupshared uint4 s_sharedMemoryB[32 * 2];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-void testLoadShB<int K>(uint tid, uint tileIndex)
+void testLoadShB<TargetEnum Target, int K>(uint tid, uint tileIndex)
 {
-    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize>.Uint4AlignedK] = {};
+    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target>.Uint4AlignedK] = {};
     for (int i = 0; i < K; i++)
     {
         inputVector[i] = half(tid * 32 + i);
@@ -66,7 +66,7 @@ void testLoadShB<int K>(uint tid, uint tileIndex)
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, K, OutputSize, SubgroupSize, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
+    MMAHelper<half, K, OutputSize, SubgroupSize, Target>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -139,7 +139,15 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 void Test<int K>(uint tid, uint tileIndex, int resIndex)
 {
     invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
-    testLoadShB<K>(tid, tileIndex);
+    __target_switch
+    {
+    case cuda:
+        testLoadShB<TargetEnum.CUDA, K>(tid, tileIndex);
+        break;
+    case spirv:
+        testLoadShB<TargetEnum.SPIR_V, K>(tid, tileIndex);
+        break;
+    }
     // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
 
     bool res = verifiedOutput<K>(tid, __getAddress(s_sharedMemoryB[0]), tileIndex);
