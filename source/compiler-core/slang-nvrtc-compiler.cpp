@@ -825,10 +825,10 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
             // Paths are expected to look like ".\OptiX SDK X.X.X"
             auto versionString = path.subString(path.lastIndexOf(' ') + 1, path.getLength());
 #else
-            // Paths are expected to look like "./NVIDIA-OptiX-SDK-X.X.X-suffix"
-            auto versionString = path.subString(0, path.lastIndexOf('-'));
-            versionString =
-                versionString.subString(path.lastIndexOf('-') + 1, versionString.getLength());
+            // Paths are expected to look like "NVIDIA-OptiX-SDK-X.X.X-suffix"
+            const UnownedStringSlice pathPrefix("NVIDIA-OptiX-SDK-");
+            auto versionString = path.tail(pathPrefix.getLength());
+            versionString = versionString.head(versionString.indexOf('-'));
 #endif
             if (SLANG_SUCCEEDED(SemanticVersion::parse(versionString, '.', optixPath.version)))
             {
