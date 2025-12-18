@@ -1,8 +1,6 @@
-//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
-//  This test requires ADCE for SPIRV optimization to produce expected output.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry entry_mesh
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry entry_mesh
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry entry_mesh
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry entry_mesh
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -entry entry_mesh
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry entry_mesh
 
 //CHECK_SPIRV: OpEntryPoint
 //CHECK_GLSL: void main()
@@ -67,6 +65,9 @@ void mesh_fn<V : VertexI, P : PrimitiveI>(
 
     if (tig < numPrimitives) {
         triangles[tig] = uint3(0, 1, 2);
+        // This is an error now: the parameter passing mode used here would require a read from
+        // primitives[] into a temporary variable, and we can't simply skip that read.
+        // CHECK: ([[# @LINE+1]]): error 54006:
         primitives[tig].set_tint(float3(1, 0, 0));
     }
 }
