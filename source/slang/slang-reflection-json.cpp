@@ -1042,7 +1042,10 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
         emitReflectionNameInfoJSON(writer, name);
     }
 
-    emitReflectionModifierInfoJSON(writer, param->getVariable());
+    if (auto var = param->getVariable())
+    {
+        emitReflectionModifierInfoJSON(writer, var);
+    }
 
     emitReflectionVarBindingInfoJSON(writer, param);
 

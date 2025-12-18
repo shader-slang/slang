@@ -339,16 +339,29 @@ void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
 }
 
 /// Compute a postorder traversal of the blocks in `code`, writing the resulting order to
+/// `outOrder`. But, iterate over the successors in a block in reverse (mirrored) order.
+void computeMirroredPostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder)
+{
+    HashSet<IRBlock*> reachableSet;
+    computePostorder(code, outOrder, reachableSet, true);
+}
+
+/// Compute a postorder traversal of the blocks in `code`, writing the resulting order to
 /// `outOrder`.
 void computePostorder(
     IRGlobalValueWithCode* code,
     List<IRBlock*>& outOrder,
-    HashSet<IRBlock*>& outReachableSet)
+    HashSet<IRBlock*>& outReachableSet,
+    bool mirrored)
 {
     PostorderComputationContext context;
     context.order = &outOrder;
+
+    auto getSuccessors = [=](IRBlock* block)
+    { return mirrored ? block->getSuccessors().reverse() : block->getSuccessors(); };
+
     if (code->getFirstBlock())
-        context.walk(code->getFirstBlock(), [](IRBlock* block) { return block->getSuccessors(); });
+        context.walk(code->getFirstBlock(), getSuccessors);
 
     // Append unvisited blocks (unreachable blocks) to the begining of postOrder.
     List<IRBlock*> prefix;
