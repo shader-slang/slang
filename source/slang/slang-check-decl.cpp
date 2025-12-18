@@ -12773,7 +12773,8 @@ void checkDerivativeAttributeImpl(
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType &&
+                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         attr,
