@@ -749,6 +749,16 @@ bool resolveStageOfProfileWithEntryPoint(
         entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
+
+    // No [shader(...)] attribute found. The entry point was likely specified via
+    // API or command line.
+    auto entryPointProfileStage = entryPointProfile.getStage();
+
+    // If the stage is already specified in the profile (from API/command line), we're done.
+    if (entryPointProfileStage != Stage::Unknown)
+        return true;
+
+    // Could not determine stage
     return false;
 }
 
@@ -807,7 +817,8 @@ static void _fixupEntryPointVaryingParameters(IRFunc* func)
         // Change the parameter's type
         param->setFullType(borrowInType);
         // Update the use if the parameter is used
-        if (param->firstUse) {
+        if (param->firstUse)
+        {
             // Insert a load instruction at the start of the function body
             builder.setInsertBefore(insertPoint);
             IRInst* loadedValue = builder.emitLoad(valueType, param);
@@ -889,13 +900,14 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
 
 
     auto funcDecl = entryPointFuncDeclRef.getDecl();
-    if  (!funcDecl->hasModifier<EntryPointAttribute>())
+    if (!funcDecl->hasModifier<EntryPointAttribute>())
     {
         // We attach a `[shader(...)]` attribute to an
         // entry point that didn't have one, so that we can have
         // a more uniform representation in the AST
         auto astBuilder = linkage->getASTBuilder();
         auto entryPointAttr = astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet = entryPointProfile.getCapabilityName().freeze(astBuilder);
         addModifier(funcDecl, entryPointAttr);
 
         // Since the entry point could be lowered without the [shader(...)]
@@ -904,7 +916,7 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         auto module = translationUnit->getModule();
         if (auto irModule = module->getIRModule())
         {
-            String mangledName = getMangledName(astBuilder, entryPointFuncDeclRef);
+            String mangledName = getMangledName(astBuilder, funcDecl);
             auto irFuncs = irModule->findSymbolByMangledName(mangledName);
             if (auto irFunc = as<IRFunc>(irFuncs[0]))
             {

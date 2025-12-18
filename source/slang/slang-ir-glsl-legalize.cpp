@@ -3861,18 +3861,11 @@ void tryReplaceUsesOfStageInput(
                         user->replaceUsesWith(materializedInner);
                         user->removeAndDeallocate();
                     }
-                    else if (as<IRPtrTypeBase>(originalVal->getDataType()))
+                    else
                     {
-                        // The original value was a pointer type, so the use expects a pointer.
-                        // Create a temporary variable and provide its address.
                         auto tmpVar = builder.emitVar(materializedInner->getDataType());
                         builder.emitStore(tmpVar, materializedInner);
                         use->set(tmpVar);
-                    }
-                    else
-                    {
-                        // The original value was not a pointer, so the use expects a value.
-                        use->set(materializedInner);
                     }
                 });
             break;
