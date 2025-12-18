@@ -1,6 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute -matrix-layout-row-major
 
-// CHECK: ColMajor
+// HLSL/Slang column_major is equivalent to SPIR-V RowMajor
+// CHECK: OpMemberDecorate {{.*}} RowMajor
 
 typedef column_major float3x4 Mat;
 

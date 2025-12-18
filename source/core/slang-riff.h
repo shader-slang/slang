@@ -127,7 +127,7 @@ public:
     //
 
     /// Required alignment for the starting offset of a chunk.
-    static const UInt32 kChunkAlignment = 2;
+    static const UInt32 kChunkAlignment = 8;
 
     //
     // Every chunk starts with a *header*, which includes
@@ -161,13 +161,13 @@ public:
     Header const* getHeader() const { return (Header const*)this; }
 
     /// Get the tag from the header of this chunk.
-    FourCC getTag() const { return _readTagFromHeader(); }
+    FourCC getTag() const { return getHeader()->tag; }
 
     /// Get the total size of this chunk, in bytes.
     ///
     /// This size includes the chunk header.
     ///
-    UInt32 getTotalSize() const { return sizeof(RIFF::Chunk) + _readSizeFromHeader(); }
+    UInt32 getTotalSize() const { return sizeof(RIFF::Chunk) + getHeader()->size; }
 
     //
     // There are three *kinds* of chunks that can appear in a RIFF:
@@ -211,29 +211,6 @@ public:
 
 private:
     Header _header;
-
-protected:
-    //
-    // Rather than directly reading the `_tag` or `_size`
-    // members, code should use the following accessors,
-    // which account for possible alignment issues.
-    //
-
-    FourCC _readTagFromHeader() const
-    {
-        auto header = getHeader();
-        FourCC result;
-        memcpy(&result, &header->tag, sizeof(header->tag));
-        return result;
-    }
-
-    UInt32 _readSizeFromHeader() const
-    {
-        auto header = getHeader();
-        UInt32 result;
-        memcpy(&result, &header->size, sizeof(header->size));
-        return result;
-    }
 };
 
 /// A chunk that contains zero or more bytes of payload data.
@@ -241,7 +218,7 @@ struct DataChunk : Chunk
 {
 public:
     /// Get the size in bytes of the payload data of this chunk.
-    UInt32 getPayloadSize() const { return _readSizeFromHeader(); }
+    UInt32 getPayloadSize() const { return getHeader()->size; }
 
     /// Get a pointer to the payload data of this chunk.
     ///
@@ -449,7 +426,7 @@ public:
     ListChunk const* findListChunkRec(Chunk::Type type) const;
 
     /// Get the type of this chunk.
-    Type getType() const { return _readTypeFromHeader(); }
+    Type getType() const { return getHeader()->type; }
 
     /// Determine if a chunk is an instance of this kind.
     static bool _isChunkOfThisKind(Chunk const* chunk)
@@ -473,14 +450,6 @@ private:
     // purposes; when actually reading from the header, we
     // make use of a cast.
     //
-
-    Type _readTypeFromHeader() const
-    {
-        auto header = getHeader();
-        Type result;
-        memcpy(&result, &header->type, sizeof(header->type));
-        return result;
-    }
 };
 
 struct RootChunk : ListChunk
