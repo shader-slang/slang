@@ -15333,6 +15333,60 @@ matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
+/// Exclusive prefix minimum within a masked subset of lanes.
+/// Returns the minimum of all values from masked lanes with a lower index.
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMaskPrefixMin(WaveMask mask, T expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T,N> WaveMaskPrefixMin(WaveMask mask, vector<T,N> expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMaskPrefixMin(WaveMask mask, matrix<T,N,M> expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+/// Exclusive prefix maximum within a masked subset of lanes.
+/// Returns the maximum of all values from masked lanes with a lower index.
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMaskPrefixMax(WaveMask mask, T expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T,N> WaveMaskPrefixMax(WaveMask mask, vector<T,N> expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMaskPrefixMax(WaveMask mask, matrix<T,N,M> expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -16217,6 +16271,242 @@ uint WaveGetLaneIndex()
     }
 }
 
+/// Returns the number of waves (subgroups) in the current workgroup.
+/// Equivalent to GLSL gl_NumSubgroups.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+uint WaveGetNumWaves()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumSubgroups)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniform;
+            result:$$uint = OpLoad builtin(NumSubgroups:uint)
+        };
+    default:
+        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
+        __stage_switch
+        {
+        case compute:
+            {
+                int3 workgroupSize = WorkgroupSize();
+                uint totalThreads = uint(workgroupSize.x * workgroupSize.y * workgroupSize.z);
+                uint waveSize = WaveGetLaneCount();
+                return (totalThreads + waveSize - 1) / waveSize;
+            }
+        default:
+            static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
+            return 0; // unreachable, but needed to satisfy compiler
+        }
+    }
+}
+
+/// Returns a mask with only the current lane's bit set.
+/// Equivalent to GLSL gl_SubgroupEqMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneEqMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupEqMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupEqMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        return uint4(
+            component == 0 ? (1u << bit) : 0u,
+            component == 1 ? (1u << bit) : 0u,
+            component == 2 ? (1u << bit) : 0u,
+            component == 3 ? (1u << bit) : 0u
+        );
+    }
+}
+
+/// Returns a mask with bits set for lanes >= current lane.
+/// Equivalent to GLSL gl_SubgroupGeMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneGeMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupGeMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupGeMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes >= laneIndex, but only within the actual wave size
+        uint laneIndex = WaveGetLaneIndex();
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;  // which component contains the last lane
+        uint waveBit = (waveSize - 1) & 31;   // bit position of last lane
+        // Use ~0u when waveBit == 31 to avoid shift overflow
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        uint4 geMask = uint4(
+            0 < component ? 0u : (0 == component ? (~0u << bit) : ~0u),
+            1 < component ? 0u : (1 == component ? (~0u << bit) : ~0u),
+            2 < component ? 0u : (2 == component ? (~0u << bit) : ~0u),
+            3 < component ? 0u : (3 == component ? (~0u << bit) : ~0u)
+        );
+        return geMask & validMask;
+    }
+}
+
+/// Returns a mask with bits set for lanes > current lane.
+/// Equivalent to GLSL gl_SubgroupGtMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneGtMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupGtMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupGtMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes > laneIndex, but only within the actual wave size
+        uint laneIndex = WaveGetLaneIndex();
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;
+        uint waveBit = (waveSize - 1) & 31;
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        // For the current component: if bit < 31, set bits above; if bit == 31, set 0
+        uint currentMask = bit >= 31 ? 0u : (~0u << (bit + 1));
+        uint4 gtMask = uint4(
+            0 < component ? 0u : (0 == component ? currentMask : ~0u),
+            1 < component ? 0u : (1 == component ? currentMask : ~0u),
+            2 < component ? 0u : (2 == component ? currentMask : ~0u),
+            3 < component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+        return gtMask & validMask;
+    }
+}
+
+/// Returns a mask with bits set for lanes <= current lane.
+/// Equivalent to GLSL gl_SubgroupLeMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneLeMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupLeMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupLeMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes <= laneIndex
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit (inclusive)
+        uint currentMask = bit >= 31 ? ~0u : ((1u << (bit + 1)) - 1);
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+    }
+}
+
+/// Returns a mask with bits set for lanes < current lane.
+/// Equivalent to GLSL gl_SubgroupLtMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneLtMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupLtMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupLtMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes < laneIndex
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit-1 (exclusive of bit)
+        uint currentMask = (1u << bit) - 1;
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+    }
+}
+
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -16352,10 +16642,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixProduct";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixProduct(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixProduct, expr);
     }
 }
 
@@ -16435,10 +16722,332 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixSum";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixSum(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixSum, expr);
+    }
+}
+
+/// WavePrefixMin - Exclusive prefix minimum (equivalent to GLSL subgroupExclusiveMin)
+/// Returns the minimum of all values from lanes with a lower index.
+/// Lane 0 gets the identity value (type max), lane i gets min(val[0], ..., val[i-1]).
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+T WavePrefixMin(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMin($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+vector<T,N> WavePrefixMin(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMin($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+matrix<T,N,M> WavePrefixMin(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMin, expr);
+    }
+}
+
+/// WavePrefixMax - Exclusive prefix maximum (equivalent to GLSL subgroupExclusiveMax)
+/// Returns the maximum of all values from lanes with a lower index.
+/// Lane 0 gets the identity value (type min), lane i gets max(val[0], ..., val[i-1]).
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+T WavePrefixMax(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMax($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+vector<T,N> WavePrefixMax(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMax($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+matrix<T,N,M> WavePrefixMax(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMax, expr);
+    }
+}
+
+/// WavePrefixBitAnd - Exclusive prefix bitwise AND (equivalent to GLSL subgroupExclusiveAnd)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitAnd(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveAnd($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitAnd(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveAnd($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitAnd(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitAnd, expr);
+    }
+}
+
+/// WavePrefixBitOr - Exclusive prefix bitwise OR (equivalent to GLSL subgroupExclusiveOr)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitOr(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveOr($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitOr(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveOr($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitOr(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitOr, expr);
+    }
+}
+
+/// WavePrefixBitXor - Exclusive prefix bitwise XOR (equivalent to GLSL subgroupExclusiveXor)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitXor(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveXor($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitXor(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveXor($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitXor(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitXor, expr);
     }
 }
 
