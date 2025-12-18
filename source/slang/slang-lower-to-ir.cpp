@@ -5849,6 +5849,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                            ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
                            : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
@@ -5859,6 +5860,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                             ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
                             : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
@@ -5868,6 +5870,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // after-block: return input parameter
         builder->insertBlock(afterBlock);
         builder->setInsertInto(afterBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto paramType = lowerType(context, expr->type.type);
         auto result = builder->emitParam(paramType);
 
@@ -6861,7 +6864,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
-
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
@@ -6883,6 +6885,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(afterBlock);
         }
+
+        maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
         if (stmt->findModifier<FlattenAttribute>())
         {

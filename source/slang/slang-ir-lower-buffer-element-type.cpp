@@ -2273,6 +2273,26 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         }
     }
+    else
+    {
+        // Set address space for buffer types
+        switch (bufferType->getOp())
+        {
+        case kIROp_ParameterBlockType:
+        case kIROp_ConstantBufferType:
+            addrSpace = AddressSpace::Uniform;
+            break;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        case kIROp_GLSLShaderStorageBufferType:
+            addrSpace = AddressSpace::StorageBuffer;
+            break;
+        }
+    }
+
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return TypeLoweringConfig{addrSpace, rules};
 }
@@ -2545,13 +2565,24 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
     {
-        // For spirv, we always want to lower all matrix types, because SPIRV does not support
+        // For spirv, we generally want to lower all matrix types, because SPIRV does not support
         // specifying matrix layout/stride if the matrix type is used in places other than
         // defining a struct field. This means that if a matrix is used to define a varying
         // parameter, we always want to wrap it in a struct.
-        //
+        // Matrices within uniform and storage buffers are already members in the overall buffer
+        // struct type, hence do not need to be lowered.
         if (target->shouldEmitSPIRVDirectly())
-            return true;
+        {
+            switch (config.addressSpace)
+            {
+            case AddressSpace::Uniform:
+            case AddressSpace::StorageBuffer:
+                return false;
+            default:
+                return true;
+            }
+        }
+
         return DefaultBufferElementTypeLoweringPolicy::shouldLowerMatrixType(matrixType, config);
     }
 
