@@ -9644,6 +9644,64 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 emitOperand(memoryScope);
                             }
                         });
+                
+                    // Check if this is an OpImageGather with Offset operand that requires ImageGatherExtended capability
+                    if (opcode == SpvOpImageGather || opcode == SpvOpImageDrefGather)
+                    {
+                        // Find the image operands mask and check if it uses Offset
+                        bool foundOffsetMask = false;
+                        IRInst* offsetOperand = nullptr;
+                        Index operandIndex = 0;
+                        
+                        for (auto operand : spvInst->getSPIRVOperands())
+                        {
+                            if (!foundOffsetMask &&
+                                (operand->getOp() == kIROp_SPIRVAsmOperandLiteral ||
+                                 operand->getOp() == kIROp_SPIRVAsmOperandEnum))
+                            {
+                                if (auto valInst = as<IRIntLit>(operand->getOperand(0)))
+                                {
+                                    uint32_t mask = uint32_t(valInst->getValue());
+                                    // Check if Offset bit (0x0010) is set
+                                    if (mask & SpvImageOperandsOffsetMask)
+                                    {
+                                        foundOffsetMask = true;
+                                        // The offset value should be the next operand
+                                        continue;
+                                    }
+                                }
+                            }
+                            else if (foundOffsetMask && offsetOperand == nullptr)
+                            {
+                                // This should be the offset value operand
+                                if (operand->getOp() == kIROp_SPIRVAsmOperandInst)
+                                {
+                                    offsetOperand = operand->getValue();
+                                    break;
+                                }
+                            }
+                            operandIndex++;
+                        }
+                        
+                        // Only require the capability if we found Offset and the operand is NOT a constant
+                        if (foundOffsetMask && offsetOperand)
+                        {
+                            // Check if the offset is a constant (OpConstant or OpConstantComposite)
+                            bool isConstant = (offsetOperand->getOp() == kIROp_IntLit ||
+                                             offsetOperand->getOp() == kIROp_FloatLit ||
+                                             offsetOperand->getOp() == kIROp_BoolLit ||
+                                             offsetOperand->getOp() == kIROp_MakeVector ||
+                                             offsetOperand->getOp() == kIROp_MakeArray ||
+                                             offsetOperand->getOp() == kIROp_MakeStruct);
+                            
+                            // If it's NOT a constant, we need ImageGatherExtended
+                            // If it IS a constant, the emitter will convert Offset to ConstOffset automatically
+                            if (!isConstant)
+                            {
+                                requireSPIRVCapability(SpvCapabilityImageGatherExtended);
+                            }
+                        }
+                    }
                 }
             }
         }
