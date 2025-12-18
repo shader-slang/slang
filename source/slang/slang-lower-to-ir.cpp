@@ -491,6 +491,13 @@ struct SharedIRGenContext
     Dictionary<BreakableStmt::UniqueID, IRBlock*> breakLabels;
     Dictionary<BreakableStmt::UniqueID, IRBlock*> continueLabels;
 
+    // Variables that need to be forced to IRVar due to fall-through
+    // in a switch statement. When a switch has fall-through, variables
+    // that are assigned in one case and used in the target case must
+    // use IRVar (memory) instead of on-the-fly SSA to preserve the
+    // fall-through structure in the generated code.
+    HashSet<VarDeclBase*> fallThroughVars;
+
     Dictionary<SourceFile*, IRInst*> mapSourceFileToDebugSourceInst;
     Dictionary<String, IRInst*> mapSourcePathToDebugSourceInst;
 
@@ -7551,7 +7558,411 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // The collected (value, label) pairs for
         // all the `case` statements.
         List<IRInst*> cases;
+
+        // === Fall-through support ===
+        //
+        // When true fall-through is present (a case without break that flows
+        // into another case), we need to force certain variables to use IRVar
+        // instead of on-the-fly SSA tracking. This is because:
+        //
+        // 1. On-the-fly SSA creates shared blocks with parameters when control
+        //    flow merges with different values (e.g., fall-through path vs
+        //    direct entry to a case)
+        // 2. These shared blocks are NOT case labels, so the restructure pass
+        //    can't recognize them as fall-through targets
+        // 3. By using IRVar, we ensure case blocks branch directly to the next
+        //    case's label, preserving the fall-through structure
+        //
+        // Variables that need IRVar treatment due to fall-through:
+        // - Variables assigned in a case that falls through to another case
+        // - Variables used (read) in a case that can be reached via fall-through
+        HashSet<VarDeclBase*> fallThroughVars;
+
+        // Track which case indices have fall-through INTO them
+        // (i.e., the previous case doesn't end with break/return/etc.)
+        HashSet<Index> fallThroughTargetIndices;
     };
+
+    // === Fall-through detection helpers ===
+
+    // Check if a statement definitively terminates control flow within a case
+    // (break, return, continue, throw, or a block ending with one of these)
+    bool stmtTerminatesCase(Stmt* stmt)
+    {
+        if (!stmt)
+            return false;
+
+        if (as<BreakStmt>(stmt))
+            return true;
+        if (as<ReturnStmt>(stmt))
+            return true;
+        if (as<ContinueStmt>(stmt))
+            return true;
+        if (as<ThrowStmt>(stmt))
+            return true;
+        if (as<DiscardStmt>(stmt))
+            return true;
+
+        // For a block, check if its last statement terminates
+        if (auto blockStmt = as<BlockStmt>(stmt))
+        {
+            return stmtTerminatesCase(blockStmt->body);
+        }
+
+        // For a sequence, check if the last statement terminates
+        if (auto seqStmt = as<SeqStmt>(stmt))
+        {
+            if (seqStmt->stmts.getCount() > 0)
+            {
+                return stmtTerminatesCase(seqStmt->stmts.getLast());
+            }
+            return false;
+        }
+
+        // For if-else, both branches must terminate
+        if (auto ifStmt = as<IfStmt>(stmt))
+        {
+            if (ifStmt->positiveStatement && ifStmt->negativeStatement)
+            {
+                return stmtTerminatesCase(ifStmt->positiveStatement) &&
+                       stmtTerminatesCase(ifStmt->negativeStatement);
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    // Information about a single case clause for fall-through analysis
+    struct CaseClauseInfo
+    {
+        Stmt* labelStmt = nullptr;  // CaseStmt or DefaultStmt
+        List<Stmt*> bodyStmts;      // Statements between this case and the next
+        bool terminates = false;    // Does this case end with break/return/etc?
+    };
+
+    // Extract case clauses from a switch body for analysis
+    // Note: currentClause is passed by reference so we can update it
+    // when we encounter a new case/default label
+    void extractCaseClauses(Stmt* inStmt, List<CaseClauseInfo>& clauses, CaseClauseInfo*& currentClause)
+    {
+        Stmt* stmt = inStmt;
+
+        // Unwrap any surrounding `{ ... }`
+        while (auto blockStmt = as<BlockStmt>(stmt))
+        {
+            stmt = blockStmt->body;
+        }
+
+        if (auto seqStmt = as<SeqStmt>(stmt))
+        {
+            for (auto childStmt : seqStmt->stmts)
+            {
+                extractCaseClauses(childStmt, clauses, currentClause);
+            }
+        }
+        else if (as<CaseStmt>(stmt) || as<DefaultStmt>(stmt))
+        {
+            // Start a new clause
+            CaseClauseInfo newClause;
+            newClause.labelStmt = stmt;
+            clauses.add(newClause);
+            currentClause = &clauses.getLast();
+        }
+        else if (!as<EmptyStmt>(stmt))
+        {
+            // Add to current clause's body
+            if (currentClause)
+            {
+                currentClause->bodyStmts.add(stmt);
+            }
+        }
+    }
+
+    // Collect all variable references (reads and writes) in a statement
+    struct VarRefCollector
+    {
+        HashSet<VarDeclBase*> assignedVars;
+        HashSet<VarDeclBase*> usedVars;
+
+        void collectAssignments(Stmt* stmt)
+        {
+            if (!stmt)
+                return;
+
+            if (auto exprStmt = as<ExpressionStmt>(stmt))
+            {
+                collectAssignmentsFromExpr(exprStmt->expression);
+            }
+            else if (auto blockStmt = as<BlockStmt>(stmt))
+            {
+                collectAssignments(blockStmt->body);
+            }
+            else if (auto seqStmt = as<SeqStmt>(stmt))
+            {
+                for (auto child : seqStmt->stmts)
+                    collectAssignments(child);
+            }
+            else if (auto ifStmt = as<IfStmt>(stmt))
+            {
+                collectAssignments(ifStmt->positiveStatement);
+                collectAssignments(ifStmt->negativeStatement);
+            }
+            else if (auto forStmt = as<ForStmt>(stmt))
+            {
+                collectAssignments(forStmt->statement);
+            }
+            else if (auto whileStmt = as<WhileStmt>(stmt))
+            {
+                collectAssignments(whileStmt->statement);
+            }
+            else if (auto doWhileStmt = as<DoWhileStmt>(stmt))
+            {
+                collectAssignments(doWhileStmt->statement);
+            }
+            else if (auto declStmt = as<DeclStmt>(stmt))
+            {
+                // Variable declarations with initializers count as assignments
+                if (auto varDecl = as<VarDecl>(declStmt->decl))
+                {
+                    if (varDecl->initExpr)
+                    {
+                        assignedVars.add(varDecl);
+                    }
+                }
+            }
+        }
+
+        void collectAssignmentsFromExpr(Expr* expr)
+        {
+            if (!expr)
+                return;
+
+            if (auto assignExpr = as<AssignExpr>(expr))
+            {
+                // Check if left side is a variable reference
+                if (auto varExpr = as<VarExpr>(assignExpr->left))
+                {
+                    if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
+                    {
+                        assignedVars.add(varDecl);
+                    }
+                }
+                // Also check right side for uses
+                collectUsesFromExpr(assignExpr->right);
+            }
+            else if (auto opAssignExpr = as<OperatorExpr>(expr))
+            {
+                // Check for compound assignment operators (+=, -=, etc.)
+                // These both read and write the variable
+                if (opAssignExpr->arguments.getCount() >= 1)
+                {
+                    if (auto varExpr = as<VarExpr>(opAssignExpr->arguments[0]))
+                    {
+                        if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
+                        {
+                            // Check if this is a compound assignment
+                            auto opName = opAssignExpr->functionExpr;
+                            if (opName)
+                            {
+                                assignedVars.add(varDecl);
+                                usedVars.add(varDecl);
+                            }
+                        }
+                    }
+                }
+            }
+            else if (auto invokeExpr = as<InvokeExpr>(expr))
+            {
+                for (auto arg : invokeExpr->arguments)
+                    collectUsesFromExpr(arg);
+            }
+        }
+
+        void collectUses(Stmt* stmt)
+        {
+            if (!stmt)
+                return;
+
+            if (auto exprStmt = as<ExpressionStmt>(stmt))
+            {
+                collectUsesFromExpr(exprStmt->expression);
+            }
+            else if (auto blockStmt = as<BlockStmt>(stmt))
+            {
+                collectUses(blockStmt->body);
+            }
+            else if (auto seqStmt = as<SeqStmt>(stmt))
+            {
+                for (auto child : seqStmt->stmts)
+                    collectUses(child);
+            }
+            else if (auto ifStmt = as<IfStmt>(stmt))
+            {
+                collectUsesFromExpr(ifStmt->predicate);
+                collectUses(ifStmt->positiveStatement);
+                collectUses(ifStmt->negativeStatement);
+            }
+            else if (auto forStmt = as<ForStmt>(stmt))
+            {
+                collectUsesFromExpr(forStmt->predicateExpression);
+                collectUsesFromExpr(forStmt->sideEffectExpression);
+                collectUses(forStmt->statement);
+            }
+            else if (auto whileStmt = as<WhileStmt>(stmt))
+            {
+                collectUsesFromExpr(whileStmt->predicate);
+                collectUses(whileStmt->statement);
+            }
+            else if (auto doWhileStmt = as<DoWhileStmt>(stmt))
+            {
+                collectUsesFromExpr(doWhileStmt->predicate);
+                collectUses(doWhileStmt->statement);
+            }
+            else if (auto returnStmt = as<ReturnStmt>(stmt))
+            {
+                collectUsesFromExpr(returnStmt->expression);
+            }
+        }
+
+        void collectUsesFromExpr(Expr* expr)
+        {
+            if (!expr)
+                return;
+
+            if (auto varExpr = as<VarExpr>(expr))
+            {
+                if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
+                {
+                    usedVars.add(varDecl);
+                }
+            }
+            else if (auto invokeExpr = as<InvokeExpr>(expr))
+            {
+                for (auto arg : invokeExpr->arguments)
+                    collectUsesFromExpr(arg);
+                collectUsesFromExpr(invokeExpr->functionExpr);
+            }
+            else if (auto memberExpr = as<MemberExpr>(expr))
+            {
+                collectUsesFromExpr(memberExpr->baseExpression);
+            }
+            else if (auto indexExpr = as<IndexExpr>(expr))
+            {
+                collectUsesFromExpr(indexExpr->baseExpression);
+                for (auto indexArg : indexExpr->indexExprs)
+                    collectUsesFromExpr(indexArg);
+            }
+            else if (auto assignExpr = as<AssignExpr>(expr))
+            {
+                collectUsesFromExpr(assignExpr->right);
+            }
+            else if (auto selectExpr = as<SelectExpr>(expr))
+            {
+                for (auto arg : selectExpr->arguments)
+                    collectUsesFromExpr(arg);
+            }
+            else if (auto operatorExpr = as<OperatorExpr>(expr))
+            {
+                for (auto arg : operatorExpr->arguments)
+                    collectUsesFromExpr(arg);
+            }
+            else if (auto castExpr = as<TypeCastExpr>(expr))
+            {
+                for (auto arg : castExpr->arguments)
+                    collectUsesFromExpr(arg);
+            }
+        }
+    };
+
+    // Pre-scan a switch statement to detect fall-through patterns and
+    // identify variables that need IRVar treatment.
+    //
+    // This is called before lowering the switch body. It walks the AST to:
+    // 1. Find cases that don't end with break/return (fall-through sources)
+    // 2. Identify variables assigned in those cases
+    // 3. Identify variables used in the target cases
+    // 4. Mark variables that appear in both sets as needing IRVar
+    void detectFallThroughAndCollectVars(SwitchStmt* stmt, SwitchStmtInfo* info)
+    {
+        // Extract case clauses from the switch body
+        List<CaseClauseInfo> clauses;
+        CaseClauseInfo* currentClause = nullptr;
+        extractCaseClauses(stmt->body, clauses, currentClause);
+
+        // Check which clauses terminate and which fall through
+        for (Index i = 0; i < clauses.getCount(); i++)
+        {
+            auto& clause = clauses[i];
+
+            // Check if the last statement in this clause terminates
+            if (clause.bodyStmts.getCount() > 0)
+            {
+                clause.terminates = stmtTerminatesCase(clause.bodyStmts.getLast());
+            }
+            else
+            {
+                // Empty body - this is trivial fall-through (case grouping)
+                // which is already handled by the existing code
+                clause.terminates = false;
+            }
+        }
+
+        // Find fall-through patterns: clause i falls through to clause i+1
+        // if clause i has a non-empty body that doesn't terminate
+        for (Index i = 0; i < clauses.getCount() - 1; i++)
+        {
+            auto& clause = clauses[i];
+
+            // Skip trivial fall-through (empty body)
+            if (clause.bodyStmts.getCount() == 0)
+                continue;
+
+            // If this clause doesn't terminate, it falls through
+            if (!clause.terminates)
+            {
+                // Mark the next clause as a fall-through target
+                info->fallThroughTargetIndices.add(i + 1);
+
+                // Collect variables assigned in the source clause
+                VarRefCollector sourceCollector;
+                for (auto bodyStmt : clause.bodyStmts)
+                {
+                    sourceCollector.collectAssignments(bodyStmt);
+                }
+
+                // Collect variables used in the target clause
+                auto& targetClause = clauses[i + 1];
+                VarRefCollector targetCollector;
+                for (auto bodyStmt : targetClause.bodyStmts)
+                {
+                    targetCollector.collectUses(bodyStmt);
+                }
+
+                // Variables that are assigned in source AND used in target
+                // need IRVar treatment
+                for (auto var : sourceCollector.assignedVars)
+                {
+                    if (targetCollector.usedVars.contains(var))
+                    {
+                        info->fallThroughVars.add(var);
+                    }
+                }
+
+                // Also, variables used in source that are then used in target
+                // (if they could have different values) - this handles the
+                // case where a variable is read in source, then read again
+                // in target after fall-through
+                for (auto var : sourceCollector.usedVars)
+                {
+                    if (targetCollector.usedVars.contains(var))
+                    {
+                        info->fallThroughVars.add(var);
+                    }
+                }
+            }
+        }
+    }
 
     // We need a label to use for a `case` or `default` statement,
     // so either create one here, or re-use the current one if
@@ -7960,7 +8371,65 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+
+        // Pre-scan the switch body to detect fall-through patterns and
+        // identify variables that need IRVar treatment.
+        // This must be done before lowerSwitchCases so we know which
+        // variables to force as IRVar during lowering.
+        detectFallThroughAndCollectVars(stmt, &info);
+
+        // Add the detected fall-through vars to the shared context
+        // so that variable lowering can check for them.
+        for (auto var : info.fallThroughVars)
+        {
+            context->shared->fallThroughVars.add(var);
+        }
+
+        // For variables that have already been lowered (declared before the switch),
+        // find their IRVar and apply the NoSSAPromotion decoration.
+        // This is needed because variables declared before the switch are already
+        // lowered before we enter the switch body, so we need to retroactively
+        // mark them to prevent SSA promotion.
+        for (auto var : info.fallThroughVars)
+        {
+            // Look up the variable in the environment chain
+            LoweredValInfo* loweredValInfoPtr = nullptr;
+            auto env = context->env;
+            while (env)
+            {
+                if (auto result = env->mapDeclToValue.tryGetValue(var))
+                {
+                    loweredValInfoPtr = result;
+                    break;
+                }
+                env = env->outer;
+            }
+            
+            if (loweredValInfoPtr)
+            {
+                auto loweredVal = *loweredValInfoPtr;
+                if (loweredVal.flavor == LoweredValInfo::Flavor::Ptr)
+                {
+                    IRInst* irVar = loweredVal.val;
+                    if (irVar && irVar->getOp() == kIROp_Var)
+                    {
+                        // Check if it already has the decoration
+                        if (!irVar->findDecoration<IRNoSSAPromotionDecoration>())
+                        {
+                            builder->addDecoration(irVar, kIROp_NoSSAPromotionDecoration);
+                        }
+                    }
+                }
+            }
+        }
+
         lowerSwitchCases(stmt->body, &info);
+
+        // Remove the fall-through vars after switch lowering is complete
+        for (auto var : info.fallThroughVars)
+        {
+            context->shared->fallThroughVars.remove(var);
+        }
 
         // TODO: once we've discovered the cases, we should
         // be able to make a quick pass over the list and eliminate

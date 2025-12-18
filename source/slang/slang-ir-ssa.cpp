@@ -146,6 +146,13 @@ bool allUsesLeadToLoads(IRInst* inst)
 // Is the given variable one that we can promote to SSA form?
 bool isPromotableVar(ConstructSSAContext* /*context*/, IRVar* var, HashSet<IRBlock*>& knownBlocks)
 {
+    // Check if the variable has been explicitly marked as not promotable.
+    // This is used for variables affected by fall-through in switch statements,
+    // where we need to preserve the memory-based representation to maintain
+    // the correct control flow structure in the output code.
+    if (var->findDecoration<IRNoSSAPromotionDecoration>())
+        return false;
+
     // We want to identify variables such that we can always
     // determine what they will contain at a point in the
     // program by directly inspecting their uses.
