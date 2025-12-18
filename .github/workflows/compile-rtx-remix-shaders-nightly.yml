@@ -298,12 +298,22 @@ jobs:
         env:
           BUILD_RESULT: ${{ job.status }}
 
-      # Slack notification on failure (for scheduled runs only)
-      # Temporarily disabled with "&& false" due to known incompatibility with RTX Remix shaders
-      # Re-enable once RTX Remix updates their shader code and Slang version
+      # Slack notifications (for scheduled runs only)
+      - name: Success notification
+        id: slack-notify-success
+        if: ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "RTX-Remix-Nightly": ":green-check-mark: RTX Remix nightly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
       - name: Failure notification
         id: slack-notify-failure
-        if: ${{ github.event_name == 'schedule' && !success() && false }}
+        if: ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |

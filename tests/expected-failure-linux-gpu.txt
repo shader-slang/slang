@@ -1,0 +1,63 @@
+# Linux GPU (Tesla T4) expected failures
+# These tests fail due to driver/hardware limitations on Tesla T4:
+# - CUDA cooperative matrix not supported on T4
+# - No VK_KHR_shader_subgroup_rotate support
+# - No sparse texture support
+
+# Unit test - RecordReplay fails on Linux GPU runner
+slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
+
+# Bug fix tests - T4 Vulkan validation issues
+tests/bugs/gh-4305.slang.4 (vk)
+tests/bugs/gh-4305.slang.5 (vk)
+
+# Cooperative matrix tests (CUDA) - T4 doesn't support cooperative matrix
+tests/cooperative-matrix/add.slang.1 (cuda)
+tests/cooperative-matrix/array.slang.1 (cuda)
+tests/cooperative-matrix/conversion-1.slang.1 (cuda)
+tests/cooperative-matrix/copyFrom.slang.1 (cuda)
+tests/cooperative-matrix/div.slang.1 (cuda)
+tests/cooperative-matrix/fill.slang.1 (cuda)
+tests/cooperative-matrix/inout.slang.1 (cuda)
+tests/cooperative-matrix/length.slang.1 (cuda)
+tests/cooperative-matrix/load-store-groupshared.slang.1 (cuda)
+tests/cooperative-matrix/load-store-pointer.slang.2 (cuda)
+tests/cooperative-matrix/load-store-rwbyteaddressbuffer.slang.2 (cuda)
+tests/cooperative-matrix/load-store-rwbyteaddressbuffer.slang.3 (cuda)
+tests/cooperative-matrix/load-store-rwstructuredbuffer.slang.2 (cuda)
+tests/cooperative-matrix/load-store-rwstructuredbuffer.slang.3 (cuda)
+tests/cooperative-matrix/mat-mul-add.slang.1 (cuda)
+tests/cooperative-matrix/mod1.slang.1 (cuda)
+tests/cooperative-matrix/mul.slang.1 (cuda)
+tests/cooperative-matrix/out.slang.1 (cuda)
+tests/cooperative-matrix/parameter.slang.1 (cuda)
+tests/cooperative-matrix/return.slang.1 (cuda)
+tests/cooperative-matrix/scalar-mul.slang.1 (cuda)
+tests/cooperative-matrix/struct.slang.1 (cuda)
+tests/cooperative-matrix/sub.slang.1 (cuda)
+tests/cooperative-matrix/subscript-in-func.slang.1 (cuda)
+tests/cooperative-matrix/subscript.slang.1 (cuda)
+tests/cooperative-matrix/unary_neg.slang.1 (cuda)
+
+# Partial resident texture tests (Vulkan) - T4 driver sparse texture issues
+tests/hlsl-intrinsic/texture/partial-resident-texture-combined.slang.1 (vk)
+tests/hlsl-intrinsic/texture/partial-resident-texture.slang.1 (vk)
+
+# Wave rotate tests (Vulkan) - T4 driver lacks shaderSubgroupRotate
+tests/hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang.2 (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang.3 (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate-clustered.slang.4 (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate.slang (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate.slang.2 (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate.slang.4 (vk)
+tests/hlsl-intrinsic/wave-rotate/wave-rotate.slang.5 (vk)
+
+# Metal texture test variant that runs on Vulkan - T4 validation issues
+tests/metal/texture.slang.5 (vk)
+
+# Pointer to groupshared - Missing VK features on T4
+tests/language-feature/pointer/ptr-to-groupshared-1.slang (vk)
+
+# Ray tracing tests - CUDA/OptiX issues on T4
+tests/pipeline/ray-tracing/raygen.slang (cuda)

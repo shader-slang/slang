@@ -14,9 +14,7 @@ struct IRModule;
 
 // Recursively visit the entire module, and diagnose an error whenever an ExtractExistentialType is
 // being used as a specialization argument to a generic function or type.
-void checkForIllegalGenericSpecializationWithExistentialTypeRec(
-    IRInst* parent,
-    DiagnosticSink* sink)
+void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(parent))
     {
@@ -43,10 +41,10 @@ void checkForIllegalGenericSpecializationWithExistentialTypeRec(
                             if (auto lookupWitness =
                                     as<IRLookupWitnessMethod>(specialize->getBase()))
                                 specializationBase = lookupWitness->getRequirementKey();
-                            sink->diagnose(
-                                specialize->sourceLoc,
-                                Diagnostics::cannotSpecializeGenericWithExistential,
-                                specializationBase);
+                            IRBuilder builder(parent->getModule());
+                            builder.addDecoration(
+                                specialize,
+                                kIROp_DisallowSpecializationWithExistentialsDecoration);
                             goto nextInst;
                         }
                     }
@@ -58,13 +56,13 @@ void checkForIllegalGenericSpecializationWithExistentialTypeRec(
 
     for (auto childInst : parent->getDecorationsAndChildren())
     {
-        checkForIllegalGenericSpecializationWithExistentialTypeRec(childInst, sink);
+        addDecorationsForGenericsSpecializedWithExistentialsRec(childInst, sink);
     }
 }
 
-void checkForIllegalGenericSpecializationWithExistentialType(IRModule* module, DiagnosticSink* sink)
+void addDecorationsForGenericsSpecializedWithExistentials(IRModule* module, DiagnosticSink* sink)
 {
-    checkForIllegalGenericSpecializationWithExistentialTypeRec(module->getModuleInst(), sink);
+    addDecorationsForGenericsSpecializedWithExistentialsRec(module->getModuleInst(), sink);
 }
 
 } // namespace Slang
