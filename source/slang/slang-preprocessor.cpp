@@ -4406,7 +4406,6 @@ static void HandleVersionDirective(PreprocessorDirectiveContext* context)
             Diagnostics::unknownLanguageVersion,
             version);
     }
-    context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
 }
 
 static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
@@ -4454,9 +4453,10 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
 
     SkipToEndOfLine(context);
 
-    if (isValidSlangLanguageVersion((SlangLanguageVersion)version))
+    if (isValidSlangLanguageVersion(version))
     {
         context->m_preprocessor->language = SourceLanguage::Slang;
+        context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
     }
     else
     {
@@ -4465,7 +4465,6 @@ static void HandleLanguageDirective(PreprocessorDirectiveContext* context)
             Diagnostics::unknownLanguageVersion,
             version);
     }
-    context->m_preprocessor->languageVersion = (SlangLanguageVersion)version;
 }
 
 // Handle an invalid directive
