@@ -7636,15 +7636,18 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // Information about a single case clause for fall-through analysis
     struct CaseClauseInfo
     {
-        Stmt* labelStmt = nullptr;  // CaseStmt or DefaultStmt
-        List<Stmt*> bodyStmts;      // Statements between this case and the next
-        bool terminates = false;    // Does this case end with break/return/etc?
+        Stmt* labelStmt = nullptr; // CaseStmt or DefaultStmt
+        List<Stmt*> bodyStmts;     // Statements between this case and the next
+        bool terminates = false;   // Does this case end with break/return/etc?
     };
 
     // Extract case clauses from a switch body for analysis
     // Note: currentClause is passed by reference so we can update it
     // when we encounter a new case/default label
-    void extractCaseClauses(Stmt* inStmt, List<CaseClauseInfo>& clauses, CaseClauseInfo*& currentClause)
+    void extractCaseClauses(
+        Stmt* inStmt,
+        List<CaseClauseInfo>& clauses,
+        CaseClauseInfo*& currentClause)
     {
         Stmt* stmt = inStmt;
 
@@ -8404,7 +8407,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 }
                 env = env->outer;
             }
-            
+
             if (loweredValInfoPtr)
             {
                 auto loweredVal = *loweredValInfoPtr;
