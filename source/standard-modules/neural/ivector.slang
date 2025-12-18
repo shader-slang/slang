@@ -23,8 +23,6 @@ public interface IVector<T, int N> : IDifferentiable, IRWArray<T>
     /// @remarks Ensures the differential is also a vector with the same structure.
     public associatedtype Differential : IVector<T.Differential, N>;
 
-    internal associatedtype InternalDataType : IArray<T>;
-
     /// Default constructor - initializes vector to zero.
     public __init();
 
@@ -58,8 +56,6 @@ public interface IVector<T, int N> : IDifferentiable, IRWArray<T>
         get;
         set;
     }
-
-    internal InternalDataType getInternalData();
 
     /**
     Evaluates a linear transformation: output = W * input.

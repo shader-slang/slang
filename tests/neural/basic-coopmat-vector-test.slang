@@ -38,8 +38,8 @@ static const int SubgroupSize = 32;
 
 #define MAX(a, b) (a < b ? a : b)
 
-static const int ShMemSize = ( MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize>.SharedMemSizeInVectorMatA +
-                               MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize>.SharedMemSizeInVectorMatB);
+static const int ShMemSize = ( MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatA +
+                               MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatB);
 
 groupshared uint4[ShMemSize] shMem;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;

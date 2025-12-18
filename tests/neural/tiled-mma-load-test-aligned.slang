@@ -1,4 +1,4 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
 import neural;
@@ -84,18 +84,18 @@ groupshared uint4 s_sharedMemoryB[SubgroupSize * 2];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-void testLoadShA(uint tid, uint tileIndex)
+void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
 {
     typealias Storage = StructuredBufferStorage<half>;
 
     Storage storage = Storage(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
-void testLoadShB(uint tid, uint tileIndex)
+void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
 {
     // Construct the input vector as follow:
     // x = tid * 32 + 0, 1, 2, 3 ... 31
@@ -107,7 +107,7 @@ void testLoadShB(uint tid, uint tileIndex)
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -150,12 +150,13 @@ bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
     return res;
 }
 
-void test1(uint tid)
+void test1<TargetEnum Target>(uint tid)
 {
     if (tid >= SubgroupSize)
         return;
 
-    testLoadShA(tid, 0);
+    testLoadShA<Target>(tid, 0);
+
     // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
 
     bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 0);
@@ -164,7 +165,7 @@ void test1(uint tid)
         outputBuffer[0] = res ? 1 : 0;
     // BUFFER: 1
 
-    testLoadShB(tid, 0);
+    testLoadShB<Target>(tid, 0);
 
     bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 0);
     res1 = WaveActiveAllTrue(res1);
@@ -173,12 +174,12 @@ void test1(uint tid)
     // BUFFER-NEXT: 1
 }
 
-void test2(uint tid)
+void test2<TargetEnum Target>(uint tid)
 {
     if (tid >= SubgroupSize)
         return;
 
-    testLoadShA(tid, 1);
+    testLoadShA<Target>(tid, 1);
 
     bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), 1);
     res = WaveActiveAllTrue(res);
@@ -186,7 +187,7 @@ void test2(uint tid)
         outputBuffer[2] = res ? 1 : 0;
     // BUFFER-NEXT: 1
 
-    testLoadShB(tid, 1);
+    testLoadShB<Target>(tid, 1);
 
     bool res1 = verifiedOutput(tid, InputSize, __getAddress(s_sharedMemoryB[0]), 1);
     res1 = WaveActiveAllTrue(res1);
@@ -231,6 +232,15 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     initWeightMatrix(tid);
 
-    test1(tid);
-    test2(tid);
+    __target_switch
+    {
+    case cuda:
+        test1<TargetEnum.CUDA>(tid);
+        test2<TargetEnum.CUDA>(tid);
+        break;
+    case spirv:
+        test1<TargetEnum.SPIR_V>(tid);
+        test2<TargetEnum.SPIR_V>(tid);
+        break;
+    }
 }
