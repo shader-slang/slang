@@ -57,9 +57,11 @@ void handleAssert(char const* message)
             PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
     {
         UnownedStringSlice envSlice = envValue.getUnownedSlice();
-        if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("ignore")))
+        if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("release-asserts-only"))
+            || envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("release-assert-only")))
         {
-            // Ignore the assert and continue execution
+            // Ignore the assert and continue execution.
+	    // This is to mimic the behavior of Release build with Debug build.
             return;
         }
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
