@@ -3859,7 +3859,10 @@ $(type_info.return_type) $(type_info.method_name)(
     ///
     IRBlock* emitBlock();
 
-    static void insertBlockAlongEdge(IRModule* module, IREdge const& edge);
+    static void insertBlockAlongEdge(
+        IRModule* module,
+        IREdge const& edge,
+        bool copyDebugLine = false);
 
     IRParam* createParam(IRType* type);
     IRParam* emitParam(IRType* type);
