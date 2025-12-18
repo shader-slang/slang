@@ -467,7 +467,11 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    char* getData() const { return m_buffer ? m_buffer->getData() : (char*)""; }
+    char* getData() const
+    {
+        static char empty[] = "";
+        return m_buffer ? m_buffer->getData() : empty;
+    }
 
 
     void ensureUniqueStorageWithCapacity(Index capacity);
@@ -658,7 +662,19 @@ public:
 #endif
         }
     }
+#if SLANG_GCC
+// GCC 11 emits many incorrect warnings about the `strcmp` call below, e.g.:
+// ```
+// warning: `int strcmp(const char*, const char*)` of a string of length 2 and an array of size 1
+// evaluates to nonzero [-Wstring-compare]
+// ```
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstring-compare"
+#endif
     bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
+#if SLANG_GCC
+#pragma GCC diagnostic pop
+#endif
 
     bool operator==(const String& str) const { return (strcmp(begin(), str.begin()) == 0); }
     bool operator!=(const char* strbuffer) const { return (strcmp(begin(), strbuffer) != 0); }
