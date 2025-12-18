@@ -23,6 +23,8 @@ using namespace Slang;
 #define UNSET_SPIRV_VALIDATION() unsetenv("SLANG_RUN_SPIRV_VALIDATION")
 #endif
 
+#define DUMP_IR_FOR_DEBUG 0
+
 SLANG_UNIT_TEST(findAndCheckEntryPoint)
 {
     // Enable SPIR-V validation
@@ -46,6 +48,7 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
         ParameterBlock<DoFSplatParams> gDoFSplatParams;
 
         // Test absence of attribute [shader("...")] intentionally
+        //  [shader("fragment")]
         float4 fragMain(float4 pos:SV_Position, uint instanceIndex: SV_InstanceID) : SV_Target
         {
             BokehSplat bokeh = gDoFSplatParams.BokehBuffer[instanceIndex];
@@ -63,6 +66,14 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
     slang::SessionDesc sessionDesc = {};
     sessionDesc.targetCount = 1;
     sessionDesc.targets = &targetDesc;
+#if DUMP_IR_FOR_DEBUG
+    slang::CompilerOptionEntry compilerOptionEntry = {};
+    compilerOptionEntry.name = slang::CompilerOptionName::DumpIr;
+    compilerOptionEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    compilerOptionEntry.value.intValue0 = 1;
+    sessionDesc.compilerOptionEntryCount = 1;
+    sessionDesc.compilerOptionEntries = &compilerOptionEntry;
+#endif
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
@@ -106,17 +117,24 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
         {
             SLANG_CHECK(false); // Fail the test on validation error
         }
+#if DUMP_IR_FOR_DEBUG
+        // Save the diagnostic blob to a file
+        FILE* f = fopen("diagnostic.txt", "wb");
+        fwrite(diagText, 1, strlen(diagText), f);
+        fclose(f);
+        printf("diagnostic.txt created\n");
+#endif
     }
-
 
     SLANG_CHECK(code != nullptr);
     SLANG_CHECK(code->getBufferSize() != 0);
 
+#if DUMP_IR_FOR_DEBUG
     FILE* f = fopen("check-entrypoint.spv", "wb");
     fwrite(code->getBufferPointer(), 1, code->getBufferSize(), f);
     fclose(f);
     printf("check-entrypoint.spv created\n");
-
+#endif
     // Restore environment variable to not affect other tests
     UNSET_SPIRV_VALIDATION();
 }

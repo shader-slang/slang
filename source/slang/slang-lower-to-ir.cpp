@@ -3886,7 +3886,7 @@ void collectParameterLists(
     if (!callableDeclRef)
         return;
 
-    // If we've determined that the paramters of this declaration might
+    // If we've determined that the parameters of this declaration might
     // be relevant, then we will iterate over them and add appropriate
     // entries to the `ioParameterLists`.
     //

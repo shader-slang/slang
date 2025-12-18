@@ -3830,20 +3830,9 @@ void tryReplaceUsesOfStageInput(
                     default:
                         {
                             auto materialized = materializeValue(&builder, val);
-                            if (as<IRPtrTypeBase>(originalVal->getDataType()))
-                            {
-                                // The original value was a pointer type, so the use expects a
-                                // pointer. Create a temporary variable and provide its address.
-                                auto tmpVar = builder.emitVar(materialized->getDataType());
-                                builder.emitStore(tmpVar, materialized);
-                                use->set(tmpVar);
-                            }
-                            else
-                            {
-                                // The original value was not a pointer, so the use expects a
-                                // value.
-                                use->set(materialized);
-                            }
+                            auto tmpVar = builder.emitVar(materialized->getDataType());
+                            builder.emitStore(tmpVar, materialized);
+                            use->set(tmpVar);
                         }
                         break;
                     }
