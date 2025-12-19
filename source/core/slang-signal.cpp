@@ -3,7 +3,10 @@
 #include "slang-exception.h"
 #include "slang-platform.h"
 #include "stdio.h"
-#include <ctime>
+#include <chrono>
+#include <fstream>
+#include <iomanip> // for std::put_time
+#include <sstream>
 
 #if _WIN32 && defined(_MSC_VER)
 #include <cassert>
@@ -52,65 +55,68 @@ String _getMessage(SignalType type, char const* message)
 // Special handler for assertions that can optionally return based on environment variable
 void handleAssert(char const* message)
 {
-    // Check for SLANG_ASSERT_OUTPUT environment variable
+    // SLANG_ASSERT_OUTPUT environment variable allows redirecting assertion messages to:
+    // - A specific file (e.g., SLANG_ASSERT_OUTPUT=D:/logs/assert.txt)
+    // - stderr (SLANG_ASSERT_OUTPUT=stderr)
+    // - stdout (SLANG_ASSERT_OUTPUT=stdout)
+    //
+    // This is primarily useful when slang.dll is used as an embedded library within another
+    // application that blocks or redirects stdout/stderr. In such cases, assertion messages
+    // from slang would be invisible to developers. This environment variable provides a way
+    // to capture those assertions to a file or specific stream for debugging.
+    //
     StringBuilder outputTarget;
     if (SLANG_SUCCEEDED(
             PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT_OUTPUT"), outputTarget)))
     {
-        // Construct the assertion message with timestamp
-        time_t now = time(nullptr);
-        char timeBuffer[64];
+        UnownedStringSlice outputSlice = outputTarget.getUnownedSlice();
+        const char* output = outputSlice.begin();
+
+        // Construct the assertion message with timestamp using chrono
+        auto now = std::chrono::system_clock::now();
+        auto nowTimeT = std::chrono::system_clock::to_time_t(now);
+
+        std::ostringstream oss;
+
+        oss << "[";
 #if _WIN32 && defined(_MSC_VER)
         struct tm timeInfo;
-        localtime_s(&timeInfo, &now);
-        strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", &timeInfo);
+        localtime_s(&timeInfo, &nowTimeT);
+        oss << std::put_time(&timeInfo, "%Y-%m-%d %H:%M:%S");
 #else
-        struct tm* timeInfo = localtime(&now);
-        strftime(timeBuffer, sizeof(timeBuffer), "%Y-%m-%d %H:%M:%S", timeInfo);
+        struct tm* timeInfo = localtime(&nowTimeT);
+        oss << std::put_time(timeInfo, "%Y-%m-%d %H:%M:%S");
 #endif
-
+        oss << "] SLANG_ASSERT ";
         // TODO: We should append filename and line number of where the assertion is.
-        StringBuilder fullMessage;
-        fullMessage << "SLANG_ASSERT[" << timeBuffer << "]\n";
-        fullMessage << message << "\n";
+        oss << "\n";
+        oss << message << "\n";
 
-        String assertMessage = fullMessage.produceString();
-        char const* msg = assertMessage.getBuffer();
+        const std::string& fullMessage = oss.str();
 
-        UnownedStringSlice outputSlice = outputTarget.getUnownedSlice();
-
-        if (outputSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("stderr")))
+        if (strcmp(output, "stderr"))
         {
-            // Write to stderr
-            fprintf(stderr, "%s", msg);
+            fprintf(stderr, "%s", fullMessage.c_str());
             fflush(stderr);
         }
-        else if (outputSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("stdout")))
+        else if (strcmp(output, "stdout"))
         {
-            // Write to stdout
-            fprintf(stdout, "%s", msg);
+            fprintf(stdout, "%s", fullMessage.c_str());
             fflush(stdout);
         }
         else
         {
             // Treat as a file path
-            FILE* fp = nullptr;
-#if _WIN32 && defined(_MSC_VER)
-            fopen_s(&fp, outputSlice.begin(), "a");
-#else
-            fp = fopen(outputSlice.begin(), "a");
-#endif
-            if (fp)
+            std::ofstream outFile(output, std::ios::app);
+            if (outFile.is_open())
             {
-                fprintf(fp, "%s", msg);
-                fflush(fp);
-                fclose(fp);
+                outFile << fullMessage;
             }
             else
             {
                 // If file can't be opened, fall back to stderr
                 fprintf(stderr, "Failed to open SLANG_ASSERT_OUTPUT file: %s\n", outputSlice.begin());
-                fprintf(stderr, "%s", msg);
+                fprintf(stderr, "%s", fullMessage.c_str());
                 fflush(stderr);
             }
         }
