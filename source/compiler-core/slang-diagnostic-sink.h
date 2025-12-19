@@ -9,7 +9,10 @@
 #include "slang.h"
 
 // Forward declaration for rich diagnostics
-namespace Slang { struct RichDiagnostic; }
+namespace Slang
+{
+struct RichDiagnostic;
+}
 
 namespace Slang
 {
