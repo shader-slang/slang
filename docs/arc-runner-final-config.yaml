@@ -1,0 +1,100 @@
+# Final Working ARC Runner Configuration for Slang GPU CI
+#
+# This is the tested and working configuration for the ARC pilot on slang-ubuntu-runner-3
+# Deploy with: kubectl apply -f arc-runner-final-config.yaml
+#
+# Prerequisites:
+# - k3s installed on host
+# - ARC controller installed
+# - Docker on host with NVIDIA runtime configured as default
+# - Docker socket permissions: chmod 666 /var/run/docker.sock
+
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: slang-gpu-runners
+  namespace: slang-runners
+spec:
+  replicas: 1 # Single runner for pilot
+  template:
+    spec:
+      repository: shader-slang/slang
+      labels:
+        - Linux
+        - self-hosted
+        - GPU
+        - arc # Distinguishes from traditional runners
+        - copilot
+
+      # Use host Docker daemon (not Docker-in-Docker)
+      dockerEnabled: false
+
+      # Explicitly set workspace directory to avoid path issues
+      workDir: /runner/_work
+
+      image: summerwind/actions-runner:ubuntu-22.04
+
+      env:
+        - name: DOCKER_HOST
+          value: unix:///var/run/docker.sock
+
+      volumeMounts:
+        # Mount host Docker socket for GPU access
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+        # Workspace directory for job execution
+        - name: work
+          mountPath: /runner/_work
+        # Externals directory (Node.js and GitHub Actions tools)
+        - name: externals
+          mountPath: /runner/externals
+
+      volumes:
+        - name: dockersock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        - name: work
+          hostPath:
+            path: /runner/_work # Must match pod path for Docker bind-mounts
+            type: DirectoryOrCreate
+        - name: externals
+          hostPath:
+            path: /runner/externals # Contains Node.js for actions
+            type: DirectoryOrCreate
+
+---
+# Notes:
+#
+# GPU Access:
+# - Works via host Docker with NVIDIA runtime configured
+# - Containers can use --gpus all flag
+# - Verified with: docker run --gpus all nvidia/cuda:12.4.1-devel-ubuntu22.04 nvidia-smi
+#
+# Host Requirements:
+# - Docker daemon.json must have nvidia as default runtime:
+#   {
+#     "runtimes": {
+#       "nvidia": {
+#         "path": "nvidia-container-runtime",
+#         "runtimeArgs": []
+#       }
+#     },
+#     "default-runtime": "nvidia"
+#   }
+#
+# - Docker socket must be accessible: sudo chmod 666 /var/run/docker.sock
+#
+# Workspace Configuration:
+# - CRITICAL: Must use hostPath (not emptyDir) for both workspace and externals
+# - Reason: GitHub Actions bind-mounts subdirs (e.g., /runner/_work/_temp, /runner/externals)
+#   into workflow containers, requiring them to exist on host filesystem
+# - Path must match exactly on host and pod (e.g., /runner/_work on both)
+# - Docker can only bind-mount from host filesystem, not from pod-internal volumes
+# - Externals contains Node.js and tools needed by actions (checkout, download-artifact, etc.)
+#
+# Limitations:
+# - Runner pods recreate periodically (normal ARC behavior)
+# - Docker socket permissions need production solution (not 666)
+# - Single replica (no autoscaling configured)
+# - Workspace and externals persist on host (not cleaned between pods)
