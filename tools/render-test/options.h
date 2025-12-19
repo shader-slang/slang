@@ -99,6 +99,8 @@ struct Options
     // Whether to enable RHI device caching (default: false in render-test)
     bool cacheRhiDevice = false;
 
+    bool useLLVMDirectly = false;
+
     Slang::List<Slang::String> capabilities;
 
     Options() { downstreamArgs.addName("slang"); }
