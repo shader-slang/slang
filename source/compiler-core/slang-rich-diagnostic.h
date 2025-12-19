@@ -2,8 +2,8 @@
 #define SLANG_RICH_DIAGNOSTIC_H
 
 #include "../core/slang-basic.h"
-#include "slang-source-loc.h"
 #include "slang-diagnostic-sink.h"
+#include "slang-source-loc.h"
 
 namespace Slang
 {
