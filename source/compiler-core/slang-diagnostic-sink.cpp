@@ -8,8 +8,8 @@
 #include "slang-core-diagnostics.h"
 #include "slang-name-convention-util.h"
 #include "slang-name.h"
-#include "slang-rich-diagnostic.h"
 #include "slang-rich-diagnostic-layout.h"
+#include "slang-rich-diagnostic.h"
 
 namespace Slang
 {
