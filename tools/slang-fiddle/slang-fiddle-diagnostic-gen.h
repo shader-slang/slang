@@ -7,6 +7,9 @@
 #include "core/slang-basic.h"
 #include "compiler-core/slang-diagnostic-sink.h"
 
+// Forward declare lua_State from Lua headers
+struct lua_State;
+
 namespace fiddle
 {
 using namespace Slang;
@@ -68,7 +71,7 @@ private:
     List<DiagnosticDef> m_definitions;
 
     /// Parse a diagnostic definition from the Lua state
-    bool parseDiagnosticDef(struct lua_State* L, DiagnosticDef& outDef);
+    bool parseDiagnosticDef(lua_State* L, DiagnosticDef& outDef);
 
     /// Generate C++ struct for a diagnostic
     void generateStruct(StringBuilder& sb, const DiagnosticDef& def);
