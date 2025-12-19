@@ -2685,6 +2685,7 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
 }
 
 IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path);
+IRInst* getDebugFuncFromIRFunc(IRFunc* irFunc);
 
 LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullptr)
 {
@@ -7339,13 +7340,19 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     }
                     if (irFunc)
                     {
-                        // Add the function itself to the scope stack
-                        // Variables declared in the function body will use this as their parent
-                        context->debugLexicalScopeStack.add(irFunc);
-                        debugLexicalBlock = irFunc; // Track that we added something to pop later
+                        // Get the IRDebugFunction to use as scope instead of IRFunc directly.
+                        // This prevents DCE from keeping unused functions alive.
+                        IRInst* debugFunc = getDebugFuncFromIRFunc(irFunc);
+                        if (debugFunc)
+                        {
+                            // Add the debug function to the scope stack
+                            // Variables declared in the function body will use this as their parent
+                            context->debugLexicalScopeStack.add(debugFunc);
+                            debugLexicalBlock = debugFunc; // Track that we added something to pop later
 
-                        // Emit a DebugScope instruction to set the function scope
-                        builder->emitDebugScope(irFunc, nullptr);
+                            // Emit a DebugScope instruction to set the function scope
+                            builder->emitDebugScope(debugFunc, nullptr);
+                        }
                     }
                 }
                 goto skipDebugBlock;
@@ -7384,9 +7391,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     }
                     if (irFunc)
                     {
-                        // Use the IRFunc itself as the parent scope
-                        // SPIR-V emission will resolve this to IRDebugFunction
-                        parentScope = irFunc;
+                        // Use the IRDebugFunction as the parent scope instead of IRFunc
+                        // This prevents DCE from keeping unused functions alive
+                        parentScope = getDebugFuncFromIRFunc(irFunc);
                     }
                 }
             }
@@ -7480,7 +7487,8 @@ skipDebugBlock:;
                             }
                             if (irFunc)
                             {
-                                restoredParentScope = irFunc;
+                                // Use the IRDebugFunction as scope instead of IRFunc
+                                restoredParentScope = getDebugFuncFromIRFunc(irFunc);
                             }
                         }
                     }
@@ -8264,6 +8272,21 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
     auto debugSrcInst = builder.emitDebugSource(absolutePath.getUnownedSlice(), content, false);
     context->shared->mapSourcePathToDebugSourceInst[absolutePath] = debugSrcInst;
     return debugSrcInst;
+}
+
+// Helper to get the IRDebugFunction from an IRFunc via its IRDebugFuncDecoration.
+// Returns nullptr if no debug function is attached.
+// Using IRDebugFunction as scope instead of IRFunc prevents DCE from keeping
+// unused functions alive just because they're referenced by debug instructions.
+IRInst* getDebugFuncFromIRFunc(IRFunc* irFunc)
+{
+    if (!irFunc)
+        return nullptr;
+    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+    {
+        return debugFuncDecor->getDebugFunc();
+    }
+    return nullptr;
 }
 
 void maybeEmitDebugLine(
@@ -12073,6 +12096,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         ConstructorDecl::ConstructorFlavor::SynthesizedDefault));
             }
 
+            // Add debugfunction decoration and emit debug function BEFORE lowering
+            // the function body. This is needed so that debug lexical scopes can
+            // reference the IRDebugFunction instead of the IRFunc directly.
+            auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+            IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+            if (nameOperand)
+            {
+                getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+                auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+                IRInst* debugType = irFunc->getDataType();
+
+                if (locationDecor && debugType)
+                {
+                    auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                        nameOperand,
+                        locationDecor->getLine(),
+                        locationDecor->getCol(),
+                        locationDecor->getSource(),
+                        debugType);
+
+                    // Add a decoration to link the function to its debug function
+                    getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
+                }
+
+                // Restore insert point for function body
+                getBuilder()->setInsertInto(irFunc);
+            }
+
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
@@ -12426,31 +12478,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
-            }
-        }
-
-        // Add debugfunction decoration and emit debug function. This
-        // is needed for emitting debug information
-        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
-        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
-        if (nameOperand)
-        {
-            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
-
-            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
-            IRInst* debugType = irFunc->getDataType();
-
-            if (locationDecor && debugType)
-            {
-                auto debugFuncCallee = getBuilder()->emitDebugFunction(
-                    nameOperand,
-                    locationDecor->getLine(),
-                    locationDecor->getCol(),
-                    locationDecor->getSource(),
-                    debugType);
-
-                // Add a decoration to link the function to its debug function
-                getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
             }
         }
 
