@@ -5,9 +5,11 @@
 //
 // This is currently NOT supported in Slang but is planned for implementation.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+// DX11 only supports trivial fall-through, WGSL doesn't support fall-through at all
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // CHECK:      D2
 // CHECK-NEXT: 69

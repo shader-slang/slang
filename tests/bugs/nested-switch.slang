@@ -3,7 +3,8 @@
 //TEST(compute):COMPARE_COMPUTE: -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-wgpu
+// WGSL doesn't support fall-through (case 0 falls through to default when inner switch doesn't match)
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-wgpu
 
 int test(int t, int r)
 {
