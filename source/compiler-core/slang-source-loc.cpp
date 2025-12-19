@@ -623,7 +623,7 @@ void SourceFile::setContents(ISlangBlob* blob)
     size_t offset;
     auto type = CharEncoding::determineEncoding(rawContentBegin, rawContentSize, offset);
     SLANG_ASSERT(rawContentSize >= offset);
-    
+
     if (0 == offset && CharEncodeType::UTF8 == type)
     {
         // Fast-path: If the input is UTF-8 without a BOM, we can use it directly.
@@ -631,7 +631,8 @@ void SourceFile::setContents(ISlangBlob* blob)
     }
     else
     {
-        // Slow path: Allocate and decode a new buffer for the data, then move that into m_contentBlob.
+        // Slow path: Allocate and decode a new buffer for the data, then move that into
+        // m_contentBlob.
         List<char> decodedBuffer;
         CharEncoding::getEncoding(type)->decode(
             rawContentBegin + offset,
