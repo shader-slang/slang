@@ -134,6 +134,9 @@ struct Options
     // Maximum number of test servers to run.
     int serverCount = 1;
 
+    // Maximum number of retries for failed tests (-1 = use default, 0 = no retry)
+    int retryCount = -1;
+
     bool emitSPIRVDirectly = true;
 
     // Whether to enable RHI device caching in render-test (default: true in slang-test)

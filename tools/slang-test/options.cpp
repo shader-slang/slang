@@ -81,6 +81,7 @@ static bool _isSubCommand(const char* arg)
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
+        "  -retry-count <n>               Set max retries for failed tests (0 = no retry, default: auto)\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
@@ -335,6 +336,16 @@ static bool _isSubCommand(const char* arg)
             {
                 optionsOut->serverCount = 1;
             }
+        }
+        else if (strcmp(arg, "-retry-count") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            optionsOut->retryCount = stringToInt(*argCursor++);
         }
         else if (strcmp(arg, "-appveyor") == 0)
         {

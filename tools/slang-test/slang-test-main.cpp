@@ -5450,13 +5450,22 @@ SlangResult innerMain(int argc, char** argv)
         // directory) They are registered with SLANG_UNIT_TEST macro
         //
         //
+        // Determine the effective retry count
+        // -1 = use default (1 retry), 0 = no retry, >0 = specific retry count
+        int effectiveRetryCount = options.retryCount;
+        if (effectiveRetryCount < 0)
+        {
+            effectiveRetryCount = 1; // Default: 1 retry
+        }
+
         if (context.canRunUnitTests())
         {
             TestReporter::SuiteScope suiteScope(&reporter, "unit tests");
             TestReporter::set(&reporter);
 
-            for (bool isRetry : {false, true})
+            for (int retryIteration = 0; retryIteration <= effectiveRetryCount; ++retryIteration)
             {
+                bool isRetry = (retryIteration > 0);
                 auto spawnType = context.getFinalSpawnType();
                 context.isRetry = isRetry;
                 if (isRetry)
@@ -5464,7 +5473,7 @@ SlangResult innerMain(int argc, char** argv)
                     if (context.failedUnitTests.getCount() == 0)
                         break;
 
-                    printf("Retrying unit tests...\n");
+                    printf("Retrying unit tests (attempt %d/%d)...\n", retryIteration, effectiveRetryCount);
                     context.options.testPrefixes = context.failedUnitTests;
                     context.failedUnitTests.clear();
                 }
@@ -5495,7 +5504,7 @@ SlangResult innerMain(int argc, char** argv)
 #else
         static constexpr int kFailedTestLimitForRetry = 16;
 #endif
-        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
+        if (effectiveRetryCount > 0 && context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
         {
             if (context.failedFileTests.getCount() > 0)
                 printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
@@ -5514,7 +5523,18 @@ SlangResult innerMain(int argc, char** argv)
                 reporter.addResult(newResult);
             }
         }
-        else
+        else if (effectiveRetryCount == 0 && context.failedFileTests.getCount() > 0)
+        {
+            // Retry disabled, mark all failed tests as failed
+            for (auto& test : context.failedFileTests)
+            {
+                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                reporter.addResult(TestResult::Fail);
+            }
+        }
+        else if (context.failedFileTests.getCount() > kFailedTestLimitForRetry)
         {
             // If there are too many failed tests, don't bother retrying.
             printf(
