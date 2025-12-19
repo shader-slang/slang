@@ -3369,7 +3369,11 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
-            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            auto clonedDebugFunc = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            // Add mapping to cloneEnv so DebugVar references inside the function
+            // get properly remapped to this cloned debug function.
+            fprintf(stderr, "DEBUG: specializeGenericWithSetArgs cloning IRDebugFunction UID %u -> %u\n", inst->_debugUID, clonedDebugFunc->_debugUID);
+            cloneEnv.mapOldValToNew[inst] = clonedDebugFunc;
         }
         else if (!as<IRReturn>(inst))
         {
@@ -3458,10 +3462,41 @@ IRInst* specializeGenericImpl(
         //
         SLANG_ASSERT(bb == genericVal->getFirstBlock());
 
+        // Pre-clone debug functions before other instructions.
+        // This ensures that when we clone IRFunc instructions, their
+        // IRDebugVar children that reference debug functions will find
+        // the cloned debug functions in the environment, rather than
+        // keeping references to the originals inside the generic.
+        // Without this, cross-references from specialized functions to
+        // debug functions inside generics can keep the generic alive
+        // and cause legalization issues (e.g., unhandled getTupleElement).
+        //
+        fprintf(stderr, "DEBUG: Pre-clone loop for generic UID %u\n", genericVal->_debugUID);
+        for (auto ii : bb->getOrdinaryInsts())
+        {
+            fprintf(stderr, "DEBUG:   Checking inst UID %u, op=%d\n", ii->_debugUID, (int)ii->getOp());
+            if (as<IRDebugFunction>(ii))
+            {
+                fprintf(stderr, "DEBUG:   Found IRDebugFunction UID %u, cloning...\n", ii->_debugUID);
+                IRInst* clonedInst = cloneInst(&env, builder, ii);
+                fprintf(stderr, "DEBUG:   Cloned to UID %u\n", clonedInst->_debugUID);
+                if (context)
+                {
+                    pendingWorkList.add(clonedInst);
+                }
+            }
+        }
+        fprintf(stderr, "DEBUG: Pre-clone loop done. Env mappings:\n");
+        for (auto& kv : env.mapOldValToNew)
+        {
+            fprintf(stderr, "DEBUG:   %u -> %u\n", kv.first->_debugUID, kv.second->_debugUID);
+        }
+
         // We will iterate over the non-parameter ("ordinary")
         // instructions only, because parameters were dealt
         // with explicitly at an earlier point.
         //
+        fprintf(stderr, "DEBUG: Main clone loop starting\n");
         for (auto ii : bb->getOrdinaryInsts())
         {
             // The last block of the generic is expected to end with
@@ -3501,7 +3536,9 @@ IRInst* specializeGenericImpl(
             // For any instruction other than a `return`, we will
             // simply clone it completely into the global scope.
             //
+            fprintf(stderr, "DEBUG: Main loop cloning inst UID %u, op=%d\n", ii->_debugUID, (int)ii->getOp());
             IRInst* clonedInst = cloneInst(&env, builder, ii);
+            fprintf(stderr, "DEBUG: Cloned to UID %u\n", clonedInst->_debugUID);
 
             // Any new instructions we create during cloning were
             // not present when we initially built our work list,

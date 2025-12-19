@@ -95,12 +95,36 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
     //
     UInt operandCount = oldInst->getOperandCount();
 
+    // Debug: check if this is a DebugVar being cloned
+    bool isDebugVar = (oldInst->getOp() == kIROp_DebugVar);
+    if (isDebugVar)
+    {
+        fprintf(stderr, "DEBUG: Cloning DebugVar UID %u with %u operands\n", oldInst->_debugUID, (unsigned)operandCount);
+    }
+
     ShortList<IRInst*> newOperands;
     newOperands.setCount(operandCount);
     for (UInt ii = 0; ii < operandCount; ++ii)
     {
         auto oldOperand = oldInst->getOperand(ii);
         auto newOperand = findCloneForOperand(env, oldOperand);
+
+        if (isDebugVar && ii == 3)  // Scope operand
+        {
+            fprintf(stderr, "DEBUG:   DebugVar scope operand[3]: old UID %u -> new UID %u (same=%d)\n", 
+                oldOperand->_debugUID, newOperand->_debugUID, oldOperand == newOperand);
+            // Dump env chain to see what's in it
+            fprintf(stderr, "DEBUG:   Env chain:\n");
+            for (auto ee = env; ee; ee = ee->parent)
+            {
+                fprintf(stderr, "DEBUG:     Env %p has %u entries\n", (void*)ee, (unsigned)ee->mapOldValToNew.getCount());
+                IRInst* found = nullptr;
+                if (ee->mapOldValToNew.tryGetValue(oldOperand, found))
+                {
+                    fprintf(stderr, "DEBUG:     FOUND mapping %u -> %u in this env\n", oldOperand->_debugUID, found->_debugUID);
+                }
+            }
+        }
 
         newOperands[ii] = newOperand;
 
