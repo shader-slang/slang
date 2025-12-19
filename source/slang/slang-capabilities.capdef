@@ -119,6 +119,10 @@ def wgsl : target + textualTarget;
 /// [Target]
 def slangvm : target;
 
+/// Represents the LLVM IR target.
+/// [Target]
+def llvm : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -247,7 +251,7 @@ def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl | llvm;
 
 /// All non-asm code-gen targets
 /// [Compound]
@@ -265,9 +269,21 @@ alias any_cpp_target = cpp | cuda;
 /// [Compound]
 alias cpp_cuda = cpp | cuda;
 
+/// CPP and LLVM code-gen targets
+/// [Compound]
+alias cpp_llvm = cpp | llvm;
+
+/// CPP, CUDA and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_llvm = cpp | cuda | llvm;
+
 /// CPP, CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
+
+/// CPP, CUDA, SPIRV and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_spirv_llvm = cpp | cuda | spirv | llvm;
 
 /// CPP, CUDA, Metal, and SPIRV code-gen targets
 /// [Compound]
@@ -285,21 +301,41 @@ alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 
+/// CPP, CUDA, GLSL, HLSL, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_llvm = cpp | cuda | glsl | hlsl | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
+
+/// CPP, CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_llvm = cpp | cuda | glsl | hlsl | spirv | llvm;
 
 /// CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;
 
+/// CPP, CUDA, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_wgsl_llvm = cpp | cuda | glsl | hlsl | spirv | wgsl | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv;
 
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_llvm = cpp | cuda | glsl | hlsl | metal | spirv | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl = cpp | cuda | glsl | hlsl | metal | spirv | wgsl;
+
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm = cpp | cuda | glsl | hlsl | metal | spirv | wgsl | llvm;
 
 /// CPP, CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -349,6 +385,10 @@ alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 
+/// CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_spirv_llvm = cuda | glsl | hlsl | spirv | llvm;
+
 /// CUDA, GLSL, HLSL, SPIRV, and WGSL code-gen targets
 /// [Compound]
 alias cuda_glsl_hlsl_spirv_wgsl = cuda | glsl | hlsl | spirv | wgsl;
@@ -372,6 +412,10 @@ alias cuda_glsl_metal_spirv = cuda | glsl | metal | spirv;
 /// CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cuda_glsl_metal_spirv_wgsl = cuda | glsl | metal | spirv | wgsl;
+
+/// CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cuda_glsl_metal_spirv_wgsl_llvm = cuda | glsl | metal | spirv | wgsl | llvm;
 
 /// CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -1482,6 +1526,7 @@ alias sm_4_0_version = _sm_4_0
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 
 
@@ -1503,6 +1548,7 @@ alias sm_4_1_version = _sm_4_1
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 /// HLSL shader model 4.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1523,6 +1569,7 @@ alias sm_5_0_version = _sm_5_0
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 /// HLSL shader model 5.0 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1543,6 +1590,7 @@ alias sm_5_1_version = _sm_5_1
              | _cuda_sm_6_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 5.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1562,6 +1610,7 @@ alias sm_6_0_version = _sm_6_0
              | _cuda_sm_6_0 
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.0 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1581,6 +1630,7 @@ alias sm_6_1_version = _sm_6_1
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1600,6 +1650,7 @@ alias sm_6_2_version = _sm_6_2
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.2 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1618,6 +1669,7 @@ alias sm_6_3_version = _sm_6_3
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.3 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1637,6 +1689,7 @@ alias sm_6_4_version = _sm_6_4
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.4 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1655,6 +1708,7 @@ alias sm_6_5_version = _sm_6_5
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.5 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1675,6 +1729,7 @@ alias sm_6_6_version = _sm_6_6
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.6 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1693,6 +1748,7 @@ alias sm_6_7_version = _sm_6_7
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.7 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1710,6 +1766,7 @@ alias sm_6_8_version = _sm_6_8
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 
 /// HLSL shader model 6.8 and related capabilities of other targets.
@@ -1728,6 +1785,7 @@ alias sm_6_9_version = _sm_6_9
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 
 /// HLSL shader model 6.9 and related capabilities of other targets.
@@ -1804,6 +1862,7 @@ alias GLSL_130 = _GLSL_130
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                ;
 /// GLSL 140 and related capabilities of other targets.
 /// [Version]
@@ -1813,6 +1872,7 @@ alias GLSL_140 = _GLSL_140
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_130
                ;
@@ -1824,6 +1884,7 @@ alias GLSL_150 = _GLSL_150
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_texture_multisample
                // previous
@@ -1837,6 +1898,7 @@ alias GLSL_330 = _GLSL_330
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_150
                ;
@@ -1848,6 +1910,7 @@ alias GLSL_400 = _GLSL_400
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_gpu_shader5 + GL_ARB_texture_gather
                // previous
@@ -1861,6 +1924,7 @@ alias GLSL_410 = _GLSL_410
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_400
                ;
@@ -1872,6 +1936,7 @@ alias GLSL_420 = _GLSL_420
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_shader_image_load_store
                // previous
@@ -1885,6 +1950,7 @@ alias GLSL_430 = _GLSL_430
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_shader_image_size + GL_ARB_texture_query_levels
                // previous
@@ -1898,6 +1964,7 @@ alias GLSL_440 = _GLSL_440
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_430
                ;
@@ -1909,6 +1976,7 @@ alias GLSL_450 = _GLSL_450
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_derivative_control + GL_ARB_shader_texture_image_samples
                // previous
@@ -1922,6 +1990,7 @@ alias GLSL_460 = _GLSL_460
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_450
                ;
@@ -2052,6 +2121,7 @@ alias fragmentprocessing = fragment + _sm_5_0
                          | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                          | fragment + metal
                          | fragment + cpp
+                         | fragment + llvm
                          | fragment + cuda
                          | fragment + wgsl
                          ;
@@ -2150,7 +2220,7 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
 /// Capabilities required to use basic TextureFootprint operations
 /// [Compound]
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
@@ -2173,6 +2243,7 @@ alias pack_vector = GL_ARB_gpu_shader5
                   | wgsl
                   | metal
                   | cpp
+                  | llvm
                   ;
 
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'
@@ -2307,7 +2378,7 @@ alias quad_control = _sm_6_7
 
 /// Capabilities required to enable shader breakpoints
 /// [Compound]
-alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
+alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp | llvm;
 
 /// Collection of capabilities for raytracing with all raytracing stages.
 /// [Compound]

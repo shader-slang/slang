@@ -575,6 +575,40 @@ Specify the space index for the system defined global bindless resource array.
 Emit debug data to a separate file, and strip it from the main output file. 
 
 
+<a id="emit-cpu-via-cpp"></a>
+### -emit-cpu-via-cpp
+Generate CPU targets using C++ (default) 
+
+
+<a id="emit-cpu-via-llvm"></a>
+### -emit-cpu-via-llvm
+Generate CPU targets using LLVM 
+
+
+<a id="llvm-target-triple"></a>
+### -llvm-target-triple
+
+**-llvm-target-triple &lt;target triple&gt;**
+
+Sets the target triple for the LLVM target, enabling cross compilation. The default value is the host platform. 
+
+
+<a id="llvm-cpu"></a>
+### -llvm-cpu
+
+**-llvm-cpu &lt;cpu name&gt;**
+
+Sets the target CPU for the LLVM target, enabling the extensions and features of that CPU. The default value is "generic". 
+
+
+<a id="llvm-features"></a>
+### -llvm-features
+
+**-llvm-features &lt;a1,+enable,-disable,...&gt;**
+
+Sets a comma-separates list of architecture-specific features for the LLVM targets. 
+
+
 
 <a id="Downstream"></a>
 ## Downstream
@@ -1128,7 +1162,7 @@ Target
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
-* `object-code` : Object code 
+* `object-code`, `shader-object-code` : Object code for host execution (shader style) 
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
@@ -1137,6 +1171,9 @@ Target
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
 * `slangvm`, `slang-vm` : Slang VM byte code 
+* `host-object-code` : Object code for host execution (host style) 
+* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style) 
+* `llvm-shader-ir` : LLVM IR assembly (shader style) 
 
 <a id="stage"></a>
 ## stage
@@ -1185,6 +1222,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spirv` 
 * `wgsl` 
 * `slangvm` 
+* `llvm` 
 * `glsl_spirv_1_0` 
 * `glsl_spirv_1_1` 
 * `glsl_spirv_1_2` 
@@ -1302,15 +1340,23 @@ A capability describes an optional feature that a target may or may not support.
 * `any_gfx_target` 
 * `any_cpp_target` 
 * `cpp_cuda` 
+* `cpp_llvm` 
+* `cpp_cuda_llvm` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 
+* `cpp_cuda_glsl_hlsl_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv` 
+* `cpp_cuda_glsl_hlsl_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_spirv_wgsl_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm` 
 * `cpp_cuda_hlsl` 
 * `cpp_cuda_hlsl_spirv` 
 * `cpp_cuda_hlsl_metal_spirv` 
@@ -1323,12 +1369,14 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_glsl_hlsl` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
+* `cuda_glsl_hlsl_spirv_llvm` 
 * `cuda_glsl_hlsl_spirv_wgsl` 
 * `cuda_glsl_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_metal_spirv_wgsl` 
 * `cuda_glsl_spirv` 
 * `cuda_glsl_metal_spirv` 
 * `cuda_glsl_metal_spirv_wgsl` 
+* `cuda_glsl_metal_spirv_wgsl_llvm` 
 * `cuda_hlsl` 
 * `cuda_hlsl_spirv` 
 * `glsl_hlsl_spirv` 

@@ -7,6 +7,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -profile cs_6_0 -xslang -DHACK -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -xslang -DHACK -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name buffer
 RWStructuredBuffer<int> buffer;
