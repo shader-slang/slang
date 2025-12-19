@@ -29,6 +29,8 @@ jobs:
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
+        -v /runner/_work:/__w
+        -v /runner/externals:/__e:ro
 
     defaults:
       run:
