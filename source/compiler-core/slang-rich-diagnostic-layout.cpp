@@ -111,7 +111,8 @@ void RichDiagnosticLayout::collectLineInfo(
         return;
 
     // Helper lambda to find existing line info index
-    auto findLineInfoIndex = [&outLineInfos](const String& filePath, Index lineNumber) -> Index {
+    auto findLineInfoIndex = [&outLineInfos](const String& filePath, Index lineNumber) -> Index
+    {
         for (Index i = 0; i < outLineInfos.getCount(); i++)
         {
             if (outLineInfos[i].filePath == filePath && outLineInfos[i].lineNumber == lineNumber)
@@ -232,11 +233,13 @@ void RichDiagnosticLayout::collectLineInfo(
     }
 
     // Sort by file path and line number
-    outLineInfos.sort([](const LineInfo& a, const LineInfo& b) {
-        if (a.filePath != b.filePath)
-            return a.filePath < b.filePath;
-        return a.lineNumber < b.lineNumber;
-    });
+    outLineInfos.sort(
+        [](const LineInfo& a, const LineInfo& b)
+        {
+            if (a.filePath != b.filePath)
+                return a.filePath < b.filePath;
+            return a.lineNumber < b.lineNumber;
+        });
 }
 
 void RichDiagnosticLayout::renderHeader(StringBuilder& sb, const RichDiagnostic& diagnostic)
