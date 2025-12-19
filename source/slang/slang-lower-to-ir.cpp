@@ -5575,9 +5575,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
-                    context->getSink()->diagnose(
-                        expr,
-                        Diagnostics::interfaceDefaultInitializer);
+                    context->getSink()->diagnose(expr, Diagnostics::interfaceDefaultInitializer);
                 }
             }
 

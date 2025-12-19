@@ -1775,7 +1775,8 @@ DIAGNOSTIC(
     30506,
     Warning,
     interfaceDefaultInitializer,
-    "initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized")
+    "initializing an interface variable with defaults is deprecated and may cause unexpected "
+    "behavior. Please provide a compatible initializer or leave the variable uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(
