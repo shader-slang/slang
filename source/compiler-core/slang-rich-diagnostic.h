@@ -3,6 +3,7 @@
 
 #include "../core/slang-basic.h"
 #include "slang-source-loc.h"
+#include "slang-diagnostic-sink.h"
 
 namespace Slang
 {
