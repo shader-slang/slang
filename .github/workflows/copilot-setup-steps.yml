@@ -35,6 +35,10 @@ jobs:
         shell: bash
 
     steps:
+      - name: Install curl (required for Copilot preparation)
+        run: |
+          apt-get update && apt-get install -y curl
+
       - name: Install Git
         run: |
           apt-get update && apt-get install -y git
