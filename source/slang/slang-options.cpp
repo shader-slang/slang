@@ -750,7 +750,30 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."}};
+         "Emit debug data to a separate file, and strip it from the main output file."},
+        {OptionKind::EmitCPUViaCPP,
+         "-emit-cpu-via-cpp",
+         nullptr,
+         "Generate CPU targets using C++ (default)"},
+        {OptionKind::EmitCPUViaLLVM,
+         "-emit-cpu-via-llvm",
+         nullptr,
+         "Generate CPU targets using LLVM"},
+        {OptionKind::LLVMTargetTriple,
+         "-llvm-target-triple",
+         "-llvm-target-triple <target triple>",
+         "Sets the target triple for the LLVM target, enabling cross "
+         "compilation. The default value is the host platform."},
+        {OptionKind::LLVMCPU,
+         "-llvm-cpu",
+         "-llvm-cpu <cpu name>",
+         "Sets the target CPU for the LLVM target, enabling the extensions and "
+         "features of that CPU. The default value is \"generic\"."},
+        {OptionKind::LLVMFeatures,
+         "-llvm-features",
+         "-llvm-features <a1,+enable,-disable,...>",
+         "Sets a comma-separates list of architecture-specific features for the LLVM targets."},
+    };
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -3310,6 +3333,37 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
+        case OptionKind::EmitCPUViaCPP:
+        case OptionKind::EmitCPUViaLLVM:
+            {
+                SlangEmitCPUMethod selectMethod = (optionKind == OptionKind::EmitCPUViaCPP)
+                                                      ? SLANG_EMIT_CPU_VIA_CPP
+                                                      : SLANG_EMIT_CPU_VIA_LLVM;
+
+                getCurrentTarget()->optionSet.set(OptionKind::EmitCPUMethod, selectMethod);
+            }
+            break;
+        case OptionKind::LLVMTargetTriple:
+            {
+                CommandLineArg targetTriple;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(targetTriple));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMTargetTriple, targetTriple.value);
+                break;
+            }
+        case OptionKind::LLVMCPU:
+            {
+                CommandLineArg cpuName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(cpuName));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMCPU, cpuName.value);
+                break;
+            }
+        case OptionKind::LLVMFeatures:
+            {
+                CommandLineArg features;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(features));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMFeatures, features.value);
+                break;
+            }
         default:
             {
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the
@@ -3906,6 +3960,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
+                    case CodeGenTarget::HostObjectCode:
+                    case CodeGenTarget::ShaderObjectCode:
+                    case CodeGenTarget::HostLLVMIR:
+                    case CodeGenTarget::ShaderLLVMIR:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:
