@@ -97,6 +97,93 @@ void _typeLayout_keepFunctions()
     SLANG_UNUSED(b);
 }
 
+// Given a Type returns the equivalent ShaderParameterKind
+static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
+{
+    if (auto textureType = as<TextureType>(type))
+    {
+        if (textureType->isCombined())
+        {
+            switch (textureType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                return ShaderParameterKind::TextureSampler;
+            default:
+                return ShaderParameterKind::MutableTextureSampler;
+            }
+        }
+        else
+        {
+            switch (textureType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                return ShaderParameterKind::Texture;
+            default:
+                return ShaderParameterKind::MutableTexture;
+            }
+        }
+    }
+    else if (auto imageType = as<GLSLImageType>(type))
+    {
+        switch (imageType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ:
+            return ShaderParameterKind::Image;
+        default:
+            return ShaderParameterKind::MutableImage;
+        }
+    }
+    else if (as<SamplerStateType>(type))
+    {
+        return ShaderParameterKind::SamplerState;
+    }
+    else if (as<GLSLAtomicUintType>(type))
+    {
+        return ShaderParameterKind::AtomicUint;
+    }
+    else if (as<HLSLByteAddressBufferType>(type))
+    {
+        return ShaderParameterKind::RawBuffer;
+    }
+    else if (
+        as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type))
+    {
+        return ShaderParameterKind::MutableRawBuffer;
+    }
+    else if (as<GLSLInputAttachmentType>(type))
+    {
+        return ShaderParameterKind::InputRenderTarget;
+    }
+    else if (as<RaytracingAccelerationStructureType>(type))
+    {
+        return ShaderParameterKind::AccelerationStructure;
+    }
+    else if (as<UntypedBufferResourceType>(type))
+    {
+        return ShaderParameterKind::RawBuffer;
+    }
+    else if (as<GLSLShaderStorageBufferType>(type))
+    {
+        return ShaderParameterKind::MutableRawBuffer;
+    }
+    else if (as<HLSLStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::StructuredBuffer;
+    }
+    else if (
+        as<HLSLRWStructuredBufferType>(type) || as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::MutableStructuredBuffer;
+    }
+    else if (as<HLSLAppendStructuredBufferType>(type) || as<HLSLConsumeStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::AppendConsumeStructuredBuffer;
+    }
+    SLANG_UNEXPECTED("unhandled shader parameter kind");
+    UNREACHABLE_RETURN(ShaderParameterKind::Texture);
+}
+
 //
 
 struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
@@ -305,6 +392,20 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(context);
+
+        // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
+        auto uintInfo = GetScalarLayout(BaseType::UInt);
+        auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
+        return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
+    }
 };
 
 /// Common behavior for GLSL-family layout.
@@ -360,6 +461,26 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of a `struct` must be rounded up to be a multiple of its alignment.
         //
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+
+        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
+            auto uint64Info = GetScalarLayout(BaseType::UInt64);
+            return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
+        }
+
+        // For non-bindless GLSL/SPIRV targets, fall back to default layout
+        return Super::GetDescriptorHandleLayout(kind, elementType, context);
     }
 };
 
@@ -538,6 +659,21 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(kind);
+
+        // For CPU targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
+
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
     }
 };
 
@@ -766,6 +902,21 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(kind);
+
+        // For CUDA targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
+
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
     }
 };
 
@@ -5038,14 +5189,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (const auto samplerStateType = as<SamplerStateType>(type))
-    {
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions)
-                .getSimple(),
-            type,
-            rules);
-    }
     else if (as<SubpassInputType>(type))
     {
         // SubpassInputType fills 2 slots, 'shader resource' and 'input_attachment_index'
@@ -5056,127 +5199,92 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         objLayout1.layoutInfos.add(objLayout2.layoutInfos.getFirst());
         return createSimpleTypeLayout(objLayout1, type, rules);
     }
-    else if (auto textureType = as<TextureType>(type))
+    else if (auto structuredBufferType = as<HLSLStructuredBufferType>(type))
     {
-        // TODO: the logic here should really be defined by the rules,
-        // and not at this top level...
-        ShaderParameterKind kind;
-        if (textureType->isCombined())
-        {
-            switch (textureType->getAccess())
-            {
-            default:
-                kind = ShaderParameterKind::MutableTextureSampler;
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                kind = ShaderParameterKind::TextureSampler;
-                break;
-            }
-        }
-        else
-        {
-            switch (textureType->getAccess())
-            {
-            default:
-                kind = ShaderParameterKind::MutableTexture;
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                kind = ShaderParameterKind::Texture;
-                break;
-            }
-        }
-        auto objLayout = rules->GetObjectLayout(kind, context.objectLayoutOptions);
-        return createSimpleTypeLayout(objLayout, type, rules);
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::StructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::StructuredBuffer,
+            structuredBufferType,
+            structuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
     }
-    else if (auto imageType = as<GLSLImageType>(type))
+    else if (auto rwStructuredBufferType = as<HLSLRWStructuredBufferType>(type))
     {
-        // TODO: the logic here should really be defined by the rules,
-        // and not at this top level...
-        ShaderParameterKind kind;
-        switch (imageType->getAccess())
-        {
-        default:
-            kind = ShaderParameterKind::MutableImage;
-            break;
-
-        case SLANG_RESOURCE_ACCESS_READ:
-            kind = ShaderParameterKind::Image;
-            break;
-        }
-
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::MutableStructuredBuffer,
+            rwStructuredBufferType,
+            rwStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (
+        auto rasterizerOrderedStructuredBufferType =
+            as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::MutableStructuredBuffer,
+            rasterizerOrderedStructuredBufferType,
+            rasterizerOrderedStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (auto appendStructuredBufferType = as<HLSLAppendStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            appendStructuredBufferType,
+            appendStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (auto consumeStructuredBufferType = as<HLSLConsumeStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            consumeStructuredBufferType,
+            consumeStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (
+        as<TextureType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type) || as<GLSLImageType>(type) ||
+        as<GLSLShaderStorageBufferType>(type) || as<GLSLAtomicUintType>(type) ||
+        as<GLSLInputAttachmentType>(type) || as<UntypedBufferResourceType>(type) ||
+        as<RaytracingAccelerationStructureType>(type))
+    {
+        ShaderParameterKind kind = _getShaderParameterKindForResourceType(type);
         return createSimpleTypeLayout(
             rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
             rules);
     }
-    else if (as<SubpassInputType>(type))
-    {
-        ShaderParameterKind kind = ShaderParameterKind::SubpassInput;
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
-    }
-    else if (as<GLSLAtomicUintType>(type))
-    {
-        ShaderParameterKind kind = ShaderParameterKind::AtomicUint;
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
-    }
-
-    // TODO: need a better way to handle this stuff...
-#define CASE(TYPE, KIND)                                                                           \
-    else if (auto type_##TYPE = as<TYPE>(type)) do                                                 \
-    {                                                                                              \
-        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions) \
-                        .getSimple();                                                              \
-        auto typeLayout = createStructuredBufferTypeLayout(                                        \
-            context,                                                                               \
-            ShaderParameterKind::KIND,                                                             \
-            type_##TYPE,                                                                           \
-            type_##TYPE->getElementType());                                                        \
-        return TypeLayoutResult(typeLayout, info);                                                 \
-    }                                                                                              \
-    while (0)
-
-    CASE(HLSLStructuredBufferType, StructuredBuffer);
-    CASE(HLSLRWStructuredBufferType, MutableStructuredBuffer);
-    CASE(HLSLRasterizerOrderedStructuredBufferType, MutableStructuredBuffer);
-    CASE(HLSLAppendStructuredBufferType, AppendConsumeStructuredBuffer);
-    CASE(HLSLConsumeStructuredBufferType, AppendConsumeStructuredBuffer);
-
-#undef CASE
-
-
-    // TODO: need a better way to handle this stuff...
-#define CASE(TYPE, KIND)                                                                    \
-    else if (as<TYPE>(type)) do                                                             \
-    {                                                                                       \
-        return createSimpleTypeLayout(                                                      \
-            rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions), \
-            type,                                                                           \
-            rules);                                                                         \
-    }                                                                                       \
-    while (0)
-
-    CASE(HLSLByteAddressBufferType, RawBuffer);
-    CASE(HLSLRWByteAddressBufferType, MutableRawBuffer);
-    CASE(HLSLRasterizerOrderedByteAddressBufferType, MutableRawBuffer);
-
-    CASE(GLSLInputAttachmentType, InputRenderTarget);
-
-    // This case is mostly to allow users to add new resource types...
-    CASE(RaytracingAccelerationStructureType, AccelerationStructure);
-    CASE(UntypedBufferResourceType, RawBuffer);
-
-    CASE(GLSLShaderStorageBufferType, MutableRawBuffer);
-
-#undef CASE
-
     else if (auto basicType = as<BasicExpressionType>(type))
     {
         return createSimpleTypeLayout(
@@ -5348,8 +5456,19 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            auto uint64Type = context.astBuilder->getUInt64Type();
+            return _createTypeLayout(context, uint64Type);
+        }
+
+        // On bindless targets, DescriptorHandle<T> has the layout of T
         if (areResourceTypesBindlessOnTarget(context.targetReq))
             return _createTypeLayout(context, resPtrType->getElementType());
+
+        // On non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uint2Type = context.astBuilder->getVectorType(
             context.astBuilder->getUIntType(),
             context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
@@ -5978,6 +6097,34 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                 auto rowInfo =
                     varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+            }
+        }
+
+        return typeLayout;
+    }
+    else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type; // Preserve the original DescriptorHandle type
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            // Determine the layout resource kind based on the direction mask
+            LayoutResourceKind varyingKind = LayoutResourceKind::VaryingInput;
+            if (directionMask & kEntryPointParameterDirection_Output)
+                varyingKind = LayoutResourceKind::VaryingOutput;
+
+            auto objLayoutInfo = varyingRules[rr]->simpleRules->GetDescriptorHandleLayout(
+                varyingKind,
+                descriptorHandleType->getElementType(),
+                context);
+
+            // For combined texture samplers, objLayoutInfo may contain multiple layoutInfos
+            // (e.g., one for texture and one for sampler)
+            for (const auto& layoutInfo : objLayoutInfo.layoutInfos)
+            {
+                typeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
             }
         }
 

@@ -6449,22 +6449,12 @@ void setupExtForSubgroupBallotBuiltIn() {
     }
 }
 
-public property uint gl_NumSubgroups {
-
+public property uint gl_NumSubgroups
+{
+    [ForceInline]
     [require(glsl_spirv, subgroup_basic)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_NumSubgroups)";
-        case spirv:
-            return spirv_asm {
-                    OpCapability GroupNonUniform;
-                    result:$$uint = OpLoad builtin(NumSubgroups:uint);
-                };
-        }
-
+        return WaveGetNumWaves();
     }
 }
 
@@ -6508,96 +6498,46 @@ public property uint gl_SubgroupInvocationID
 
 public property uvec4 gl_SubgroupEqMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupEqMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupEqMask:uvec4);
-                    };
-        }
+        return WaveGetLaneEqMask();
     }
 }
 
 public property uvec4 gl_SubgroupGeMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupGeMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupGeMask:uvec4);
-                    };
-        }
+        return WaveGetLaneGeMask();
     }
 }
 
 public property uvec4 gl_SubgroupGtMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupGtMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupGtMask:uvec4);
-                    };
-        }
+        return WaveGetLaneGtMask();
     }
 }
 
 public property uvec4 gl_SubgroupLeMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupLeMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupLeMask:uvec4);
-                    };
-        }
+        return WaveGetLaneLeMask();
     }
 }
 
 public property uvec4 gl_SubgroupLtMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupLtMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupLtMask:uvec4);
-                    };
-        }
+        return WaveGetLaneLtMask();
     }
 }
 
@@ -7126,46 +7066,22 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public T subgroupExclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMin($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public T subgroupExclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMax($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMax(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7173,16 +7089,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitAnd(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7190,16 +7101,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitOr(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7207,16 +7113,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitXor(value);
 }
 
 // GL_KHR_shader_subgroup_arithmetic
@@ -7542,46 +7443,22 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMin($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMax($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMax(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7589,16 +7466,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitAnd(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7606,16 +7478,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitOr(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7623,16 +7490,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitXor(value);
 }
 
 // GL_KHR_shader_subgroup_ballot

@@ -27,7 +27,7 @@ bool equals(matrix<T, N, M> lhs, matrix<T, N, M> rhs)
         for (int j = 0; j < M; j++)
         {
             if (
-                lhs[i][j] 
+                lhs[i][j]
                 !=
                 rhs[i][j]
                 )
@@ -90,13 +90,13 @@ bool testHitObjectTraceRayWithAuxInfo() {
         && hitObjectGetRayTMaxNV(hit) == 1e4f
 // CHECK_GLSL-DAG: hitObjectGetObjectRayOriginNV
 // CHECK_SPV-DAG: OpHitObjectGetObjectRayOriginNV
-        && hitObjectGetObjectRayOriginNV(hit) == vec3(0.1, 0.1, 0.0) 
+        && hitObjectGetObjectRayOriginNV(hit) == vec3(0.1, 0.1, 0.0)
 // CHECK_GLSL-DAG: hitObjectGetObjectRayDirectionNV
 // CHECK_SPV-DAG: OpHitObjectGetObjectRayDirectionNV
         && hitObjectGetObjectRayDirectionNV(hit) == vec3(0, 0, 1)
 // CHECK_GLSL-DAG: hitObjectGetWorldRayOriginNV
 // CHECK_SPV-DAG: OpHitObjectGetWorldRayOriginNV
-        && hitObjectGetWorldRayOriginNV(hit) == vec3(0.1, 0.1, 0.0) 
+        && hitObjectGetWorldRayOriginNV(hit) == vec3(0.1, 0.1, 0.0)
 // CHECK_GLSL-DAG: hitObjectGetWorldRayDirectionNV
 // CHECK_SPV-DAG: OpHitObjectGetWorldRayDirectionNV
         && hitObjectGetWorldRayDirectionNV(hit) == vec3(0, 0, 1)
@@ -282,10 +282,10 @@ bool testTraceRayMotion() {
 // CHECK_GLSL-DAG: traceRayMotionNV
 // CHECK_SPV-DAG: OpTraceRayMotionNV
     traceRayMotionNV(as, gl_RayFlagsNoneEXT, 0xff, 0, 0, 0, vec3(0.1, 0.1, 0.0), 0.01f, vec3(0, 0, 1), 1e4f, 0.0f, 2);
-    attrMain = vec4(1); //ensure traceRayMotionNV does not get optimized out 
+    attrMain = vec4(1); //ensure traceRayMotionNV does not get optimized out
     return true &&
         attrMain == vec4(1)
-        ;       
+        ;
 }
 
 bool testPayloadReadWrite() {
@@ -317,7 +317,7 @@ bool testReadWriteOfObjects(){
         && testPayloadReadWrite()
         && testAttributeReadWrite()
         && testCallableReadWrite();
-        ;       
+        ;
 }
 
 void main()
@@ -329,6 +329,6 @@ void main()
         && testRecordEmptyCalls()
         && testTraceRayMotion()
         && testReadWriteOfObjects()
-        ;    
+        ;
     //BUF: 1
 }

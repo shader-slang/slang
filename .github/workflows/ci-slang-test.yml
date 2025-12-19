@@ -34,6 +34,11 @@ on:
         required: false
         type: boolean
         default: true
+      artifact-suffix:
+        required: false
+        type: string
+        default: ""
+        description: "Optional suffix for artifact name (e.g., '-cuda')"
 
 jobs:
   test-slang:
@@ -53,6 +58,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Test Slang
         run: |
@@ -82,10 +88,15 @@ jobs:
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
           fi
 
+          # Add Linux GPU expected failure list for CUDA builds (Tesla T4 driver limitations)
+          if [[ "${{ inputs.artifact-suffix }}" == "-cuda" ]]; then
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+          fi
+
           # Execute slang-test with all arguments
           "$bin_dir/slang-test" "${slang_test_args[@]}"
       - name: Run Slang examples
-        # Run GLSL backend tests on release for pull requests, and not on merge_group, to reduce CI load.
+        # Run examples on release for pull requests, and not on merge_group, to reduce CI load.
         if: inputs.full-gpu-tests && inputs.config == 'release' && github.event_name == 'pull_request'
         run: |
           .github/workflows/ci-examples.sh \
@@ -139,6 +150,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Run slang-rhi tests
         run: |
@@ -178,6 +190,7 @@ jobs:
           compiler: ${{ inputs.compiler }}
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
 
       - name: Setup Python
         if: ${{ runner.environment != 'self-hosted' }}
@@ -247,8 +260,27 @@ jobs:
 
       - name: Clone slangpy-samples
         run: |
+          # Clone slangpy-samples and checkout the tag matching the installed
+          # slangpy version. This ensures compatibility between the slangpy
+          # release and the samples. Falls back to main if no matching tag exists.
           echo "Cloning slangpy-samples repository..."
-          git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+
+          # Detect installed slangpy version
+          SLANGPY_VERSION=$(python -c "import slangpy; print(slangpy.__version__)" 2>/dev/null || echo "unknown")
+          echo "Installed slangpy version: $SLANGPY_VERSION"
+
+          # Try to clone specific version tag directly, fallback to main if it fails
+          if [ "$SLANGPY_VERSION" != "unknown" ]; then
+            if git clone --branch "v${SLANGPY_VERSION}" --depth 1 https://github.com/shader-slang/slangpy-samples.git 2>/dev/null; then
+              echo "Successfully cloned version tag v${SLANGPY_VERSION}"
+            else
+              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, cloning main branch"
+              git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+            fi
+          else
+            echo "Warning: Could not detect slangpy version, cloning main branch"
+            git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+          fi
 
       - name: Install slangpy-samples dependencies
         run: |

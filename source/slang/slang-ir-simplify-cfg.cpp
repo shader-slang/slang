@@ -348,12 +348,22 @@ static bool isTrivialIfElseBranch(IRIfElse* condBranch, IRBlock* branchBlock)
 {
     if (branchBlock != condBranch->getAfterBlock())
     {
-        if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
+        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr;
+             inst = inst->getNextInst())
         {
-            if (br->getTargetBlock() == condBranch->getAfterBlock() &&
-                br->getOp() == kIROp_UnconditionalBranch)
+            switch (inst->getOp())
             {
-                return true;
+            case kIROp_DebugLine:
+                continue;
+
+            case kIROp_UnconditionalBranch:
+                {
+                    auto br = as<IRUnconditionalBranch>(inst);
+                    return br->getTargetBlock() == condBranch->getAfterBlock();
+                }
+
+            default:
+                return false;
             }
         }
     }
@@ -433,12 +443,21 @@ static bool isTrivialSwitchBranch(IRSwitch* switchInst, IRBlock* branchBlock)
 {
     if (branchBlock != switchInst->getBreakLabel())
     {
-        if (auto br = as<IRUnconditionalBranch>(branchBlock->getFirstOrdinaryInst()))
+        for (auto inst = branchBlock->getFirstOrdinaryInst(); inst != nullptr; inst = inst->next)
         {
-            if (br->getTargetBlock() == switchInst->getBreakLabel() &&
-                br->getOp() == kIROp_UnconditionalBranch)
+            switch (inst->getOp())
             {
-                return true;
+            case kIROp_DebugLine:
+                continue;
+
+            case kIROp_UnconditionalBranch:
+                {
+                    auto br = as<IRUnconditionalBranch>(inst);
+                    return br->getTargetBlock() == switchInst->getBreakLabel();
+                }
+
+            default:
+                return false;
             }
         }
     }
@@ -564,9 +583,20 @@ static bool trySimplifySwitch(IRBuilder& builder, IRSwitch* switchInst)
         for (;;)
         {
             auto block = as<IRBlock>(targetUse->get());
-            if (block->getFirstInst()->getOp() != kIROp_UnconditionalBranch)
-                return;
-            auto branch = as<IRUnconditionalBranch>(block->getFirstInst());
+            IRUnconditionalBranch* branch = nullptr;
+            for (auto inst = block->getFirstInst(); inst && !branch; inst = inst->next)
+            {
+                switch (inst->getOp())
+                {
+                case kIROp_DebugLine:
+                    continue;
+                case kIROp_UnconditionalBranch:
+                    branch = as<IRUnconditionalBranch>(inst);
+                    break;
+                default:
+                    return;
+                }
+            }
             // We can't fuse the block if there are phi arguments.
             if (branch->getArgCount() != 0)
                 return;
@@ -945,7 +975,7 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
                     inst = next;
                 }
                 branch->removeAndDeallocate();
-                assert(!successor->hasUses());
+                SLANG_ASSERT(!successor->hasUses());
                 successor->removeAndDeallocate();
 
                 break;
