@@ -105,7 +105,10 @@ private:
         Index labelIndex);
 
     /// Render notes and helps
-    void renderNotesAndHelps(StringBuilder& sb, const RichDiagnostic& diagnostic, Index gutterWidth);
+    void renderNotesAndHelps(
+        StringBuilder& sb,
+        const RichDiagnostic& diagnostic,
+        Index gutterWidth);
 
     /// Get the gutter width needed for line numbers
     Index calculateGutterWidth(const List<LineInfo>& lineInfos);
