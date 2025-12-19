@@ -677,6 +677,70 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     }
 };
 
+// The LLVM layout is similar to the CPU layout, except vectors are aligned to the
+// next power of two.
+//
+// TODO: The current implementation should be reasonably performant and reliable
+// on common targets. However, the layout rules should follow LLVM's DataLayout
+// for the given target triple. To know this triple, it either needs to be
+// passed as a parameter to all member functions or the struct needs to have a
+// constructor and be constructed dynamically.
+//
+// All of that implies a larger refactor touching lots of code around the
+// codebase.
+struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    {
+        switch (baseType)
+        {
+        case BaseType::Bool:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
+        case BaseType::IntPtr:
+        case BaseType::UIntPtr:
+            // TODO: Hardcoded size and alignment for 64 bit pointers. This is
+            // excessive if the target is 32-bit, but should work everywhere in
+            // practice. There will simply be unused bytes.
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+
+        // This always returns a layout where the size is the same as the alignment.
+        default:
+            return Super::GetScalarLayout(baseType);
+        }
+    }
+
+    SimpleLayoutInfo GetPointerLayout() override
+    {
+        // TODO: Hardcoded size and alignment for 64 bit pointers. Leads to
+        // wasted bytes on 32-bit targets.
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+    }
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        // Align vector to next power of two.
+        vectorInfo.alignment = Slang::_roundUpToPowerOfTwo(vectorInfo.size.getFiniteValue());
+        return vectorInfo;
+    }
+
+    UniformLayoutInfo BeginStructLayout() override { return Super::BeginStructLayout(); }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Insert tailing padding.
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+};
+
 // The CUDA compiler NVRTC only works on 64 bit operating systems.
 // So instead of using native host type sizes we use these types instead
 //
@@ -1346,6 +1410,30 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct LLVMLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1453,6 +1541,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+LLVMLayoutRulesFamilyImpl kLLVMLayoutRulesFamilyImpl;
 CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
@@ -1875,6 +1964,46 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLObjectLayoutRulesImpl,
 };
 
+// LLVM cases
+
+static LLVMLayoutRulesImpl kLLVMLayoutRulesImpl;
+
+LayoutRulesImpl kLLVMLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kLLVMLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMAnyValueLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd140LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd140LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd430LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd430LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMScalarLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMCLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
 // GLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
@@ -2158,6 +2287,133 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getEntryPointParameterRules()
 LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOptionSet&)
 {
     return &kCPULayoutRulesImpl_;
+}
+
+// LLVM Family
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kLLVMAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet& compilerOptions,
+    Type* containerType)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        switch (cbufferType->getLayoutType()->astNodeType)
+        {
+        default:
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::Std140DataLayoutType:
+            return &kLLVMStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+        case ASTNodeType::Std430DataLayoutType:
+            return &kLLVMStd430LayoutRulesImpl_;
+        case ASTNodeType::ScalarDataLayoutType:
+            return &kLLVMScalarLayoutRulesImpl_;
+        case ASTNodeType::CDataLayoutType:
+            return &kLLVMCLayoutRulesImpl_;
+        }
+    }
+    else if (containerType == nullptr)
+        return &kLLVMStd140LayoutRulesImpl_;
+
+    // If we're here, containerType is probably a uniform parameter.
+
+    // It'd be nice if this could be Std140 to match GLSL. However, that can't
+    // be: the LLVM target needs to collect its uniforms into one top-level
+    // ConstantBuffer, which in turn enforces that all uniforms must use the
+    // same layout :/
+    //
+    // The top-level ConstantBuffer uses the C layout for compatibility with the
+    // C++ target, so uniforms within it cannot be Std140.
+    return &kLLVMCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd140LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kLLVMCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getStructuredBufferRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
 }
 
 // C compatible layout family
@@ -2695,6 +2951,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+        if (isCPUTargetViaLLVM(targetReq))
+        {
+            return &kLLVMLayoutRulesFamilyImpl;
+        }
+        else
         {
             // For now lets use some fairly simple CPU binding rules
 
@@ -2706,6 +2971,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
             return &kCPULayoutRulesFamilyImpl;
         }
+
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
@@ -2989,13 +3255,45 @@ bool isSPIRV(CodeGenTarget codeGenTarget)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
+    return isCPUTarget(targetReq->getTarget());
+}
+
+bool isCPUTarget(CodeGenTarget codeGenTarget)
+{
     return ArtifactDescUtil::isCpuLikeTarget(
-        ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
+        ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)));
+}
+
+bool isCPUTargetViaLLVM(TargetRequest* targetReq)
+{
+    SlangEmitCPUMethod emitCPUMethod = targetReq->getOptionSet().getEnumOption<SlangEmitCPUMethod>(
+        CompilerOptionName::EmitCPUMethod);
+    bool emitViaLLVM = emitCPUMethod == SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM;
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+        return true;
+
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+        return emitViaLLVM;
+    }
 }
 
 bool isCUDATarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isCUDATarget(targetReq->getTarget());
+}
+
+bool isCUDATarget(CodeGenTarget codeGenTarget)
+{
+    switch (codeGenTarget)
     {
     default:
         return false;
@@ -3035,7 +3333,8 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->shouldEmitSPIRVDirectly())
+    if (targetProgram->shouldEmitSPIRVDirectly() ||
+        isCPUTargetViaLLVM(targetProgram->getTargetReq()))
     {
         return SourceLanguage::Unknown;
     }
@@ -3074,7 +3373,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         }
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostSharedLibrary:
-    case CodeGenTarget::ObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:

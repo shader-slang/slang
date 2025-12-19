@@ -5,6 +5,7 @@
 
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -compute -entry computeMain -allow-glsl -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF):-llvm -compute -entry computeMain -allow-glsl -output-using-type -Xslang -DTARGET_LLVM
 
 //TEST_INPUT:ubuffer(data=[0 1 -1], stride=4):name=inputBuffer
 buffer MyBlockName1
@@ -462,9 +463,11 @@ bool Test_ScalarType()
 
         // CHECK_GLSL-COUNT-3: inverse(
         // CHECK_SPIR-COUNT-3: MatrixInverse{{ }}
+#if !defined(TARGET_LLVM)
         && equals(identity2x2, inverse(identity2x2))
         && equals(identity3x3, inverse(identity3x3))
         && equals(identity4x4, inverse(identity4x4))
+#endif
 
         // 8.8. Integer Functions
 

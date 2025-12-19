@@ -5,6 +5,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -wgsl -compute
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -mtl -compute
 //TEST(compute,vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -vk -compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK): -llvm -compute
 
 // Slang allows the type of system value semantics to differ from their
 // "canonical" type - e.g. `uint8_t tid : SV_DispatchThreadID` is technically
