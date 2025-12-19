@@ -2949,9 +2949,9 @@ bool isD3DTarget(TargetRequest* targetReq)
     }
 }
 
-bool isMetalTarget(TargetRequest* targetReq)
+bool isMetalTarget(CodeGenTarget target)
 {
-    switch (targetReq->getTarget())
+    switch (target)
     {
     default:
         return false;
@@ -2961,6 +2961,11 @@ bool isMetalTarget(TargetRequest* targetReq)
     case CodeGenTarget::MetalLibAssembly:
         return true;
     }
+}
+
+bool isMetalTarget(TargetRequest* targetReq)
+{
+    return isMetalTarget(targetReq->getTarget());
 }
 
 bool isKhronosTarget(CodeGenTarget target)
@@ -2987,15 +2992,20 @@ bool isSPIRV(CodeGenTarget codeGenTarget)
     return codeGenTarget == CodeGenTarget::SPIRV || codeGenTarget == CodeGenTarget::SPIRVAssembly;
 }
 
-bool isCPUTarget(TargetRequest* targetReq)
+bool isCPUTarget(CodeGenTarget target)
 {
     return ArtifactDescUtil::isCpuLikeTarget(
-        ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
+        ArtifactDescUtil::makeDescForCompileTarget(asExternal(target)));
 }
 
-bool isCUDATarget(TargetRequest* targetReq)
+bool isCPUTarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isCPUTarget(targetReq->getTarget());
+}
+
+bool isCUDATarget(CodeGenTarget target)
+{
+    switch (target)
     {
     default:
         return false;
@@ -3005,6 +3015,11 @@ bool isCUDATarget(TargetRequest* targetReq)
     case CodeGenTarget::PTX:
         return true;
     }
+}
+
+bool isCUDATarget(TargetRequest* targetReq)
+{
+    return isCUDATarget(targetReq->getTarget());
 }
 
 bool isWGPUTarget(CodeGenTarget target)
@@ -3100,9 +3115,14 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
     return SourceLanguage::Unknown;
 }
 
+bool areResourceTypesBindlessOnTarget(CodeGenTarget target)
+{
+    return isCPUTarget(target) || isCUDATarget(target) || isMetalTarget(target);
+}
+
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
-    return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
+    return areResourceTypesBindlessOnTarget(targetReq->getTarget());
 }
 
 static bool isD3D11Target(TargetRequest*)

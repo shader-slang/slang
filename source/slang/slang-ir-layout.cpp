@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -373,11 +374,29 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
-            IRBuilder builder(type);
-            builder.setInsertBefore(type);
-            auto uintType = builder.getUIntType();
-            auto uint2Type = builder.getVectorType(uintType, 2);
-            return getSizeAndAlignment(optionSet, this, uint2Type, outSizeAndAlignment);
+            // DescriptorHandle<T> size depends on the target:
+            // - On bindless targets (CUDA, CPU, Metal), it has the same size as T
+            // - On other targets, it's represented as uint2 (8 bytes)
+            auto handleType = cast<IRDescriptorHandleType>(type);
+
+            if (areResourceTypesBindlessOnTarget(optionSet.getTarget()))
+            {
+                // On bindless targets, DescriptorHandle<T> has the same layout as T
+                return getSizeAndAlignment(
+                    optionSet,
+                    this,
+                    handleType->getResourceType(),
+                    outSizeAndAlignment);
+            }
+            else
+            {
+                // On non-bindless targets, DescriptorHandle is represented as uint2
+                IRBuilder builder(type);
+                builder.setInsertBefore(type);
+                auto uintType = builder.getUIntType();
+                auto uint2Type = builder.getVectorType(uintType, 2);
+                return getSizeAndAlignment(optionSet, this, uint2Type, outSizeAndAlignment);
+            }
         }
     case kIROp_AttributedType:
         {
