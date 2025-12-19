@@ -243,6 +243,10 @@ struct ResourceOutputSpecializationPass
         newFunc->setFullType(oldFunc->getFullType());
 
         IRCloneEnv cloneEnv;
+        // Map oldFunc to newFunc so that any self-references (e.g., DebugScope
+        // instructions that reference the containing function) get properly
+        // remapped during cloning.
+        cloneEnv.mapOldValToNew.add(oldFunc, newFunc);
         cloneInstDecorationsAndChildren(&cloneEnv, module, oldFunc, newFunc);
 
         // At first `newFunc` is a direct clone of `oldFunc`, and thus doesn't

@@ -1849,6 +1849,11 @@ struct SpecializationContext
 
         IRFunc* newFunc = builder->createFunc();
 
+        // Map oldFunc to newFunc so that any self-references (e.g., DebugScope
+        // instructions that reference the containing function) get properly
+        // remapped during cloning.
+        cloneEnv.mapOldValToNew.add(oldFunc, newFunc);
+
         builder->setInsertInto(newFunc);
         IRBlock* tempHeaderBlock = builder->emitBlock();
 
