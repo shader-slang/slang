@@ -10,22 +10,58 @@ on:
 
 jobs:
   copilot-setup-steps:
-    runs-on: ubuntu-latest
+    # Use self-hosted ARC runner with GPU support for Copilot
+    runs-on: [self-hosted, Linux, GPU, arc]
 
     permissions:
       contents: read
       pull-requests: write
       checks: write
 
+    container:
+      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: "2"
-      - uses: ./.github/actions/format-setup
-      - name: setup environment
+      - name: Install Git and dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libx11-dev
+          apt-get update
+          apt-get install -y \
+            git \
+            libx11-6 \
+            libxext6 \
+            libegl1 \
+            libvulkan1 \
+            python3
+          git config --global --add safe.directory '*'
+
+      - name: Verify GPU access
+        run: |
+          echo "=== GPU Information ==="
+          nvidia-smi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Configure CMake
+        run: |
           cmake --preset default --fresh
+
+      - name: Build Slang
+        run: |
           cmake --workflow --preset debug
