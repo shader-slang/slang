@@ -14,12 +14,13 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        llvmPackages = pkgs.llvmPackages_21;
+        # We want to use Clang instead of GCC because it seems to behave better
+        # with LLDB, so we use `mkShell` with the LLVM stdenv
+        mkShell = pkgs.mkShell.override { stdenv = llvmPackages.stdenv; };
       in
       {
-        # We want to use Clang instead of GCC because it seems to behave better
-        # with LLDB, so we use `mkShellNoCC` here instead of `mkShell` because
-        # the latter brings in GCC by default on Linux.
-        devShell = pkgs.mkShellNoCC {
+        devShell = mkShell {
           buildInputs = [
             # We must list clangd before the `clang` package to make sure it
             # comes earlier on the `PATH`, and we must get it from the
@@ -39,10 +40,9 @@
               }
             ])
 
-            pkgs.clang
             pkgs.cmake
             pkgs.gersemi
-            pkgs.lldb
+            llvmPackages.lldb
             pkgs.ninja
             pkgs.nixfmt-rfc-style
             pkgs.prettier
@@ -56,6 +56,13 @@
             # other than NixOS may require the use of nixGL:
             # https://github.com/nix-community/nixGL
             pkgs.vulkan-loader
+            # Needed for the prebuilt LLVM
+            pkgs.libz
+            pkgs.zstd
+            # Despite requiring this packages (slang) to be built with Clang,
+            # the prebuilt libslang-llvm.so is actually linked against GCC's
+            # libstdc++.so.6
+            pkgs.stdenv.cc.cc.lib
           ];
         };
       }
