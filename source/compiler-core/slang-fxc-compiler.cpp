@@ -300,8 +300,25 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case DebugInfoType::None:
         break;
 
-    default:
+    case DebugInfoType::Minimal:
+    case DebugInfoType::Standard:
+    case DebugInfoType::Maximal:
+        // FXC has limited debug control options - it only supports a binary on/off for debug info
+        // All non-None levels enable D3DCOMPILE_DEBUG which includes line numbers and symbols
+        // The actual debug level control is primarily done in the IR generation phase
         flags |= D3DCOMPILE_DEBUG;
+        
+        // For maximal debug, also disable optimizations
+        if (options.debugInfoType == DebugInfoType::Maximal)
+        {
+            // If optimizations were set to anything other than None, override to None
+            if (options.optimizationLevel != OptimizationLevel::None)
+            {
+                // Remove any previous optimization flags and set to O0
+                flags &= ~(D3DCOMPILE_OPTIMIZATION_LEVEL1 | D3DCOMPILE_OPTIMIZATION_LEVEL2 | D3DCOMPILE_OPTIMIZATION_LEVEL3);
+                flags |= D3DCOMPILE_OPTIMIZATION_LEVEL0;
+            }
+        }
         break;
     }
 
