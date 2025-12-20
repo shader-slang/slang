@@ -10704,6 +10704,36 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             emitGenericConstraintDecl(subContext, constraintDecl);
         }
 
+        // If we are emitting an IRGeneric inst for a generic interface member,
+        // we need to create a fresh stand-in ThisType and ThisTypeWitness in this
+        // IRGeneric scoppe.
+        if (auto ifaceDecl = as<InterfaceDecl>(genericDecl->inner))
+        {
+            if (auto lowered = subContext->findLoweredDecl(ifaceDecl))
+            {
+                IRInst* currentThisType = lowered->val;
+                if (auto irIfaceGeneric = as<IRGeneric>(currentThisType))
+                    currentThisType = findGenericReturnVal(irIfaceGeneric);
+                if (as<IRInterfaceType>(currentThisType))
+                {
+                    auto outerInterfaceGeneric = findOuterGeneric(currentThisType);
+                    SLANG_ASSERT(outerInterfaceGeneric);
+
+                    List<IRInst*> params = irGeneric->getParams().getLast();
+                    // The specialized interface generic.
+                    auto specializedInterfaceType = subBuilder->emitSpecializeInst(
+                        subBuilder->getTypeKind(),
+                        outerInterfaceGeneric,
+                        params);
+                    auto newThisType = subBuilder->getThisType((IRType*)specializedInterfaceType);
+                    auto newThisWitness =
+                        subBuilder->createThisTypeWitness((IRType*)specializedInterfaceType);
+                    subContext->thisType = newThisType;
+                    subContext->thisTypeWitness = newThisWitness;
+                }
+            }
+        }
+
         return irGeneric;
     }
 
