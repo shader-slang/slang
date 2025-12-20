@@ -288,11 +288,11 @@ static int glslang_optimizeSPIRV(
     };
     optimizer.SetMessageConsumer(messageConsumer);
 
-    // If debug info is being generated, propagate
+    // If debug info is being generated at Minimal level or above, propagate
     // line information into all SPIR-V instructions. This avoids loss of
     // information when instructions are deleted or moved. Later, remove
     // redundant information to minimize final SPRIR-V size.
-    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
+    if (debugInfoType >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
     {
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
     }
@@ -509,7 +509,7 @@ static int glslang_optimizeSPIRV(
         }
     }
 
-    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
+    if (debugInfoType >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
     {
         optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
@@ -776,16 +776,28 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
 
     const SlangDebugInfoLevel debugLevel = (SlangDebugInfoLevel)request.debugInfoType;
 
-    // Enable generation of debug info, if any debug level other than none is requested
-    if (debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
+    // Configure debug info generation based on the requested level:
+    // - Minimal: Line numbers only (basic debug info for stack traces)
+    // - Standard: Full debug info including variables and types
+    // - Maximal: Everything including source code embedding and no optimization
+    
+    if (debugLevel >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
     {
+        // Enable basic debug info for all levels (Minimal and above)
         spvOptions.generateDebugInfo = true;
-        spvOptions.emitNonSemanticShaderDebugInfo = true;
         shader->setDebugInfo(true);
+    }
+
+    if (debugLevel >= SLANG_DEBUG_INFO_LEVEL_STANDARD)
+    {
+        // Enable NonSemantic debug info for Standard and Maximal
+        // This includes variable names, types, and other rich debug information
+        spvOptions.emitNonSemanticShaderDebugInfo = true;
     }
 
     if (debugLevel == SLANG_DEBUG_INFO_LEVEL_MAXIMAL)
     {
+        // For Maximal, also embed source code and disable optimizations
         spvOptions.emitNonSemanticShaderDebugSource = true;
         spvOptions.disableOptimizer = true;
         request.optimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;

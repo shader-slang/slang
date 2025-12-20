@@ -2367,10 +2367,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_DebugSource:
             {
-                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
                 auto debugSource = as<IRDebugSource>(inst);
                 auto sourceStr = as<IRStringLit>(debugSource->getSource())->getStringSlice();
-                // If source content is empty, skip the content operand.
+                auto debugLevel = m_targetProgram->getOptionSet().getDebugInfoLevel();
+                if (debugLevel == DebugInfoLevel::Minimal)
+                {
+                    // For minimal (g1), just emit OpString with the filename for use with OpLine
+                    // The actual OpSource instruction is emitted separately in emitSPIRVFromIR
+                    return emitInst(
+                        getSection(SpvLogicalSectionID::DebugStringsAndSource),
+                        inst,
+                        SpvOpString,
+                        kResultID,
+                        debugSource->getFileName());
+                }
+                
+                // For Standard (g2) and Maximal (g3), use NonSemantic DebugSource
+                // Both levels are treated identically in SPIR-V emit;
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_non_semantic_info"));
                 if (sourceStr.getLength() == 0)
                 {
                     return emitOpDebugSource(
@@ -8534,6 +8548,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
     {
+        // For Minimal (g1), emit standard SPIR-V OpLine for line number tracking only
+        auto debugLevel = m_targetProgram->getOptionSet().getDebugInfoLevel();
+        if (debugLevel == DebugInfoLevel::Minimal)
+        {
+            // Emit standard SPIR-V OpLine instruction for minimal debug info
+            // OpLine takes: file (id), line (literal), column (literal)
+            auto lineStart = as<IRIntLit>(debugLine->getLineStart())->getValue();
+            auto colStart = as<IRIntLit>(debugLine->getColStart())->getValue();
+            // Extract the filename from the IRDebugSource instruction
+            // IRDebugSource has: operand 0 = filename, operand 1 = source content
+            auto debugSource = as<IRDebugSource>(debugLine->getSource());
+            return emitInst(
+                parent,
+                debugLine,
+                SpvOpLine,
+                debugSource->getFileName(),  // file ID should be the filename, not source content
+                SpvLiteralInteger::from32((uint32_t)lineStart),  // line number
+                SpvLiteralInteger::from32((uint32_t)colStart));  // column number
+        }
+        
+        // For Standard (g2) and Maximal (g3), use NonSemantic DebugLine
+        // Both levels are treated identically in SPIR-V emit
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
@@ -9859,6 +9895,18 @@ SlangResult emitSPIRVFromIR(
         CompilerOptionName::PreserveParameters);
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::GenerateWholeProgram);
+    
+    // Note: Debug info emission is controlled by the IR generation phase based on the debug level:
+    // - None (g0): No debug instructions in IR
+    // - Minimal (g1): IRDebugSource (without content) and IRDebugLine for line numbers only
+    //                 Emits standard SPIR-V debug instructions (OpString, OpLine, OpSource)
+    // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
+    // - Maximal (g3): Same as Standard, but with source content embedded in IRDebugSource
+    // 
+    // In SPIR-V emit, Standard and Maximal are treated identically - both use NonSemantic
+    // debug info extensions. The only difference is whether source content was embedded
+    // during IR generation, which is transparent to the SPIR-V emitter.
+    
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))
