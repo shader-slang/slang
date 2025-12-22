@@ -2,6 +2,8 @@
 // variable is initialized with defaults.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+
+//Disabled due to issue 9462
 //DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 
 
