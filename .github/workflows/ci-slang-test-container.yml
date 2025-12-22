@@ -129,7 +129,7 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
       options: >-
         --gpus all
         --user root
@@ -145,15 +145,14 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
+      - name: Install runtime dependencies
         run: |
           apt-get update && apt-get install -y \
-            git \
             libx11-6 \
             libxext6 \
             libegl1 \
             libvulkan1
-          git config --global --add safe.directory '*'
+          rm -rf /var/lib/apt/lists/*
 
       - uses: actions/checkout@v4
         with:
@@ -199,7 +198,7 @@ jobs:
     timeout-minutes: 30
     if: always() && inputs.config == 'release'
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
       options: >-
         --gpus all
         --user root
@@ -215,18 +214,15 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git, Python and dependencies
+      - name: Install Python dependencies
         run: |
           apt-get update && apt-get install -y \
-            git \
-            python3 \
             python3-pip \
-            curl \
             libx11-6 \
             libxext6 \
             libegl1 \
             libvulkan1
-          git config --global --add safe.directory '*'
+          rm -rf /var/lib/apt/lists/*
           # Create python -> python3 symlink for slangpy-samples tests
           ln -sf /usr/bin/python3 /usr/bin/python
 
