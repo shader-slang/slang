@@ -20,6 +20,9 @@ jobs:
 
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -35,13 +38,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
