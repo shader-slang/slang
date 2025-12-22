@@ -12,7 +12,7 @@ and linear algebra operations for neural network computations.
 @see `InlineVector`
 @category neural
 */
-public interface IVector<T, int N> : IDifferentiable, IRWArray<T>
+public interface IVector<T, int N> : IDifferentiable, IArrayAccessor<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {

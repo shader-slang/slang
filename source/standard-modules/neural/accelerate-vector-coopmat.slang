@@ -304,7 +304,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
                     // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUnit4() will handle the padding
                     // if the reading is cross the boundary of the uint4 vector size.
-                    value = weightStorage.readUint4<IsAlignedVector, K, 0>(weightAddress, offsetAddress);
+                    value = weightStorage.readUint4<IsAlignedVector, K>(weightAddress, offsetAddress);
                 }
 
                 sharedMemory[indexInVectorizedTile] = value;
@@ -363,7 +363,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // Since the input vector is loaded from thread local memory, one thread can only load one
     // column of the matrix B.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVector<InputArray: IArray<T>>(
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVector<InputArray: IArrayAccessor<T>>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
@@ -436,7 +436,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // into the shared memory. Compared to the LoadSharedMemoryFromLocalVector, where it loads partial vectors by every thread
     // in a warp.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, InputArray : IArray<T>>(
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, InputArray : IArrayAccessor<T>>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
         InputArray inputVector)
@@ -463,7 +463,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // column of the matrix B.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void StoreSharedMemoryToLocalVector<InputArray : IRWArray<T>>(
+    VISIBILITY_LEVEL static void StoreSharedMemoryToLocalVector<InputArray : IArrayAccessor<T>>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
@@ -559,8 +559,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
-            where InArrayTypeA : IArray<T>
-            where InArrayTypeB : IArray<T>
+            where InArrayTypeA : IArrayAccessor<T>
+            where InArrayTypeB : IArrayAccessor<T>
     {
         const uint subgroupIndex = getWaveId();
 
@@ -648,8 +648,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
-            where InArrayType : IArray<T>
-            where OutArrayType : IRWArray<T>
+            where InArrayType : IArrayAccessor<T>
+            where OutArrayType : IArrayAccessor<T>
     {
         SPtr<uint4> ptrA[EnableDoubleBuffer ? 2 : 1];
         SPtr<uint4> ptrB[EnableDoubleBuffer ? 2 : 1];

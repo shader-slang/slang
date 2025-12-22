@@ -32,7 +32,7 @@ public interface IStorage<T> : IDifferentiablePtrType
     Reads sequential 4 elements starting from the given address and packed into a uint4.
     */
 
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address);
+    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address);
 
     internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value);
     /**

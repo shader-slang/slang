@@ -55,10 +55,9 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return m_buffer[address + m_baseAddress];
     }
 
-
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address)
+    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
     {
-        return readUint4<T, BufferType, IsAligned, ActualBoundary, AlignedBoundary>(m_buffer, baseAddress, address);
+        return readUint4<T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address);
     }
 
     internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>( Address baseAddress, Address address, uint4 value)
