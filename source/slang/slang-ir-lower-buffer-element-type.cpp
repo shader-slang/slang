@@ -2184,13 +2184,14 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
-    if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+    auto targetReq = target->getTargetReq();
+    if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
+        if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
+        if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If the user specified a C-compatible buffer layout, then do that.
@@ -2235,7 +2236,13 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std140);
+
+            // The CPU targets default to the C buffer layout for compatibility
+            // with C/C++.
+            auto defaultTypeOp =
+                isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
+
+            return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2273,6 +2280,26 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         }
     }
+    else
+    {
+        // Set address space for buffer types
+        switch (bufferType->getOp())
+        {
+        case kIROp_ParameterBlockType:
+        case kIROp_ConstantBufferType:
+            addrSpace = AddressSpace::Uniform;
+            break;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        case kIROp_GLSLShaderStorageBufferType:
+            addrSpace = AddressSpace::StorageBuffer;
+            break;
+        }
+    }
+
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return TypeLoweringConfig{addrSpace, rules};
 }
@@ -2545,13 +2572,24 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
     {
-        // For spirv, we always want to lower all matrix types, because SPIRV does not support
+        // For spirv, we generally want to lower all matrix types, because SPIRV does not support
         // specifying matrix layout/stride if the matrix type is used in places other than
         // defining a struct field. This means that if a matrix is used to define a varying
         // parameter, we always want to wrap it in a struct.
-        //
+        // Matrices within uniform and storage buffers are already members in the overall buffer
+        // struct type, hence do not need to be lowered.
         if (target->shouldEmitSPIRVDirectly())
-            return true;
+        {
+            switch (config.addressSpace)
+            {
+            case AddressSpace::Uniform:
+            case AddressSpace::StorageBuffer:
+                return false;
+            default:
+                return true;
+            }
+        }
+
         return DefaultBufferElementTypeLoweringPolicy::shouldLowerMatrixType(matrixType, config);
     }
 
@@ -2676,6 +2714,23 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    LLVMBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
+    {
+        SLANG_UNUSED(matrixType);
+        SLANG_UNUSED(config);
+        return true;
+    }
+};
+
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
@@ -2691,6 +2746,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::LLVM:
+        return new LLVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }

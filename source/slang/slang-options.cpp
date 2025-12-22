@@ -754,7 +754,30 @@ void initCommandOptions(CommandOptions& options)
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
-         "Emit debug data to a separate file, and strip it from the main output file."}};
+         "Emit debug data to a separate file, and strip it from the main output file."},
+        {OptionKind::EmitCPUViaCPP,
+         "-emit-cpu-via-cpp",
+         nullptr,
+         "Generate CPU targets using C++ (default)"},
+        {OptionKind::EmitCPUViaLLVM,
+         "-emit-cpu-via-llvm",
+         nullptr,
+         "Generate CPU targets using LLVM"},
+        {OptionKind::LLVMTargetTriple,
+         "-llvm-target-triple",
+         "-llvm-target-triple <target triple>",
+         "Sets the target triple for the LLVM target, enabling cross "
+         "compilation. The default value is the host platform."},
+        {OptionKind::LLVMCPU,
+         "-llvm-cpu",
+         "-llvm-cpu <cpu name>",
+         "Sets the target CPU for the LLVM target, enabling the extensions and "
+         "features of that CPU. The default value is \"generic\"."},
+        {OptionKind::LLVMFeatures,
+         "-llvm-features",
+         "-llvm-features <a1,+enable,-disable,...>",
+         "Sets a comma-separates list of architecture-specific features for the LLVM targets."},
+    };
 
     _addOptions(makeConstArrayView(targetOpts), options);
 
@@ -1574,29 +1597,6 @@ void OptionsParser::setProfile(RawTarget* rawTarget, Profile profile)
         }
     }
     rawTarget->optionSet.setProfile(profile);
-
-    // Auto-enable hlsl_nvapi for HLSL raytracing profiles < sm_6_9
-    // DXR 1.3 native (sm_6_9+) doesn't need NVAPI, but older profiles do
-    // Only apply to D3D targets (HLSL/DXIL), not SPIRV or other targets
-    bool isD3DFormat = false;
-    switch (rawTarget->format)
-    {
-    case CodeGenTarget::HLSL:
-    case CodeGenTarget::DXBytecode:
-    case CodeGenTarget::DXBytecodeAssembly:
-    case CodeGenTarget::DXIL:
-    case CodeGenTarget::DXILAssembly:
-        isD3DFormat = true;
-        break;
-    default:
-        break;
-    }
-    if (isD3DFormat && profile.getFamily() == ProfileFamily::DX &&
-        profile.getVersion() >= ProfileVersion::DX_6_3 &&
-        profile.getVersion() < ProfileVersion::DX_6_9)
-    {
-        rawTarget->optionSet.addCapabilityAtom(CapabilityName::hlsl_nvapi);
-    }
 }
 
 void OptionsParser::addCapabilityAtom(RawTarget* rawTarget, CapabilityName atom)
@@ -3338,6 +3338,37 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 linkage->m_optionSet.set(OptionKind::EmitSeparateDebug, true);
                 break;
             }
+        case OptionKind::EmitCPUViaCPP:
+        case OptionKind::EmitCPUViaLLVM:
+            {
+                SlangEmitCPUMethod selectMethod = (optionKind == OptionKind::EmitCPUViaCPP)
+                                                      ? SLANG_EMIT_CPU_VIA_CPP
+                                                      : SLANG_EMIT_CPU_VIA_LLVM;
+
+                getCurrentTarget()->optionSet.set(OptionKind::EmitCPUMethod, selectMethod);
+            }
+            break;
+        case OptionKind::LLVMTargetTriple:
+            {
+                CommandLineArg targetTriple;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(targetTriple));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMTargetTriple, targetTriple.value);
+                break;
+            }
+        case OptionKind::LLVMCPU:
+            {
+                CommandLineArg cpuName;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(cpuName));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMCPU, cpuName.value);
+                break;
+            }
+        case OptionKind::LLVMFeatures:
+            {
+                CommandLineArg features;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(features));
+                linkage->m_optionSet.set(CompilerOptionName::LLVMFeatures, features.value);
+                break;
+            }
         default:
             {
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the
@@ -3934,6 +3965,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
                     case CodeGenTarget::HostVM:
+                    case CodeGenTarget::HostObjectCode:
+                    case CodeGenTarget::ShaderObjectCode:
+                    case CodeGenTarget::HostLLVMIR:
+                    case CodeGenTarget::ShaderLLVMIR:
                         rawOutput.isWholeProgram = true;
                         break;
                     case CodeGenTarget::SPIRV:

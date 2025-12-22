@@ -1268,7 +1268,7 @@ IRInst* emitLoopBlocks(
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func)
 {
-    auto order = getReversePostorder(func);
+    auto order = getReverseMirroredPostorder(func);
     for (auto block : order)
         block->insertAtEnd(func);
 }

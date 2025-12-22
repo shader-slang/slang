@@ -1,43 +1,27 @@
 Shader Execution Reordering (SER)
 =================================
 
-Slang provides support for Shader Execution Reordering (SER) across multiple backends:
+Slang provides preliminary support for Shader Execution Reordering (SER). The API hasn't been finalized and may change in the future.
 
-- **D3D12**: Via [NVAPI](nvapi-support.md) or native DXR 1.3 (SM 6.9)
-- **Vulkan/SPIR-V**: Via [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) (NV) or [GL_EXT_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/main/extensions/ext/GLSL_EXT_shader_invocation_reorder.txt) (cross-vendor EXT)
-- **CUDA**: Via OptiX
+The feature is available on D3D12 via [NVAPI](nvapi-support.md) and on Vulkan through the [GL_NV_shader_invocation_reorder](https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_shader_invocation_reorder.txt) extension.
 
-## Platform Notes
+## Vulkan
 
-### Vulkan (NV Extension)
+SER as implemented on Vulkan has extra limitations on usage. On D3D via NvAPI `HitObject` variables are like regular variables. They can be assigned, passed to functions and so forth. Using `GL_NV_shader_invocation_reorder` on Vulkan, this isn't the case and `HitObject` variables are special and act is if their introduction allocates a single unique entry. One implication of this is there are limitations on Vulkan around HitObject with flow control, and assignment to HitObject variables. 
 
-With `GL_NV_shader_invocation_reorder`, `HitObject` variables have special allocation semantics with limitations around flow control and assignment.
-
-### Vulkan (EXT Extension)
-
-The cross-vendor `GL_EXT_shader_invocation_reorder` extension provides broader compatibility. Note that `MakeHit` and `MakeMotionHit` are **NV-only** and not available with the EXT extension.
-
-### D3D12 (DXR 1.3)
-
-Native DXR 1.3 support (SM 6.9) provides `HitObject` without requiring NVAPI.
+TODO: Examples and discussion around these limitation.
 
 ## Links
 
 * [SER white paper for NVAPI](https://developer.nvidia.com/sites/default/files/akamai/gameworks/ser-whitepaper.pdf)
 
-# API Reference
+# Preliminary API
 
-The HitObject API provides cross-platform SER functionality. The API is based on the NvAPI/DXR 1.3 interface.
+The API is preliminary and based on the NvAPI SER interface. It may change with future Slang versions.
 
 ## Free Functions
 
 * [ReorderThread](#reorder-thread)
-
-## Fused Functions (Vulkan EXT only)
-
-* [ReorderExecute](#reorder-execute)
-* [TraceReorderExecute](#trace-reorder-execute)
-* [TraceMotionReorderExecute](#trace-motion-reorder-execute)
 
 --------------------------------------------------------------------------------
 # `struct HitObject`
@@ -57,17 +41,11 @@ and its related functions are available in raytracing shader types only.
 * [MakeMotionHit](#make-motion-hit)
 * [MakeMotionMiss](#make-motion-miss)
 * [MakeNop](#make-nop)
-* [FromRayQuery](#from-ray-query)
 * [Invoke](#invoke)
 * [IsMiss](#is-miss)
 * [IsHit](#is-hit)
 * [IsNop](#is-nop)
 * [GetRayDesc](#get-ray-desc)
-* [GetRayFlags](#get-ray-flags)
-* [GetRayTMin](#get-ray-tmin)
-* [GetRayTCurrent](#get-ray-tcurrent)
-* [GetWorldRayOrigin](#get-world-ray-origin)
-* [GetWorldRayDirection](#get-world-ray-direction)
 * [GetShaderTableIndex](#get-shader-table-index)
 * [SetShaderTableIndex](#set-shader-table-index)
 * [GetInstanceIndex](#get-instance-index)
@@ -76,7 +54,6 @@ and its related functions are available in raytracing shader types only.
 * [GetPrimitiveIndex](#get-primitive-index)
 * [GetHitKind](#get-hit-kind)
 * [GetAttributes](#get-attributes)
-* [GetTriangleVertexPositions](#get-triangle-vertex-positions)
 * [GetWorldToObject](#get-world-to-object)
 * [GetObjectToWorld](#get-object-to-world)
 * [GetCurrentTime](#get-current-time)
@@ -122,8 +99,6 @@ static HitObject HitObject.TraceRay<payload_t>(
 Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
 resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
 
-**Note**: Requires motion blur support. Available on Vulkan (NV/EXT) and CUDA.
-
 ## Signature 
 
 ```
@@ -152,8 +127,6 @@ and PrimitiveIndex must exist. The shader table index is computed using the form
 TraceRay. The computed index must reference a valid hit group record in the shader table. The
 Attributes parameter must either be an attribute struct, such as
 BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
-
-**Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
 
 ## Signature 
 
@@ -185,9 +158,8 @@ static HitObject HitObject.MakeHit<attr_t>(
 
 ## Description
 
-See MakeHit but handles Motion.
-
-**Note**: This function is **NV-only** and not available with the cross-vendor EXT extension.
+See MakeHit but handles Motion 
+Currently only supported on VK
 
 ## Signature 
 
@@ -239,7 +211,8 @@ static HitObject HitObject.MakeMiss(
 
 ## Description
 
-See MakeMiss but handles Motion. Available on Vulkan (NV and EXT extensions).
+See MakeMiss but handles Motion 
+Currently only supported on VK
 
 ## Signature 
 
@@ -262,33 +235,10 @@ ReorderThread will group NOP hit objects together. This can be useful in some re
 scenarios where future control flow for some threads is known to process neither a hit nor a
 miss.
 
-## Signature
+## Signature 
 
 ```
 static HitObject HitObject.MakeNop();
-```
-
---------------------------------------------------------------------------------
-<a id="from-ray-query"></a>
-# `HitObject.FromRayQuery`
-
-## Description
-
-Creates a HitObject from a committed RayQuery hit. The RayQuery must have a committed hit
-(either triangle or procedural). If the RayQuery has no committed hit, the resulting HitObject
-will represent a miss or NOP depending on the query state.
-
-**Note**: **DXR 1.3 only**. Also available on Vulkan EXT via `hitObjectRecordFromQueryEXT`.
-
-## Signature
-
-```
-static HitObject HitObject.FromRayQuery<RayQuery_t>(
-    RayQuery_t           Query);
-static HitObject HitObject.FromRayQuery<RayQuery_t, attr_t>(
-    RayQuery_t           Query,
-    uint                 CommittedCustomHitKind,
-    attr_t               CommittedCustomAttribs);
 ```
 
 --------------------------------------------------------------------------------
@@ -300,16 +250,11 @@ static HitObject HitObject.FromRayQuery<RayQuery_t, attr_t>(
 Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
 shader is invoked.
 
-## Signature
+## Signature 
 
 ```
 static void HitObject.Invoke<payload_t>(
     RaytracingAccelerationStructure AccelerationStructure,
-    HitObject            HitOrMiss,
-    inout payload_t      Payload);
-
-// DXR 1.3 overload (without AccelerationStructure)
-static void HitObject.Invoke<payload_t>(
     HitObject            HitOrMiss,
     inout payload_t      Payload);
 ```
@@ -364,90 +309,10 @@ bool HitObject.IsNop();
 
 Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
 
-## Signature
+## Signature 
 
 ```
 RayDesc HitObject.GetRayDesc();
-```
-
---------------------------------------------------------------------------------
-<a id="get-ray-flags"></a>
-# `HitObject.GetRayFlags`
-
-## Description
-
-Returns the ray flags used when tracing the ray. Valid if the hit object represents a hit or a miss.
-
-**Note**: **DXR 1.3 and Vulkan EXT**.
-
-## Signature
-
-```
-uint HitObject.GetRayFlags();
-```
-
---------------------------------------------------------------------------------
-<a id="get-ray-tmin"></a>
-# `HitObject.GetRayTMin`
-
-## Description
-
-Returns the minimum T value of the ray. Valid if the hit object represents a hit or a miss.
-
-**Note**: **DXR 1.3 and Vulkan EXT**.
-
-## Signature
-
-```
-float HitObject.GetRayTMin();
-```
-
---------------------------------------------------------------------------------
-<a id="get-ray-tcurrent"></a>
-# `HitObject.GetRayTCurrent`
-
-## Description
-
-Returns the current T value (hit distance) of the ray. Valid if the hit object represents a hit or a miss.
-
-**Note**: **DXR 1.3 and Vulkan EXT** (called `GetRayTMax` in GLSL/SPIR-V).
-
-## Signature
-
-```
-float HitObject.GetRayTCurrent();
-```
-
---------------------------------------------------------------------------------
-<a id="get-world-ray-origin"></a>
-# `HitObject.GetWorldRayOrigin`
-
-## Description
-
-Returns the ray origin in world space. Valid if the hit object represents a hit or a miss.
-
-**Note**: **DXR 1.3 and Vulkan EXT**.
-
-## Signature
-
-```
-float3 HitObject.GetWorldRayOrigin();
-```
-
---------------------------------------------------------------------------------
-<a id="get-world-ray-direction"></a>
-# `HitObject.GetWorldRayDirection`
-
-## Description
-
-Returns the ray direction in world space. Valid if the hit object represents a hit or a miss.
-
-**Note**: **DXR 1.3 and Vulkan EXT**.
-
-## Signature
-
-```
-float3 HitObject.GetWorldRayDirection();
 ```
 
 --------------------------------------------------------------------------------
@@ -542,26 +407,10 @@ uint HitObject.GetHitKind();
 
 Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
 
-## Signature
+## Signature 
 
 ```
 attr_t HitObject.GetAttributes<attr_t>();
-```
-
---------------------------------------------------------------------------------
-<a id="get-triangle-vertex-positions"></a>
-# `HitObject.GetTriangleVertexPositions`
-
-## Description
-
-Returns the world-space vertex positions of the triangle that was hit. Valid if the hit object represents a triangle hit.
-
-**Note**: **Vulkan EXT only**. Requires `SPV_KHR_ray_tracing_position_fetch` capability.
-
-## Signature
-
-```
-void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
 ```
 
 --------------------------------------------------------------------------------
@@ -572,8 +421,6 @@ void HitObject.GetTriangleVertexPositions(out float3 positions[3]);
 
 Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
 represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
-
-**Note**: **D3D12/HLSL only**.
 
 ## Signature 
 
@@ -587,12 +434,12 @@ uint HitObject.LoadLocalRootTableConstant(uint RootConstantOffsetInBytes);
 
 ## Description
 
-Sets the shader table index of the hit object. Used to modify which shader gets invoked during HitObject.Invoke. **EXT extension only** (not available with NV extension).
+Sets the shader table index of the hit object. Used to modify which shader gets invoked during HitObject.Invoke.
 
-## Signature
+## Signature 
 
 ```
-void HitObject.SetShaderTableIndex(uint RecordIndex);
+uint HitObject.SetShaderTableIndex(uint RecordIndex);
 ```
 
 --------------------------------------------------------------------------------
@@ -603,14 +450,10 @@ void HitObject.SetShaderTableIndex(uint RecordIndex);
 
 Returns the world-to-object transformation matrix. Valid if the hit object represents a hit.
 
-## Signature
+## Signature 
 
 ```
 float4x3 HitObject.GetWorldToObject();
-
-// DXR 1.3 layout variants
-float3x4 HitObject.GetWorldToObject3x4();
-float4x3 HitObject.GetWorldToObject4x3();
 ```
 
 --------------------------------------------------------------------------------
@@ -621,14 +464,10 @@ float4x3 HitObject.GetWorldToObject4x3();
 
 Returns the object-to-world transformation matrix. Valid if the hit object represents a hit.
 
-## Signature
+## Signature 
 
 ```
 float4x3 HitObject.GetObjectToWorld();
-
-// DXR 1.3 layout variants
-float3x4 HitObject.GetObjectToWorld3x4();
-float4x3 HitObject.GetObjectToWorld4x3();
 ```
 
 --------------------------------------------------------------------------------
@@ -638,8 +477,6 @@ float4x3 HitObject.GetObjectToWorld4x3();
 ## Description
 
 Returns the current time for motion blur. Valid if the hit object represents a motion hit or miss.
-
-**Note**: Requires motion blur support. Available on Vulkan (NV/EXT).
 
 ## Signature 
 
@@ -697,8 +534,6 @@ uint2 HitObject.GetShaderRecordBufferHandle();
 
 Returns the cluster ID for cluster acceleration structures. Valid if the hit object represents a hit.
 
-**Note**: **NV-only** (requires `GL_NV_cluster_acceleration_structure`).
-
 ## Signature 
 
 ```
@@ -712,8 +547,6 @@ int HitObject.GetClusterID();
 ## Description
 
 Returns the position and radius of a sphere primitive. Valid if the hit object represents a sphere hit.
-
-**Note**: **NV-only**.
 
 ## Signature 
 
@@ -729,8 +562,6 @@ float4 HitObject.GetSpherePositionAndRadius();
 
 Returns the positions and radii of a linear swept sphere primitive. Valid if the hit object represents an LSS hit.
 
-**Note**: **NV-only**.
-
 ## Signature 
 
 ```
@@ -745,8 +576,6 @@ float2x4 HitObject.GetLssPositionsAndRadii();
 
 Returns true if the HitObject represents a hit on a sphere primitive, otherwise returns false.
 
-**Note**: **NV-only**.
-
 ## Signature 
 
 ```
@@ -760,8 +589,6 @@ bool HitObject.IsSphereHit();
 ## Description
 
 Returns true if the HitObject represents a hit on a linear swept sphere primitive, otherwise returns false.
-
-**Note**: **NV-only**.
 
 ## Signature 
 
@@ -802,95 +629,4 @@ void ReorderThread(
     uint                 CoherenceHint,
     uint                 NumCoherenceHintBitsFromLSB);
 void ReorderThread(HitObject HitOrMiss);
-```
-
---------------------------------------------------------------------------------
-<a id="reorder-execute"></a>
-# `ReorderExecute`
-
-## Description
-
-Fused operation that reorders threads by HitObject and then executes the shader. Equivalent to calling `ReorderThread` followed by `HitObject.Invoke`.
-
-**Note**: **Vulkan EXT only**. Available via `hitObjectReorderExecuteEXT` in GLSL.
-
-## Signature
-
-```
-// GLSL: hitObjectReorderExecuteEXT(hitObject, payload)
-void ReorderExecute<payload_t>(
-    HitObject            HitOrMiss,
-    inout payload_t      Payload);
-
-// GLSL: hitObjectReorderExecuteEXT(hitObject, hint, bits, payload)
-void ReorderExecute<payload_t>(
-    HitObject            HitOrMiss,
-    uint                 CoherenceHint,
-    uint                 NumCoherenceHintBitsFromLSB,
-    inout payload_t      Payload);
-```
-
---------------------------------------------------------------------------------
-<a id="trace-reorder-execute"></a>
-# `TraceReorderExecute`
-
-## Description
-
-Fused operation that traces a ray, reorders threads by the resulting HitObject, and executes the shader. Equivalent to calling `HitObject.TraceRay`, `ReorderThread`, and `HitObject.Invoke` in sequence.
-
-**Note**: **Vulkan EXT only**. Available via `hitObjectTraceReorderExecuteEXT` in GLSL.
-
-## Signature
-
-```
-// GLSL: hitObjectTraceReorderExecuteEXT(...)
-void TraceReorderExecute<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
-    uint                 RayFlags,
-    uint                 InstanceInclusionMask,
-    uint                 RayContributionToHitGroupIndex,
-    uint                 MultiplierForGeometryContributionToHitGroupIndex,
-    uint                 MissShaderIndex,
-    RayDesc              Ray,
-    inout payload_t      Payload);
-
-// With coherence hint
-void TraceReorderExecute<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
-    uint                 RayFlags,
-    uint                 InstanceInclusionMask,
-    uint                 RayContributionToHitGroupIndex,
-    uint                 MultiplierForGeometryContributionToHitGroupIndex,
-    uint                 MissShaderIndex,
-    RayDesc              Ray,
-    uint                 CoherenceHint,
-    uint                 NumCoherenceHintBitsFromLSB,
-    inout payload_t      Payload);
-```
-
---------------------------------------------------------------------------------
-<a id="trace-motion-reorder-execute"></a>
-# `TraceMotionReorderExecute`
-
-## Description
-
-Fused operation for motion blur that traces a motion ray, reorders threads, and executes the shader.
-
-**Note**: **Vulkan EXT only**. Available via `hitObjectTraceMotionReorderExecuteEXT` in GLSL. Requires motion blur support.
-
-## Signature
-
-```
-void TraceMotionReorderExecute<payload_t>(
-    RaytracingAccelerationStructure AccelerationStructure,
-    uint                 RayFlags,
-    uint                 InstanceInclusionMask,
-    uint                 RayContributionToHitGroupIndex,
-    uint                 MultiplierForGeometryContributionToHitGroupIndex,
-    uint                 MissShaderIndex,
-    RayDesc              Ray,
-    float                CurrentTime,
-    uint                 CoherenceHint,
-    uint                 NumCoherenceHintBitsFromLSB,
-    inout payload_t      Payload);
 ```

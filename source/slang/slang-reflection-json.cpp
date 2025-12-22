@@ -421,7 +421,10 @@ static void emitReflectionVarLayoutJSON(PrettyWriter& writer, slang::VariableLay
         emitReflectionTypeLayoutJSON(writer, var->getTypeLayout());
     }
 
-    emitReflectionModifierInfoJSON(writer, var->getVariable());
+    if (auto variable = var->getVariable())
+    {
+        emitReflectionModifierInfoJSON(writer, variable);
+    }
 
     emitReflectionVarBindingInfoJSON(writer, var);
     writer.dedent();
@@ -1039,7 +1042,10 @@ static void emitReflectionParamJSON(PrettyWriter& writer, slang::VariableLayoutR
         emitReflectionNameInfoJSON(writer, name);
     }
 
-    emitReflectionModifierInfoJSON(writer, param->getVariable());
+    if (auto var = param->getVariable())
+    {
+        emitReflectionModifierInfoJSON(writer, var);
+    }
 
     emitReflectionVarBindingInfoJSON(writer, param);
 
