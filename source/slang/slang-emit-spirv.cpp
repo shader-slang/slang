@@ -8798,7 +8798,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(type);
         if (IRFuncType* funcType = as<IRFuncType>(type))
         {
-            SpvInst* returnType = emitDebugType(funcType->getResultType());
+            SpvInst* returnType = ensureInst(m_voidType);
+            if (!as<IRVoidType>(funcType->getResultType()))
+            {
+                returnType = emitDebugType(funcType->getResultType());
+            }
 
             List<SpvInst*> argTypes;
             for (UInt i = 0; i < funcType->getParamCount(); ++i)

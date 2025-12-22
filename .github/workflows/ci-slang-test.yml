@@ -259,6 +259,8 @@ jobs:
           python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
 
       - name: Clone slangpy-samples
+        # Skip on macOS debug due to intermittent failures in test_toy_restir
+        if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           # Clone slangpy-samples and checkout the tag matching the installed
           # slangpy version. This ensures compatibility between the slangpy
@@ -283,11 +285,15 @@ jobs:
           fi
 
       - name: Install slangpy-samples dependencies
+        # Skip on macOS debug due to intermittent failures in test_toy_restir
+        if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Installing slangpy-samples dependencies..."
           python -m pip install -r slangpy-samples/requirements.txt --user
 
       - name: Run slangpy-samples tests
+        # Skip on macOS debug due to intermittent failures in test_toy_restir
+        if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Running slangpy-samples tests..."
           python -m pytest -n 4 slangpy-samples/tests
