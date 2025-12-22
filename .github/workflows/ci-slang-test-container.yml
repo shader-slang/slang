@@ -22,8 +22,16 @@ jobs:
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -39,17 +47,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1 \
-            python3
-          git config --global --add safe.directory '*'
-
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -128,8 +125,16 @@ jobs:
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -145,16 +150,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          git config --global --add safe.directory '*'
-
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -198,8 +193,16 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     if: always() && inputs.config == 'release'
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -215,21 +218,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git, Python and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            python3 \
-            python3-pip \
-            curl \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          git config --global --add safe.directory '*'
-          # Create python -> python3 symlink for slangpy-samples tests
-          ln -sf /usr/bin/python3 /usr/bin/python
-
       - uses: actions/checkout@v4
 
       - name: Download artifacts
