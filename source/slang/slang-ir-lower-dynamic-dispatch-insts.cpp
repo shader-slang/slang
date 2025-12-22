@@ -834,7 +834,6 @@ public:
 
 bool lowerDispatchers(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
 {
-    SLANG_UNUSED(sink);
     DispatcherLoweringContext context(module, sink, reportDispatchLocations);
     context.processModule();
     return true;
