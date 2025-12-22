@@ -1849,6 +1849,11 @@ struct SpecializationContext
 
         IRFunc* newFunc = builder->createFunc();
 
+        // Map oldFunc to newFunc so that any self-references (e.g., DebugScope
+        // instructions that reference the containing function) get properly
+        // remapped during cloning.
+        cloneEnv.mapOldValToNew.add(oldFunc, newFunc);
+
         builder->setInsertInto(newFunc);
         IRBlock* tempHeaderBlock = builder->emitBlock();
 
@@ -3364,7 +3369,10 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
-            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            auto clonedDebugFunc = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            // Add mapping to cloneEnv so DebugVar references inside the function
+            // get properly remapped to this cloned debug function.
+            cloneEnv.mapOldValToNew[inst] = clonedDebugFunc;
         }
         else if (!as<IRReturn>(inst))
         {

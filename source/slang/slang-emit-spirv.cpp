@@ -19,7 +19,7 @@
 
 namespace Slang
 {
-
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
 // Our goal in this file is to convert a module in the Slang IR over to an
 // equivalent module in the SPIR-V intermediate language.
 //
@@ -583,6 +583,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
+    // Map each IRBlock to its active debug scope (IRFunc, IRDebugLexicalBlock, etc.)
+    Dictionary<IRBlock*, IRInst*> m_blockToActiveDebugScope;
+
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
@@ -607,8 +610,38 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* findDebugScope(IRInst* inst)
     {
+        if (!inst)
+        {
+            return nullptr;
+        }
+
+        // First, look for IRDebugLexicalBlock in preceding instructions in the same block
+        auto block = as<IRBlock>(inst->getParent());
+        if (block)
+        {
+            // Walk backwards from the current instruction to find the most recent IRDebugLexicalBlock
+            for (auto prevInst = inst->getPrevInst(); prevInst; prevInst = prevInst->getPrevInst())
+            {
+                if (as<IRDebugLexicalBlock>(prevInst))
+                {
+                    SpvInst* spvInst = nullptr;
+                    if (m_mapIRInstToSpvDebugInst.tryGetValue(prevInst, spvInst))
+                        return spvInst;
+                }
+            }
+        }
+
+        // Then check parents in the hierarchy
         for (auto parent = inst; parent; parent = parent->getParent())
         {
+            // Check for debug lexical blocks first
+            if (as<IRDebugLexicalBlock>(parent))
+            {
+                SpvInst* spvInst = nullptr;
+                if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
+                    return spvInst;
+            }
+
             if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
                 continue;
 
@@ -617,6 +650,33 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return spvInst;
         }
         return nullptr;
+    }
+
+    /// Build a mapping of each IRBlock to its active debug scope
+    /// This is needed because SPIR-V DebugScope is block-scoped
+    void buildBlockDebugScopeMap(IRFunc* irFunc)
+    {
+        m_blockToActiveDebugScope.clear();
+
+        // Track the current active scope as we walk through ALL instructions
+        IRInst* currentScope = irFunc;  // Start with function as default scope
+
+        // Walk through all blocks and instructions in order
+        for (auto block : irFunc->getBlocks())
+        {
+            // Record the scope that's active at the START of this block
+            m_blockToActiveDebugScope[block] = currentScope;
+
+            // Now walk through instructions in this block to see if scope changes
+            for (auto inst : block->getChildren())
+            {
+                if (auto debugScope = as<IRDebugScope>(inst))
+                {
+                    // This changes the active scope for subsequent instructions/blocks
+                    currentScope = debugScope->getScope();
+                }
+            }
+        }
     }
 
     /// Get or reserve a SpvID for an IR value.
@@ -2410,6 +2470,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 nullptr,
                 nullptr,
                 as<IRDebugFunction>(inst));
+        case kIROp_DebugLexicalBlock:
+            return emitDebugLexicalBlock(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugLexicalBlock>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
@@ -3532,6 +3596,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // not possible for ordinary instructions within
         // the blocks in the Slang IR)
         //
+
+        // Build mapping of blocks to their active debug scopes
+        // This is needed because SPIR-V DebugScope is block-scoped
+        buildBlockDebugScopeMap(irFunc);
+
         SpvInst* funcDebugScope = nullptr;
         for (auto irBlock : irFunc->getBlocks())
         {
@@ -3571,14 +3640,65 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     irDebugFunc,
                     irFunc);
             }
+            // Emit DebugScope at start of each block with the active scope for that block
+            // This is required because SPIR-V DebugScope is block-scoped
+            // Skip if block starts with IRDebugScope (it will handle it)
             if (funcDebugScope)
             {
-                emitOpDebugScope(
-                    spvBlock,
-                    nullptr,
-                    m_voidType,
-                    getNonSemanticDebugInfoExtInst(),
-                    funcDebugScope);
+                bool blockHasDebugScopeAtStart = false;
+                for (auto inst : irBlock->getChildren())
+                {
+                    if (as<IRDebugScope>(inst))
+                    {
+                        blockHasDebugScopeAtStart = true;
+                        break;
+                    }
+                    // Stop checking after first non-debug instruction
+                    if (inst->getOp() != kIROp_DebugLine &&
+                        inst->getOp() != kIROp_DebugVar &&
+                        inst->getOp() != kIROp_DebugValue &&
+                        inst->getOp() != kIROp_Var)
+                    {
+                        break;
+                    }
+                }
+
+                if (!blockHasDebugScopeAtStart)
+                {
+                    // Look up the active debug scope for this block
+                    IRInst* activeScope = nullptr;
+                    if (m_blockToActiveDebugScope.tryGetValue(irBlock, activeScope) && activeScope)
+                    {
+                        // Get the SPIR-V debug instruction for this scope
+                        SpvInst* activeScopeSpv = nullptr;
+
+                        // Check if it's an IRFunc - need to use DebugFunction, not OpFunction
+                        if (as<IRFunc>(activeScope))
+                        {
+                            // Use the DebugFunction we already created
+                            activeScopeSpv = funcDebugScope;
+                        }
+                        else
+                        {
+                            // It's a debug instruction (IRDebugLexicalBlock, etc.) - use debug inst map
+                            if (!m_mapIRInstToSpvDebugInst.tryGetValue(activeScope, activeScopeSpv))
+                            {
+                                // Fallback to regular inst map for other types
+                                activeScopeSpv = ensureInst(activeScope);
+                            }
+                        }
+
+                        if (activeScopeSpv)
+                        {
+                            emitOpDebugScope(
+                                spvBlock,
+                                nullptr,
+                                m_voidType,
+                                getNonSemanticDebugInfoExtInst(),
+                                activeScopeSpv);
+                        }
+                    }
+                }
             }
             // In addition to normal basic blocks,
             // all loops gets a header block.
@@ -3891,7 +4011,44 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The `actualHelperVar` is used to update the actual value of the variable
         // at each kIROp_DebugValue instruction.
         //
-        auto scope = findDebugScope(debugVar);
+        // Get the scope from the stored operand (set during lowering) or find it
+        SpvInst* scope = nullptr;
+        auto scopeOperand = debugVar->getScope();
+        if (scopeOperand)
+        {
+            // Scope was captured during lowering (normal case)
+            // Check if it's an IRFunc - need to resolve to DebugFunction
+            if (auto irFunc = as<IRFunc>(scopeOperand))
+            {
+                // Look up the DebugFunction for this IRFunc
+                if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                {
+                    auto irDebugFunc = debugFuncDecor->getOperand(0);
+                    if (irDebugFunc)
+                    {
+                        if (!m_mapIRInstToSpvDebugInst.tryGetValue(irDebugFunc, scope))
+                        {
+                            // Try regular map as fallback
+                            scope = ensureInst(irDebugFunc);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // It's a debug instruction (IRDebugLexicalBlock, etc.)
+                if (!m_mapIRInstToSpvDebugInst.tryGetValue(scopeOperand, scope))
+                {
+                    scope = ensureInst(scopeOperand);
+                }
+            }
+        }
+        else
+        {
+            // No scope stored - find it based on position in IR
+            // (happens for debug vars created by passes that don't track lexical scope)
+            scope = findDebugScope(debugVar);
+        }
         if (!scope)
             return nullptr;
 
@@ -4777,11 +4934,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 nullptr,
                 nullptr,
                 as<IRDebugFunction>(inst));
+        case kIROp_DebugLexicalBlock:
+            return emitDebugLexicalBlock(
+                getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                as<IRDebugLexicalBlock>(inst));
         case kIROp_DebugInlinedAt:
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugInlinedAt>(inst));
         case kIROp_DebugScope:
+            // Emit DebugScope instructions as they appear in the IR
+            // This handles scope changes within a block
             return emitDebugScope(parent, as<IRDebugScope>(inst));
         case kIROp_DebugNoScope:
             return emitDebugNoScope(parent);
@@ -8520,13 +8683,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugScope(SpvInstParent* parent, IRDebugScope* debugScope)
     {
-        auto inlinedAt = ensureInst(debugScope->getInlinedAt());
-        if (!inlinedAt)
-            return nullptr;
+        SpvInst* scope = nullptr;
+        auto scopeOperand = debugScope->getScope();
 
-        SpvInst* scope = ensureInst(debugScope->getScope());
+        // Check if scope is an IRFunc - need to resolve to DebugFunction
+        if (auto irFunc = as<IRFunc>(scopeOperand))
+        {
+            // Look up the DebugFunction for this IRFunc
+            if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+            {
+                auto irDebugFunc = debugFuncDecor->getOperand(0);
+                if (irDebugFunc)
+                {
+                    if (!m_mapIRInstToSpvDebugInst.tryGetValue(irDebugFunc, scope))
+                    {
+                        // Try regular map as fallback
+                        scope = ensureInst(irDebugFunc);
+                    }
+                }
+            }
+        }
+        else
+        {
+            // It's a debug instruction (IRDebugLexicalBlock, etc.)
+            if (!m_mapIRInstToSpvDebugInst.tryGetValue(scopeOperand, scope))
+            {
+                scope = ensureInst(scopeOperand);
+            }
+        }
+
         if (!scope)
             return nullptr;
+
+        // Only call ensureInst if inlinedAt is non-null
+        SpvInst* inlinedAt = nullptr;
+        auto irInlinedAt = debugScope->getInlinedAt();
+        if (irInlinedAt)
+        {
+            inlinedAt = ensureInst(irInlinedAt);
+        }
 
         return emitOpDebugScope(
             parent,
@@ -8545,8 +8740,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRDebugFunction* debugFunc,
         IRFunc* irFunc = nullptr)
     {
+        // If there's no debug function info, we can't emit debug info
+        if (!debugFunc)
+        {
+            return nullptr;
+        }
+
         SpvInst* debugFuncInfo = nullptr;
-        if (debugFunc && m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
+        if (m_mapIRInstToSpvInst.tryGetValue(debugFunc, debugFuncInfo))
         {
             return debugFuncInfo;
         }
@@ -8590,6 +8791,83 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 spvFunc);
         }
         return debugFuncInfo;
+    }
+
+    SpvInst* emitDebugLexicalBlock(SpvInstParent* parent, IRDebugLexicalBlock* debugLexicalBlock)
+    {
+        SpvInst* result = nullptr;
+        if (m_mapIRInstToSpvInst.tryGetValue(debugLexicalBlock, result))
+        {
+            return result;
+        }
+
+        // Resolve parent scope - if it's an IRFunc or IRDebugLexicalBlock, find its debug representation
+        SpvInst* parentScope = nullptr;
+        IRInst* parentScopeIR = debugLexicalBlock->getParentScope();
+
+        if (as<IRFunc>(parentScopeIR))
+        {
+            // Parent is an IRFunc - look up its corresponding debug function
+            if (!m_mapIRInstToSpvDebugInst.tryGetValue(parentScopeIR, parentScope))
+            {
+                // Debug function hasn't been created yet - try to find a valid scope as fallback
+                parentScope = findDebugScope(debugLexicalBlock);
+                if (!parentScope)
+                {
+                    return nullptr;
+                }
+            }
+        }
+        else if (as<IRDebugLexicalBlock>(parentScopeIR) || as<IRDebugFunction>(parentScopeIR))
+        {
+            // Parent is already a debug instruction - use its SPIR-V representation
+            parentScope = ensureInst(parentScopeIR);
+            if (!parentScope)
+            {
+                parentScope = findDebugScope(debugLexicalBlock);
+                if (!parentScope)
+                {
+                    return nullptr;
+                }
+            }
+        }
+        else
+        {
+            parentScope = findDebugScope(debugLexicalBlock);
+            if (!parentScope)
+            {
+                return nullptr;
+            }
+        }
+
+        // Check if this has a discriminator - if so, emit DebugLexicalBlockDiscriminator
+        if (debugLexicalBlock->hasDiscriminator())
+        {
+            result = emitOpDebugLexicalBlockDiscriminator(
+                parent,
+                debugLexicalBlock,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugLexicalBlock->getFile(),
+                debugLexicalBlock->getDiscriminator(),
+                parentScope);
+        }
+        else
+        {
+            // Emit regular DebugLexicalBlock
+            result = emitOpDebugLexicalBlock(
+                parent,
+                debugLexicalBlock,
+                m_voidType,
+                getNonSemanticDebugInfoExtInst(),
+                debugLexicalBlock->getFile(),
+                debugLexicalBlock->getLine(),
+                debugLexicalBlock->getCol(),
+                parentScope);
+        }
+
+        registerDebugInst(debugLexicalBlock, result);
+        return result;
     }
 
     SpvInst* emitDebugNoScope(SpvInstParent* parent)
@@ -9811,9 +10089,9 @@ SlangResult emitSPIRVFromIR(
             &writer);
     }
 #endif
-
+    dumpIRIfEnabled(codeGenContext, irModule, "POST legalizeIRForSPIRV");
     removeAvailableInDownstreamModuleDecorations(irModule, CodeGenTarget::SPIRV);
-
+    dumpIRIfEnabled(codeGenContext, irModule, "POST removeAvailableInDownstreamModuleDecorations");
     auto shouldPreserveParams = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::PreserveParameters);
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
@@ -9825,6 +10103,10 @@ SlangResult emitSPIRVFromIR(
             context.ensureInst(inst);
         }
         if (as<IRDebugBuildIdentifier>(inst))
+        {
+            context.ensureInst(inst);
+        }
+        if (as<IRDebugLexicalBlock>(inst))
         {
             context.ensureInst(inst);
         }

@@ -1032,6 +1032,11 @@ struct FunctionParameterSpecializationContext
         IRFunc* newFunc = builder->createFunc();
         newFunc->setFullType(funcType);
 
+        // Map oldFunc to newFunc so that any self-references (e.g., DebugScope
+        // instructions that reference the containing function) get properly
+        // remapped during cloning.
+        cloneEnv.mapOldValToNew.add(oldFunc, newFunc);
+
         // The above step has accomplished the "first phase"
         // of cloning the function (since `IRFunc`s have no
         // operands).

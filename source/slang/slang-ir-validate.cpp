@@ -9,6 +9,8 @@
 
 namespace Slang
 {
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
+
 struct IRValidateContext
 {
     // The IR module we are validating.
@@ -430,18 +432,24 @@ void validateIRModule(IRModule* module, DiagnosticSink* sink)
 
 void validateIRModuleIfEnabled(CompileRequestBase* compileRequest, IRModule* module)
 {
+    IRDumpOptions irDumpOptions;
+    irDumpOptions.mode = IRDumpOptions::Mode::Detailed;
+    irDumpOptions.flags = IRDumpOptions::Flag::DumpDebugIds;
+    //dumpIR(module, irDumpOptions, "VALIDATE IRModule", compileRequest->getSourceManager(), nullptr);
     if (!compileRequest->getLinkage()->m_optionSet.getBoolOption(CompilerOptionName::ValidateIr))
         return;
-
     auto sink = compileRequest->getSink();
     validateIRModule(module, sink);
 }
 
 void validateIRModuleIfEnabled(CodeGenContext* codeGenContext, IRModule* module)
 {
+    IRDumpOptions irDumpOptions;
+    irDumpOptions.mode = IRDumpOptions::Mode::Detailed;
+    irDumpOptions.flags = IRDumpOptions::Flag::DumpDebugIds;
+    //dumpIR(module, irDumpOptions, "VALIDATE IRModule", codeGenContext->getSourceManager(), nullptr);
     if (!codeGenContext->shouldValidateIR())
         return;
-
     auto sink = codeGenContext->getSink();
     validateIRModule(module, sink);
 }

@@ -621,6 +621,13 @@ struct IRGenContext
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
+    // Stack of lexical scopes for debug info, can be IRDebugFunction or IRDebugLexicalBlock
+    List<IRInst*> debugLexicalScopeStack;
+
+    // Map to track lexical block locations and assign discriminators for duplicates
+    // Key: (file, line, col, parentScope), Value: count of blocks at this location
+    Dictionary<HashCode, UInt> debugLexicalBlockLocationMap;
+
     // Callback function to call when after lowering a type.
     std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
         nullptr;
@@ -2677,6 +2684,8 @@ void maybeSetRate(IRGenContext* context, IRInst* inst, Decl* decl)
     }
 }
 
+IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path);
+IRInst* getDebugFuncFromIRFunc(IRFunc* irFunc);
 
 LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullptr)
 {
@@ -2692,6 +2701,42 @@ LoweredValInfo createVar(IRGenContext* context, IRType* type, Decl* decl = nullp
         builder->addHighLevelDeclDecoration(irAlloc, decl);
 
         addNameHint(context, irAlloc, decl);
+
+        // Create debug variable with proper scope if debug info is enabled
+        if (context->includeDebugInfo && decl->loc.isValid() &&
+            context->shared->debugValueContext.isDebuggableType(type))
+        {
+            auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
+                decl->loc,
+                SourceLocType::Emit);
+
+            // Find the debug source for this file
+            auto sourceView =
+                context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
+            if (sourceView)
+            {
+                auto pathInfo = sourceView->getPathInfo(decl->loc, SourceLocType::Emit);
+                IRInst* debugSourceInst = getOrEmitDebugSource(context, pathInfo);
+                if (debugSourceInst)
+                {
+                    // Get the current debug scope (lexical block or function)
+                    IRInst* debugScope = nullptr;
+                    if (context->debugLexicalScopeStack.getCount() > 0)
+                        debugScope = context->debugLexicalScopeStack.getLast();
+
+                    auto debugVar = builder->emitDebugVar(
+                        type,
+                        debugSourceInst,
+                        builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                        builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                        debugScope,
+                        nullptr);
+
+                    // Copy name hint from the declaration
+                    addNameHint(context, debugVar, decl);
+                }
+            }
+        }
     }
 
     return LoweredValInfo::ptr(irAlloc);
@@ -7261,8 +7306,199 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         IRBlock* prevScopeEndBlock = pushScopeBlock(nullptr);
 
+        // Emit debug lexical block if debug info is enabled
+        IRInst* debugLexicalBlock = nullptr;
+        bool isFunctionBody = false;
+
+        if (context->includeDebugInfo && stmt->loc.isValid())
+        {
+            auto builder = getBuilder();
+            auto sourceManager = context->getLinkage()->getSourceManager();
+            auto sourceView = sourceManager->findSourceView(stmt->loc);
+            if (!sourceView)
+                goto skipDebugBlock;
+
+            // Check if this is the function body (no parent lexical scope yet)
+            isFunctionBody = (context->debugLexicalScopeStack.getCount() == 0 && context->funcDecl);
+
+            // If this is the function body, don't create a separate lexical block
+            // Variables will attach directly to the DebugFunction
+            if (isFunctionBody)
+            {
+                // Find the IRFunc and add it to the scope stack so variables attach to it
+                auto funcVal = context->findLoweredDecl(context->funcDecl);
+                if (funcVal && funcVal->val)
+                {
+                    IRFunc* irFunc = as<IRFunc>(funcVal->val);
+                    if (!irFunc)
+                    {
+                        // May be wrapped in a generic
+                        if (auto generic = as<IRGeneric>(funcVal->val))
+                        {
+                            irFunc = as<IRFunc>(findInnerMostGenericReturnVal(generic));
+                        }
+                    }
+                    if (irFunc)
+                    {
+                        // Get the IRDebugFunction to use as scope instead of IRFunc directly.
+                        // This prevents DCE from keeping unused functions alive.
+                        IRInst* debugFunc = getDebugFuncFromIRFunc(irFunc);
+                        if (debugFunc)
+                        {
+                            // Add the debug function to the scope stack
+                            // Variables declared in the function body will use this as their parent
+                            context->debugLexicalScopeStack.add(debugFunc);
+                            debugLexicalBlock = debugFunc; // Track that we added something to pop later
+
+                            // Emit a DebugScope instruction to set the function scope
+                            builder->emitDebugScope(debugFunc, nullptr);
+                        }
+                    }
+                }
+                goto skipDebugBlock;
+            }
+
+            auto humaneLoc = sourceManager->getHumaneLoc(stmt->loc, SourceLocType::Emit);
+            auto pathInfo = sourceView->getPathInfo(stmt->loc, SourceLocType::Emit);
+
+            // Get or create debug source using absolute path
+            IRInst* debugSource = getOrEmitDebugSource(context, pathInfo);
+            IRInst* line = builder->getIntValue(builder->getUIntType(), humaneLoc.line);
+            IRInst* col = builder->getIntValue(builder->getUIntType(), humaneLoc.column);
+
+            // Get parent scope - either the current lexical block or the IRFunc
+            // Note: We use IRFunc itself as the parent reference. During SPIR-V emission,
+            // this will be resolved to the corresponding IRDebugFunction.
+            IRInst* parentScope = nullptr;
+            if (context->debugLexicalScopeStack.getCount() > 0)
+            {
+                parentScope = context->debugLexicalScopeStack.getLast();
+            }
+            else if (context->funcDecl)
+            {
+                // Find the IRFunc by looking up the function decl
+                auto funcVal = context->findLoweredDecl(context->funcDecl);
+                if (funcVal && funcVal->val)
+                {
+                    IRFunc* irFunc = as<IRFunc>(funcVal->val);
+                    if (!irFunc)
+                    {
+                        // May be wrapped in a generic
+                        if (auto generic = as<IRGeneric>(funcVal->val))
+                        {
+                            irFunc = as<IRFunc>(findInnerMostGenericReturnVal(generic));
+                        }
+                    }
+                    if (irFunc)
+                    {
+                        // Use the IRDebugFunction as the parent scope instead of IRFunc
+                        // This prevents DCE from keeping unused functions alive
+                        parentScope = getDebugFuncFromIRFunc(irFunc);
+                    }
+                }
+            }
+
+            if (parentScope)
+            {
+                // Check if we've seen a lexical block at this location before
+                // Create a hash based on file, line, column, and parent scope
+                HashCode locationHash = combineHash(
+                    combineHash(
+                        combineHash(getHashCode(debugSource), getHashCode(humaneLoc.line)),
+                        getHashCode(humaneLoc.column)),
+                    getHashCode(parentScope));
+
+                UInt* countPtr = context->debugLexicalBlockLocationMap.tryGetValue(locationHash);
+                UInt discriminator = 0;
+                if (countPtr)
+                {
+                    // This is a duplicate location, assign a discriminator
+                    discriminator = *countPtr;
+                    (*countPtr)++;
+                }
+                else
+                {
+                    // First block at this location
+                    context->debugLexicalBlockLocationMap[locationHash] = 1;
+                }
+
+                // Emit the lexical block with optional discriminator in the current block
+                if (discriminator > 0)
+                {
+                    IRInst* discriminatorVal = builder->getIntValue(builder->getUIntType(), discriminator);
+                    debugLexicalBlock = builder->emitDebugLexicalBlock(debugSource, line, col, parentScope, discriminatorVal);
+                }
+                else
+                {
+                    debugLexicalBlock = builder->emitDebugLexicalBlock(debugSource, line, col, parentScope);
+                }
+
+                // Add keepAlive decoration to prevent removal during dead code elimination
+                builder->addKeepAliveDecoration(debugLexicalBlock);
+
+                context->debugLexicalScopeStack.add(debugLexicalBlock);
+
+                // Emit a DebugScope instruction to switch to this lexical block
+                builder->emitDebugScope(debugLexicalBlock, nullptr);
+            }
+        }
+skipDebugBlock:;
+
         // To lower a block (scope) statement, just lower its body.
         lowerStmt(context, stmt->body);
+
+        // Pop the debug lexical block from the stack
+        if (debugLexicalBlock)
+        {
+            context->debugLexicalScopeStack.removeLast();
+
+            // For function body, don't emit restore scope (it's the top level)
+            if (isFunctionBody)
+            {
+                // Nothing more to do - we're exiting the function body
+            }
+            else
+            {
+                // Emit a DebugScope instruction to restore parent scope
+                // Only do this if the current block doesn't already have a terminator
+                auto currentBlock = getBuilder()->getBlock();
+                if (currentBlock && !currentBlock->getTerminator())
+                {
+                    IRInst* restoredParentScope = nullptr;
+                    if (context->debugLexicalScopeStack.getCount() > 0)
+                    {
+                        // Parent is another lexical block
+                        restoredParentScope = context->debugLexicalScopeStack.getLast();
+                    }
+                    else if (context->funcDecl)
+                    {
+                        // Parent is the function itself
+                        auto funcVal = context->findLoweredDecl(context->funcDecl);
+                        if (funcVal && funcVal->val)
+                        {
+                            IRFunc* irFunc = as<IRFunc>(funcVal->val);
+                            if (!irFunc)
+                            {
+                                // May be wrapped in a generic
+                                if (auto generic = as<IRGeneric>(funcVal->val))
+                                {
+                                    irFunc = as<IRFunc>(findInnerMostGenericReturnVal(generic));
+                                }
+                            }
+                            if (irFunc)
+                            {
+                                // Use the IRDebugFunction as scope instead of IRFunc
+                                restoredParentScope = getDebugFuncFromIRFunc(irFunc);
+                            }
+                        }
+                    }
+                    if (restoredParentScope)
+                    {
+                        getBuilder()->emitDebugScope(restoredParentScope, nullptr);
+                    }
+                }
+            }
+        }
 
         popScopeBlock(prevScopeEndBlock, false);
     }
@@ -8016,7 +8252,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
 IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 {
-    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
+    // Use absolute path for consistency with older behavior
+    auto absolutePath = path.getMostUniqueIdentity();
+    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(absolutePath))
         return *result;
 
     ComPtr<ISlangBlob> outBlob;
@@ -8031,9 +8269,24 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
-    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
+    auto debugSrcInst = builder.emitDebugSource(absolutePath.getUnownedSlice(), content, false);
+    context->shared->mapSourcePathToDebugSourceInst[absolutePath] = debugSrcInst;
     return debugSrcInst;
+}
+
+// Helper to get the IRDebugFunction from an IRFunc via its IRDebugFuncDecoration.
+// Returns nullptr if no debug function is attached.
+// Using IRDebugFunction as scope instead of IRFunc prevents DCE from keeping
+// unused functions alive just because they're referenced by debug instructions.
+IRInst* getDebugFuncFromIRFunc(IRFunc* irFunc)
+{
+    if (!irFunc)
+        return nullptr;
+    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+    {
+        return debugFuncDecor->getDebugFunc();
+    }
+    return nullptr;
 }
 
 void maybeEmitDebugLine(
@@ -9405,6 +9658,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.returnDestination = LoweredValInfo();
             subContextStorage.lowerTypeCallback = nullptr;
             subContextStorage.catchHandler = nullptr;
+
+            subContextStorage.debugLexicalScopeStack.clear();
         }
 
         IRBuilder* getBuilder() { return &subBuilderStorage; }
@@ -9802,17 +10057,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
                     if (sourceView)
                     {
-                        auto source = sourceView->getSourceFile();
-                        IRInst* debugSourceInst = nullptr;
-                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
-                                source,
-                                debugSourceInst))
+                        auto pathInfo = sourceView->getPathInfo(decl->loc, SourceLocType::Emit);
+                        IRInst* debugSourceInst = getOrEmitDebugSource(context, pathInfo);
+                        if (debugSourceInst)
                         {
+                            // Get the current debug scope (lexical block or function)
+                            IRInst* debugScope = nullptr;
+                            if (context->debugLexicalScopeStack.getCount() > 0)
+                                debugScope = context->debugLexicalScopeStack.getLast();
+
                             auto debugVar = builder->emitDebugVar(
                                 varType,
                                 debugSourceInst,
                                 builder->getIntValue(builder->getUIntType(), humaneLoc.line),
                                 builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                                debugScope,
                                 nullptr);
 
                             // Copy name hint from the declaration
@@ -11837,6 +12096,35 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         ConstructorDecl::ConstructorFlavor::SynthesizedDefault));
             }
 
+            // Add debugfunction decoration and emit debug function BEFORE lowering
+            // the function body. This is needed so that debug lexical scopes can
+            // reference the IRDebugFunction instead of the IRFunc directly.
+            auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
+            IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
+            if (nameOperand)
+            {
+                getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
+
+                auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
+                IRInst* debugType = irFunc->getDataType();
+
+                if (locationDecor && debugType)
+                {
+                    auto debugFuncCallee = getBuilder()->emitDebugFunction(
+                        nameOperand,
+                        locationDecor->getLine(),
+                        locationDecor->getCol(),
+                        locationDecor->getSource(),
+                        debugType);
+
+                    // Add a decoration to link the function to its debug function
+                    getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
+                }
+
+                // Restore insert point for function body
+                getBuilder()->setInsertInto(irFunc);
+            }
+
             // We lower whatever statement was stored on the declaration
             // as the body of the new IR function.
             //
@@ -12190,31 +12478,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     isInline = true;
                     break;
                 }
-            }
-        }
-
-        // Add debugfunction decoration and emit debug function. This
-        // is needed for emitting debug information
-        auto nameHint = irFunc->findDecoration<IRNameHintDecoration>();
-        IRStringLit* nameOperand = nameHint ? as<IRStringLit>(nameHint->getNameOperand()) : nullptr;
-        if (nameOperand)
-        {
-            getBuilder()->setInsertInto(getBuilder()->getModule()->getModuleInst());
-
-            auto locationDecor = irFunc->findDecoration<IRDebugLocationDecoration>();
-            IRInst* debugType = irFunc->getDataType();
-
-            if (locationDecor && debugType)
-            {
-                auto debugFuncCallee = getBuilder()->emitDebugFunction(
-                    nameOperand,
-                    locationDecor->getLine(),
-                    locationDecor->getCol(),
-                    locationDecor->getSource(),
-                    debugType);
-
-                // Add a decoration to link the function to its debug function
-                getBuilder()->addDecoration(irFunc, kIROp_DebugFuncDecoration, debugFuncCallee);
             }
         }
 
@@ -12947,11 +13210,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
+            auto pathInfo = source->getPathInfo();
+            auto absolutePath = pathInfo.getMostUniqueIdentity();
             auto debugSource = builder->emitDebugSource(
-                source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
+                absolutePath.getUnownedSlice(),
                 source->getContent(),
                 source->isIncludedFile());
+            // Add to both maps to ensure consistency - use absolute path for both
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
+            context->shared->mapSourcePathToDebugSourceInst.add(absolutePath, debugSource);
         }
     }
 
@@ -13002,16 +13269,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             nvapiSlotModifier->spaceName.getUnownedSlice());
     }
 
-#if 0
-    if (compileRequest->optionSet.shouldDumpIR())
+#if 1
+    //if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
-        dumpIR(
-            module,
-            compileRequest->m_irDumpOptions,
-            "GENERATED",
-            compileRequest->getSourceManager(),
-            &writer);
+        dumpIR(module, compileRequest->m_irDumpOptions, "GENERATED", compileRequest->getSourceManager(), nullptr);
     }
 #endif
 
@@ -13086,11 +13347,15 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     dceOptions.keepLayoutsAlive = true;
     dceOptions.useFastAnalysis = true;
 
+    dumpIR(module, compileRequest->m_irDumpOptions, "BEFORE DCE0", compileRequest->getSourceManager(), nullptr);
+
     for (auto inst : module->getGlobalInsts())
     {
         if (auto func = as<IRGlobalValueWithCode>(inst))
             eliminateDeadCode(func, dceOptions);
     }
+
+    dumpIR(module, compileRequest->m_irDumpOptions, "POST DCE0", compileRequest->getSourceManager(), nullptr);
 
     // Where possible, move loop condition checks to the end of loops, and wrap
     // the loop in an 'if(condition)'.
@@ -13151,6 +13416,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             break;
     }
 
+    dumpIR(module, compileRequest->m_irDumpOptions, "generateIRForTranslationUnit1", compileRequest->getSourceManager(), nullptr);
+
     if (compileRequest->getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
         // We don't allow recursive types.
@@ -13182,6 +13449,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
+
+    dumpIR(module, compileRequest->m_irDumpOptions, "generateIRForTranslationUnit2", compileRequest->getSourceManager(), nullptr);
 
     // The "mandatory" optimization passes may make use of the
     // `IRHighLevelDeclDecoration` type to relate IR instructions
@@ -13220,7 +13489,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         stripFrontEndOnlyInstructions(module, stripOptions);
 
         stripImportedWitnessTable(module);
-
+        dumpIR(module, compileRequest->m_irDumpOptions, "BEFORE DCE1", compileRequest->getSourceManager(), nullptr);
         // Stripping out decorations could leave some dead code behind
         // in the module, and in some cases that extra code is also
         // undesirable (e.g., the string literals referenced by name-hint
@@ -13230,7 +13499,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // eliminate anything that has been marked for export.
         //
         eliminateDeadCode(module, dceOptions);
-
+        dumpIR(module, compileRequest->m_irDumpOptions, "POST DCE1", compileRequest->getSourceManager(), nullptr);
         if (stripOptions.shouldStripNameHints && linkage->m_optionSet.shouldHaveSourceMap())
         {
             // The obfuscated source map is stored on the module
@@ -13252,16 +13521,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 
     // If we are being asked to dump IR during compilation,
     // then we can dump the initial IR for the module here.
-    if (compileRequest->optionSet.shouldDumpIR())
+    // if (compileRequest->optionSet.shouldDumpIR())
     {
-        DiagnosticSinkWriter writer(compileRequest->getSink());
-
-        dumpIR(
-            module,
-            compileRequest->m_irDumpOptions,
-            "LOWER-TO-IR",
-            compileRequest->getSourceManager(),
-            &writer);
+        // DiagnosticSinkWriter writer(compileRequest->getSink());
+        dumpIR(module, compileRequest->m_irDumpOptions, "LOWER-TO-IR", compileRequest->getSourceManager(), nullptr);
     }
 
     module->buildMangledNameToGlobalInstMap();

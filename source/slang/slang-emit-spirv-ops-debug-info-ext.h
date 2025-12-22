@@ -423,6 +423,56 @@ SpvInst* emitOpDebugTypeQualifier(
 }
 
 template<typename T>
+SpvInst* emitOpDebugLexicalBlock(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* source,
+    IRInst* line,
+    IRInst* col,
+    SpvInst* parentScope)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(21),
+        source,
+        line,
+        col,
+        parentScope);
+}
+
+template<typename T>
+SpvInst* emitOpDebugLexicalBlockDiscriminator(
+    SpvInstParent* parent,
+    IRInst* inst,
+    const T& idResultType,
+    SpvInst* set,
+    IRInst* source,
+    IRInst* discriminator,
+    SpvInst* parentScope)
+{
+    static_assert(isSingular<T>);
+    return emitInst(
+        parent,
+        inst,
+        SpvOpExtInst,
+        idResultType,
+        kResultID,
+        set,
+        SpvWord(22),
+        source,
+        discriminator,
+        parentScope);
+}
+
+template<typename T>
 SpvInst* emitOpDebugScope(
     SpvInstParent* parent,
     IRInst* inst,

@@ -107,6 +107,16 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
     auto funcDebugLoc = func->findDecoration<IRDebugLocationDecoration>();
     if (!funcDebugLoc)
         return;
+
+    // Get the IRDebugFunction for this function to use as the scope for parameters
+    IRInst* funcDebugScope = nullptr;
+    if (auto debugFuncDecor = func->findDecoration<IRDebugFuncDecoration>())
+    {
+        // IRDebugFuncDecoration stores the IRDebugFunction as its first operand
+        if (debugFuncDecor->getOperandCount() > 0)
+            funcDebugScope = debugFuncDecor->getOperand(0);
+    }
+
     List<IRInst*> params;
     for (auto param : firstBlock->getParams())
     {
@@ -130,12 +140,17 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
         }
         if (!isDebuggableType(paramType))
             continue;
+
+        // Use the function's debug scope as the parent for parameter debug vars
+        // If we don't have one, use the paramIndex as a fallback (will be nullptr)
+        IRInst* paramScope = funcDebugScope ? funcDebugScope : builder.getIntValue(builder.getUIntType(), paramIndex);
+
         auto debugVar = builder.emitDebugVar(
             paramType,
             funcDebugLoc->getSource(),
             funcDebugLoc->getLine(),
             funcDebugLoc->getCol(),
-            builder.getIntValue(builder.getUIntType(), paramIndex));
+            paramScope);
         copyNameHintAndDebugDecorations(debugVar, param);
 
         mapVarToDebugVar[param] = debugVar;
@@ -179,7 +194,60 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
             nextInst = inst->getNextInst();
             if (auto varInst = as<IRVar>(inst))
             {
-                if (auto debugLoc = varInst->findDecoration<IRDebugLocationDecoration>())
+                // First, check if there's already a debug var for this variable
+                // (created during IR lowering with proper scope)
+                IRDebugVar* existingDebugVar = nullptr;
+                for (auto use = varInst->firstUse; use; use = use->nextUse)
+                {
+                    if (auto candidate = as<IRDebugVar>(use->getUser()->getParent()))
+                    {
+                        // Check if this is a debug var that follows this variable
+                        if (candidate->getDataType() &&
+                            as<IRPtrType>(candidate->getDataType()) &&
+                            candidate->getOperand(0) && // has source
+                            !existingDebugVar)
+                        {
+                            existingDebugVar = candidate;
+                            break;
+                        }
+                    }
+                }
+
+                // Look forward in the same block for a debug var that was created for this variable
+                if (!existingDebugVar)
+                {
+                    for (auto searchInst = varInst->getNextInst(); searchInst; searchInst = searchInst->getNextInst())
+                    {
+                        if (auto candidateDebugVar = as<IRDebugVar>(searchInst))
+                        {
+                            // Check if it matches the location
+                            if (auto debugLoc = varInst->findDecoration<IRDebugLocationDecoration>())
+                            {
+                                if (candidateDebugVar->getSource() == debugLoc->getSource() &&
+                                    candidateDebugVar->getLine() == debugLoc->getLine() &&
+                                    candidateDebugVar->getCol() == debugLoc->getCol())
+                                {
+                                    auto varType = tryGetPointedToType(&builder, varInst->getDataType());
+                                    auto debugVarType = tryGetPointedToType(&builder, candidateDebugVar->getDataType());
+                                    if (varType == debugVarType)
+                                    {
+                                        existingDebugVar = candidateDebugVar;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        // Stop searching after we hit another var or significant instruction
+                        if (as<IRVar>(searchInst) || as<IRStore>(searchInst))
+                            break;
+                    }
+                }
+
+                if (existingDebugVar)
+                {
+                    mapVarToDebugVar[varInst] = existingDebugVar;
+                }
+                else if (auto debugLoc = varInst->findDecoration<IRDebugLocationDecoration>())
                 {
                     auto varType = tryGetPointedToType(&builder, varInst->getDataType());
                     builder.setInsertBefore(varInst);
@@ -189,7 +257,8 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
                         varType,
                         debugLoc->getSource(),
                         debugLoc->getLine(),
-                        debugLoc->getCol());
+                        debugLoc->getCol(),
+                        nullptr);  // scope will be determined during SPIRV emission via findDebugScope
                     copyNameHintAndDebugDecorations(debugVar, varInst);
                     mapVarToDebugVar[varInst] = debugVar;
                 }

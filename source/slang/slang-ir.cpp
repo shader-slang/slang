@@ -3115,15 +3115,34 @@ IRInst* IRBuilder::emitDebugVar(
     IRInst* source,
     IRInst* line,
     IRInst* col,
+    IRInst* scope,
     IRInst* argIndex)
 {
-    if (argIndex)
+    // Operand layout:
+    // 0: source (required)
+    // 1: line (required)
+    // 2: col (required)
+    // 3: scope (optional)
+    // 4: argIndex (optional, only if scope is present)
+
+    if (scope)
     {
-        IRInst* args[] = {source, line, col, argIndex};
-        return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
+        if (argIndex)
+        {
+            IRInst* args[] = {source, line, col, scope, argIndex};
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 5, args);
+        }
+        else
+        {
+            IRInst* args[] = {source, line, col, scope};
+            return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 4, args);
+        }
     }
     else
     {
+        // No scope provided - only emit source, line, col
+        // Note: If argIndex is provided without scope, we ignore it
+        // (in practice this shouldn't happen based on current usage)
         IRInst* args[] = {source, line, col};
         return emitIntrinsicInst(getPtrType(type), kIROp_DebugVar, 3, args);
     }
@@ -3172,6 +3191,25 @@ IRInst* IRBuilder::emitDebugFunction(
     return emitIntrinsicInst(getVoidType(), kIROp_DebugFunction, 5, args);
 }
 
+IRInst* IRBuilder::emitDebugLexicalBlock(
+    IRInst* file,
+    IRInst* line,
+    IRInst* col,
+    IRInst* parentScope,
+    IRInst* discriminator)
+{
+    if (discriminator)
+    {
+        IRInst* args[] = {file, line, col, parentScope, discriminator};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 5, args);
+    }
+    else
+    {
+        IRInst* args[] = {file, line, col, parentScope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugLexicalBlock, 4, args);
+    }
+}
+
 IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 {
     IRInst* args[] = {variable, inlinedAt};
@@ -3180,8 +3218,16 @@ IRInst* IRBuilder::emitDebugInlinedVariable(IRInst* variable, IRInst* inlinedAt)
 
 IRInst* IRBuilder::emitDebugScope(IRInst* scope, IRInst* inlinedAt)
 {
-    IRInst* args[] = {scope, inlinedAt};
-    return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    if (inlinedAt)
+    {
+        IRInst* args[] = {scope, inlinedAt};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 2, args);
+    }
+    else
+    {
+        IRInst* args[] = {scope};
+        return emitIntrinsicInst(getVoidType(), kIROp_DebugScope, 1, args);
+    }
 }
 
 IRInst* IRBuilder::emitDebugNoScope()
@@ -6806,7 +6852,7 @@ static String getName(IRDumpContext* context, IRInst* value)
 static void dumpDebugID(IRDumpContext* context, IRInst* inst)
 {
 #if SLANG_ENABLE_IR_BREAK_ALLOC
-    if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
+    // if (context->options.flags & IRDumpOptions::Flag::DumpDebugIds)
     {
         dump(context, "{");
         dump(context, String(inst->_debugUID));
@@ -7301,6 +7347,19 @@ static void dumpInstExpr(IRDumpContext* context, IRInst* inst)
 
     dump(context, opInfo.name);
     dumpInstOperandList(context, inst);
+
+    extern String lastDumpedEntryPoint;
+    if (op == kIROp_EntryPointDecoration)
+    {
+        lastDumpedEntryPoint = ".";
+        auto irConst1 = as<IRConstant>(inst->getOperand(1));
+        auto irConst2 = as<IRConstant>(inst->getOperand(2));
+        if (irConst1)
+            lastDumpedEntryPoint.append(String(irConst1->getStringSlice().begin(), irConst1->getStringSlice().end()) + ".");
+        if (irConst2)
+            lastDumpedEntryPoint.append(String(irConst2->getStringSlice().begin(), irConst2->getStringSlice().end()) + ".");
+        lastDumpedEntryPoint.append(".txt");
+    }
 }
 
 static void dumpInstBody(IRDumpContext* context, IRInst* inst)
@@ -7478,6 +7537,21 @@ void dumpIR(
     SourceManager* sourceManager,
     ISlangWriter* inWriter)
 {
+    extern bool dumpEnable;
+    FileWriter* fileWriter = dynamic_cast<FileWriter*>(inWriter);
+    std::FILE* f = nullptr;
+    extern String dumpFileNameBase;
+    extern String lastDumpedEntryPoint;
+    extern int dumpCount;
+    String dumpFileName = "";
+    lastDumpedEntryPoint = "";
+    if (!fileWriter && dumpEnable) {
+        dumpFileName = (dumpFileNameBase + String(dumpCount++) + "." + label + ".txt");
+        fopen_s(&f, dumpFileName.getBuffer(), "wt");
+        inWriter = new FileWriter(f, 0);
+    } else if (!inWriter)
+        return;
+
     WriterHelper writer(inWriter);
 
     if (label)
@@ -7492,6 +7566,13 @@ void dumpIR(
     if (label)
     {
         writer.put("###\n");
+    }
+
+    if (!fileWriter && dumpEnable) {
+        fclose(f);
+        if (lastDumpedEntryPoint != "") {
+            std::rename(dumpFileName.getBuffer(), (dumpFileName + lastDumpedEntryPoint).getBuffer());
+        }
     }
 }
 

@@ -57,7 +57,27 @@ auto wrapPass(
     Args&&... args)
 {
     PassHooksRAII passHooks(codeGenContext, irModule, passName);
-    return passFunc(irModule, std::forward<Args>(args)...);
+    extern void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label);
+    static int dumpPostPass = -1;
+    if (dumpPostPass == -1)
+    {
+        dumpPostPass = (getenv("SLANG_IRDUMP_POST_PASS") ? atoi(getenv("SLANG_IRDUMP_POST_PASS")) : 0);
+    }
+    //dumpIRIfEnabled(codeGenContext, irModule, (String("PRE_") + passName).getBuffer());
+    using ReturnType = decltype(passFunc(irModule, std::forward<Args>(args)...));
+    if constexpr (std::is_void_v<ReturnType>)
+    {
+        passFunc(irModule, std::forward<Args>(args)...);
+        if (dumpPostPass > 0)
+            dumpIRIfEnabled(codeGenContext, irModule, (String("POST_") + passName).getBuffer());
+    }
+    else
+    {
+        auto result = passFunc(irModule, std::forward<Args>(args)...);
+        if (dumpPostPass > 0)
+            dumpIRIfEnabled(codeGenContext, irModule, (String("POST_") + passName).getBuffer());
+        return result;
+    }
 }
 
 } // namespace Slang

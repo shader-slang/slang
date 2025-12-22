@@ -3198,6 +3198,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
 
     case kIROp_DebugSource:
     case kIROp_DebugLine:
+    case kIROp_DebugLocationDecoration:
     case kIROp_DebugVar:
     case kIROp_DebugValue:
     case kIROp_DebugInlinedAt:
@@ -3205,7 +3206,9 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_DebugNoScope:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugFunction:
+    case kIROp_DebugFuncDecoration:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugLexicalBlock:
         break;
 
     case kIROp_Unmodified:
@@ -5109,6 +5112,29 @@ void CLikeSourceEmitter::ensureInstOperand(
 
 void CLikeSourceEmitter::ensureInstOperandsRec(ComputeEmitActionsContext* ctx, IRInst* inst)
 {
+    // Skip processing operands for debug instructions to avoid circularity.
+    // Debug instructions like IRDebugLexicalBlock can have operands that reference
+    // the parent IRFunc, which would create a circular dependency during emission.
+    switch (inst->getOp())
+    {
+    case kIROp_DebugInlinedAt:
+    case kIROp_DebugScope:
+    case kIROp_DebugNoScope:
+    case kIROp_DebugFunction:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugSource:
+    case kIROp_DebugValue:
+    case kIROp_DebugInlinedVariable:
+    case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugLexicalBlock:
+    case kIROp_DebugFuncDecoration:
+    case kIROp_DebugLocationDecoration:
+        return;
+    default:
+        break;
+    }
+
     ensureInstOperand(ctx, inst->getFullType());
 
     UInt operandCount = inst->operandCount;
@@ -5202,6 +5228,7 @@ void CLikeSourceEmitter::ensureGlobalInst(
     case kIROp_DebugValue:
     case kIROp_DebugInlinedVariable:
     case kIROp_DebugBuildIdentifier:
+    case kIROp_DebugLexicalBlock:
         return;
     default:
         break;

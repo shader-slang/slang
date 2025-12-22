@@ -16,6 +16,7 @@
 
 namespace Slang
 {
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
 
 /// Find a suitable layout for `entryPoint` in `programLayout`.
 ///
@@ -2220,7 +2221,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // arguments which might end up affecting the mangled
     // entry point name.
     //
-
+    dumpIRIfEnabled(codeGenContext, userModules[0], "BEFORE specializeIRForEntryPoint");
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
     {
@@ -2233,7 +2234,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             entryPoint,
             nameOverride.getUnownedSlice()));
     }
-
+    dumpIRIfEnabled(codeGenContext, context->getModule(), "POST specializeIRForEntryPoint");
     // Layout information for global shader parameters is also required,
     // and in particular every global parameter that is part of the layout
     // should be present in the initial IR module so that steps that

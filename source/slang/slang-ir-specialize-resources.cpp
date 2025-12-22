@@ -10,6 +10,8 @@
 
 namespace Slang
 {
+void dumpIRIfEnabled(CodeGenContext* codeGenContext, IRModule* irModule, char const* label = nullptr);
+String dumpIRToString(IRInst* root, IRDumpOptions options = {IRDumpOptions::Mode::Simplified, IRDumpOptions::Flag::DumpDebugIds});
 
 struct ResourceParameterSpecializationCondition : FunctionCallSpecializeCondition
 {
@@ -114,8 +116,38 @@ void inlineAllCallsOfFunction(IRFunc* func)
                 return;
             if (call->getCallee() != func)
                 return;
-            inlineCall(call);
+            bool inlined = inlineCall(call);
+            if (!inlined)
+            {
+                // Debug: print when inlining fails
+                fprintf(stderr, "Warning: Failed to inline call to function\n");
+            }
         });
+}
+
+/// Check if a function has any uses other than from debug instructions.
+bool hasNonDebugUses(IRFunc* func)
+{
+    for (auto use = func->firstUse; use; use = use->nextUse)
+    {
+        auto user = use->getUser();
+        switch (user->getOp())
+        {
+        case kIROp_DebugScope:
+        case kIROp_DebugFuncDecoration:
+        case kIROp_DebugVar:
+        case kIROp_DebugValue:
+        case kIROp_DebugLexicalBlock:
+        case kIROp_DebugInlinedAt:
+        case kIROp_DebugInlinedVariable:
+        case kIROp_DebugLine:
+        case kIROp_DebugLocationDecoration:
+            break;
+        default:
+            return true;
+        }
+    }
+    return false;
 }
 
 /// A pass to specialize resource-typed function outputs
@@ -149,7 +181,9 @@ struct ResourceOutputSpecializationPass
 
     bool processModule()
     {
-        specializedFuncs.clear();
+        // Note: specializedFuncs is now initialized from the caller with the persistent set,
+        // so we don't clear it here - we want to remember which functions have already been
+        // successfully specialized to avoid re-processing them.
         bool changed = false;
 
         // The main logic consists of iterating over all functions
@@ -164,6 +198,7 @@ struct ResourceOutputSpecializationPass
 
             changed |= processFunc(func);
         }
+        
         return changed;
     }
 
@@ -171,7 +206,7 @@ struct ResourceOutputSpecializationPass
     {
         // Avoid re-computing by checking our 'processFunc' cache.
         if (specializedFuncs.contains(oldFunc))
-            return true;
+            return false;
         if (unspecializableFuncs->contains(oldFunc))
             return false;
 
@@ -208,6 +243,10 @@ struct ResourceOutputSpecializationPass
         newFunc->setFullType(oldFunc->getFullType());
 
         IRCloneEnv cloneEnv;
+        // Map oldFunc to newFunc so that any self-references (e.g., DebugScope
+        // instructions that reference the containing function) get properly
+        // remapped during cloning.
+        cloneEnv.mapOldValToNew.add(oldFunc, newFunc);
         cloneInstDecorationsAndChildren(&cloneEnv, module, oldFunc, newFunc);
 
         // At first `newFunc` is a direct clone of `oldFunc`, and thus doesn't
@@ -217,8 +256,15 @@ struct ResourceOutputSpecializationPass
         //
         FuncInfo funcInfo;
         SpecializeFuncResult result = specializeFunc(newFunc, funcInfo);
+        //UnownedStringSlice newFuncName = newFunc->findDecoration<IRLinkageDecoration>() ?
+        //    newFunc->findDecoration<IRLinkageDecoration>()->getMangledName() :
+        //        (newFunc->findDecoration<IRNameHintDecoration>() ? newFunc->findDecoration<IRNameHintDecoration>()->getName() :
+        //            UnownedStringSlice("<unnamed>"));
+        //String newFuncStr = dumpIRToString(newFunc, {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
         if (failedResult(result))
         {
+            //fprintf(stderr, "ResourceOutputSpecializationPass::processFunc specializeFunc fail:%.*s\n%s\n",
+            //    (int)newFuncName.getLength(), newFuncName.begin(), newFuncStr.getBuffer());
             // Even though we deterined that we *should* specialize
             // this function, we were not able to because of some
             // failure inside the body of the function.
@@ -244,12 +290,17 @@ struct ResourceOutputSpecializationPass
             // Check if `oldFunc` is the reason for failing,
             // Otherwise don't add to 'unspecializableFuncs'
             //
-            // Ensure oldFunc has uses, else, there is nothing to specialize here.
+            // Ensure oldFunc has non-debug uses, else, there is nothing to specialize here.
+            // Debug uses (like IRDebugScope) are preserved after inlining to maintain proper
+            // debug information, but they don't prevent the function from being removed.
             // If oldFunc has IRKeepAlive, this code should be assumed to have a
             // "dynamic" resource value.
-            if (result == SpecializeFuncResult::ThisFuncFailed && oldFunc->hasUses())
+            if (failedResult(result) && hasNonDebugUses(oldFunc))
                 unspecializableFuncs->add(oldFunc);
             return false;
+        } else {
+            //fprintf(stderr, "ResourceOutputSpecializationPass::processFunc specializeFunc succ:%.*s\n%s\n",
+            //    (int)newFuncName.getLength(), newFuncName.begin(), newFuncStr.getBuffer());
         }
 
         // Specialization might have changed the signature of `newFunc`,
@@ -315,7 +366,9 @@ struct ResourceOutputSpecializationPass
         {
             specializeCallSite(oldCall, newFunc, funcInfo);
         }
+
         specializedFuncs.add(oldFunc);
+        specializedFuncs.add(newFunc);  // Also add newFunc to prevent re-specialization
 
         // Since we can no longer fail and we are replacing all `Func` uses, 'KeepAlive'
         // can be removed from the oldFunc so DCE can it clean-up.
@@ -1235,7 +1288,8 @@ struct ResourceOutputSpecializationPass
 bool specializeResourceOutputs(
     CodeGenContext* codeGenContext,
     IRModule* module,
-    HashSet<IRFunc*>& unspecializableFuncs)
+    HashSet<IRFunc*>& unspecializableFuncs,
+    HashSet<IRFunc*>& specializedFuncs)
 {
     auto targetRequest = codeGenContext->getTargetReq();
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) || isWGPUTarget(targetRequest))
@@ -1258,11 +1312,18 @@ bool specializeResourceOutputs(
     pass.targetRequest = targetRequest;
     pass.module = module;
     pass.unspecializableFuncs = &unspecializableFuncs;
-    return pass.processModule();
+    pass.specializedFuncs = specializedFuncs;  // Initialize with existing set
+    
+    bool result = pass.processModule();
+    
+    specializedFuncs = pass.specializedFuncs;  // Copy back the updated set
+    return result;
 }
 
 bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
 {
+    dumpIRIfEnabled(codeGenContext, irModule, "BEFORE specializeResourceUsage");
+
     bool result = false;
     // We apply two kinds of specialization to clean up resource value usage:
     //
@@ -1276,6 +1337,8 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
     // simplification passes), because each optimization may open up opportunties
     // for the other to apply.
     //
+    HashSet<IRFunc*> specializedFuncs;
+
     for (;;)
     {
         bool changed = true;
@@ -1283,13 +1346,12 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         while (changed)
         {
             changed = false;
-            unspecializableFuncs.clear();
             // Because the legalization may depend on what target
             // we are compiling for (certain things might be okay
             // for D3D targets that are not okay for Vulkan), we
             // pass down the target request along with the IR.
             //
-            changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs);
+            changed |= specializeResourceOutputs(codeGenContext, irModule, unspecializableFuncs, specializedFuncs);
             changed |= specializeResourceParameters(codeGenContext, irModule);
 
             // After specialization of function outputs, we may find that there
@@ -1313,11 +1375,16 @@ bool specializeResourceUsage(IRModule* irModule, CodeGenContext* codeGenContext)
         for (auto func : unspecializableFuncs)
             inlineAllCallsOfFunction(func);
 
+        // After inlining, we need to clear the specializedFuncs cache because
+        // the IR has changed and functions may need to be re-specialized.
+        specializedFuncs.clear();
+
         simplifyIR(
             irModule,
             codeGenContext->getTargetProgram(),
             IRSimplificationOptions::getFast(codeGenContext->getTargetProgram()));
     }
+    dumpIRIfEnabled(codeGenContext, irModule, "POST specializeResourceUsage");
     return result;
 }
 
