@@ -35,6 +35,7 @@ RUN apt-get update && apt-get install -y \
     ninja-build \
     unzip \
     python3 \
+    python3-pip \
     libx11-dev \
     libxcursor-dev \
     libxrandr-dev \
@@ -45,6 +46,14 @@ RUN apt-get update && apt-get install -y \
     vulkan-validationlayers \
     spirv-tools \
     glslang-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install runtime libraries for test execution
+RUN apt-get update && apt-get install -y \
+    libx11-6 \
+    libxext6 \
+    libegl1 \
+    libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install CMake 3.30 (required for CMakePresets.json version 6)
