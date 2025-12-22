@@ -17,6 +17,7 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+      packages: read
 
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
