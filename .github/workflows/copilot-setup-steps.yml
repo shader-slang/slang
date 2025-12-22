@@ -45,21 +45,28 @@ jobs:
           submodules: recursive
           fetch-depth: 2
 
-      - name: Verify GPU access
+      - name: Install build dependencies
         run: |
-          echo "=== GPU Information ==="
-          nvidia-smi
-          echo "=== CMake version ==="
-          cmake --version
-          echo "=== CUDA version ==="
-          nvcc --version
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            ninja-build \
+            git \
+            python3
 
-      - name: Configure CMake
+      - name: Verify environment
         run: |
-          cmake --preset default --fresh \
-            -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+          echo "=== System Info ==="
+          uname -a
+          echo "=== CMake ==="
+          cmake --version || echo "CMake not installed"
+          echo "=== Docker ==="
+          docker --version
+          echo "=== GPU (via Docker) ==="
+          docker run --rm --gpus all nvidia/cuda:12.4.1-devel-ubuntu22.04 nvidia-smi
 
-      - name: Build Slang
+      - name: Configure and build
         run: |
+          cmake --preset default --fresh
           cmake --build --preset debug -j$(nproc)
