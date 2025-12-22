@@ -32,6 +32,13 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
 
 internal extension<T, int N> Array<T, N> : IArrayAccessor<T> {}
 
+enum AccessOp
+{
+    READ,
+    WRITE,
+    ATOMIC_ADD,
+}
+
 internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerRead>(BufferType buffer, int bufferIdx, int elementIdx, inout uint result)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -76,32 +83,8 @@ internal static void writeOneElement<T, BufferType, int NBytes, int BitsShiftPer
     }
 }
 
-
 [ForceInline]
-internal static uint4 readUint4Aligned<T, BufferType>(BufferType buffer, int startIndex)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
-{
-    uint4 result = uint4(0, 0, 0, 0);
-    const int nBytes = sizeof(T);
-    const int ReadPerElement = 4 / nBytes;
-    const int BitsShiftPerRead = 32 / ReadPerElement;
-    [ForceUnroll]
-    for (int i = 0; i < 4; i++)
-    {
-        [ForceUnroll]
-        for (int j = 0; j < ReadPerElement; j++)
-        {
-            int index = startIndex + i * ReadPerElement + j;
-            readOneElement<T, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, result[i]);
-        }
-    }
-    return result;
-}
-
-[ForceInline]
-internal static void writeUint4Aligned<T, BufferType>( out BufferType buffer, int startIndex, uint4 value)
+internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferType buffer, int startIndex, inout uint4 value)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where BufferType : IArrayAccessor<T>
@@ -109,6 +92,10 @@ internal static void writeUint4Aligned<T, BufferType>( out BufferType buffer, in
     const int nBytes = sizeof(T);
     const int WritePerElement = 4 / nBytes;
     const int BitsShiftPerWrite = 32 / WritePerElement;
+
+    if (Op == AccessOp.READ)
+        value = uint4(0, 0, 0, 0);
+
     [ForceUnroll]
     for (int i = 0; i < 4; i++)
     {
@@ -116,7 +103,12 @@ internal static void writeUint4Aligned<T, BufferType>( out BufferType buffer, in
         for (int j = 0; j < WritePerElement; j++)
         {
             int index = startIndex + i * WritePerElement + j;
-            writeOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+            if (Op == AccessOp.READ)
+                readOneElement<T, BufferType, nBytes, BitsShiftPerWrite>( buffer, index, j, value[i]);
+            else if (Op == AccessOp.WRITE)
+                writeOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+            else
+                static_assert(false, "Unsupported access operation");
         }
     }
 }
@@ -129,7 +121,9 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType 
     if (IsAligned)
     {
         // Call the aligned version of readUint4 which is branchless.
-        readUint4Aligned<T, BufferType>(buffer, startIndex);
+        uint4 value;
+        accessUint4Aligned<AccessOp.READ, T, BufferType>(buffer, startIndex, value);
+        return value;
     }
 
     uint4 result = uint4(0, 0, 0, 0);
