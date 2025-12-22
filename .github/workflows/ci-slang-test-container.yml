@@ -128,6 +128,11 @@ jobs:
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
       options: >-
@@ -145,6 +150,13 @@ jobs:
         shell: bash
 
     steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -188,6 +200,11 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     if: always() && inputs.config == 'release'
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
       options: >-
@@ -205,6 +222,13 @@ jobs:
         shell: bash
 
     steps:
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: actions/checkout@v4
 
       - name: Download artifacts
