@@ -6647,25 +6647,19 @@ struct WmmaFragment
     void __device__ fill(T value)
     {
         unsigned packed = Pack32Helper(value);
-
-        // Manually assign to prevent register coalescing
-        regs[0] = packed;
-        regs[1] = packed;
-        regs[2] = packed;
-        regs[3] = packed;
-        regs[4] = packed;
-        regs[5] = packed;
-        regs[6] = packed;
-        regs[7] = packed;
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        for (int i = 0; i < nregs; i++)
+        {
+            regs[i] = packed;
+        }
     }
 
     __device__ This operator*(T b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b);
         }
@@ -6674,11 +6668,10 @@ struct WmmaFragment
 
     __device__ This operator*(const This& b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b.get(i));
         }
@@ -6687,10 +6680,9 @@ struct WmmaFragment
 
     __device__ This operator/(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) / other.get(i));
         }
@@ -6699,10 +6691,9 @@ struct WmmaFragment
 
     __device__ This operator-(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) - other.get(i));
         }
@@ -6711,10 +6702,9 @@ struct WmmaFragment
 
     __device__ This operator-()
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, -get(i));
         }
@@ -6723,10 +6713,9 @@ struct WmmaFragment
 
     __device__ This operator+(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) + other.get(i));
         }
@@ -6735,10 +6724,9 @@ struct WmmaFragment
 
     __device__ This operator%(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) % other.get(i));
         }
@@ -6751,7 +6739,7 @@ struct WmmaFragment
         // If the data type is different, we need to copy element by element.
         // Since the shape of two matrices are the same, they have the same
         // number of elements.
-        for (int i = 0; i < elements_per_thread; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             set(i, static_cast<T>(other.get(i)));
         }
@@ -6763,7 +6751,6 @@ struct WmmaFragment
     //   - index 1: bits [8:15]  of regs[0]
     //   - index 2: bits [16:23] of regs[0]
     //   - index 3: bits [24:31] of regs[0]
-    //   - index 4: bits [0:7]   of regs[1], etc.
     __device__ T get(int index) const
     {
         if constexpr (sizeof(T) == 4)
@@ -6880,7 +6867,7 @@ struct WmmaFragment
         return fragment;
     }
 
-    static __device__ uint32_t GetLength() { return This::elements_per_thread; }
+    static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
 
     // For referencing those template parameters outside the struct
     using ElementType = T;
@@ -6893,15 +6880,7 @@ struct WmmaFragment
     static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
     unsigned regs[RegsCount] = {};
 
-    static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
-                                                  : (R == MatrixUse::MatrixB) ? (K * N)
-                                                                              : (M * N);
-
-    static_assert(elements_per_warp % 32 == 0, "Total elements per warp must be divisible by 32");
-
-    static constexpr uint32_t elements_per_thread = elements_per_warp / 32;
-    static constexpr uint32_t bytes_per_thread = elements_per_thread * sizeof(T);
-    static constexpr uint32_t registers_per_thread = (bytes_per_thread + 3) / 4;
+    static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
 };
 
 // ====================================================================================
