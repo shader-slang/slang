@@ -57,12 +57,14 @@ public struct StructuredBufferStorage<T> : IStorage<T>
 
     internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
     {
-        return readUint4<T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address);
+        uint4 value;
+        accessUint4<AccessOp.READ, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+        return value;
     }
 
-    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>( Address baseAddress, Address address, uint4 value)
+    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
     {
-        // uint4Accessor<T, BufferType, AccessorOp.ATOMIC_ADD, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+        accessUint4<AccessOp.ATOMIC_ADD, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
     }
 
     /**
