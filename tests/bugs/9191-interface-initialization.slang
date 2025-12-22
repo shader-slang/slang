@@ -2,6 +2,7 @@
 // variable is initialized with defaults.
 
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 
 
 interface IHelper
@@ -32,7 +33,9 @@ struct HelperImpl3 : IHelper
 
 IHelper test(int val)
 {
+    // check for the presense of the warning
 
+    //CHECK: result code = 0
     //CHECK: warning 30506
 
     IHelper ret = { };
