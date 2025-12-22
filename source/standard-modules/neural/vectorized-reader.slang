@@ -14,11 +14,30 @@ implementing neural;
 //     }
 // }
 
+interface IArrayAccessor<T> : IRWArray<T>
+{
+    internal void atomicAdd(int index, T value)
+    {
+        static_assert(false, "atomicAdd is not supported for IArrayAccessor");
+    }
+}
+
+internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
+{
+    override internal void atomicAdd(int index, T value)
+    {
+        __atomic_add(this[index], value);
+    }
+}
+
+internal extension<T, int N> Array<T, N> : IArrayAccessor<T> {}
+
+
 // [ForceInline]
 internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IArray<T>
+    where BufferType : IArrayAccessor<T>
 {
     uint4 result = uint4(0, 0, 0, 0);
     const int nBytes = sizeof(T);
@@ -54,10 +73,10 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
     return result;
 }
 
-internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint AlignedStride>(BufferType buffer, int baseIndex, int startIndex)
+internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType buffer, int baseIndex, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IArray<T>
+    where BufferType : IArrayAccessor<T>
 {
     if (IsAligned)
     {
@@ -125,7 +144,7 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride, uint Aligne
 internal static void writeUint4<T, BufferType>(out BufferType buffer, int startIndex, uint4 value)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where BufferType : IRWArray<T>
+    where BufferType : IArrayAccessor<T>
 {
     const int nBytes = sizeof(T);
     const int WritePerElement = 4 / nBytes;
