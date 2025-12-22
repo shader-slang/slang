@@ -61,6 +61,11 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return readUint4<T, BufferType, IsAligned, ActualBoundary, AlignedBoundary>(m_buffer, baseAddress, address);
     }
 
+    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>( Address baseAddress, Address address, uint4 value)
+    {
+        // uint4Accessor<T, BufferType, AccessorOp.ATOMIC_ADD, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+    }
+
     /**
     Atomically adds a value (for gradient accumulation).
     @param[in] address The address relative to base address.

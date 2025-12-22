@@ -33,6 +33,8 @@ public interface IStorage<T> : IDifferentiablePtrType
     */
 
     internal uint4 readUint4<bool IsAligned, uint ActualBoundary, uint AlignedBoundary>(Address baseAddress, Address address);
+
+    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value);
     /**
     Atomically adds a value to storage (for gradient accumulation).
     @param[in] address The address to add to.

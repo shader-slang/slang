@@ -135,6 +135,10 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         static_assert(false, "Not implemented");
         return uint4(0);
     }
+    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+    {
+        static_assert(false, "Not implemented");
+    }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
@@ -154,6 +158,10 @@ public struct PointerStorage<T> : IStorage<T>
     {
         static_assert(false, "Not implemented");
         return uint4(0);
+    }
+    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+    {
+        static_assert(false, "Not implemented");
     }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
     public void write(Address address, T value) {address[0] = value;}
