@@ -1,4 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+// This test verifies that a warning is emitted if an interface
+// variable is initialized with defaults.
+
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 
 
 interface IHelper
@@ -29,6 +32,9 @@ struct HelperImpl3 : IHelper
 
 IHelper test(int val)
 {
+
+    //CHECK: warning 30506
+
     IHelper ret = { };
 
     switch (val % 4)
@@ -67,7 +73,6 @@ RWStructuredBuffer<int> gOutputBuffer;
 [numthreads(4, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    //CHECK: warning 30506
     uint tid = dispatchThreadID.x;
     IHelper helper = test(int(tid));
     int outputVal = helper.getVal();
