@@ -32,9 +32,33 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
 
 internal extension<T, int N> Array<T, N> : IArrayAccessor<T> {}
 
+internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerRead>(BufferType buffer, int bufferIdx, int elementIdx, inout uint result)
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where BufferType : IArrayAccessor<T>
+{
+        switch (NBytes)
+        {
+        case 1:
+            result |= uint(bit_cast<uint8_t>(buffer[bufferIdx]))
+                                << (BitsShiftPerRead * elementIdx);
+            break;
+        case 2:
+            result |= uint(bit_cast<uint16_t>(buffer[bufferIdx]))
+                                << (BitsShiftPerRead * elementIdx);
+            break;
+        case 4:
+            result |= uint(bit_cast<uint>(buffer[bufferIdx]))
+                                << (BitsShiftPerRead * elementIdx);
+            break;
+        default:
+            static_assert(false, "Unsupported data type T");
+        }
+}
 
-// [ForceInline]
-internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex)
+
+[ForceInline]
+internal static uint4 readUint4Aligned<T, BufferType>(BufferType buffer, int startIndex)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where BufferType : IArrayAccessor<T>
@@ -50,24 +74,7 @@ internal static uint4 readUint4<T, BufferType>(BufferType buffer, int startIndex
         for (int j = 0; j < ReadPerElement; j++)
         {
             int index = startIndex + i * ReadPerElement + j;
-            switch (nBytes)
-            {
-            case 1:
-                result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
-                                << (BitsShiftPerRead * j);
-                break;
-            case 2:
-                result[i] |= uint(bit_cast<uint16_t>(buffer[index]))
-                                << (BitsShiftPerRead * j);
-                break;
-            case 4:
-                result[i] |= uint(bit_cast<uint>(buffer[index]))
-                                << (BitsShiftPerRead * j);
-                break;
-            default:
-                static_assert(false, "Unsupported data type T");
-                return uint4(0);
-            }
+            readOneElement<T, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, result[i]);
         }
     }
     return result;
@@ -81,7 +88,7 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType 
     if (IsAligned)
     {
         // Call the aligned version of readUint4 which is branchless.
-        return readUint4<T, BufferType>(buffer, startIndex);
+        readUint4Aligned<T, BufferType>(buffer, startIndex);
     }
 
     uint4 result = uint4(0, 0, 0, 0);
@@ -120,8 +127,8 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType 
             switch (nBytes)
             {
             case 1:
-                // result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
-                //                 << (BitsShiftPerRead * j);
+                result[i] |= uint(bit_cast<uint8_t>(buffer[index]))
+                                << (BitsShiftPerRead * j);
                 break;
             case 2:
                 result[i] |= uint(bit_cast<uint16_t>(buffer[index]))
