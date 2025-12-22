@@ -17,6 +17,7 @@ enum class RenderApiType
     CPU,
     CUDA,
     WebGPU,
+    LLVM,
     CountOf,
 };
 
@@ -33,6 +34,7 @@ struct RenderApiFlag
         CPU = 1 << int(RenderApiType::CPU),
         CUDA = 1 << int(RenderApiType::CUDA),
         WebGPU = 1 << int(RenderApiType::WebGPU),
+        LLVM = 1 << int(RenderApiType::LLVM),
         AllOf = (1 << int(RenderApiType::CountOf)) - 1 ///< All bits set
     };
 };

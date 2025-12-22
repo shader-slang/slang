@@ -14,6 +14,8 @@
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage compute -entry computeMain
 // Not supported in WGSL: Use of traditional atomics intrinsics (InterlockedXXX functions)
 //DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -wgpu
+// Not supported in LLVM: atomics are not currently available
+//DISABLE_TEST(compute):COMPARE_COMPUTE:-slang -shaderobj -llvm
 
 //METALLIB: @computeMain
 
