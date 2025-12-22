@@ -145,15 +145,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install runtime dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          rm -rf /var/lib/apt/lists/*
-
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -214,15 +205,8 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Python dependencies
+      - name: Setup Python
         run: |
-          apt-get update && apt-get install -y \
-            python3-pip \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          rm -rf /var/lib/apt/lists/*
           # Create python -> python3 symlink for slangpy-samples tests
           ln -sf /usr/bin/python3 /usr/bin/python
 
