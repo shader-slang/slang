@@ -34,8 +34,6 @@ jobs:
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
         -v /runner:/home/runner
-        --cap-add NET_ADMIN
-        --cap-add NET_RAW
 
     defaults:
       run:
