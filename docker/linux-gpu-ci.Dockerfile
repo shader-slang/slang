@@ -36,6 +36,7 @@ RUN apt-get update && apt-get install -y \
     unzip \
     python3 \
     python3-pip \
+    python-is-python3 \
     libx11-dev \
     libxcursor-dev \
     libxrandr-dev \

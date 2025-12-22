@@ -205,11 +205,6 @@ jobs:
         shell: bash
 
     steps:
-      - name: Setup Python
-        run: |
-          # Create python -> python3 symlink for slangpy-samples tests
-          ln -sf /usr/bin/python3 /usr/bin/python
-
       - uses: actions/checkout@v4
 
       - name: Download artifacts
