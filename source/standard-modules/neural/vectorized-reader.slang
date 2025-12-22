@@ -37,23 +37,43 @@ internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerR
     where T.Differential == T
     where BufferType : IArrayAccessor<T>
 {
-        switch (NBytes)
-        {
-        case 1:
-            result |= uint(bit_cast<uint8_t>(buffer[bufferIdx]))
-                                << (BitsShiftPerRead * elementIdx);
-            break;
-        case 2:
-            result |= uint(bit_cast<uint16_t>(buffer[bufferIdx]))
-                                << (BitsShiftPerRead * elementIdx);
-            break;
-        case 4:
-            result |= uint(bit_cast<uint>(buffer[bufferIdx]))
-                                << (BitsShiftPerRead * elementIdx);
-            break;
-        default:
-            static_assert(false, "Unsupported data type T");
-        }
+    const uint shift = BitsShiftPerRead * elementIdx;
+    switch (NBytes)
+    {
+    case 1:
+        result |= uint(bit_cast<uint8_t>(buffer[bufferIdx])) << shift;
+        break;
+    case 2:
+        result |= uint(bit_cast<uint16_t>(buffer[bufferIdx])) << shift;
+        break;
+    case 4:
+        result |= uint(bit_cast<uint>(buffer[bufferIdx])) << shift;
+        break;
+    default:
+        static_assert(false, "Unsupported data type T");
+    }
+}
+
+internal static void writeOneElement<T, BufferType, int NBytes, int BitsShiftPerWrite>(out BufferType buffer, int bufferIdx, int elementIdx, uint value)
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where BufferType : IArrayAccessor<T>
+{
+    const uint shift = BitsShiftPerWrite * elementIdx;
+    switch (NBytes)
+    {
+    case 1:
+        buffer[bufferIdx] = bit_cast<T>((uint8_t)(value >> shift));
+        break;
+    case 2:
+        buffer[bufferIdx] = bit_cast<T>((uint16_t)(value >> shift));
+        break;
+    case 4:
+        buffer[bufferIdx] = bit_cast<T>((uint)(value >> shift));
+        break;
+    default:
+        static_assert(false, "Unsupported data type T");
+    }
 }
 
 
@@ -78,6 +98,27 @@ internal static uint4 readUint4Aligned<T, BufferType>(BufferType buffer, int sta
         }
     }
     return result;
+}
+
+[ForceInline]
+internal static void writeUint4Aligned<T, BufferType>( out BufferType buffer, int startIndex, uint4 value)
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where BufferType : IArrayAccessor<T>
+{
+    const int nBytes = sizeof(T);
+    const int WritePerElement = 4 / nBytes;
+    const int BitsShiftPerWrite = 32 / WritePerElement;
+    [ForceUnroll]
+    for (int i = 0; i < 4; i++)
+    {
+        [ForceUnroll]
+        for (int j = 0; j < WritePerElement; j++)
+        {
+            int index = startIndex + i * WritePerElement + j;
+            writeOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+        }
+    }
 }
 
 internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType buffer, int baseIndex, int startIndex)
@@ -147,36 +188,4 @@ internal uint4 readUint4<T, BufferType, bool IsAligned, uint Stride>(BufferType 
     return result;
 }
 
-[ForceInline]
-internal static void writeUint4<T, BufferType>(out BufferType buffer, int startIndex, uint4 value)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
-{
-    const int nBytes = sizeof(T);
-    const int WritePerElement = 4 / nBytes;
-    const int BitsShiftPerWrite = 32 / WritePerElement;
-    [ForceUnroll]
-    for (int i = 0; i < 4; i++)
-    {
-        [ForceUnroll]
-        for (int j = 0; j < WritePerElement; j++)
-        {
-            int index = startIndex + i * WritePerElement + j;
-            switch (nBytes)
-            {
-            case 1:
-                buffer[index] = bit_cast<T>((uint8_t)(value[i] >> (BitsShiftPerWrite * j)));
-                break;
-            case 2:
-                buffer[index] = bit_cast<T>((uint16_t)(value[i] >> (BitsShiftPerWrite * j)));
-                break;
-            case 4:
-                buffer[index] = bit_cast<T>((uint)(value[i] >> (BitsShiftPerWrite * j)));
-                break;
-            default:
-                static_assert(false, "Unsupported data type T");
-            }
-        }
-    }
-}
+
