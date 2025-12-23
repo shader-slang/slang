@@ -2480,6 +2480,20 @@ bool doesTargetSupportUnrestrictedPointers(TargetRequest* req)
     return isCPUTarget(req) || isCUDATarget(req) || isCPUTargetViaLLVM(req);
 }
 
+bool canInstBeStored(IRInst* inst)
+{
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
+    // stored into variables or context structs as normal values.
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
+        !inst->getDataType())
+        return false;
+
+    return true;
+}
+
 // Should `inst` be duplicated at use sites instead of being
 // stored to a temporary variable?
 // Some targets such as spirv don't support forming variables of pointer types,
@@ -2496,11 +2510,21 @@ bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
         return true;
     }
 
+    if (!canInstBeStored(inst))
+        return true;
+
     // For targets that don't support forming variables of pointer types,
     // we will duplicate pointer access chains at use sites.
     if (isPtrLikeOrHandleType(inst->getDataType()))
     {
-        return !doesTargetSupportUnrestrictedPointers(target->getTargetReq());
+        if (doesTargetSupportUnrestrictedPointers(target->getTargetReq()))
+            return false;
+        if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+        {
+            // A user-pointer type can be stored to a variable.
+            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                return false;
+        }
     }
     return false;
 }

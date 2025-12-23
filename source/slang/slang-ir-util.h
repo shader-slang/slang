@@ -467,6 +467,9 @@ bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
 
 IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
 
+// Return true if the inst can be stored into a variable.
+bool canInstBeStored(IRInst* inst);
+
 } // namespace Slang
 
 #endif
