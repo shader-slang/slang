@@ -201,6 +201,10 @@ static void allocVarForLoopInductionPhiParam(
             IRBuilder builder(module);
             builder.setInsertBefore(loopInst);
             auto inductionVar = builder.emitVar(param->getDataType());
+            if (auto nameHintDecor = param->findDecoration<IRNameHintDecoration>())
+            {
+                builder.addNameHintDecoration(inductionVar, nameHintDecor->getName());
+            }
             newBreakParams.add({inductionVar, param});
             setInsertAfterOrdinaryInst(&builder, param);
             builder.emitStore(inductionVar, param);
@@ -560,6 +564,7 @@ bool unrollLoopsInFunc(
         simplifyCFG(func, CFGSimplificationOptions::getDefault());
         eliminateDeadCode(func);
     }
+    sortBlocksInFunc(func);
     return true;
 }
 
