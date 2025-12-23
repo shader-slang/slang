@@ -2186,14 +2186,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 &fieldParentInfo,
                 field,
                 nameHintSB);
-            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
-            {
-                ScalarizedTupleValImpl::Element element;
-                element.val = fieldVal;
-                element.key = field->getKey();
 
-                tupleValImpl->elements.add(element);
-            }
+            ScalarizedTupleValImpl::Element element = {};
+            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                element.val = fieldVal;
+            element.key = field->getKey();
+
+            tupleValImpl->elements.add(element);
         }
 
         return ScalarizedVal::tuple(tupleValImpl);
@@ -2568,6 +2567,9 @@ ScalarizedVal getSubscriptVal(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return ScalarizedVal::value(
             builder->emitElementExtract(elementType, val.irValue, indexVal));
