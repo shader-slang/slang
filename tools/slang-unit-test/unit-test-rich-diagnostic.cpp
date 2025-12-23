@@ -1,12 +1,11 @@
 // unit-test-rich-diagnostic.cpp
 // Unit tests for the rich diagnostic formatting system
 
-#include "tools/unit-test/slang-unit-test.h"
-
 #include "source/compiler-core/slang-diagnostic-sink.h"
-#include "source/compiler-core/slang-rich-diagnostic.h"
 #include "source/compiler-core/slang-rich-diagnostic-layout.h"
+#include "source/compiler-core/slang-rich-diagnostic.h"
 #include "source/compiler-core/slang-source-loc.h"
+#include "tools/unit-test/slang-unit-test.h"
 
 using namespace Slang;
 
@@ -31,12 +30,12 @@ SLANG_UNIT_TEST(richDiagnosticBuilder)
 {
     // Test the builder pattern
     RichDiagnostic diagnostic = RichDiagnosticBuilder()
-        .setCode("E30019")
-        .setSeverity(Severity::Error)
-        .setMessage("type mismatch")
-        .addNote("types must match")
-        .addHelp("use explicit cast")
-        .build();
+                                    .setCode("E30019")
+                                    .setSeverity(Severity::Error)
+                                    .setMessage("type mismatch")
+                                    .addNote("types must match")
+                                    .addHelp("use explicit cast")
+                                    .build();
 
     SLANG_CHECK(diagnostic.code == "E30019");
     SLANG_CHECK(diagnostic.severity == Severity::Error);
