@@ -624,7 +624,7 @@ void SourceFile::setContents(ISlangBlob* blob)
     auto type = CharEncoding::determineEncoding(rawContentBegin, rawContentSize, offset);
     SLANG_ASSERT(rawContentSize >= offset);
 
-    if (0 == offset && CharEncodeType::UTF8 == type)
+    if (offset == 0 && type == CharEncodeType::UTF8)
     {
         // Fast-path: If the input is UTF-8 without a BOM, we can use it directly.
         m_contentBlob = blob;
