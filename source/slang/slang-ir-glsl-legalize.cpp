@@ -2464,6 +2464,8 @@ void assign(
 {
     switch (left.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return;
     case ScalarizedVal::Flavor::arrayIndex:
         {
             // Get the rhs value
@@ -2715,6 +2717,8 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return builder->getVoidValue();
     case ScalarizedVal::Flavor::value:
         return val.irValue;
 
