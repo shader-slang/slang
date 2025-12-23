@@ -146,6 +146,84 @@ static void _foldAndSimplifyLoopIteration(
     }
 }
 
+static void duplicateLoopInductionPhiParamInBreakBlock(
+    IRModule* module,
+    IRLoop* loopInst,
+    List<IRBlock*>& blocks)
+{
+    HashSet<IRBlock*> loopBlocks;
+    for (auto b : blocks)
+        loopBlocks.add(b);
+    auto targetBlock = loopInst->getTargetBlock();
+    auto breakBlock = loopInst->getBreakBlock();
+    struct NewBreakParamInfo
+    {
+        IRParam* newBreakParam;
+        IRParam* originalInductionParam;
+    };
+    ShortList<NewBreakParamInfo> newBreakParams;
+    for (auto param : targetBlock->getParams())
+    {
+        ShortList<IRUse*> outsideUses;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto userBlock = getBlock(use->getUser());
+            if (!loopBlocks.contains(userBlock))
+            {
+                outsideUses.add(use);
+            }
+        }
+        if (outsideUses.getCount() != 0)
+        {
+            IRBuilder builder(module);
+            builder.setInsertInto(breakBlock);
+            auto newParam = builder.emitParam(param->getDataType());
+            newBreakParams.add({newParam, param});
+            for (auto use : outsideUses)
+            {
+                builder.replaceOperand(use, newParam);
+            }
+        }
+    }
+    if (newBreakParams.getCount() > 0)
+    {
+        // Update all branches into the break block to provide arguments for new break params.
+        ShortList<IRUnconditionalBranch*> branchesToBreakBlock;
+        for (auto use = breakBlock->firstUse; use; use = use->nextUse)
+        {
+            auto userInst = as<IRUnconditionalBranch>(use->getUser());
+            if (!userInst)
+                continue;
+            if (use != userInst->getTargetBlockUse())
+                continue;
+            branchesToBreakBlock.add(userInst);
+        }
+        for (auto branchInst : branchesToBreakBlock)
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(branchInst);
+            ShortList<IRInst*> args;
+
+            for (UInt i = 0; i < branchInst->getOperandCount(); i++)
+            {
+                args.add(branchInst->getOperand(i));
+            }
+            for (auto param : newBreakParams)
+            {
+                args.add(param.originalInductionParam);
+            }
+            IRCloneEnv cloneEnv;
+            auto newBranchInst = builder.emitIntrinsicInst(
+                branchInst->getFullType(),
+                branchInst->getOp(),
+                (UInt)args.getCount(),
+                args.getArrayView().getBuffer());
+            branchInst->transferDecorationsTo(newBranchInst);
+            branchInst->removeAndDeallocate();
+        }
+    }
+}
+
 // Unroll loop up to a predefined maximum number of iterations.
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
 // This operation assumes the loop does not have `continue` jumps, i.e. continueBlock ==
@@ -168,6 +246,12 @@ static bool _unrollLoop(
     auto maxIterations = _getLoopMaxIterationsToUnroll(loopInst);
     if (maxIterations < 0)
         return true;
+
+    // If the loop contains any induction variables (phi params in the header block)
+    // that are used outside of the loop, we need to create separated phi params in
+    // the break block, and turn all outside uses to reference the params in the break
+    // block instead.
+    duplicateLoopInductionPhiParamInBreakBlock(module, loopInst, blocks);
 
     // We assume all `continue`s are eliminated and turned into multi-level breaks
     // before this operation.
@@ -285,9 +369,9 @@ static bool _unrollLoop(
         // valid.
 
         builder.setInsertInto(firstIterationBreakBlock);
+        List<IRInst*> newParams;
         {
             IRCloneEnv paramCloneEnv;
-            List<IRInst*> newParams;
             for (auto param : loopTargetBlock->getParams())
             {
                 newParams.add(cloneInst(&paramCloneEnv, &builder, param));

@@ -994,7 +994,6 @@ Result linkAndOptimizeIR(
                     return SLANG_FAIL;
             }
         }
-
         // Few of our targets support higher order functions, and
         // we don't have the backend code to emit higher order functions for those
         // which do.
