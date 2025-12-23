@@ -2,11 +2,10 @@
 #include "slang-fiddle-diagnostic-gen.h"
 
 #include "core/slang-io.h"
-#include "slang-fiddle-script.h"
-
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
 #include "lua/lualib.h"
+#include "slang-fiddle-script.h"
 
 namespace fiddle
 {
@@ -32,7 +31,8 @@ bool DiagnosticGenerator::loadFromLuaFile(const String& filePath)
     lua_pushlightuserdata(L, &m_definitions);
     lua_pushcclosure(
         L,
-        [](lua_State* L) -> int {
+        [](lua_State* L) -> int
+        {
             // Get the definitions list from upvalue
             auto* definitions =
                 static_cast<List<DiagnosticDef>*>(lua_touserdata(L, lua_upvalueindex(1)));
@@ -267,7 +267,8 @@ void DiagnosticGenerator::generateStruct(StringBuilder& sb, const DiagnosticDef&
 void DiagnosticGenerator::generateBuilder(StringBuilder& sb, const DiagnosticDef& def)
 {
     sb << "/// Build a RichDiagnostic for " << def.name << "\n";
-    sb << "inline RichDiagnostic build_" << def.name << "(const " << def.name << "_Params& params)\n";
+    sb << "inline RichDiagnostic build_" << def.name << "(const " << def.name
+       << "_Params& params)\n";
     sb << "{\n";
     sb << "    RichDiagnosticBuilder builder;\n";
     sb << "    builder.setCode(\"" << escapeForCpp(def.code) << "\");\n";
