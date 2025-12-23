@@ -147,34 +147,13 @@ static void _foldAndSimplifyLoopIteration(
 }
 
 // If a loop induction param has uses outside of the loop, create
-// a duplicate phi param in the break block, and turn all outside uses
-// to reference the param in the break block instead.
-// This ensures that after the transformation, the loop induction params
-// will only have uses inside the loop, which simplifies further processing.
+// a duplicate var before the loop inst, and insert an update to the
+// variable at start of each iteration. Then replace all outside
+// uses to load from the new var instead.
+// This transformation ensures that any uses of induction variables
+// outside of the loop will get the up-to-date value after
+// unrolling the loop.
 //
-// For example, consider the following loop:
-//  somePreviousBlock:
-//      ..
-//      loop targetBlock, breakBlock... (initialInductionVal)
-//  targetBlock:
-//      inductionVal = param
-//       ..
-//      branch breakBlock  // break
-//  breakBlock:
-//      add inductionVal, 1
-// This is valid IR, but the inductionVal param in targetBlock has a use
-// outside of the loop (in breakBlock). After this translation, we will turn
-// it into:
-//  somePreviousBlock:
-//      ..
-//      loop targetBlock, breakBlock... (initialInductionVal)
-//  targetBlock:
-//      inductionVal = param
-//       ..
-//      branch breakBlock, newInductionVal // break
-// breakBlock :
-//      newInductionParam = param
-//      add newInductionParam, 1
 //
 // For reference, the following code will create a situation where an induction param is
 // used outside the loop:
@@ -185,7 +164,7 @@ static void _foldAndSimplifyLoopIteration(
 //    }
 //    use(sum);
 // ```
-static void duplicateLoopInductionPhiParamInBreakBlock(
+static void allocVarForLoopInductionPhiParam(
     IRModule* module,
     IRLoop* loopInst,
     List<IRBlock*>& blocks)
@@ -201,7 +180,7 @@ static void duplicateLoopInductionPhiParamInBreakBlock(
 
     struct NewBreakParamInfo
     {
-        IRParam* newBreakParam;          // The new param created in the breakBlock.
+        IRVar* inductionVar;             // The new variable created before the loop inst.
         IRParam* originalInductionParam; // The original induction param in the targetBlock.
     };
 
@@ -221,54 +200,17 @@ static void duplicateLoopInductionPhiParamInBreakBlock(
         if (outsideUses.getCount() != 0)
         {
             IRBuilder builder(module);
-            builder.setInsertInto(breakBlock);
-            auto newParam = builder.emitParam(param->getDataType());
-            newBreakParams.add({newParam, param});
+            builder.setInsertBefore(loopInst);
+            auto inductionVar = builder.emitVar(param->getDataType());
+            newBreakParams.add({inductionVar, param});
+            setInsertAfterOrdinaryInst(&builder, param);
+            builder.emitStore(inductionVar, param);
             for (auto use : outsideUses)
             {
+                builder.setInsertBefore(use->getUser());
+                auto newParam = builder.emitLoad(param->getDataType(), inductionVar);
                 builder.replaceOperand(use, newParam);
             }
-        }
-    }
-
-    if (newBreakParams.getCount() > 0)
-    {
-        // Update all branches into the break block to provide arguments for new break params.
-        // First collect all branches to the break block that we need to update.
-        ShortList<IRUnconditionalBranch*> branchesToBreakBlock;
-        for (auto use = breakBlock->firstUse; use; use = use->nextUse)
-        {
-            auto userInst = as<IRUnconditionalBranch>(use->getUser());
-            if (!userInst)
-                continue;
-            if (use != userInst->getTargetBlockUse())
-                continue;
-            branchesToBreakBlock.add(userInst);
-        }
-        // Now update all those branches with new arguments that forwards
-        // the induction param values explicitly.
-        for (auto branchInst : branchesToBreakBlock)
-        {
-            IRBuilder builder(module);
-            builder.setInsertBefore(branchInst);
-            ShortList<IRInst*> args;
-
-            for (UInt i = 0; i < branchInst->getOperandCount(); i++)
-            {
-                args.add(branchInst->getOperand(i));
-            }
-            for (auto param : newBreakParams)
-            {
-                args.add(param.originalInductionParam);
-            }
-            IRCloneEnv cloneEnv;
-            auto newBranchInst = builder.emitIntrinsicInst(
-                branchInst->getFullType(),
-                branchInst->getOp(),
-                (UInt)args.getCount(),
-                args.getArrayView().getBuffer());
-            branchInst->transferDecorationsTo(newBranchInst);
-            branchInst->removeAndDeallocate();
         }
     }
 }
@@ -297,10 +239,13 @@ static bool _unrollLoop(
         return true;
 
     // If the loop contains any induction variables (phi params in the header block)
-    // that are used outside of the loop, we need to create separated phi params in
-    // the break block, and turn all outside uses to reference the params in the break
-    // block instead.
-    duplicateLoopInductionPhiParamInBreakBlock(module, loopInst, blocks);
+    // that are used outside of the loop, we need to make sure these uses are referencing
+    // the up-to-date value after unrolling the loop.
+    // The simplest way to achieve this is to create a duplicate `Var` before the loop inst
+    // and copy the value of the param to the new var at start of each iteration.
+    // Then replace all outside uses to loads from the new var instead.
+    //
+    allocVarForLoopInductionPhiParam(module, loopInst, blocks);
 
     // We assume all `continue`s are eliminated and turned into multi-level breaks
     // before this operation.
