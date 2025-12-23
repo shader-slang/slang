@@ -2525,6 +2525,7 @@ bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
             if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
                 return false;
         }
+        return true;
     }
     return false;
 }
