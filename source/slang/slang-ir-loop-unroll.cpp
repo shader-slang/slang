@@ -146,21 +146,66 @@ static void _foldAndSimplifyLoopIteration(
     }
 }
 
+// If a loop induction param has uses outside of the loop, create
+// a duplicate phi param in the break block, and turn all outside uses
+// to reference the param in the break block instead.
+// This ensures that after the transformation, the loop induction params
+// will only have uses inside the loop, which simplifies further processing.
+//
+// For example, consider the following loop:
+//  somePreviousBlock:
+//      ..
+//      loop targetBlock, breakBlock... (initialInductionVal)
+//  targetBlock:
+//      inductionVal = param
+//       ..
+//      branch breakBlock  // break
+//  breakBlock:
+//      add inductionVal, 1
+// This is valid IR, but the inductionVal param in targetBlock has a use
+// outside of the loop (in breakBlock). After this translation, we will turn
+// it into:
+//  somePreviousBlock:
+//      ..
+//      loop targetBlock, breakBlock... (initialInductionVal)
+//  targetBlock:
+//      inductionVal = param
+//       ..
+//      branch breakBlock, newInductionVal // break
+// breakBlock :
+//      newInductionParam = param
+//      add newInductionParam, 1
+//
+// For reference, the following code will create a situation where an induction param is
+// used outside the loop:
+// ```
+//    int sum = 0; // sum is an induction variable.
+//    for (int i = 0; i < N; i++) {
+//        sum += i;
+//    }
+//    use(sum);
+// ```
 static void duplicateLoopInductionPhiParamInBreakBlock(
     IRModule* module,
     IRLoop* loopInst,
     List<IRBlock*>& blocks)
 {
+    // Collect all blocks in the loop into a set so we can
+    // quickly check if a use is inside or outside the loop.
     HashSet<IRBlock*> loopBlocks;
     for (auto b : blocks)
         loopBlocks.add(b);
+
     auto targetBlock = loopInst->getTargetBlock();
     auto breakBlock = loopInst->getBreakBlock();
+
     struct NewBreakParamInfo
     {
-        IRParam* newBreakParam;
-        IRParam* originalInductionParam;
+        IRParam* newBreakParam;          // The new param created in the breakBlock.
+        IRParam* originalInductionParam; // The original induction param in the targetBlock.
     };
+
+    // Collect all induction params that have uses outside of the loop.
     ShortList<NewBreakParamInfo> newBreakParams;
     for (auto param : targetBlock->getParams())
     {
@@ -185,9 +230,11 @@ static void duplicateLoopInductionPhiParamInBreakBlock(
             }
         }
     }
+
     if (newBreakParams.getCount() > 0)
     {
         // Update all branches into the break block to provide arguments for new break params.
+        // First collect all branches to the break block that we need to update.
         ShortList<IRUnconditionalBranch*> branchesToBreakBlock;
         for (auto use = breakBlock->firstUse; use; use = use->nextUse)
         {
@@ -198,6 +245,8 @@ static void duplicateLoopInductionPhiParamInBreakBlock(
                 continue;
             branchesToBreakBlock.add(userInst);
         }
+        // Now update all those branches with new arguments that forwards
+        // the induction param values explicitly.
         for (auto branchInst : branchesToBreakBlock)
         {
             IRBuilder builder(module);
@@ -369,9 +418,9 @@ static bool _unrollLoop(
         // valid.
 
         builder.setInsertInto(firstIterationBreakBlock);
-        List<IRInst*> newParams;
         {
             IRCloneEnv paramCloneEnv;
+            ShortList<IRInst*> newParams;
             for (auto param : loopTargetBlock->getParams())
             {
                 newParams.add(cloneInst(&paramCloneEnv, &builder, param));
@@ -383,8 +432,8 @@ static bool _unrollLoop(
                 loopTargetBlock,
                 loopInst->getBreakBlock(),
                 loopInst->getContinueBlock(),
-                newParams.getCount(),
-                newParams.getBuffer()));
+                (UInt)newParams.getCount(),
+                newParams.getArrayView().getBuffer()));
             loopInst->removeAndDeallocate();
 
             // Update `loopInst` to represent the remaining loop iterations that are yet to be

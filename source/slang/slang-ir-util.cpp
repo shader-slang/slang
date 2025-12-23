@@ -2455,6 +2455,9 @@ IRBlock* getLoopHeaderForConditionBlock(IRBlock* block)
     return nullptr;
 }
 
+// Return true if `inst` is defined at the start of `block`.
+// That is, either `inst` is defined in a block that dominates `block`,
+// or `inst` is defined in a parent of `block`.
 bool isInstAvailableAtBlock(IRDominatorTree& dom, IRInst* inst, IRBlock* block)
 {
     auto defBlock = as<IRBlock>(inst->getParent());
@@ -2584,7 +2587,7 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
                 else if (as<IRGetElementPtr>(inst) || as<IRFieldAddress>(inst))
                 {
                     // If inst is a pointer access chain, we will just duplicate it at the use site.
-                    // This is because many targets doesn't allow us to form a variable whose type
+                    // This is because many targets don't allow us to form a variable whose type
                     // is a pointer.
                     traverseUses(
                         inst,
