@@ -158,7 +158,7 @@ static SlangResult _compileProgramImpl(
         break;
 
     default:
-        assert(!"unexpected");
+        SLANG_ASSERT(!"unexpected");
         break;
     }
 
@@ -183,6 +183,15 @@ static SlangResult _compileProgramImpl(
         entry.name = slang::CompilerOptionName::LineDirectiveMode;
         entry.value.kind = slang::CompilerOptionValueKind::Int;
         entry.value.intValue0 = int(SlangLineDirectiveMode::SLANG_LINE_DIRECTIVE_MODE_NONE);
+        sessionOptionEntries.add(entry);
+    }
+
+    if (options.useLLVMDirectly)
+    {
+        slang::CompilerOptionEntry entry;
+        entry.name = slang::CompilerOptionName::EmitCPUMethod;
+        entry.value.kind = slang::CompilerOptionValueKind::Int;
+        entry.value.intValue0 = int(SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM);
         sessionOptionEntries.add(entry);
     }
 

@@ -2,14 +2,38 @@
 
 #ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
-#include "slang-diagnostic.h"
-#include "slang-source-loc.h"
-#include "slang-string.h"
+#include "../compiler-core/slang-diagnostic-sink.h"
+#include "../core/slang-basic.h"
+
+// Forward declaration for Type
+namespace Slang
+{
+class Type;
+}
 
 //
 #include "slang-rich-diagnostics.h.fiddle"
 
 namespace Slang
+{
+
+// Generic diagnostic representation for layout rendering
+struct DiagnosticSpan
+{
+    SourceLoc location;
+    String message;
+};
+
+struct GenericDiagnostic
+{
+    int code;
+    String severity;
+    String message;
+    DiagnosticSpan primarySpan;
+    List<DiagnosticSpan> secondarySpans;
+};
+
+namespace Diagnostics
 {
 
 // Generate parameter structures for all diagnostics
@@ -30,14 +54,18 @@ struct $(class_name)
     SourceLoc $(span.location);
 %         end
 %     end
+
+    GenericDiagnostic toGenericDiagnostic() const;
 };
 
 % end
+
 #else // FIDDLE OUTPUT:
 #define FIDDLE_GENERATED_OUTPUT_ID 0
 #include "slang-rich-diagnostics.h.fiddle"
 #endif // FIDDLE END
 
+} // namespace Diagnostics
 } // namespace Slang
 
 #endif // SLANG_PROTOTYPE_DIAGNOSTICS

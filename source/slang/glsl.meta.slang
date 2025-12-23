@@ -227,7 +227,7 @@ public in float2 gl_SamplePosition : SV_VulkanSamplePosition;
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
     return mul(m2, m1);
@@ -235,7 +235,7 @@ public matrix<float, N, N> operator*<let N:int>(matrix<float, N, N> m1, matrix<f
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
     return mul(m2, m1);
@@ -243,7 +243,7 @@ public matrix<half, N, N> operator*<let N:int>(matrix<half, N, N> m1, matrix<hal
 
 [OverloadRank(15)]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
     return mul(m2, m1);
@@ -251,7 +251,7 @@ public matrix<double, N, N> operator*<let N:int>(matrix<double, N, N> m1, matrix
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
 {
     return mul(m2, m1);
@@ -259,7 +259,7 @@ public matrix<T, R, L> operator*<T:__BuiltinFloatingPointType, let L : int, let 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
 {
     return mul(m, v);
@@ -267,7 +267,7 @@ public vector<T, R> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R : int>(matrix<T, R, C> m, vector<T, R> v)
 {
     return mul(v, m);
@@ -304,7 +304,7 @@ public extension vector<T, 3>
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -312,7 +312,7 @@ public bool operator==<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -320,7 +320,7 @@ public bool operator!=<T:__BuiltinArithmeticType, let N:int>(vector<T, N> left, 
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -328,7 +328,7 @@ public bool operator==<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -336,7 +336,7 @@ public bool operator!=<T:__BuiltinFloatingPointType, let N:int>(vector<T, N> lef
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return all(equal(left, right));
@@ -344,7 +344,7 @@ public bool operator==<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vec
 
 [ForceInline]
 [OverloadRank(14)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator!=<T:__BuiltinLogicalType, let N:int>(vector<T, N> left, vector<T, N> right)
 {
     return any(notEqual(left, right));
@@ -357,7 +357,7 @@ for (auto type : kBaseTypes) {
 $}
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return all(equal(left, right));
@@ -365,7 +365,7 @@ public bool operator==<let N:int>(vector<$(typeName), N> left, vector<$(typeName
 
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 public bool operator!=<let N:int>(vector<$(typeName), N> left, vector<$(typeName), N> right)
 {
     return any(notEqual(left, right));
@@ -392,7 +392,7 @@ public extension Array<T, N>
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T atan(T y, T x)
 {
     return atan2(y, x);
@@ -401,7 +401,7 @@ public T atan(T y, T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 {
     return atan2(y, x);
@@ -414,7 +414,7 @@ public vector<T,N> atan(vector<T,N> y, vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T inversesqrt(T x)
 {
     return rsqrt(x);
@@ -423,7 +423,7 @@ public T inversesqrt(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> inversesqrt(vector<T, N> x)
 {
     return rsqrt(x);
@@ -436,7 +436,7 @@ public vector<T, N> inversesqrt(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 public T roundEven(T x)
 {
     return rint(x);
@@ -445,7 +445,7 @@ public T roundEven(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 public vector<T,N> roundEven(vector<T,N> x)
 {
     return rint(x);
@@ -454,7 +454,7 @@ public vector<T,N> roundEven(vector<T,N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mod(T x, T y)
 {
     // SPIR-V doesn't have "modulus".
@@ -471,7 +471,7 @@ public T mod(T x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, T y)
 {
     __target_switch
@@ -485,7 +485,7 @@ public vector<T, N> mod(vector<T, N> x, T y)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -498,7 +498,7 @@ public vector<T, N> mod(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T,N> min(vector<T,N> x, T y)
 {
     __target_switch
@@ -511,7 +511,7 @@ public vector<T,N> min(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T,N> max(vector<T,N> x, T y)
 {
     __target_switch
@@ -524,7 +524,7 @@ public vector<T,N> max(vector<T,N> x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 {
     __target_switch
@@ -538,7 +538,7 @@ public vector<T,N> clamp(vector<T,N> x, T minBound, T maxBound)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mix(T x, T y, T a)
 {
     return lerp(x, y, a);
@@ -547,7 +547,7 @@ public T mix(T x, T y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 {
     __target_switch
@@ -561,7 +561,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, T a)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 {
     return lerp(x, y, a);
@@ -570,7 +570,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<T, N> a)
 __generic<T>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public T mix(T x, T y, bool a)
 {
     __target_switch
@@ -587,7 +587,7 @@ public T mix(T x, T y, bool a)
 __generic<T, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 {
     __target_switch
@@ -609,7 +609,7 @@ public vector<T, N> mix(vector<T, N> x, vector<T, N> y, vector<bool, N> a)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public int floatBitsToInt(highp float x)
 {
     return asint(x);
@@ -618,7 +618,7 @@ public int floatBitsToInt(highp float x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 {
     return asint(x);
@@ -626,7 +626,7 @@ public vector<int, N> floatBitsToInt(highp vector<float, N> x)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public uint floatBitsToUint(highp float x)
 {
     return asuint(x);
@@ -635,7 +635,7 @@ public uint floatBitsToUint(highp float x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 {
     return asuint(x);
@@ -643,7 +643,7 @@ public vector<uint, N> floatBitsToUint(highp vector<float, N> x)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public float intBitsToFloat(highp int x)
 {
     return asfloat(x);
@@ -652,7 +652,7 @@ public float intBitsToFloat(highp int x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 {
     return asfloat(x);
@@ -660,7 +660,7 @@ public vector<float, N> intBitsToFloat(highp vector<int, N> x)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public float uintBitsToFloat(highp uint x)
 {
     return asfloat(x);
@@ -669,7 +669,7 @@ public float uintBitsToFloat(highp uint x)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 {
     return asfloat(x);
@@ -681,7 +681,7 @@ public vector<float, N> uintBitsToFloat(highp vector<uint, N> x)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 public vec2 unpackUnorm2x16(uint p)
 {
     return unpackUnorm2x16ToFloat(p);
@@ -689,7 +689,7 @@ public vec2 unpackUnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 public vec2 unpackSnorm2x16(uint p)
 {
     return unpackSnorm2x16ToFloat(p);
@@ -697,7 +697,7 @@ public vec2 unpackSnorm2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 public vec4 unpackUnorm4x8(highp uint p)
 {
     return unpackUnorm4x8ToFloat(p);
@@ -705,7 +705,7 @@ public vec4 unpackUnorm4x8(highp uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 public vec4 unpackSnorm4x8(highp uint p)
 {
     return unpackSnorm4x8ToFloat(p);
@@ -713,7 +713,7 @@ public vec4 unpackSnorm4x8(highp uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 public float half2float(uint h)
 {
     __target_switch
@@ -733,7 +733,7 @@ public float half2float(uint h)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 public vec2 unpackHalf2x16(uint p)
 {
     return unpackHalf2x16ToFloat(p);
@@ -741,7 +741,7 @@ public vec2 unpackHalf2x16(uint p)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public double packDouble2x32(uvec2 v)
 {
     __target_switch
@@ -751,15 +751,13 @@ public double packDouble2x32(uvec2 v)
         result:$$double = OpExtInst glsl450 PackDouble2x32 $v
     };
     default:
-        // TODO: there is no "asdouble()"
-        //return asdouble(uint64_t(v.x) | (uint64_t(v.y) << 32));
-        return 0.0;
+        return asdouble(v.x, v.y);
     }
 }
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uvec2 unpackDouble2x32(double v)
 {
     __target_switch
@@ -769,79 +767,80 @@ public uvec2 unpackDouble2x32(double v)
         result:$$uvec2 = OpExtInst glsl450 UnpackDouble2x32 $v
     };
     default:
-        // TODO: there is no "asuint64()"
-        uint64_t u = 0; // asuint64(v);
-        return uvec2(uint(u & 0xFFFFFFFF), uint(u >> 32));
+        uint lowbits = 0;
+        uint highbits = 0;
+        asuint(v, lowbits, highbits);
+        return uvec2(lowbits, highbits);
     }
 }
 
 /// Unpack a 32-bit unsigned integer into 4 8-bit unsigned integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public u8vec4 unpack8(uint32_t u);
 
 /// Unpack a 32-bit signed integer into 4 8-bit signed integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public i8vec4 unpack8(int32_t u);
 
 /// Unpack a 16-bit unsigned integer into 2 8-bit unsigned integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public u8vec2 unpack8(uint16_t u);
 
 /// Unpack a 16-bit signed integer into 2 8-bit signed integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public i8vec2 unpack8(int16_t u);
 
 /// Unpack a 32-bit unsigned integer into 2 16-bit unsigned integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public u16vec2 unpack16(uint32_t u);
 
 /// Unpack a 32-bit signed integer into 2 16-bit signed integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public i16vec2 unpack16(int32_t u);
 
 /// Pack 2 16-bit unsigned integers into a 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public uint32_t pack32(u16vec2 v);
 
 /// Pack 2 16-bit signed integers into a 32-bit signed integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public int32_t pack32(i16vec2 v);
 
 /// Pack 4 8-bit unsigned integers into a 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public uint32_t pack32(u8vec4 v);
 
 /// Pack 4 8-bit signed integers into a 32-bit signed integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, pack_vector)]
 __intrinsic_op($(kIROp_BitCast))
 public int32_t pack32(i8vec4 v);
 
@@ -852,7 +851,7 @@ public int32_t pack32(i8vec4 v);
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public T faceforward(T n, T i, T ng)
 {
     __target_switch
@@ -874,7 +873,7 @@ __generic<T : __BuiltinFloatingPointType, let C : int, let R : int>
 [__readNone]
 [ForceInline]
 [OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 {
     __target_switch
@@ -921,7 +920,7 @@ public matrix<T,N,N> inverse(matrix<T,N,N> m)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 {
     __target_switch
@@ -944,7 +943,7 @@ public uint uaddCarry(highp uint x, highp uint y, out lowp uint carry)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> carry)
 {
     __target_switch
@@ -964,7 +963,7 @@ public vector<uint,N> uaddCarry(highp vector<uint,N> x, highp vector<uint,N> y, 
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 {
     __target_switch
@@ -986,7 +985,7 @@ public uint usubBorrow(highp uint x, highp uint y, out lowp uint borrow)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y, out lowp vector<uint,N> borrow)
 {
     __target_switch
@@ -1006,7 +1005,7 @@ public vector<uint,N> usubBorrow(highp vector<uint,N> x, highp vector<uint,N> y,
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void umulExtended(highp uint x, highp uint y, out highp uint msb, out highp uint lsb)
 {
     __target_switch
@@ -1021,7 +1020,7 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
         OpStore &msb %msb;
     };
     default:
-        uint64_t result = x * y;
+        uint64_t result = uint64_t(x) * uint64_t(y);
         msb = uint(result >> 32);
         lsb = uint(result);
     }
@@ -1030,7 +1029,7 @@ public void umulExtended(highp uint x, highp uint y, out highp uint msb, out hig
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out highp vector<uint,N> msb, out highp vector<uint,N> lsb)
 {
     __target_switch
@@ -1055,7 +1054,7 @@ public void umulExtended(highp vector<uint,N> x, highp vector<uint,N> y, out hig
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void imulExtended(highp int x, highp int y, out highp int msb, out highp int lsb)
 {
     __target_switch
@@ -1070,7 +1069,7 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
         OpStore &msb %msb;
     };
     default:
-        int64_t result = x * y;
+        int64_t result = int64_t(x) * int64_t(y);
         msb = int(result >> 32);
         lsb = int(result);
     }
@@ -1079,7 +1078,7 @@ public void imulExtended(highp int x, highp int y, out highp int msb, out highp 
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp vector<int,N> msb, out highp vector<int,N> lsb)
 {
     __target_switch
@@ -1104,7 +1103,7 @@ public void imulExtended(highp vector<int,N> x, highp vector<int,N> y, out highp
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public int bitfieldReverse(highp int value)
 {
     __target_switch
@@ -1113,6 +1112,7 @@ public int bitfieldReverse(highp int value)
     case spirv: return spirv_asm {
         result:$$int = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
         value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
@@ -1126,7 +1126,7 @@ public int bitfieldReverse(highp int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 {
     __target_switch
@@ -1135,6 +1135,7 @@ public vector<int,N> bitfieldReverse(highp vector<int,N> value)
     case spirv: return spirv_asm {
         result:$$vector<int,N> = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
     }
@@ -1142,7 +1143,7 @@ public vector<int,N> bitfieldReverse(highp vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public uint bitfieldReverse(highp uint value)
 {
     __target_switch
@@ -1151,6 +1152,7 @@ public uint bitfieldReverse(highp uint value)
     case spirv: return spirv_asm {
         result:$$uint = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         value = ((value & 0xAAAAAAAA) >> 1) | ((value & 0x55555555) << 1);
         value = ((value & 0xCCCCCCCC) >> 2) | ((value & 0x33333333) << 2);
@@ -1164,7 +1166,7 @@ public uint bitfieldReverse(highp uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, GLSL_400)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, GLSL_400)]
 public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 {
     __target_switch
@@ -1173,6 +1175,7 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
     case spirv: return spirv_asm {
         result:$$vector<uint,N> = OpBitReverse $value
     };
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     default:
         VECTOR_MAP_UNARY(int, N, bitfieldReverse, value);
     }
@@ -1180,7 +1183,7 @@ public vector<uint,N> bitfieldReverse(highp vector<uint,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint bitCount(uint value)
 {
     return countbits(value);
@@ -1189,7 +1192,7 @@ public uint bitCount(uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> bitCount(vector<uint,N> value)
 {
     return countbits(value);
@@ -1197,7 +1200,7 @@ public vector<uint,N> bitCount(vector<uint,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int bitCount(int value)
 {
     __target_switch
@@ -1214,7 +1217,7 @@ public int bitCount(int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> bitCount(vector<int,N> value)
 {
     __target_switch
@@ -1230,7 +1233,7 @@ public vector<int,N> bitCount(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int findLSB(int v)
 {
     return firstbitlow(v);
@@ -1239,7 +1242,7 @@ public int findLSB(int v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> findLSB(vector<int,N> value)
 {
     return firstbitlow(value);
@@ -1247,7 +1250,7 @@ public vector<int,N> findLSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint findLSB(uint v)
 {
     return firstbitlow(v);
@@ -1256,7 +1259,7 @@ public uint findLSB(uint v)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> findLSB(vector<uint,N> value)
 {
     return firstbitlow(value);
@@ -1264,7 +1267,7 @@ public vector<uint,N> findLSB(vector<uint,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public int findMSB(int value)
 {
     return firstbithigh(value);
@@ -1273,7 +1276,7 @@ public int findMSB(int value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<int,N> findMSB(vector<int,N> value)
 {
     return firstbithigh(value);
@@ -1281,7 +1284,7 @@ public vector<int,N> findMSB(vector<int,N> value)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public uint findMSB(uint value)
 {
     return firstbithigh(value);
@@ -1290,7 +1293,7 @@ public uint findMSB(uint value)
 __generic<let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 public vector<uint,N> findMSB(vector<uint,N> value)
 {
     return firstbithigh(value);
@@ -6446,22 +6449,12 @@ void setupExtForSubgroupBallotBuiltIn() {
     }
 }
 
-public property uint gl_NumSubgroups {
-
+public property uint gl_NumSubgroups
+{
+    [ForceInline]
     [require(glsl_spirv, subgroup_basic)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_NumSubgroups)";
-        case spirv:
-            return spirv_asm {
-                    OpCapability GroupNonUniform;
-                    result:$$uint = OpLoad builtin(NumSubgroups:uint);
-                };
-        }
-
+        return WaveGetNumWaves();
     }
 }
 
@@ -6505,96 +6498,46 @@ public property uint gl_SubgroupInvocationID
 
 public property uvec4 gl_SubgroupEqMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupEqMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupEqMask:uvec4);
-                    };
-        }
+        return WaveGetLaneEqMask();
     }
 }
 
 public property uvec4 gl_SubgroupGeMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupGeMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupGeMask:uvec4);
-                    };
-        }
+        return WaveGetLaneGeMask();
     }
 }
 
 public property uvec4 gl_SubgroupGtMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupGtMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupGtMask:uvec4);
-                    };
-        }
+        return WaveGetLaneGtMask();
     }
 }
 
 public property uvec4 gl_SubgroupLeMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupLeMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupLeMask:uvec4);
-                    };
-        }
+        return WaveGetLaneLeMask();
     }
 }
 
 public property uvec4 gl_SubgroupLtMask
 {
-    [require(glsl_spirv, subgroup_basic_ballot)]
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
     get {
-        setupExtForSubgroupBasicBuiltIn();
-        setupExtForSubgroupBallotBuiltIn();
-        __target_switch
-        {
-        case glsl:
-            __intrinsic_asm "(gl_SubgroupLtMask)";
-        case spirv:
-            return spirv_asm {
-                        OpCapability GroupNonUniformBallot;
-                        result:$$uvec4 = OpLoad builtin(SubgroupLtMask:uvec4);
-                    };
-        }
+        return WaveGetLaneLtMask();
     }
 }
 
@@ -7123,46 +7066,22 @@ __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public T subgroupExclusiveMin(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMin($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public T subgroupExclusiveMax(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMax($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMax(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7170,16 +7089,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveAnd(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitAnd(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7187,16 +7101,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveOr(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitOr(value);
 }
 
 __generic<T : __BuiltinLogicalType>
@@ -7204,16 +7113,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public T subgroupExclusiveXor(T value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitXor(value);
 }
 
 // GL_KHR_shader_subgroup_arithmetic
@@ -7539,46 +7443,22 @@ __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveMin(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMin($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMin(value);
 }
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
-[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
 public vector<T,N> subgroupExclusiveMax(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl:
-        __intrinsic_asm "subgroupExclusiveMax($0)";
-    case spirv:
-        if (__isFloat<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isSignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else if (__isUnsignedInt<T>())
-            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return value;
-    }
+    return WavePrefixMax(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7586,16 +7466,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveAnd(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveAnd($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitAnd(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7603,16 +7478,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveOr(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveOr($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitOr(value);
 }
 
 __generic<T : __BuiltinLogicalType, let N : int>
@@ -7620,16 +7490,11 @@ __spirv_version(1.3)
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
 [ForceInline]
 [require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
 public vector<T,N> subgroupExclusiveXor(vector<T,N> value)
 {
     shader_subgroup_preamble<T>();
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "subgroupExclusiveXor($0)";
-    case spirv:
-        if (__isBool<T>()) return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-        else return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $value};
-    }
+    return WavePrefixBitXor(value);
 }
 
 // GL_KHR_shader_subgroup_ballot
