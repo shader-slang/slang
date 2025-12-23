@@ -222,6 +222,7 @@ String evaluateScriptCode(
 
     String luaChunkName = "@" + originalFileName;
 
+#define DEBUG_PRINT_FIDDLE_LUA_SOURCE 0
 #if DEBUG_PRINT_FIDDLE_LUA_SOURCE
     auto f = fopen("fiddle-generated-lua.lua", "w");
     fprintf(f, "%.*s", static_cast<int>(scriptSource.getLength()), scriptSource.getBuffer());
