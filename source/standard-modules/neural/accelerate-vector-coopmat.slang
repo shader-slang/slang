@@ -437,26 +437,32 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // into the shared memory. Compared to the LoadSharedMemoryFromLocalVector, where it loads partial vectors by every thread
     // in a warp.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, InputArray : IArrayAccessor<T>>(
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, int TileStrideInVector, InputArray>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
         InputArray inputVector)
+            where InputArray : IArrayAccessor<T>
     {
         const uint laneId = WaveGetLaneIndex();
+
         // Due the limitation of the size of shared memory, we cannot load all the vectors in a warp to the shared memory. Instead,
         // we can only load it in smaller batches (batch size is the WMMA tile in column or row).
-        if (laneId >= BatchSize)
+        if ((laneId / BatchSize) != tileIndex)
             return;
 
-        uint index = laneId * ArraySizeInVector;
-        for (uint i = 0; i < ArraySizeInVector; i++)
+        uint index = (laneId % BatchSize) * TileStrideInVector;
+
+        for (uint i = 0; i < TileStrideInVector; i++)
         {
-            // We have the assumption that the input array must be aligned to the uint4 vector size.
-            // uint4 result = uint4(0, 0, 0, 0);
-            // uint4AccessorAligned<T, AccessorOp.READ>(inputVector, i * ElementCountPerVector, 0, result);
-            // readUint4<true, ElementCountPerVector>( inputVector, i * ElementCountPerVector, 0, result);
             uint4 value;
-            accessUint4Aligned<AccessOp.READ, T>(inputVector, i * ElementCountPerVector, value);
+            if (i >= ArraySizeInVector)
+            {
+                value = uint4(0, 0, 0, 0);
+            }
+            else
+            {
+                accessUint4Aligned<AccessOp.READ, T>(inputVector, i * ElementCountPerVector, value);
+            }
             sharedMemory[index + i] = value;
         }
     }
@@ -508,11 +514,12 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
         // perform n/2 ways warp reduce, so each iteration will perform a 2-way reduce operation,
         // totally log2(n) steps, where n is the number of subgroups.
-        for (int k = 1; k < subgroupCount; k <<= 1)
+        for (int k = 1; k < 4; k <<= 1)
         {
-            // (subgroupId / k) calculate which cooperative matrix tile this warp will write to.
-            // The whole shared memory is divided into subgroupCount parts.
-            uint subgroupOffset = (subgroupId / (k<<1)) * CoopMatCSizeInVector;
+            // (subgroupId / k<< 1 ) calculate which cooperative matrix tile this warp will write to.
+            // The whole shared memory is divided into subgroupCount/2 parts. So each two neighboring subgroups
+            // will use one shared memory. And left subgroup loads, right subgroup stores.
+            uint subgroupOffset = (subgroupId / (k<<1)) * (CoopMatCSizeInVector * COLUMN);
             let ptrPerWarp = sharedMemory + subgroupOffset;
             for (int i = 0; i < ROW; i++)
             {
@@ -557,8 +564,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         InArrayTypeA inputVectorA,
         InArrayTypeB inputVectorB,
         Storage weightStorage,
-        Storage.Address weightAddress
-        )
+        Storage.Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
@@ -572,6 +578,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         static const int CoopMatCRows = (M + T_ROW_A - 1) / T_ROW_A;
         static const int CoopMatCColumns = (K + T_COLUMN_A - 1) / T_COLUMN_A;
         static const int StrideInVectorTileB = CoopMatCColumns * T_COLUMN_B / ElementCountPerVector;
+        static const int StrideInVectorTileA = CoopMatCRows * T_ROW_A / ElementCountPerVector;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
@@ -579,23 +586,22 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             matC[i].fill(T(0.0f));
         }
 
-        SPtr<uint4> warpLocalPtrA = sharedMemoryA + subgroupIndex * (Uint4AlignedM / ElementCountPerVector) * BatchSize;
-        SPtr<uint4> warpLocalPtrB = sharedMemoryB + subgroupIndex * (Uint4AlignedK / ElementCountPerVector) * BatchSize;
+        SPtr<uint4> warpLocalPtrA = sharedMemoryA + subgroupIndex * StrideInVectorTileA * BatchSize;
+        SPtr<uint4> warpLocalPtrB = sharedMemoryB + subgroupIndex * StrideInVectorTileB * BatchSize;
 
         // Perform outer product for each warp.
         // The shared dimension is the Subgroup size N.
         for (uint k = 0; k < N; k += T_COLUMN_A)
         {
             uint tileIndex = k / T_COLUMN_A;
-            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedM / ElementCountPerVector>(warpLocalPtrA, tileIndex, inputVectorA);
-            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedK / ElementCountPerVector>(warpLocalPtrB, tileIndex, inputVectorB);
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedM / ElementCountPerVector, StrideInVectorTileA>(warpLocalPtrA, tileIndex, inputVectorA);
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedK / ElementCountPerVector, StrideInVectorTileB>(warpLocalPtrB, tileIndex, inputVectorB);
             GroupMemoryBarrierWithWaveSync();
+
             MatA matA[CoopMatCRows];
             for (uint i = 0; i < CoopMatCRows; i++)
             {
-                // For matrix A, stride will be the height of the tile. Since, in the outer product, matrix A's height is same as the weight matrix's height,
-                // the stride will be HeightInVectorTileA
-                matA[i] = MatA.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(warpLocalPtrA + i * T_ROW_A / ElementCountPerVector, HeightInVectorTileA);
+                matA[i] = MatA.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>( warpLocalPtrA + i * T_ROW_A / ElementCountPerVector, StrideInVectorTileA);
             }
 
             for (uint j = 0; j < CoopMatCColumns; j++)
@@ -625,7 +631,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 {
                     // Save the result to shared memory in row major, because this is cache friendly for global memory access.
                     // As each row of the tile will be corresponding to the contiguous global memory.
-                    matC[i * CoopMatCColumns + j].Store<linalg.CoopMatMatrixLayout.RowMajor, uint4>(sharedMemoryB, StrideInVectorTileB);
+                    matC[i * CoopMatCColumns + j].Store<linalg.CoopMatMatrixLayout.RowMajor, uint4>(sharedMemoryB + j * T_COLUMN_B / ElementCountPerVector, StrideInVectorTileB);
                 }
 
                 // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
