@@ -4,8 +4,8 @@
 #ifndef SLANG_FIDDLE_DIAGNOSTIC_GEN_H
 #define SLANG_FIDDLE_DIAGNOSTIC_GEN_H
 
-#include "core/slang-basic.h"
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-basic.h"
 
 // Forward declare lua_State from Lua headers
 struct lua_State;
@@ -24,19 +24,19 @@ struct DiagnosticParam
 /// Represents a label (primary or secondary) in a diagnostic
 struct DiagnosticLabelDef
 {
-    String locName;    // Name of the location parameter
-    String message;    // Message template for the label
+    String locName; // Name of the location parameter
+    String message; // Message template for the label
     bool isPrimary = false;
 };
 
 /// Represents a complete diagnostic definition from Lua
 struct DiagnosticDef
 {
-    String name;           // Diagnostic identifier (e.g., "argument_type_mismatch")
-    String code;           // Error code (e.g., "E30019")
-    String severity;       // "error", "warning", "note"
-    String flag;           // Compiler flag name
-    String message;        // Main message template
+    String name;     // Diagnostic identifier (e.g., "argument_type_mismatch")
+    String code;     // Error code (e.g., "E30019")
+    String severity; // "error", "warning", "note"
+    String flag;     // Compiler flag name
+    String message;  // Main message template
 
     List<DiagnosticParam> params;
     DiagnosticLabelDef primaryLabel;
