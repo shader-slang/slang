@@ -176,7 +176,6 @@ static void allocVarForLoopInductionPhiParam(
         loopBlocks.add(b);
 
     auto targetBlock = loopInst->getTargetBlock();
-    auto breakBlock = loopInst->getBreakBlock();
 
     struct NewBreakParamInfo
     {
