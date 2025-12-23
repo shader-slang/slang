@@ -1,5 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type -xslang -g0
-//DISABLED_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm -output-using-type -xslang -g0
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type -xslang -g0
+
 //TEST_INPUT:set output = out ubuffer(data=[0], stride=4)
 
 RWStructuredBuffer<int> output;

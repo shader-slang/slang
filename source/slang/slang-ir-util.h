@@ -401,7 +401,7 @@ IRType* getFieldType(IRType* type, IRStructKey* key);
 
 Int getSpecializationConstantId(IRGlobalParam* param);
 
-void legalizeDefUse(IRGlobalValueWithCode* func);
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target);
 
 UnownedStringSlice getMangledName(IRInst* inst);
 

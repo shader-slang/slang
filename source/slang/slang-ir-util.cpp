@@ -2474,7 +2474,38 @@ bool isInstAvailableAtBlock(IRDominatorTree& dom, IRInst* inst, IRBlock* block)
     return false;
 }
 
-void legalizeDefUse(IRGlobalValueWithCode* func)
+
+bool doesTargetSupportUnrestrictedPointers(TargetRequest* req)
+{
+    return isCPUTarget(req) || isCUDATarget(req) || isCPUTargetViaLLVM(req);
+}
+
+// Should `inst` be duplicated at use sites instead of being
+// stored to a temporary variable?
+// Some targets such as spirv don't support forming variables of pointer types,
+// so in those cases we will duplicate pointer access chains at use sites.
+//
+bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastDynamicResource:
+        // These casts potentially produces non-storable types, so we will always duplicate them at
+        // use sites.
+        return true;
+    }
+
+    // For targets that don't support forming variables of pointer types,
+    // we will duplicate pointer access chains at use sites.
+    if (isPtrLikeOrHandleType(inst->getDataType()))
+    {
+        return !doesTargetSupportUnrestrictedPointers(target->getTargetReq());
+    }
+    return false;
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
 {
     // After multi-level break lowering, we may create situations where an inst
     // defined in an inner region is referenced from an outer region, which creates
@@ -2584,11 +2615,11 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
                                 as<IRPtrTypeBase>(var->getDataType())->getValueType()));
                     }
                 }
-                else if (as<IRGetElementPtr>(inst) || as<IRFieldAddress>(inst))
+                else if (shouldDuplicateInstAtUseSite(inst, target))
                 {
-                    // If inst is a pointer access chain, we will just duplicate it at the use site.
-                    // This is because many targets don't allow us to form a variable whose type
-                    // is a pointer.
+                    // If inst must be duplicated at use sites due to target restrictions,
+                    // we will make a copy of it at its use, and rerun the entire processing loop
+                    // to transitively duplicate referenced operands.
                     traverseUses(
                         inst,
                         [&](IRUse* use)
