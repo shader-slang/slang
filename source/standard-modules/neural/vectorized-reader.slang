@@ -25,6 +25,7 @@ internal enum AccessOp
     ATOMIC_ADD,
 }
 
+[ForceInline]
 internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerRead>(BufferType buffer, int bufferIdx, int elementIdx, inout uint result)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -47,6 +48,7 @@ internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerR
     }
 }
 
+[ForceInline]
 internal static void writeOneElement<T, BufferType, int NBytes, int BitsShiftPerWrite>(out BufferType buffer, int bufferIdx, int elementIdx, uint value)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -69,6 +71,7 @@ internal static void writeOneElement<T, BufferType, int NBytes, int BitsShiftPer
     }
 }
 
+[ForceInline]
 internal static void atomicAddOneElement<T, BufferType, int NBytes, int BitsShiftPerWrite>(inout BufferType buffer, int bufferIdx, int elementIdx, uint value)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
