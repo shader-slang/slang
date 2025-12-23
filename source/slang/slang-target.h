@@ -13,6 +13,7 @@
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-target-builtin-type-layout-info.h"
 
 #include <slang.h>
 
@@ -144,11 +145,14 @@ public:
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
+    ITargetBuiltinTypeLayoutInfo* getBuiltinTypeLayoutInfo();
+
 private:
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
+    ComPtr<ITargetBuiltinTypeLayoutInfo> builtinTypeLayoutInfo;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
