@@ -3,6 +3,8 @@
 
 #include "slang-fiddle-script.h"
 
+#include <cstdio>
+
 namespace fiddle
 {
 struct TextTemplateParserBase
@@ -93,12 +95,13 @@ public:
 
     List<RefPtr<TextTemplateStmt>> stmts;
 
-    void addRaw(char const* rawBegin, char const* rawEnd)
+    void addRaw(char const* rawBegin, char const* rawEnd, bool preserveWhitespace)
     {
         if (rawBegin == rawEnd)
             return;
 
         auto stmt = RefPtr(new TextTemplateRawStmt());
+        stmt->preserveWhitespace = preserveWhitespace;
         stmt->text = UnownedStringSlice(rawBegin, rawEnd);
         stmts.add(stmt);
     }
@@ -169,7 +172,7 @@ public:
             case '%':
                 if (wasAtStartOfLine && !depthInSplice)
                 {
-                    addRaw(currentSpanBegin, currentLineBegin);
+                    addRaw(currentSpanBegin, currentLineBegin, false);
                     isInScriptLine = true;
                     currentSpanBegin = _cursor;
                 }
@@ -184,14 +187,14 @@ public:
                 if (*_cursor == '(')
                 {
                     _cursor++;
-                    addRaw(currentSpanBegin, currentSpanEnd);
+                    addRaw(currentSpanBegin, currentSpanEnd, true);
                     depthInSplice = 1;
                     currentSpanBegin = _cursor;
                     break;
                 }
                 else if (isIdentifierStartChar(*_cursor))
                 {
-                    addRaw(currentSpanBegin, currentSpanEnd);
+                    addRaw(currentSpanBegin, currentSpanEnd, true);
 
                     auto spliceExprBegin = _cursor;
                     while (isIdentifierChar(*_cursor))
@@ -201,6 +204,7 @@ public:
                     currentSpanBegin = _cursor;
                     break;
                 }
+
                 break;
 
             case '(':
@@ -221,7 +225,7 @@ public:
                 break;
             }
         }
-        addRaw(currentSpanBegin, _end);
+        addRaw(currentSpanBegin, _end, false);
 
         if (stmts.getCount() == 1)
             return stmts[0];
@@ -388,6 +392,7 @@ public:
         char const* originalFileRawSpanStart = _templateFile->originalFileContent.begin();
         for (auto t : _templateFile->textTemplates)
         {
+            _builder.append("\n\n");
             flushOriginalFileRawSpan(originalFileRawSpanStart, t->templateSource.begin());
 
             evaluateTextTemplate(t);
@@ -453,12 +458,18 @@ private:
         else if (auto rawStmt = as<TextTemplateRawStmt>(stmt))
         {
             auto rawContent = rawStmt->text;
-            if (isEntirelyWhitespace(rawContent))
+            if (!rawStmt->preserveWhitespace && isEntirelyWhitespace(rawContent))
             {
                 _builder.append(rawContent);
             }
             else
             {
+                // Strictly speaking, raw string literals in lua strip the
+                // first chrarcter if it's a newline However this is actually
+                // exactly what we want, otherwise every amount of leading
+                // whitespace at the beginning of the raw c++ lines includes
+                // the trailing newline of the %-introduced lua code on the
+                // preceding line
                 _builder.append("RAW [==[");
                 _builder.append(rawContent);
                 _builder.append("]==]");
@@ -480,6 +491,7 @@ private:
             SLANG_ABORT_COMPILATION(
                 "fiddle encountered an unknown construct when converting a text template to Lua");
         }
+        _builder.append("\n");
     }
 };
 
