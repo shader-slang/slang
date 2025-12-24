@@ -320,9 +320,8 @@ bool SemanticsVisitor::getAttributeTargetSyntaxClasses(
     return false;
 }
 
-AttributeDecl* SemanticsVisitor::synthesizeAttributeDeclFromUserDefinedAttributeStruct(
-    StructDecl* structDecl,
-    AttributeUsageAttribute* attrUsageAttr)
+AttributeDecl* SemanticsVisitor::findOrSynthesizeAttributeDeclFromUserDefinedAttributeStruct(
+    StructDecl* structDecl)
 {
     // We will now synthesize a new `AttributeDecl` to mirror
     // what was declared on the `struct` type.
@@ -332,19 +331,25 @@ AttributeDecl* SemanticsVisitor::synthesizeAttributeDeclFromUserDefinedAttribute
     {
         attributeName = attributeName.subString(0, attributeName.getLength() - 9);
     }
+    // Try to do a lookup to see if we already synthesized
+    // an attribute decl for this struct.
+    if (auto parent = structDecl->parentDecl)
+    {
+        if (auto existingDecl = parent->findLastDirectMemberDeclOfName(getName(attributeName)))
+        {
+            for (auto declOfAttrName = existingDecl; declOfAttrName;
+                 declOfAttrName = declOfAttrName->_prevInContainerWithSameName)
+            {
+                if (auto existingAttrDecl = as<AttributeDecl>(declOfAttrName))
+                    return existingAttrDecl;
+            }
+        }
+    }
     AttributeDecl* attrDecl = m_astBuilder->create<AttributeDecl>();
     attrDecl->nameAndLoc.name = getName(attributeName);
     attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
     attrDecl->loc = structDecl->loc;
 
-    while (attrUsageAttr)
-    {
-        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
-        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
-        targetModifier->loc = attrUsageAttr->loc;
-        addModifier(attrDecl, targetModifier);
-        attrUsageAttr = as<AttributeUsageAttribute>(attrUsageAttr->next);
-    }
 
     // Every attribute declaration is associated with the type
     // of syntax nodes it constructs (via reflection/RTTI).
@@ -785,8 +790,23 @@ Modifier* SemanticsVisitor::validateAttribute(
             getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
             return nullptr;
         }
+
+        // Create or find the AttributeDecl that represents the attribute
+        // this struct defines.
         attr->attributeDecl =
-            synthesizeAttributeDeclFromUserDefinedAttributeStruct(structDecl, attrUsageAttr);
+            findOrSynthesizeAttributeDeclFromUserDefinedAttributeStruct(structDecl);
+
+        // Add an AttributeTargetModifier to the attribute decl
+        // to make the attribute applicable to the specified
+        // target syntax class.
+        if (attr->attributeDecl)
+        {
+            AttributeTargetModifier* targetModifier =
+                m_astBuilder->create<AttributeTargetModifier>();
+            targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
+            targetModifier->loc = attrUsageAttr->loc;
+            addModifier(attr->attributeDecl, targetModifier);
+        }
     }
     else if (const auto unrollAttr = as<UnrollAttribute>(attr))
     {
