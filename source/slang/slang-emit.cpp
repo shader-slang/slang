@@ -2703,6 +2703,7 @@ static SlangResult createArtifactFromIR(
             }
         }
 
+        // Perform spirv optimization
         ComPtr<IArtifact> optimizedArtifact;
         DownstreamCompileOptions downstreamOptions;
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
@@ -2737,9 +2738,14 @@ static SlangResult createArtifactFromIR(
             // contain all instructions.
             if (targetCompilerOptions.shouldEmitSeparateDebugInfo())
             {
+                auto stripStartTime = std::chrono::high_resolution_clock::now();
                 auto strippedArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_SPIRV);
                 SLANG_RETURN_ON_FAIL(
                     stripDbgSpirvFromArtifact(optimizedArtifact, strippedArtifact));
+                auto stripElapsedTime =
+                    (std::chrono::high_resolution_clock::now() - stripStartTime).count() *
+                    0.000000001;
+                printf("[SPIRV-STRIP] Debug info stripping time: %.6f seconds\n", stripElapsedTime);
                 artifact = _Move(strippedArtifact);
                 dbgArtifact = _Move(optimizedArtifact);
             }
@@ -2748,6 +2754,48 @@ static SlangResult createArtifactFromIR(
         }
         auto downstreamElapsedTime =
             (std::chrono::high_resolution_clock::now() - downstreamStartTime).count() * 0.000000001;
+        printf("[SPIRV-OPT] Downstream compilation time: %.6f seconds\n", downstreamElapsedTime);
+
+        // Print diagnostic info if downstream compilation is slow (>10 seconds)
+        if (downstreamElapsedTime > 10.0)
+        {
+            printf("[SPIRV-OPT] WARNING: Slow downstream compilation detected!\n");
+
+            // Print artifact size
+            ComPtr<ISlangBlob> sourceBlob;
+            if (SLANG_SUCCEEDED(artifact->loadBlob(ArtifactKeep::No, sourceBlob.writeRef())))
+            {
+                size_t sizeInBytes = sourceBlob->getBufferSize();
+                size_t sizeInKB = sizeInBytes / 1024;
+                size_t sizeInWords = sizeInBytes / 4;
+                printf(
+                    "[SPIRV-OPT]   Source artifact size: %zu bytes (%zu KB, %zu SPIR-V words)\n",
+                    sizeInBytes,
+                    sizeInKB,
+                    sizeInWords);
+            }
+
+            // Print optimization level
+            const char* optLevelStr = "Unknown";
+            switch (downstreamOptions.optimizationLevel)
+            {
+            case DownstreamCompileOptions::OptimizationLevel::None:
+                optLevelStr = "None";
+                break;
+            case DownstreamCompileOptions::OptimizationLevel::Default:
+                optLevelStr = "Default";
+                break;
+            case DownstreamCompileOptions::OptimizationLevel::High:
+                optLevelStr = "High";
+                break;
+            case DownstreamCompileOptions::OptimizationLevel::Maximal:
+                optLevelStr = "Maximal";
+                break;
+            }
+            printf("[SPIRV-OPT]   Optimization level: %s\n", optLevelStr);
+            printf("[SPIRV-OPT]   Consider using -O0 to skip optimization passes\n");
+        }
+
         codeGenContext->getSession()->addDownstreamCompileTime(downstreamElapsedTime);
 
         SLANG_RETURN_ON_FAIL(
