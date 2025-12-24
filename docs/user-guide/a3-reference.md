@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/reference
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a3-reference.html
 ---
 
 Reference
