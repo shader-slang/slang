@@ -1,5 +1,8 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 #pragma warning(disable: 41017)
@@ -21,8 +24,15 @@ import neural;
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(data=[0], stride=2, count=4096):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+
+#if TEST_HALF
+typealias StorageElemType = half;
+#else
+typealias StorageElemType = float;
+#endif
+
+// TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
+RWStructuredBuffer<StorageElemType> inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -59,9 +69,9 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
         {
             int index = row * InputSize + i;
             if (clear)
-                inputBuffer[index] = half(0);
+                inputBuffer[index] = StorageElemType(0);
             else
-                inputBuffer[index] = half(scaleFactor * (i + 1));
+                inputBuffer[index] = StorageElemType(scaleFactor * (i + 1));
         }
     }
     else
@@ -85,7 +95,7 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
 
 half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    typealias Storage = StructuredBufferStorage<StorageElemType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
@@ -107,7 +117,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>( inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<StorageElemType, Storage, half[InSize], half[OutSize]>( inputVector, ptrA, ptrB, ptrC, storage, 0);
     return res;
 }
 
