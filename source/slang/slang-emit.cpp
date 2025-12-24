@@ -1915,7 +1915,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(performIntrinsicFunctionInlining);
     }
 
-    SLANG_PASS(eliminateMultiLevelBreak);
+    SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {

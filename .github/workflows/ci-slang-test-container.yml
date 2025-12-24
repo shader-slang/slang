@@ -47,6 +47,9 @@ jobs:
         shell: bash
 
     steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -150,6 +153,9 @@ jobs:
         shell: bash
 
     steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -218,6 +224,9 @@ jobs:
         shell: bash
 
     steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
 
       - name: Download artifacts
