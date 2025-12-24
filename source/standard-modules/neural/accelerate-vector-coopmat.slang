@@ -434,11 +434,13 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     // into the shared memory. Compared to the LoadSharedMemoryFromLocalVector, where it loads partial vectors by every thread
     // in a warp.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, int TileStrideInVector, InputArray>(
+    VISIBILITY_LEVEL static void LoadSharedMemoryFromLocalVectorTranspose<int BatchSize, int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
         InputArray inputVector)
-            where InputArray : IArrayAccessor<T>
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where InputArray : IArrayAccessor<U>
     {
         const uint laneId = WaveGetLaneIndex();
 
@@ -458,7 +460,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             }
             else
             {
-                accessUint4Aligned<AccessOp.READ, T, T>(inputVector, i * ElementCountPerVector, value);
+                accessUint4Aligned<AccessOp.READ, U, U>(inputVector, i * ElementCountPerVector, value);
             }
             sharedMemory[index + i] = value;
         }
@@ -556,7 +558,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
     [require(cooperative_matrix, subgroup_basic)]
     [require(spvAtomicFloat16AddEXT)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, InArrayTypeA, InArrayTypeB>(
+    VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         InArrayTypeA inputVectorA,
@@ -566,8 +568,12 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
-            where InArrayTypeA : IArrayAccessor<T>
-            where InArrayTypeB : IArrayAccessor<T>
+            where TypeA : __BuiltinFloatingPointType
+            where TypeA.Differential == TypeA
+            where TypeB : __BuiltinFloatingPointType
+            where TypeB.Differential == TypeB
+            where InArrayTypeA : IArrayAccessor<TypeA>
+            where InArrayTypeB : IArrayAccessor<TypeB>
     {
         const uint subgroupIndex = getWaveId();
 
@@ -592,8 +598,8 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
         for (uint k = 0; k < N; k += T_COLUMN_A)
         {
             uint tileIndex = k / T_COLUMN_A;
-            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedM / ElementCountPerVector, StrideInVectorTileA>(warpLocalPtrA, tileIndex, inputVectorA);
-            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedK / ElementCountPerVector, StrideInVectorTileB>(warpLocalPtrB, tileIndex, inputVectorB);
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedM / ElementCountPerVector, StrideInVectorTileA, TypeA, InArrayTypeA>(warpLocalPtrA, tileIndex, inputVectorA);
+            LoadSharedMemoryFromLocalVectorTranspose<BatchSize, Uint4AlignedK / ElementCountPerVector, StrideInVectorTileB, TypeB, InArrayTypeB>(warpLocalPtrB, tileIndex, inputVectorB);
             GroupMemoryBarrierWithWaveSync();
 
             MatA matA[CoopMatCRows];
@@ -901,10 +907,20 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
                         >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
+
+        MMA.outerProductAccumulate<T.Differential, Storage.Differential,
+                                   T.Differential, OutputVector.Differential,
+                                   T, T[Uint4AlignedInputSize]
+                                  >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
 #else
         let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
                         >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
         dthis = DifferentialPair<This>(dthis.p, dInput);
+
+        MMA.outerProductAccumulate< T.Differential, Storage.Differential,
+                                    T.Differential, OutputVector.Differential,
+                                    T, This
+                                  >( shA, shB, doutput, dthis.p, dWeightStorage.d, dWeightAddress);
 #endif
     }
 
