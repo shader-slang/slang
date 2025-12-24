@@ -112,10 +112,11 @@ void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<StorageElemTyp
 
     for (int i = 0; i < Row; i++)
     {
+        printf("row: %d\n", i);
         for (int j = 0; j < Column; j++)
         {
             float value = outputBuffer[i * Column + j];
-            printf("%.4f ", value);
+            printf("%.1f ", value);
         }
         printf("\n");
     }
@@ -197,30 +198,30 @@ void cleanOutputBuffer<int InputSize, int OutputSize>(uint tid)
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
-        cleanOutputBuffer<8, 8>(tid);
-        test<8, 8>(tid, 0);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        cleanOutputBuffer<16, 16>(tid);
-        test<16, 16>(tid, 1);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        cleanOutputBuffer<32, 32>(tid);
-        test<32, 32>(tid, 2);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        cleanOutputBuffer<64, 64>(tid);
-        test<64, 64>(tid, 3);
+        cleanOutputBuffer<3, 15>(tid);
+        test<3, 15>(tid, 0);
         AllMemoryBarrierWithGroupSync();
     }
     // BUFFER: 1
+
+    {
+        cleanOutputBuffer<20, 30>(tid);
+        test<20, 30>(tid, 1);
+        AllMemoryBarrierWithGroupSync();
+    }
     // BUFFER-NEXT: 1
+
+    {
+        cleanOutputBuffer<49, 17>(tid);
+        test<49, 17>(tid, 2);
+        AllMemoryBarrierWithGroupSync();
+    }
     // BUFFER-NEXT: 1
+
+    {
+        cleanOutputBuffer<33, 9>(tid);
+        test<33, 9>(tid, 3);
+        AllMemoryBarrierWithGroupSync();
+    }
     // BUFFER-NEXT: 1
 }

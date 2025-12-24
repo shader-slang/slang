@@ -137,7 +137,7 @@ internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferT
     }
 }
 
-internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, uint Stride>(BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
+internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, int Stride>(BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where BufferType : IArrayAccessor<T>
@@ -164,7 +164,7 @@ internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, uint Strid
     const int endAddress = (x + 4 * ReadPerElement - 1);
 
     // this is same as paddingCount = endAddress < AlignedStride ? 0 : AlignedStride - endAddress + 1
-    const int paddingCount = max(0, endAddress - Stride + 1);
+    const int paddingCount = max<int>(0, endAddress - Stride + 1);
     const int elementsToRead = (4 * ReadPerElement) - paddingCount;
 
     [ForceUnroll]
