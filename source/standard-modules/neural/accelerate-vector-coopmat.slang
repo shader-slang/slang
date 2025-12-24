@@ -304,7 +304,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
                     // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUnit4() will handle the padding
                     // if the reading is cross the boundary of the uint4 vector size.
-                    value = weightStorage.readUint4<IsAlignedVector, K>(weightAddress, offsetAddress);
+                    value = weightStorage.readUint4<T, IsAlignedVector, K>(weightAddress, offsetAddress);
                 }
 
                 sharedMemory[indexInVectorizedTile] = value;
@@ -317,7 +317,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 {
                     value = sharedMemory[indexInVectorizedTile];
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-                    weightStorage.writeUint4Atomic<IsAlignedVector, K>(weightAddress, offsetAddress, value);
+                    weightStorage.writeUint4Atomic<T, IsAlignedVector, K>(weightAddress, offsetAddress, value);
                 }
             }
 
@@ -393,7 +393,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             // It's fine that we only used the aligned version of readUint4() here, because the inputVector is the internal data which we can always
             //  create it as an aligned array.
             uint4 value;
-            accessUint4Aligned<AccessOp.READ, T>(inputVector, startIndex, value);
+            accessUint4Aligned<AccessOp.READ, T, T>(inputVector, startIndex, value);
             sharedMemoryBSubgroup[indexInVectorizedTile + yInTile] = value;
         }
 
@@ -458,7 +458,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             }
             else
             {
-                accessUint4Aligned<AccessOp.READ, T>(inputVector, i * ElementCountPerVector, value);
+                accessUint4Aligned<AccessOp.READ, T, T>(inputVector, i * ElementCountPerVector, value);
             }
             sharedMemory[index + i] = value;
         }
@@ -496,7 +496,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
                 break;
             }
 
-            accessUint4Aligned<AccessOp.WRITE, T>(outputVector, startIndex, sharedMemoryBSubgroup[indexInVectorizedTile + yInTile]);
+            accessUint4Aligned<AccessOp.WRITE, T, T>(outputVector, startIndex, sharedMemoryBSubgroup[indexInVectorizedTile + yInTile]);
         }
 
         // No padding needs for store to local vector. We need padding when loading from local vector to shared memory

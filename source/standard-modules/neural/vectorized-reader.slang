@@ -25,70 +25,75 @@ internal enum AccessOp
     ATOMIC_ADD,
 }
 
+#define COMMON_TYPE_CONSTRAINTS \
+    where T : __BuiltinFloatingPointType \
+    where T.Differential == T \
+    where U : __BuiltinFloatingPointType \
+    where U.Differential == U \
+    where BufferType : IArrayAccessor<U>
+
 [ForceInline]
-internal static void readOneElement<T, BufferType, int NBytes, int BitsShiftPerRead>(BufferType buffer, int bufferIdx, int elementIdx, inout uint result)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
+internal static void readOneElement<T, U, BufferType, int NBytes, int BitsShiftPerRead>(BufferType buffer, int bufferIdx, int elementIdx, inout uint result)
+    COMMON_TYPE_CONSTRAINTS
 {
     const uint shift = BitsShiftPerRead * elementIdx;
-    switch (NBytes)
-    {
-    case 1:
-        result |= uint(bit_cast<uint8_t>(buffer[bufferIdx])) << shift;
-        break;
-    case 2:
-        result |= uint(bit_cast<uint16_t>(buffer[bufferIdx])) << shift;
-        break;
-    case 4:
-        result |= uint(bit_cast<uint>(buffer[bufferIdx])) << shift;
-        break;
-    default:
-        static_assert(false, "Unsupported data type T");
-    }
-}
-
-[ForceInline]
-internal static void writeOneElement<T, BufferType, int NBytes, int BitsShiftPerWrite>(out BufferType buffer, int bufferIdx, int elementIdx, uint value)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
-{
-    const uint shift = BitsShiftPerWrite * elementIdx;
-    switch (NBytes)
-    {
-    case 1:
-        buffer[bufferIdx] = bit_cast<T>((uint8_t)(value >> shift));
-        break;
-    case 2:
-        buffer[bufferIdx] = bit_cast<T>((uint16_t)(value >> shift));
-        break;
-    case 4:
-        buffer[bufferIdx] = bit_cast<T>((uint)(value >> shift));
-        break;
-    default:
-        static_assert(false, "Unsupported data type T");
-    }
-}
-
-[ForceInline]
-internal static void atomicAddOneElement<T, BufferType, int NBytes, int BitsShiftPerWrite>(inout BufferType buffer, int bufferIdx, int elementIdx, uint value)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
-{
-    const uint shift = BitsShiftPerWrite * elementIdx;
     T convertedValue;
+    convertedValue = __realCast<T>(buffer[bufferIdx]);
     switch (NBytes)
     {
     case 1:
-        convertedValue = T(bit_cast<uint8_t>((uint8_t)(value >> shift)));
+        result |= uint(bit_cast<uint8_t>(convertedValue)) << shift;
         break;
     case 2:
-        convertedValue = T(bit_cast<half>((uint16_t)(value >> shift)));
+        result |= uint(bit_cast<uint16_t>(convertedValue)) << shift;
         break;
     case 4:
-        convertedValue = T(bit_cast<float>((uint)(value >> shift)));
+        result |= uint(bit_cast<uint>(convertedValue)) << shift;
+        break;
+    default:
+        static_assert(false, "Unsupported data type T");
+    }
+}
+
+[ForceInline]
+internal static void writeOneElement<T, U, BufferType, int NBytes, int BitsShiftPerWrite>(out BufferType buffer, int bufferIdx, int elementIdx, uint value)
+    COMMON_TYPE_CONSTRAINTS
+{
+    const uint shift = BitsShiftPerWrite * elementIdx;
+    U convertedValue;
+    switch (NBytes)
+    {
+    case 1:
+        convertedValue = __realCast<U>(bit_cast<T>((uint8_t)(value >> shift)));
+        break;
+    case 2:
+        convertedValue = __realCast<U>(bit_cast<T>((uint16_t)(value >> shift)));
+        break;
+    case 4:
+        convertedValue = __realCast<U>(bit_cast<T>((uint)(value >> shift)));
+        break;
+    default:
+        static_assert(false, "Unsupported data type T");
+    }
+    buffer[bufferIdx] = convertedValue;
+}
+
+[ForceInline]
+internal static void atomicAddOneElement<T, U, BufferType, int NBytes, int BitsShiftPerWrite>(inout BufferType buffer, int bufferIdx, int elementIdx, uint value)
+    COMMON_TYPE_CONSTRAINTS
+{
+    const uint shift = BitsShiftPerWrite * elementIdx;
+    U convertedValue;
+    switch (NBytes)
+    {
+    case 1:
+        convertedValue = __realCast<U>(bit_cast<T>((uint8_t)(value >> shift)));
+        break;
+    case 2:
+        convertedValue = __realCast<U>(bit_cast<T>((uint16_t)(value >> shift)));
+        break;
+    case 4:
+        convertedValue = __realCast<U>(bit_cast<T>((uint)(value >> shift)));
         break;
     default:
         static_assert(false, "Unsupported data type T");
@@ -98,14 +103,12 @@ internal static void atomicAddOneElement<T, BufferType, int NBytes, int BitsShif
 }
 
 [ForceInline]
-internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferType buffer, int startIndex, inout uint4 value)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
+internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>( out BufferType buffer, int startIndex, inout uint4 value)
+    COMMON_TYPE_CONSTRAINTS
 {
     // TODO: for now, we just fixed the type to be half for all the internal operations.
     // We can extend this to support other types in the future.
-    const int nBytes = sizeof(half);
+    const int nBytes = sizeof(T);
     const int WritePerElement = 4 / nBytes;
     const int BitsShiftPerWrite = 32 / WritePerElement;
 
@@ -122,13 +125,13 @@ internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferT
             switch (Op)
             {
             case AccessOp.READ:
-                readOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+                readOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
                 break;
             case AccessOp.WRITE:
-                writeOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
                 break;
             case AccessOp.ATOMIC_ADD:
-                atomicAddOneElement<T, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+                atomicAddOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
                 break;
             default:
                 static_assert(false, "Unsupported access operation");
@@ -137,24 +140,24 @@ internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferT
     }
 }
 
-internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, int Stride>(BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-    where BufferType : IArrayAccessor<T>
+internal void accessUint4<AccessOp Op, T, U, BufferType, bool IsAligned, int Stride>( BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
+    COMMON_TYPE_CONSTRAINTS
 {
     if (IsAligned)
     {
         // Call the aligned version of readUint4 which is branchless.
-        accessUint4Aligned<Op, T, BufferType>(buffer, startIndex, value);
+        accessUint4Aligned<Op, T, U, BufferType>(buffer, startIndex, value);
         return;
     }
 
     if (Op == AccessOp.READ)
         value = uint4(0, 0, 0, 0);
 
-    // TODO: for now, we just fixed the type to be half for all the internal operations.
-    // We can extend this to support other types in the future.
-    const int nBytes = sizeof(half);
+    // T is the type of source (read) or destination (write) data type. We will always pack few elements into a uint4.
+    // So T will determine how many elements we can pack into a uint4.
+    // If U is different from T, we will first convert from U to T (in read operation) or from T to U (in write operation).
+    // But U will not determined how many elements we can read or write, only T will.
+    const int nBytes = sizeof(T);
     const int ReadPerElement = 4 / nBytes;
     const int BitsShiftPerRead = 32 / ReadPerElement;
 
@@ -188,13 +191,13 @@ internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, int Stride
             switch (Op)
             {
             case AccessOp.READ:
-                readOneElement<T, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
+                readOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
                 break;
             case AccessOp.WRITE:
-                writeOneElement<T, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
+                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
                 break;
             case AccessOp.ATOMIC_ADD:
-                atomicAddOneElement<T, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
+                atomicAddOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
                 break;
             default:
                 static_assert(false, "Unsupported access operation");

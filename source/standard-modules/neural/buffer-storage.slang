@@ -55,16 +55,20 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return m_buffer[address + m_baseAddress];
     }
 
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
     {
         uint4 value;
-        accessUint4<AccessOp.READ, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+        accessUint4<AccessOp.READ, DstType, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
         return value;
     }
 
-    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
     {
-        accessUint4<AccessOp.ATOMIC_ADD, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+        accessUint4<AccessOp.ATOMIC_ADD, SrcType, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
     }
 
     /**
