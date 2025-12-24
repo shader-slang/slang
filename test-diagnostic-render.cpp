@@ -73,14 +73,9 @@ struct TestData
 // ============================================================================
 
 /*
-   Updates made to Test 1:
-   1. Corrected `column` to 30. In the source line `        float4...`, 'someSampler' starts at
-   index 29 (col 30).
-   2. Added `length` of 11 for 'someSampler'.
-   3. Updated `expectedOutput` to match the source indentation (8 spaces) and the new column
-   position.
+The raw strings have a 0th line, so if an error occurs on line 1 it means the
+first line after the initial newline, so the files are 0-based
 */
-
 
 TestData testCases[] = {
     // Test 1: Undeclared identifier
@@ -103,8 +98,8 @@ struct PixelShader {
 error[E1001]: use of undeclared identifier 'someSampler'
  --> example.slang:8:30
   |
-8 |         float4 color = tex2D(someSampler, input.texCoord); // Undefined sampler
-  |                              ^^^^^^^^^^^ not found in this scope
+8 | float4 color = tex2D(someSampler, input.texCoord); // Undefined sampler
+  |                      ^^^^^^^^^^^ not found in this scope
 )",
      .diagnostic =
          {.code = 1001,
@@ -135,14 +130,14 @@ struct PixelShader {
 error[E1002]: cannot add `float4` and `int`
   --> example.slang:10:28
    |
-05 |     int invalid_field; // This field has issues
-   |     ----------------- field declared here
+ 5 | int invalid_field; // This field has issues
+   | ----------------- field declared here
 ...
-10 |         return color * 2.0 + input.invalid_field; // Type mismatch
-   |                ----------- ^ ------------------- int
-   |                |           |
-   |                |           no implementation for `float4 + int`
-   |                float4
+10 |     return color * 2.0 + input.invalid_field; // Type mismatch
+   |            ----------- ^ ------------------- int
+   |            |           |
+   |            |           no implementation for `float4 + int`
+   |            float4
 )",
      .diagnostic =
          {.code = 1002,
@@ -185,8 +180,8 @@ struct PixelShader {
 error[E1003]: use of undeclared identifier 'undefinedVariable'
  --> example.slang:7:17
   |
-7 |     int x = undefinedVariable; // Undefined variable
-  |             ^^^^^^^^^^^^^^^^^ not found in this scope
+7 | int x = undefinedVariable; // Undefined variable
+  |         ^^^^^^^^^^^^^^^^^ not found in this scope
 )",
      .diagnostic =
          {.code = 1003,
@@ -214,10 +209,10 @@ struct PixelShader {
 error[E1004]: mismatched types
   --> example.slang:15:15
    |
-15 |     float y = "string"; // Wrong type assignment
-   |     -----     ^^^^^^^^ expected `float`, found `&str`
-   |     |
-   |     expected due to this type
+15 |    float y = "string"; // Wrong type assignment
+   |    -----     ^^^^^^^^ expected `float`, found `&str`
+   |    |
+   |    expected due to this type
 )",
      .diagnostic =
          {.code = 1004,
@@ -236,7 +231,7 @@ float3 normalize(float3 v) {
 }
 
 struct VertexShader {
-    float4 main() : SV_Position { 
+    float4 main() : SV_Position {
         return float4(0, 0, 0, 1);
     }
 }
@@ -245,16 +240,16 @@ struct VertexShader {
 warning[E2001]: potential division by zero
  --> math.slang:7:14
   |
-6 |     float len = sqrt(dot(v, v));
-  |                 --------------- length computed here
-7 |     return v / len; // Potential division by zero
-  |              ^ division by zero if `len` is 0.0
+6 |       float len = sqrt(dot(v, v));
+  |                   --------------- length computed here
+7 |       return v / len; // Potential division by zero
+  |                ^ division by zero if `len` is 0.0
 
 note: consider using 'normalize' builtin function instead
  --> math.slang:5:8
   |
-5 | float3 normalize(float3 v) {
-  |        ^^^^^^^^^
+5 |   float3 normalize(float3 v) {
+  |          ^^^^^^^^^
 )",
      .diagnostic =
          {.code = 2001,
@@ -283,14 +278,14 @@ struct PixelShader {
 error[E0308]: mismatched types
   --> example.slang:12:18
    |
-4  |     string name = "User";
-   |            ----   ------ secondary span: defined as `string` here
+4  |   string name = "User";
+   |          ----   ------ secondary span: defined as `string` here
 ...
-12 |     float result = 5.0 + name;
-   |                    --- ^ ---- primary span: expected `float`
-   |                    |   |
-   |                    |   `+` cannot be applied to these types
-   |                    float
+12 |       float result = 5.0 + name;
+   |                      --- ^ ---- primary span: expected `float`
+   |                      |   |
+   |                      |   `+` cannot be applied to these types
+   |                      float
 )",
      .diagnostic = {
          .code = 308,
@@ -317,37 +312,6 @@ std::vector<std::string> getSourceLines(const std::string& content)
         lines.push_back(line);
     }
     return lines;
-}
-
-// Find minimum common whitespace indentation across non-empty lines
-size_t findCommonIndent(const std::vector<std::string>& lines)
-{
-    size_t minIndent = SIZE_MAX;
-    bool foundNonEmpty = false;
-
-    for (const auto& line : lines)
-    {
-        if (line.empty())
-            continue;
-
-        // Skip lines that look like top-level declarations if they start at 0
-        // This is a heuristic.
-        size_t indent = 0;
-        for (char c : line)
-        {
-            if (c == ' ' || c == '\t')
-                indent++;
-            else
-                break;
-        }
-
-        if (!foundNonEmpty || indent < minIndent)
-        {
-            minIndent = indent;
-            foundNonEmpty = true;
-        }
-    }
-    return foundNonEmpty ? minIndent : 0;
 }
 
 // Helper to remove newlines from start/end of a string
@@ -443,7 +407,6 @@ struct DiagnosticLayout
     std::vector<LayoutBlock> blocks;
 };
 
-
 struct LayoutSpan
 {
     int line;
@@ -452,6 +415,34 @@ struct LayoutSpan
     std::string label;
     bool isPrimary;
 };
+
+// Return the minimum leading-whitespace length among *only* the lines
+// that will be displayed (given by their 1-based line numbers).
+size_t findCommonIndent(
+    const std::vector<std::string>& allLines,
+    const std::vector<LayoutSpan>& allSpans)
+{
+    size_t minIndent = SIZE_MAX;
+    for (const auto& s : allSpans)
+    {
+        size_t idx = static_cast<size_t>(s.line); // 1-based -> 0-based
+        if (idx >= allLines.size())
+            continue;
+
+        const std::string& line = allLines[idx];
+        if (line.empty())
+            continue;
+
+        size_t indent = 0;
+        while (indent < line.size() && (line[indent] == ' ' || line[indent] == '\t'))
+            ++indent;
+
+        if (indent < minIndent)
+            minIndent = indent;
+    }
+    return (minIndent == SIZE_MAX) ? 0 : minIndent;
+}
+
 
 DiagnosticLayout createLayout(const TestData& data)
 {
@@ -499,6 +490,7 @@ DiagnosticLayout createLayout(const TestData& data)
 
     // 3. Build Blocks
     std::vector<std::string> sourceLines = getSourceLines(data.sourceContent);
+    size_t commonIndent = findCommonIndent(sourceLines, allSpans);
     int prevLine = -1;
 
     for (size_t i = 0; i < allSpans.size();)
@@ -522,7 +514,11 @@ DiagnosticLayout createLayout(const TestData& data)
         snippet.lineNum = currentLine;
         if (currentLine > 0 && currentLine <= (int)sourceLines.size())
         {
-            snippet.content = sourceLines[currentLine];
+            std::string raw = sourceLines[currentLine];
+            if (commonIndent > 0 && raw.size() >= commonIndent)
+                raw.erase(0, commonIndent);
+            snippet.content = raw;
+            fprintf(stderr, "XXXXXXXXXX\n%d\n", commonIndent);
         }
 
         // --- Generate Annotations (Waterfall Logic) ---
