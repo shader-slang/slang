@@ -32,9 +32,14 @@ public interface IStorage<T> : IDifferentiablePtrType
     Reads sequential 4 elements starting from the given address and packed into a uint4.
     */
 
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address);
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType;
 
-    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value);
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType;
+
     /**
     Atomically adds a value to storage (for gradient accumulation).
     @param[in] address The address to add to.

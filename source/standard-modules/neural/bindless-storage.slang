@@ -129,13 +129,18 @@ public struct BindlessBufferStorage<T> : IStorage<T>
 
     // Following method will not be needed for bindless storage
     public T read(Address address) { return address[0]; }
-    private uint4 readUint4(Address address) { static_assert(false, "Not implemented"); return uint4(0);}
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
     {
         static_assert(false, "Not implemented");
         return uint4(0);
     }
-    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
     {
         static_assert(false, "Not implemented");
     }
@@ -153,13 +158,17 @@ public struct PointerStorage<T> : IStorage<T>
 
     // Following method will not be needed for pointer storage
     public T read(Address address) { return address[0]; }
-    private uint4 readUint4(Address address) {static_assert(false, "Not implemented"); return uint4(0);}
-    internal uint4 readUint4<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
     {
         static_assert(false, "Not implemented");
         return uint4(0);
     }
-    internal void writeUint4Atomic<bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
     {
         static_assert(false, "Not implemented");
     }
