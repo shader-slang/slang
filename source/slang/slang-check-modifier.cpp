@@ -218,12 +218,10 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     // If the attribute was `[Something(...)]` then we will
     // look for a `struct` named `SomethingAttribute`.
     //
-    LookupResult lookupResult = lookUp(
-        m_astBuilder,
-        this,
-        m_astBuilder->getGlobalSession()->getNameObj(attributeName->text + "Attribute"),
-        scope,
-        LookupMask::type);
+    auto attributeDeclNameObj =
+        m_astBuilder->getGlobalSession()->getNameObj(attributeName->text + "Attribute");
+    LookupResult lookupResult =
+        lookUp(m_astBuilder, this, attributeDeclNameObj, scope, LookupMask::type);
     //
     // If we didn't find a matching type name, then we give up.
     //
@@ -238,71 +236,13 @@ AttributeDecl* SemanticsVisitor::lookUpAttributeDecl(Name* attributeName, Scope*
     auto structDecl = lookupResult.item.declRef.as<StructDecl>().getDecl();
     if (!structDecl)
         return nullptr;
+
+    ensureDecl(structDecl, DeclCheckState::ModifiersChecked);
     auto attrUsageAttr = structDecl->findModifier<AttributeUsageAttribute>();
     if (!attrUsageAttr)
         return nullptr;
 
-    // We will now synthesize a new `AttributeDecl` to mirror
-    // what was declared on the `struct` type.
-    //
-    AttributeDecl* attrDecl = m_astBuilder->create<AttributeDecl>();
-    attrDecl->nameAndLoc.name = attributeName;
-    attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
-    attrDecl->loc = structDecl->loc;
-
-    while (attrUsageAttr)
-    {
-        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
-        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
-        targetModifier->loc = attrUsageAttr->loc;
-        addModifier(attrDecl, targetModifier);
-        attrUsageAttr = as<AttributeUsageAttribute>(attrUsageAttr->next);
-    }
-
-    // Every attribute declaration is associated with the type
-    // of syntax nodes it constructs (via reflection/RTTI).
-    //
-    // User-defined attributes create instances of
-    // `UserDefinedAttribute`.
-    //
-    attrDecl->syntaxClass =
-        m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("UserDefinedAttribute"));
-
-    // The fields of the user-defined `struct` type become
-    // the parameters of the new attribute.
-    //
-    // TODO: This step should skip `static` fields.
-    //
-    for (auto varMember : structDecl->getDirectMemberDeclsOfType<VarDecl>())
-    {
-        ensureDecl(varMember, DeclCheckState::CanUseTypeOfValueDecl);
-
-        ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
-        paramDecl->nameAndLoc = varMember->nameAndLoc;
-        paramDecl->type = varMember->type;
-        paramDecl->loc = varMember->loc;
-        paramDecl->setCheckState(DeclCheckState::DefinitionChecked);
-
-        attrDecl->addMember(paramDecl);
-    }
-
-    // We need to end by putting the new attribute declaration
-    // into the AST, so that it can be found via lookup.
-    //
-    auto parentDecl = structDecl->parentDecl;
-    //
-    // TODO: handle the case where `parentDecl` is generic?
-    //
-    parentDecl->addMember(attrDecl);
-
-    // Finally, we perform any required semantic checks on
-    // the newly constructed attribute decl.
-    //
-    // TODO: what check state is relevant here?
-    //
-    ensureDecl(attrDecl, DeclCheckState::DefinitionChecked);
-
-    return attrDecl;
+    return attrUsageAttr->attributeDecl;
 }
 
 bool SemanticsVisitor::hasFloatArgs(Attribute* attr, int numArgs)
@@ -378,6 +318,65 @@ bool SemanticsVisitor::getAttributeTargetSyntaxClasses(
         return true;
     }
     return false;
+}
+
+AttributeDecl* SemanticsVisitor::synthesizeAttributeDeclFromUserDefinedAttributeStruct(
+    StructDecl* structDecl,
+    AttributeUsageAttribute* attrUsageAttr)
+{
+    // We will now synthesize a new `AttributeDecl` to mirror
+    // what was declared on the `struct` type.
+    //
+    auto attributeName = getText(structDecl->getName());
+    if (attributeName.endsWith("Attribute"))
+    {
+        attributeName = attributeName.subString(0, attributeName.getLength() - 9);
+    }
+    AttributeDecl* attrDecl = m_astBuilder->create<AttributeDecl>();
+    attrDecl->nameAndLoc.name = getName(attributeName);
+    attrDecl->nameAndLoc.loc = structDecl->nameAndLoc.loc;
+    attrDecl->loc = structDecl->loc;
+
+    while (attrUsageAttr)
+    {
+        AttributeTargetModifier* targetModifier = m_astBuilder->create<AttributeTargetModifier>();
+        targetModifier->syntaxClass = attrUsageAttr->targetSyntaxClass;
+        targetModifier->loc = attrUsageAttr->loc;
+        addModifier(attrDecl, targetModifier);
+        attrUsageAttr = as<AttributeUsageAttribute>(attrUsageAttr->next);
+    }
+
+    // Every attribute declaration is associated with the type
+    // of syntax nodes it constructs (via reflection/RTTI).
+    //
+    // User-defined attributes create instances of
+    // `UserDefinedAttribute`.
+    //
+    attrDecl->syntaxClass =
+        m_astBuilder->findSyntaxClass(UnownedStringSlice::fromLiteral("UserDefinedAttribute"));
+
+    // The fields of the user-defined `struct` type become
+    // the parameters of the new attribute.
+    //
+    for (auto varMember : structDecl->getDirectMemberDeclsOfType<VarDecl>())
+    {
+        if (isEffectivelyStatic(varMember))
+            continue;
+        ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
+        paramDecl->nameAndLoc = varMember->nameAndLoc;
+        paramDecl->type = varMember->type;
+        paramDecl->loc = varMember->loc;
+        paramDecl->setCheckState(varMember->checkState.getState());
+        attrDecl->addMember(paramDecl);
+    }
+
+    // We need to end by putting the new attribute declaration
+    // into the AST, so that it can be found via lookup.
+    //
+    auto parentDecl = structDecl->parentDecl;
+    parentDecl->addMember(attrDecl);
+
+    return attrDecl;
 }
 
 Modifier* SemanticsVisitor::validateAttribute(
@@ -751,6 +750,23 @@ Modifier* SemanticsVisitor::validateAttribute(
     else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
     {
         uint32_t targetClassId = (uint32_t)UserDefinedAttributeTargets::None;
+        auto structDecl = as<StructDecl>(attrTarget);
+        if (!structDecl)
+        {
+            getSink()->diagnose(
+                attr,
+                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
+                attr->keywordName);
+            return nullptr;
+        }
+        if (findNextOuterGeneric(structDecl) != nullptr)
+        {
+            getSink()->diagnose(
+                attr,
+                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
+                attr->keywordName);
+            return nullptr;
+        }
         if (attr->args.getCount() == 1)
         {
             // IntVal* outIntVal;
@@ -769,6 +785,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
             return nullptr;
         }
+        attr->attributeDecl =
+            synthesizeAttributeDeclFromUserDefinedAttributeStruct(structDecl, attrUsageAttr);
     }
     else if (const auto unrollAttr = as<UnrollAttribute>(attr))
     {

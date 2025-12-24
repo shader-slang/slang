@@ -1860,6 +1860,10 @@ public:
         UncheckedAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);
 
+    AttributeDecl* synthesizeAttributeDeclFromUserDefinedAttributeStruct(
+        StructDecl* attributeTypeDecl,
+        AttributeUsageAttribute* attrUsageAttr);
+
     AttributeBase* checkGLSLLayoutAttribute(
         UncheckedGLSLLayoutAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);

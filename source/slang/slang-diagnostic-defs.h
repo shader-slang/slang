@@ -1340,7 +1340,11 @@ DIAGNOSTIC(
 
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
-
+DIAGNOSTIC(
+    31125,
+    Error,
+    attributeUsageAttributeMustBeOnNonGenericStruct,
+    "[__AttributeUsage] can only be applied to non-generic struct definitions")
 DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 
 DIAGNOSTIC(
