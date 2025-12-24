@@ -10,6 +10,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 // ============================================================================
@@ -48,6 +49,12 @@ struct DiagnosticSpan
     }
 };
 
+struct DiagnosticNote
+{
+    std::string message;
+    DiagnosticSpan span;
+};
+
 struct GenericDiagnostic
 {
     int code;
@@ -55,6 +62,7 @@ struct GenericDiagnostic
     std::string message;
     DiagnosticSpan primarySpan;
     std::vector<DiagnosticSpan> secondarySpans;
+    std::vector<DiagnosticNote> notes;
 };
 
 struct TestData
@@ -235,7 +243,10 @@ note: consider using 'normalize' builtin function instead
           .severity = "warning",
           .message = "potential division by zero",
           .primarySpan = {SourceLoc("math.slang", 3, 14), "division by zero if `len` is 0.0", 1},
-          .secondarySpans = {{SourceLoc("math.slang", 2, 17), "length computed here", 15}}}},
+          .secondarySpans = {{SourceLoc("math.slang", 2, 17), "length computed here", 15}},
+          .notes =
+              {{.message = "consider using 'normalize' builtin function instead",
+                .span = {SourceLoc("math.slang", 1, 8), "", 9}}}}},
     // Test 6: Complex mismatched types
     {.name = "mismatched_types_complex",
      .sourceFile = "example.slang",
@@ -352,6 +363,13 @@ struct LayoutBlock
     std::vector<LayoutSnippet> snippets;
 };
 
+struct SectionLayout
+{
+    int maxGutterWidth = 0;
+    size_t commonIndent = 0;
+    std::vector<LayoutBlock> blocks;
+};
+
 struct DiagnosticLayout
 {
     struct Header
@@ -364,14 +382,20 @@ struct DiagnosticLayout
     struct Location
     {
         std::string fileName;
-        int line;
-        int col;
-        int gutterIndent;
+        int line = 0;
+        int col = 0;
+        int gutterIndent = 0;
     } primaryLoc;
 
-    int maxGutterWidth;
-    std::vector<LayoutBlock> blocks;
-    size_t commonIndent = 0;
+    SectionLayout primarySection;
+
+    struct NoteEntry
+    {
+        std::string message;
+        Location loc;
+        SectionLayout section;
+    };
+    std::vector<NoteEntry> notes;
 };
 
 size_t findCommonIndent(
@@ -396,33 +420,45 @@ size_t findCommonIndent(
     return (minIndent == SIZE_MAX) ? 0 : minIndent;
 }
 
-DiagnosticLayout createLayout(const TestData& data)
+int resolveSpanLength(const DiagnosticSpan& span, const std::vector<std::string>& sourceLines)
 {
-    DiagnosticLayout layout;
-    const auto& diag = data.diagnostic;
+    if (span.length > 0)
+        return span.length;
 
-    // header & primary location
-    layout.header.severity = diag.severity;
-    layout.header.code = diag.code;
-    layout.header.message = diag.message;
-    layout.primaryLoc.fileName = diag.primarySpan.location.fileName;
-    layout.primaryLoc.line = diag.primarySpan.location.line;
-    layout.primaryLoc.col = diag.primarySpan.location.column;
+    int lineIndex = span.location.line;
+    if (lineIndex >= 0 && lineIndex < static_cast<int>(sourceLines.size()))
+        return calculateFallbackLength(
+            sourceLines[static_cast<size_t>(lineIndex)],
+            span.location.column);
+    return 1;
+}
 
-    // flatten spans
-    std::vector<LayoutSpan> allSpans;
-    allSpans.push_back(
-        {diag.primarySpan.location.line,
-         diag.primarySpan.location.column,
-         diag.primarySpan.length,
-         diag.primarySpan.message,
-         true});
-    for (const auto& s : diag.secondarySpans)
-        allSpans.push_back({s.location.line, s.location.column, s.length, s.message, false});
+LayoutSpan makeLayoutSpan(
+    const DiagnosticSpan& span,
+    bool isPrimary,
+    const std::vector<std::string>& sourceLines)
+{
+    LayoutSpan layoutSpan;
+    layoutSpan.line = span.location.line;
+    layoutSpan.col = span.location.column;
+    layoutSpan.length = resolveSpanLength(span, sourceLines);
+    layoutSpan.label = span.message;
+    layoutSpan.isPrimary = isPrimary;
+    return layoutSpan;
+}
 
+SectionLayout buildSectionLayout(
+    const std::vector<LayoutSpan>& spans,
+    const std::vector<std::string>& sourceLines)
+{
+    SectionLayout section;
+    if (spans.empty())
+        return section;
+
+    std::vector<LayoutSpan> sortedSpans = spans;
     std::sort(
-        allSpans.begin(),
-        allSpans.end(),
+        sortedSpans.begin(),
+        sortedSpans.end(),
         [](const LayoutSpan& a, const LayoutSpan& b)
         {
             if (a.line != b.line)
@@ -431,37 +467,31 @@ DiagnosticLayout createLayout(const TestData& data)
         });
 
     int maxLine = 0;
-    for (const auto& s : allSpans)
+    for (const auto& s : sortedSpans)
         maxLine = std::max(maxLine, s.line);
-    layout.maxGutterWidth = static_cast<int>(std::to_string(maxLine).length());
-    layout.primaryLoc.gutterIndent = layout.maxGutterWidth;
+    section.maxGutterWidth = static_cast<int>(std::to_string(std::max(1, maxLine)).length());
+    section.commonIndent = findCommonIndent(sourceLines, sortedSpans);
 
-    // compute common indent
-    std::vector<std::string> sourceLines = getSourceLines(data.sourceContent);
-    layout.commonIndent = findCommonIndent(sourceLines, allSpans);
-
-    // build blocks
     int prevLine = -1;
-    for (size_t i = 0; i < allSpans.size();)
+    size_t i = 0;
+    while (i < sortedSpans.size())
     {
-        int currentLine = allSpans[i].line;
+        int currentLine = sortedSpans[i].line;
         LayoutBlock block;
         block.showGap = (prevLine != -1 && currentLine > prevLine + 1);
 
         std::vector<LayoutSpan> lineSpans;
-        while (i < allSpans.size() && allSpans[i].line == currentLine)
-            lineSpans.push_back(allSpans[i++]);
+        while (i < sortedSpans.size() && sortedSpans[i].line == currentLine)
+            lineSpans.push_back(sortedSpans[i++]);
 
         LayoutSnippet snippet;
         snippet.lineNum = currentLine;
-        if (currentLine > 0 && currentLine <= static_cast<int>(sourceLines.size()))
+        if (currentLine >= 0 && currentLine < static_cast<int>(sourceLines.size()))
             snippet.content = sourceLines[static_cast<size_t>(currentLine)];
 
-        // annotations
         std::string underlineRow;
         int currentPos = 1;
-        auto sortedByCol = lineSpans;
-        for (const auto& span : sortedByCol)
+        for (const auto& span : lineSpans)
         {
             int spaces = std::max(0, span.col - currentPos);
             underlineRow += repeat(' ', spaces);
@@ -470,9 +500,9 @@ DiagnosticLayout createLayout(const TestData& data)
             underlineRow += repeat(marker, len);
             currentPos = span.col + len;
         }
-        // rightmost label inline
+
         std::vector<LayoutSpan> pendingLabels;
-        for (const auto& s : sortedByCol)
+        for (const auto& s : lineSpans)
             if (!s.label.empty())
                 pendingLabels.push_back(s);
         std::sort(
@@ -481,12 +511,11 @@ DiagnosticLayout createLayout(const TestData& data)
             [](const LayoutSpan& a, const LayoutSpan& b) { return a.col > b.col; });
         if (!pendingLabels.empty())
         {
-            underlineRow += " " + pendingLabels[0].label;
+            underlineRow += " " + pendingLabels.front().label;
             pendingLabels.erase(pendingLabels.begin());
         }
         snippet.annotations.push_back(underlineRow);
 
-        // connector & waterfall
         if (!pendingLabels.empty())
         {
             std::string connectorRow;
@@ -536,9 +565,50 @@ DiagnosticLayout createLayout(const TestData& data)
         }
 
         block.snippets.push_back(snippet);
-        layout.blocks.push_back(block);
+        section.blocks.push_back(block);
         prevLine = currentLine;
     }
+
+    return section;
+}
+
+DiagnosticLayout createLayout(const TestData& data)
+{
+    DiagnosticLayout layout;
+    const auto& diag = data.diagnostic;
+
+    layout.header.severity = diag.severity;
+    layout.header.code = diag.code;
+    layout.header.message = diag.message;
+    layout.primaryLoc.fileName = diag.primarySpan.location.fileName;
+    layout.primaryLoc.line = diag.primarySpan.location.line;
+    layout.primaryLoc.col = diag.primarySpan.location.column;
+
+    std::vector<std::string> sourceLines = getSourceLines(data.sourceContent);
+
+    std::vector<LayoutSpan> allSpans;
+    allSpans.push_back(makeLayoutSpan(diag.primarySpan, true, sourceLines));
+    for (const auto& s : diag.secondarySpans)
+        allSpans.push_back(makeLayoutSpan(s, false, sourceLines));
+
+    layout.primarySection = buildSectionLayout(allSpans, sourceLines);
+    layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
+
+    for (const auto& note : diag.notes)
+    {
+        DiagnosticLayout::NoteEntry noteEntry;
+        noteEntry.message = note.message;
+        noteEntry.loc.fileName = note.span.location.fileName;
+        noteEntry.loc.line = note.span.location.line;
+        noteEntry.loc.col = note.span.location.column;
+
+        std::vector<LayoutSpan> noteSpans = {makeLayoutSpan(note.span, false, sourceLines)};
+        noteEntry.section = buildSectionLayout(noteSpans, sourceLines);
+        noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
+
+        layout.notes.push_back(std::move(noteEntry));
+    }
+
     return layout;
 }
 
@@ -550,50 +620,55 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
 {
     std::stringstream ss;
 
-    // header
     ss << layout.header.severity << "[E" << std::setfill('0') << std::setw(4) << layout.header.code
        << "]: " << layout.header.message << '\n';
 
-    // primary location
     ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName << ":"
        << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
 
-    // top separator
-    ss << repeat(' ', layout.maxGutterWidth + 1) << "|\n";
+    ss << repeat(' ', layout.primarySection.maxGutterWidth + 1) << "|\n";
 
-    for (const auto& block : layout.blocks)
+    auto renderBlocks = [&ss](const SectionLayout& section)
     {
-        if (block.showGap)
-            ss << "...\n";
-
-        for (const auto& snippet : block.snippets)
+        for (const auto& block : section.blocks)
         {
-            // code line (with zero-padded gutter)
-            std::string lineStr = std::to_string(snippet.lineNum);
-            int padding = layout.maxGutterWidth - static_cast<int>(lineStr.length());
-            if (layout.maxGutterWidth > 1 &&
-                lineStr.length() < static_cast<size_t>(layout.maxGutterWidth))
-                ss << repeat(' ', padding) << lineStr << " | ";
-            else
-                ss << repeat(' ', padding) << lineStr << " | ";
+            if (block.showGap)
+                ss << "...\n";
 
-            // *** remove common indent from the printed source ***
-            std::string dedented = snippet.content;
-            if (layout.commonIndent > 0 && dedented.size() >= layout.commonIndent)
-                dedented.erase(0, layout.commonIndent);
-            ss << dedented << "\n";
-
-            // annotations (already built relative to column 1)
-            for (const auto& ann : snippet.annotations)
+            for (const auto& snippet : block.snippets)
             {
-                ss << repeat(' ', layout.maxGutterWidth + 1) << "| ";
-                // *** remove common indent from the annotation line ***
-                std::string dedentedAnn = ann;
-                if (layout.commonIndent > 0 && dedentedAnn.size() >= layout.commonIndent)
-                    dedentedAnn.erase(0, layout.commonIndent);
-                ss << dedentedAnn << "\n";
+                std::string lineStr = std::to_string(snippet.lineNum);
+                int padding = section.maxGutterWidth - static_cast<int>(lineStr.length());
+                if (padding < 0)
+                    padding = 0;
+                ss << repeat(' ', padding) << lineStr << " | ";
+
+                std::string dedented = snippet.content;
+                if (section.commonIndent > 0 && dedented.size() >= section.commonIndent)
+                    dedented.erase(0, section.commonIndent);
+                ss << dedented << "\n";
+
+                for (const auto& ann : snippet.annotations)
+                {
+                    ss << repeat(' ', section.maxGutterWidth + 1) << "| ";
+                    std::string dedentedAnn = ann;
+                    if (section.commonIndent > 0 && dedentedAnn.size() >= section.commonIndent)
+                        dedentedAnn.erase(0, section.commonIndent);
+                    ss << dedentedAnn << "\n";
+                }
             }
         }
+    };
+
+    renderBlocks(layout.primarySection);
+
+    for (const auto& note : layout.notes)
+    {
+        ss << "\nnote: " << note.message << "\n";
+        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName << ":"
+           << note.loc.line << ":" << note.loc.col << "\n";
+        ss << repeat(' ', note.section.maxGutterWidth + 1) << "|\n";
+        renderBlocks(note.section);
     }
 
     return ss.str();
