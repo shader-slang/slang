@@ -228,7 +228,7 @@ note: consider using 'normalize' builtin function instead
  --- math.slang:1:8
   |
 1 | float3 normalize(float3 v) {
-  |        ^^^^^^^^^
+  |        ---------
 )",
      .diagnostic =
          {.code = 2001,
