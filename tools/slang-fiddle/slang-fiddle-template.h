@@ -28,7 +28,6 @@ public:
     // that we can emit approriate `#line` directives
     // to the output...
 
-    bool preserveWhitespace;
     UnownedStringSlice text;
 };
 
