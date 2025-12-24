@@ -133,7 +133,7 @@ struct PixelShader {
 )",
      .expectedOutput = R"(
 error[E1002]: cannot add `float4` and `int`
-  --> example.slang:10:12
+  --> example.slang:10:28
    |
 05 |     int invalid_field; // This field has issues
    |     ----------------- field declared here
@@ -183,16 +183,16 @@ struct PixelShader {
 )",
      .expectedOutput = R"(
 error[E1003]: use of undeclared identifier 'undefinedVariable'
-  --> example.slang:14:13
-   |
-14 |     int x = undefinedVariable; // Undefined variable
-   |             ^^^^^^^^^^^^^^^^^ not found in this scope
+ --> example.slang:7:17
+  |
+7 |     int x = undefinedVariable; // Undefined variable
+  |             ^^^^^^^^^^^^^^^^^ not found in this scope
 )",
      .diagnostic =
          {.code = 1003,
           .severity = "error",
           .message = "use of undeclared identifier 'undefinedVariable'",
-          .primarySpan = {SourceLoc("example.slang", 14, 13), "not found in this scope", 17},
+          .primarySpan = {SourceLoc("example.slang", 7, 17), "not found in this scope", 17},
           .secondarySpans = {}}},
 
     // Test 4: Wrong type assignment
@@ -495,8 +495,7 @@ DiagnosticLayout createLayout(const TestData& data)
     for (const auto& s : allSpans)
         maxLine = std::max(maxLine, s.line);
     layout.maxGutterWidth = std::to_string(maxLine).length();
-    // Default indentation for the arrow line is usually 1 space in these tests
-    layout.primaryLoc.gutterIndent = 1;
+    layout.primaryLoc.gutterIndent = layout.maxGutterWidth;
 
     // 3. Build Blocks
     std::vector<std::string> sourceLines = getSourceLines(data.sourceContent);
