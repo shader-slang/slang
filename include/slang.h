@@ -1098,6 +1098,8 @@ typedef uint32_t SlangSizeT;
         LLVMFeatures,     // string
 
         CountOf,
+
+        ReportDynamicDispatchSites, // bool
     };
 
     enum class CompilerOptionValueKind
