@@ -1771,6 +1771,12 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    interfaceDefaultInitializer,
+    "initializing an interface variable with defaults is deprecated and may cause unexpected "
+    "behavior. Please provide a compatible initializer or leave the variable uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(

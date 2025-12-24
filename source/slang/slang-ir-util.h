@@ -401,7 +401,7 @@ IRType* getFieldType(IRType* type, IRStructKey* key);
 
 Int getSpecializationConstantId(IRGlobalParam* param);
 
-void legalizeDefUse(IRGlobalValueWithCode* func);
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target);
 
 UnownedStringSlice getMangledName(IRInst* inst);
 
@@ -466,6 +466,9 @@ bool isGenericParameter(IRInst* inst);
 bool canRelaxInstOrderRule(IRInst* instToCheck, IRInst* otherInst);
 
 IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
+
+// Return true if the inst can be stored into a variable.
+bool canInstBeStored(IRInst* inst);
 
 } // namespace Slang
 
