@@ -1,11 +1,8 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-// //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-// //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
 
-// Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
 import neural;
+
 typealias ElementType = half;
 
 // set up a 2x4 matrix for input parameters, the last 2 elements are for bias
@@ -38,8 +35,8 @@ static const int SubgroupSize = 32;
 
 #define MAX(a, b) (a < b ? a : b)
 
-static const int ShMemSize = ( MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatA +
-                               MMAHelper<ElementType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatB);
+static const int ShMemSize = ( MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatA +
+                               MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatB);
 
 groupshared uint4[ShMemSize] shMem;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
@@ -86,17 +83,10 @@ void BasicTestWithoutBias(int tid, int resIndex)
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
-    // serialRead(tid, (input.sharedMemoryPtr + 32));
 
     // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
-    isPassed = WaveActiveAllTrue(isPassed);
-    if (tid == 0)
-    {
-        testResult[resIndex].x = isPassed ? 1 : 0;
-    }
-
 
     var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
     let dRes = OutVectorType(1.0f);
@@ -104,28 +94,28 @@ void BasicTestWithoutBias(int tid, int resIndex)
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMul<InVectorType, OutVectorType>)
                 (dPair, weightDiffPair, weightAddress, dRes);
 
+    isPassed = isPassed &&
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
+
+    // dW = dOutput * dInput^T
+    // dW = [1, 1]^T * [1, 2, 3, 4]
+    //    = [[1, 2, 3, 4]; [1, 2, 3, 4]]
+    // But since it's accumulated cross 32 threads, so the result is 32 times of the original result.
+    // So the result should be 32 * [[1, 2, 3, 4]; [1, 2, 3, 4]] = [[32, 64, 96, 128]; [32, 64, 96, 128]]
+    isPassed = isPassed &&
+        dParameters[0] == 32.0 && dParameters[1] == 64.0 && dParameters[2] == 96.0 && dParameters[3] == 128.0 &&
+        dParameters[4] == 32.0 && dParameters[5] == 64.0 && dParameters[6] == 96.0 && dParameters[7] == 128.0;
+
+
+    isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        for (int i = 0; i < 4; i++)
-        {
-            printf("%.1f ", float(dPair.d[i]));
-        }
-        printf("\n");
+        testResult[resIndex].x = isPassed ? 1 : 0;
     }
-
-    // isPassed = isPassed &&
-    //     dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
-
-    // // dW = dOutput * dInput^T
-    // // dW = [1, 1]^T * [1, 2, 3, 4]
-    // //    = [[1, 2, 3, 4]; [1, 2, 3, 4]]
-    // isPassed = isPassed &&
-    //     dParameters[0] == 1.0 && dParameters[1] == 2.0 && dParameters[2] == 3.0 && dParameters[3] == 4.0 &&
-    //     dParameters[4] == 1.0 && dParameters[5] == 2.0 && dParameters[6] == 3.0 && dParameters[7] == 4.0;
 }
 
 void serialRead(uint tid, SPtr<uint4> sharedMem)
