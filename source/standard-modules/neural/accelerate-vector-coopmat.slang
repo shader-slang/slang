@@ -311,14 +311,11 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
             }
             else
             {
-                value = sharedMemory[indexInVectorizedTile];
-                if (isOutOfRange)
+                // We don't need padding when store back to global memory, because the padding is only needed when construct the cooperative matrix.
+                // So if there is out of range, we don't need to store anything.
+                if (!isOutOfRange)
                 {
-                    // when write back to global memory, we don't need padding at all. Padding is only needed when construct the cooperative matrix.
-                    continue;
-                }
-                else
-                {
+                    value = sharedMemory[indexInVectorizedTile];
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
                     weightStorage.writeUint4Atomic<IsAlignedVector, K>(weightAddress, offsetAddress, value);
                 }
@@ -514,7 +511,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
 
         // perform n/2 ways warp reduce, so each iteration will perform a 2-way reduce operation,
         // totally log2(n) steps, where n is the number of subgroups.
-        for (int k = 1; k < 4; k <<= 1)
+        for (int k = 1; k < subgroupCount; k <<= 1)
         {
             // (subgroupId / k<< 1 ) calculate which cooperative matrix tile this warp will write to.
             // The whole shared memory is divided into subgroupCount/2 parts. So each two neighboring subgroups
