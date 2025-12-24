@@ -558,6 +558,7 @@ VISIBILITY_LEVEL struct MMAHelper< T : __BuiltinFloatingPointType, int InputSize
     }
 
     [require(cooperative_matrix, subgroup_basic)]
+    [require(spvAtomicFloat16AddEXT)]
     VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, InArrayTypeA, InArrayTypeB>(
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,

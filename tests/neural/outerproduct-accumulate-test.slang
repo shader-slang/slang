@@ -1,16 +1,28 @@
-// //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature
+
+// On Vulkan, we can only test float type for now because atomicAdd is not supported for half on our CI machine.
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
 import neural;
 #pragma warning(disable: 41017)
 
 
-//TEST_INPUT: ubuffer(data=[0], stride=2, count=4096):name=outputBuffer
-RWStructuredBuffer<half> outputBuffer;
-
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
-typealias BufferStorage = StructuredBufferStorage<half>;
+
+#if TEST_HALF
+typealias StorageElemType = half;
+#else
+typealias StorageElemType = float;
+#endif
+
+// TEST_INPUT: ubuffer(stride=4, count=4096):name=outputBuffer
+RWStructuredBuffer<StorageElemType> outputBuffer;
+
+typealias BufferStorage = StructuredBufferStorage<StorageElemType>;
+
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
 static const int workgroupCount = WorkgroupSize / SubgroupSize;
@@ -54,9 +66,9 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
 
     // perform dOut OPA Input
-    MMA.outerProductAccumulate<half, BufferStorage, half[OutSize], half[InSize]>( ptrA, ptrB, dOutVector, inputVector, storage, 0);
+    MMA.outerProductAccumulate<StorageElemType, BufferStorage, half[OutSize], half[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
 
-    // serialRead<InSize>(tid, ptrB);
+    // serialRead<16>(tid, ptrB);
     // serialRead<OutputSize, InputSize>(tid, outputBuffer);
 }
 
@@ -91,7 +103,7 @@ void serialRead<int Stride>(uint tid, SPtr sharedMem)
     }
 }
 
-void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<half> outputBuffer)
+void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<StorageElemType> outputBuffer)
 {
     GroupMemoryBarrierWithWaveSync();
 
@@ -102,8 +114,8 @@ void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<half> outputBu
     {
         for (int j = 0; j < Column; j++)
         {
-            half value = outputBuffer[i * Column + j];
-            printf("%.4f ", float(value));
+            float value = outputBuffer[i * Column + j];
+            printf("%.4f ", value);
         }
         printf("\n");
     }
@@ -136,7 +148,8 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
     // we increase the error threshold by using the scale of the workgroup size which is exactly
     // the number of accumulations.
     // This is a purely empirical value, good input pattern could make the error smaller.
-    half errorThreshold = WorkgroupSize * 0.016h;
+    StorageElemType errorThreshold = StorageElemType(WorkgroupSize * 0.016);
+
     for (int i = 0; i < numIterPerThread; i++)
     {
         int rowIdx = i * SubgroupSize + tid;
@@ -148,8 +161,8 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         // each thread will check one row
         for (int j = 0; j < InputSize; j++)
         {
-            half expected = half(startVal * scaleFactor * (j + 1) );
-            half actual = outputBuffer[rowIdx * InputSize + j];
+            StorageElemType expected = StorageElemType(startVal * scaleFactor * (j + 1));
+            StorageElemType actual = outputBuffer[rowIdx * InputSize + j];
             if (abs(expected - actual) > errorThreshold)
             {
                 res = false;
@@ -166,16 +179,17 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 
 void cleanOutputBuffer<int InputSize, int OutputSize>(uint tid)
 {
-    if (tid > 0)
-        return;
-
-    for (int i = 0; i < OutputSize; i++)
+    int size = OutputSize * InputSize;
+    int numIter = (size + WorkgroupSize - 1) / WorkgroupSize;
+    for (int i = 0; i < numIter; i++)
     {
-        for (int j = 0; j < InputSize; j++)
-        {
-            outputBuffer[i * InputSize + j] = 0.0h;
-        }
+        int index = i * WorkgroupSize + tid;
+        if (index >= size)
+            break;
+
+        outputBuffer[index] = StorageElemType(0.0f);
     }
+    AllMemoryBarrierWithGroupSync();
 }
 
 [shader("compute")]

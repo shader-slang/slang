@@ -78,20 +78,23 @@ internal static void atomicAddOneElement<T, BufferType, int NBytes, int BitsShif
     where BufferType : IArrayAccessor<T>
 {
     const uint shift = BitsShiftPerWrite * elementIdx;
+    T convertedValue;
     switch (NBytes)
     {
     case 1:
-        buffer.atomicAdd(bufferIdx, bit_cast<T>((uint8_t)(value >> shift)));
+        convertedValue = T(bit_cast<uint8_t>((uint8_t)(value >> shift)));
         break;
     case 2:
-        buffer.atomicAdd(bufferIdx, bit_cast<T>((uint16_t)(value >> shift)));
+        convertedValue = T(bit_cast<half>((uint16_t)(value >> shift)));
         break;
     case 4:
-        buffer.atomicAdd(bufferIdx, bit_cast<T>((uint)(value >> shift)));
+        convertedValue = T(bit_cast<float>((uint)(value >> shift)));
         break;
     default:
         static_assert(false, "Unsupported data type T");
     }
+
+    buffer.atomicAdd(bufferIdx, convertedValue);
 }
 
 [ForceInline]
@@ -100,7 +103,9 @@ internal static void accessUint4Aligned<AccessOp Op, T, BufferType>( out BufferT
     where T.Differential == T
     where BufferType : IArrayAccessor<T>
 {
-    const int nBytes = sizeof(T);
+    // TODO: for now, we just fixed the type to be half for all the internal operations.
+    // We can extend this to support other types in the future.
+    const int nBytes = sizeof(half);
     const int WritePerElement = 4 / nBytes;
     const int BitsShiftPerWrite = 32 / WritePerElement;
 
@@ -147,7 +152,9 @@ internal void accessUint4<AccessOp Op, T, BufferType, bool IsAligned, uint Strid
     if (Op == AccessOp.READ)
         value = uint4(0, 0, 0, 0);
 
-    const int nBytes = sizeof(T);
+    // TODO: for now, we just fixed the type to be half for all the internal operations.
+    // We can extend this to support other types in the future.
+    const int nBytes = sizeof(half);
     const int ReadPerElement = 4 / nBytes;
     const int BitsShiftPerRead = 32 / ReadPerElement;
 
