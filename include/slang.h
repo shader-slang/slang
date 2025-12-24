@@ -1097,9 +1097,11 @@ typedef uint32_t SlangSizeT;
         LLVMCPU,          // string
         LLVMFeatures,     // string
 
-        CountOf,
+        EnableRichDiagnostics, // bool, enable the experimental rich diagnostics
 
         ReportDynamicDispatchSites, // bool
+
+        CountOf,
     };
 
     enum class CompilerOptionValueKind
