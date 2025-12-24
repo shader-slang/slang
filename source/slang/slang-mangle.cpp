@@ -788,6 +788,10 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
         emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
         return;
     }
+    else if (as<AttributeDecl>(decl))
+    {
+        emitRaw(context, "A");
+    }
     else
     {
         // TODO: handle other cases
