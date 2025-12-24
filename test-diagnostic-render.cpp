@@ -225,7 +225,7 @@ warning[E2001]: potential division by zero
   |          ^ division by zero if `len` is 0.0
 
 note: consider using 'normalize' builtin function instead
- --> math.slang:1:8
+ --- math.slang:1:8
   |
 1 | float3 normalize(float3 v) {
   |        ^^^^^^^^^
