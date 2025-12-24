@@ -95,13 +95,12 @@ public:
 
     List<RefPtr<TextTemplateStmt>> stmts;
 
-    void addRaw(char const* rawBegin, char const* rawEnd, bool preserveWhitespace)
+    void addRaw(char const* rawBegin, char const* rawEnd)
     {
         if (rawBegin == rawEnd)
             return;
 
         auto stmt = RefPtr(new TextTemplateRawStmt());
-        stmt->preserveWhitespace = preserveWhitespace;
         stmt->text = UnownedStringSlice(rawBegin, rawEnd);
         stmts.add(stmt);
     }
@@ -160,7 +159,7 @@ public:
                 {
                     addScriptStmtLine(currentSpanBegin, currentSpanEnd);
                     isInScriptLine = false;
-                    currentSpanBegin = currentSpanEnd;
+                    currentSpanBegin = currentLineBegin;
                 }
                 break;
 
@@ -172,7 +171,7 @@ public:
             case '%':
                 if (wasAtStartOfLine && !depthInSplice)
                 {
-                    addRaw(currentSpanBegin, currentLineBegin, false);
+                    addRaw(currentSpanBegin, currentLineBegin);
                     isInScriptLine = true;
                     currentSpanBegin = _cursor;
                 }
@@ -187,14 +186,14 @@ public:
                 if (*_cursor == '(')
                 {
                     _cursor++;
-                    addRaw(currentSpanBegin, currentSpanEnd, true);
+                    addRaw(currentSpanBegin, currentSpanEnd);
                     depthInSplice = 1;
                     currentSpanBegin = _cursor;
                     break;
                 }
                 else if (isIdentifierStartChar(*_cursor))
                 {
-                    addRaw(currentSpanBegin, currentSpanEnd, true);
+                    addRaw(currentSpanBegin, currentSpanEnd);
 
                     auto spliceExprBegin = _cursor;
                     while (isIdentifierChar(*_cursor))
@@ -225,7 +224,7 @@ public:
                 break;
             }
         }
-        addRaw(currentSpanBegin, _end, false);
+        addRaw(currentSpanBegin, _end);
 
         if (stmts.getCount() == 1)
             return stmts[0];
@@ -458,22 +457,11 @@ private:
         else if (auto rawStmt = as<TextTemplateRawStmt>(stmt))
         {
             auto rawContent = rawStmt->text;
-            if (!rawStmt->preserveWhitespace && isEntirelyWhitespace(rawContent))
-            {
-                _builder.append(rawContent);
-            }
-            else
-            {
-                // Strictly speaking, raw string literals in lua strip the
-                // first chrarcter if it's a newline However this is actually
-                // exactly what we want, otherwise every amount of leading
-                // whitespace at the beginning of the raw c++ lines includes
-                // the trailing newline of the %-introduced lua code on the
-                // preceding line
-                _builder.append("RAW [==[");
-                _builder.append(rawContent);
-                _builder.append("]==]");
-            }
+            // Strictly speaking, raw string literals in lua strip the
+            // first chrarcter if it's a newline so add it here
+            _builder.append("RAW [==[\n");
+            _builder.append(rawContent);
+            _builder.append("]==]");
         }
         else if (auto scriptStmt = as<TextTemplateScriptStmt>(stmt))
         {
