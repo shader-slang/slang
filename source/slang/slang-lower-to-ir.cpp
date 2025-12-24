@@ -8021,7 +8021,7 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 
     ComPtr<ISlangBlob> outBlob;
     UnownedStringSlice content;
-    
+
     // Only embed source content for Maximal debug level
     if (context->debugInfoLevel == DebugInfoLevel::Maximal)
     {
@@ -8032,9 +8032,10 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
                 outBlob.writeRef());
         }
         if (outBlob)
-            content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+            content =
+                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     }
-    
+
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
     auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
@@ -12959,7 +12960,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // For Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel == DebugInfoLevel::Maximal || context->debugInfoLevel == DebugInfoLevel::Standard) ? source->getContent() : UnownedStringSlice(),
+                (context->debugInfoLevel == DebugInfoLevel::Maximal ||
+                 context->debugInfoLevel == DebugInfoLevel::Standard)
+                    ? source->getContent()
+                    : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
