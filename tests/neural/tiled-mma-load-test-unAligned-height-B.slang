@@ -66,7 +66,7 @@ void testLoadShB<TargetEnum Target, int K>(uint tid, uint tileIndex)
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, K, OutputSize, SubgroupSize, Target>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
+    MMAHelper<half, K, OutputSize, SubgroupSize, Target>.loadVectorToShB(sharedMemoryB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 

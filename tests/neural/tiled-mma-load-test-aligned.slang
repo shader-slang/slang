@@ -91,7 +91,7 @@ void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
     Storage storage = Storage(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.loadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -107,7 +107,7 @@ void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
 
     SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.LoadSharedMemoryFromLocalVector(sharedMemoryB, tileIndex, 0, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>.loadVectorToShB(sharedMemoryB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
