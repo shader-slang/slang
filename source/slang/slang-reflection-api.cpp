@@ -1385,23 +1385,27 @@ bool matchName(VarDeclBase* varDecl, UnownedStringSlice name)
                 ++i; // Skip the next ':'
         }
     }
-    if (start < name.getLength())
-        nameParts.add(name.tail(start));
-    if (nameParts.getCount() == 0)
+    if (start >= name.getLength())
         return false;
+
+    auto lastPart = name.tail(start);
+    if (getText(getReflectionName(varDecl)) != lastPart)
+        return false;
+
+    // If `name` is prefixed with qualifiers, continue matching parent declarations.
     Decl* decl = varDecl;
-    if (getText(getReflectionName(varDecl)) != nameParts.getLast())
-        return false;
-    decl = getParentDecl(varDecl);
-    for (Index i = nameParts.getCount() - 2; i >= 0; --i)
+
+    for (Index i = nameParts.getCount() - 1; i >= 0; --i)
     {
+        decl = getParentDecl(decl);
+        if (!decl)
+            return false;
         auto part = nameParts[i];
         if (getText(decl->getName()) != part)
             return false;
-        decl = getParentDecl(decl);
-        if (!decl && i > 0)
-            return false;
     }
+
+    // All name parts matched.
     return true;
 }
 
