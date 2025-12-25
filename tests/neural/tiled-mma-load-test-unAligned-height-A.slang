@@ -61,7 +61,7 @@ void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
     Storage storage = Storage(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, M, SubgroupSize, Target, false>.LoadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, M, SubgroupSize, Target, false>.loadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
