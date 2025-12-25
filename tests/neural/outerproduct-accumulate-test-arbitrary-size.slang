@@ -66,7 +66,7 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
 
     // perform dOut OPA Input
-    MMA.outerProductAccumulate<StorageElemType, BufferStorage, half[OutSize], half[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
+    MMA.outerProductAccumulate<StorageElemType, BufferStorage, half, half[OutSize], half, half[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
 
     // serialRead<48>(tid, ptrB);
     // serialRead<OutputSize, InputSize>(tid, outputBuffer);
