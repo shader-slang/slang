@@ -1,8 +1,16 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 #pragma warning(disable: 41017)
+
+#if TEST_HALF
+typealias DType = half;
+#else
+typealias DType = float;
+#endif
 
 // This test verifies that the tiled MMA load operations work correctly.
 //
@@ -21,14 +29,14 @@ import neural;
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(data=[0], stride=2, count=4096):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+// TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
+RWStructuredBuffer<DType> inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-// RWStructuredBuffer<half> debugBuffer;
+// TEST_INPUT:ubuffer(stride=4, count=4096):name=debugBuffer
+RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
@@ -40,7 +48,6 @@ groupshared uint4 s_sharedMemoryB[256];
 groupshared bool s_resultMem[BatchSize/32];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
-typealias HalfPtr = Ptr<half, Access::ReadWrite, AddressSpace::GroupShared>;
 
 // Initialize the weight matrix as half(0.5).
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
@@ -57,28 +64,28 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
         for (int j = 0; j < InputSize; j++)
         {
             int index = startIndex + j;
-            inputBuffer[index] = half(0.5);
+            inputBuffer[index] = DType(0.5);
         }
     }
 }
 
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
     // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
-    half inputVector[InSize];
+    DType inputVector[InSize] = {};
 
     for (int i = 0; i < InputSize; i++)
     {
-        inputVector[i] = half(tid + 1);
+        inputVector[i] = DType(tid + 1);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
@@ -87,16 +94,16 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
-    // serialRead(tid, ptrC, 32);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>(inputVector, ptrA, ptrB, ptrC, storage, 0);
+
+    // serialRead<DType>(tid, ptrC, 32);
+
     return res;
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
+void serialRead<T : __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 {
-    GroupMemoryBarrierWithGroupSync();
-
     if (tid > 0)
         return;
 
@@ -104,22 +111,28 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
     for (int id = 0; id < rowOrColumnCount; id++)
     {
         printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
+        int numVectors = sizeof(uint4) / sizeof(T);
+        for (int i = 0; i < numVectors; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = sharedMem[id * numVectors + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
+                if (sizeof(T) == 2)
+                {
+                    uint16_t a = (uint16_t)(value & 0xFFFF);
+                    uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                // debugBuffer[linearIndex++] = aa;
-                // debugBuffer[linearIndex++] = bb;
-                printf("%.1f %.1f ", float(aa), float(bb));
+                    half aa = bit_cast<half>(a);
+                    half bb = bit_cast<half>(b);
+                    printf("%.1f %.1f ", float(aa), float(bb));
+                }
+                else
+                {
+                    float aa = bit_cast<float>(value);
+                    printf("%.1f ", aa);
+                }
             }
         }
         printf("\n");
@@ -128,7 +141,7 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
 
     __target_switch
     {
@@ -143,10 +156,10 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     bool res = true;
     if (tid < OutputSize)
     {
-        float expected = float(tid + 1) * float(InputSize) * 0.5f;
+        DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
         for (int i = 0; i < OutputSize; i++)
         {
-            if (outputVector[i] != half(expected))
+            if (outputVector[i] != DType(expected))
             {
                 res = false;
                 break;
@@ -191,37 +204,41 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
         fillWeightMatrix<3, 5>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<3, 5>(tid, 0);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<11, 18>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<11, 18>(tid, 1);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<23, 9>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<23, 9>(tid, 2);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<35, 3>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<35, 3>(tid, 3);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<17, 64>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<17, 64>(tid, 4);
-        GroupMemoryBarrierWithGroupSync();
     }
     // BUFFER: 1
     // BUFFER-NEXT: 1

@@ -1,28 +1,22 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 #pragma warning(disable: 41017)
 
-// This test verifies that the tiled MMA load operations work correctly.
-//
-// ============================================================================
-// MATRIX A - Loaded from Global Memory
-// ============================================================================
-// We construct a 32x32 matrix in row-major order:
-//
-//   Column:  0    1    2    3   ...  15   16   17   ...   31
-//   Row 0:   0    1    2    3   ...  15   16   17   ...   31
-//   Row 1:  32   33   34   35   ...  47   48   49   ...   63
-//   ...
-//   Row 30: 960  961  962  963  ...  975  976  977  ...  991
-//   Row 31: 992  993  994  995  ... 1007 1008 1009  ... 1023
-//
+#if TEST_HALF
+typealias DType = half;
+#else
+typealias DType = float;
+#endif
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(data=[0], stride=2, count=4096):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+// TEST_INPUT:ubuffer(data=[0], stride=4, count=4096):name=inputBuffer
+RWStructuredBuffer<DType> inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -38,7 +32,6 @@ groupshared uint4 s_sharedMemoryA[256];
 groupshared uint4 s_sharedMemoryB[256];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
-typealias HalfPtr = Ptr<half, Access::ReadWrite, AddressSpace::GroupShared>;
 
 // Initialize the weight matrix as half(0.5).
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
@@ -55,27 +48,27 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
         for (int j = 0; j < InputSize; j++)
         {
             int index = startIndex + j;
-            inputBuffer[index] = half(0.5);
+            inputBuffer[index] = DType(0.5);
         }
     }
 }
 
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
-    half inputVector[InSize];
+    DType inputVector[InSize] = {};
 
     for (int i = 0; i < InputSize; i++)
     {
-        inputVector[i] = half(tid + 1);
+        inputVector[i] = DType(tid + 1);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
@@ -84,7 +77,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target>.Uint4AlignedM]
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>(inputVector, ptrA, ptrB, ptrC, storage, 0);
     // serialRead(tid, ptrC, 32);
     return res;
 }
@@ -125,7 +118,7 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
     __target_switch
     {
     case cuda:
@@ -139,10 +132,10 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     bool res = true;
     if (tid < OutputSize)
     {
-        float expected = float(tid + 1) * float(InputSize) * 0.5f;
+        DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
         for (int i = 0; i < OutputSize; i++)
         {
-            if (outputVector[i] != half(expected))
+            if (outputVector[i] != DType(expected))
             {
                 res = false;
                 break;

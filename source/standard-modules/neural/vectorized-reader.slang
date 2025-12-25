@@ -27,9 +27,7 @@ internal enum AccessOp
 
 #define COMMON_TYPE_CONSTRAINTS \
     where T : __BuiltinFloatingPointType \
-    where T.Differential == T \
     where U : __BuiltinFloatingPointType \
-    where U.Differential == U \
     where BufferType : IArrayAccessor<U>
 
 [ForceInline]
@@ -106,8 +104,6 @@ internal static void atomicAddOneElement<T, U, BufferType, int NBytes, int BitsS
 internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>( out BufferType buffer, int startIndex, inout uint4 value)
     COMMON_TYPE_CONSTRAINTS
 {
-    // TODO: for now, we just fixed the type to be half for all the internal operations.
-    // We can extend this to support other types in the future.
     const int nBytes = sizeof(T);
     const int WritePerElement = 4 / nBytes;
     const int BitsShiftPerWrite = 32 / WritePerElement;

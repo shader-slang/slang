@@ -1,8 +1,16 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 #pragma warning(disable: 41017)
+
+#if TEST_HALF
+typealias DType = half;
+#else
+typealias DType = float;
+#endif
 
 // This test verifies that the tiled MMA load operations work correctly.
 //
@@ -21,14 +29,16 @@ import neural;
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(data=[0], stride=2, count=4096):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+// TEST_INPUT:ubuffer(data=[0], stride=4, count=4096):name=inputBuffer
+RWStructuredBuffer<DType> inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
+// TEST_INPUT:ubuffer(stride=4, count=64):out, name=resultBuffer
+RWStructuredBuffer<uint> resultBuffer;
 
-// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-// RWStructuredBuffer<half> debugBuffer;
+// TEST_INPUT:ubuffer(stride=4, count=4096):name=debugBuffer
+RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
@@ -37,10 +47,11 @@ static const int SubgroupSize = 32;
 groupshared uint4 s_sharedMemoryA[256];
 groupshared uint4 s_sharedMemoryB[256];
 
+groupshared uint4 s_sharedMemoryC[512];
+
 groupshared bool s_resultMem[BatchSize/32];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
-typealias HalfPtr = Ptr<half, Access::ReadWrite, AddressSpace::GroupShared>;
 
 // Initialize the weight matrix as identity matrix.
 void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
@@ -53,9 +64,9 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
         // InputSize mount of threads are enough to fill the input buffer
         int index = tid * InputSize + tid;
         if (clear)
-            inputBuffer[index] = half(0);
+            inputBuffer[index] = DType(0);
         else
-            inputBuffer[index] = half(1);
+            inputBuffer[index] = DType(1);
     }
     else
     {
@@ -65,45 +76,47 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
             int row = tid + i * BatchSize;
             int index = row * InputSize + row;
             if (clear)
-                inputBuffer[index] = half(0);
+                inputBuffer[index] = DType(0);
             else
-                inputBuffer[index] = half(1);
+                inputBuffer[index] = DType(1);
         }
     }
 }
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
-    half inputVector[InSize];
+    DType inputVector[InSize] = {};
     for (int i = 0; i < InputSize; i++)
     {
-        inputVector[i] = half(tid + 1);
+        inputVector[i] = DType(tid + 1);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
     // In this test, we can safely share the shMemB and shMemC, because they are always used at different time.
     // And they are always the same size.
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
+    SPtr ptrC = __getAddress(s_sharedMemoryC[0]);
 
-    let res = MMA.mma<half, Storage, half[InSize], half[OutSize]>(inputVector, ptrA, ptrB, ptrC, storage, 0);
-    // serialRead(tid, ptrB, 16);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>( inputVector, ptrA, ptrB, ptrC, storage, 0);
+
+    // GroupMemoryBarrierWithGroupSync();
+
+    // only take a look at the first warp's shared memory
+    // serialRead<DType>(tid, ptrC, 32);
     return res;
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
+void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint rowOrColumnCount)
 {
-    GroupMemoryBarrierWithGroupSync();
-
     if (tid > 0)
         return;
 
@@ -111,31 +124,51 @@ void serialRead(uint tid, SPtr sharedMem, uint rowOrColumnCount)
     for (int id = 0; id < rowOrColumnCount; id++)
     {
         printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
+        int numVectors = sizeof(uint4) / sizeof(T);
+        for (int i = 0; i < numVectors; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = sharedMem[id * numVectors + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
+                if (sizeof(T) == 2)
+                {
+                    uint16_t a = (uint16_t)(value & 0xFFFF);
+                    uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
-
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                // debugBuffer[linearIndex++] = aa;
-                // debugBuffer[linearIndex++] = bb;
-                printf("%.1f %.1f ", float(aa), float(bb));
+                    half aa = bit_cast<half>(a);
+                    half bb = bit_cast<half>(b);
+                    printf("%.1f %.1f ", float(aa), float(bb));
+                }
+                else
+                {
+                    float aa = bit_cast<float>(value);
+                    printf("%.1f ", aa);
+                }
             }
         }
         printf("\n");
     }
 }
 
+bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
+{
+    bool res = true;
+    for (int i = 0; i < OutputSize; i++)
+    {
+        if (output[i] != DType(tid + 1))
+        {
+            res = false;
+            break;
+        }
+    }
+    return res;
+}
+
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
     __target_switch
     {
     case cuda:
@@ -146,15 +179,12 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         break;
     }
 
-    bool res = true;
-    for (int i = 0; i < OutputSize; i++)
-    {
-        if (outputVector[i] != half(tid + 1))
-        {
-            res = false;
-            break;
-        }
-    }
+    bool res = verifyResult<OutputSize>(tid, outputVector);
+
+    // if (resIndex == 4)
+    // {
+    //     resultBuffer[tid] = res ? 1 : 0;
+    // }
 
     // each warp will check the result
     res = WaveActiveAllTrue(res);
@@ -171,19 +201,35 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
     int warpCount = BatchSize / 32;
     bool finalResult = true;
+
+    // Sync the shared memory write
+    AllMemoryBarrierWithGroupSync();
+
     // We will use the "warpCount" threads in the first warp to reduce the result.
-    if (tid < warpCount)
+    if (subgroupIndex == 0)
     {
-        finalResult = s_resultMem[tid];
+        if (laneId < warpCount)
+        {
+            finalResult = s_resultMem[tid];
+        }
+
+        finalResult = WaveActiveAllTrue(finalResult);
+
+        if (tid == 0)
+        {
+            outputBuffer[resIndex] = finalResult ? 1 : 0;
+        }
     }
 
-    finalResult = WaveActiveAllTrue(finalResult);
-
-    // Finally, use the first thread to write the result to the output buffer.
-    if (tid == 0)
-    {
-        outputBuffer[resIndex] = finalResult ? 1 : 0;
-    }
+    // if (resIndex == 4)
+    // {
+    //     for (int i = 0; i < OutputSize; i++)
+    //     {
+    //         int rowIdx = tid;
+    //         int index = rowIdx * OutputSize + i;
+    //         debugBuffer[index] = DType(outputVector[i]);
+    //     }
+    // }
 }
 
 
@@ -193,43 +239,54 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
         identityWeightMatrix<4>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<4, 4>(tid, 0);
+
+        AllMemoryBarrierWithGroupSync();
         identityWeightMatrix<4>(tid, true);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
-
         identityWeightMatrix<8>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<8, 8>(tid, 1);
+
+        AllMemoryBarrierWithGroupSync();
         identityWeightMatrix<8>(tid, true);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         identityWeightMatrix<16>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<16, 16>(tid, 2);
+
+        AllMemoryBarrierWithGroupSync();
         identityWeightMatrix<16>(tid, true);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         identityWeightMatrix<32>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<32, 32>(tid, 3);
+
+        AllMemoryBarrierWithGroupSync();
         identityWeightMatrix<32>(tid, true);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
+        AllMemoryBarrierWithGroupSync();
         identityWeightMatrix<64>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
+
         test<64, 64>(tid, 4);
-        identityWeightMatrix<64>(tid, true);
-        GroupMemoryBarrierWithGroupSync();
     }
 
     // BUFFER: 1

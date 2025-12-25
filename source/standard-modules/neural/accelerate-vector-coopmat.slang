@@ -74,16 +74,12 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     static const int T_COLUMN_A = 16;
 
     // TODO: Currently, we only support floating point data type, therefore, we can always use 16x16x16.
-    //  Once in the future we want to extend to support integer type, we can uncomment the following code.
+    // Once in the future we want to extend to support integer type, we can uncomment the following code.
     static const int T_ROW_B = 16; // (Target == TargetEnum.CUDA) ? 16 : (sizeof(T) == 1 ? 32 : 16);
     static const int T_COLUMN_B = 16;
 
     static const int T_ROW_C = 16;
     static const int T_COLUMN_C = 16;
-
-    static const int T_SIZE_A = T_ROW_A * T_COLUMN_A;
-    static const int T_SIZE_B = T_ROW_B * T_COLUMN_B;
-    static const int T_SIZE_C = T_ROW_C * T_COLUMN_C;
 
     static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
     static const linalg.CoopMatMatrixLayout ColumnMajor = linalg.CoopMatMatrixLayout.ColumnMajor;
@@ -153,6 +149,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     static const int WidthInElementsTileB = NCoopMatColumn * T_COLUMN_B;
     static const int WidthInVectorTileB = WidthInElementsTileB / ElementCountPerVector;
 
+    static const uint HeightInVectorTileC = T_ROW_C / ElementCountPerVectorMatC;
+
     // The aligned size of the shared memory for matrix A and B.
     // The size of the shared memory is the tile size for each matrices, measured in uint4.
     // Tile A = AlignedM * Tile_width of A
@@ -167,9 +165,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // we will need double size of shared memory B for C.
     static const uint SharedMemSizeInVectorMatC = SharedMemSizeInVectorMatB * sizeof(T) / sizeof(half);
 
-    static const uint CoopMatASizeInVector = T_SIZE_A / ElementCountPerVector;
-    static const uint CoopMatBSizeInVector = T_SIZE_B / ElementCountPerVector;
-    static const uint CoopMatCSizeInVector = T_SIZE_C / ElementCountPerVector;
+    static const uint CoopMatASizeInVector = (T_ROW_A * T_COLUMN_A) / ElementCountPerVector;
+    static const uint CoopMatBSizeInVector = (T_ROW_B * T_COLUMN_B) / ElementCountPerVector;
+    static const uint CoopMatCSizeInVector = (T_ROW_C * T_COLUMN_C) / ElementCountPerVectorMatC;
 
     // NumLoadsEachThreadMatA is the number of loads each thread needs to perform.
     // N is the number of active threads in the subgroup.
@@ -255,14 +253,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // we can consider using more than one warp in the future.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void MatALoadStore<U, Storage, bool isStore = false>(
-            SPtr<uint4> sharedMemory,
-            int tileIndex,
-            Storage weightStorage,
-            Storage.Address weightAddress)
-                where U : __BuiltinFloatingPointType
-                where U.Differential == U
-                where Storage : IStorage<U>
+    internal static void matALoadStore<U, Storage, bool isStore = false>(
+        SPtr<uint4> sharedMemory,
+        int tileIndex,
+        Storage weightStorage,
+        Storage.Address weightAddress)
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where Storage : IStorage<U>
     {
         uint indexInVectorizedTile = WaveGetLaneIndex();
 
@@ -303,7 +301,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
                     // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUnit4() will handle the padding
                     // if the reading is cross the boundary of the uint4 vector size.
-                    value = weightStorage.readUint4<T, IsAlignedVector, K>(weightAddress, offsetAddress);
+                    // MatA can only be half type, so we can always read it as half type no matter what the data type of the weight matrix is.
+                    value = weightStorage.readUint4<half, IsAlignedVector, K>(weightAddress, offsetAddress);
                 }
 
                 sharedMemory[indexInVectorizedTile] = value;
@@ -316,6 +315,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 {
                     value = sharedMemory[indexInVectorizedTile];
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
+                    // TODO: This is something we need to handle later.
                     weightStorage.writeUint4Atomic<T, IsAlignedVector, K>(weightAddress, offsetAddress, value);
                 }
             }
@@ -339,7 +339,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             where U.Differential == U
             where Storage : IStorage<U>
     {
-        MatALoadStore<U, Storage, false>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Storage, false>(sharedMemory, tileIndex, weightStorage, weightAddress);
     }
 
     [require(cooperative_matrix, subgroup_basic)]
@@ -352,30 +352,37 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             where U.Differential == U
             where Storage : IStorage<U>
     {
-        MatALoadStore<U, Storage, true>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Storage, true>(sharedMemory, tileIndex, weightStorage, weightAddress);
     }
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void vectorLoadStore<U, InputArray, bool isStore = false>(
+    internal static void vectorLoadStore<U, InputArray, bool isStore = false>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
         inout InputArray inoutVector)
             where U : __BuiltinFloatingPointType
-            where U.Differential == U
             where InputArray : IArrayAccessor<U>
     {
         const uint laneId = WaveGetLaneIndex();
-        SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * SharedMemSizeInVectorMatB;
+
+        // select the correct shared memory layout configurations.
+        // In store case, we actually store the MatC, whose data type could not be `half`.
+        const uint elementPerVector = isStore ? ElementCountPerVectorMatC : ElementCountPerVector;
+        const uint heightInVectorTile = isStore ? HeightInVectorTileC : HeightInVectorTileB;
+        const uint sharedMemSizeInVector = isStore ? SharedMemSizeInVectorMatC : SharedMemSizeInVectorMatB;
+
+        // In store case, we actually store the MatC. So the shared memory size could be different from MatB.
+        SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * sharedMemSizeInVector;
 
         // start index in vectorized tile for current thread: x * column_stride
-        const uint indexInVectorizedTile = laneId * HeightInVectorTileB;
-        const uint yOffset = (tileIndex * HeightInVectorTileB) * ElementCountPerVector;
+        const uint indexInVectorizedTile = laneId * heightInVectorTile;
+        const uint yOffset = (tileIndex * heightInVectorTile) * elementPerVector;
 
-        for (uint yInTile = 0; yInTile < HeightInVectorTileB; yInTile++)
+        for (uint yInTile = 0; yInTile < heightInVectorTile; yInTile++)
         {
-            const int startIndex = yInTile * ElementCountPerVector + yOffset;
+            const int startIndex = yInTile * elementPerVector + yOffset;
 
             // Bounds check on Y direction. If y coordinate out of the input vector length, just padding with 0.
             // No need to check the X direction, because the X direction is bound by the thread count, so any active
@@ -392,7 +399,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 if (isOutOfRange)
                     return;
 
-                accessUint4Aligned<AccessOp.WRITE, half, U>(inoutVector, startIndex, sharedMemoryBSubgroup[indexInVectorizedTile + yInTile]);
+                // in store case, we always store MatC, so the data type is T.
+                uint4 tempValue = sharedMemoryBSubgroup[indexInVectorizedTile + yInTile];
+                float debugVal = float(startIndex);
+                uint debugValUint = bit_cast<uint>(debugVal);
+
+                uint4 value = tempValue;//uint4(tempValue.x, debugValUint, debugValUint, debugValUint);
+                accessUint4Aligned<AccessOp.WRITE, T, U, InputArray>(inoutVector, startIndex, value);
             }
             else
             {
@@ -408,8 +421,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // It's fine that we only use the aligned version of readUint4() here, because the inputVector is the internal data which we can always
                 // create it as an aligned array.
                 uint4 value;
+
                 // Note we can only use half type for matrix A and B, the value must be packed by 8 half type elements.
-                accessUint4Aligned<AccessOp.READ, half, U>(inoutVector, startIndex, value);
+                accessUint4Aligned<AccessOp.READ, half, U, InputArray>(inoutVector, startIndex, value);
                 sharedMemoryBSubgroup[indexInVectorizedTile + yInTile] = value;
             }
         }
@@ -448,29 +462,31 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // Since the input vector is loaded from thread local memory, one thread can only load one
     // column of the matrix B.
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void loadVectorToShB<InputArray>(
+    VISIBILITY_LEVEL static void loadVectorToShB<U, InputArray>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
         InputArray inputVector)
-            where InputArray : IArrayAccessor<T>
+            where U : __BuiltinFloatingPointType
+            where InputArray : IArrayAccessor<U>
     {
-        vectorLoadStore<T, InputArray, false>(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
+        vectorLoadStore<U, InputArray, false>(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     }
 
-        // Load the input vector into shared memory. Each input vector is a column of the matrix B.
+    // Load the input vector into shared memory. Each input vector is a column of the matrix B.
     // Since the input vector is loaded from thread local memory, one thread can only load one
     // column of the matrix B.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void storeVectorFromShB<InputArray>(
+    VISIBILITY_LEVEL static void storeVectorFromShB<U, InputArray>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
         out InputArray outputVector)
-            where InputArray : IArrayAccessor<T>
+            where U : __BuiltinFloatingPointType
+            where InputArray : IArrayAccessor<U>
     {
-        vectorLoadStore<T, InputArray, true>(sharedMemoryB, tileIndex, subgroupIndex, outputVector);
+        vectorLoadStore<U, InputArray, true>(sharedMemoryB, tileIndex, subgroupIndex, outputVector);
     }
 
     // Read one complete vector into the shared memory. Different from the loadVectorToShB,
@@ -657,8 +673,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
-        [require(cooperative_matrix, subgroup_basic)]
-        VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType>(InArrayType inputVector,
+    [require(cooperative_matrix, subgroup_basic)]
+    VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
@@ -667,8 +683,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
-            where InArrayType : IArrayAccessor<T>
-            where OutArrayType : IArrayAccessor<T>
+            where V : __BuiltinFloatingPointType
+            where V.Differential == V
+            where InArrayType : IArrayAccessor<V>
+            where OutArrayType : IArrayAccessor<V>
     {
         SPtr<uint4> ptrA[EnableDoubleBuffer ? 2 : 1];
         SPtr<uint4> ptrB[EnableDoubleBuffer ? 2 : 1];
@@ -708,9 +726,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
             if (EnableDoubleBuffer)
             {
-                // warp sync to ensure all threads in the warp have loaded the data.
-                // The reason we always put
-                GroupMemoryBarrierWithWaveSync();
+                GroupMemoryBarrierWithGroupSync();
 
                 // swap to next buffer to load new data.
                 bufferIndex = bufferIndex ^ 1;
@@ -775,18 +791,22 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // Get start address of the shared memory for current warp.
         SPtr<uint4> ptrPerWarp = ptrC + subgroupIndex * SharedMemSizeInVectorMatC;
+
         for (int i = 0; i < NCoopMatRow; i ++)
         {
             for (int j = 0; j < NCoopMatColumn; j ++)
             {
-                matC[i * NCoopMatColumn + j].Store<ColumnMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C/ElementCountPerVector);
+                matC[i * NCoopMatColumn + j].Store<ColumnMajor, uint4>( ptrPerWarp + j * CoopMatCSizeInVector, HeightInVectorTileC);
             }
+
             // Store one row of tiled result matrix back to the thread-local vector.
             storeVectorFromShB(ptrC, i, subgroupIndex, outputVector);
+
 
             // Wave sync is good enough, because shared memory C is only shared by each subgroup.
             GroupMemoryBarrierWithWaveSync();
         }
+
         return outputVector;
     }
 }
@@ -878,7 +898,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
         const int AlignedOutSize = MMA.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize]>( data, shA, shB, shC, weightStorage, weightAddress);
+        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T>( data, shA, shB, shC, weightStorage, weightAddress);
         return OutputVector(outputArray);
     }
 
@@ -909,7 +929,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
 
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential
+        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential
                         >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
