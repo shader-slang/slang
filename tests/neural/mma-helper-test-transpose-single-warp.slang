@@ -26,13 +26,13 @@ import neural;
 // Make the weight matrix a 64x64 matrix in row major order
 
 #if TEST_HALF
-typealias StorageElemType = half;
+typealias DType = half;
 #else
-typealias StorageElemType = float;
+typealias DType = float;
 #endif
 
 // TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
-RWStructuredBuffer<StorageElemType> inputBuffer;
+RWStructuredBuffer<DType> inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -69,9 +69,9 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
         {
             int index = row * InputSize + i;
             if (clear)
-                inputBuffer[index] = StorageElemType(0);
+                inputBuffer[index] = DType(0);
             else
-                inputBuffer[index] = StorageElemType(scaleFactor * (i + 1));
+                inputBuffer[index] = DType(scaleFactor * (i + 1));
         }
     }
     else
@@ -85,30 +85,30 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
             {
                 int index = row * InputSize + j;
                 if (clear)
-                    inputBuffer[index] = half(0);
+                    inputBuffer[index] = DType(0);
                 else
-                    inputBuffer[index] = half(scaleFactor * (j + 1));
+                    inputBuffer[index] = DType(scaleFactor * (j + 1));
             }
         }
     }
 }
 
-half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<StorageElemType>;
+    typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, true>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, true>;
     const int OutSize = MMA.Uint4AlignedK;
     const int InSize = MMA.Uint4AlignedM;
 
-    half inputVector[InSize] = {};
+    DType inputVector[InSize] = {};
 
     for (int i = 0; i < OutputSize; i++)
     {
-        inputVector[i] = half(tid + 1);
+        inputVector[i] = DType(tid + 1);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
@@ -117,7 +117,7 @@ half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<StorageElemType, Storage, half[InSize], half[OutSize]>( inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>( inputVector, ptrA, ptrB, ptrC, storage, 0);
     return res;
 }
 
@@ -176,7 +176,7 @@ void serialReadA(uint tid)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    half[MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] outputVector;
     __target_switch
     {
     case cuda:
@@ -191,8 +191,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     int scaleFactor = (OutputSize % 3 == 0 ) ? 0 : -1;
     for (int i = 0; i < InputSize; i++)
     {
-        float expected = scaleFactor * (i + 1.0f) * (tid + 1.0f);
-        if (outputVector[i] != half(expected))
+        DType expected = DType(scaleFactor * (i + 1.0f) * (tid + 1.0f));
+        if (outputVector[i] != DType(expected))
         {
             res = false;
             break;
