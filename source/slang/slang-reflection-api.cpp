@@ -1366,6 +1366,49 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
     return nullptr;
 }
 
+// Return true if the variable declaration's qualified name matches the given name slice.
+bool matchName(VarDeclBase* varDecl, UnownedStringSlice name)
+{
+    ShortList<UnownedStringSlice> nameParts;
+    // Split `name` by `.` or `::` into parts.
+    Index start = 0;
+    for (Index i = 0; i < name.getLength(); ++i)
+    {
+        if (name[i] == '.' || (name[i] == ':' && i + 1 < name.getLength() && name[i + 1] == ':'))
+        {
+            if (i > start)
+            {
+                nameParts.add(name.subString(start, i - start));
+            }
+            start = (name[i] == ':') ? i + 2 : i + 1;
+            if (name[i] == ':')
+                ++i; // Skip the next ':'
+        }
+    }
+    if (start >= name.getLength())
+        return false;
+
+    auto lastPart = name.tail(start);
+    if (getText(getReflectionName(varDecl)) != lastPart)
+        return false;
+
+    // If `name` is prefixed with qualifiers, continue matching parent declarations.
+    Decl* decl = varDecl;
+
+    for (Index i = nameParts.getCount() - 1; i >= 0; --i)
+    {
+        decl = getParentDecl(decl);
+        if (!decl)
+            return false;
+        auto part = nameParts[i];
+        if (getText(decl->getName()) != part)
+            return false;
+    }
+
+    // All name parts matched.
+    return true;
+}
+
 SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
     SlangReflectionTypeLayout* inTypeLayout,
     const char* nameBegin,
@@ -1384,7 +1427,7 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
         for (Index f = 0; f < fieldCount; ++f)
         {
             auto field = structTypeLayout->fields[f];
-            if (getReflectionName(field->getVariable())->text.getUnownedSlice() == name)
+            if (matchName(field->getVariable(), name))
                 return f;
         }
     }
