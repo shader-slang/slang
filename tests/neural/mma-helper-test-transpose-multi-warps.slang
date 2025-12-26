@@ -36,8 +36,8 @@ RWStructuredBuffer<DType> inputBuffer;
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-// RWStructuredBuffer<half> debugBuffer;
+// TEST_INPUT:ubuffer(stride=4, count=4096):out, name=debugBuffer
+RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
@@ -198,18 +198,21 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
     int warpCount = BatchSize / 32;
     bool finalResult = true;
-    // We will use the "warpCount" threads in the first warp to reduce the result.
-    if (tid < warpCount)
+    if (subgroupIndex == 0)
     {
-        finalResult = s_resultMem[tid];
-    }
+        // We will use the "warpCount" threads in the first warp to reduce the result.
+        if (laneId < warpCount)
+        {
+            finalResult = s_resultMem[laneId];
+        }
 
-    finalResult = WaveActiveAllTrue(finalResult);
+        finalResult = WaveActiveAllTrue(finalResult);
 
-    // Finally, use the first thread to write the result to the output buffer.
-    if (tid == 0)
-    {
-        outputBuffer[resIndex] = finalResult ? 1 : 0;
+        // Finally, use the first thread to write the result to the output buffer.
+        if (laneId == 0)
+        {
+            outputBuffer[resIndex] = finalResult ? 1 : 0;
+        }
     }
 }
 
@@ -220,35 +223,35 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
         fillWeightMatrix<4, 4>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
         test<4, 4>(tid, 0);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<8, 8>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
         test<8, 8>(tid, 1);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<16, 16>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
         test<16, 16>(tid, 2);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<32, 32>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
         test<32, 32>(tid, 3);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
     }
 
     {
         fillWeightMatrix<64, 64>(tid);
-        GroupMemoryBarrierWithGroupSync();
+        AllMemoryBarrierWithGroupSync();
         test<64, 64>(tid, 4);
     }
 
