@@ -13,15 +13,15 @@ RWStructuredBuffer<uint> resultBuffer;
 
 
 #if TEST_HALF
-typealias StorageElemType = half;
+typealias DType = half;
 #else
-typealias StorageElemType = float;
+typealias DType = float;
 #endif
 
 // TEST_INPUT: ubuffer(stride=4, count=4096):name=outputBuffer
-RWStructuredBuffer<StorageElemType> outputBuffer;
+RWStructuredBuffer<DType> outputBuffer;
 
-typealias BufferStorage = StructuredBufferStorage<StorageElemType>;
+typealias BufferStorage = StructuredBufferStorage<DType>;
 
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
@@ -34,7 +34,7 @@ static const int ShMemSizeA = MaxM * 2;
 static const int ShMemSizeB = MaxK * 2;
 
 groupshared uint4 s_sharedMemoryA[ShMemSizeA * workgroupCount];
-groupshared uint4 s_sharedMemoryB[ShMemSizeB * workgroupCount];
+groupshared uint4 s_sharedMemoryB[ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half)];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
@@ -43,37 +43,37 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
 {
     BufferStorage storage = BufferStorage(outputBuffer);
 
-    typealias MMA = MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 
-    half dOutVector[OutSize] = {};
-    half inputVector[InSize] = {};
+    DType dOutVector[OutSize] = {};
+    DType inputVector[InSize] = {};
 
     float scaleFactor = 1.0f / WorkgroupSize;
 
     for (int i = 0; i < InputSize; i++)
     {
-        inputVector[i] = half((i + 1) * (tid + 1) * scaleFactor);
+        inputVector[i] = DType((i + 1) * (tid + 1) * scaleFactor);
     }
 
     for (int i = 0; i < OutputSize; i++)
     {
-        dOutVector[i] = half((OutputSize - i) * scaleFactor);
+        dOutVector[i] = DType((OutputSize - i) * scaleFactor);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
 
     // perform dOut OPA Input
-    MMA.outerProductAccumulate<StorageElemType, BufferStorage, half, half[OutSize], half, half[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
+    MMA.outerProductAccumulate<DType, BufferStorage, DType, DType[OutSize], DType, DType[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
 
-    // serialRead<48>(tid, ptrB);
+    // serialRead<32, DType>(tid, ptrB);
     // serialRead<OutputSize, InputSize>(tid, outputBuffer);
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<int Stride>(uint tid, SPtr sharedMem)
+void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem)
 {
     GroupMemoryBarrierWithGroupSync();
 
@@ -83,7 +83,7 @@ void serialRead<int Stride>(uint tid, SPtr sharedMem)
     for (int id = 0; id < 16; id++)
     {
         printf("tid: %d\n", id);
-        int strideInVector  = Stride / (sizeof(uint4) / sizeof(half));
+        int strideInVector  = Stride / (sizeof(uint4) / sizeof(T));
         for (int i = 0; i < strideInVector; i++)
         {
             uint4 values = sharedMem[id * strideInVector + i];
@@ -91,19 +91,26 @@ void serialRead<int Stride>(uint tid, SPtr sharedMem)
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
+                if (sizeof(T) == 2)
+                {
+                    uint16_t a = (uint16_t)(value & 0xFFFF);
+                    uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
+                    half aa = bit_cast<half>(a);
+                    half bb = bit_cast<half>(b);
+                    printf("%.1f %.1f ", float(aa), float(bb));
+                }
+                else
+                {
+                    printf("%f ", bit_cast<float>(value));
+                }
             }
         }
         printf("\n");
     }
 }
 
-void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<StorageElemType> outputBuffer)
+void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<DType> outputBuffer)
 {
     GroupMemoryBarrierWithWaveSync();
 
@@ -114,8 +121,8 @@ void serialRead<int Row, int Column>(uint tid, RWStructuredBuffer<StorageElemTyp
     {
         for (int j = 0; j < Column; j++)
         {
-            float value = outputBuffer[i * Column + j];
-            printf("%.4f ", value);
+            DType value = outputBuffer[i * Column + j];
+            printf("%.1f ", float(value));
         }
         printf("\n");
     }
@@ -148,7 +155,7 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
     // we increase the error threshold by using the scale of the workgroup size which is exactly
     // the number of accumulations.
     // This is a purely empirical value, good input pattern could make the error smaller.
-    StorageElemType errorThreshold = StorageElemType(WorkgroupSize * 0.016);
+    DType errorThreshold = DType(WorkgroupSize * 0.016);
 
     for (int i = 0; i < numIterPerThread; i++)
     {
@@ -161,12 +168,12 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         // each thread will check one row
         for (int j = 0; j < InputSize; j++)
         {
-            StorageElemType expected = StorageElemType(startVal * scaleFactor * (j + 1));
-            StorageElemType actual = outputBuffer[rowIdx * InputSize + j];
+            DType expected = DType(startVal * scaleFactor * (j + 1));
+            DType actual = outputBuffer[rowIdx * InputSize + j];
             if (abs(expected - actual) > errorThreshold)
             {
                 res = false;
-                printf("tid: %d, rowIdx: %d, j: %d, expected: %.4f, actual: %.4f\n", tid, rowIdx, j, float(expected), float(actual));
+                // printf("tid: %d, rowIdx: %d, j: %d, expected: %.4f, actual: %.4f\n", tid, rowIdx, j, float(expected), float(actual));
                 break;
             }
         }
@@ -187,7 +194,7 @@ void cleanOutputBuffer<int InputSize, int OutputSize>(uint tid)
         if (index >= size)
             break;
 
-        outputBuffer[index] = StorageElemType(0.0f);
+        outputBuffer[index] = DType(0.0f);
     }
     AllMemoryBarrierWithGroupSync();
 }

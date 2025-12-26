@@ -1,9 +1,14 @@
 // // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 
+#if TEST_HALF
 typealias ElementType = half;
+#else
+typealias ElementType = float;
+#endif
 
 // set up a 2x4 matrix for input parameters, the last 2 elements are for bias
 //TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4):name=parametersFloat
@@ -32,13 +37,14 @@ static const int InputSize = 4;
 static const int OutputSize = 2;
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
+static const int workgroupCount = BatchSize / SubgroupSize;
 
 #define MAX(a, b) (a < b ? a : b)
 
-static const int ShMemSize = ( MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatA +
-                               MMAHelper<half, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.SharedMemSizeInVectorMatB);
+static const int ShASize = 64 * 2 * workgroupCount;
+static const int ShBSize = 64 * 2 * workgroupCount * sizeof(ElementType) / sizeof(half);
 
-groupshared uint4[ShMemSize] shMem;
+groupshared uint4[ShASize + ShBSize] shMem;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
 [Differentiable]
@@ -73,8 +79,9 @@ void BasicTestWithoutBias(int tid, int resIndex)
     typealias InVectorType = AccelerateVectorCoopMat<ElementType, 4, SubgroupSize>;
     typealias OutVectorType = AccelerateVectorCoopMat<ElementType, 2, SubgroupSize>;
 
-    ElementType[4] inputData = {ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0)};
-    var input = InVectorType(inputData);
+    ElementType[4] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
+    InVectorType input = InVectorType(inputData);
+
     input.sharedMemoryPtr = __getAddress(shMem[0]);
 
     BufferStorage weightStorage = BufferStorage(parameters);
@@ -87,6 +94,8 @@ void BasicTestWithoutBias(int tid, int resIndex)
     // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
+    if (tid == 0)
+        printf("outputVec: %.1f %.1f\n", float(outputVec[0]), float(outputVec[1]));
 
     var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
     let dRes = OutVectorType(1.0f);

@@ -158,8 +158,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // Tile C = Tile_height of B * AlignedN
     // Note B and C are the same size because their widths are always the same as subGroupSize and
     // their heights are fixed determined by Cooperative matrix shape.
-    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatA = (HeightInElementsTileA * T_COLUMN_A) / ElementCountPerVector;
-    VISIBILITY_LEVEL static const uint SharedMemSizeInVectorMatB = (T_ROW_B * WidthInElementsTileB) / ElementCountPerVector;
+    internal static const uint SharedMemSizeInVectorMatA = (HeightInElementsTileA * T_COLUMN_A) / ElementCountPerVector;
+    internal static const uint SharedMemSizeInVectorMatB = (T_ROW_B * WidthInElementsTileB) / ElementCountPerVector;
 
     // In the actual implementation, we always reuse shared memory B for store MatC. However, if data type of MatC is float,
     // we will need double size of shared memory B for C.
@@ -171,15 +171,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     // NumLoadsEachThreadMatA is the number of loads each thread needs to perform.
     // N is the number of active threads in the subgroup.
-    // For matrix A, each iteration we load a column of matrix tile of Matrix A, which is M x 32 bytes.
-    // And each thread can load 16 bytes for each load, so the number of loads each thread needs to
+    // For matrix A, each iteration we load a column of matrix tile of Matrix A, which is height * sizeof(elementType) x 16 bytes.
+    // And each thread can load 16 bytes for each load, so the number of loads each thread needs to do for half type is
     // (M * 32) / (N * 16) = M * 2 / N, and we just round up the result to the nearest integer.
     static const uint NumLoadsEachThreadMatA = (HeightInElementsTileA * 2 + N - 1) / N;
 
-    // Similarly, for matrix A^T, each iteration we load a column of matrix tile of Matrix A^T, which is K x 32 bytes.
-    // And each thread can load 16 bytes for each load, so the number of loads each thread needs to
-    // (K * 32) / (N * 16) = K * 2 / N, and we just round up the result to the nearest integer.
-    static const uint NumLoadsEachThreadMatATranspose = (HeightInElementsTileA * 2 + N - 1) / N;
+    static const uint NumStoresEachThreadMatA = (sizeof(T) == 2) ?
+                                                    NumLoadsEachThreadMatA :
+                                                    (HeightInElementsTileA * 4 + N - 1) / N;
 
     // OffsetPerThreadLoadMatA is the offset between each load.
     // The reason is same as above, since the whole subgroup can load N * 16 bytes, and the load is consecutive,
@@ -195,48 +194,48 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     static const bool EnableDoubleBuffer = false;
 
     [ForceInline]
-    static uint flattenedIndex(uint2 coord, int stride)
+    static uint flattenedIndex<int Stride>(uint2 coord)
     {
         if (TransposeA)
         {
-            return coord.y + coord.x * stride;
+            return coord.y + coord.x * Stride;
         }
         else
         {
-            return coord.x + coord.y * stride;
+            return coord.x + coord.y * Stride;
         }
     }
 
     [ForceInline]
-    static uint2 vectorizedTileCoordToWeightCoord(uint2 coordInTile, int tileIndex)
+    static uint2 vectorizedTileCoordToWeightCoord<int ElemCountPerVector>(uint2 coordInTile, int tileIndex)
     {
         uint2 coordOut;
         if (TransposeA)
         {
             coordOut.x = coordInTile.x + tileIndex * WidthInElementTileA;
-            coordOut.y = coordInTile.y * ElementCountPerVector;
+            coordOut.y = coordInTile.y * ElemCountPerVector;
         }
         else
         {
-            coordOut.x = coordInTile.x * ElementCountPerVector + tileIndex * WidthInElementTileA;
+            coordOut.x = coordInTile.x * ElemCountPerVector + tileIndex * WidthInElementTileA;
             coordOut.y = coordInTile.y;
         }
         return coordOut;
     }
 
     [ForceInline]
-    static uint2 vectorizedTileIndexTo2DCoord(uint indexInVectorizedTile)
+    static uint2 vectorizedTileIndexTo2DCoord<int HeightInVector, int WidthInVector>(uint indexInVectorizedTile)
     {
         uint2 coordOut;
         if (TransposeA)
         {
-            coordOut.x = indexInVectorizedTile / HeightInVectorTileA;
-            coordOut.y = indexInVectorizedTile % HeightInVectorTileA;
+            coordOut.x = indexInVectorizedTile / HeightInVector;
+            coordOut.y = indexInVectorizedTile % HeightInVector;
         }
         else
         {
-            coordOut.x = indexInVectorizedTile % WidthInVectorTileA;
-            coordOut.y = indexInVectorizedTile / WidthInVectorTileA;
+            coordOut.x = indexInVectorizedTile % WidthInVector;
+            coordOut.y = indexInVectorizedTile / WidthInVector;
         }
         return coordOut;
     }
@@ -264,17 +263,31 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     {
         uint indexInVectorizedTile = WaveGetLaneIndex();
 
+        // In load case, since we always load the matrix into MatA, so the tile must in half type, because that is
+        // what MatA can only support.
+        // However, in store, we store the MatC which could be float type, so we need to adjust the tile height in vector
+        // and element count per vector.
+        const int elementCountPerVector = isStore ? ElementCountPerVectorMatC : ElementCountPerVector;
+        const int heightInVector = isStore ?
+                                        HeightInVectorTileA * ElementCountPerVector / ElementCountPerVectorMatC :
+                                        HeightInVectorTileA;
+        const int widthInVector = isStore ?
+                                        WidthInVectorTileA * ElementCountPerVector / ElementCountPerVectorMatC :
+                                        WidthInVectorTileA;
+        const int numLoadOrStorePerThread = isStore ? NumStoresEachThreadMatA : NumLoadsEachThreadMatA;
+
         // get the 2-D coordinate of the tile in the vectorized tile
-        const uint2 coordInTile = vectorizedTileIndexTo2DCoord(indexInVectorizedTile);
+        const uint2 coordInTile = vectorizedTileIndexTo2DCoord<heightInVector, widthInVector>(indexInVectorizedTile);
 
         // tx and ty are the 2-D coordinate of scalar tile.
         // row coordinate ty is the same between vectorized tile and original tile.
         // column coordinate tx needs to be scaled by ElementCountPerVector to get the actual column coordinate in original data type.
-        uint2 coordInWeight = vectorizedTileCoordToWeightCoord(coordInTile, tileIndex);
+
+        uint2 coordInWeight = vectorizedTileCoordToWeightCoord<elementCountPerVector>(coordInTile, tileIndex);
 
         uint4 value;
         uint indexInWeight;
-        for (uint i = 0; i < NumLoadsEachThreadMatA; i++)
+        for (uint i = 0; i < numLoadOrStorePerThread; i++)
         {
             if (coordInWeight.y >= HeightInElementsTileA)
                 break;
@@ -282,7 +295,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // Note, we always treat row of matrix A as uint4 aligned, so always calculate 'indexInWeight' as if it's uint4 aligned.
             // though it might not. But IStorage.readUint4() will handle the padding.
             // We only need to provide the actual boundary and the aligned boundary.
-            indexInWeight = flattenedIndex(coordInWeight, K);
+            indexInWeight = flattenedIndex<K>(coordInWeight);
 
             // Bounds check on global memory.
             bool isOutOfRange = TransposeA ?
@@ -315,7 +328,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 {
                     value = sharedMemory[indexInVectorizedTile];
                     let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-                    // TODO: This is something we need to handle later.
+
                     weightStorage.writeUint4Atomic<T, IsAlignedVector, K>(weightAddress, offsetAddress, value);
                 }
             }
@@ -325,7 +338,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // Given the index in the tile, get the 2-D coordinate in the matrix A.
             // Note that, when TransposeA is true, this is 2-D coordinate in the matrix A^T. We don't change the semantics of the 2-D coordinate
             // in matrix, but we change the way to calculate the 1-D index in the matrix. But we can still use the same function to get the 2-D coordinate.
-            coordInWeight = vectorizedTileCoordToWeightCoord(vectorizedTileIndexTo2DCoord(indexInVectorizedTile), tileIndex);
+            coordInWeight = vectorizedTileCoordToWeightCoord<elementCountPerVector>(
+                                vectorizedTileIndexTo2DCoord<heightInVector, widthInVector>(indexInVectorizedTile),
+                                tileIndex);
         }
     }
 
@@ -551,7 +566,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     {
                         // We choose to process one row of cooperative matrices at a time, store the cooperative matrix in column major is more efficient.
                         // Because in column major, each column of the cooperative matrix is contiguous in the shared memory, so there will not be bank conflict.
-                        matC[i * COLUMN + j].Store<RowMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C / ElementCountPerVector);
+                        matC[i * COLUMN + j].Store<RowMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C / ElementCountPerVectorMatC);
                     }
                 }
 
@@ -566,7 +581,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     {
                         for (int j = 0; j < COLUMN; j++)
                         {
-                            MatC rightMatC = MatC.Load<RowMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C / ElementCountPerVector);
+                            MatC rightMatC = MatC.Load<RowMajor, uint4>(ptrPerWarp + j * CoopMatCSizeInVector, T_ROW_C / ElementCountPerVectorMatC);
                             matC[i * COLUMN + j] = matC[i * COLUMN + j] + rightMatC;
                         }
                     }
@@ -604,6 +619,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         static const int CoopMatCColumns = (K + T_COLUMN_A - 1) / T_COLUMN_A;
         static const int StrideInVectorTileB = CoopMatCColumns * T_COLUMN_B / ElementCountPerVector;
         static const int StrideInVectorTileA = CoopMatCRows * T_ROW_A / ElementCountPerVector;
+        static const int StrideInVectorTileC = CoopMatCColumns * T_COLUMN_C / ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
@@ -657,7 +673,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 {
                     // Save the result to shared memory in row major, because this is cache friendly for global memory access.
                     // As each row of the tile will be corresponding to the contiguous global memory.
-                    matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(sharedMemoryB + j * T_COLUMN_B / ElementCountPerVector, StrideInVectorTileB);
+                    matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(sharedMemoryB + j * T_COLUMN_C / ElementCountPerVectorMatC, StrideInVectorTileC);
                 }
 
                 // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
@@ -854,18 +870,17 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
-            if (i < N)
-            {
-                this.data[i] = data[i];
-            }
-            else
-            {
-                this.data[i] = T(0.0f);
-            }
+            this.data[i] = data[i];
+        }
+
+        [ForceUnroll]
+        for (int i = N; i < Uint4AlignedInputSize; i++)
+        {
+            this.data[i] = T(0.0f);
         }
     }
 
-    public __init(T[Uint4AlignedInputSize] data)
+    internal __init(T[Uint4AlignedInputSize] data)
     {
         this.data = data;
     }
@@ -893,7 +908,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         where Storage.Address == Storage.Differential.Address
         where OutputVector : IVector<T, OutputSize>
     {
-        typealias MMA = MMAHelper<T, N, OutputSize, SubgroupSize, Target, false>;
+        typealias MMA = MMAHelper<half, N, OutputSize, SubgroupSize, Target, false>;
         SPtr<uint4> shA = sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
@@ -913,7 +928,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         where OutputVector : IVector<T, OutputSize>
         where OutputVector.Differential : IVector<T.Differential, OutputSize>
     {
-        typealias MMA = MMAHelper<T.Differential, N, OutputSize, SubgroupSize, Target, true>;
+        typealias MMA = MMAHelper<half, N, OutputSize, SubgroupSize, Target, true>;
 
         SPtr<uint4> shA = dthis.p.sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
