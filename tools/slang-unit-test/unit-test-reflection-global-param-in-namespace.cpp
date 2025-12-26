@@ -47,7 +47,7 @@ SLANG_UNIT_TEST(reflectionGlobalParamInNamespace)
     SLANG_CHECK(globalVarTypeLayout->getFieldByIndex(field0)->getTypeLayout()->getSize() == 16);
 
     auto field1 = globalVarTypeLayout->findFieldIndexByName("NS::gParam");
-    SLANG_CHECK_ABORT(field1 != -1);
+    SLANG_CHECK_ABORT(field1 != -1 && field1 != field0);
     SLANG_CHECK(globalVarTypeLayout->getFieldByIndex(field1)->getTypeLayout()->getSize() == 4);
 
     auto field2 = globalVarTypeLayout->findFieldIndexByName("NS.gParam");
