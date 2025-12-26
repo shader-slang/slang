@@ -5910,7 +5910,9 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            return *reinterpret_cast<const T*>(&regs[index]);
+            T v;
+            memcpy(&v, &regs[index], 4);
+            return v;
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5921,7 +5923,9 @@ struct WmmaFragment
             int bitOffset = elementOffset * 16;
             uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFFFF;
             uint16_t value16 = static_cast<uint16_t>(extracted);
-            return *reinterpret_cast<const T*>(&value16);
+            T v;
+            memcpy(&v, &value16, 2);
+            return v;
         }
         else if constexpr (sizeof(T) == 1)
         {
@@ -5942,7 +5946,7 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            regs[index] = *reinterpret_cast<const uint32_t*>(&value);
+            memcpy(&regs[index], &value, 4);
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5951,7 +5955,8 @@ struct WmmaFragment
             int elementOffset = index % 2;
             int bitOffset = elementOffset * 16;
             uint32_t mask = 0xFFFF;
-            uint16_t value16 = *reinterpret_cast<const uint16_t*>(&value);
+            uint16_t value16;
+            memcpy(value16, &value, 2);
 
             // Clear the bits at the target position
             regs[regIndex] &= ~(mask << bitOffset);
@@ -6007,7 +6012,7 @@ struct WmmaFragment
 
     // Maximum registers needed across all fragment types and data types
     static constexpr int MAX_REGS = 8;
-    unsigned regs[MAX_REGS] = {};
+    uint32_t regs[MAX_REGS] = {};
 
     static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
                                                   : (R == MatrixUse::MatrixB) ? (K * N)
