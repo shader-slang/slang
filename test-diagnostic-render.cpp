@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -409,27 +410,6 @@ struct DiagnosticLayout
     std::vector<NoteEntry> notes;
 };
 
-size_t findCommonIndent(
-    const std::vector<std::string>& allLines,
-    const std::vector<LayoutSpan>& spans)
-{
-    size_t minIndent = std::numeric_limits<size_t>::max();
-    for (const auto& span : spans)
-    {
-        size_t idx = static_cast<size_t>(span.line);
-        if (idx >= allLines.size())
-            continue;
-        const std::string& line = allLines[idx];
-        if (line.empty())
-            continue;
-        size_t indent = 0;
-        while (indent < line.size() && (line[indent] == ' ' || line[indent] == '\t'))
-            ++indent;
-        minIndent = std::min(minIndent, indent);
-    }
-    return (minIndent == std::numeric_limits<size_t>::max()) ? 0 : minIndent;
-}
-
 int resolveSpanLength(const DiagnosticSpan& span, const std::vector<std::string>& sourceLines)
 {
     if (span.length > 0)
@@ -456,6 +436,26 @@ LayoutSpan makeLayoutSpan(
     return layoutSpan;
 }
 
+size_t findCommonIndent(const std::vector<LayoutBlock>& blocks)
+{
+    size_t minIndent = std::numeric_limits<size_t>::max();
+    for (const auto& block : blocks)
+    {
+        for (const auto& line : block.lines)
+        {
+            if (line.content.empty())
+                continue;
+            size_t indent = 0;
+            while (indent < line.content.size() &&
+                   (line.content[indent] == ' ' || line.content[indent] == '\t'))
+                ++indent;
+            if (indent < minIndent)
+                minIndent = indent;
+        }
+    }
+    return (minIndent == std::numeric_limits<size_t>::max()) ? 0 : minIndent;
+}
+
 SectionLayout buildSectionLayout(
     const std::vector<LayoutSpan>& spans,
     const std::vector<std::string>& sourceLines)
@@ -463,8 +463,6 @@ SectionLayout buildSectionLayout(
     SectionLayout section;
     if (spans.empty())
         return section;
-
-    section.commonIndent = findCommonIndent(sourceLines, spans);
 
     int maxLineNum = 0;
     for (const auto& span : spans)
@@ -524,6 +522,7 @@ SectionLayout buildSectionLayout(
     if (!currentBlock.lines.empty())
         section.blocks.push_back(currentBlock);
 
+    section.commonIndent = findCommonIndent(section.blocks);
     return section;
 }
 
@@ -531,36 +530,97 @@ SectionLayout buildSectionLayout(
 // RENDERING UTILITIES
 // ============================================================================
 
-std::string buildMarkerRow(const HighlightLine& line, size_t indentShift)
+struct LabelInfo
 {
-    if (line.spans.empty())
-        return {};
-    std::string row;
-    int cursor = 1;
-    for (const auto& span : line.spans)
-    {
-        int effectiveColumn = std::max(1, span.column - static_cast<int>(indentShift));
-        int spaces = std::max(0, effectiveColumn - cursor);
-        row += repeat(' ', spaces);
-        int length = std::max(1, span.length);
-        row += repeat(span.isPrimary ? '^' : '-', length);
-        cursor = effectiveColumn + length;
-    }
-    return row;
-}
+    int column = 0;
+    std::string text;
+};
 
-std::vector<std::string> buildLabelRows(const HighlightLine& line, size_t indentShift)
+std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
 {
     std::vector<std::string> rows;
+    if (line.spans.empty())
+        return rows;
+
+    std::vector<LabelInfo> labels;
+    std::string underline;
+    int cursor = 1;
+
     for (const auto& span : line.spans)
     {
-        if (span.label.empty())
-            continue;
         int effectiveColumn = std::max(1, span.column - static_cast<int>(indentShift));
-        std::string padding = repeat(' ', effectiveColumn - 1);
-        rows.push_back(padding + "|");
-        rows.push_back(padding + span.label);
+        int length = std::max(1, span.length);
+        int spaces = std::max(0, effectiveColumn - cursor);
+        underline += repeat(' ', spaces);
+        underline += repeat(span.isPrimary ? '^' : '-', length);
+        cursor = effectiveColumn + length;
+
+        if (!span.label.empty())
+            labels.push_back(LabelInfo{effectiveColumn, span.label});
     }
+
+    if (!labels.empty())
+    {
+        std::sort(
+            labels.begin(),
+            labels.end(),
+            [](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
+        underline += " " + labels.front().text;
+        labels.erase(labels.begin());
+    }
+
+    rows.push_back(underline);
+    if (labels.empty())
+        return rows;
+
+    auto sortedLabels = labels;
+    std::sort(
+        sortedLabels.begin(),
+        sortedLabels.end(),
+        [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
+
+    std::string connector;
+    int pos = 1;
+    for (const auto& info : sortedLabels)
+    {
+        int spaces = std::max(0, info.column - pos);
+        connector += repeat(' ', spaces) + "|";
+        pos = info.column + 1;
+    }
+    rows.push_back(connector);
+
+    for (const auto& target : labels)
+    {
+        std::vector<LabelInfo> active;
+        for (const auto& candidate : labels)
+            if (candidate.column <= target.column)
+                active.push_back(candidate);
+
+        std::sort(
+            active.begin(),
+            active.end(),
+            [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
+
+        std::string labelRow;
+        int current = 1;
+        for (const auto& info : active)
+        {
+            int spaces = std::max(0, info.column - current);
+            labelRow += repeat(' ', spaces);
+            if (info.column == target.column)
+            {
+                labelRow += info.text;
+                current = info.column + static_cast<int>(info.text.length());
+            }
+            else
+            {
+                labelRow += "|";
+                current = info.column + 1;
+            }
+        }
+        rows.push_back(labelRow);
+    }
+
     return rows;
 }
 
@@ -585,11 +645,8 @@ void renderSectionBody(std::ostream& ss, const SectionLayout& section)
             ss << repeat(' ', padding) << label << " | "
                << stripIndent(line.content, section.commonIndent) << '\n';
 
-            const std::string markerRow = buildMarkerRow(line, section.commonIndent);
-            printAnnotationRow(ss, section.maxGutterWidth, markerRow);
-
-            for (const std::string& labelRow : buildLabelRows(line, section.commonIndent))
-                printAnnotationRow(ss, section.maxGutterWidth, labelRow);
+            for (const auto& row : buildAnnotationRows(line, section.commonIndent))
+                printAnnotationRow(ss, section.maxGutterWidth, row);
         }
     }
 }
