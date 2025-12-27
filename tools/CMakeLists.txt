@@ -125,6 +125,12 @@ if(SLANG_ENABLE_SLANGI)
     )
 endif()
 
+slang_add_target(
+    slang-rich-diagnostics-unit-test
+    EXECUTABLE
+    LINK_WITH_PRIVATE core compiler-core
+)
+
 if(SLANG_ENABLE_GFX)
     #
     # GFX
