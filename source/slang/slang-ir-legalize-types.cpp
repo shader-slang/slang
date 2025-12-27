@@ -2038,6 +2038,17 @@ static LegalVal legalizeInst(
     case kIROp_CastDescriptorHandleToResource:
         result = LegalVal::simple(inst);
         break;
+    case kIROp_SPIRVAsm:
+    case kIROp_SPIRVAsmInst:
+        // SPIRVAsm blocks and instructions contain inline assembly and should be preserved as-is
+        result = LegalVal::simple(inst);
+        break;
+    case kIROp_ForceVarIntoStructTemporarily:
+    case kIROp_ForceVarIntoRayPayloadStructTemporarily:
+        // These instructions wrap parameters and will be removed later in target-specific
+        // legalization
+        result = LegalVal::simple(inst);
+        break;
     case kIROp_DebugVar:
         result = legalizeDebugVar(context, type, (IRDebugVar*)inst);
         if (result.flavor == LegalVal::Flavor::none)
@@ -2085,6 +2096,13 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
+        // Handle all SPIRVAsmOperand instructions (they form a contiguous range)
+        if (inst->getOp() >= kIROp_FirstSPIRVAsmOperand &&
+            inst->getOp() <= kIROp_LastSPIRVAsmOperand)
+        {
+            result = LegalVal::simple(inst);
+            break;
+        }
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
         break;
