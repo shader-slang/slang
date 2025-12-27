@@ -292,6 +292,9 @@ const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 
 std::vector<std::string> getSourceLines(const std::string& content)
 {
+    // Parse the embedded shader snippet into logical lines once so downstream layout
+    // code can work with indexed access; the intermediate stringstream keeps the
+    // implementation simple while guaranteeing consistent handling of CRLF vs LF.
     std::vector<std::string> lines;
     std::stringstream ss(content);
     std::string line;
@@ -302,6 +305,8 @@ std::vector<std::string> getSourceLines(const std::string& content)
 
 std::string trimNewlines(const std::string& s)
 {
+    // Harness output comparisons assume deterministic framing, so we aggressively
+    // trim leading/trailing newline noise that often shows up in raw heredoc data.
     size_t start = 0;
     while (start < s.length() && (s[start] == '\n' || s[start] == '\r'))
         ++start;
@@ -318,6 +323,9 @@ std::string repeat(char c, int n)
 
 int calculateFallbackLength(const std::string& line, int col)
 {
+    // When the diagnostic lacks an explicit length we infer one by walking the
+    // identifier starting at the reported column; this keeps highlighting useful
+    // without requiring every test case to spell out exact spans.
     if (col < 1 || col > static_cast<int>(line.length()))
         return 1;
     int start = col - 1;
@@ -460,6 +468,10 @@ SectionLayout buildSectionLayout(
     const std::vector<LayoutSpan>& spans,
     const std::vector<std::string>& sourceLines)
 {
+    // Transform resolved spans into grouped, display-ready blocks: we bucket spans
+    // per line, preserve source text for each line, keep gaps explicit so rendering
+    // can insert ellipses, and measure shared indentation so highlights align even
+    // when shader code is heavily indented in the fixture.
     SectionLayout section;
     if (spans.empty())
         return section;
@@ -538,6 +550,10 @@ struct LabelInfo
 
 std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
 {
+    // Convert intra-line highlights into the familiar caret/label ladder: first
+    // lay down the underline with different glyphs for primary vs secondary spans,
+    // attach the closest label inline when possible, then fall back to vertical
+    // connectors so multiple labels can coexist without clobbering each other.
     std::vector<std::string> rows;
     if (line.spans.empty())
         return rows;
@@ -633,6 +649,10 @@ void printAnnotationRow(std::ostream& ss, int gutterWidth, const std::string& co
 
 void renderSectionBody(std::ostream& ss, const SectionLayout& section)
 {
+    // Rendering mirrors the layout structure: we print each block with the computed
+    // gutter width, insert ellipses whenever the block reported a gap, then stream
+    // the highlight ladder rows so the final text matches the snapshot stored in
+    // the tests byte-for-byte.
     for (const auto& block : section.blocks)
     {
         if (block.showGap)
@@ -653,6 +673,10 @@ void renderSectionBody(std::ostream& ss, const SectionLayout& section)
 
 DiagnosticLayout createLayout(const TestData& data)
 {
+    // createLayout is the bridge between raw fixture data and the renderer: it
+    // copies headline metadata, resolves all spans (primary, secondary, notes),
+    // builds the shared section layout once, and stores everything in a single
+    // structure so the rendering phase can be a pure formatting pass.
     DiagnosticLayout layout;
     const auto& diag = data.diagnostic;
 
@@ -694,6 +718,9 @@ DiagnosticLayout createLayout(const TestData& data)
 
 std::string renderFromLayout(const DiagnosticLayout& layout)
 {
+    // This function owns the string assembly for everything the harness compares:
+    // severity header, primary location, annotated source, and optional notes.
+    // Keeping it side-effect free makes it trivial to diff the produced output.
     std::stringstream ss;
 
     ss << layout.header.severity << "[E" << std::setfill('0') << std::setw(4) << layout.header.code
@@ -735,6 +762,8 @@ std::string renderDiagnostic(const TestData& testData)
 
 void writeTempFile(const std::string& path, const std::string& content)
 {
+    // Helper for diffing: we materialize both the expected and actual buffers as
+    // plain files so we can lean on the system `diff` without dragging in a lib.
     std::ofstream file(path);
     file << content << '\n';
 }
@@ -751,6 +780,10 @@ int runDiff(const std::string& expected, const std::string& actual)
 
 int main(int argc, char* argv[])
 {
+    // The harness accepts an optional `--until N` switch so developers can run a
+    // prefix of the fixture set; we parse it once, fall back to all tests, then
+    // drive a simple pass/fail loop that renders diagnostics, compares them to the
+    // captured golden output, and shells out to `diff` when anything diverges.
     int maxTests = -1;
     for (int i = 1; i < argc; ++i)
     {
