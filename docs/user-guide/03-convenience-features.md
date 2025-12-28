@@ -555,7 +555,8 @@ struct MyType
 int test(MyType* pObj)
 {
     MyType* pNext = pObj + 1;
-    MyType* pNext2 = &pNext[1];
+    // Note: `__getAddress` is a place-holder since pointers are experimental. Do not use `&`.
+    MyType* pNext2 = __getAddress(pNext[1]);
     return pNext.a + pNext->a + (*pNext2).a + pNext2[0].a;
 }
 
@@ -573,25 +574,95 @@ int invalidTest()
 {
     // cannot produce a pointer from a local variable 
     MyType obj;
-    return test(&obj); // !! ERROR !!
+    return test(__getAddress(obj)); // !! ERROR !!
 }
 ```
 
 Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
+### Pointer Access
+
+Pointers can be specified with an `Access` qualifier: `Ptr<T, Access::Read>`.
+A pointer specified as `Access::Read` cannot be read from. A pointer specified as `Access::ReadWrite` can be read/written to. 
+
+By default, `T*` and `Ptr<T>` are both `Access::ReadWrite`.
+
+```C#
+uniform int* buffer;
+
+typealias ReadPtr = Ptr<int, Access::Read>;
+[numthreads(1, 1, 1)]
+void computeMain(int id : SV_DispatchThreadID)
+{
+    ReadPtr ptrReadOnly = ReadPtr(__getAddress(buffer[0]));
+    Ptr<int> ptrReadWrite = Ptr<int, Access::ReadWrite>(__getAddress(buffer[0]));
+    output[0] = ptrReadOnly[0]; // error: cannot read from a `Access::Read` pointer
+    output[1] = ptrReadWrite[0]; // allowed
+}
+```
+
+### Pointer AddressSpace
+
+By default, Slang will assume all pointers are of the address-space `AddressSpace::Device`. Examples of device AddressSpace objects are provided below.
+
+```c#
+uniform int* deviceMemory1;
+
+cbuffer Constants
+{
+    MyType *deviceMemory2;
+};
+```
+
+To get the address of a `groupshared` object, a user must specify this intention in the `AddressSpace` type argument of `Ptr<>`. An example of how to do this is provided below.
+
+```C#
+typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
+
+groupshared int groupsharedMemory;
+
+[numthreads(1, 1, 1)]
+void computeMain(int id : SV_DispatchThreadID)
+{
+    GroupSharedPtr<int> ptr = __getAddress(groupsharedMemory);
+    output[0] = ptr[0];
+}
+void foo()
+{
+}
+```
+
+### Coherent Operations
+
+Slang supports coherence to specific memory-scopes on a per operation basis when working with pointers.
+To use coherent operations, `vk_mem_model` is required and will be automatically-enabled.
+Textures are not currently supported.
+
+```c#
+RWStructuredBuffer<int> outputBuffer;
+groupshared int[32] shared;
+
+[numthreads(1, 1, 1)]
+void computeMain(uint3 group_thread_id: SV_GroupThreadID)
+{
+    Ptr<int, Access::ReadWrite, AddressSpace::GroupShared> ptr = __getAddress(shared[0]);
+    coherentStore(ptr, 0, 4, MemoryScope::Workgroup);
+    GroupMemoryBarrierWithGroupSync();
+    outputBuffer[0] = coherentLoad(ptr, 4, MemoryScope::Workgroup);
+}
+```
+
 ### Limitations
 
-- Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
+- Slang can produce pointers using the `__getAddress` expression in only some contexts. `&` should not be used.
+
+- Slang supports pointers to global memory and shared-memory, but not local memory. For example, it is invalid to define a pointer to a local `int myLocal = 1;` variable.
 
 - Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
-- Slang can produce pointers using the & operator from data in global memory.
-
 - Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
 
-- Slang doesn't support coherent load/stores.
-
-- Slang doesn't support custom alignment specification.
+- Slang doesn't support custom alignment specification of pointers.
 
 - Slang currently does not support pointers to immutable values, i.e. `const T*`.
 
