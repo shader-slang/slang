@@ -50,7 +50,7 @@
 namespace Slang
 {
 static Result _calcArraySizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRTypeLayoutRules* rules,
     IRType* elementType,
     IRInst* elementCountInst,
@@ -68,7 +68,7 @@ static Result _calcArraySizeAndAlignment(
     }
 
     IRSizeAndAlignment elementTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(optionSet, rules, elementType, &elementTypeLayout));
+    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(targetReq, rules, elementType, &elementTypeLayout));
 
     elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
     *outSizeAndAlignment = IRSizeAndAlignment(
@@ -84,21 +84,11 @@ IRIntegerValue getIntegerValueFromInst(IRInst* inst)
 }
 
 Result IRTypeLayoutRules::calcSizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
-    int kPointerSize = 8;
-    switch (optionSet.getTarget())
-    {
-    case CodeGenTarget::HostCPPSource:
-    case CodeGenTarget::HostHostCallable:
-    case CodeGenTarget::HostExecutable:
-    case CodeGenTarget::HostSharedLibrary:
-    case CodeGenTarget::ShaderHostCallable:
-        kPointerSize = (int)sizeof(void*);
-        break;
-    }
+    TargetBuiltinTypeLayoutInfo builtinTypeInfo = getBuiltinTypeLayoutInfo(targetReq);
 
     switch (type->getOp())
     {
@@ -124,8 +114,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
         BASE(Int64, 8);
         BASE(UInt64, 8);
-        BASE(IntPtr, kPointerSize);
-        BASE(UIntPtr, kPointerSize);
+        BASE(IntPtr, builtinTypeInfo.genericPointerSize);
+        BASE(UIntPtr, builtinTypeInfo.genericPointerSize);
         BASE(Double, 8);
 
         // We are currently handling `bool` following the HLSL
@@ -159,7 +149,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
-                    getSizeAndAlignment(optionSet, this, field->getFieldType(), &fieldTypeLayout));
+                    getSizeAndAlignment(targetReq, this, field->getFieldType(), &fieldTypeLayout));
                 seenFinalUnsizedArrayField =
                     fieldTypeLayout.size == IRSizeAndAlignment::kIndeterminateSize;
 
@@ -214,7 +204,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             auto arrayType = cast<IRArrayType>(type);
 
             return _calcArraySizeAndAlignment(
-                optionSet,
+                targetReq,
                 this,
                 arrayType->getElementType(),
                 arrayType->getElementCount(),
@@ -225,7 +215,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(optionSet, atomicType->getElementType(), outSizeAndAlignment);
+            calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment);
             return SLANG_OK;
         }
         break;
@@ -234,7 +224,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto unsizedArrayType = cast<IRUnsizedArrayType>(type);
             getSizeAndAlignment(
-                optionSet,
+                targetReq,
                 this,
                 unsizedArrayType->getElementType(),
                 outSizeAndAlignment);
@@ -247,7 +237,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto vecType = cast<IRVectorType>(type);
             IRSizeAndAlignment elementTypeLayout;
-            getSizeAndAlignment(optionSet, this, vecType->getElementType(), &elementTypeLayout);
+            getSizeAndAlignment(targetReq, this, vecType->getElementType(), &elementTypeLayout);
             *outSizeAndAlignment = getVectorSizeAndAlignment(
                 elementTypeLayout,
                 getIntegerValueFromInst(vecType->getElementCount()));
@@ -274,7 +264,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 auto elementType = tupleType->getOperand(i);
                 IRSizeAndAlignment fieldTypeLayout;
                 SLANG_RETURN_ON_FAIL(
-                    getSizeAndAlignment(optionSet, this, (IRType*)elementType, &fieldTypeLayout));
+                    getSizeAndAlignment(targetReq, this, (IRType*)elementType, &fieldTypeLayout));
                 resultLayout.size = adjustOffset(
                     resultLayout.size,
                     fieldTypeLayout.size,
@@ -330,7 +320,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 auto colVector =
                     builder.getVectorType(matType->getElementType(), matType->getRowCount());
                 return _calcArraySizeAndAlignment(
-                    optionSet,
+                    targetReq,
                     this,
                     colVector,
                     matType->getColumnCount(),
@@ -341,7 +331,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
                 auto rowVector =
                     builder.getVectorType(matType->getElementType(), matType->getColumnCount());
                 return _calcArraySizeAndAlignment(
-                    optionSet,
+                    targetReq,
                     this,
                     rowVector,
                     matType->getRowCount(),
@@ -361,7 +351,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_FuncType:
         {
-            *outSizeAndAlignment = IRSizeAndAlignment(kPointerSize, kPointerSize);
+            *outSizeAndAlignment = IRSizeAndAlignment(
+                builtinTypeInfo.genericPointerSize, builtinTypeInfo.genericPointerSize);
             return SLANG_OK;
         }
         break;
@@ -378,14 +369,14 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             builder.setInsertBefore(type);
             auto uintType = builder.getUIntType();
             auto uint2Type = builder.getVectorType(uintType, 2);
-            return getSizeAndAlignment(optionSet, this, uint2Type, outSizeAndAlignment);
+            return getSizeAndAlignment(targetReq, this, uint2Type, outSizeAndAlignment);
         }
     case kIROp_AttributedType:
         {
             auto attributedType = cast<IRAttributedType>(type);
             SLANG_ASSERT(attributedType->getAttr()->getOp() == kIROp_NoDiffAttr);
             return getSizeAndAlignment(
-                optionSet,
+                targetReq,
                 this,
                 attributedType->getBaseType(),
                 outSizeAndAlignment);
@@ -394,7 +385,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto enumType = cast<IREnumType>(type);
             auto tagType = enumType->getTagType();
-            return calcSizeAndAlignment(optionSet, tagType, outSizeAndAlignment);
+            return calcSizeAndAlignment(targetReq, tagType, outSizeAndAlignment);
         }
         break;
     default:
@@ -425,7 +416,7 @@ IRSizeAndAlignmentDecoration* findSizeAndAlignmentDecorationForLayout(
 }
 
 Result getSizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRTypeLayoutRules* rules,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
@@ -437,7 +428,7 @@ Result getSizeAndAlignment(
     }
 
     IRSizeAndAlignment sizeAndAlignment;
-    SLANG_RETURN_ON_FAIL(rules->calcSizeAndAlignment(optionSet, type, &sizeAndAlignment));
+    SLANG_RETURN_ON_FAIL(rules->calcSizeAndAlignment(targetReq, type, &sizeAndAlignment));
 
     if (auto module = type->getModule())
     {
@@ -472,7 +463,7 @@ IROffsetDecoration* findOffsetDecorationForLayout(
 }
 
 Result getOffset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRTypeLayoutRules* rules,
     IRStructField* field,
     IRIntegerValue* outOffset)
@@ -493,7 +484,7 @@ Result getOffset(
         return SLANG_FAIL;
 
     IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(optionSet, rules, structType, &structTypeLayout));
+    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(targetReq, rules, structType, &structTypeLayout));
 
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
@@ -541,7 +532,7 @@ struct CLayoutRules : IRTypeLayoutRules
     CLayoutRules() { ruleName = IRTypeLayoutRuleName::C; }
 
     virtual Result calcSizeAndAlignment(
-        CompilerOptionSet& optionSet,
+        TargetRequest* targetReq,
         IRType* type,
         IRSizeAndAlignment* outSizeAndAlignment)
     {
@@ -550,7 +541,7 @@ struct CLayoutRules : IRTypeLayoutRules
             *outSizeAndAlignment = IRSizeAndAlignment(1, 1);
             return SLANG_OK;
         }
-        return IRTypeLayoutRules::calcSizeAndAlignment(optionSet, type, outSizeAndAlignment);
+        return IRTypeLayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
     }
 
     virtual IRIntegerValue adjustOffset(
@@ -698,7 +689,7 @@ struct LLVMLayoutRules : IRTypeLayoutRules
     LLVMLayoutRules() { ruleName = IRTypeLayoutRuleName::LLVM; }
 
     virtual Result calcSizeAndAlignment(
-        CompilerOptionSet& optionSet,
+        TargetRequest* targetReq,
         IRType* type,
         IRSizeAndAlignment* outSizeAndAlignment)
     {
@@ -707,7 +698,7 @@ struct LLVMLayoutRules : IRTypeLayoutRules
             *outSizeAndAlignment = IRSizeAndAlignment(1, 1);
             return SLANG_OK;
         }
-        return IRTypeLayoutRules::calcSizeAndAlignment(optionSet, type, outSizeAndAlignment);
+        return IRTypeLayoutRules::calcSizeAndAlignment(targetReq, type, outSizeAndAlignment);
     }
 
     virtual IRIntegerValue adjustOffset(
@@ -741,23 +732,23 @@ struct LLVMLayoutRules : IRTypeLayoutRules
 };
 
 Result getNaturalSizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(
-        optionSet,
+        targetReq,
         IRTypeLayoutRules::getNatural(),
         type,
         outSizeAndAlignment);
 }
 
 Result getNaturalOffset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRStructField* field,
     IRIntegerValue* outOffset)
 {
-    return getOffset(optionSet, IRTypeLayoutRules::getNatural(), field, outOffset);
+    return getOffset(targetReq, IRTypeLayoutRules::getNatural(), field, outOffset);
 }
 
 
@@ -766,23 +757,23 @@ Result getNaturalOffset(
 //////////////////////////
 
 Result getStd430SizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment)
 {
     return getSizeAndAlignment(
-        optionSet,
+        targetReq,
         IRTypeLayoutRules::getStd430(),
         type,
         outSizeAndAlignment);
 }
 
 Result getStd430Offset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRStructField* field,
     IRIntegerValue* outOffset)
 {
-    return getOffset(optionSet, IRTypeLayoutRules::getStd430(), field, outOffset);
+    return getOffset(targetReq, IRTypeLayoutRules::getStd430(), field, outOffset);
 }
 
 IRTypeLayoutRules* IRTypeLayoutRules::getStd430()

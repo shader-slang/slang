@@ -127,7 +127,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
+            m_sharedContext->m_targetRequest,
             layoutRules,
             elementType,
             &elementSize);
@@ -142,7 +142,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
         getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
+            m_sharedContext->m_targetRequest,
             layoutRules,
             structType,
             &structSize);
@@ -234,7 +234,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
+            m_sharedContext->m_targetRequest,
             rules,
             structType,
             &sizeAlignment);
@@ -2113,7 +2113,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     break;
                                 IRIntegerValue offset = 0;
                                 if (getOffset(
-                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        m_sharedContext->m_targetRequest,
                                         IRTypeLayoutRules::get(layoutRuleName),
                                         field,
                                         &offset) != SLANG_OK)

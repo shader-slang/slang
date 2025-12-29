@@ -102,7 +102,7 @@ public:
 
         IRSizeAndAlignment sizeAlignment = {};
         getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
+            codeGenContext->getTargetReq(),
             inst->getDataType(),
             &sizeAlignment);
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
@@ -174,7 +174,7 @@ public:
         // Align constantSection.
         IRSizeAndAlignment sizeAlignment;
         getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
+            codeGenContext->getTargetReq(),
             inst->getDataType(),
             &sizeAlignment);
         alignConstSection(sizeAlignment.alignment);
@@ -509,7 +509,7 @@ public:
                     funcBuilder.parameterOffsets.add(operand.offset);
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         inst->getDataType(),
                         &sizeAlignment);
                     funcBuilder.parameterSize =
@@ -523,7 +523,7 @@ public:
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     type,
                     &sizeAlignment);
                 auto varStorage = allocReg(
@@ -541,7 +541,7 @@ public:
             {
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     inst->getDataType(),
                     &sizeAlignment);
                 writeInst(
@@ -556,7 +556,7 @@ public:
             {
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     inst->getOperand(1)->getDataType(),
                     &sizeAlignment);
                 writeInst(
@@ -590,7 +590,7 @@ public:
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     inst->getDataType(),
                     &sizeAlignment);
                 writeInst(
@@ -609,7 +609,7 @@ public:
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     inst->getDataType(),
                     &sizeAlignment);
                 writeInst(
@@ -642,7 +642,7 @@ public:
                     auto paramReg = ensureWorkingsetMemory(funcBuilder, param);
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         param->getDataType(),
                         &sizeAlignment);
                     writeInst(
@@ -719,7 +719,7 @@ public:
                 }
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     inst->getDataType(),
                     &sizeAlignment);
                 writeInst(
@@ -737,7 +737,7 @@ public:
                 {
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         returnInst->getVal()->getDataType(),
                         &sizeAlignment);
                     writeInst(
@@ -761,7 +761,7 @@ public:
                 auto elementType = tryGetPointedToType(&builder, getElemInst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     elementType,
                     &sizeAlignment);
                 auto stride = sizeAlignment.getStride();
@@ -788,7 +788,7 @@ public:
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
                 getNaturalOffset(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     field,
                     &offset);
 
@@ -810,7 +810,7 @@ public:
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getOffsetPtrInst->getDataType());
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     elementType,
                     &sizeAlignment);
                 writeInst(
@@ -832,7 +832,7 @@ public:
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
                 getNaturalOffset(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     field,
                     &offset);
 
@@ -849,7 +849,7 @@ public:
                 auto elementType = getElemInst->getDataType();
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     elementType,
                     &sizeAlignment);
                 auto stride = sizeAlignment.getStride();
@@ -914,7 +914,7 @@ public:
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     elementType,
                     &sizeAlignment);
                 auto stride = (uint32_t)sizeAlignment.getStride();
@@ -938,7 +938,7 @@ public:
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     elementType,
                     &sizeAlignment);
                 auto stride = (uint32_t)sizeAlignment.getStride();
@@ -969,12 +969,12 @@ public:
                     auto field = fields[i];
                     IRIntegerValue offset = 0;
                     getNaturalOffset(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         field,
                         &offset);
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         field->getFieldType(),
                         &sizeAlignment);
                     VMOperand elementOperand = result;
@@ -997,7 +997,7 @@ public:
                     VMOperand elementOperand = result;
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetProgram()->getOptionSet(),
+                        codeGenContext->getTargetReq(),
                         inst->getOperand(i)->getDataType(),
                         &sizeAlignment);
                     writeInst(
@@ -1016,7 +1016,7 @@ public:
                 auto vectorType = as<IRVectorType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     vectorType->getElementType(),
                     &sizeAlignment);
                 auto stride = (uint32_t)sizeAlignment.getStride();
@@ -1039,7 +1039,7 @@ public:
                 auto matrixType = as<IRMatrixType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetProgram()->getOptionSet(),
+                    codeGenContext->getTargetReq(),
                     matrixType->getElementType(),
                     &sizeAlignment);
                 auto stride = (uint32_t)sizeAlignment.getStride();
@@ -1095,7 +1095,7 @@ public:
 
         IRSizeAndAlignment sizeAlignment = {};
         getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
+            codeGenContext->getTargetReq(),
             func->getResultType(),
             &sizeAlignment);
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();

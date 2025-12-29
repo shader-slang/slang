@@ -67,7 +67,7 @@ bool isTypePreferrableToDeferLoad(CodeGenContext* codeGenContext, IRType* type)
     //
     IRSizeAndAlignment sizeAlignment = {};
     if (SLANG_FAILED(getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
+            codeGenContext->getTargetReq(),
             type,
             &sizeAlignment)))
     {

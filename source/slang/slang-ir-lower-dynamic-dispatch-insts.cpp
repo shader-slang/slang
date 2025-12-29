@@ -805,7 +805,7 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(
-            targetProgram->getOptionSet(),
+            targetProgram->getTargetReq(),
             concreteType,
             &sizeAndAlignment);
 
@@ -1660,7 +1660,7 @@ struct ExistentialLoweringContext : public InstPassBase
         //
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(
-            targetProgram->getOptionSet(),
+            targetProgram->getTargetReq(),
             payloadType,
             &sizeAndAlignment);
         if (SLANG_FAILED(result) || sizeAndAlignment.size > anyValueSize)

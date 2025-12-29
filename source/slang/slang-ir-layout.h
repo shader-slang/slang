@@ -22,7 +22,7 @@
 
 namespace Slang
 {
-struct CompilerOptionSet;
+class TargetRequest;
 
 /// Align `value` to the next multiple of `alignment`, which must be a power of two.
 inline IRIntegerValue align(IRIntegerValue value, int alignment)
@@ -58,7 +58,7 @@ public:
 
     /// This function calculates the size and alignment of the given type.
     virtual Result calcSizeAndAlignment(
-        CompilerOptionSet& optionSet,
+        TargetRequest* targetReq,
         IRType* type,
         IRSizeAndAlignment* outSizeAndAlignment);
 
@@ -92,13 +92,13 @@ public:
 };
 
 Result getOffset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRTypeLayoutRules* rules,
     IRStructField* field,
     IRIntegerValue* outOffset);
 
 Result getSizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRTypeLayoutRules* rules,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment);
@@ -110,7 +110,7 @@ Result getSizeAndAlignment(
 /// type is considered to have no natural layout.
 ///
 Result getNaturalSizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment);
 
@@ -121,7 +121,7 @@ Result getNaturalSizeAndAlignment(
 /// field is considered to have no natural offset.
 ///
 Result getNaturalOffset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRStructField* field,
     IRIntegerValue* outOffset);
 
@@ -132,7 +132,7 @@ Result getNaturalOffset(
 /// type is considered to have no std430 layout.
 ///
 Result getStd430SizeAndAlignment(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment);
 
@@ -143,7 +143,7 @@ Result getStd430SizeAndAlignment(
 /// field is considered to have no std430 offset.
 ///
 Result getStd430Offset(
-    CompilerOptionSet& optionSet,
+    TargetRequest* targetReq,
     IRStructField* field,
     IRIntegerValue* outOffset);
 

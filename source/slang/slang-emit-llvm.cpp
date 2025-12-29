@@ -160,7 +160,7 @@ class LLVMTypeTranslator
 {
 private:
     ILLVMBuilder* builder;
-    CompilerOptionSet* compilerOptions;
+    TargetRequest* targetReq;
     const Dictionary<IRInst*, LLVMDebugNode*>* instToDebugLLVM;
 
     Dictionary<IRType*, LLVMType*> valueTypeMap;
@@ -170,9 +170,9 @@ private:
 public:
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
-        CompilerOptionSet& compilerOptions,
+        TargetRequest* targetReq,
         const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM)
-        : builder(builder), compilerOptions(&compilerOptions), instToDebugLLVM(&instToDebugLLVM)
+        : builder(builder), targetReq(targetReq), instToDebugLLVM(&instToDebugLLVM)
     {
     }
 
@@ -613,7 +613,7 @@ public:
                 }
             }
         }
-        Slang::getOffset(*compilerOptions, rules, legalField, &offset);
+        Slang::getOffset(targetReq, rules, legalField, &offset);
         return offset;
     }
 
@@ -624,7 +624,7 @@ public:
         IRSizeAndAlignment sizeAlignment;
 
         Slang::getSizeAndAlignment(
-            *compilerOptions,
+            targetReq,
             rules,
             legalizeResourceTypes(type),
             &sizeAlignment);
@@ -651,7 +651,7 @@ public:
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
         Slang::getSizeAndAlignment(
-            *compilerOptions,
+            targetReq,
             rules,
             vecType->getElementType(),
             &elementAlignment);
@@ -869,7 +869,7 @@ struct LLVMEmitter
         else
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
-        types.reset(new LLVMTypeTranslator(builder, getOptions(), instToDebugLLVM));
+        types.reset(new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);

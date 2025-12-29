@@ -277,7 +277,7 @@ struct PeepholeContext : InstPassBase
                     baseType = inst->getOperand(0)->getDataType();
 
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         baseType,
                         &sizeAlignment)))
                     break;
@@ -1199,7 +1199,7 @@ struct PeepholeContext : InstPassBase
                     auto type = inst->getOperand(0)->getDataType();
                     IRSizeAndAlignment sizeAlignment;
                     const auto res = getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         type,
                         &sizeAlignment);
                     if (!SLANG_SUCCEEDED(res))

@@ -1899,7 +1899,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
                             getSizeAndAlignment(
-                                m_targetProgram->getOptionSet(),
+                                m_targetRequest,
                                 rule,
                                 valueType,
                                 &sizeAndAlignment);
@@ -1907,7 +1907,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         else
                         {
                             getNaturalSizeAndAlignment(
-                                m_targetProgram->getOptionSet(),
+                                m_targetRequest,
                                 valueType,
                                 &sizeAndAlignment);
                         }
@@ -2145,7 +2145,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                         IRSizeAndAlignment sizeAndAlignment;
                         getNaturalSizeAndAlignment(
-                            m_targetProgram->getOptionSet(),
+                            m_targetRequest,
                             elementType,
                             &sizeAndAlignment);
                         stride = (int)sizeAndAlignment.getStride();
@@ -3973,7 +3973,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;
-        getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
+        getNaturalSizeAndAlignment(this->m_targetRequest, varType, &sizeAlignment);
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
             requireVariableBufferCapabilityIfNeeded(varType);
@@ -5910,7 +5910,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             else
             {
                 getOffset(
-                    m_targetProgram->getOptionSet(),
+                    m_targetRequest,
                     IRTypeLayoutRules::get(layoutRuleName),
                     field,
                     &offset);
@@ -5939,7 +5939,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_targetRequest,
                     rule,
                     matrixType->getElementType(),
                     &elementSizeAlignment);
@@ -7293,7 +7293,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
                 else
                     getNaturalSizeAndAlignment(
-                        m_targetProgram->getOptionSet(),
+                        m_targetRequest,
                         ptrType->getValueType(),
                         &sizeAndAlignment);
 
@@ -8836,18 +8836,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &structSizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
 
             List<SpvInst*> members;
             for (auto field : structType->getFields())
             {
                 IRIntegerValue offset = 0;
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalOffset(m_targetProgram->getOptionSet(), field, &offset);
+                getNaturalOffset(m_targetRequest, field, &offset);
 
                 auto fieldType = field->getFieldType();
                 getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_targetRequest,
                     fieldType,
                     &sizeAlignment);
 
@@ -9003,7 +9003,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (auto basicType = as<IRBasicType>(type))
         {
             IRSizeAndAlignment sizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), basicType, &sizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, basicType, &sizeAlignment);
             int spvEncoding = 0;
             StringBuilder sbName;
             getTypeNameHint(sbName, basicType);
@@ -9138,7 +9138,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_forward_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &structSizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_relaxed_extended_instruction"));
             return emitOpDebugForwardRefsComposite(

@@ -261,9 +261,9 @@ struct ByteAddressBufferLegalizationContext
         if (target->getHLSLToVulkanLayoutOptions() &&
             target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430Offset(target->getOptionSet(), field, outOffset);
+            return getStd430Offset(target->getTargetReq(), field, outOffset);
         }
-        return getNaturalOffset(target->getOptionSet(), field, outOffset);
+        return getNaturalOffset(target->getTargetReq(), field, outOffset);
     }
 
     SlangResult getSizeAndAlignment(
@@ -274,9 +274,9 @@ struct ByteAddressBufferLegalizationContext
         if (target->getHLSLToVulkanLayoutOptions() &&
             target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430SizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
+            return getStd430SizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
         }
-        return getNaturalSizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
+        return getNaturalSizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
     }
 
     // The core workhorse routine for the load case is `emitLegalLoad`,
@@ -384,7 +384,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -482,7 +482,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     vecType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -605,7 +605,7 @@ struct ByteAddressBufferLegalizationContext
         //
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(
-            m_targetProgram->getOptionSet(),
+            m_target,
             elementType,
             &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
@@ -708,7 +708,7 @@ struct ByteAddressBufferLegalizationContext
 
                 IRSizeAndAlignment typeLayout;
                 SLANG_RETURN_NULL_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
+                    getNaturalSizeAndAlignment(m_target, type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -726,7 +726,7 @@ struct ByteAddressBufferLegalizationContext
             // sized. We need to lower such loads.
             IRSizeAndAlignment sizeAlignment;
             SLANG_RETURN_NULL_ON_FAIL(
-                getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+                getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to load the value as two 4-byte values and then combine them.
@@ -1234,7 +1234,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the stores.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -1327,7 +1327,7 @@ struct ByteAddressBufferLegalizationContext
 
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     vecType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -1420,7 +1420,7 @@ struct ByteAddressBufferLegalizationContext
 
                 IRSizeAndAlignment typeLayout;
                 SLANG_RETURN_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
+                    getNaturalSizeAndAlignment(m_target, type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -1438,7 +1438,7 @@ struct ByteAddressBufferLegalizationContext
             // sized. We need to lower such stores.
             IRSizeAndAlignment sizeAlignment;
             SLANG_RETURN_ON_FAIL(
-                getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+                getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to store the value as two 4-byte values.
@@ -1539,7 +1539,7 @@ struct ByteAddressBufferLegalizationContext
         //
         IRSizeAndAlignment elementLayout;
         SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(
-            m_targetProgram->getOptionSet(),
+            m_target,
             elementType,
             &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();

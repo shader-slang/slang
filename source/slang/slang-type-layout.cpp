@@ -3364,6 +3364,14 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
     TargetBuiltinTypeLayoutInfo info;
     info.genericPointerSize = 8; // Assume 64-bit pointers by default.
 
+    // If we don't know the target, we just have to assume the defaults. This
+    // type of usage occurs in IR checking passes prior to target-specific
+    // emission, e.g. checkForOperatorShiftOverflow. Because we don't yet know
+    // the size of pointers when that pass runs, we just assume it's 64 bits
+    // because that's the case most of the time.
+    if (!targetReq)
+        return info;
+
     // If we're using an LLVM target, we should ask from LLVM.
     if (isCPUTargetViaLLVM(targetReq) && getLLVMBuiltinTypeLayoutInfo(targetReq, &info))
         return info;

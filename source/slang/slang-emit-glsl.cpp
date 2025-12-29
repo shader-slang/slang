@@ -2111,7 +2111,7 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     auto ptrTypeName = getName(ptrType);
     IRSizeAndAlignment sizeAlignment;
     getNaturalSizeAndAlignment(
-        m_codeGenContext->getTargetProgram()->getOptionSet(),
+        m_codeGenContext->getTargetReq(),
         ptrType->getValueType(),
         &sizeAlignment);
     auto alignment = sizeAlignment.alignment;

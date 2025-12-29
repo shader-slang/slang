@@ -221,7 +221,7 @@ static void reportCheckpointIntermediates(
     IRModule* irModule)
 {
     // Report checkpointing information
-    CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+    TargetRequest* targetReq = codeGenContext->getTargetReq();
     SourceManager* sourceManager = sink->getSourceManager();
 
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
@@ -245,7 +245,7 @@ static void reportCheckpointIntermediates(
             continue;
 
         IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
 
         // Reporting happens before empty structs are optimized out
         // and we still want to keep the checkpointing decorations,
@@ -265,7 +265,7 @@ static void reportCheckpointIntermediates(
         {
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
             if (fieldSize.size == 0)
                 continue;
 

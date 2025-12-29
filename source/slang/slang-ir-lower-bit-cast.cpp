@@ -76,7 +76,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
+                        getNaturalOffset(targetProgram->getTargetReq(), field, &fieldOffset) ==
                         SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
@@ -95,7 +95,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         arrayType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
@@ -121,7 +121,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         vectorType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -151,7 +151,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         elementType,
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -230,9 +230,9 @@ struct BitCastLoweringContext
         auto toType = inst->getDataType();
 
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;
