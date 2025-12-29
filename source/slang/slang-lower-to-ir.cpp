@@ -13070,7 +13070,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
     bool minimumOptimizations =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
@@ -13140,7 +13140,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
                     changed |=
-                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                        applySparseConditionalConstantPropagation(func, nullptr, compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);

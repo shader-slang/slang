@@ -1415,7 +1415,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 
 bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
-    if (inst != tryConstantFoldInst(module, inst))
+    if (inst != tryConstantFoldInst(module, target, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());

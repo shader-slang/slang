@@ -1002,7 +1002,7 @@ struct IntInfo
     bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
 };
 
-IntInfo getIntTypeInfo(const IRType* intType);
+IntInfo getIntTypeInfo(IRType* intType);
 
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);

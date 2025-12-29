@@ -2490,7 +2490,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
 
         changed = false;
 
-        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
 
         for (auto inst : module->getGlobalInsts())
@@ -2503,7 +2503,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
             while (funcChanged && funcIterationCount < kMaxFuncIterations)
             {
                 funcChanged = false;
-                funcChanged |= applySparseConditionalConstantPropagation(func, sink);
+                funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 funcChanged |= removeRedundancyInFunc(func, false);
                 CFGSimplificationOptions options;

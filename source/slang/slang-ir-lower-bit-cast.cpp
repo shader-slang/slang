@@ -181,10 +181,6 @@ struct BitCastLoweringContext
         case kIROp_UIntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
-#if SLANG_PTR_IS_32
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 object = builder.emitCast(builder.getUIntType(), object);
@@ -194,16 +190,26 @@ struct BitCastLoweringContext
         case kIROp_DoubleType:
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
+            {
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
+                object = builder.emitCast(builder.getUInt64Type(), object);
+                return builder.emitBitCast(type, object);
+            }
+            break;
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-#endif
         case kIROp_RawPointerType:
         case kIROp_PtrType:
         case kIROp_FuncType:
             {
-                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
-                object = builder.emitCast(builder.getUInt64Type(), object);
+                IRInst* object;
+                auto ptrSize = getPointerSize(targetProgram->getTargetReq());
+                object = extractValueAtOffset(builder, targetProgram, src, offset, ptrSize);
+                object = builder.emitCast(
+                    ptrSize == sizeof(uint64_t) ?
+                    (IRType*)builder.getUInt64Type() : 
+                    (IRType*)builder.getUIntType(),
+                    object);
                 return builder.emitBitCast(type, object);
             }
             break;

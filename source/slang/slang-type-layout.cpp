@@ -244,8 +244,8 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 
     SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) override
     {
-        TargetBuiltinTypeLayoutInfo info = getBuiltinTypeLayoutInfo(context.targetReq);
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, info.genericPointerSize, info.genericPointerSize);
+        auto pointerSize = getPointerSize(context.targetReq);
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, pointerSize, pointerSize);
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -3371,6 +3371,12 @@ TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
         break;
     }
     return info;
+}
+
+size_t getPointerSize(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info = getBuiltinTypeLayoutInfo(targetReq);
+    return info.genericPointerSize;
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)

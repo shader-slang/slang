@@ -7678,7 +7678,7 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
-IntInfo getIntTypeInfo(const IRType* intType)
+IntInfo getIntTypeInfo(IRType* intType)
 {
     switch (intType->getOp())
     {

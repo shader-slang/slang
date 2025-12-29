@@ -1101,12 +1101,15 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         }
     case kIROp_IntPtrType:
         {
-#if SLANG_PTR_IS_64
-            _requireBaseType(BaseType::Int64);
-            m_writer->emit("i64");
-#else
-            m_writer->emit("i");
-#endif
+            if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            {
+                _requireBaseType(BaseType::Int64);
+                m_writer->emit("i64");
+            }
+            else
+            {
+                m_writer->emit("i");
+            }
             break;
         }
 
@@ -1130,12 +1133,15 @@ void GLSLSourceEmitter::_emitGLSLTypePrefix(IRType* type, bool promoteHalfToFloa
         }
     case kIROp_UIntPtrType:
         {
-#if SLANG_PTR_IS_64
-            _requireBaseType(BaseType::Int64);
-            m_writer->emit("u64");
-#else
-            m_writer->emit("u");
-#endif
+            if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            {
+                _requireBaseType(BaseType::Int64);
+                m_writer->emit("u64");
+            }
+            else
+            {
+                m_writer->emit("u");
+            }
             break;
         }
     case kIROp_BoolType:
@@ -3359,22 +3365,28 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_IntPtrType:
         {
-#if SLANG_PTR_IS_64
-            _requireBaseType(BaseType::Int64);
-            m_writer->emit("int64_t");
-#else
-            m_writer->emit("int");
-#endif
+            if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            {
+                _requireBaseType(BaseType::Int64);
+                m_writer->emit("int64_t");
+            }
+            else
+            {
+                m_writer->emit("int");
+            }
             return;
         }
     case kIROp_UIntPtrType:
         {
-#if SLANG_PTR_IS_64
-            _requireBaseType(BaseType::UInt64);
-            m_writer->emit("uint64_t");
-#else
-            m_writer->emit("uint");
-#endif
+            if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            {
+                _requireBaseType(BaseType::UInt64);
+                m_writer->emit("uint64_t");
+            }
+            else
+            {
+                m_writer->emit("uint");
+            }
             return;
         }
     case kIROp_VoidType:

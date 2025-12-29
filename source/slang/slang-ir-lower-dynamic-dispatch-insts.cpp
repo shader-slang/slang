@@ -764,7 +764,7 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         SlangInt maxSize = 0;
         for (auto type : types)
         {
-            auto size = getAnyValueSize(type);
+            auto size = getAnyValueSize(type, targetProgram);
             if (size > maxSize)
                 maxSize = size;
 

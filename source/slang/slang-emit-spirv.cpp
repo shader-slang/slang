@@ -1085,13 +1085,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_PtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 if (auto val = as<IRIntLit>(inst))
                     return SpvLiteralBits::from64(uint64_t(val->getValue()));
+                break;
+            }
+        case kIROp_PtrType:
+        case kIROp_UIntPtrType:
+            {
+                if (auto val = as<IRIntLit>(inst))
+                {
+                    if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
+                        return SpvLiteralBits::from64(uint64_t(val->getValue()));
+                    else
+                        return SpvLiteralBits::from32(uint32_t(val->getValue()));
+                }
                 break;
             }
         default:
@@ -1119,12 +1127,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_PtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
+                break;
+            }
+        case kIROp_PtrType:
+        case kIROp_UIntPtrType:
+            {
+                if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
+                    result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
+                else
+                    result = emitOpConstant(inst, type, SpvLiteralBits::from32(uint32_t(val)));
                 break;
             }
         default:

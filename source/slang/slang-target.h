@@ -99,6 +99,7 @@ bool isKernelTarget(CodeGenTarget codeGenTarget);
 
 // Determine the size of target-specific built-in types, like pointers.
 TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq);
+size_t getPointerSize(TargetRequest* targetReq);
 
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject

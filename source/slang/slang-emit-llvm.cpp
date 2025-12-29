@@ -820,10 +820,6 @@ struct LLVMEmitter
         getOptions().writeCommandLineArgs(codeGenContext->getSession(), sb);
         auto params = sb.toString();
 
-        // TODO: Should probably complain here if the target machine's pointer
-        // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
-        // rather just fix the whole pointer size mechanism in Slang.
-
         LLVMBuilderOptions builderOpt;
         builderOpt.target = asExternal(codeGenContext->getTargetFormat());
         builderOpt.targetTriple = CharSlice();
