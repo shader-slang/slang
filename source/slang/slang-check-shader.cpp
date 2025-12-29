@@ -6,7 +6,10 @@
 // enumerating specialization parameters, and validating
 // attempts to specialize shader code.
 
+#include "slang-ir-insts.h"
+#include "slang-ir.h"
 #include "slang-lookup.h"
+#include "slang-mangle.h"
 
 namespace Slang
 {
@@ -746,7 +749,102 @@ bool resolveStageOfProfileWithEntryPoint(
         entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
+
+    // No [shader(...)] attribute found. The entry point was likely specified via
+    // API or command line.
+    auto entryPointProfileStage = entryPointProfile.getStage();
+
+    // If the stage is already specified in the profile (from API/command line), we're done.
+    if (entryPointProfileStage != Stage::Unknown)
+        return true;
+
+    // Could not determine stage
     return false;
+}
+
+/// Check if a parameter has a varying input semantic (SV_Position, SV_InstanceID, etc.)
+static bool _isVaryingInputParam(IRParam* param)
+{
+    // Check if the parameter has a semantic decoration that indicates
+    // it's a varying input (system values or user-defined varyings).
+    if (param->findDecoration<IRSemanticDecoration>())
+    {
+        // All semantically-decorated parameters on entry points are varying inputs
+        // (they come from the pipeline, not from function calls)
+        return true;
+    }
+    return false;
+}
+
+/// Transform entry point parameters from value types to BorrowInParamType.
+///
+/// When an entry point is discovered via findAndCheckEntryPoint without a
+/// [shader(...)] attribute, the IR was generated with value-type parameters.
+/// This function transforms those parameters to use BorrowInParamType, which
+/// is what the downstream IR passes expect for entry point varying inputs.
+///
+static void _fixupEntryPointVaryingParameters(IRFunc* func)
+{
+    if (!func || !func->getFirstBlock())
+        return;
+
+    IRModule* irModule = func->getModule();
+    IRBuilder builder(irModule);
+
+    // Get the first ordinary instruction in the first block - we'll insert loads before it
+    auto firstBlock = func->getFirstBlock();
+    auto insertPoint = firstBlock->getFirstOrdinaryInst();
+
+    bool modified = false;
+
+    for (auto param : func->getParams())
+    {
+        // Skip parameters that are already pointer types
+        if (as<IRPtrTypeBase>(param->getDataType()))
+            continue;
+
+        // Only transform parameters that are varying inputs
+        if (!_isVaryingInputParam(param))
+            continue;
+
+        // Get the original value type
+        IRType* valueType = param->getDataType();
+
+        // Create the new BorrowInParamType
+        builder.setInsertBefore(func);
+        IRType* borrowInType = builder.getBorrowInParamType(valueType, AddressSpace::Generic);
+
+        // Change the parameter's type
+        param->setFullType(borrowInType);
+        // Update the use if the parameter is used
+        if (param->firstUse)
+        {
+            // Insert a load instruction at the start of the function body
+            builder.setInsertBefore(insertPoint);
+            IRInst* loadedValue = builder.emitLoad(valueType, param);
+
+            // Replace all uses of the parameter (except the load we just created)
+            // with the loaded value
+            IRUse* nextUse = nullptr;
+            for (IRUse* use = param->firstUse; use; use = nextUse)
+            {
+                nextUse = use->nextUse;
+
+                // Don't replace the load instruction's use of the parameter
+                if (use->getUser() == loadedValue)
+                    continue;
+
+                use->set(loadedValue);
+            }
+        }
+        modified = true;
+    }
+
+    // If we modified any parameters, update the function's type
+    if (modified)
+    {
+        fixUpFuncType(func);
+    }
 }
 
 // Given an entry point specified via API or command line options,
@@ -799,9 +897,33 @@ RefPtr<EntryPoint> findAndValidateEntryPoint(FrontEndEntryPointRequest* entryPoi
         linkage->targets,
         entryPointFuncDeclRef.getDecl(),
         sink);
-    // TODO: Should we attach a `[shader(...)]` attribute to an
-    // entry point that didn't have one, so that we can have
-    // a more uniform representation in the AST?
+
+
+    auto funcDecl = entryPointFuncDeclRef.getDecl();
+    if (!funcDecl->hasModifier<EntryPointAttribute>())
+    {
+        // We attach a `[shader(...)]` attribute to an
+        // entry point that didn't have one, so that we can have
+        // a more uniform representation in the AST
+        auto astBuilder = linkage->getASTBuilder();
+        auto entryPointAttr = astBuilder->create<EntryPointAttribute>();
+        entryPointAttr->capabilitySet = entryPointProfile.getCapabilityName().freeze(astBuilder);
+        addModifier(funcDecl, entryPointAttr);
+
+        // Since the entry point could be lowered without the [shader(...)]
+        // attribute, its IR has value-type parameters instead of BorrowInParamType.
+        // We need to fix up the IR now.
+        auto module = translationUnit->getModule();
+        if (auto irModule = module->getIRModule())
+        {
+            String mangledName = getMangledName(astBuilder, funcDecl);
+            auto irFuncs = irModule->findSymbolByMangledName(mangledName);
+            if (auto irFunc = as<IRFunc>(irFuncs[0]))
+            {
+                _fixupEntryPointVaryingParameters(irFunc);
+            }
+        }
+    }
 
     RefPtr<EntryPoint> entryPoint =
         EntryPoint::create(linkage, entryPointFuncDeclRef, entryPointProfile);
