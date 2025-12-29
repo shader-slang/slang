@@ -49,7 +49,7 @@ groupshared bool s_resultMem[BatchSize/32];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-// Initialize the weight matrix as half(0.5).
+// Initialize the weight matrix as 0.5
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
 {
     uint numIter = (OutputSize + BatchSize - 1) / BatchSize;
@@ -70,7 +70,8 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
 }
 
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM]
+testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
@@ -154,16 +155,15 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     }
 
     bool res = true;
-    if (tid < OutputSize)
+
+
+    DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
+    for (int i = 0; i < OutputSize; i++)
     {
-        DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
-        for (int i = 0; i < OutputSize; i++)
+        if (outputVector[i] != DType(expected))
         {
-            if (outputVector[i] != DType(expected))
-            {
-                res = false;
-                break;
-            }
+            res = false;
+            break;
         }
     }
 
