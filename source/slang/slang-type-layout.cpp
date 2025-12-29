@@ -216,10 +216,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::Int64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::IntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout();
 
         case BaseType::UInt8:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
@@ -230,10 +227,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::UInt64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::UIntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout();
 
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
@@ -698,24 +692,11 @@ struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
         {
         case BaseType::Bool:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
-        case BaseType::IntPtr:
-        case BaseType::UIntPtr:
-            // TODO: Hardcoded size and alignment for 64 bit pointers. This is
-            // excessive if the target is 32-bit, but should work everywhere in
-            // practice. There will simply be unused bytes.
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
 
         // This always returns a layout where the size is the same as the alignment.
         default:
             return Super::GetScalarLayout(baseType);
         }
-    }
-
-    SimpleLayoutInfo GetPointerLayout() override
-    {
-        // TODO: Hardcoded size and alignment for 64 bit pointers. Leads to
-        // wasted bytes on 32-bit targets.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
     }
 
     SimpleLayoutInfo GetVectorLayout(
