@@ -1,6 +1,6 @@
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 import neural;
 
@@ -90,12 +90,14 @@ void BasicTestWithoutBias(int tid, int resIndex)
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
+    // serialRead<16, half>(tid, __getAddress(shMem[0]));
+    // serialRead<16, half>(tid, __getAddress(shMem[0]) + 32);
 
     // (1*1 + 2*2 + 3*3 + 4*4) = 30.0
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
-    bool isPassed = (outputVec[0] == 30.0 && outputVec[1] == 70.0);
-    if (tid == 0)
-        printf("outputVec: %.1f %.1f\n", float(outputVec[0]), float(outputVec[1]));
+    bool isPassed = true;
+    isPassed = isPassed && (outputVec[0] == 30.0 && outputVec[1] == 70.0);
+
 
     var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
     let dRes = OutVectorType(1.0f);
@@ -110,6 +112,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     isPassed = isPassed &&
         dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
+
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
     //    = [[1, 2, 3, 4]; [1, 2, 3, 4]]
@@ -119,7 +122,6 @@ void BasicTestWithoutBias(int tid, int resIndex)
         dParameters[0] == 32.0 && dParameters[1] == 64.0 && dParameters[2] == 96.0 && dParameters[3] == 128.0 &&
         dParameters[4] == 32.0 && dParameters[5] == 64.0 && dParameters[6] == 96.0 && dParameters[7] == 128.0;
 
-
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
@@ -127,9 +129,10 @@ void BasicTestWithoutBias(int tid, int resIndex)
     }
 }
 
-void serialRead(uint tid, SPtr<uint4> sharedMem)
+// This function is just used for debugging, not for verification. So keep it here.
+void serialRead<int Stride, T : __BuiltinFloatingPointType>(uint tid, SPtr<uint4> sharedMem)
 {
-    GroupMemoryBarrierWithWaveSync();
+    GroupMemoryBarrierWithGroupSync();
 
     if (tid > 0)
         return;
@@ -137,19 +140,27 @@ void serialRead(uint tid, SPtr<uint4> sharedMem)
     for (int id = 0; id < 16; id++)
     {
         printf("tid: %d\n", id);
-        for (int i = 0; i < 2; i++)
+        int strideInVector = Stride / (sizeof(uint4) / sizeof(T));
+        for (int i = 0; i < strideInVector; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = sharedMem[id * strideInVector + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
                 uint value = element[j];
-                uint16_t a = (uint16_t)(value & 0xFFFF);
-                uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
+                if (sizeof(T) == 2)
+                {
+                    uint16_t a = (uint16_t)(value & 0xFFFF);
+                    uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
 
-                half aa = bit_cast<half>(a);
-                half bb = bit_cast<half>(b);
-                printf("%.1f %.1f ", float(aa), float(bb));
+                    half aa = bit_cast<half>(a);
+                    half bb = bit_cast<half>(b);
+                    printf("%.1f %.1f ", float(aa), float(bb));
+                }
+                else
+                {
+                    printf("%f ", bit_cast<float>(value));
+                }
             }
         }
         printf("\n");
