@@ -3330,6 +3330,68 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
            ArtifactStyle::Kernel;
 }
 
+static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltinTypeLayoutInfo* out)
+{
+    CompilerOptionSet& compileOptions = targetReq->getOptionSet();
+
+    // On LLVM targets, we need to query the sizes from LLVM itself, based
+    // on the target triple.
+    Session* session = targetReq->getSession();
+    ISlangSharedLibrary* llvmLib = session->getOrLoadSlangLLVM();
+    if (!llvmLib)
+        return false;
+
+    auto targetTripleOption = compileOptions.getStringOption(
+        CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
+    CharSlice targetTriple =
+        CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+
+    using InfoFuncV1 = SlangResult (*)(
+        Slang::CharSlice targetTriple,
+        Slang::TargetBuiltinTypeLayoutInfo* info);
+
+    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
+
+    if (!infoFunc)
+        return false;
+
+    SlangResult result = infoFunc(targetTriple, out);
+    return result == SLANG_OK;
+}
+
+TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info;
+    info.genericPointerSize = 8; // Assume 64-bit pointers by default.
+
+    // If we're using an LLVM target, we should ask from LLVM.
+    if (isCPUTargetViaLLVM(targetReq) && getLLVMBuiltinTypeLayoutInfo(targetReq, &info))
+        return info;
+
+    // Otherwise, we can make educated guesses based on the targets.
+    switch (targetReq->getTarget())
+    {
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+        // Assume we're targeting the compiler's host, so we can just get the
+        // pointer size from the host here.
+        info.genericPointerSize = sizeof(void*);
+        break;
+    }
+    return info;
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language

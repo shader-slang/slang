@@ -8,12 +8,12 @@
 // code generation and/or layout for that target.
 //
 
+#include "../compiler-core/slang-target-builtin-type-layout-info.h"
 #include "../core/slang-string.h"
 #include "slang-ast-base.h"
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
-#include "slang-target-builtin-type-layout-info.h"
 
 #include <slang.h>
 
@@ -97,6 +97,9 @@ bool isWGPUTarget(CodeGenTarget target);
 // Are we generating code for a Kernel-style target (as opposed to host-style target)
 bool isKernelTarget(CodeGenTarget codeGenTarget);
 
+// Determine the size of target-specific built-in types, like pointers.
+TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq);
+
 /// A request to generate output in some target format.
 class TargetRequest : public RefObject
 {
@@ -145,14 +148,11 @@ public:
 
     HLSLToVulkanLayoutOptions* getHLSLToVulkanLayoutOptions();
 
-    ITargetBuiltinTypeLayoutInfo* getBuiltinTypeLayoutInfo();
-
 private:
     Linkage* linkage = nullptr;
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
-    ComPtr<ITargetBuiltinTypeLayoutInfo> builtinTypeLayoutInfo;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?

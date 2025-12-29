@@ -19,6 +19,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LinkAllPasses.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
@@ -34,6 +35,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 
 // Jit
 #include "llvm/ExecutionEngine/JITEventListener.h"
@@ -56,6 +58,7 @@
 #include <compiler-core/slang-artifact-desc-util.h>
 #include <compiler-core/slang-downstream-compiler.h>
 #include <compiler-core/slang-slice-allocator.h>
+#include <compiler-core/slang-target-builtin-type-layout-info.h>
 #include <core/slang-com-object.h>
 #include <core/slang-hash.h>
 #include <core/slang-list.h>
@@ -1060,4 +1063,26 @@ createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCom
     }
 
     return SLANG_E_NO_INTERFACE;
+}
+
+extern "C" SLANG_DLL_EXPORT SlangResult
+getLLVMTargetBuiltinTypeLayoutInfo_V1(Slang::CharSlice targetTripleSlice, Slang::TargetBuiltinTypeLayoutInfo* out)
+{
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+
+    std::string targetTripleStr;
+    if (targetTripleSlice.count != 0)
+        targetTripleStr = std::string(targetTripleSlice.begin(), targetTripleSlice.count);
+    else
+        targetTripleStr = llvm::sys::getDefaultTargetTriple();
+
+    llvm::Triple targetTriple(targetTripleStr);
+
+    unsigned pointerBits = targetTriple.getArchPointerBitWidth();
+
+    out->genericPointerSize = pointerBits / 8;
+
+    return SLANG_OK;
 }
