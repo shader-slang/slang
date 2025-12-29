@@ -181,11 +181,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
     bool res = verifyResult<OutputSize>(tid, outputVector);
 
-    // if (resIndex == 4)
-    // {
-    //     resultBuffer[tid] = res ? 1 : 0;
-    // }
-
     // each warp will check the result
     res = WaveActiveAllTrue(res);
 
