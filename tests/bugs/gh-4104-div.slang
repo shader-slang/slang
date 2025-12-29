@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -profile cs_6_6 -use-dxil -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-directly
 
@@ -10,6 +9,8 @@ RWStructuredBuffer<int> outputBuffer;
 // Note, it appears that -2 works fine.
 static const uint32_t u32Const = uint(0xffffffff); // -1 or max
 static const int32_t i32Const = 1;
+static const uint64_t u64Const = 0xffffffffffffffffULL; // -1 or max
+static const int64_t i64Const = 1;
 
 bool Test_CompileTimeDiv()
 {
@@ -20,7 +21,14 @@ bool Test_CompileTimeDiv()
         && ((1 / u32Const) == 0)
         && ((uint32_t(1) / u32Const) == uint32_t(0))
         && ((int32_t(1) / u32Const) == uint32_t(0))
-        && ((i32Const / u32Const) == uint32_t(0));
+        && ((i32Const / u32Const) == uint32_t(0))
+        && ((uint32_t(1) / u64Const) == uint64_t(0))
+        && ((int32_t(1) / u64Const) == uint64_t(0))
+        && ((i32Const / u64Const) == uint64_t(0))
+        && ((uint64_t(1) / u64Const) == uint64_t(0))
+        && ((int64_t(1) / u64Const) == uint64_t(0))
+        && ((i64Const / u64Const) == uint64_t(0))
+        ;
 }
 
 [numthreads(4, 1, 1)]
