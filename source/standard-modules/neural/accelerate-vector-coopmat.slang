@@ -61,6 +61,7 @@ internal int getWaveCount()
 // and implement both of them, and document about the difference between them.
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
+
 // A wrapper of matrix type to access each tile of the matrix
 // Note: The reason we want to make SubgroupSize as a generic parameter instead of using WaveGetLaneCount() is that
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
@@ -415,11 +416,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     return;
 
                 // in store case, we always store MatC, so the data type is T.
-                uint4 tempValue = sharedMemoryBSubgroup[indexInVectorizedTile + yInTile];
-                float debugVal = float(startIndex);
-                uint debugValUint = bit_cast<uint>(debugVal);
-
-                uint4 value = tempValue;//uint4(tempValue.x, debugValUint, debugValUint, debugValUint);
+                uint4 value = sharedMemoryBSubgroup[indexInVectorizedTile + yInTile];
                 accessUint4Aligned<AccessOp.WRITE, T, U, InputArray>(inoutVector, startIndex, value);
             }
             else
@@ -814,19 +811,15 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             {
                 matC[i * NCoopMatColumn + j].Store<ColumnMajor, uint4>( ptrPerWarp + j * CoopMatCSizeInVector, HeightInVectorTileC);
             }
-
             // Store one row of tiled result matrix back to the thread-local vector.
             storeVectorFromShB(ptrC, i, subgroupIndex, outputVector);
-
 
             // Wave sync is good enough, because shared memory C is only shared by each subgroup.
             GroupMemoryBarrierWithWaveSync();
         }
-
         return outputVector;
     }
 }
-
 
 // Cooperative matrix is only supported by CUDA and SPIR-V
 [require(cooperative_matrix, subgroup_basic)]
@@ -840,7 +833,16 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
 
     public no_diff SPtr<uint4> sharedMemoryPtr;
 
-    internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(T);
+    private typealias DTypeMatC = half;
+
+    // TODO: This is just an easiest solution to make the alignment work. But the disadvantage is wasting of registers.
+    //       A better solution is that we can implement a "special" alignment rule for the vectorized reader.
+    //       Normally, the alignment rule is that one uint4 can pack 8 half type elements, so we want our internal data
+    //       is always 8 elements aligned. But we can have a "byte-aligned" rule such that we just need our data is 16 bytes aligned.
+    //       So for example, float[4] is also considered as aligned. We can just pack 4 elements into a uint4, the remaining 4 elements
+    //       just fill with 0.
+    // Since we always use half type for A and B, we want to follow the alignment requirement of half type.
+    internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(DTypeMatC);
     internal static const int Uint4AlignedInputSize = ((N + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
     // [DerivativeMember(Differential.data)]
@@ -854,44 +856,51 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
-            if (i < N)
-            {
-                this.data[i] = value;
-            }
-            else
-            {
-                this.data[i] = T(0.0f);
-            }
+            this.data[i] = value;
         }
+
+        cleanPaddingData();
     }
 
-    public __init(T[N] data)
+    public __init(T[N] inData)
     {
         [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
-            this.data[i] = data[i];
+            this.data[i] = inData[i];
         }
 
-        [ForceUnroll]
-        for (int i = N; i < Uint4AlignedInputSize; i++)
-        {
-            this.data[i] = T(0.0f);
-        }
+        cleanPaddingData();
     }
 
-    internal __init(T[Uint4AlignedInputSize] data)
+    internal __init(T[Uint4AlignedInputSize] inData)
     {
-        this.data = data;
+        this.data = inData;
     }
 
     public __init(This other) { this.data = other.data; }
 
-    public __init<InputArray : IArray<T>>(InputArray data)
+    public __init<InputArray : IArray<T>>(InputArray inData)
     {
         [ForceUnroll]
         for (int i = 0; i < N; i++)
-            this.data[i] = data[i];
+            this.data[i] = inData[i];
+
+        cleanPaddingData();
+    }
+
+    [ForceInline]
+    [mutating]
+    internal void cleanPaddingData()
+    {
+        const int elementCountPerUint4 = sizeof(uint4) / sizeof(DTypeMatC);
+        const int alignedSize = ((N + (elementCountPerUint4 - 1)) / elementCountPerUint4) * elementCountPerUint4;
+
+        [ForceUnroll]
+        for (int i = N; i < alignedSize; i++)
+        {
+            this.data[i] = T(0.0f);
+        }
     }
 
     public __subscript(int index) -> T
@@ -908,7 +917,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         where Storage.Address == Storage.Differential.Address
         where OutputVector : IVector<T, OutputSize>
     {
-        typealias MMA = MMAHelper<half, N, OutputSize, SubgroupSize, Target, false>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputSize, SubgroupSize, Target, false>;
         SPtr<uint4> shA = sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
@@ -928,7 +937,7 @@ public struct AccelerateVectorCoopMat<T, int N, int SubgroupSize> : IVector<T, N
         where OutputVector : IVector<T, OutputSize>
         where OutputVector.Differential : IVector<T.Differential, OutputSize>
     {
-        typealias MMA = MMAHelper<half, N, OutputSize, SubgroupSize, Target, true>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputSize, SubgroupSize, Target, true>;
 
         SPtr<uint4> shA = dthis.p.sharedMemoryPtr;
         SPtr<uint4> shB = shA + MMA.SharedMemSizeInVectorMatA;
