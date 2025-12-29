@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target glsl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -profile cs_6_6 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-directly
 
@@ -27,7 +28,7 @@ bool Test_CompileTimeMod()
         && ((i32Const % u64Const) == i64Const)
         && ((uint64_t(1) % u64Const) == uint64_t(1))
         && ((int64_t(1) % u64Const) == uint64_t(1))
-        && ((i64Const % u64Const) == i64Const)
+        && ((i32Const % u64Const) == i64Const)
         ;
 }
 
