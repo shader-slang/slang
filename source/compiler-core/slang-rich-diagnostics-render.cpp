@@ -2,6 +2,8 @@
 #include "../core/slang-list.h"
 #include "../core/slang-string-util.h"
 #include "../core/slang-string.h"
+#include "compiler-core/slang-diagnostic-sink.h"
+#include "compiler-core/slang-source-loc.h"
 
 #include <algorithm>
 #include <cctype>
@@ -14,12 +16,12 @@
 #include <string>
 #include <utility>
 
-using namespace Slang;
-
 // ============================================================================
 // CORE DATA STRUCTURES
 // ============================================================================
 
+namespace Slang
+{
 namespace
 {
 struct SourceLoc
@@ -73,10 +75,11 @@ struct GenericDiagnostic
 struct TestData
 {
     const char* name;
-    const char* sourceFile;
+    const char* sourceFileName;
     const char* sourceContent;
     const char* expectedOutput;
     GenericDiagnostic diagnostic;
+    SourceFile* sourceFile = nullptr;
 };
 
 // ============================================================================
@@ -85,7 +88,7 @@ struct TestData
 
 TestData testCases[] = {
     {.name = "undeclared_identifier",
-     .sourceFile = "example.slang",
+     .sourceFileName = "example.slang",
      .sourceContent = R"(
 struct VertexInput {
     float4 position : POSITION;
@@ -115,7 +118,7 @@ error[E1001]: use of undeclared identifier 'someSampler'
           .notes = List<DiagnosticNote>()}},
 
     {.name = "type_mismatch_with_secondary",
-     .sourceFile = "example.slang",
+     .sourceFileName = "example.slang",
      .sourceContent = R"(
 struct VertexInput {
     float4 position : POSITION;
@@ -161,7 +164,7 @@ error[E1002]: cannot add `float4` and `int`
           .notes = List<DiagnosticNote>()}},
 
     {.name = "undeclared_variable",
-     .sourceFile = "example.slang",
+     .sourceFileName = "example.slang",
      .sourceContent = R"(
 struct VertexInput {
     float4 position : POSITION;
@@ -190,7 +193,7 @@ error[E1003]: use of undeclared identifier 'undefinedVariable'
           .notes = List<DiagnosticNote>()}},
 
     {.name = "wrong_type_assignment",
-     .sourceFile = "example.slang",
+     .sourceFileName = "example.slang",
      .sourceContent = R"(
 struct VertexInput {
     float4 position : POSITION;
@@ -227,7 +230,7 @@ error[E1004]: mismatched types
           .notes = List<DiagnosticNote>()}},
 
     {.name = "division_by_zero_warning",
-     .sourceFile = "math.slang",
+     .sourceFileName = "math.slang",
      .sourceContent = R"(
 float3 normalize(float3 v) {
     float len = sqrt(dot(v, v));
@@ -278,7 +281,7 @@ note: consider using 'normalize' builtin function instead
          }()}},
 
     {.name = "mismatched_types_complex",
-     .sourceFile = "example.slang",
+     .sourceFileName = "example.slang",
      .sourceContent = R"(
 struct Data {
     string name = "User";
@@ -824,6 +827,7 @@ int runDiff(const std::string& expected, const std::string& actual)
 
 int slangRichDiagnosticsUnitTest(int argc, char* argv[])
 {
+
     // The harness accepts an optional `--until N` switch so developers can run a
     // prefix of the fixture set; we parse it once, fall back to all tests, then
     // drive a simple pass/fail loop that renders diagnostics, compares them to the
@@ -852,10 +856,18 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
     int passed = 0;
     int failed = 0;
 
+    SourceManager sm;
+    sm.initialize(nullptr, nullptr);
+    DiagnosticSink sink;
+
     for (int i = 0; i < testLimit; ++i)
     {
-        const TestData& test = testCases[i];
+        TestData& test = testCases[i];
         std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
+
+        test.sourceFile = sm.createSourceFileWithString(
+            PathInfo::makePath(test.sourceFileName),
+            test.sourceContent);
 
         String actualOutput = trimNewlines(renderDiagnostic(test));
         String expectedOutput = trimNewlines(test.expectedOutput);
@@ -876,3 +888,4 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
     std::cout << "\nResults: " << passed << " passed, " << failed << " failed\n";
     return failed > 0 ? 1 : 0;
 }
+} // namespace Slang
