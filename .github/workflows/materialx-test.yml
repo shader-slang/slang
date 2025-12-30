@@ -107,10 +107,6 @@ jobs:
             -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
             -DMATERIALX_BUILD_TESTS=OFF \
             -DMATERIALX_BUILD_RENDER=OFF \
-            -DMATERIALX_BUILD_GEN_GLSL=ON \
-            -DMATERIALX_BUILD_GEN_OSL=OFF \
-            -DMATERIALX_BUILD_GEN_MDL=OFF \
-            -DMATERIALX_BUILD_GEN_MSL=OFF \
             ..
 
           echo "Building MaterialX (this may take a few minutes)..."
@@ -126,8 +122,8 @@ jobs:
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
           
-          export PYTHONPATH="$WORK_DIR/MaterialX/build/python:$PYTHONPATH"
-          GENERATESHADER="$WORK_DIR/MaterialX/python/Scripts/generateshader.py"
+          export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
+          GENERATESHADER="$WORK_DIR/MaterialX/install/python/Scripts/generateshader.py"
           MATERIALX_RESOURCES="$WORK_DIR/MaterialX/resources/Materials/TestSuite"
           
           mkdir -p generated-shaders
