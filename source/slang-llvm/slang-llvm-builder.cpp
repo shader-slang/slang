@@ -2264,7 +2264,7 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V1(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V2(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,

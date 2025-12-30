@@ -797,13 +797,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV1 = SlangResult (*)(
+        using BuilderFuncV2 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV1)library->findFuncByName("createLLVMBuilder_V1");
+        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
         if (!builderFunc)
             return SLANG_FAIL;
 
