@@ -505,14 +505,18 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     // ParseCommandLineOptions below assumes that the first parameter is the
     // name of the executable, but we do this cute trick to make it complain
     // about parameters forwarded to LLVM instead:
-    std::vector<const char*> llvmArgs = { "-Xllvm" };
-    for (TerminatedCharSlice arg: options.llvmArguments)
+    std::vector<const char*> llvmArgs = {"-Xllvm"};
+    for (TerminatedCharSlice arg : options.llvmArguments)
         llvmArgs.push_back(arg.data);
 
     // Parse LLVM options. These can be used to adjust the behavior of various
     // LLVM passes.
     llvm::raw_string_ostream errorStream(error);
-    if (!llvm::cl::ParseCommandLineOptions(llvmArgs.size(), llvmArgs.data(), "slangc", &errorStream))
+    if (!llvm::cl::ParseCommandLineOptions(
+            llvmArgs.size(),
+            llvmArgs.data(),
+            "slangc",
+            &errorStream))
     {
         ArtifactDiagnostic diagnostic;
         diagnostic.severity = ArtifactDiagnostic::Severity::Error;
