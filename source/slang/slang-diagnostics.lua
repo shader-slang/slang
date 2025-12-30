@@ -33,7 +33,7 @@ local diagnostics = {
 		name = "function return type mismatch",
 		code = 30007,
 		severity = "error",
-		message = "expression type '{expression_type : type}' does not match function's return type '{return_type : string}'",
+		message = "expression type '{expression_type : type}' does not match function's return type '{return_type : type}'",
 		primary_span = {
 			location = "expression_location",
 			message = "expression type",
@@ -43,6 +43,16 @@ local diagnostics = {
 				location = "function_location",
 				message = "function return type",
 			},
+		},
+	},
+	{
+		name = "function redefinition",
+		code = 30201,
+		severity = "error",
+		message = "function '{name : name}' already has a body",
+		primary_span = {
+			location = "function_location",
+			message = "redeclared here",
 		},
 	},
 }
