@@ -626,6 +626,37 @@ bool DiagnosticSink::diagnoseImpl(
     return true;
 }
 
+bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
+{
+    if (diagnostic.severity >= Severity::Error)
+    {
+        m_errorCount++;
+    }
+
+    String message = "diagnostic";
+
+    if (writer)
+    {
+        writer->write(message.begin(), message.getLength());
+    }
+    else
+    {
+        outputBuffer.append(message);
+    }
+
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseRichImpl(diagnostic);
+    }
+
+    if (diagnostic.severity >= Severity::Fatal)
+    {
+        // TODO: figure out a better policy for aborting compilation
+        SLANG_ABORT_COMPILATION("fatal error encountered");
+    }
+    return true;
+}
+
 Severity DiagnosticSink::getEffectiveMessageSeverity(
     DiagnosticInfo const& info,
     SourceLoc const& location)
