@@ -17,6 +17,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -9093,9 +9094,10 @@ List<Val*> getDefaultSubstitutionArgs(
     {
         if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
         {
-            args.add(DeclRefType::create(
-                astBuilder,
-                astBuilder->getDirectDeclRef(genericTypeParamDecl)));
+            args.add(
+                DeclRefType::create(
+                    astBuilder,
+                    astBuilder->getDirectDeclRef(genericTypeParamDecl)));
         }
         else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
         {
@@ -9416,6 +9418,14 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                     prevDecl,
                     Diagnostics::seePreviousDefinitionOf,
                     prevDecl->getName());
+
+                if (getOptionSet().getBoolOption(CompilerOptionName::EnableRichDiagnostics))
+                {
+                    getSink()->diagnose(
+                        Diagnostics::FunctionRedefinition{
+                            .name = newDecl->getName(),
+                            .function_location = newDecl->getNameLoc()});
+                }
             }
         }
 
@@ -12412,8 +12422,9 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
         }
         else
         {
-            SLANG_UNEXPECTED("Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
-                             "Use getCanonicalGenericConstraints2(...) instead.");
+            SLANG_UNEXPECTED(
+                "Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
+                "Use getCanonicalGenericConstraints2(...) instead.");
         }
     }
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
