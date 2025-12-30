@@ -15,6 +15,7 @@
 
 #include "../core/slang-list.h"
 #include "../core/slang-string.h"
+#include "../core/slang-dictionary.h"
 
 using namespace Slang;
 
@@ -510,7 +511,7 @@ SectionLayout buildSectionLayout(
         maxLineNum = std::max(maxLineNum, span.line);
     section.maxGutterWidth = static_cast<int>(std::to_string(std::max(1, maxLineNum)).length());
 
-    std::map<int, HighlightLine> grouped;
+    Dictionary<int, HighlightLine> grouped;
     for (const auto& span : spans)
     {
         HighlightLine& line = grouped[span.line];
@@ -660,14 +661,14 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
     return rows;
 }
 
-void printAnnotationRow(std::ostream& ss, int gutterWidth, const std::string& content)
+void printAnnotationRow(StringBuilder& ss, int gutterWidth, const std::string& content)
 {
     if (content.empty())
         return;
-    ss << repeat(' ', gutterWidth + 1) << "| " << content << '\n';
+    ss << repeat(' ', gutterWidth + 1).c_str() << "| " << content.c_str() << '\n';
 }
 
-void renderSectionBody(std::ostream& ss, const SectionLayout& section)
+void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
 {
     // Rendering mirrors the layout structure: we print each block with the computed
     // gutter width, insert ellipses whenever the block reported a gap, then stream
@@ -682,8 +683,8 @@ void renderSectionBody(std::ostream& ss, const SectionLayout& section)
         {
             const std::string label = line.number >= 0 ? std::to_string(line.number) : "?";
             int padding = std::max(0, section.maxGutterWidth - static_cast<int>(label.length()));
-            ss << repeat(' ', padding) << label << " | "
-               << stripIndent(line.content, section.commonIndent) << '\n';
+            ss << repeat(' ', padding).c_str() << label.c_str() << " | "
+               << stripIndent(line.content, section.commonIndent).c_str() << '\n';
 
             for (const auto& row : buildAnnotationRows(line, section.commonIndent))
                 printAnnotationRow(ss, section.maxGutterWidth, row);
@@ -742,33 +743,37 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
     // This function owns the string assembly for everything the harness compares:
     // severity header, primary location, annotated source, and optional notes.
     // Keeping it side-effect free makes it trivial to diff the produced output.
-    std::stringstream ss;
+    StringBuilder ss;
 
-    ss << layout.header.severity << "[E" << std::setfill('0') << std::setw(4) << layout.header.code
-       << std::setfill(' ') << "]: " << layout.header.message << '\n';
+    ss << layout.header.severity.c_str() << "[E";
+    // Format error code with leading zeros to 4 digits
+    String codeStr = String(layout.header.code);
+    while (codeStr.getLength() < 4)
+        codeStr = "0" + codeStr;
+    ss << codeStr << "]: " << layout.header.message.c_str() << '\n';
 
-    ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName << ":"
+    ss << repeat(' ', layout.primaryLoc.gutterIndent).c_str() << "--> " << layout.primaryLoc.fileName.c_str() << ":"
        << layout.primaryLoc.line << ":" << layout.primaryLoc.col << '\n';
 
     if (layout.primarySection.blocks.getCount() > 0)
     {
-        ss << repeat(' ', layout.primarySection.maxGutterWidth + 1) << "|\n";
+        ss << repeat(' ', layout.primarySection.maxGutterWidth + 1).c_str() << "|\n";
         renderSectionBody(ss, layout.primarySection);
     }
 
     for (const auto& note : layout.notes)
     {
-        ss << "\nnote: " << note.message << '\n';
-        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName << ":"
+        ss << "\nnote: " << note.message.c_str() << '\n';
+        ss << repeat(' ', note.loc.gutterIndent).c_str() << "--- " << note.loc.fileName.c_str() << ":"
            << note.loc.line << ":" << note.loc.col << '\n';
         if (note.section.blocks.getCount() > 0)
         {
-            ss << repeat(' ', note.section.maxGutterWidth + 1) << "|\n";
+            ss << repeat(' ', note.section.maxGutterWidth + 1).c_str() << "|\n";
             renderSectionBody(ss, note.section);
         }
     }
 
-    return ss.str();
+    return std::string(ss.getBuffer());
 }
 
 std::string renderDiagnostic(const TestData& testData)
