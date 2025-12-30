@@ -16,6 +16,7 @@
 #include "../core/slang-list.h"
 #include "../core/slang-string.h"
 #include "../core/slang-dictionary.h"
+#include "../core/slang-string-util.h"
 
 using namespace Slang;
 
@@ -323,13 +324,21 @@ const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 List<std::string> getSourceLines(const std::string& content)
 {
     // Parse the embedded shader snippet into logical lines once so downstream layout
-    // code can work with indexed access; the intermediate stringstream keeps the
-    // implementation simple while guaranteeing consistent handling of CRLF vs LF.
+    // code can work with indexed access; using StringUtil::split handles both CRLF and LF.
     List<std::string> lines;
-    std::stringstream ss(content);
-    std::string line;
-    while (std::getline(ss, line))
+    UnownedStringSlice contentSlice(content.c_str(), content.length());
+    List<UnownedStringSlice> slices;
+    StringUtil::split(contentSlice, '\n', slices);
+    
+    // Convert slices to strings, handling potential CRLF endings
+    for (const auto& slice : slices)
+    {
+        std::string line(slice.begin(), slice.getLength());
+        // Remove trailing \r if present (for CRLF line endings)
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
         lines.add(line);
+    }
     return lines;
 }
 
