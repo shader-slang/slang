@@ -257,4 +257,3 @@ jobs:
           path: |
             ${{ runner.temp }}/materialx-test/
           retention-days: 3
-
