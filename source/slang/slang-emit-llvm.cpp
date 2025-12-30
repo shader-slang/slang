@@ -840,6 +840,12 @@ struct LLVMEmitter
         builderOpt.fp64DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp64();
         builderOpt.fpMode = (SlangFloatingPointMode)getOptions().getFloatingPointMode();
 
+        List<TerminatedCharSlice> llvmArguments;
+        List<String> downstreamArgs = getOptions().getDownstreamArgs("llvm");
+        for (const auto& arg : downstreamArgs)
+            llvmArguments.add(TerminatedCharSlice(arg.getBuffer()));
+        builderOpt.llvmArguments = Slice(llvmArguments.begin(), llvmArguments.getCount());
+
         ComPtr<IArtifact> errorArtifact;
         SLANG_RETURN_ON_FAIL(builderFunc(
             ILLVMBuilder::getTypeGuid(),
