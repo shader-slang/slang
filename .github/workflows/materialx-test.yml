@@ -82,11 +82,11 @@ jobs:
           echo "MaterialX → Slang Integration Test"
           echo "Platform: ${{ matrix.os }} | Config: ${{ matrix.config }}"
           echo "===================================================================="
-          
+
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           mkdir -p "$WORK_DIR"
           cd "$WORK_DIR"
-          
+
           echo "Cloning MaterialX repository..."
           git clone --depth 1 --branch main https://github.com/AcademySoftwareFoundation/MaterialX.git
           echo "SUCCESS: MaterialX cloned successfully"
@@ -121,26 +121,26 @@ jobs:
         run: |
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
-          
+
           export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
           GENERATESHADER="$WORK_DIR/MaterialX/install/python/Scripts/generateshader.py"
           MATERIALX_RESOURCES="$WORK_DIR/MaterialX/resources/Materials/TestSuite"
-          
+
           mkdir -p generated-shaders
-          
+
           echo "Generating Slang shaders from MaterialX test suite..."
-          
+
           # Find all .mtlx files and generate shaders
           SUCCESS_COUNT=0
           FAILED_COUNT=0
           SKIPPED_COUNT=0
-          
+
           while IFS= read -r MATERIAL_PATH; do
             RELATIVE_PATH="${MATERIAL_PATH#$MATERIALX_RESOURCES/}"
             CATEGORY=$(dirname "$RELATIVE_PATH")
             CATEGORY_DIR="generated-shaders/$CATEGORY"
             mkdir -p "$CATEGORY_DIR"
-            
+
             # Skip Blackbody.slang due to upstream MaterialX code generation issue
             if [[ "$RELATIVE_PATH" == "pbrlib/bsdf/blackbody.mtlx" ]]; then
               echo "Skipping Blackbody.mtlx due to known upstream MaterialX code generation issue (global const variable)"
@@ -159,9 +159,9 @@ jobs:
               FAILED_COUNT=$((FAILED_COUNT + 1))
             fi
           done < <(find "$MATERIALX_RESOURCES" -name "*.mtlx" -type f | sort)
-          
+
           SHADER_COUNT=$(find generated-shaders -name "*.slang" -type f | wc -l | xargs)
-          
+
           echo "Generation complete:"
           echo "  Success:  $SUCCESS_COUNT"
           echo "  Skipped:  $SKIPPED_COUNT (no renderable elements or explicitly skipped)"
@@ -177,40 +177,40 @@ jobs:
         run: |
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
-          
+
           # Set slangc path based on platform
           if [ "${{ matrix.os }}" == "windows" ]; then
             SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc.exe"
           else
             SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc"
           fi
-          
+
           echo "Compiling shaders with slangc..."
           echo "Using: $SLANGC"
-          
+
           PASS_COUNT=0
           FAIL_COUNT=0
           SKIP_COUNT=0
           FAILED_SHADERS=()
           SKIPPED_SHADERS=()
-          
+
           while IFS= read -r SHADER_PATH; do
             RELATIVE_PATH="${SHADER_PATH#generated-shaders/}"
             TEMP_OUT=$(mktemp)
-            
+
             if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>&1; then
               PASS_COUNT=$((PASS_COUNT + 1))
             else
               FAIL_COUNT=$((FAIL_COUNT + 1))
               FAILED_SHADERS+=("$RELATIVE_PATH")
             fi
-            
+
             rm -f "$TEMP_OUT"
           done < <(find generated-shaders -name "*.slang" -type f | sort)
-          
+
           TOTAL_TESTED=$((PASS_COUNT + FAIL_COUNT))
           TOTAL_SHADERS=$((PASS_COUNT + FAIL_COUNT + SKIP_COUNT))
-          
+
           echo ""
           echo "===================================================================="
           echo "Results:"
@@ -219,7 +219,7 @@ jobs:
           echo "  Compiled:      $PASS_COUNT"
           echo "  Skipped:       $SKIP_COUNT"
           echo "  Failed:        $FAIL_COUNT"
-          
+
           if [ $SKIP_COUNT -gt 0 ]; then
             echo ""
             echo "Skipped shaders (known issues):"
@@ -227,7 +227,7 @@ jobs:
               echo "  - $shader"
             done
           fi
-          
+
           if [ $FAIL_COUNT -gt 0 ]; then
             echo ""
             echo "Failed shaders:"
@@ -238,13 +238,13 @@ jobs:
             echo "FAILED: $FAIL_COUNT shaders failed compilation"
             exit 1
           fi
-          
+
           if [ $TOTAL_TESTED -gt 0 ]; then
             PASS_RATE=$((PASS_COUNT * 100 / TOTAL_TESTED))
             echo ""
             echo "SUCCESS: All $PASS_COUNT tested shaders compiled ($PASS_RATE%)"
           fi
-          
+
           echo "===================================================================="
           echo "MaterialX → Slang Integration Test: PASSED"
           echo "===================================================================="
