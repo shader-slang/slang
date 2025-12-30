@@ -174,6 +174,7 @@ public:
     bool shouldValidateIR();
     bool shouldDumpIR();
     bool shouldReportCheckpointIntermediates();
+    bool shouldReportDynamicDispatchSites();
 
     bool shouldTrackLiveness();
 

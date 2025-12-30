@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "Vector:IScalable=0" -conformance "Matrix:IScalable=1" -conformance "Circle:IShape=0" -conformance "Square:IShape=1" -conformance "Circle:IScalable=2" -conformance "Square:IScalable=3"
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -62,7 +63,9 @@ float f(uint id, float data, float scale)
 {
     let obj = createShape(id, data);
     let scaledObj = obj.scale(scale);
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     return scaledObj.getArea() + scaledObj.getPerimeter();
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 };
 
 
