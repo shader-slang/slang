@@ -114,10 +114,10 @@ jobs:
             ..
 
           echo "Building MaterialX (this may take a few minutes)..."
-          cmake --build . -j 4
+          cmake --build . --config Release -j 4
 
           echo "Installing MaterialX..."
-          cmake --install . --prefix ../install
+          cmake --install . --config Release --prefix ../install
 
           echo "SUCCESS: MaterialX built and installed successfully"
 
