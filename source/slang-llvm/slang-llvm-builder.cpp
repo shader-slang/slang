@@ -4,6 +4,7 @@
 #include "slang-llvm-jit-shared-library.h"
 
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -38,6 +39,10 @@ namespace slang_llvm
 {
 
 using namespace Slang;
+
+// This instance needs to exist so that we gain access to codegen flags in the
+// downstream arguments.
+static llvm::codegen::RegisterCodeGenFlags CGF;
 
 // There doesn't appear to be an LLVM output stream for writing into a memory
 // buffer. This implementation saves all written data directly into Slang's List
