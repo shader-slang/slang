@@ -1,0 +1,265 @@
+name: MaterialX Integration Tests
+
+on:
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - "docs/**"
+      - "LICENSES/**"
+      - "LICENSE"
+      - "CONTRIBUTING.md"
+      - "README.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  materialx-integration:
+    timeout-minutes: 60
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [linux, windows, macos]
+        config: [release]
+        include:
+          - os: linux
+            runs-on: [ubuntu-22.04]
+            compiler: gcc
+            platform: x86_64
+            cmake-preset: default
+          - os: windows
+            runs-on: [windows-latest]
+            compiler: cl
+            platform: x86_64
+            cmake-preset: vs2022
+          - os: macos
+            runs-on: [macos-latest]
+            compiler: clang
+            platform: aarch64
+            cmake-preset: default
+
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
+          platform: ${{ matrix.platform }}
+          config: ${{ matrix.config }}
+          build-llvm: false
+
+      - name: Build Slang
+        run: |
+          cmake --preset ${{ matrix.cmake-preset }} --fresh \
+            -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
+            -DSLANG_ENABLE_CUDA=0 \
+            -DSLANG_ENABLE_EXAMPLES=0 \
+            -DSLANG_ENABLE_GFX=0 \
+            -DSLANG_ENABLE_SLANG_RHI=0 \
+            -DSLANG_ENABLE_TESTS=0
+          cmake --build --preset ${{ matrix.config }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Clone MaterialX
+        run: |
+          echo "===================================================================="
+          echo "MaterialX → Slang Integration Test"
+          echo "Platform: ${{ matrix.os }} | Config: ${{ matrix.config }}"
+          echo "===================================================================="
+          
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          mkdir -p "$WORK_DIR"
+          cd "$WORK_DIR"
+          
+          echo "Cloning MaterialX repository..."
+          git clone --depth 1 --branch main https://github.com/AcademySoftwareFoundation/MaterialX.git
+          echo "SUCCESS: MaterialX cloned successfully"
+
+      - name: Build MaterialX
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR/MaterialX"
+          
+          echo "Configuring MaterialX build..."
+          mkdir -p build
+          cd build
+          
+          cmake \
+            -DMATERIALX_BUILD_PYTHON=ON \
+            -DMATERIALX_BUILD_VIEWER=OFF \
+            -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
+            -DMATERIALX_BUILD_TESTS=OFF \
+            -DMATERIALX_BUILD_GEN_GLSL=ON \
+            -DMATERIALX_BUILD_GEN_OSL=OFF \
+            -DMATERIALX_BUILD_GEN_MDL=OFF \
+            -DMATERIALX_BUILD_GEN_MSL=OFF \
+            ..
+          
+          echo "Building MaterialX (this may take a few minutes)..."
+          cmake --build . -j 4
+          
+          echo "Installing MaterialX..."
+          cmake --install . --prefix ../install
+          
+          echo "SUCCESS: MaterialX built and installed successfully"
+
+      - name: Generate Slang Shaders from MaterialX
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR"
+          
+          export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
+          GENERATESHADER="$WORK_DIR/MaterialX/install/python/Scripts/generateshader.py"
+          MATERIALX_RESOURCES="$WORK_DIR/MaterialX/resources/Materials/TestSuite"
+          
+          mkdir -p generated-shaders
+          
+          echo "Generating Slang shaders from MaterialX test suite..."
+          
+          # Find all .mtlx files and generate shaders
+          SUCCESS_COUNT=0
+          FAILED_COUNT=0
+          SKIPPED_COUNT=0
+          
+          while IFS= read -r MATERIAL_PATH; do
+            RELATIVE_PATH="${MATERIAL_PATH#$MATERIALX_RESOURCES/}"
+            CATEGORY=$(dirname "$RELATIVE_PATH")
+            CATEGORY_DIR="generated-shaders/$CATEGORY"
+            mkdir -p "$CATEGORY_DIR"
+            
+            if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>&1; then
+              # Check if shader was created
+              if find "$CATEGORY_DIR" -name "*.slang" -newer "$GENERATESHADER" 2>/dev/null | grep -q .; then
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+              else
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              fi
+            else
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+            fi
+          done < <(find "$MATERIALX_RESOURCES" -name "*.mtlx" -type f | sort)
+          
+          SHADER_COUNT=$(find generated-shaders -name "*.slang" -type f | wc -l | xargs)
+          
+          echo "Generation complete:"
+          echo "  Success:  $SUCCESS_COUNT"
+          echo "  Skipped:  $SKIPPED_COUNT (no renderable elements)"
+          echo "  Failed:   $FAILED_COUNT"
+          echo "  Generated $SHADER_COUNT shaders"
+          
+          if [ $FAILED_COUNT -gt 0 ]; then
+            echo "ERROR: Some shaders failed to generate"
+            exit 1
+          fi
+
+      - name: Compile Shaders with slangc
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR"
+          
+          # Set slangc path based on platform
+          if [ "${{ matrix.os }}" == "windows" ]; then
+            SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc.exe"
+          else
+            SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc"
+          fi
+          
+          echo "Compiling shaders with slangc..."
+          echo "Using: $SLANGC"
+          
+          PASS_COUNT=0
+          FAIL_COUNT=0
+          SKIP_COUNT=0
+          FAILED_SHADERS=()
+          SKIPPED_SHADERS=()
+          
+          while IFS= read -r SHADER_PATH; do
+            RELATIVE_PATH="${SHADER_PATH#generated-shaders/}"
+            
+            # Skip Blackbody.slang - MaterialX generates 'const' instead of 'static const'
+            # See: MaterialX issue with global const variables
+            # TODO: Remove this skip once MaterialX fixes code generation
+            if [[ "$RELATIVE_PATH" == *"Blackbody.slang" ]]; then
+              SKIP_COUNT=$((SKIP_COUNT + 1))
+              SKIPPED_SHADERS+=("$RELATIVE_PATH (MaterialX code generation issue)")
+              continue
+            fi
+            
+            TEMP_OUT=$(mktemp)
+            
+            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>&1; then
+              PASS_COUNT=$((PASS_COUNT + 1))
+            else
+              FAIL_COUNT=$((FAIL_COUNT + 1))
+              FAILED_SHADERS+=("$RELATIVE_PATH")
+            fi
+            
+            rm -f "$TEMP_OUT"
+          done < <(find generated-shaders -name "*.slang" -type f | sort)
+          
+          TOTAL_TESTED=$((PASS_COUNT + FAIL_COUNT))
+          TOTAL_SHADERS=$((PASS_COUNT + FAIL_COUNT + SKIP_COUNT))
+          
+          echo ""
+          echo "===================================================================="
+          echo "Results:"
+          echo "===================================================================="
+          echo "  Total shaders: $TOTAL_SHADERS"
+          echo "  Compiled:      $PASS_COUNT"
+          echo "  Skipped:       $SKIP_COUNT"
+          echo "  Failed:        $FAIL_COUNT"
+          
+          if [ $SKIP_COUNT -gt 0 ]; then
+            echo ""
+            echo "Skipped shaders (known issues):"
+            for shader in "${SKIPPED_SHADERS[@]}"; do
+              echo "  - $shader"
+            done
+          fi
+          
+          if [ $FAIL_COUNT -gt 0 ]; then
+            echo ""
+            echo "Failed shaders:"
+            for shader in "${FAILED_SHADERS[@]}"; do
+              echo "  - $shader"
+            done
+            echo ""
+            echo "FAILED: $FAIL_COUNT shaders failed compilation"
+            exit 1
+          fi
+          
+          if [ $TOTAL_TESTED -gt 0 ]; then
+            PASS_RATE=$((PASS_COUNT * 100 / TOTAL_TESTED))
+            echo ""
+            echo "SUCCESS: All $PASS_COUNT tested shaders compiled ($PASS_RATE%)"
+          fi
+          
+          echo "===================================================================="
+          echo "MaterialX → Slang Integration Test: PASSED"
+          echo "===================================================================="
+
+      - name: Upload Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: materialx-test-results-${{ matrix.os }}-${{ matrix.config }}
+          path: |
+            ${{ runner.temp }}/materialx-test/
+          retention-days: 7
+
