@@ -122,7 +122,13 @@ jobs:
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
 
-          export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
+          # Set PYTHONPATH with correct separator for the platform
+          if [ "${{ matrix.os }}" == "windows" ]; then
+            export PYTHONPATH="$WORK_DIR/MaterialX/install/python;$PYTHONPATH"
+          else
+            export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
+          fi
+
           GENERATESHADER="$WORK_DIR/MaterialX/install/python/Scripts/generateshader.py"
           MATERIALX_RESOURCES="$WORK_DIR/MaterialX/resources/Materials/TestSuite"
 
@@ -156,7 +162,8 @@ jobs:
               continue
             fi
 
-            if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>&1; then
+            ERROR_LOG=$(mktemp)
+            if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>"$ERROR_LOG"; then
               # Check if shader was created
               if find "$CATEGORY_DIR" -name "*.slang" -newer "$GENERATESHADER" 2>/dev/null | grep -q .; then
                 SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
@@ -168,7 +175,13 @@ jobs:
             else
               FAILED_COUNT=$((FAILED_COUNT + 1))
               echo "  -> FAILED"
+              # Show error for first failure only
+              if [ $FAILED_COUNT -eq 1 ]; then
+                echo "  First failure error:"
+                cat "$ERROR_LOG" | head -20
+              fi
             fi
+            rm -f "$ERROR_LOG"
           done
 
           SHADER_COUNT=$(find generated-shaders -name "*.slang" -type f | wc -l | xargs)
@@ -217,16 +230,22 @@ jobs:
 
             echo "[$CURRENT/$TOTAL_SHADERS] Compiling $RELATIVE_PATH"
 
-            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>&1; then
+            ERROR_LOG=$(mktemp)
+            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>"$ERROR_LOG"; then
               PASS_COUNT=$((PASS_COUNT + 1))
               echo "  -> OK"
             else
               FAIL_COUNT=$((FAIL_COUNT + 1))
               FAILED_SHADERS+=("$RELATIVE_PATH")
               echo "  -> FAILED"
+              # Show error for first failure only
+              if [ $FAIL_COUNT -eq 1 ]; then
+                echo "  First failure error:"
+                cat "$ERROR_LOG" | head -20
+              fi
             fi
 
-            rm -f "$TEMP_OUT"
+            rm -f "$TEMP_OUT" "$ERROR_LOG"
           done
 
           TOTAL_TESTED=$((PASS_COUNT + FAIL_COUNT))
