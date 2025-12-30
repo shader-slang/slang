@@ -1251,10 +1251,10 @@ struct PeepholeContext : InstPassBase
                         result = type->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && !getIntTypeSigned(type);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
                         result = as<IRVectorType>(type);

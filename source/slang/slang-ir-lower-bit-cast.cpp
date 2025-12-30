@@ -317,7 +317,7 @@ struct BitCastLoweringContext
                 auto elementType = toVectorType->getElementType();
                 if (isIntegralType(elementType))
                 {
-                    auto intInfo = getIntTypeInfo(elementType);
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
                     if (intInfo.width == 32)
                         return;
                 }
@@ -330,7 +330,7 @@ struct BitCastLoweringContext
                 auto elementType = fromVectorType->getElementType();
                 if (isIntegralType(elementType))
                 {
-                    auto intInfo = getIntTypeInfo(elementType);
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
                     if (intInfo.width == 32)
                         return;
                 }

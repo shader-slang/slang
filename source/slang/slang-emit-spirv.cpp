@@ -1804,7 +1804,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IntType:
         case kIROp_Int64Type:
             {
-                const IntInfo i = getIntTypeInfo(as<IRType>(inst));
+                const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)
                     requireSPIRVCapability(SpvCapabilityInt16);
                 else if (i.width == 64)
@@ -3782,7 +3782,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto scalarType = getVectorElementType(atomicInst->getDataType());
             if (isIntegralType(scalarType))
             {
-                auto intInfo = getIntTypeInfo(scalarType);
+                auto intInfo = getIntTypeInfo(m_targetRequest, scalarType);
                 if (intInfo.isSigned)
                     return sop;
                 return uop;
@@ -7669,8 +7669,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return inner;
         }
 
-        const auto fromInfo = getIntTypeInfo(fromType);
-        const auto toInfo = getIntTypeInfo(toType);
+        const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
+        const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
         if (fromInfo == toInfo)
         {
@@ -7816,7 +7816,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         if (isIntegralType(fromType))
         {
-            const auto fromInfo = getIntTypeInfo(fromType);
+            const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
 
             return fromInfo.isSigned
                        ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
@@ -7892,7 +7892,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isIntegralType(toType));
 
-        const auto toInfo = getIntTypeInfo(toType);
+        const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
         return toInfo.isSigned ? emitOpConvertFToS(parent, inst, toTypeV, inst->getOperand(0))
                                : emitOpConvertFToU(parent, inst, toTypeV, inst->getOperand(0));
@@ -7965,7 +7965,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_targetRequest, elementType);
 
         // NM: technically, using bitfield intrinsics for anything non-32-bit goes against
         // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least
@@ -7990,7 +7990,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_targetRequest, elementType);
 
         if (i.width == 64)
             requireSPIRVCapability(SpvCapabilityInt64);

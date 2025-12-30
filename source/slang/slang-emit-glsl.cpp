@@ -2809,7 +2809,7 @@ bool GLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
         if (isIntegralType(inst->getDataType()))
         {
-            if (getIntTypeInfo(inst->getDataType()).width == 64)
+            if (getIntTypeInfo(getTargetReq(), inst->getDataType()).width == 64)
             {
                 _requireGLSLExtension(toSlice("GL_EXT_shader_atomic_int64"));
             }

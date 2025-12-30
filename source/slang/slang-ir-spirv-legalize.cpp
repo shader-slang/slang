@@ -1553,7 +1553,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_codeGenContext->getTargetReq(), elementType);
 
         // SPIRV doesn't support non-32bit integer types, so we need to convert
         if (i.width < 32)

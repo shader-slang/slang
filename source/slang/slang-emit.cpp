@@ -1651,7 +1651,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {
-            SLANG_PASS(legalizeIRForMetal, sink);
+            SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
     case CodeGenTarget::CSource:
@@ -1676,7 +1676,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            SLANG_PASS(legalizeIRForWGSL, sink);
+            SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
 
@@ -1691,7 +1691,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(legalizeLogicalAndOr);
+        SLANG_PASS(legalizeLogicalAndOr, targetProgram);
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))

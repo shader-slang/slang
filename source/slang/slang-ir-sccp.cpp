@@ -703,8 +703,8 @@ struct SCCPContext
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
@@ -720,8 +720,8 @@ struct SCCPContext
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
