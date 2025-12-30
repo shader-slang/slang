@@ -13,6 +13,11 @@
 #include <utility>
 #include <vector>
 
+#include "../core/slang-list.h"
+#include "../core/slang-string.h"
+
+using namespace Slang;
+
 // ============================================================================
 // CORE DATA STRUCTURES
 // ============================================================================
@@ -63,8 +68,8 @@ struct GenericDiagnostic
     std::string severity;
     std::string message;
     DiagnosticSpan primarySpan;
-    std::vector<DiagnosticSpan> secondarySpans;
-    std::vector<DiagnosticNote> notes;
+    List<DiagnosticSpan> secondarySpans;
+    List<DiagnosticNote> notes;
 };
 
 struct TestData
@@ -108,7 +113,8 @@ error[E1001]: use of undeclared identifier 'someSampler'
           .severity = "error",
           .message = "use of undeclared identifier 'someSampler'",
           .primarySpan = {SourceLoc("example.slang", 8, 30), "not found in this scope", 11},
-          .secondarySpans = {}}},
+          .secondarySpans = List<DiagnosticSpan>(),
+          .notes = List<DiagnosticNote>()}},
 
     {.name = "type_mismatch_with_secondary",
      .sourceFile = "example.slang",
@@ -145,10 +151,14 @@ error[E1002]: cannot add `float4` and `int`
           .message = "cannot add `float4` and `int`",
           .primarySpan =
               {SourceLoc("example.slang", 10, 28), "no implementation for `float4 + int`", 1},
-          .secondarySpans =
-              {{SourceLoc("example.slang", 5, 5), "field declared here", 17},
-               {SourceLoc("example.slang", 10, 16), "float4", 11},
-               {SourceLoc("example.slang", 10, 30), "int", 19}}}},
+          .secondarySpans = []() {
+              List<DiagnosticSpan> spans;
+              spans.add({SourceLoc("example.slang", 5, 5), "field declared here", 17});
+              spans.add({SourceLoc("example.slang", 10, 16), "float4", 11});
+              spans.add({SourceLoc("example.slang", 10, 30), "int", 19});
+              return spans;
+          }(),
+          .notes = List<DiagnosticNote>()}},
 
     {.name = "undeclared_variable",
      .sourceFile = "example.slang",
@@ -176,7 +186,8 @@ error[E1003]: use of undeclared identifier 'undefinedVariable'
           .severity = "error",
           .message = "use of undeclared identifier 'undefinedVariable'",
           .primarySpan = {SourceLoc("example.slang", 7, 17), "not found in this scope", 17},
-          .secondarySpans = {}}},
+          .secondarySpans = List<DiagnosticSpan>(),
+          .notes = List<DiagnosticNote>()}},
 
     {.name = "wrong_type_assignment",
      .sourceFile = "example.slang",
@@ -206,7 +217,12 @@ error[E1004]: mismatched types
           .severity = "error",
           .message = "mismatched types",
           .primarySpan = {SourceLoc("example.slang", 7, 19), "expected `float`, found `&str`", 8},
-          .secondarySpans = {{SourceLoc("example.slang", 7, 9), "expected due to this type", 5}}}},
+          .secondarySpans = []() {
+              List<DiagnosticSpan> spans;
+              spans.add({SourceLoc("example.slang", 7, 9), "expected due to this type", 5});
+              return spans;
+          }(),
+          .notes = List<DiagnosticNote>()}},
 
     {.name = "division_by_zero_warning",
      .sourceFile = "math.slang",
@@ -242,10 +258,17 @@ note: consider using 'normalize' builtin function instead
           .severity = "warning",
           .message = "potential division by zero",
           .primarySpan = {SourceLoc("math.slang", 3, 14), "division by zero if `len` is 0.0", 1},
-          .secondarySpans = {{SourceLoc("math.slang", 2, 17), "length computed here", 15}},
-          .notes =
-              {{.message = "consider using 'normalize' builtin function instead",
-                .span = {SourceLoc("math.slang", 1, 8), "", 9}}}}},
+          .secondarySpans = []() {
+              List<DiagnosticSpan> spans;
+              spans.add({SourceLoc("math.slang", 2, 17), "length computed here", 15});
+              return spans;
+          }(),
+          .notes = []() {
+              List<DiagnosticNote> notes;
+              notes.add({.message = "consider using 'normalize' builtin function instead",
+                        .span = {SourceLoc("math.slang", 1, 8), "", 9}});
+              return notes;
+          }()}},
 
     {.name = "mismatched_types_complex",
      .sourceFile = "example.slang",
@@ -281,10 +304,14 @@ error[E0308]: mismatched types
          .message = "mismatched types",
          .primarySpan =
              {SourceLoc("example.slang", 8, 28), "`+` cannot be applied to these types", 1},
-         .secondarySpans = {
-             {SourceLoc("example.slang", 2, 5), "defined as `string` here", 5},
-             {SourceLoc("example.slang", 8, 24), "float", 3},
-             {SourceLoc("example.slang", 8, 30), "expected `float`", 9}}}}};
+         .secondarySpans = []() {
+             List<DiagnosticSpan> spans;
+             spans.add({SourceLoc("example.slang", 2, 5), "defined as `string` here", 5});
+             spans.add({SourceLoc("example.slang", 8, 24), "float", 3});
+             spans.add({SourceLoc("example.slang", 8, 30), "expected `float`", 9});
+             return spans;
+         }(),
+         .notes = List<DiagnosticNote>()}}};
 
 const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 
@@ -292,16 +319,16 @@ const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 // HELPER FUNCTIONS
 // ============================================================================
 
-std::vector<std::string> getSourceLines(const std::string& content)
+List<std::string> getSourceLines(const std::string& content)
 {
     // Parse the embedded shader snippet into logical lines once so downstream layout
     // code can work with indexed access; the intermediate stringstream keeps the
     // implementation simple while guaranteeing consistent handling of CRLF vs LF.
-    std::vector<std::string> lines;
+    List<std::string> lines;
     std::stringstream ss(content);
     std::string line;
     while (std::getline(ss, line))
-        lines.push_back(line);
+        lines.add(line);
     return lines;
 }
 
@@ -376,20 +403,20 @@ struct HighlightLine
 {
     int number = 0;
     std::string content;
-    std::vector<LineHighlight> spans;
+    List<LineHighlight> spans;
 };
 
 struct LayoutBlock
 {
     bool showGap = false;
-    std::vector<HighlightLine> lines;
+    List<HighlightLine> lines;
 };
 
 struct SectionLayout
 {
     int maxGutterWidth = 0;
     size_t commonIndent = 0;
-    std::vector<LayoutBlock> blocks;
+    List<LayoutBlock> blocks;
 };
 
 struct DiagnosticLayout
@@ -417,15 +444,15 @@ struct DiagnosticLayout
         Location loc;
         SectionLayout section;
     };
-    std::vector<NoteEntry> notes;
+    List<NoteEntry> notes;
 };
 
-int resolveSpanLength(const DiagnosticSpan& span, const std::vector<std::string>& sourceLines)
+int resolveSpanLength(const DiagnosticSpan& span, const List<std::string>& sourceLines)
 {
     if (span.length > 0)
         return span.length;
     int lineIndex = span.location.line;
-    if (lineIndex >= 0 && lineIndex < static_cast<int>(sourceLines.size()))
+    if (lineIndex >= 0 && lineIndex < static_cast<int>(sourceLines.getCount()))
         return calculateFallbackLength(
             sourceLines[static_cast<size_t>(lineIndex)],
             span.location.column);
@@ -435,7 +462,7 @@ int resolveSpanLength(const DiagnosticSpan& span, const std::vector<std::string>
 LayoutSpan makeLayoutSpan(
     const DiagnosticSpan& span,
     bool isPrimary,
-    const std::vector<std::string>& sourceLines)
+    const List<std::string>& sourceLines)
 {
     LayoutSpan layoutSpan;
     layoutSpan.line = span.location.line;
@@ -446,7 +473,7 @@ LayoutSpan makeLayoutSpan(
     return layoutSpan;
 }
 
-size_t findCommonIndent(const std::vector<LayoutBlock>& blocks)
+size_t findCommonIndent(const List<LayoutBlock>& blocks)
 {
     size_t minIndent = std::numeric_limits<size_t>::max();
     for (const auto& block : blocks)
@@ -467,15 +494,15 @@ size_t findCommonIndent(const std::vector<LayoutBlock>& blocks)
 }
 
 SectionLayout buildSectionLayout(
-    const std::vector<LayoutSpan>& spans,
-    const std::vector<std::string>& sourceLines)
+    const List<LayoutSpan>& spans,
+    const List<std::string>& sourceLines)
 {
     // Transform resolved spans into grouped, display-ready blocks: we bucket spans
     // per line, preserve source text for each line, keep gaps explicit so rendering
     // can insert ellipses, and measure shared indentation so highlights align even
     // when shader code is heavily indented in the fixture.
     SectionLayout section;
-    if (spans.empty())
+    if (spans.getCount() == 0)
         return section;
 
     int maxLineNum = 0;
@@ -489,16 +516,14 @@ SectionLayout buildSectionLayout(
         HighlightLine& line = grouped[span.line];
         line.number = span.line;
         if (line.content.empty() && span.line >= 0 &&
-            span.line < static_cast<int>(sourceLines.size()))
-            line.content = sourceLines[static_cast<size_t>(span.line)];
-        line.spans.push_back(LineHighlight{span.col, span.length, span.label, span.isPrimary});
+            span.line < static_cast<int>(sourceLines.getCount()))
+            line.content = sourceLines[static_cast<Index>(span.line)];
+        line.spans.add(LineHighlight{span.col, span.length, span.label, span.isPrimary});
     }
 
     for (auto& [_, line] : grouped)
     {
-        std::sort(
-            line.spans.begin(),
-            line.spans.end(),
+        line.spans.sort(
             [](const LineHighlight& a, const LineHighlight& b)
             {
                 if (a.column != b.column)
@@ -507,34 +532,33 @@ SectionLayout buildSectionLayout(
             });
     }
 
-    std::vector<int> lineNumbers;
-    lineNumbers.reserve(grouped.size());
+    List<int> lineNumbers;
     for (const auto& [number, _] : grouped)
-        lineNumbers.push_back(number);
-    std::sort(lineNumbers.begin(), lineNumbers.end());
+        lineNumbers.add(number);
+    lineNumbers.sort();
 
     LayoutBlock currentBlock;
     int prevLine = std::numeric_limits<int>::min();
     for (int number : lineNumbers)
     {
         bool hasGap = prevLine != std::numeric_limits<int>::min() && number > prevLine + 1;
-        if (hasGap && !currentBlock.lines.empty())
+        if (hasGap && currentBlock.lines.getCount() > 0)
         {
-            section.blocks.push_back(currentBlock);
+            section.blocks.add(currentBlock);
             currentBlock = LayoutBlock{};
             currentBlock.showGap = true;
         }
-        else if (currentBlock.lines.empty())
+        else if (currentBlock.lines.getCount() == 0)
         {
             currentBlock.showGap = false;
         }
 
-        currentBlock.lines.push_back(grouped[number]);
+        currentBlock.lines.add(grouped[number]);
         prevLine = number;
     }
 
-    if (!currentBlock.lines.empty())
-        section.blocks.push_back(currentBlock);
+    if (currentBlock.lines.getCount() > 0)
+        section.blocks.add(currentBlock);
 
     section.commonIndent = findCommonIndent(section.blocks);
     return section;
@@ -550,17 +574,17 @@ struct LabelInfo
     std::string text;
 };
 
-std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
+List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
 {
     // Convert intra-line highlights into the familiar caret/label ladder: first
     // lay down the underline with different glyphs for primary vs secondary spans,
     // attach the closest label inline when possible, then fall back to vertical
     // connectors so multiple labels can coexist without clobbering each other.
-    std::vector<std::string> rows;
-    if (line.spans.empty())
+    List<std::string> rows;
+    if (line.spans.getCount() == 0)
         return rows;
 
-    std::vector<LabelInfo> labels;
+    List<LabelInfo> labels;
     std::string underline;
     int cursor = 1;
 
@@ -574,27 +598,23 @@ std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t i
         cursor = effectiveColumn + length;
 
         if (!span.label.empty())
-            labels.push_back(LabelInfo{effectiveColumn, span.label});
+            labels.add(LabelInfo{effectiveColumn, span.label});
     }
 
-    if (!labels.empty())
+    if (labels.getCount() > 0)
     {
-        std::sort(
-            labels.begin(),
-            labels.end(),
+        labels.sort(
             [](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
-        underline += " " + labels.front().text;
-        labels.erase(labels.begin());
+        underline += " " + labels.getFirst().text;
+        labels.removeAt(0);
     }
 
-    rows.push_back(underline);
-    if (labels.empty())
+    rows.add(underline);
+    if (labels.getCount() == 0)
         return rows;
 
     auto sortedLabels = labels;
-    std::sort(
-        sortedLabels.begin(),
-        sortedLabels.end(),
+    sortedLabels.sort(
         [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
     std::string connector;
@@ -605,18 +625,16 @@ std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t i
         connector += repeat(' ', spaces) + "|";
         pos = info.column + 1;
     }
-    rows.push_back(connector);
+    rows.add(connector);
 
     for (const auto& target : labels)
     {
-        std::vector<LabelInfo> active;
+        List<LabelInfo> active;
         for (const auto& candidate : labels)
             if (candidate.column <= target.column)
-                active.push_back(candidate);
+                active.add(candidate);
 
-        std::sort(
-            active.begin(),
-            active.end(),
+        active.sort(
             [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
         std::string labelRow;
@@ -636,7 +654,7 @@ std::vector<std::string> buildAnnotationRows(const HighlightLine& line, size_t i
                 current = info.column + 1;
             }
         }
-        rows.push_back(labelRow);
+        rows.add(labelRow);
     }
 
     return rows;
@@ -690,12 +708,12 @@ DiagnosticLayout createLayout(const TestData& data)
     layout.primaryLoc.line = diag.primarySpan.location.line;
     layout.primaryLoc.col = diag.primarySpan.location.column;
 
-    std::vector<std::string> sourceLines = getSourceLines(data.sourceContent);
+    List<std::string> sourceLines = getSourceLines(data.sourceContent);
 
-    std::vector<LayoutSpan> allSpans;
-    allSpans.push_back(makeLayoutSpan(diag.primarySpan, true, sourceLines));
+    List<LayoutSpan> allSpans;
+    allSpans.add(makeLayoutSpan(diag.primarySpan, true, sourceLines));
     for (const auto& s : diag.secondarySpans)
-        allSpans.push_back(makeLayoutSpan(s, false, sourceLines));
+        allSpans.add(makeLayoutSpan(s, false, sourceLines));
 
     layout.primarySection = buildSectionLayout(allSpans, sourceLines);
     layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
@@ -708,11 +726,12 @@ DiagnosticLayout createLayout(const TestData& data)
         noteEntry.loc.line = note.span.location.line;
         noteEntry.loc.col = note.span.location.column;
 
-        std::vector<LayoutSpan> noteSpans = {makeLayoutSpan(note.span, false, sourceLines)};
+        List<LayoutSpan> noteSpans;
+        noteSpans.add(makeLayoutSpan(note.span, false, sourceLines));
         noteEntry.section = buildSectionLayout(noteSpans, sourceLines);
         noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
 
-        layout.notes.push_back(std::move(noteEntry));
+        layout.notes.add(std::move(noteEntry));
     }
 
     return layout;
@@ -731,7 +750,7 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
     ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName << ":"
        << layout.primaryLoc.line << ":" << layout.primaryLoc.col << '\n';
 
-    if (!layout.primarySection.blocks.empty())
+    if (layout.primarySection.blocks.getCount() > 0)
     {
         ss << repeat(' ', layout.primarySection.maxGutterWidth + 1) << "|\n";
         renderSectionBody(ss, layout.primarySection);
@@ -742,7 +761,7 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
         ss << "\nnote: " << note.message << '\n';
         ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName << ":"
            << note.loc.line << ":" << note.loc.col << '\n';
-        if (!note.section.blocks.empty())
+        if (note.section.blocks.getCount() > 0)
         {
             ss << repeat(' ', note.section.maxGutterWidth + 1) << "|\n";
             renderSectionBody(ss, note.section);
