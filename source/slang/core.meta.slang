@@ -3156,11 +3156,90 @@ __generic<T, U>
 __intrinsic_op($(kIROp_BitCast))
 T bit_cast(U value);
 
-// Create Existential object
+/// Reinterpret `U` as a type that conforms to interface `T`. The precise
+/// underlying type is determined by `coherenceId`.
+///
+/// The compiler automatically assigns coherence IDs that can be retrieved by
+/// `ISession::getTypeConformanceWitnessSequentialID`. These automatic IDs can
+/// be overriden by `ISession::getTypeConformanceWitnessSequentialID`.
+///
+/// Note that the returned object can not be used in a context that requires
+/// monomorphization. That is, the object returned by `createDynamicObject` can
+/// only be used through the interface `T`. For example, the following will
+/// **not** work:
+/// ```
+/// float3 shadeMaterial<M: IMaterial>(M m, ShadingParameters p) {
+///     return m.shadeWith(p);
+/// }
+///
+/// float3 shadeObject(Object o) {
+///     IMaterial material = createDynamicObject<IMaterial, MaterialParameters>(o.material.id, o.material.params);
+///     // This fails: we can't monomorphize to a dynamic type!
+///     return shadeMaterial(material);
+/// }
+/// ```
+///
+/// @param T Interface to which the returned object will conform.
+/// @param U Type for the source data
+/// @param coherenceId Coherence ID used to determine the underlying type.
+/// @param value Data to be reinterpreted.
+///
+/// @example
+///
+/// ```csharp
+/// interface IDistribution {
+///     float samplePdf(float f);
+/// }
+///
+/// // ISession::getTypeConformanceWitnessSequentialID is 1
+/// struct Logistic : IDistribution {
+///     float mu;
+///     float s2; // 2 * s
+///
+///     float samplePdf(float f) {
+///         return 0.5 + 0.5 * tanh((f - mu) / s2);
+///     }
+/// }
+///
+/// // ISession::getTypeConformanceWitnessSequentialID is 2
+/// struct Gaussian : IDistribution {
+///     float mu;
+///     float sigma2; // 2 * sigma^2
+///     float norm;   // 1 / (sqrt(2 * pi * sigma * sigma))
+///
+///     float samplePdf(float f) {
+///         float d = (f - mu);
+///         d *= d;
+///         return norm * exp(d / sigma2);
+///     }
+/// }
+///
+/// struct DistributionParameters {
+///     int kind;
+///     float4 data;
+/// }
+///
+/// float sampleDistribution(DistributionParameters d, float f) {
+///     IDistribution d = createDynamicObject<IDistribution, float4>(d.kind, d.data);
+///     return d.samplePdf(f);
+/// }
+/// ```
+///
+/// If we then provide a buffer like:
+/// ```
+/// distributions = [
+///     DistributionParameters(1, {0.0, 2.0, NaN, NaN}),
+///     DistributionParameters(2, {0.0, 2.0, 0.56418958 NaN}),
+/// ]
+/// ```
+///
+/// Anything using `distributions[0]` will use a logistic distribution with
+/// mean 0 and scale 1, while `distributions[1]` will be a Gaussian
+/// distribution with mean 0 and standard deviation of 1.
 __generic<T, U>
 [__unsafeForceInlineEarly]
 __intrinsic_op($(kIROp_CreateExistentialObject))
-T createDynamicObject(uint typeId, U value);
+T createDynamicObject(uint coherenceId, U value);
 
 /// Reinterpret type `U` as type `T`. `T` and `U`
 /// can be any scalar, vector, matrix, struct or array types.
