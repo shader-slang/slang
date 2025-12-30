@@ -12,7 +12,8 @@
 namespace Slang
 {
 struct RichDiagnostic;
-}
+struct GenericDiagnostic;
+} // namespace Slang
 
 namespace Slang
 {
@@ -39,6 +40,7 @@ static_assert(
 
 // TODO(tfoley): move this into a source file...
 inline const char* getSeverityName(Severity severity)
+
 {
     switch (severity)
     {
@@ -58,6 +60,22 @@ inline const char* getSeverityName(Severity severity)
         return "unknown error";
     }
 }
+
+// Generic diagnostic representation for layout rendering
+struct DiagnosticSpan
+{
+    SourceLoc location;
+    String message;
+};
+
+struct GenericDiagnostic
+{
+    int code;
+    Severity severity;
+    String message;
+    DiagnosticSpan primarySpan;
+    List<DiagnosticSpan> secondarySpans;
+};
 
 // A structure to be used in static data describing different
 // diagnostic messages.
@@ -197,6 +215,12 @@ public:
         return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
     }
 
+    template<typename D>
+    bool diagnose(D const& d)
+    {
+        return diagnoseRichImpl(d.toGenericDiagnostic());
+    }
+
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
     // line again. (Ideally we would print the error/warning and notes in one call...)
     template<typename P, typename... Args>
@@ -299,13 +323,16 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    // Returns true if a diagnostic is actually written.
+    // Returns true if a diagnostic is writte, doesn't return at all if the diagnostic is fatal
     bool diagnoseImpl(
         SourceLoc const& pos,
         DiagnosticInfo info,
         int argCount,
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
+
+    // Returns true if a diagnostic is writte, doesn't return at all if the diagnostic is fatal
+    bool diagnoseRichImpl(const GenericDiagnostic& d);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info, SourceLoc const& location);
 
