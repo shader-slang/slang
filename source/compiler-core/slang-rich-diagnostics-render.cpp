@@ -321,11 +321,11 @@ const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 // HELPER FUNCTIONS
 // ============================================================================
 
-List<std::string> getSourceLines(const std::string& content)
+List<String> getSourceLines(const std::string& content)
 {
     // Parse the embedded shader snippet into logical lines once so downstream layout
     // code can work with indexed access; using StringUtil::split handles both CRLF and LF.
-    List<std::string> lines;
+    List<String> lines;
     UnownedStringSlice contentSlice(content.c_str(), content.length());
     List<UnownedStringSlice> slices;
     StringUtil::split(contentSlice, '\n', slices);
@@ -333,31 +333,36 @@ List<std::string> getSourceLines(const std::string& content)
     // Convert slices to strings, handling potential CRLF endings
     for (const auto& slice : slices)
     {
-        std::string line(slice.begin(), slice.getLength());
+        String line(slice);
         // Remove trailing \r if present (for CRLF line endings)
-        if (!line.empty() && line.back() == '\r')
-            line.pop_back();
+        if (line.getLength() > 0 && line[line.getLength() - 1] == '\r')
+            line = line.subString(0, line.getLength() - 1);
         lines.add(line);
     }
     return lines;
 }
 
-std::string trimNewlines(const std::string& s)
+String trimNewlines(const std::string& s)
 {
     // Harness output comparisons assume deterministic framing, so we aggressively
     // trim leading/trailing newline noise that often shows up in raw heredoc data.
-    size_t start = 0;
-    while (start < s.length() && (s[start] == '\n' || s[start] == '\r'))
+    String str(s.c_str());
+    Index start = 0;
+    while (start < str.getLength() && (str[start] == '\n' || str[start] == '\r'))
         ++start;
-    size_t end = s.length();
-    while (end > start && (s[end - 1] == '\n' || s[end - 1] == '\r'))
+    Index end = str.getLength();
+    while (end > start && (str[end - 1] == '\n' || str[end - 1] == '\r'))
         --end;
-    return s.substr(start, end - start);
+    return str.subString(start, end - start);
 }
 
-std::string repeat(char c, int n)
+String repeat(char c, int n)
 {
-    return n <= 0 ? std::string() : std::string(static_cast<size_t>(n), c);
+    if (n <= 0) return String();
+    StringBuilder sb;
+    for (int i = 0; i < n; i++)
+        sb << c;
+    return sb;
 }
 
 int calculateFallbackLength(const std::string& line, int col)
@@ -380,12 +385,13 @@ int calculateFallbackLength(const std::string& line, int col)
     return len > 0 ? len : 1;
 }
 
-std::string stripIndent(const std::string& text, size_t indent)
+String stripIndent(const std::string& text, size_t indent)
 {
     if (indent == 0 || text.empty())
-        return text;
-    size_t usable = std::min(indent, text.size());
-    return text.substr(usable);
+        return String(text.c_str());
+    String str(text.c_str());
+    Index usable = std::min(static_cast<Index>(indent), str.getLength());
+    return str.subString(usable, str.getLength() - usable);
 }
 
 // ============================================================================
@@ -457,14 +463,14 @@ struct DiagnosticLayout
     List<NoteEntry> notes;
 };
 
-int resolveSpanLength(const DiagnosticSpan& span, const List<std::string>& sourceLines)
+int resolveSpanLength(const DiagnosticSpan& span, const List<String>& sourceLines)
 {
     if (span.length > 0)
         return span.length;
     int lineIndex = span.location.line;
     if (lineIndex >= 0 && lineIndex < static_cast<int>(sourceLines.getCount()))
         return calculateFallbackLength(
-            sourceLines[static_cast<size_t>(lineIndex)],
+            std::string(sourceLines[static_cast<Index>(lineIndex)].getBuffer()),
             span.location.column);
     return 1;
 }
@@ -472,7 +478,7 @@ int resolveSpanLength(const DiagnosticSpan& span, const List<std::string>& sourc
 LayoutSpan makeLayoutSpan(
     const DiagnosticSpan& span,
     bool isPrimary,
-    const List<std::string>& sourceLines)
+    const List<String>& sourceLines)
 {
     LayoutSpan layoutSpan;
     layoutSpan.line = span.location.line;
@@ -505,7 +511,7 @@ size_t findCommonIndent(const List<LayoutBlock>& blocks)
 
 SectionLayout buildSectionLayout(
     const List<LayoutSpan>& spans,
-    const List<std::string>& sourceLines)
+    const List<String>& sourceLines)
 {
     // Transform resolved spans into grouped, display-ready blocks: we bucket spans
     // per line, preserve source text for each line, keep gaps explicit so rendering
@@ -527,7 +533,7 @@ SectionLayout buildSectionLayout(
         line.number = span.line;
         if (line.content.empty() && span.line >= 0 &&
             span.line < static_cast<int>(sourceLines.getCount()))
-            line.content = sourceLines[static_cast<Index>(span.line)];
+            line.content = std::string(sourceLines[static_cast<Index>(span.line)].getBuffer());
         line.spans.add(LineHighlight{span.col, span.length, span.label, span.isPrimary});
     }
 
@@ -584,18 +590,18 @@ struct LabelInfo
     std::string text;
 };
 
-List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
+List<String> buildAnnotationRows(const HighlightLine& line, size_t indentShift)
 {
     // Convert intra-line highlights into the familiar caret/label ladder: first
     // lay down the underline with different glyphs for primary vs secondary spans,
     // attach the closest label inline when possible, then fall back to vertical
     // connectors so multiple labels can coexist without clobbering each other.
-    List<std::string> rows;
+    List<String> rows;
     if (line.spans.getCount() == 0)
         return rows;
 
     List<LabelInfo> labels;
-    std::string underline;
+    String underline;
     int cursor = 1;
 
     for (const auto& span : line.spans)
@@ -603,8 +609,8 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
         int effectiveColumn = std::max(1, span.column - static_cast<int>(indentShift));
         int length = std::max(1, span.length);
         int spaces = std::max(0, effectiveColumn - cursor);
-        underline += repeat(' ', spaces);
-        underline += repeat(span.isPrimary ? '^' : '-', length);
+        underline = underline + repeat(' ', spaces);
+        underline = underline + repeat(span.isPrimary ? '^' : '-', length);
         cursor = effectiveColumn + length;
 
         if (!span.label.empty())
@@ -615,7 +621,7 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
     {
         labels.sort(
             [](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
-        underline += " " + labels.getFirst().text;
+        underline = underline + " " + String(labels.getFirst().text.c_str());
         labels.removeAt(0);
     }
 
@@ -627,12 +633,12 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
     sortedLabels.sort(
         [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
-    std::string connector;
+    String connector;
     int pos = 1;
     for (const auto& info : sortedLabels)
     {
         int spaces = std::max(0, info.column - pos);
-        connector += repeat(' ', spaces) + "|";
+        connector = connector + repeat(' ', spaces) + "|";
         pos = info.column + 1;
     }
     rows.add(connector);
@@ -647,20 +653,20 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
         active.sort(
             [](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
-        std::string labelRow;
+        String labelRow;
         int current = 1;
         for (const auto& info : active)
         {
             int spaces = std::max(0, info.column - current);
-            labelRow += repeat(' ', spaces);
+            labelRow = labelRow + repeat(' ', spaces);
             if (info.column == target.column)
             {
-                labelRow += info.text;
+                labelRow = labelRow + String(info.text.c_str());
                 current = info.column + static_cast<int>(info.text.length());
             }
             else
             {
-                labelRow += "|";
+                labelRow = labelRow + "|";
                 current = info.column + 1;
             }
         }
@@ -670,11 +676,11 @@ List<std::string> buildAnnotationRows(const HighlightLine& line, size_t indentSh
     return rows;
 }
 
-void printAnnotationRow(StringBuilder& ss, int gutterWidth, const std::string& content)
+void printAnnotationRow(StringBuilder& ss, int gutterWidth, const String& content)
 {
-    if (content.empty())
+    if (content.getLength() == 0)
         return;
-    ss << repeat(' ', gutterWidth + 1).c_str() << "| " << content.c_str() << '\n';
+    ss << repeat(' ', gutterWidth + 1) << "| " << content << '\n';
 }
 
 void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
@@ -690,10 +696,10 @@ void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
 
         for (const auto& line : block.lines)
         {
-            const std::string label = line.number >= 0 ? std::to_string(line.number) : "?";
-            int padding = std::max(0, section.maxGutterWidth - static_cast<int>(label.length()));
-            ss << repeat(' ', padding).c_str() << label.c_str() << " | "
-               << stripIndent(line.content, section.commonIndent).c_str() << '\n';
+            const String label = line.number >= 0 ? String(std::to_string(line.number).c_str()) : "?";
+            int padding = std::max(0, section.maxGutterWidth - static_cast<int>(label.getLength()));
+            ss << repeat(' ', padding) << label << " | "
+               << stripIndent(line.content, section.commonIndent) << '\n';
 
             for (const auto& row : buildAnnotationRows(line, section.commonIndent))
                 printAnnotationRow(ss, section.maxGutterWidth, row);
@@ -718,7 +724,7 @@ DiagnosticLayout createLayout(const TestData& data)
     layout.primaryLoc.line = diag.primarySpan.location.line;
     layout.primaryLoc.col = diag.primarySpan.location.column;
 
-    List<std::string> sourceLines = getSourceLines(data.sourceContent);
+    List<String> sourceLines = getSourceLines(data.sourceContent);
 
     List<LayoutSpan> allSpans;
     allSpans.add(makeLayoutSpan(diag.primarySpan, true, sourceLines));
@@ -761,23 +767,23 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
         codeStr = "0" + codeStr;
     ss << codeStr << "]: " << layout.header.message.c_str() << '\n';
 
-    ss << repeat(' ', layout.primaryLoc.gutterIndent).c_str() << "--> " << layout.primaryLoc.fileName.c_str() << ":"
+    ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName.c_str() << ":"
        << layout.primaryLoc.line << ":" << layout.primaryLoc.col << '\n';
 
     if (layout.primarySection.blocks.getCount() > 0)
     {
-        ss << repeat(' ', layout.primarySection.maxGutterWidth + 1).c_str() << "|\n";
+        ss << repeat(' ', layout.primarySection.maxGutterWidth + 1) << "|\n";
         renderSectionBody(ss, layout.primarySection);
     }
 
     for (const auto& note : layout.notes)
     {
         ss << "\nnote: " << note.message.c_str() << '\n';
-        ss << repeat(' ', note.loc.gutterIndent).c_str() << "--- " << note.loc.fileName.c_str() << ":"
+        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName.c_str() << ":"
            << note.loc.line << ":" << note.loc.col << '\n';
         if (note.section.blocks.getCount() > 0)
         {
-            ss << repeat(' ', note.section.maxGutterWidth + 1).c_str() << "|\n";
+            ss << repeat(' ', note.section.maxGutterWidth + 1) << "|\n";
             renderSectionBody(ss, note.section);
         }
     }
@@ -849,8 +855,8 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
         const TestData& test = testCases[i];
         std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
 
-        std::string actualOutput = trimNewlines(renderDiagnostic(test));
-        std::string expectedOutput = trimNewlines(test.expectedOutput);
+        String actualOutput = trimNewlines(renderDiagnostic(test));
+        String expectedOutput = trimNewlines(test.expectedOutput);
 
         if (actualOutput == expectedOutput)
         {
@@ -860,7 +866,7 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
         else
         {
             std::cout << "FAIL - Output mismatch\nRunning diff...\n";
-            runDiff(expectedOutput, actualOutput);
+            runDiff(std::string(expectedOutput.getBuffer()), std::string(actualOutput.getBuffer()));
             ++failed;
         }
     }
