@@ -33,6 +33,10 @@ extension<T : IInterface> T
     }
 }
 
+// TEST_INPUT: type_conformance A:IInterface = 0
+// TEST_INPUT: type_conformance B:IInterface = 1
+// TEST_INPUT: type_conformance C:IInterface = 2
+
 IInterface factoryAB(uint id, float x)
 {
     if (id == 0)
@@ -53,9 +57,37 @@ float f(uint id, float x)
     return calcTwice(obj, x);
 }
 
+float dynamicF(uint id, float x)
+{
+    IInterface obj = createDynamicObject<IInterface, float>(id, x);
+    // CHECK: ([[# @LINE+1]]): error 33180
+    return obj.calcTwice(x);
+}
+
+float dceCalcTwice(IInterface obj, float x)
+{
+    if (false) {
+        // This check doesn't work right now because the actual errors are
+        // emitted during specialization, which happens after DCE.
+        // todo-check
+        // ([[# @LINE+1]]): error 33180
+        return obj.calcTwice(x);
+    } else {
+        return 0;
+    }
+}
+
+float dceF(uint id, float x)
+{
+    IInterface obj = factoryAB(id, x);
+    return dceCalcTwice(obj, x);
+}
+
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = f(0, 3);
     outputBuffer[1] = f(1, 3); 
+    outputBuffer[2] = dynamicF(int(outputBuffer[0]), 3);
+    outputBuffer[3] = dceF(1, 3);
 }
