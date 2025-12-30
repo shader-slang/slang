@@ -439,14 +439,14 @@ struct DiagnosticLayout
 {
     struct Header
     {
-        std::string severity;
+        String severity;
         int code = 0;
-        std::string message;
+        String message;
     } header;
 
     struct Location
     {
-        std::string fileName;
+        String fileName;
         int line = 0;
         int col = 0;
         int gutterIndent = 0;
@@ -456,7 +456,7 @@ struct DiagnosticLayout
 
     struct NoteEntry
     {
-        std::string message;
+        String message;
         Location loc;
         SectionLayout section;
     };
@@ -716,11 +716,11 @@ DiagnosticLayout createLayout(const TestData& data)
     DiagnosticLayout layout;
     const auto& diag = data.diagnostic;
 
-    layout.header.severity = diag.severity;
+    layout.header.severity = String(diag.severity.c_str());
     layout.header.code = diag.code;
-    layout.header.message = diag.message;
+    layout.header.message = String(diag.message.c_str());
 
-    layout.primaryLoc.fileName = diag.primarySpan.location.fileName;
+    layout.primaryLoc.fileName = String(diag.primarySpan.location.fileName.c_str());
     layout.primaryLoc.line = diag.primarySpan.location.line;
     layout.primaryLoc.col = diag.primarySpan.location.column;
 
@@ -737,8 +737,8 @@ DiagnosticLayout createLayout(const TestData& data)
     for (const auto& note : diag.notes)
     {
         DiagnosticLayout::NoteEntry noteEntry;
-        noteEntry.message = note.message;
-        noteEntry.loc.fileName = note.span.location.fileName;
+        noteEntry.message = String(note.message.c_str());
+        noteEntry.loc.fileName = String(note.span.location.fileName.c_str());
         noteEntry.loc.line = note.span.location.line;
         noteEntry.loc.col = note.span.location.column;
 
@@ -760,14 +760,14 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
     // Keeping it side-effect free makes it trivial to diff the produced output.
     StringBuilder ss;
 
-    ss << layout.header.severity.c_str() << "[E";
+    ss << layout.header.severity << "[E";
     // Format error code with leading zeros to 4 digits
     String codeStr = String(layout.header.code);
     while (codeStr.getLength() < 4)
         codeStr = "0" + codeStr;
-    ss << codeStr << "]: " << layout.header.message.c_str() << '\n';
+    ss << codeStr << "]: " << layout.header.message << '\n';
 
-    ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName.c_str() << ":"
+    ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName << ":"
        << layout.primaryLoc.line << ":" << layout.primaryLoc.col << '\n';
 
     if (layout.primarySection.blocks.getCount() > 0)
@@ -778,8 +778,8 @@ std::string renderFromLayout(const DiagnosticLayout& layout)
 
     for (const auto& note : layout.notes)
     {
-        ss << "\nnote: " << note.message.c_str() << '\n';
-        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName.c_str() << ":"
+        ss << "\nnote: " << note.message << '\n';
+        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName << ":"
            << note.loc.line << ":" << note.loc.col << '\n';
         if (note.section.blocks.getCount() > 0)
         {
