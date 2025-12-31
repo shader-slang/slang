@@ -48,12 +48,16 @@ jobs:
           else
             bin_dir="$(pwd)/github_artifact/Release/bin"
             SLANGC="${bin_dir}/slangc"
+
+            # Make executables executable on Unix systems
+            chmod +x "${bin_dir}"/* 2>/dev/null || echo "Could not chmod all files"
+            chmod +x "$SLANGC" || echo "Could not chmod slangc"
           fi
 
           echo "bin_dir=$bin_dir" >> $GITHUB_ENV
           echo "SLANGC=$SLANGC" >> $GITHUB_ENV
 
-          # Verify slangc exists
+          # Verify slangc exists and is executable
           if [ ! -f "$SLANGC" ]; then
             echo "ERROR: slangc not found at: $SLANGC"
             echo "Artifact directory contents:"
