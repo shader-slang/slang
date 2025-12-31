@@ -855,7 +855,7 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         SlangInt maxSize = 0;
         for (auto type : types)
         {
-            auto size = getAnyValueSize(type);
+            auto size = getAnyValueSize(type, targetProgram);
             if (size > maxSize)
                 maxSize = size;
 
@@ -896,7 +896,7 @@ struct UntaggedUnionLoweringContext : public InstPassBase
 
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(
-            targetProgram->getOptionSet(),
+            targetProgram->getTargetReq(),
             concreteType,
             &sizeAndAlignment);
 
@@ -1751,7 +1751,7 @@ struct ExistentialLoweringContext : public InstPassBase
         //
         IRSizeAndAlignment sizeAndAlignment;
         Result result = getNaturalSizeAndAlignment(
-            targetProgram->getOptionSet(),
+            targetProgram->getTargetReq(),
             payloadType,
             &sizeAndAlignment);
         if (SLANG_FAILED(result) || sizeAndAlignment.size > anyValueSize)

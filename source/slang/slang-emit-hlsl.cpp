@@ -1356,21 +1356,21 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
-#if SLANG_PTR_IS_64
+
     case kIROp_IntPtrType:
-        m_writer->emit("int64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("int64_t");
+        else
+            m_writer->emit("int");
         return;
+
     case kIROp_UIntPtrType:
-        m_writer->emit("uint64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("uint64_t");
+        else
+            m_writer->emit("uint");
         return;
-#else
-    case kIROp_IntPtrType:
-        m_writer->emit("int");
-        return;
-    case kIROp_UIntPtrType:
-        m_writer->emit("uint");
-        return;
-#endif
+
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;

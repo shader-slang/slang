@@ -277,7 +277,7 @@ struct PeepholeContext : InstPassBase
                     baseType = inst->getOperand(0)->getDataType();
 
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         baseType,
                         &sizeAlignment)))
                     break;
@@ -1199,7 +1199,7 @@ struct PeepholeContext : InstPassBase
                     auto type = inst->getOperand(0)->getDataType();
                     IRSizeAndAlignment sizeAlignment;
                     const auto res = getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         type,
                         &sizeAlignment);
                     if (!SLANG_SUCCEEDED(res))
@@ -1251,10 +1251,10 @@ struct PeepholeContext : InstPassBase
                         result = type->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && !getIntTypeSigned(type);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
                         result = as<IRVectorType>(type);
@@ -1415,7 +1415,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 
 bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
-    if (inst != tryConstantFoldInst(module, inst))
+    if (inst != tryConstantFoldInst(module, target, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());

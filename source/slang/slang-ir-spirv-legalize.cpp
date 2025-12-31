@@ -127,7 +127,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
+            m_sharedContext->m_targetRequest,
             layoutRules,
             elementType,
             &elementSize);
@@ -141,11 +141,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
-            layoutRules,
-            structType,
-            &structSize);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, structType, &structSize);
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -233,11 +229,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
-            rules,
-            structType,
-            &sizeAlignment);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)
@@ -1553,7 +1545,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_codeGenContext->getTargetReq(), elementType);
 
         // SPIRV doesn't support non-32bit integer types, so we need to convert
         if (i.width < 32)
@@ -2113,7 +2105,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     break;
                                 IRIntegerValue offset = 0;
                                 if (getOffset(
-                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        m_sharedContext->m_targetRequest,
                                         IRTypeLayoutRules::get(layoutRuleName),
                                         field,
                                         &offset) != SLANG_OK)
@@ -2490,7 +2482,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
 
         changed = false;
 
-        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
 
         for (auto inst : module->getGlobalInsts())
@@ -2503,7 +2495,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
             while (funcChanged && funcIterationCount < kMaxFuncIterations)
             {
                 funcChanged = false;
-                funcChanged |= applySparseConditionalConstantPropagation(func, sink);
+                funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 funcChanged |= removeRedundancyInFunc(func, false);
                 CFGSimplificationOptions options;

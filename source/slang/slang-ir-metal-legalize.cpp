@@ -199,7 +199,7 @@ struct MetalAddressSpaceAssigner : InitialAddressSpaceAssigner
     }
 };
 
-static void processInst(IRInst* inst, DiagnosticSink* sink)
+static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     switch (inst->getOp())
     {
@@ -222,7 +222,7 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_Less:
     case kIROp_Geq:
     case kIROp_Leq:
-        legalizeBinaryOp(inst, sink, CodeGenTarget::Metal);
+        legalizeBinaryOp(inst, sink, targetProgram);
         break;
     case kIROp_MeshOutputRef:
         sink->diagnose(getDiagnosticPos(inst), Diagnostics::assignToRefNotSupported);
@@ -241,12 +241,12 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     default:
         for (auto child : inst->getModifiableChildren())
         {
-            processInst(child, sink);
+            processInst(child, targetProgram, sink);
         }
     }
 }
 
-void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
+void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
     for (auto inst : module->getGlobalInsts())
@@ -266,7 +266,7 @@ void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink)
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);
 
-    processInst(module->getModuleInst(), sink);
+    processInst(module->getModuleInst(), targetProgram, sink);
 }
 
 void specializeAddressSpaceForMetal(IRModule* module)

@@ -41,6 +41,11 @@ NaturalSize NaturalSize::operator*(Count count) const
     {
         return makeEmpty();
     }
+    if (baseType == BaseType::IntPtr || baseType == BaseType::UIntPtr)
+    {
+        // We don't know the size of the pointer at the AST level.
+        return makeInvalid();
+    }
     else
     {
         // In "natural" layout the alignment of a base type is always the same
@@ -135,8 +140,9 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     }
     else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
     {
-        // We assume 64 bits/8 bytes across the board
-        return NaturalSize::makeFromBaseType(BaseType::UInt64);
+        // We can't know the size of pointer types at the AST level, as it is
+        // determined by the target that is not yet known.
+        return NaturalSize::makeInvalid();
     }
     else if (auto arrayType = as<ArrayExpressionType>(type))
     {

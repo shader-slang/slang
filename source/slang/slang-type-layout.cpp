@@ -189,7 +189,7 @@ static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
 struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -216,10 +216,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::Int64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::IntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout(context);
 
         case BaseType::UInt8:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
@@ -230,10 +227,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::UInt64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::UIntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout(context);
 
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
@@ -248,10 +242,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) override
     {
-        // We'll assume 64 pointers by default, with 8 byte alignment
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        auto pointerSize = getPointerSize(context.targetReq);
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, pointerSize, pointerSize);
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -402,7 +396,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         SLANG_UNUSED(context);
 
         // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
-        auto uintInfo = GetScalarLayout(BaseType::UInt);
+        auto uintInfo = GetScalarLayout(BaseType::UInt, context);
         auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
         return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
     }
@@ -437,7 +431,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // TODO(JS):
         // We'll assume 64 bit "pointer". If we are using these extensions...
@@ -475,7 +469,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
             context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
         {
             // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
-            auto uint64Info = GetScalarLayout(BaseType::UInt64);
+            auto uint64Info = GetScalarLayout(BaseType::UInt64, context);
             return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
         }
 
@@ -547,7 +541,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // Not supported on HLSL currently...
         return SimpleLayoutInfo();
@@ -605,7 +599,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -619,18 +613,8 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
         // This always returns a layout where the size is the same as the alignment.
         default:
-            return Super::GetScalarLayout(baseType);
+            return Super::GetScalarLayout(baseType, context);
         }
-    }
-
-    SimpleLayoutInfo GetPointerLayout() override
-    {
-        // TODO(JS):
-        // NOTE! We are assuming that the layout is the same for the *target* that it is for
-        // the compilation.
-        // If we are emitting C++, then there is no way in general to know how that C++ will be
-        // compiled it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -692,30 +676,17 @@ struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
         case BaseType::Bool:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
-        case BaseType::IntPtr:
-        case BaseType::UIntPtr:
-            // TODO: Hardcoded size and alignment for 64 bit pointers. This is
-            // excessive if the target is 32-bit, but should work everywhere in
-            // practice. There will simply be unused bytes.
-            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
 
         // This always returns a layout where the size is the same as the alignment.
         default:
-            return Super::GetScalarLayout(baseType);
+            return Super::GetScalarLayout(baseType, context);
         }
-    }
-
-    SimpleLayoutInfo GetPointerLayout() override
-    {
-        // TODO: Hardcoded size and alignment for 64 bit pointers. Leads to
-        // wasted bytes on 32-bit targets.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
     }
 
     SimpleLayoutInfo GetVectorLayout(
@@ -774,7 +745,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -789,11 +760,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             }
 
         default:
-            return Super::GetScalarLayout(baseType);
+            return Super::GetScalarLayout(baseType, context);
         }
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // CUDA/NVTRC only support 64 bit pointers
         return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
@@ -1005,12 +976,13 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
     // hook to allow differentiating for input/output
     virtual LayoutResourceKind getKind() { return kind; }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType, const TypeLayoutContext&) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(getKind(), 1);
     }
-    SimpleLayoutInfo GetPointerLayout() override
+
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // For pointers assume same logic as for scalars
         return SimpleLayoutInfo(getKind(), 1);
@@ -1057,12 +1029,13 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     LayoutResourceKind getKind() { return LayoutResourceKind::SpecializationConstant; }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType, const TypeLayoutContext&) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(getKind(), 1);
     }
-    SimpleLayoutInfo GetPointerLayout() override
+
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // In a sense pointer are just like ScalarLayout, so we'll use the same logic...
         return SimpleLayoutInfo(getKind(), 1);
@@ -2604,7 +2577,7 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
 struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, DefaultLayoutRulesImpl
 {
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext&) override
     {
         SLANG_UNUSED(baseType);
         // Everything in a metal argument buffer, including basic scalar values, occupy one `[[id]]`
@@ -3328,6 +3301,80 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
 {
     return ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)).style ==
            ArtifactStyle::Kernel;
+}
+
+static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltinTypeLayoutInfo* out)
+{
+    CompilerOptionSet& compileOptions = targetReq->getOptionSet();
+
+    // On LLVM targets, we need to query the sizes from LLVM itself, based
+    // on the target triple.
+    Session* session = targetReq->getSession();
+    ISlangSharedLibrary* llvmLib = session->getOrLoadSlangLLVM();
+    if (!llvmLib)
+        return false;
+
+    auto targetTripleOption =
+        compileOptions.getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
+    CharSlice targetTriple = CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+
+    using InfoFuncV1 =
+        SlangResult (*)(Slang::CharSlice targetTriple, Slang::TargetBuiltinTypeLayoutInfo* info);
+
+    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
+
+    if (!infoFunc)
+        return false;
+
+    SlangResult result = infoFunc(targetTriple, out);
+    return result == SLANG_OK;
+}
+
+TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info;
+    info.genericPointerSize = 8; // Assume 64-bit pointers by default.
+
+    // If we don't know the target, we just have to assume the defaults. This
+    // type of usage occurs in IR checking passes prior to target-specific
+    // emission, e.g. checkForOperatorShiftOverflow. Because we don't yet know
+    // the size of pointers when that pass runs, we just assume it's 64 bits
+    // because that's the case most of the time.
+    if (!targetReq)
+        return info;
+
+    // If we're using an LLVM target, we should ask from LLVM.
+    if (isCPUTargetViaLLVM(targetReq) && getLLVMBuiltinTypeLayoutInfo(targetReq, &info))
+        return info;
+
+    // Otherwise, we can make educated guesses based on the targets.
+    switch (targetReq->getTarget())
+    {
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+        // Assume we're targeting the compiler's host, so we can just get the
+        // pointer size from the host here.
+        info.genericPointerSize = sizeof(void*);
+        break;
+    }
+    return info;
+}
+
+size_t getPointerSize(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info = getBuiltinTypeLayoutInfo(targetReq);
+    return info.genericPointerSize;
 }
 
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
@@ -5288,7 +5335,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto basicType = as<BasicExpressionType>(type))
     {
         return createSimpleTypeLayout(
-            rules->GetScalarLayout(basicType->getBaseType()),
+            rules->GetScalarLayout(basicType->getBaseType(), context),
             type,
             rules);
     }
@@ -5420,7 +5467,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
 
-        const auto info = rules->GetPointerLayout();
+        const auto info = rules->GetPointerLayout(context);
 
         const TypeLayoutResult result(ptrLayout, info);
         _addLayout(context, type, result);
@@ -5979,7 +6026,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
-            auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            auto info = varyingRules[rr]->GetScalarLayout(baseType, context);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -5993,7 +6040,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
-            auto info = varyingRules[rr]->GetPointerLayout();
+            auto info = varyingRules[rr]->GetPointerLayout(context);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -6027,7 +6074,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto varyingRuleSet = varyingRules[rr];
-            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
             auto info = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, elementCount);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
@@ -6081,7 +6128,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto varyingRuleSet = varyingRules[rr];
-            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
 
             auto info = varyingRuleSet->GetMatrixLayout(
                 elementBaseType,

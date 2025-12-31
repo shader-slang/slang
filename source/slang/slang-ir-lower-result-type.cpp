@@ -11,13 +11,14 @@ namespace Slang
 struct ResultTypeLoweringContext
 {
     IRModule* module;
+    TargetProgram* program;
     DiagnosticSink* sink;
 
     InstWorkList workList;
     InstHashSet workListSet;
 
-    ResultTypeLoweringContext(IRModule* inModule)
-        : module(inModule), workList(inModule), workListSet(inModule)
+    ResultTypeLoweringContext(IRModule* inModule, TargetProgram* program)
+        : module(inModule), program(program), workList(inModule), workListSet(inModule)
     {
     }
 
@@ -72,14 +73,14 @@ struct ResultTypeLoweringContext
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
-            anyValueSize = getAnyValueSize(valueType);
+            anyValueSize = getAnyValueSize(valueType, program);
             info->valueType = valueType;
         }
 
         auto errorType = resultType->getErrorType();
         info->errorType = errorType;
 
-        auto errSize = getAnyValueSize(errorType);
+        auto errSize = getAnyValueSize(errorType, program);
         if (errSize > anyValueSize)
             anyValueSize = errSize;
 
@@ -282,9 +283,9 @@ struct ResultTypeLoweringContext
     }
 };
 
-void lowerResultType(IRModule* module, DiagnosticSink* sink)
+void lowerResultType(IRModule* module, TargetProgram* program, DiagnosticSink* sink)
 {
-    ResultTypeLoweringContext context(module);
+    ResultTypeLoweringContext context(module, program);
     context.sink = sink;
     context.processModule();
 }

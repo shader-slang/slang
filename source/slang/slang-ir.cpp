@@ -7681,41 +7681,66 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
-IntInfo getIntTypeInfo(const IRType* intType)
+Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType)
+{
+    switch (intType->getOp())
+    {
+    case kIROp_UIntPtrType:
+    case kIROp_IntPtrType:
+        return Int(getPointerSize(targetReq)) * 8;
+    default:
+        return maybeGetIntTypeWidth(intType).value();
+    }
+}
+
+std::optional<Int> maybeGetIntTypeWidth(IRType* intType)
 {
     switch (intType->getOp())
     {
     case kIROp_UInt8Type:
-        return {8, false};
-    case kIROp_UInt16Type:
-        return {16, false};
-    case kIROp_UIntType:
-        return {32, false};
-    case kIROp_UInt64Type:
-        return {64, false};
-    case kIROp_UIntPtrType:
-#if SLANG_PTR_IS_32
-        return {32, false};
-#else
-        return {64, false};
-#endif
     case kIROp_Int8Type:
-        return {8, true};
+        return 8;
+    case kIROp_UInt16Type:
     case kIROp_Int16Type:
-        return {16, true};
+        return 16;
+    case kIROp_UIntType:
     case kIROp_IntType:
-        return {32, true};
+        return 32;
+    case kIROp_UInt64Type:
     case kIROp_Int64Type:
-        return {64, true};
+        return 64;
+    case kIROp_UIntPtrType:
     case kIROp_IntPtrType:
-#if SLANG_PTR_IS_32
-        return {32, true};
-#else
-        return {64, true};
-#endif
+        return {};
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getIntTypeWidth");
+    }
+}
+
+bool getIntTypeSigned(IRType* intType)
+{
+    switch (intType->getOp())
+    {
+    case kIROp_UInt8Type:
+    case kIROp_UInt16Type:
+    case kIROp_UIntType:
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+        return false;
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+    case kIROp_IntType:
+    case kIROp_Int64Type:
+    case kIROp_IntPtrType:
+        return true;
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
     }
+}
+
+IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType)
+{
+    return {getIntTypeWidth(targetReq, intType), getIntTypeSigned(intType)};
 }
 
 IROp getIntTypeOpFromInfo(const IntInfo info)

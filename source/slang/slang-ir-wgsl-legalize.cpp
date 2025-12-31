@@ -123,7 +123,7 @@ static void legalizeSwitch(IRSwitch* switchInst)
     switchInst->removeAndDeallocate();
 }
 
-static void processInst(IRInst* inst, DiagnosticSink* sink)
+static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     switch (inst->getOp())
     {
@@ -156,7 +156,7 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     case kIROp_Less:
     case kIROp_Geq:
     case kIROp_Leq:
-        legalizeBinaryOp(inst, sink, CodeGenTarget::WGSL);
+        legalizeBinaryOp(inst, sink, targetProgram);
         break;
 
     case kIROp_Func:
@@ -165,7 +165,7 @@ static void processInst(IRInst* inst, DiagnosticSink* sink)
     default:
         for (auto child : inst->getModifiableChildren())
         {
-            processInst(child, sink);
+            processInst(child, targetProgram, sink);
         }
     }
 }
@@ -199,7 +199,7 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
     }
 };
 
-void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
+void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
     for (auto inst : module->getGlobalInsts())
@@ -220,7 +220,7 @@ void legalizeIRForWGSL(IRModule* module, DiagnosticSink* sink)
     legalizeEntryPointVaryingParamsForWGSL(module, sink, entryPoints);
 
     // Go through every instruction in the module and legalize them as needed.
-    processInst(module->getModuleInst(), sink);
+    processInst(module->getModuleInst(), targetProgram, sink);
 
     // Some global insts are illegal, e.g. function calls.
     // We need to inline and remove those.
