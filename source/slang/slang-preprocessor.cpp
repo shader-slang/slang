@@ -703,7 +703,8 @@ struct MacroInvocation : InputStream
         Preprocessor* preprocessor,
         MacroDefinition* macro,
         SourceLoc macroInvocationLoc,
-        SourceLoc initiatingMacroInvocationLoc);
+        SourceLoc initiatingMacroInvocationLoc,
+        bool isStartOfLine = false);
 
     /// Prime the input stream
     ///
@@ -809,6 +810,10 @@ private:
     /// by `valueBuilder`
     template<typename F>
     void _pushStreamForSourceLocBuiltin(TokenType tokenType, F const& valueBuilder);
+
+    /// Indicate that whether this invocation is at the start of a line, this can be determined by
+    /// the macro invocation token.
+    bool m_isStartOfLine = false;
 };
 
 // Playing back macro bodies for macro invocations is one part of the expansion process, and the
@@ -1460,13 +1465,15 @@ MacroInvocation::MacroInvocation(
     Preprocessor* preprocessor,
     MacroDefinition* macro,
     SourceLoc macroInvocationLoc,
-    SourceLoc initiatingMacroInvocationLoc)
+    SourceLoc initiatingMacroInvocationLoc,
+    bool isStartOfLine)
     : Super(preprocessor)
 {
     m_macro = macro;
     m_firstBusyMacroInvocation = this;
     m_macroInvocationLoc = macroInvocationLoc;
     m_initiatingMacroInvocationLoc = initiatingMacroInvocationLoc;
+    m_isStartOfLine = isStartOfLine;
 }
 
 void MacroInvocation::prime(MacroInvocation* nextBusyMacroInvocation)
@@ -1683,6 +1690,7 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
             return;
         }
 
+        bool isStartOfLine = (token.flags & TokenFlag::AtStartOfLine) != 0;
         // Now we get to the slightly trickier cases.
         //
         // *If* the identifier names a macro, but we are currently in the
@@ -1749,7 +1757,8 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                     preprocessor,
                     macro,
                     token.loc,
-                    m_initiatingMacroInvocationLoc);
+                    m_initiatingMacroInvocationLoc,
+                    isStartOfLine);
                 invocation->prime(busyMacros);
                 _pushMacroInvocation(invocation);
             }
@@ -1806,7 +1815,8 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                     preprocessor,
                     macro,
                     token.loc,
-                    m_initiatingMacroInvocationLoc);
+                    m_initiatingMacroInvocationLoc,
+                    isStartOfLine);
 
                 // We start by consuming the opening `(` that we checked for above.
                 //
@@ -1982,6 +1992,11 @@ Token MacroInvocation::_readTokenImpl()
             // We can safely return with our invaraints intact, because
             // the next attempt to read a token will read a non-EOF.
             //
+            // Before returning, we need to check whether this macro invocation is
+            // at start of line, if it is, we must mark the first token as start of line
+            // as well, otherwise the expanded code could be invalid.
+            if (m_isStartOfLine)
+                token.flags |= TokenFlag::AtStartOfLine;
             return token;
         }
 
@@ -2003,7 +2018,14 @@ Token MacroInvocation::_readTokenImpl()
         // end of the macro expansion.
         //
         if (nextOpIndex == m_macro->ops.getCount())
+        {
+            // Before returning, we need to check whether this macro invocation is
+            // at start of line, if it is, we must mark the first token as start of line
+            // as well, otherwise the expanded code could be invalid.
+            if (m_isStartOfLine)
+                token.flags |= TokenFlag::AtStartOfLine;
             return token;
+        }
 
         // Because `m_currentOpStreams` is at its end, we can pop all of
         // those streams to reclaim their memory before we push any new
