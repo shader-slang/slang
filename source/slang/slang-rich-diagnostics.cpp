@@ -17,13 +17,13 @@ namespace Diagnostics
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
+%     local class_name = lua_module.toPascalCase(diagnostic.name) 
 %     local params = lua_module.getUniqueParams(diagnostic)
 GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 {
     GenericDiagnostic result;
     result.code = $(diagnostic.code);
-    result.severity = "$(diagnostic.severity)";
+    result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
     
     // Build message by interpolating parameters using StringBuilder
     StringBuilder messageBuilder;
@@ -33,6 +33,15 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         elseif part.type == "interpolation" then
 %             if part.param_type == "string" then
     messageBuilder << $(part.param_name);
+%             elseif part.param_type == "name" then
+    if ($(part.param_name))
+    {
+        messageBuilder << $(part.param_name)->text;
+    }
+    else
+    {
+        messageBuilder << "<unknown name>";
+    }
 %             elseif part.param_type == "type" then
     if ($(part.param_name))
     {
