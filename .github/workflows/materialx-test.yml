@@ -85,8 +85,12 @@ jobs:
           cd "$WORK_DIR"
 
           echo "Cloning MaterialX repository..."
-          git clone --depth 1 --branch main https://github.com/AcademySoftwareFoundation/MaterialX.git
-          echo "SUCCESS: MaterialX cloned successfully"
+          git clone https://github.com/AcademySoftwareFoundation/MaterialX.git
+          cd MaterialX
+          # Pin to specific commit that includes generateshader.py
+          # TODO: Switch to stable release tag when available
+          git checkout 3bd5fa90225169d90e1cd83ca12c732a461025f8
+          echo "SUCCESS: MaterialX cloned at commit 3bd5fa9"
 
       - name: Build MaterialX
         run: |
