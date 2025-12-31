@@ -17,22 +17,6 @@ class Type;
 namespace Slang
 {
 
-// Generic diagnostic representation for layout rendering
-struct DiagnosticSpan
-{
-    SourceLoc location;
-    String message;
-};
-
-struct GenericDiagnostic
-{
-    int code;
-    String severity;
-    String message;
-    DiagnosticSpan primarySpan;
-    List<DiagnosticSpan> secondarySpans;
-};
-
 namespace Diagnostics
 {
 
@@ -41,7 +25,7 @@ namespace Diagnostics
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
+%     local class_name = lua_module.toPascalCase(diagnostic.name) 
 %     local params = lua_module.getUniqueParams(diagnostic)
 struct $(class_name)
 {
