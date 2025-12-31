@@ -811,8 +811,8 @@ private:
     template<typename F>
     void _pushStreamForSourceLocBuiltin(TokenType tokenType, F const& valueBuilder);
 
-    /// Indicate that whether this invocation is at the start of a line, this can be determined by the macro
-    /// invocation token.
+    /// Indicate that whether this invocation is at the start of a line, this can be determined by
+    /// the macro invocation token.
     bool m_isStartOfLine = false;
 };
 
