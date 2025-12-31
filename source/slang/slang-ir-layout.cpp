@@ -114,8 +114,6 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
         BASE(Int64, 8);
         BASE(UInt64, 8);
-        BASE(IntPtr, builtinTypeInfo.genericPointerSize);
-        BASE(UIntPtr, builtinTypeInfo.genericPointerSize);
         BASE(Double, 8);
 
         // We are currently handling `bool` following the HLSL
@@ -339,6 +337,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             }
         }
         break;
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
     case kIROp_OutParamType:
     case kIROp_BorrowInOutParamType:
     case kIROp_RefParamType:
@@ -350,6 +350,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_NativeStringType:
     case kIROp_RaytracingAccelerationStructureType:
     case kIROp_FuncType:
+        // If we don't know the target, we can't tell the size of these types
+        // yet as it is target-dependent.
+        if (targetReq)
         {
             *outSizeAndAlignment = IRSizeAndAlignment(
                 builtinTypeInfo.genericPointerSize,
