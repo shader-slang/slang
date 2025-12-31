@@ -4,6 +4,7 @@
 #include "slang-llvm-jit-shared-library.h"
 
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/CodeGen/CommandFlags.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
@@ -38,6 +39,10 @@ namespace slang_llvm
 {
 
 using namespace Slang;
+
+// This instance needs to exist so that we gain access to codegen flags in the
+// downstream arguments.
+static llvm::codegen::RegisterCodeGenFlags CGF;
 
 // There doesn't appear to be an LLVM output stream for writing into a memory
 // buffer. This implementation saves all written data directly into Slang's List
@@ -501,6 +506,30 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     llvmModule->setTargetTriple(targetTriple);
 
     byteType = llvmBuilder->getInt8Ty();
+
+    // ParseCommandLineOptions below assumes that the first parameter is the
+    // name of the executable, but we do this cute trick to make it complain
+    // about parameters forwarded to LLVM instead:
+    std::vector<const char*> llvmArgs = {"-Xllvm"};
+    for (TerminatedCharSlice arg : options.llvmArguments)
+        llvmArgs.push_back(arg.data);
+
+    // Parse LLVM options. These can be used to adjust the behavior of various
+    // LLVM passes.
+    llvm::raw_string_ostream errorStream(error);
+    if (!llvm::cl::ParseCommandLineOptions(
+            llvmArgs.size(),
+            llvmArgs.data(),
+            "slangc",
+            &errorStream))
+    {
+        ArtifactDiagnostic diagnostic;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+        diagnostic.stage = ArtifactDiagnostic::Stage::Link;
+        diagnostic.text = TerminatedCharSlice(error.c_str(), error.length());
+        *outErrorArtifact = createErrorArtifact(diagnostic);
+        return;
+    }
 
     if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
@@ -2244,7 +2273,7 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V1(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V2(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,
