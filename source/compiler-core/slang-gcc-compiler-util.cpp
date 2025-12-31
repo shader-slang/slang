@@ -558,9 +558,32 @@ static SlangResult _parseGCCFamilyLine(
         break;
     }
 
-    if (options.debugInfoType != DebugInfoType::None)
+    switch (options.debugInfoType)
     {
+    case DebugInfoType::None:
+        // No debug information
+        break;
+
+    case DebugInfoType::Minimal:
+        // Minimal: Line numbers only for stack traces
+        // Use -g1 for minimal debug info or -gline-tables-only if available
+        cmdLine.addArg("-g1");
+        break;
+
+    case DebugInfoType::Standard:
+        // Standard: Full debug information (GCC default level)
         cmdLine.addArg("-g");
+        break;
+
+    case DebugInfoType::Maximal:
+        // Maximal: Maximum debug information including macro definitions
+        cmdLine.addArg("-g3");
+        // Also disable optimizations for better debugging experience
+        if (options.optimizationLevel != OptimizationLevel::None)
+        {
+            cmdLine.addArg("-O0");
+        }
+        break;
     }
 
     if (options.flags & CompileOptions::Flag::Verbose)
