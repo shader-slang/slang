@@ -1,46 +1,28 @@
 name: MaterialX Integration Tests
 
 on:
-  pull_request:
-    branches: [master]
-    paths-ignore:
-      - "docs/**"
-      - "LICENSES/**"
-      - "LICENSE"
-      - "CONTRIBUTING.md"
-      - "README.md"
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
 
 jobs:
   materialx-integration:
-    timeout-minutes: 60
-    continue-on-error: false
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [linux, windows, macos]
-        config: [release]
-        include:
-          - os: linux
-            runs-on: [ubuntu-22.04]
-            compiler: gcc
-            platform: x86_64
-            cmake-preset: default
-          - os: windows
-            runs-on: [windows-latest]
-            compiler: cl
-            platform: x86_64
-            cmake-preset: vs2022
-          - os: macos
-            runs-on: [macos-latest]
-            compiler: clang
-            platform: aarch64
-            cmake-preset: default
-
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -51,25 +33,13 @@ jobs:
           submodules: "recursive"
           fetch-depth: "1"
 
-      - name: Setup
-        uses: ./.github/actions/common-setup
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
         with:
-          os: ${{ matrix.os }}
-          compiler: ${{ matrix.compiler }}
-          platform: ${{ matrix.platform }}
-          config: ${{ matrix.config }}
-          build-llvm: false
-
-      - name: Build Slang
-        run: |
-          cmake --preset ${{ matrix.cmake-preset }} --fresh \
-            -DCMAKE_BUILD_TYPE=${{ matrix.config }} \
-            -DSLANG_ENABLE_CUDA=0 \
-            -DSLANG_ENABLE_EXAMPLES=0 \
-            -DSLANG_ENABLE_GFX=0 \
-            -DSLANG_ENABLE_SLANG_RHI=0 \
-            -DSLANG_ENABLE_TESTS=0
-          cmake --build --preset ${{ matrix.config }}
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -80,7 +50,7 @@ jobs:
         run: |
           echo "===================================================================="
           echo "MaterialX → Slang Integration Test"
-          echo "Platform: ${{ matrix.os }} | Config: ${{ matrix.config }}"
+          echo "Platform: ${{ inputs.os }} | Config: ${{ inputs.config }}"
           echo "===================================================================="
 
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
@@ -123,7 +93,7 @@ jobs:
           cd "$WORK_DIR"
 
           # Set PYTHONPATH with correct separator for the platform
-          if [ "${{ matrix.os }}" == "windows" ]; then
+          if [ "${{ inputs.os }}" == "windows" ]; then
             export PYTHONPATH="$WORK_DIR/MaterialX/install/python;$PYTHONPATH"
           else
             export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
@@ -202,14 +172,11 @@ jobs:
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
 
-          # Set slangc path based on platform
-          # Note: CMake multi-config generators use capitalized config names (Release, not release)
-          if [ "${{ matrix.os }}" == "windows" ]; then
-            CONFIG_DIR="Release"
-            SLANGC="${GITHUB_WORKSPACE}/build/${CONFIG_DIR}/bin/slangc.exe"
+          # Use slangc from downloaded artifact (bin_dir set by common-test-setup)
+          if [ "${{ inputs.os }}" == "windows" ]; then
+            SLANGC="${bin_dir}/slangc.exe"
           else
-            CONFIG_DIR="Release"
-            SLANGC="${GITHUB_WORKSPACE}/build/${CONFIG_DIR}/bin/slangc"
+            SLANGC="${bin_dir}/slangc"
           fi
 
           echo "Compiling shaders with slangc..."
@@ -218,8 +185,8 @@ jobs:
           # Verify slangc exists
           if [ ! -f "$SLANGC" ]; then
             echo "ERROR: slangc not found at: $SLANGC"
-            echo "Build directory contents:"
-            ls -la "${GITHUB_WORKSPACE}/build/" || true
+            echo "bin_dir contents:"
+            ls -la "${bin_dir}" || true
             exit 1
           fi
 
@@ -304,7 +271,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: materialx-test-results-${{ matrix.os }}-${{ matrix.config }}
+          name: materialx-test-results-${{ inputs.os }}-${{ inputs.config }}
           path: |
             ${{ runner.temp }}/materialx-test/
           retention-days: 3
