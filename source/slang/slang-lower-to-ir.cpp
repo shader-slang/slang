@@ -13139,8 +13139,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |=
-                        applySparseConditionalConstantPropagation(func, nullptr, compileRequest->getSink());
+                    changed |= applySparseConditionalConstantPropagation(
+                        func,
+                        nullptr,
+                        compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);

@@ -2157,10 +2157,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(
-                            m_targetRequest,
-                            elementType,
-                            &sizeAndAlignment);
+                        getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
@@ -5922,11 +5919,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             else
             {
-                getOffset(
-                    m_targetRequest,
-                    IRTypeLayoutRules::get(layoutRuleName),
-                    field,
-                    &offset);
+                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -8859,10 +8852,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 getNaturalOffset(m_targetRequest, field, &offset);
 
                 auto fieldType = field->getFieldType();
-                getNaturalSizeAndAlignment(
-                    m_targetRequest,
-                    fieldType,
-                    &sizeAlignment);
+                getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment);
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;

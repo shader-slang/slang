@@ -92,9 +92,12 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
         // later on.
         const auto backingWidthSizeOf = builder.emitSizeOf(backingType);
         const auto intType = builder.getIntType();
-        const auto backingBitWidth = builder.emitMul(intType, builder.getIntValue(intType, 8), backingWidthSizeOf);
-        const auto leftShiftAmount = builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, topOfField));
-        const auto rightShiftAmount = builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, fieldWidth));
+        const auto backingBitWidth =
+            builder.emitMul(intType, builder.getIntValue(intType, 8), backingWidthSizeOf);
+        const auto leftShiftAmount =
+            builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, topOfField));
+        const auto rightShiftAmount =
+            builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, fieldWidth));
         const auto leftShifted = builder.emitShl(backingType, castedBacking, leftShiftAmount);
         rightShifted = builder.emitShr(backingType, leftShifted, rightShiftAmount);
     }

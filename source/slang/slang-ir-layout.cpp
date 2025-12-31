@@ -352,7 +352,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_FuncType:
         {
             *outSizeAndAlignment = IRSizeAndAlignment(
-                builtinTypeInfo.genericPointerSize, builtinTypeInfo.genericPointerSize);
+                builtinTypeInfo.genericPointerSize,
+                builtinTypeInfo.genericPointerSize);
             return SLANG_OK;
         }
         break;
@@ -743,10 +744,7 @@ Result getNaturalSizeAndAlignment(
         outSizeAndAlignment);
 }
 
-Result getNaturalOffset(
-    TargetRequest* targetReq,
-    IRStructField* field,
-    IRIntegerValue* outOffset)
+Result getNaturalOffset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset)
 {
     return getOffset(targetReq, IRTypeLayoutRules::getNatural(), field, outOffset);
 }
@@ -768,10 +766,7 @@ Result getStd430SizeAndAlignment(
         outSizeAndAlignment);
 }
 
-Result getStd430Offset(
-    TargetRequest* targetReq,
-    IRStructField* field,
-    IRIntegerValue* outOffset)
+Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset)
 {
     return getOffset(targetReq, IRTypeLayoutRules::getStd430(), field, outOffset);
 }

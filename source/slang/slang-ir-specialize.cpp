@@ -1237,7 +1237,10 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, targetProgram, this->sink);
+                applySparseConditionalConstantPropagationForGlobalScope(
+                    this->module,
+                    targetProgram,
+                    this->sink);
             }
 
             // Once the work list has gone dry, we should have the invariant

@@ -156,10 +156,14 @@ struct AnyValueMarshallingContext
 
         void ensureOffsetAtNByteBoundary(int n)
         {
-            if (n == 1) return;
-            else if (n == 2) ensureOffsetAt2ByteBoundary();
-            else if (n == 4) ensureOffsetAt4ByteBoundary();
-            else if (n == 8) ensureOffsetAt8ByteBoundary();
+            if (n == 1)
+                return;
+            else if (n == 2)
+                ensureOffsetAt2ByteBoundary();
+            else if (n == 4)
+                ensureOffsetAt4ByteBoundary();
+            else if (n == 8)
+                ensureOffsetAt8ByteBoundary();
         }
 
         void advanceOffset(uint32_t bytes)
@@ -479,7 +483,8 @@ struct AnyValueMarshallingContext
                             auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
                             auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
                             auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
-                            auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
+                            auto highBits =
+                                builder->emitElementExtract(uint2Val, IRIntegerValue(1));
 
                             auto dstAddr = builder->emitFieldAddress(
                                 uintPtrType,
@@ -487,7 +492,8 @@ struct AnyValueMarshallingContext
                                 anyValInfo->fieldKeys[fieldOffset]);
                             builder->emitStore(dstAddr, lowBits);
                             fieldOffset++;
-                            if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                            if (fieldOffset <
+                                static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                             {
                                 dstAddr = builder->emitFieldAddress(
                                     uintPtrType,
@@ -506,7 +512,9 @@ struct AnyValueMarshallingContext
                                 anyValInfo->fieldKeys[fieldOffset]);
                             builder->emitStore(dstAddr, dstVal);
                         }
-                        else SLANG_UNIMPLEMENTED_X("Pointer sizes other than 32 or 64 haven't been implemented!");
+                        else
+                            SLANG_UNIMPLEMENTED_X(
+                                "Pointer sizes other than 32 or 64 haven't been implemented!");
                     }
                 }
                 break;
@@ -764,7 +772,8 @@ struct AnyValueMarshallingContext
                         {
                             auto lowBits = builder->emitLoad(srcAddr);
                             fieldOffset++;
-                            if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                            if (fieldOffset <
+                                static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                             {
                                 auto srcAddr1 = builder->emitFieldAddress(
                                     uintPtrType,
@@ -787,7 +796,9 @@ struct AnyValueMarshallingContext
                             builder->emitStore(concreteVar, srcVal);
                             advanceOffset(4);
                         }
-                        else SLANG_UNIMPLEMENTED_X("Pointer sizes other than 32 or 64 haven't been implemented!");
+                        else
+                            SLANG_UNIMPLEMENTED_X(
+                                "Pointer sizes other than 32 or 64 haven't been implemented!");
                     }
                 }
                 break;

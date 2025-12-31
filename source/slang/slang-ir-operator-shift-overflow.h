@@ -8,7 +8,5 @@ namespace Slang
 class DiagnosticSink;
 struct IRModule;
 
-void checkForOperatorShiftOverflow(
-    IRModule* module,
-    DiagnosticSink* sink);
+void checkForOperatorShiftOverflow(IRModule* module, DiagnosticSink* sink);
 } // namespace Slang

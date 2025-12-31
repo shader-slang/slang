@@ -604,10 +604,8 @@ struct ByteAddressBufferLegalizationContext
         // the "stride" of the element type.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(
-            m_target,
-            elementType,
-            &elementLayout));
+        SLANG_RETURN_NULL_ON_FAIL(
+            getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -707,8 +705,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -725,8 +722,7 @@ struct ByteAddressBufferLegalizationContext
             // Some platforms e.g. Metal does not allow loading basic types that are not 4-byte
             // sized. We need to lower such loads.
             IRSizeAndAlignment sizeAlignment;
-            SLANG_RETURN_NULL_ON_FAIL(
-                getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+            SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to load the value as two 4-byte values and then combine them.
@@ -1419,8 +1415,7 @@ struct ByteAddressBufferLegalizationContext
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_target, type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -1437,8 +1432,7 @@ struct ByteAddressBufferLegalizationContext
             // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte
             // sized. We need to lower such stores.
             IRSizeAndAlignment sizeAlignment;
-            SLANG_RETURN_ON_FAIL(
-                getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
+            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to store the value as two 4-byte values.
@@ -1538,10 +1532,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(
-            m_target,
-            elementType,
-            &elementLayout));
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();

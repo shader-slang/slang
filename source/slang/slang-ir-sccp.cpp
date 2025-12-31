@@ -1806,7 +1806,10 @@ static bool applySparseConditionalConstantPropagationRec(
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
@@ -1828,7 +1831,10 @@ bool applySparseConditionalConstantPropagation(IRModule* module, TargetProgram* 
     return changed;
 }
 
-bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, TargetProgram* targetProgram,  DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagationForGlobalScope(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
@@ -1844,7 +1850,10 @@ bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, T
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRInst* func, TargetProgram* targetProgram, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRInst* func,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;

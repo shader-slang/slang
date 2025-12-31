@@ -141,11 +141,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetRequest,
-            layoutRules,
-            structType,
-            &structSize);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, structType, &structSize);
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -233,11 +229,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetRequest,
-            rules,
-            structType,
-            &sizeAlignment);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)

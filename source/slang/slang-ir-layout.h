@@ -120,10 +120,7 @@ Result getNaturalSizeAndAlignment(
 /// that can be stored in general-purpose memory. In that case, the
 /// field is considered to have no natural offset.
 ///
-Result getNaturalOffset(
-    TargetRequest* targetReq,
-    IRStructField* field,
-    IRIntegerValue* outOffset);
+Result getNaturalOffset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
 /// Compute (if necessary) and return the std430 size and alignment of `type`.
 ///
@@ -142,9 +139,6 @@ Result getStd430SizeAndAlignment(
 /// that can be stored in general-purpose memory. In that case, the
 /// field is considered to have no std430 offset.
 ///
-Result getStd430Offset(
-    TargetRequest* targetReq,
-    IRStructField* field,
-    IRIntegerValue* outOffset);
+Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
 } // namespace Slang

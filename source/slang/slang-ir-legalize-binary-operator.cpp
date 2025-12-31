@@ -109,7 +109,8 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
         if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
         {
             IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
-            IntInfo opIntInfo = getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
+            IntInfo opIntInfo =
+                getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
             if (opIntInfo.isSigned)
             {
                 opIntInfo.isSigned = false;

@@ -522,10 +522,7 @@ public:
                 IRBuilder builder(inst);
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    type,
-                    &sizeAlignment);
+                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment);
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -787,10 +784,7 @@ public:
                     as<IRStructType>(tryGetPointedToType(&builder, base->getDataType()));
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(
-                    codeGenContext->getTargetReq(),
-                    field,
-                    &offset);
+                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
 
                 writeInst(
                     funcBuilder,
@@ -831,10 +825,7 @@ public:
                 auto structType = as<IRStructType>(base->getDataType());
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(
-                    codeGenContext->getTargetReq(),
-                    field,
-                    &offset);
+                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
 
                 auto baseOperand = ensureInst(base);
                 baseOperand.offset += (uint32_t)offset;
@@ -968,10 +959,7 @@ public:
                 {
                     auto field = fields[i];
                     IRIntegerValue offset = 0;
-                    getNaturalOffset(
-                        codeGenContext->getTargetReq(),
-                        field,
-                        &offset);
+                    getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
                     IRSizeAndAlignment sizeAlignment = {};
                     getNaturalSizeAndAlignment(
                         codeGenContext->getTargetReq(),

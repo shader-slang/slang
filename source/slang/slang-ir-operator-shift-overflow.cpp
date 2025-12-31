@@ -12,9 +12,7 @@ namespace Slang
 class DiagnosticSink;
 struct IRModule;
 
-void checkForOperatorShiftOverflowRecursive(
-    IRInst* inst,
-    DiagnosticSink* sink)
+void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(inst))
     {
@@ -63,9 +61,7 @@ void checkForOperatorShiftOverflowRecursive(
     }
 }
 
-void checkForOperatorShiftOverflow(
-    IRModule* module,
-    DiagnosticSink* sink)
+void checkForOperatorShiftOverflow(IRModule* module, DiagnosticSink* sink)
 {
     // Look for `operator<<` instructions
     checkForOperatorShiftOverflowRecursive(module->getModuleInst(), sink);

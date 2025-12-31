@@ -7737,7 +7737,7 @@ bool getIntTypeSigned(IRType* intType)
 
 IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType)
 {
-    return { getIntTypeWidth(targetReq, intType), getIntTypeSigned(intType) };
+    return {getIntTypeWidth(targetReq, intType), getIntTypeSigned(intType)};
 }
 
 IROp getIntTypeOpFromInfo(const IntInfo info)

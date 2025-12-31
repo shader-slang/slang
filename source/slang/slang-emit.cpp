@@ -975,7 +975,10 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            SLANG_PASS(applySparseConditionalConstantPropagation, targetProgram, codeGenContext->getSink());
+            SLANG_PASS(
+                applySparseConditionalConstantPropagation,
+                targetProgram,
+                codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 

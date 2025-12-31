@@ -1065,8 +1065,9 @@ createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCom
     return SLANG_E_NO_INTERFACE;
 }
 
-extern "C" SLANG_DLL_EXPORT SlangResult
-getLLVMTargetBuiltinTypeLayoutInfo_V1(Slang::CharSlice targetTripleSlice, Slang::TargetBuiltinTypeLayoutInfo* out)
+extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
+    Slang::CharSlice targetTripleSlice,
+    Slang::TargetBuiltinTypeLayoutInfo* out)
 {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();

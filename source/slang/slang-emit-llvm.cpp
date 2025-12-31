@@ -623,11 +623,7 @@ public:
     {
         IRSizeAndAlignment sizeAlignment;
 
-        Slang::getSizeAndAlignment(
-            targetReq,
-            rules,
-            legalizeResourceTypes(type),
-            &sizeAlignment);
+        Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment);
 
         return sizeAlignment;
     }
@@ -650,11 +646,7 @@ public:
     {
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
-        Slang::getSizeAndAlignment(
-            targetReq,
-            rules,
-            vecType->getElementType(),
-            &elementAlignment);
+        Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment);
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 
@@ -865,7 +857,8 @@ struct LLVMEmitter
         else
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
-        types.reset(new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
+        types.reset(
+            new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);

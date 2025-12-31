@@ -204,11 +204,11 @@ struct BitCastLoweringContext
             {
                 IRInst* object;
                 auto ptrSize = getPointerSize(targetProgram->getTargetReq());
-                object = extractValueAtOffset(builder, targetProgram, src, offset, uint32_t(ptrSize));
+                object =
+                    extractValueAtOffset(builder, targetProgram, src, offset, uint32_t(ptrSize));
                 object = builder.emitCast(
-                    ptrSize == sizeof(uint64_t) ?
-                    (IRType*)builder.getUInt64Type() : 
-                    (IRType*)builder.getUIntType(),
+                    ptrSize == sizeof(uint64_t) ? (IRType*)builder.getUInt64Type()
+                                                : (IRType*)builder.getUIntType(),
                     object);
                 return builder.emitBitCast(type, object);
             }

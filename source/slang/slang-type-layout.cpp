@@ -3314,14 +3314,12 @@ static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltin
     if (!llvmLib)
         return false;
 
-    auto targetTripleOption = compileOptions.getStringOption(
-        CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
-    CharSlice targetTriple =
-        CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+    auto targetTripleOption =
+        compileOptions.getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
+    CharSlice targetTriple = CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
 
-    using InfoFuncV1 = SlangResult (*)(
-        Slang::CharSlice targetTriple,
-        Slang::TargetBuiltinTypeLayoutInfo* info);
+    using InfoFuncV1 =
+        SlangResult (*)(Slang::CharSlice targetTriple, Slang::TargetBuiltinTypeLayoutInfo* info);
 
     auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
 

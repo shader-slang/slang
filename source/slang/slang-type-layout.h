@@ -1318,7 +1318,9 @@ enum class ShaderParameterKind
 struct SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
-    virtual SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) = 0;
+    virtual SimpleLayoutInfo GetScalarLayout(
+        BaseType baseType,
+        const TypeLayoutContext& context) = 0;
 
     // Get size and alignment for an array of elements
     virtual SimpleArrayLayoutInfo GetArrayLayout(
@@ -1384,7 +1386,10 @@ struct LayoutRulesImpl
     {
         return simpleRules->GetScalarLayout(baseType, context);
     }
-    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) { return simpleRules->GetPointerLayout(context); }
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context)
+    {
+        return simpleRules->GetPointerLayout(context);
+    }
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
