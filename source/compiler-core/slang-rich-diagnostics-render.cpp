@@ -24,6 +24,12 @@ namespace Slang
 {
 namespace
 {
+
+// ----------------------------------------------------------------------------
+// TEST DATA DEFINITIONS (INPUT)
+// These structures match the user-provided test cases exactly.
+// ----------------------------------------------------------------------------
+
 struct SourceLoc
 {
     String fileName;
@@ -82,6 +88,33 @@ struct TestData
     SourceFile* sourceFile = nullptr;
 };
 
+// ----------------------------------------------------------------------------
+// RENDERER DATA DEFINITIONS (NATIVE)
+// These structures are what the renderer consumes, using real SourceLoc/Range.
+// ----------------------------------------------------------------------------
+
+struct RenderSpan
+{
+    Slang::SourceRange range;
+    String message;
+};
+
+struct RenderNote
+{
+    String message;
+    RenderSpan span;
+};
+
+struct RenderDiagnostic
+{
+    int code;
+    String severity;
+    String message;
+    RenderSpan primarySpan;
+    List<RenderSpan> secondarySpans;
+    List<RenderNote> notes;
+};
+
 // ============================================================================
 // TEST DATA
 // ============================================================================
@@ -89,8 +122,7 @@ struct TestData
 TestData testCases[] = {
     {.name = "undeclared_identifier",
      .sourceFileName = "example.slang",
-     .sourceContent = R"(
-struct VertexInput {
+     .sourceContent = R"(struct VertexInput {
     float4 position : POSITION;
     float2 texCoord : TEXCOORD0;
 };
@@ -119,8 +151,7 @@ error[E1001]: use of undeclared identifier 'someSampler'
 
     {.name = "type_mismatch_with_secondary",
      .sourceFileName = "example.slang",
-     .sourceContent = R"(
-struct VertexInput {
+     .sourceContent = R"(struct VertexInput {
     float4 position : POSITION;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
@@ -133,8 +164,7 @@ struct PixelShader {
     }
 }
 )",
-     .expectedOutput = R"(
-error[E1002]: cannot add `float4` and `int`
+     .expectedOutput = R"(error[E1002]: cannot add `float4` and `int`
   --> example.slang:10:28
    |
  5 | int invalid_field; // This field has issues
@@ -165,8 +195,7 @@ error[E1002]: cannot add `float4` and `int`
 
     {.name = "undeclared_variable",
      .sourceFileName = "example.slang",
-     .sourceContent = R"(
-struct VertexInput {
+     .sourceContent = R"(struct VertexInput {
     float4 position : POSITION;
 };
 
@@ -194,8 +223,7 @@ error[E1003]: use of undeclared identifier 'undefinedVariable'
 
     {.name = "wrong_type_assignment",
      .sourceFileName = "example.slang",
-     .sourceContent = R"(
-struct VertexInput {
+     .sourceContent = R"(struct VertexInput {
     float4 position : POSITION;
 };
 
@@ -231,8 +259,7 @@ error[E1004]: mismatched types
 
     {.name = "division_by_zero_warning",
      .sourceFileName = "math.slang",
-     .sourceContent = R"(
-float3 normalize(float3 v) {
+     .sourceContent = R"(float3 normalize(float3 v) {
     float len = sqrt(dot(v, v));
     return v / len; // Potential division by zero
 }
@@ -282,8 +309,7 @@ note: consider using 'normalize' builtin function instead
 
     {.name = "mismatched_types_complex",
      .sourceFileName = "example.slang",
-     .sourceContent = R"(
-struct Data {
+     .sourceContent = R"(struct Data {
     string name = "User";
 };
 
@@ -331,26 +357,6 @@ const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 // HELPER FUNCTIONS
 // ============================================================================
 
-List<String> getSourceLines(const String& content)
-{
-    // Parse the embedded shader snippet into logical lines once so downstream layout
-    // code can work with indexed access; using StringUtil::split handles both CRLF and LF.
-    List<String> lines;
-    List<UnownedStringSlice> slices;
-    StringUtil::split(content.getUnownedSlice(), '\n', slices);
-
-    // Convert slices to strings, handling potential CRLF endings
-    for (const auto& slice : slices)
-    {
-        String line(slice);
-        // Remove trailing \r if present (for CRLF line endings)
-        if (line.getLength() > 0 && line[line.getLength() - 1] == '\r')
-            line = line.subString(0, line.getLength() - 1);
-        lines.add(line);
-    }
-    return lines;
-}
-
 String trimNewlines(const String& str)
 {
     // Harness output comparisons assume deterministic framing, so we aggressively
@@ -374,11 +380,8 @@ String repeat(char c, int n)
     return sb;
 }
 
-int calculateFallbackLength(const String& line, int col)
+int calculateFallbackLength(const UnownedStringSlice& line, int col)
 {
-    // When the diagnostic lacks an explicit length we infer one by walking the
-    // identifier starting at the reported column; this keeps highlighting useful
-    // without requiring every test case to spell out exact spans.
     if (col < 1 || col > static_cast<int>(line.getLength()))
         return 1;
     int start = col - 1;
@@ -404,7 +407,96 @@ String stripIndent(const String& text, size_t indent)
 }
 
 // ============================================================================
-// DIAGNOSTIC LAYOUT
+// CONVERSION: TestData -> RenderDiagnostic
+// ============================================================================
+
+Slang::SourceLoc calcSourceLoc(SourceView* view, int lineIndex, int columnOneBased)
+{
+    SLANG_ASSERT(view);
+    SourceFile* file = view->getSourceFile();
+    SourceFile::OffsetRange lineRange = file->getOffsetRangeAtLineIndex(Index(lineIndex));
+    uint32_t lineStart = lineRange.isValid() ? lineRange.start : 0;
+    uint32_t columnOffset = columnOneBased > 0 ? uint32_t(columnOneBased - 1) : 0;
+    if (lineRange.isValid())
+    {
+        uint32_t lineLength = lineRange.getCount();
+        if (columnOffset > lineLength)
+            columnOffset = lineLength;
+    }
+    Slang::SourceLoc base = view->getRange().begin;
+    return base + Int(lineStart + columnOffset);
+}
+
+RenderSpan createRenderSpan(SourceView* view, const DiagnosticSpan& inputSpan)
+{
+    RenderSpan outSpan;
+    outSpan.message = inputSpan.message;
+
+    if (!view)
+        return outSpan;
+
+    SourceFile* file = view->getSourceFile();
+
+    // Convert 1-based line to 0-based index
+    int lineIndex = std::max(0, inputSpan.location.line - 1);
+
+    // Resolve length if not provided (legacy fallback behavior)
+    int length = inputSpan.length;
+    if (length <= 0)
+    {
+        // Fetch line content to calculate fallback length
+        UnownedStringSlice lineContent = file->getLineAtIndex(lineIndex);
+        length = calculateFallbackLength(lineContent, inputSpan.location.column);
+    }
+
+    Slang::SourceLoc begin = calcSourceLoc(view, lineIndex, inputSpan.location.column);
+    Slang::SourceLoc end = begin;
+    if (length > 1)
+        end = begin + Int(length - 1);
+
+    outSpan.range = Slang::SourceRange(begin, end);
+    return outSpan;
+}
+
+RenderDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
+{
+    RenderDiagnostic outDiag;
+    outDiag.code = test.diagnostic.code;
+    outDiag.severity = test.diagnostic.severity;
+    outDiag.message = test.diagnostic.message;
+
+    // Create the source infrastructure if not already present
+    if (!test.sourceFile)
+    {
+        PathInfo pathInfo = PathInfo::makePath(String(test.sourceFileName));
+        test.sourceFile = sm.createSourceFileWithString(pathInfo, test.sourceContent);
+    }
+
+    // Create view for the file
+    // Note: In a real compiler, SourceViews are managed; here we create one for the test case
+    SourceView* view = sm.createSourceView(test.sourceFile, nullptr, Slang::SourceLoc());
+
+    // Map spans
+    outDiag.primarySpan = createRenderSpan(view, test.diagnostic.primarySpan);
+
+    for (const auto& sec : test.diagnostic.secondarySpans)
+    {
+        outDiag.secondarySpans.add(createRenderSpan(view, sec));
+    }
+
+    for (const auto& note : test.diagnostic.notes)
+    {
+        RenderNote outNote;
+        outNote.message = note.message;
+        outNote.span = createRenderSpan(view, note.span);
+        outDiag.notes.add(outNote);
+    }
+
+    return outDiag;
+}
+
+// ============================================================================
+// DIAGNOSTIC LAYOUT & RENDERER (Uses SourceManager API only)
 // ============================================================================
 
 struct LayoutSpan
@@ -414,6 +506,7 @@ struct LayoutSpan
     int length;
     String label;
     bool isPrimary;
+    Slang::SourceLoc startLoc; // Keep for finding source file later
 };
 
 struct LineHighlight
@@ -472,29 +565,20 @@ struct DiagnosticLayout
     List<NoteEntry> notes;
 };
 
-int resolveSpanLength(const DiagnosticSpan& span, const List<String>& sourceLines)
-{
-    if (span.length > 0)
-        return span.length;
-    int lineIndex = span.location.line;
-    if (lineIndex >= 0 && lineIndex < static_cast<int>(sourceLines.getCount()))
-        return calculateFallbackLength(
-            sourceLines[static_cast<Index>(lineIndex)],
-            span.location.column);
-    return 1;
-}
-
-LayoutSpan makeLayoutSpan(
-    const DiagnosticSpan& span,
-    bool isPrimary,
-    const List<String>& sourceLines)
+LayoutSpan makeLayoutSpan(SourceManager& sm, const RenderSpan& span, bool isPrimary)
 {
     LayoutSpan layoutSpan;
-    layoutSpan.line = span.location.line;
-    layoutSpan.col = span.location.column;
-    layoutSpan.length = resolveSpanLength(span, sourceLines);
-    layoutSpan.label = String(span.message);
+
+    // Use SourceManager to get humane (display) location
+    HumaneSourceLoc humane = sm.getHumaneLoc(span.range.begin);
+
+    layoutSpan.line = static_cast<int>(humane.line);
+    layoutSpan.col = static_cast<int>(humane.column);
+    layoutSpan.length = static_cast<int>(span.range.getSize() + 1); // +1 because inclusive range
+    layoutSpan.label = span.message;
     layoutSpan.isPrimary = isPrimary;
+    layoutSpan.startLoc = span.range.begin;
+
     return layoutSpan;
 }
 
@@ -518,12 +602,8 @@ size_t findCommonIndent(const List<LayoutBlock>& blocks)
     return (minIndent == std::numeric_limits<Index>::max()) ? 0 : minIndent;
 }
 
-SectionLayout buildSectionLayout(const List<LayoutSpan>& spans, const List<String>& sourceLines)
+SectionLayout buildSectionLayout(SourceManager& sm, const List<LayoutSpan>& spans)
 {
-    // Transform resolved spans into grouped, display-ready blocks: we bucket spans
-    // per line, preserve source text for each line, keep gaps explicit so rendering
-    // can insert ellipses, and measure shared indentation so highlights align even
-    // when shader code is heavily indented in the fixture.
     SectionLayout section;
     if (spans.getCount() == 0)
         return section;
@@ -538,9 +618,19 @@ SectionLayout buildSectionLayout(const List<LayoutSpan>& spans, const List<Strin
     {
         HighlightedLine& line = grouped[span.line];
         line.number = span.line;
-        if (line.content.getLength() == 0 && span.line >= 0 &&
-            span.line < static_cast<int>(sourceLines.getCount()))
-            line.content = sourceLines[static_cast<Index>(span.line)];
+
+        // Retrieve content if not already set
+        if (line.content.getLength() == 0)
+        {
+            SourceView* view = sm.findSourceView(span.startLoc);
+            if (view)
+            {
+                SourceFile* file = view->getSourceFile();
+                // HumaneLoc line is 1-based, getLineAtIndex is 0-based
+                line.content = StringUtil::trimEndOfLine(file->getLineAtIndex(span.line - 1));
+            }
+        }
+
         line.spans.add(LineHighlight{span.col, span.length, span.label, span.isPrimary});
     }
 
@@ -588,7 +678,7 @@ SectionLayout buildSectionLayout(const List<LayoutSpan>& spans, const List<Strin
 }
 
 // ============================================================================
-// RENDERING UTILITIES
+// RENDERING STRINGS
 // ============================================================================
 
 struct LabelInfo
@@ -599,10 +689,6 @@ struct LabelInfo
 
 List<String> buildAnnotationRows(const HighlightedLine& line, size_t indentShift)
 {
-    // Convert intra-line highlights into the familiar caret/label ladder: first
-    // lay down the underline with different glyphs for primary vs secondary spans,
-    // attach the closest label inline when possible, then fall back to vertical
-    // connectors so multiple labels can coexist without clobbering each other.
     List<String> rows;
     if (line.spans.getCount() == 0)
         return rows;
@@ -689,10 +775,6 @@ void printAnnotationRow(StringBuilder& ss, int gutterWidth, const String& conten
 
 void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
 {
-    // Rendering mirrors the layout structure: we print each block with the computed
-    // gutter width, insert ellipses whenever the block reported a gap, then stream
-    // the highlight ladder rows so the final text matches the snapshot stored in
-    // the tests byte-for-byte.
     for (const auto& block : section.blocks)
     {
         if (block.showGap)
@@ -712,44 +794,41 @@ void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     }
 }
 
-DiagnosticLayout createLayout(const TestData& data)
+DiagnosticLayout createLayout(SourceManager& sm, const RenderDiagnostic& diag)
 {
-    // createLayout is the bridge between raw fixture data and the renderer: it
-    // copies headline metadata, resolves all spans (primary, secondary, notes),
-    // builds the shared section layout once, and stores everything in a single
-    // structure so the rendering phase can be a pure formatting pass.
     DiagnosticLayout layout;
-    const auto& diag = data.diagnostic;
 
-    layout.header.severity = String(diag.severity);
+    layout.header.severity = diag.severity;
     layout.header.code = diag.code;
-    layout.header.message = String(diag.message);
+    layout.header.message = diag.message;
 
-    layout.primaryLoc.fileName = String(diag.primarySpan.location.fileName);
-    layout.primaryLoc.line = diag.primarySpan.location.line;
-    layout.primaryLoc.col = diag.primarySpan.location.column;
-
-    List<String> sourceLines = getSourceLines(data.sourceContent);
+    // Use SourceManager to get humane info for the primary location
+    HumaneSourceLoc humaneLoc = sm.getHumaneLoc(diag.primarySpan.range.begin);
+    layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
+    layout.primaryLoc.line = static_cast<int>(humaneLoc.line);
+    layout.primaryLoc.col = static_cast<int>(humaneLoc.column);
 
     List<LayoutSpan> allSpans;
-    allSpans.add(makeLayoutSpan(diag.primarySpan, true, sourceLines));
+    allSpans.add(makeLayoutSpan(sm, diag.primarySpan, true));
     for (const auto& s : diag.secondarySpans)
-        allSpans.add(makeLayoutSpan(s, false, sourceLines));
+        allSpans.add(makeLayoutSpan(sm, s, false));
 
-    layout.primarySection = buildSectionLayout(allSpans, sourceLines);
+    layout.primarySection = buildSectionLayout(sm, allSpans);
     layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
 
     for (const auto& note : diag.notes)
     {
         DiagnosticLayout::NoteEntry noteEntry;
-        noteEntry.message = String(note.message);
-        noteEntry.loc.fileName = String(note.span.location.fileName);
-        noteEntry.loc.line = note.span.location.line;
-        noteEntry.loc.col = note.span.location.column;
+        noteEntry.message = note.message;
+
+        HumaneSourceLoc noteHumane = sm.getHumaneLoc(note.span.range.begin);
+        noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
+        noteEntry.loc.line = static_cast<int>(noteHumane.line);
+        noteEntry.loc.col = static_cast<int>(noteHumane.column);
 
         List<LayoutSpan> noteSpans;
-        noteSpans.add(makeLayoutSpan(note.span, false, sourceLines));
-        noteEntry.section = buildSectionLayout(noteSpans, sourceLines);
+        noteSpans.add(makeLayoutSpan(sm, note.span, false));
+        noteEntry.section = buildSectionLayout(sm, noteSpans);
         noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
 
         layout.notes.add(std::move(noteEntry));
@@ -760,13 +839,9 @@ DiagnosticLayout createLayout(const TestData& data)
 
 String renderFromLayout(const DiagnosticLayout& layout)
 {
-    // This function owns the string assembly for everything the harness compares:
-    // severity header, primary location, annotated source, and optional notes.
-    // Keeping it side-effect free makes it trivial to diff the produced output.
     StringBuilder ss;
 
     ss << layout.header.severity << "[E";
-    // Format error code with leading zeros to 4 digits
     String codeStr = String(layout.header.code);
     while (codeStr.getLength() < 4)
         codeStr = "0" + codeStr;
@@ -796,9 +871,9 @@ String renderFromLayout(const DiagnosticLayout& layout)
     return ss;
 }
 
-String renderDiagnostic(const TestData& testData)
+String renderDiagnostic(SourceManager& sm, const RenderDiagnostic& diag)
 {
-    DiagnosticLayout layout = createLayout(testData);
+    DiagnosticLayout layout = createLayout(sm, diag);
     return renderFromLayout(layout);
 }
 
@@ -808,8 +883,6 @@ String renderDiagnostic(const TestData& testData)
 
 void writeTempFile(const std::string& path, const std::string& content)
 {
-    // Helper for diffing: we materialize both the expected and actual buffers as
-    // plain files so we can lean on the system `diff` without dragging in a lib.
     std::ofstream file(path);
     file << content << '\n';
 }
@@ -827,11 +900,6 @@ int runDiff(const std::string& expected, const std::string& actual)
 
 int slangRichDiagnosticsUnitTest(int argc, char* argv[])
 {
-
-    // The harness accepts an optional `--until N` switch so developers can run a
-    // prefix of the fixture set; we parse it once, fall back to all tests, then
-    // drive a simple pass/fail loop that renders diagnostics, compares them to the
-    // captured golden output, and shells out to `diff` when anything diverges.
     int maxTests = -1;
     for (int i = 1; i < argc; ++i)
     {
@@ -863,13 +931,20 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
     for (int i = 0; i < testLimit; ++i)
     {
         TestData& test = testCases[i];
+
+        // Reset source manager for each test to keep IDs deterministic if needed,
+        // or just to simulate fresh environment. For this harness, we reuse one sm
+        // but it doesn't matter much as long as SourceLocs are valid.
+
         std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
 
-        test.sourceFile = sm.createSourceFileWithString(
-            PathInfo::makePath(test.sourceFileName),
-            test.sourceContent);
+        // 1. Convert Input Data -> System Types
+        // This simulates how the compiler would already have these structures ready.
+        RenderDiagnostic renderDiag = createRenderDiagnostic(sm, test);
 
-        String actualOutput = trimNewlines(renderDiagnostic(test));
+        // 2. Render using ONLY the system types and SourceManager
+        // The renderer has no access to 'test.sourceContent' or 'test.diagnostic' structs.
+        String actualOutput = trimNewlines(renderDiagnostic(sm, renderDiag));
         String expectedOutput = trimNewlines(test.expectedOutput);
 
         if (actualOutput == expectedOutput)
