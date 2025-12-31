@@ -468,7 +468,7 @@ struct AnyValueMarshallingContext
             case kIROp_IntPtrType:
                 {
                     auto ptrSize = getPointerSize(targetRequest);
-                    ensureOffsetAtNByteBoundary(ptrSize);
+                    ensureOffsetAtNByteBoundary(int(ptrSize));
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
@@ -753,7 +753,7 @@ struct AnyValueMarshallingContext
             case kIROp_UIntPtrType:
                 {
                     auto ptrSize = getPointerSize(targetRequest);
-                    ensureOffsetAtNByteBoundary(ptrSize);
+                    ensureOffsetAtNByteBoundary(int(ptrSize));
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcAddr = builder->emitFieldAddress(
