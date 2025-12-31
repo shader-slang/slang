@@ -33,13 +33,36 @@ jobs:
           submodules: "recursive"
           fetch-depth: "1"
 
-      - name: Common Test Setup
-        uses: ./.github/actions/common-test-setup
+      - name: Download Slang Artifacts
+        uses: actions/download-artifact@v4
         with:
-          os: ${{ inputs.os }}
-          compiler: ${{ inputs.compiler }}
-          platform: ${{ inputs.platform }}
-          config: ${{ inputs.config }}
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          path: github_artifact
+
+      - name: Setup Slang Path
+        run: |
+          # Set up bin_dir for slangc
+          if [ "${{ inputs.os }}" == "windows" ]; then
+            bin_dir="$(pwd)/github_artifact/Release/bin"
+            SLANGC="${bin_dir}/slangc.exe"
+          else
+            bin_dir="$(pwd)/github_artifact/Release/bin"
+            SLANGC="${bin_dir}/slangc"
+          fi
+
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+          echo "SLANGC=$SLANGC" >> $GITHUB_ENV
+
+          # Verify slangc exists
+          if [ ! -f "$SLANGC" ]; then
+            echo "ERROR: slangc not found at: $SLANGC"
+            echo "Artifact directory contents:"
+            ls -laR github_artifact/ || true
+            exit 1
+          fi
+
+          echo "Found slangc at: $SLANGC"
+          "$SLANGC" --version || echo "Could not get slangc version"
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -172,23 +195,8 @@ jobs:
           WORK_DIR="${RUNNER_TEMP}/materialx-test"
           cd "$WORK_DIR"
 
-          # Use slangc from downloaded artifact (bin_dir set by common-test-setup)
-          if [ "${{ inputs.os }}" == "windows" ]; then
-            SLANGC="${bin_dir}/slangc.exe"
-          else
-            SLANGC="${bin_dir}/slangc"
-          fi
-
           echo "Compiling shaders with slangc..."
           echo "Using: $SLANGC"
-
-          # Verify slangc exists
-          if [ ! -f "$SLANGC" ]; then
-            echo "ERROR: slangc not found at: $SLANGC"
-            echo "bin_dir contents:"
-            ls -la "${bin_dir}" || true
-            exit 1
-          fi
 
           SHADER_FILES=($(find generated-shaders -name "*.slang" -type f | sort))
           TOTAL_SHADERS=${#SHADER_FILES[@]}
