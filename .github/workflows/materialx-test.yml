@@ -203,14 +203,25 @@ jobs:
           cd "$WORK_DIR"
 
           # Set slangc path based on platform
+          # Note: CMake multi-config generators use capitalized config names (Release, not release)
           if [ "${{ matrix.os }}" == "windows" ]; then
-            SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc.exe"
+            CONFIG_DIR="Release"
+            SLANGC="${GITHUB_WORKSPACE}/build/${CONFIG_DIR}/bin/slangc.exe"
           else
-            SLANGC="${GITHUB_WORKSPACE}/build/${{ matrix.config }}/bin/slangc"
+            CONFIG_DIR="Release"
+            SLANGC="${GITHUB_WORKSPACE}/build/${CONFIG_DIR}/bin/slangc"
           fi
 
           echo "Compiling shaders with slangc..."
           echo "Using: $SLANGC"
+
+          # Verify slangc exists
+          if [ ! -f "$SLANGC" ]; then
+            echo "ERROR: slangc not found at: $SLANGC"
+            echo "Build directory contents:"
+            ls -la "${GITHUB_WORKSPACE}/build/" || true
+            exit 1
+          fi
 
           SHADER_FILES=($(find generated-shaders -name "*.slang" -type f | sort))
           TOTAL_SHADERS=${#SHADER_FILES[@]}
