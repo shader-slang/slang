@@ -4,9 +4,11 @@ The types in the Slang language consists of the following categories:
 
 * [4a - Fundamental Types](04-types-fundamental.md)
 * [4b - Vector and Matrix Types](04-types-vector-and-matrix.md)
-* [4c - Structures and Interfaces](04-types-struct-and-interface.md)
-* [4d - Array types](04-types-array.md)
-* [4e - Opaque types](04-types-opaque.md)
+* [4c - Structures](04-types-struct.md)
+* [4d - Interfaces](04-types-interface.md)
+* [4e - Extensions](04-types-extension.md)
+* [4f - Array types](04-types-array.md)
+* [4g - Opaque types](04-types-opaque.md)
 
 Types in Slang do not generally have identical memory layouts in different targets. The provided guarantees
 are discussed with each type. Any details of layout not specified may depend on the target language, target
