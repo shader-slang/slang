@@ -1,6 +1,7 @@
 // slang-diagnostic-sink.cpp
 #include "slang-diagnostic-sink.h"
 
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-memory-arena.h"
@@ -633,7 +634,7 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
         m_errorCount++;
     }
 
-    String message = "diagnostic";
+    String message = renderDiagnostic(getSourceManager(), diagnostic);
 
     if (writer)
     {
