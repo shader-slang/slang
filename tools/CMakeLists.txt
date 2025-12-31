@@ -128,7 +128,7 @@ endif()
 slang_add_target(
     slang-rich-diagnostics-unit-test
     EXECUTABLE
-    LINK_WITH_PRIVATE core compiler-core
+    LINK_WITH_PRIVATE core compiler-core slang-fiddle-output
 )
 
 if(SLANG_ENABLE_GFX)
