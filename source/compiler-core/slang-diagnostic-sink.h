@@ -40,7 +40,6 @@ static_assert(
 
 // TODO(tfoley): move this into a source file...
 inline const char* getSeverityName(Severity severity)
-
 {
     switch (severity)
     {
@@ -65,6 +64,14 @@ inline const char* getSeverityName(Severity severity)
 struct DiagnosticSpan
 {
     SourceLoc location;
+    Count length;
+    String message;
+};
+
+struct DiagnosticNote
+{
+    SourceLoc location;
+    Count length;
     String message;
 };
 
@@ -75,6 +82,7 @@ struct GenericDiagnostic
     String message;
     DiagnosticSpan primarySpan;
     List<DiagnosticSpan> secondarySpans;
+    List<DiagnosticNote> notes;
 };
 
 // A structure to be used in static data describing different
