@@ -39,12 +39,9 @@ static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
 
-#define MAX(a, b) (a < b ? a : b)
+typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
+static const int ShMemSizeInBytes = ShMemSize.OfLayer1<InputSize, OutputSize>.Bytes;
 
-static const int ShASize = 64 * 2 * workgroupCount;
-static const int ShBSize = 64 * 2 * workgroupCount * sizeof(ElementType) / sizeof(half);
-
-groupshared uint4[ShASize + ShBSize] shMem;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
 [Differentiable]
@@ -76,13 +73,14 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias InVectorType = AccelerateVectorCoopMat<ElementType, 4, SubgroupSize>;
-    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, 2, SubgroupSize>;
+    typealias ShMemPool = SharedMemoryPool<ShMemSizeInBytes>;
+    typealias InVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, InputSize, SubgroupSize>;
+    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
-    ElementType[4] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
+    ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    input.sharedMemoryPtr = __getAddress(shMem[0]);
+    input.sharedMemoryPtr = ShMemPool.getPointer();
 
     BufferStorage weightStorage = BufferStorage(parameters);
     BufferStorage dweightStorage = BufferStorage(dParameters);

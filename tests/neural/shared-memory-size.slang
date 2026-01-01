@@ -41,14 +41,12 @@ void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, 
 
     const int tileASize = Mode == ExecutionMode.Inference ?
                 alignedM * coopMatShape * sizeof(half) :               // Forward,  A is M x K, tile A is M x 16
-                alignedK * coopMatShape * sizeof(half);                // Backward, A is K x M, tile A is K x 16
+                max(alignedM, alignedK) * coopMatShape * sizeof(half); // Backward, A is K x M, tile A is K x 16
 
     // in backward, B is M x N, and N x K, tile B is 16 x max(N, K)
-    const int maxTileBSizeInBackward = (aliggnedN > alignedK ? aliggnedN: alignedK) * coopMatShape;
-
     const int tileBSize = Mode == ExecutionMode.Inference ?
-                coopMatShape * aliggnedN * sizeof(half) :               // forward,  B is K x N, tile B is 16 x N
-                maxTileBSizeInBackward * sizeof(half);                  // backward, B is M x N, tile B is 16 x max(N, K)
+                coopMatShape * aliggnedN * sizeof(half) :                   // forward,  B is K x N, tile B is 16 x N
+                coopMatShape * (max(aliggnedN, alignedK)) * sizeof(half);   // backward, B is M x N, tile B is 16 x max(N, K)
 
     const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
 
@@ -68,7 +66,9 @@ uint verifySize<ExecutionMode Mode, each T, each U>(expand each T a, expand each
     expand computeOneLayer<Mode>(each a, each b, index, resBuffer);
 
     int maxSize = 0;
-    for (int i = 0; i < resBuffer.getCount(); i++)
+
+    [ForceUnroll]
+    for (int i = 0; i < countof(T); i++)
     {
         maxSize = max(maxSize, resBuffer[i]);
     }
@@ -158,12 +158,15 @@ uint verifySize<ExecutionMode Mode, each T, each U>(expand each T a, expand each
 #define TEST_CASE_16_PAIR_1 14U, 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U
 #define TEST_CASE_16_PAIR_2 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U, 29U
 
-
 #define RunTest(N) \
 do { \
     uint expectedValue = verifySize<ExecutionMode.Inference>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
-    uint actualValue = SharedMemorySize.OfLayer##N<TEST_CASE_##N>.Bytes; \
-    outputBuffer[N-1] = expectedValue == actualValue ? 1U : 0U; \
+    uint actualValue = SharedMemorySizeInference.OfLayer##N<TEST_CASE_##N>.Bytes; \
+    bool isCorrect = expectedValue == actualValue; \
+    actualValue = SharedMemorySizeTraining.OfLayer##N<TEST_CASE_##N>.Bytes; \
+    expectedValue = verifySize<ExecutionMode.Training>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
+    isCorrect = isCorrect && (expectedValue == actualValue); \
+    outputBuffer[N-1] = isCorrect ? 1U : 0U; \
 } while (false)
 
 
@@ -171,24 +174,47 @@ do { \
 [shader("compute")]
 void computeMain(uint tid: SV_DispatchThreadID)
 {
-    typealias SharedMemorySize = SharedMemorySize<DType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
-
-    RunTest(1);
-    RunTest(2);
-    RunTest(3);
-    RunTest(4);
-    RunTest(5);
-    RunTest(6);
-    RunTest(7);
-    RunTest(8);
-    RunTest(9);
-    RunTest(10);
-    RunTest(11);
-    RunTest(12);
-    RunTest(13);
-    RunTest(14);
-    RunTest(15);
-    RunTest(16);
+    __target_switch
+    {
+    case cuda:
+        typealias SharedMemorySizeInference = SharedMemorySize<DType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
+        typealias SharedMemorySizeTraining = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
+        RunTest(1);
+        RunTest(2);
+        RunTest(3);
+        RunTest(4);
+        RunTest(5);
+        RunTest(6);
+        RunTest(7);
+        RunTest(8);
+        RunTest(9);
+        RunTest(10);
+        RunTest(11);
+        RunTest(12);
+        RunTest(13);
+        RunTest(14);
+        RunTest(15);
+        RunTest(16);
+    case spirv:
+        typealias SharedMemorySizeInference = SharedMemorySize<DType, TargetEnum.SPIR_V, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
+        typealias SharedMemorySizeTraining = SharedMemorySize< DType, TargetEnum.SPIR_V, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
+        RunTest(1);
+        RunTest(2);
+        RunTest(3);
+        RunTest(4);
+        RunTest(5);
+        RunTest(6);
+        RunTest(7);
+        RunTest(8);
+        RunTest(9);
+        RunTest(10);
+        RunTest(11);
+        RunTest(12);
+        RunTest(13);
+        RunTest(14);
+        RunTest(15);
+        RunTest(16);
+    }
 
     // BUFFER: 1
     // BUFFER-NEXT: 1

@@ -2,6 +2,12 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
+#ifndef UNIT_TEST
+#define VISIBILITY_LEVEL public
+#else
+#define VISIBILITY_LEVEL internal
+#endif
+
 #define Max(A, B) ((A) > (B) ? (A) : (B))
 
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
@@ -11,10 +17,10 @@ internal interface ISharedMemoryPool
     static SPtr<uint4> getPointer();
 }
 
-struct SharedMemoryPool<int Bytes> : ISharedMemoryPool
+public struct SharedMemoryPool<int Bytes> : ISharedMemoryPool
 {
     internal static groupshared uint4 data[Bytes / sizeof(uint4)];
-    internal static SPtr<uint4> getPointer()
+    VISIBILITY_LEVEL static SPtr<uint4> getPointer()
     {
         return __getAddress(data[0]);
     }
@@ -24,27 +30,35 @@ internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, i
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    static const bool TransposeA = ExeMode == ExecutionMode.Training;
-    typealias TileInfo = TileInfo<T, OutputSize, SubgroupSize, InputSize, Target, TransposeA>;
+    static const bool IsTraining = ExeMode == ExecutionMode.Training;
+    typealias TileInfoNormal = TileInfo<T, OutputSize, SubgroupSize, InputSize, Target, false>;
+    typealias TileInfoTransposed = TileInfo<T, OutputSize, SubgroupSize, InputSize, Target, true>;
     typealias CMShape = CoopMatShape<T, Target>;
 
     // Shared memory A is used to load Tile A. The Size Tile A is determined by the height of matrix A and width of CoopMatA.
-    // 'TileInfo.HeightInElementsTileA' is the height of the Tile A and it already takes the transpose into account, where it's M
-    // for non-transpose case and K for transpose case. 'CMShape.COLUMN_A' is the width of the CoopMatA.
-    static const int SharedMemSizeInVectorMatA = (TileInfo.HeightInElementsTileA * CMShape.COLUMN_A) / CMShape.ElementCountPerVector;
+    // The possible shapes of matrix A can be:
+    // 1. M x K in A * B      -> inference (TransposeA = false)
+    // 2. K x M in A^T * B    -> training (TransposeA = true)
+    // 3. M x N in outer product of dOut and input. -> training (TransposeA = false)
+    // In the inference mode, tile A size is always [M x CoopMatA_Width].
+    // In the training mode, tile A size is either [M x CoopMatA_Width] or [K x CoopMatA_Width], so we need to choose the max value
+    static const int SharedMemSizeInVectorMatA = !IsTraining ?
+        (TileInfoNormal.HeightInElementsTileA * CMShape.COLUMN_A) / CMShape.ElementCountPerVector :
+        (Max(TileInfoNormal.HeightInElementsTileA, TileInfoTransposed.HeightInElementsTileA) * CMShape.COLUMN_A) / CMShape.ElementCountPerVector;
 
     // Shared memory B is used to load Tile B. The Size Tile B is determined by the height of CoopMatB and width of Tile B.
-    // The possible shapes of matrix B can be:
-    // 1. K x N in A * B
-    // 2. M x N in A^T * B
-    // 3. N x K in outer product of dOut and input.
-    //    In the outer product, matrix B will be collection of input vectors in row major, the row dimension is the batch dimension.
-    // Notice that in the inference mode, the width of Tile B is always subgroup size (N). While in the training mode, the width of Tile B is
-    // is N and K, so we need to choose the max value.
+    // The possible shapes of matrix B in inference mode can be:
+    // 1. K x N in A * B      -> inference
+    // 2. M x N in A^T * B    -> training
+    // 3. N x K in outer product of dOut and input. -> training
+    // In the inference mode, tile B size is always [CoopMatB_Height x N].
+    // In the training mode, tile B size is either [CoopMatB_Height x N] or [CoopMatB_Height x K], so we need to choose the max value.
+
+    // InputSize is K.
     static const int TileBWidthForOuterProduct = ((InputSize + CMShape.COLUMN_B - 1) / CMShape.COLUMN_B) * CMShape.COLUMN_B;
-    static const int SharedMemSizeInVectorMatB = !TransposeA ?
-        ((TileInfo.WidthInElementsTileB * CMShape.ROW_B) / CMShape.ElementCountPerVector) :
-        ((Max(TileInfo.WidthInElementsTileB, TileBWidthForOuterProduct) * CMShape.ROW_B) / CMShape.ElementCountPerVector);
+    static const int SharedMemSizeInVectorMatB = !IsTraining ?
+        ((TileInfoNormal.WidthInElementsTileB * CMShape.ROW_B) / CMShape.ElementCountPerVector) :
+        ((Max(TileInfoNormal.WidthInElementsTileB, TileBWidthForOuterProduct) * CMShape.ROW_B) / CMShape.ElementCountPerVector);
 
     // Shared memory C is used to store the result of CoopMatC. The size is determened by height of CoopMatC and width of Tile C.
     // The possible shapes matrix C can only be:
@@ -68,7 +82,6 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 }
 
-
 // The following code is a macro-based implementation of the shared memory size calculation.
 // It is used to calculate the shared memory size for a given number of hidden layers.
 // The challenge here is that the size of the shared memory has to be compile time constant, however
@@ -79,7 +92,6 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
 // Then we can define larger number of layers by using the divide and conquer strategy. The reason to use Macro here
 // is just to reduce the mount of code that we need to write. But under the hood, the macro will be expanded to:
 // `SharedMemorySize1` to `SharedMemorySize15`.
-// The number in the suffix represents the number of hidden layers. So it means that we can only support up to 15 hidden layers.
 
 // Take an example:
 // ```
@@ -98,6 +110,11 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
 // TODO: We shouldn't need such sophisticated meta-programming to achieve this once we have const_expr function
 //       or we can provide more advanced variadic generic parameters support such as First(...)/Rest(...), so that
 //       we can define the SharedMemorySize as variadic generic struct instead of these pre-defined generics.
+//
+// We note that this implementation is not the most efficient way to calculate the shared memory size, because
+// we can first find out the max layer size, and then do the remaining calculation. But since this computation is
+// not done at run time, so we don't need to worry about the performance, and we can reuse other data structure we
+// already have, so it's easiest way to implement this.
 
 
 #define UNPACK(...) __VA_ARGS__
