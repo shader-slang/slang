@@ -3,6 +3,12 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
+// Test that given the layer configuration, thread count, data type, subgroup size, and execution mode, the shared memory required is correctly
+// calculated during compile time.
+
+// SharedMemorySize<DType, TargetEnum, ExecutionMode, SubgroupSize, SubgroupCount>.OfHiddenN<LayerConfiguration>.Bytes
+// is the compile time (or link time) constant that represents the total shared memory needed for launcing the inference kernel or training kernel.
+
 import neural;
 #pragma warning(disable: 41017)
 
@@ -18,65 +24,183 @@ RWStructuredBuffer<uint> outputBuffer;
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
 
-bool verify<int InputSize, int OutputSize, ExecutionMode Mode>(int actualSize)
+// Compute the shared memory size to verify the output.
+// This verify function uses naive implementation to calculate the shared memory size at run time.
+// It just calculate the shared memory size for a single layer, and store the result in the result array.
+// Then we will find the maximum value in the result array.
+void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, U outputSize, inout uint index, out Arr result)
+    where T == uint
+    where U == uint
 {
     // In this test, the CoopMat shape is always 16x16x16.
-    static const int coopMatShape = 16;
-    static const int alignedK = ((InputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
-    static const int alignedM = ((OutputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
-    static const int aliggnedN = SubgroupSize;
-    static const int subgroupCount = BatchSize / SubgroupSize;
+    const int coopMatShape = 16;
+    const int alignedK = ((inputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
+    const int alignedM = ((outputSize + coopMatShape - 1) / coopMatShape) * coopMatShape;
+    const int aliggnedN = SubgroupSize;
+    const int subgroupCount = BatchSize / SubgroupSize;
 
-    static const int tileASize = Mode == ExecutionMode.Inference ?
+    const int tileASize = Mode == ExecutionMode.Inference ?
                 alignedM * coopMatShape * sizeof(half) :               // Forward,  A is M x K, tile A is M x 16
                 alignedK * coopMatShape * sizeof(half);                // Backward, A is K x M, tile A is K x 16
 
     // in backward, B is M x N, and N x K, tile B is 16 x max(N, K)
-    static const int maxTileBSizeInBackward = (aliggnedN > alignedK ? aliggnedN: alignedK) * coopMatShape;
+    const int maxTileBSizeInBackward = (aliggnedN > alignedK ? aliggnedN: alignedK) * coopMatShape;
 
-    static const int tileBSize = Mode == ExecutionMode.Inference ?
+    const int tileBSize = Mode == ExecutionMode.Inference ?
                 coopMatShape * aliggnedN * sizeof(half) :               // forward,  B is K x N, tile B is 16 x N
                 maxTileBSizeInBackward * sizeof(half);                  // backward, B is M x N, tile B is 16 x max(N, K)
 
-    static const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
+    const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
 
-    static const int maxTileBCSize = tileBSize > tileCSize ? tileBSize : tileCSize;
-    static const int expectedSize = tileASize + maxTileBCSize * subgroupCount;
+    const int maxTileBCSize = tileBSize > tileCSize ? tileBSize : tileCSize;
+    const int expectedSize = tileASize + maxTileBCSize * subgroupCount;
 
-    return actualSize == expectedSize;
+    result[index++] = expectedSize;
 }
 
-void test<int InputSize, int OutputSize, ExecutionMode Mode>(int resIndex)
+
+uint verifySize<ExecutionMode Mode, each T, each U>(expand each T a, expand each U b)
+    where T == uint
+    where U == uint
 {
-    int size = 0;
-    __target_switch
+    uint index = 0;
+    uint resBuffer[countof(T)];
+    expand computeOneLayer<Mode>(each a, each b, index, resBuffer);
+
+    int maxSize = 0;
+    for (int i = 0; i < resBuffer.getCount(); i++)
     {
-    case cuda:
-        size = SharedMemorySize<DType, TargetEnum.CUDA, Mode, SubgroupSize, BatchSize/SubgroupSize, InputSize, OutputSize>.SharedMemSizeInBytes;
-        break;
-    case spirv:
-        size = SharedMemorySize<DType, TargetEnum.SPIR_V, Mode, SubgroupSize, BatchSize/SubgroupSize, InputSize, OutputSize>.SharedMemSizeInBytes;
-        break;
+        maxSize = max(maxSize, resBuffer[i]);
     }
 
-    bool res = verify<InputSize, OutputSize, Mode>(size);
-    outputBuffer[resIndex] = res ? 1 : 0;
+    return maxSize;
 }
+
+// randomly generated layer configurations
+
+// hidden layer count = 0
+#define TEST_CASE_1 5U, 9U
+#define TEST_CASE_1_PAIR_1 5U
+#define TEST_CASE_1_PAIR_2 9U
+
+// hidden layer count = 1
+#define TEST_CASE_2 17U, 23U, 3U
+#define TEST_CASE_2_PAIR_1 17U, 23U
+#define TEST_CASE_2_PAIR_2 23U, 3U
+
+// hidden layer count = 2
+#define TEST_CASE_3 1U, 2U, 3U, 4U
+#define TEST_CASE_3_PAIR_1 1U, 2U, 3U
+#define TEST_CASE_3_PAIR_2 2U, 3U, 4U
+
+// hidden layer count = 3
+#define TEST_CASE_4 7U, 18U, 29U, 42U, 57U
+#define TEST_CASE_4_PAIR_1 7U, 18U, 29U, 42U
+#define TEST_CASE_4_PAIR_2 18U, 29U, 42U, 57U
+
+// hidden layer count = 4
+#define TEST_CASE_5 3U, 11U, 24U, 37U, 49U, 62U
+#define TEST_CASE_5_PAIR_1 3U, 11U, 24U, 37U, 49U
+#define TEST_CASE_5_PAIR_2 11U, 24U, 37U, 49U, 62U
+
+// hidden layer count = 5
+#define TEST_CASE_6 38U, 7U, 59U, 14U, 46U, 3U, 27U
+#define TEST_CASE_6_PAIR_1 38U, 7U, 59U, 14U, 46U, 3U
+#define TEST_CASE_6_PAIR_2 7U, 59U, 14U, 46U, 3U, 27U
+
+// hidden layer count = 6
+#define TEST_CASE_7 41U, 6U, 58U, 13U, 29U, 2U, 47U, 35U
+#define TEST_CASE_7_PAIR_1 41U, 6U, 58U, 13U, 29U, 2U, 47U
+#define TEST_CASE_7_PAIR_2 6U, 58U, 13U, 29U, 2U, 47U, 35U
+
+// hidden layer count = 7
+#define TEST_CASE_8 3U, 21U, 45U, 12U, 56U, 7U, 39U, 50U, 8U
+#define TEST_CASE_8_PAIR_1 3U, 21U, 45U, 12U, 56U, 7U, 39U, 50U
+#define TEST_CASE_8_PAIR_2 21U, 45U, 12U, 56U, 7U, 39U, 50U, 8U
+
+// hidden layer count = 8
+#define TEST_CASE_9 11U, 27U, 4U, 33U, 58U, 19U, 42U, 6U, 31U, 22U
+#define TEST_CASE_9_PAIR_1 11U, 27U, 4U, 33U, 58U, 19U, 42U, 6U, 31U
+#define TEST_CASE_9_PAIR_2 27U, 4U, 33U, 58U, 19U, 42U, 6U, 31U, 22U
+
+// hidden layer count = 9
+#define TEST_CASE_10 5U, 48U, 2U, 37U, 14U, 51U, 9U, 28U, 41U, 17U, 60U
+#define TEST_CASE_10_PAIR_1 5U, 48U, 2U, 37U, 14U, 51U, 9U, 28U, 41U, 17U
+#define TEST_CASE_10_PAIR_2 48U, 2U, 37U, 14U, 51U, 9U, 28U, 41U, 17U, 60U
+
+// hidden layer count = 10
+#define TEST_CASE_11 8U, 36U, 50U, 3U, 22U, 57U, 14U, 44U, 6U, 31U, 12U, 59U
+#define TEST_CASE_11_PAIR_1 8U, 36U, 50U, 3U, 22U, 57U, 14U, 44U, 6U, 31U, 12U
+#define TEST_CASE_11_PAIR_2 36U, 50U, 3U, 22U, 57U, 14U, 44U, 6U, 31U, 12U, 59U
+
+// hidden layer count = 11
+#define TEST_CASE_12 7U, 49U, 18U, 5U, 33U, 41U, 2U, 28U, 11U, 54U, 19U, 47U, 23U
+#define TEST_CASE_12_PAIR_1 7U, 49U, 18U, 5U, 33U, 41U, 2U, 28U, 11U, 54U, 19U, 47U
+#define TEST_CASE_12_PAIR_2 49U, 18U, 5U, 33U, 41U, 2U, 28U, 11U, 54U, 19U, 47U, 23U
+
+// hidden layer count = 12
+#define TEST_CASE_13 12U, 3U, 56U, 7U, 21U, 49U, 15U, 28U, 5U, 37U, 11U, 44U, 6U, 30U
+#define TEST_CASE_13_PAIR_1 12U, 3U, 56U, 7U, 21U, 49U, 15U, 28U, 5U, 37U, 11U, 44U, 6U
+#define TEST_CASE_13_PAIR_2 3U, 56U, 7U, 21U, 49U, 15U, 28U, 5U, 37U, 11U, 44U, 6U, 30U
+
+// hidden layer count = 13
+#define TEST_CASE_14 9U, 27U, 41U, 6U, 32U, 18U, 50U, 4U, 39U, 12U, 23U, 55U, 7U, 34U, 16U
+#define TEST_CASE_14_PAIR_1 9U, 27U, 41U, 6U, 32U, 18U, 50U, 4U, 39U, 12U, 23U, 55U, 7U, 34U
+#define TEST_CASE_14_PAIR_2 27U, 41U, 6U, 32U, 18U, 50U, 4U, 39U, 12U, 23U, 55U, 7U, 34U, 16U
+
+// hidden layer count = 14
+#define TEST_CASE_15 2U, 45U, 10U, 51U, 8U, 36U, 19U, 5U, 28U, 43U, 12U, 56U, 7U, 34U, 21U, 48U
+#define TEST_CASE_15_PAIR_1 2U, 45U, 10U, 51U, 8U, 36U, 19U, 5U, 28U, 43U, 12U, 56U, 7U, 34U, 21U
+#define TEST_CASE_15_PAIR_2 45U, 10U, 51U, 8U, 36U, 19U, 5U, 28U, 43U, 12U, 56U, 7U, 34U, 21U, 48U
+
+// hidden layer count = 15
+#define TEST_CASE_16 14U, 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U, 29U
+#define TEST_CASE_16_PAIR_1 14U, 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U
+#define TEST_CASE_16_PAIR_2 3U, 49U, 8U, 37U, 6U, 28U, 11U, 41U, 2U, 33U, 17U, 55U, 9U, 44U, 12U, 29U
+
+
+#define RunTest(N) \
+do { \
+    uint expectedValue = verifySize<ExecutionMode.Inference>(TEST_CASE_##N##_PAIR_1, TEST_CASE_##N##_PAIR_2); \
+    uint actualValue = SharedMemorySize.OfLayer##N<TEST_CASE_##N>.Bytes; \
+    outputBuffer[N-1] = expectedValue == actualValue ? 1U : 0U; \
+} while (false)
+
 
 [numthreads(1, 1, 1)]
 [shader("compute")]
 void computeMain(uint tid: SV_DispatchThreadID)
 {
-    // test<5, 9, ExecutionMode.Inference>(0);
-    test<5, 9, ExecutionMode.Training>(1);
+    typealias SharedMemorySize = SharedMemorySize<DType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize/SubgroupSize>;
 
-    // test<17, 23, ExecutionMode.Inference>(2);
-    // test<17, 23, ExecutionMode.Training>(3);
-
-    // test<34, 47, ExecutionMode.Inference>(4);
-    // test<34, 47, ExecutionMode.Training>(5);
+    RunTest(1);
+    RunTest(2);
+    RunTest(3);
+    RunTest(4);
+    RunTest(5);
+    RunTest(6);
+    RunTest(7);
+    RunTest(8);
+    RunTest(9);
+    RunTest(10);
+    RunTest(11);
+    RunTest(12);
+    RunTest(13);
+    RunTest(14);
+    RunTest(15);
+    RunTest(16);
 
     // BUFFER: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
     // BUFFER-NEXT: 1
