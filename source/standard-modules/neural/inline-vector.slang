@@ -12,7 +12,7 @@ for gradient computation in neural networks.
 - `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
 @category neural
 */
-public struct InlineVector<T, int N> : IVector<T, N>
+public struct InlineVector<T, int N> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -47,7 +47,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     Array constructor - initializes from an array.
     @param[in] data Array of N elements to initialize the vector.
     */
-    public __init(T[N] data) { this.data = data; }
+    public __init(T[Size] data) { this.data = data; }
 
     /**
     Copy constructor.
@@ -76,18 +76,19 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         OutputVector output = OutputVector();
+        static const int outSize = OutputVector.Size;
 
-        [MaxIters(OutputSize)]
-        for (int row = 0; row < OutputSize; row++)
+        [MaxIters(outSize)]
+        for (int row = 0; row < outSize; row++)
         {
             // get the address of each row of the weight matrix
             let rowOffset = Storage.getOffset(weightAddress, row * N);
@@ -104,7 +105,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
     // Linear transformation with bias
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -112,14 +113,14 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         // Reuse the unbias matmul method
-        OutputVector output = this.linearTransform<OutputSize, Storage, OutputVector>(weightStorage, weightAddress);
+        OutputVector output = this.linearTransform<Storage, OutputVector>(weightStorage, weightAddress);
 
         // apply the bias
         [ForceUnroll]
-        for (int i = 0; i < OutputSize; i++)
+        for (int i = 0; i < OutputVector.Size; i++)
         {
             let elementOffset = Storage.getOffset(biasAddress, i);
             output[i] = output[i] + biasStorage.read(elementOffset);
@@ -129,7 +130,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation without bias
-    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+    static void linearTransformBwd<Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
@@ -137,13 +138,13 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         // Derivative of the input is transposed weight matrix times the output differential
         This.Differential d = {};
 
-        [MaxIters(OutputSize)]
-        for (int j = 0; j < OutputSize; j++)
+        [MaxIters(OutputVector.Size)]
+        for (int j = 0; j < OutputVector.Size; j++)
         {
             T.Differential dy = doutput[j];
 
@@ -160,8 +161,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
         // Derivative of the weights is the outer product of the input and the output differential
         // dW = dOutput * dInput^T
-        [MaxIters(OutputSize)]
-        for (int row = 0; row < OutputSize; row++)
+        [MaxIters(OutputVector.Size)]
+        for (int row = 0; row < OutputVector.Size; row++)
         {
             let rowOffset = Storage.getOffset(dWeightAddress, row * N);
             T.Differential dy = doutput[row];
@@ -179,7 +180,7 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation with bias
-    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+    static void linearTransformBwd<Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         DifferentialPtrPair<Storage> dBiasStorage,
@@ -189,14 +190,14 @@ public struct InlineVector<T, int N> : IVector<T, N>
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         // Reuse the unbias backward method
-        linearTransformBwd<OutputSize, Storage, OutputVector>(dthis, dWeightStorage, dWeightAddress, doutput);
+        linearTransformBwd<Storage, OutputVector>(dthis, dWeightStorage, dWeightAddress, doutput);
 
         // Derivative of the bias is the same as the output differential
         [ForceUnroll]
-        for (int i = 0; i < OutputSize; i++)
+        for (int i = 0; i < OutputVector.Size; i++)
         {
             let biasOffset = Storage.getOffset(dBiasAddress, i);
             dBiasStorage.d.atomicAdd(biasOffset, doutput[i]);
@@ -205,17 +206,17 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
     // Linear transformation without bias (Bindless storage)
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         var output = OutputVector();
 
         // output = W * input
-        [MaxIters(OutputSize)]
-        for (int row = 0; row < OutputSize; row++)
+        [MaxIters(OutputVector.Size)]
+        for (int row = 0; row < OutputVector.Size; row++)
         {
             // get the address of each row of the weight matrix
             let rowAddr = weightAddress.getOffset(row * N);
@@ -230,37 +231,37 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
     // Linear transformation with bias (Bindless storage)
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, OutputVector>(
         Address weightAddress,
         Address biasAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         // Reuse the unbias matmul method
-        OutputVector output = this.linearTransform<OutputSize, Address, OutputVector>(weightAddress);
+        OutputVector output = this.linearTransform<Address, OutputVector>(weightAddress);
 
         [ForceUnroll]
-        for (int i = 0; i < OutputSize; i++)
+        for (int i = 0; i < OutputVector.Size; i++)
             output[i] = output[i] + biasAddress[i];
 
         return output;
     }
 
     // Backward of linear transformation without bias (Bindless storage)
-    static public void linearTransformBwd<int OutputSize, Address, OutputVector>(
+    static public void linearTransformBwd<Address, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dparameters,
         OutputVector.Differential doutput)
       where Address : IPointerLikeAddress<T>
       where Address.Differential : IPointerLikeAddress<T.Differential>
-      where OutputVector : IVector<T, OutputSize>
-      where OutputVector.Differential : IVector<T.Differential, OutputSize>
+      where OutputVector : IVector<T>
+      where OutputVector.Differential : IVector<T.Differential>
     {
         // dInput = dW^T * dOutput
         This.Differential d = {};
-        [MaxIters(OutputSize)]
-        for (int j = 0; j < OutputSize; j++)
+        [MaxIters(OutputVector.Size)]
+        for (int j = 0; j < OutputVector.Size; j++)
         {
             let dy = doutput[j];
             [ForceUnroll]
@@ -273,8 +274,8 @@ public struct InlineVector<T, int N> : IVector<T, N>
 
         // Derivative of the weights is the outer product of the input and the output differential
         // dW = dOutput * Input^T
-        [MaxIters(OutputSize)]
-        for (int row = 0; row < OutputSize; row++)
+        [MaxIters(OutputVector.Size)]
+        for (int row = 0; row < OutputVector.Size; row++)
         {
             let rowAddr = dparameters.d.getOffset(row * N);
             T.Differential dy = doutput[row];
@@ -291,22 +292,22 @@ public struct InlineVector<T, int N> : IVector<T, N>
     }
 
     // Backward of linear transformation with bias (Bindless storage)
-    static public void linearTransformBwd<int OutputSize, Address, OutputVector>(
+    static public void linearTransformBwd<Address, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dWeightAddress,
         DifferentialPtrPair<Address> dBiasAddress,
         OutputVector.Differential doutput)
         where Address : IPointerLikeAddress<T>
         where Address.Differential : IPointerLikeAddress<T.Differential>
-        where OutputVector : IVector<T, OutputSize>
+        where OutputVector : IVector<T>
     {
         // Reuse the unbias backward method
-        linearTransformBwd<OutputSize, Address, OutputVector>(dthis, dWeightAddress, doutput);
+        linearTransformBwd<Address, OutputVector>(dthis, dWeightAddress, doutput);
 
         let biasOffset = dBiasAddress.d.getOffset(0);
         // dBias = dOutput
         [ForceUnroll]
-        for (int i = 0; i < OutputSize; i++)
+        for (int i = 0; i < OutputVector.Size; i++)
         {
             biasOffset.atomicAdd(i, doutput[i]);
         }
