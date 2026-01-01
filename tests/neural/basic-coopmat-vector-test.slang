@@ -49,10 +49,10 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     BufferStorage weightStorage,
     BufferStorage.Address weightAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, BufferStorage, OutputVector>(weightStorage, weightAddress);
+    var outputVec = input.linearTransform<BufferStorage, OutputVector>(weightStorage, weightAddress);
     return outputVec;
 }
 

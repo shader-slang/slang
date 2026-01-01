@@ -843,7 +843,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
 // Cooperative matrix is only supported by CUDA and SPIR-V
 [require(cooperative_matrix, subgroup_basic)]
-public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, int SubgroupSize> : IVector<T, N>
+public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, int SubgroupSize> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -883,7 +883,7 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         cleanPaddingData();
     }
 
-    public __init(T[N] inData)
+    public __init(T[Size] inData)
     {
         [ForceUnroll]
         for (int i = 0; i < N; i++)
@@ -930,15 +930,15 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         set { data[index] = newValue; }
     }
 
-    private OutputVector linearTransformOnTarget<int OutputSize, Storage, OutputVector, TargetEnum Target>(
+    private OutputVector linearTransformOnTarget<Storage, OutputVector, TargetEnum Target>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
         where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T, OutputSize>
+        where OutputVector : IVector<T>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputSize, SubgroupSize, Target, false>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, false>;
         SPtr<uint4> shA = shMemPool.getPointer();
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
@@ -947,7 +947,7 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         return OutputVector(outputArray);
     }
 
-    private static void linearTransformBwdOnTarget<int OutputSize, Storage, OutputVector, TargetEnum Target>(
+    private static void linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum Target>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
@@ -955,10 +955,10 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
         where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T, OutputSize>
-        where OutputVector.Differential : IVector<T.Differential, OutputSize>
+        where OutputVector : IVector<T>
+        where OutputVector.Differential : IVector<T.Differential>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputSize, SubgroupSize, Target, true>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, true>;
 
         SPtr<uint4> shA = dthis.p.shMemPool.getPointer();
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
@@ -999,25 +999,25 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
     // Linear transformation without bias
     [Differentiable]
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         __target_switch
         {
         case cuda:
-            return no_diff linearTransformOnTarget<OutputSize, Storage, OutputVector, TargetEnum.CUDA>(weightStorage, weightAddress);
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.CUDA>(weightStorage, weightAddress);
         case spirv:
-            return no_diff linearTransformOnTarget<OutputSize, Storage, OutputVector, TargetEnum.SPIR_V>(weightStorage, weightAddress);
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.SPIR_V>(weightStorage, weightAddress);
         }
     }
 
     // Backward of linear transformation without bias
-    static void linearTransformBwd<int OutputSize, Storage, OutputVector>(
+    static void linearTransformBwd<Storage, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
@@ -1025,20 +1025,20 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
-            where OutputVector.Differential : IVector<T.Differential, OutputSize>
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
     {
         __target_switch
         {
         case cuda:
-            linearTransformBwdOnTarget<OutputSize, Storage, OutputVector, TargetEnum.CUDA>(dthis, dWeightStorage, dWeightAddress, doutput);
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.CUDA>(dthis, dWeightStorage, dWeightAddress, doutput);
         case spirv:
-            linearTransformBwdOnTarget<OutputSize, Storage, OutputVector, TargetEnum.SPIR_V>(dthis, dWeightStorage, dWeightAddress, doutput);
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.SPIR_V>(dthis, dWeightStorage, dWeightAddress, doutput);
         }
     }
 
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -1046,29 +1046,29 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         OutputVector output = OutputVector();
         return output;
     }
 
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         OutputVector output = OutputVector();
         return output;
     }
 
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>
+            where OutputVector : IVector<T>
     {
         OutputVector output = OutputVector();
         return output;

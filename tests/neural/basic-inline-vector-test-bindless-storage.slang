@@ -62,10 +62,10 @@ uniform RWStructuredBuffer<float> parametersFloat;
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     Address address)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(address);
+    var outputVec = input.linearTransform<Address, OutputVector>(address);
     return outputVec;
 }
 
@@ -74,10 +74,10 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     InputVector input,
     Address weightAddress,
     Address biasAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(weightAddress, biasAddress);
+    var outputVec = input.linearTransform<Address, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 
