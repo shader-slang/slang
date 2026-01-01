@@ -6,6 +6,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "../core/slang-random-generator.h"
 #include "slang-check.h"
+#include "slang-profile.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bit-field-accessors.h"
 #include "slang-ir-check-differentiability.h"
@@ -3894,19 +3895,13 @@ void collectParameterLists(
     {
         auto paramInfo = getParameterInfo(context, paramDeclRef);
 
-        // One unfortunate wrinkle that arises is that all the downstream
-        // logic in the Slang IR *really* wants the varying input parameters
-        // to a shader entry point to use `ParamPassingMode::BorrowIn`,
-        // so that they don't force copying, but syntactically such parameters
-        // are conventionally declared using `in` (meaning `ParamPassingMode::In`).
+        // Note: We no longer attempt to detect entry points and modify parameter
+        // passing modes here. Entry points are now handled separately after all
+        // ordinary functions are lowered, allowing a function to be used both as
+        // an entry point and as an ordinary function without conflicts.
         //
-        // We include logic here to switch up the parameter-passing mode
-        // in the case where we can statically detect that something is
-        // being compiled as an entry point. Note, however, that this logic
-        // is inherently fragile, since not every entry point that a user specifies
-        // is guaranteed to have had a `[shader(...)]` attribute on it.
-        //
-        maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(paramInfo, callableDeclRef);
+        // The transformation of varying `in` parameters to `borrow in` for
+        // entry points is now handled in the dedicated entry point lowering logic.
 
         ioParameterLists->params.add(paramInfo);
     }
@@ -12743,62 +12738,265 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
     return emitDeclRef(context, declRef.getDecl(), declRef.declRefBase, type);
 }
 
-static void lowerFrontEndEntryPointToIR(
+/// Create a wrapper IR function for an entry point that calls through to the ordinary function.
+///
+/// This function creates a new `IRFunc` with a modified signature where varying `in` parameters
+/// are changed to `borrow in` parameters. The body of the wrapper simply calls the ordinary
+/// function, allowing the same AST function to be used both as an entry point and as a callable
+/// function.
+///
+static IRFunc* createEntryPointWrapperFunc(
+    IRGenContext* context,
+    EntryPoint* entryPoint,
+    IRInst* ordinaryFunc,
+    DeclRef<FuncDecl> funcDeclRef)
+{
+    auto builder = context->irBuilder;
+    
+    // Unwrap generic if necessary to get to the actual function
+    IRFunc* ordinaryIRFunc = as<IRFunc>(ordinaryFunc);
+    if (auto irGeneric = as<IRGeneric>(ordinaryFunc))
+    {
+        ordinaryIRFunc = as<IRFunc>(findGenericReturnVal(irGeneric));
+    }
+    
+    if (!ordinaryIRFunc)
+        return nullptr;
+        
+    // Get the original function type
+    auto ordinaryFuncType = cast<IRFuncType>(ordinaryIRFunc->getFullType());
+    
+    // Build modified parameter list for entry point
+    // We need to transform varying `in` parameters to `borrow in`
+    List<IRType*> entryPointParamTypes;
+    List<ParamPassingMode> originalParamModes;
+    
+    // Collect information about parameters from the AST
+    auto params = getParameters(context->astBuilder, funcDeclRef);
+    Index paramIndex = 0;
+    
+    for (auto originalParamType : ordinaryFuncType->getParamTypes())
+    {
+        IRType* entryPointParamType = originalParamType;
+        ParamPassingMode originalMode = ParamPassingMode::In;
+        
+        // Determine if this parameter should be transformed
+        if (paramIndex < params.getCount())
+        {
+            auto paramDeclRef = params[paramIndex];
+            auto paramDecl = paramDeclRef.getDecl();
+            
+            // Get the original parameter passing mode
+            originalMode = getParamPassingMode(paramDecl);
+            
+            // Check if this is a varying input parameter that should be transformed
+            // We transform `in` parameters to `borrow in` unless they are:
+            // - Already not `in` mode
+            // - Marked as uniform
+            // - Special types like HLSLPatchType or MeshOutputType
+            bool shouldTransform = false;
+            if (originalMode == ParamPassingMode::In)
+            {
+                if (!paramDecl->findModifier<HLSLUniformModifier>())
+                {
+                    auto paramType = getParamValueType(context->astBuilder, paramDeclRef);
+                    if (!as<HLSLPatchType>(paramType) && !as<MeshOutputType>(paramType))
+                    {
+                        shouldTransform = true;
+                    }
+                }
+            }
+            
+            if (shouldTransform)
+            {
+                // The original param type in the IR might already be wrapped for `in` mode
+                // (which doesn't add wrapping), so we need to wrap it as `borrow in`
+                IRType* valueType = originalParamType;
+                entryPointParamType = builder->getBorrowInParamType(valueType, AddressSpace::Generic);
+                originalMode = ParamPassingMode::BorrowIn;
+            }
+        }
+        
+        entryPointParamTypes.add(entryPointParamType);
+        originalParamModes.add(originalMode);
+        paramIndex++;
+    }
+    
+    // Create the new function type for the entry point
+    auto entryPointFuncType = builder->getFuncType(entryPointParamTypes, ordinaryFuncType->getResultType());
+    
+    // Create the wrapper function
+    auto wrapperFunc = builder->createFunc();
+    wrapperFunc->setFullType(entryPointFuncType);
+    
+    // Generate a distinct mangled name for the entry point
+    String baseMangledName = getMangledName(context->astBuilder, funcDeclRef);
+    const char* stageName = getStageName(entryPoint->getStage());
+    String entryPointMangledName = baseMangledName + "_entrypoint_" + stageName;
+    
+    builder->addExportDecoration(wrapperFunc, entryPointMangledName.getUnownedSlice());
+    builder->addNameHintDecoration(wrapperFunc, funcDeclRef.getName()->text.getUnownedSlice());
+    
+    // Create the function body that calls through to the ordinary function
+    builder->setInsertInto(wrapperFunc);
+    auto entryBlock = builder->emitBlock();
+    builder->setInsertInto(entryBlock);
+    
+    // Create parameters for the wrapper
+    List<IRInst*> wrapperParams;
+    for (Index i = 0; i < entryPointParamTypes.getCount(); i++)
+    {
+        auto param = builder->emitParam(entryPointParamTypes[i]);
+        wrapperParams.add(param);
+        
+        // Add name hint if available
+        if (i < params.getCount())
+        {
+            builder->addNameHintDecoration(param, params[i].getName()->text.getUnownedSlice());
+        }
+    }
+    
+    // Build arguments for the call to the ordinary function
+    List<IRInst*> callArgs;
+    for (Index i = 0; i < wrapperParams.getCount(); i++)
+    {
+        IRInst* arg = wrapperParams[i];
+        
+        // If we transformed this parameter from `in` to `borrow in`,
+        // we need to dereference it when calling the ordinary function
+        if (originalParamModes[i] == ParamPassingMode::BorrowIn)
+        {
+            // Check if the ordinary function expects a non-pointer type
+            auto ordinaryParamType = ordinaryFuncType->getParamType(i);
+            if (!as<IRPtrTypeBase>(ordinaryParamType))
+            {
+                // Dereference the pointer parameter
+                arg = builder->emitLoad(arg);
+            }
+        }
+        
+        callArgs.add(arg);
+    }
+    
+    // Emit the call to the ordinary function
+    auto callResult = builder->emitCallInst(
+        ordinaryFuncType->getResultType(),
+        ordinaryFunc,
+        callArgs.getCount(),
+        callArgs.getBuffer());
+    
+    // Return the result
+    if (ordinaryFuncType->getResultType()->getOp() == kIROp_VoidType)
+    {
+        builder->emitReturn();
+    }
+    else
+    {
+        builder->emitReturn(callResult);
+    }
+    
+    return wrapperFunc;
+}
+
+void lowerFrontEndEntryPointToIR(
     IRGenContext* context,
     EntryPoint* entryPoint,
     String moduleName)
 {
-    // TODO: We should emit an entry point as a dedicated IR function
-    // (distinct from the IR function used if it were called normally),
-    // with a mangled name based on the original function name plus
-    // the stage for which it is being compiled as an entry point (so
-    // that entry points for distinct stages always have distinct names).
+    // We now emit entry points as dedicated IR functions that are distinct
+    // from the IR function used if the same AST function were called as an
+    // ordinary function. This allows a single function to be used both as
+    // an entry point and as a callable function.
     //
-    // For now we just have an (implicit) constraint that a given
-    // function should only be used as an entry point for one stage,
-    // and any such function should *not* be used as an ordinary function.
+    // The entry point wrapper has a modified signature where varying `in`
+    // parameters are changed to `borrow in` parameters, and it simply calls
+    // through to the ordinary function.
 
     auto entryPointFuncDecl = entryPoint->getFuncDecl();
-
-    if (!entryPointFuncDecl->findModifier<EntryPointAttribute>())
-    {
-        // If the entry point doesn't have an explicit `[shader("...")]` attribute,
-        // then we make sure to add one here, so the lowering logic knows it is an
-        // entry point.
-        auto entryPointAttr = context->astBuilder->create<EntryPointAttribute>();
-        entryPointAttr->capabilitySet =
-            entryPoint->getProfile().getCapabilityName().freeze(context->astBuilder);
-        addModifier(entryPointFuncDecl, entryPointAttr);
-    }
+    auto entryPointFuncDeclRef = entryPoint->getFuncDeclRef();
 
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
 
-    auto loweredEntryPointFunc = getSimpleVal(context, ensureDecl(context, entryPointFuncDecl));
+    // First, ensure the ordinary function is lowered
+    auto ordinaryFunc = getSimpleVal(context, ensureDecl(context, entryPointFuncDecl));
 
-    // Attach a marker decoration so that we recognize
-    // this as an entry point.
-    //
-    IRInst* instToDecorate = loweredEntryPointFunc;
-    if (auto irGeneric = as<IRGeneric>(instToDecorate))
+    // Now create a separate IR function specifically for use as an entry point
+    auto entryPointFunc = createEntryPointWrapperFunc(
+        context, 
+        entryPoint, 
+        ordinaryFunc,
+        entryPointFuncDeclRef);
+    
+    if (!entryPointFunc)
+    {
+        // Fall back to using the ordinary function if wrapper creation failed
+        entryPointFunc = as<IRFunc>(ordinaryFunc);
+        if (auto irGeneric = as<IRGeneric>(ordinaryFunc))
+        {
+            entryPointFunc = as<IRFunc>(findGenericReturnVal(irGeneric));
+        }
+        if (!entryPointFunc)
+            return;
+    }
+
+    // Attach a marker decoration so that we recognize this as an entry point.
+    IRInst* instToDecorate = entryPointFunc;
+    if (auto irGeneric = as<IRGeneric>(entryPointFunc))
     {
         instToDecorate = findGenericReturnVal(irGeneric);
     }
 
-    // If the entry-point decorations has already been created (because the user
+    // If the entry-point decoration has already been created (because the user
     // specified duplicate entries in the entry point list), we can stop now.
     if (instToDecorate->findDecoration<IREntryPointDecoration>())
         return;
 
-    {
+    Name* entryPointName = entryPoint->getFuncDecl()->getName();
+    builder->addEntryPointDecoration(
+        instToDecorate,
+        entryPoint->getProfile(),
+        entryPointName->text.getUnownedSlice(),
+        moduleName.getUnownedSlice());
+}
 
-        Name* entryPointName = entryPoint->getFuncDecl()->getName();
-        builder->addEntryPointDecoration(
-            instToDecorate,
-            entryPoint->getProfile(),
-            entryPointName->text.getUnownedSlice(),
-            moduleName.getUnownedSlice());
-    }
+void addEntryPointToExistingIR(
+    IRModule* irModule,
+    EntryPoint* entryPoint,
+    String moduleName,
+    DiagnosticSink* sink)
+{
+    // Get the module's session and linkage for context setup
+    auto session = irModule->getSession();
+    auto linkage = entryPoint->getLinkage();
+    auto moduleDecl = entryPoint->getModule()->getModuleDecl();
+    
+    // Set up the IR generation context
+    // We need a SharedIRGenContext and IRGenContext similar to what
+    // generateIRForTranslationUnit does
+    SharedIRGenContext sharedContextStorage(
+        session,
+        sink,
+        false, // obfuscateCode - use false since we're just adding an entry point
+        moduleDecl,
+        linkage);
+    SharedIRGenContext* sharedContext = &sharedContextStorage;
+    
+    // Get the ASTBuilder from the module
+    auto astBuilder = entryPoint->getModule()->getASTBuilder();
+    
+    IRGenContext contextStorage(sharedContext, astBuilder);
+    IRGenContext* context = &contextStorage;
+    
+    // Set up the IRBuilder to work with the existing IR module
+    IRBuilder builderStorage(irModule);
+    IRBuilder* builder = &builderStorage;
+    
+    context->irBuilder = builder;
+    builder->setInsertInto(irModule->getModuleInst());
+    
+    // Now generate the entry point wrapper
+    lowerFrontEndEntryPointToIR(context, entryPoint, moduleName);
 }
 
 static void lowerProgramEntryPointToIR(
@@ -12810,23 +13008,32 @@ static void lowerProgramEntryPointToIR(
     if (specializationInfo)
         entryPointFuncDeclRef = specializationInfo->specializedFuncDeclRef;
 
-    // First, lower the entry point like an ordinary function
-
+    // First, lower the function as an ordinary function (not as an entry point)
     auto entryPointFuncType =
         lowerType(context, getFuncType(context->astBuilder, entryPointFuncDeclRef));
 
     auto builder = context->irBuilder;
     builder->setInsertInto(builder->getModule()->getModuleInst());
 
-    auto loweredEntryPointFunc =
+    auto ordinaryFunc =
         getSimpleVal(context, emitDeclRef(context, entryPointFuncDeclRef, entryPointFuncType));
 
-    if (!loweredEntryPointFunc->findDecoration<IRLinkageDecoration>())
+    if (!ordinaryFunc->findDecoration<IRLinkageDecoration>())
     {
         builder->addExportDecoration(
-            loweredEntryPointFunc,
+            ordinaryFunc,
             getMangledName(context->astBuilder, entryPointFuncDeclRef).getUnownedSlice());
     }
+
+    // Now create a separate IR function specifically for use as an entry point
+    // This wrapper will have the modified signature with borrow in parameters
+    auto entryPointFunc = createEntryPointWrapperFunc(
+        context,
+        entryPoint,
+        ordinaryFunc,
+        entryPointFuncDeclRef);
+    
+    IRInst* funcToDecorate = entryPointFunc ? (IRInst*)entryPointFunc : ordinaryFunc;
 
     // We may have shader parameters of interface/existential type,
     // which need us to supply concrete type information for specialization.
@@ -12848,7 +13055,7 @@ static void lowerProgramEntryPointToIR(
         }
 
         builder->addBindExistentialSlotsDecoration(
-            loweredEntryPointFunc,
+            funcToDecorate,
             existentialSlotArgs.getCount(),
             existentialSlotArgs.getBuffer());
     }

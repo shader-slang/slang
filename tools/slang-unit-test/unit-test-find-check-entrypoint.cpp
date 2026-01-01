@@ -23,7 +23,7 @@ using namespace Slang;
 #define UNSET_SPIRV_VALIDATION() unsetenv("SLANG_RUN_SPIRV_VALIDATION")
 #endif
 
-#define DUMP_IR_FOR_DEBUG 0
+#define DUMP_IR_FOR_DEBUG 1
 
 SLANG_UNIT_TEST(findAndCheckEntryPoint)
 {
@@ -101,19 +101,26 @@ SLANG_UNIT_TEST(findAndCheckEntryPoint)
         diagnosticBlob.writeRef());
     SLANG_CHECK(entryPoint != nullptr);
 
-    // Build specialization arguments
-    slang::SpecializationArg args[] = {
-        // T = X (a type that implements interface I)
-        slang::SpecializationArg::fromType(module->getLayout()->findTypeByName("X")),
-        // n = 8 (an integer constant)
-        slang::SpecializationArg::fromExpr("8"),
-    };
+    module->findAndCheckEntryPoint(
+        "fragMain",
+        SLANG_STAGE_FRAGMENT,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
 
-    ComPtr<slang::IComponentType> specializedEntryPoint;
-    entryPoint->specialize(args, 2, specializedEntryPoint.writeRef(), nullptr);
+    // // Build specialization arguments
+    // slang::SpecializationArg args[] = {
+    //     // T = X (a type that implements interface I)
+    //     slang::SpecializationArg::fromType(module->getLayout()->findTypeByName("X")),
+    //     // n = 8 (an integer constant)
+    //     slang::SpecializationArg::fromExpr("8"),
+    // };
+
+    // ComPtr<slang::IComponentType> specializedEntryPoint;
+    // entryPoint->specialize(args, 2, specializedEntryPoint.writeRef(), nullptr);
 
     ComPtr<slang::IComponentType> compositeProgram;
-    slang::IComponentType* components[] = {module, specializedEntryPoint.get()};
+    slang::IComponentType* components[] = {module, entryPoint.get()};
     session->createCompositeComponentType(
         components,
         2,
