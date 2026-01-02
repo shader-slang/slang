@@ -1762,6 +1762,10 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
         case kIROp_BackwardDerivativeDecoration:
         case kIROp_UserDefinedBackwardDerivativeDecoration:
         case kIROp_PrimalSubstituteDecoration:
+        // Explicitly external functions
+        case kIROp_ExternCDecoration:
+        case kIROp_ExternCppDecoration:
+        case kIROp_UserExternDecoration:
             return true;
         default:
             continue;
@@ -1816,6 +1820,11 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;
         return false;
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+        return true;
     default:
         return false;
     }
