@@ -17,6 +17,11 @@ internal interface ISharedMemoryPool
     static SPtr<uint4> getPointer();
 }
 
+public interface ISharedMemorySize
+{
+    public static const uint Bytes;
+}
+
 public struct SharedMemoryPool<int Bytes> : ISharedMemoryPool
 {
     internal static groupshared uint4 data[Bytes / sizeof(uint4)];
@@ -71,6 +76,7 @@ internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, i
 }
 
 public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int SubgroupSize, int SubgroupCount, int InputSize, int OutputSize>
+                    : ISharedMemorySize
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -124,11 +130,14 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
 #define SHMEM_BASE T, Target, ExeMode, SubgroupSize, SubgroupCount
 
 // 3. The Core Macro - note the removed spaces around UNPACK
-#define DEFINE_SHMEM_SIZE(N, LN, RN, ARGS, L_VALS, R_VALS)                                                                                       \
-    public struct SharedMemorySize##N<T, TargetEnum Target, ExecutionMode ExeMode, int SubgroupSize, int SubgroupCount, UNPACK ARGS> SHMEM_WHERE {                                                                                                                                            \
-        internal static const uint a = SharedMemorySize##LN<SHMEM_BASE, UNPACK L_VALS>.Bytes;                                     \
-        internal static const uint b = SharedMemorySize##RN<SHMEM_BASE, UNPACK R_VALS>.Bytes;                                     \
-        public static const uint Bytes = Max(a, b);                                                                               \
+#define DEFINE_SHMEM_SIZE(N, LN, RN, ARGS, L_VALS, R_VALS)                                                                           \
+    public struct SharedMemorySize##N<T, TargetEnum Target, ExecutionMode ExeMode, int SubgroupSize, int SubgroupCount, UNPACK ARGS> \
+         : ISharedMemorySize                                                                                                         \
+        SHMEM_WHERE                                                                                                                  \
+    {                                                                                                                                \
+        internal static const uint a = SharedMemorySize##LN<SHMEM_BASE, UNPACK L_VALS>.Bytes;                                        \
+        internal static const uint b = SharedMemorySize##RN<SHMEM_BASE, UNPACK R_VALS>.Bytes;                                        \
+        public static const uint Bytes = Max(a, b);                                                                                  \
     }
 
 #define PARAM_1 (uint S0, uint S1, uint S2)

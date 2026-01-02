@@ -105,7 +105,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryC[0]);
 
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>( inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
 
     // GroupMemoryBarrierWithGroupSync();
 

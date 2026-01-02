@@ -282,14 +282,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // what MatA can only support.
         // However, in store, we store the MatC which could be float type, so we need to adjust the tile height in vector
         // and element count per vector.
-        const int elementCountPerVector = isStore ? CMShape.ElementCountPerVectorMatC : CMShape.ElementCountPerVector;
-        const int heightInVector = isStore ?
+        static const int elementCountPerVector = isStore ? CMShape.ElementCountPerVectorMatC : CMShape.ElementCountPerVector;
+        static const int heightInVector = isStore ?
                                         TileInfo.HeightInVectorTileA * CMShape.ElementCountPerVector / CMShape.ElementCountPerVectorMatC :
                                         TileInfo.HeightInVectorTileA;
-        const int widthInVector = isStore ?
+        static const int widthInVector = isStore ?
                                         TileInfo.WidthInVectorTileA * CMShape.ElementCountPerVector / CMShape.ElementCountPerVectorMatC :
                                         TileInfo.WidthInVectorTileA;
-        const int numLoadOrStorePerThread = isStore ? NumStoresEachThreadMatA : NumLoadsEachThreadMatA;
+        static const int numLoadOrStorePerThread = isStore ? NumStoresEachThreadMatA : NumLoadsEachThreadMatA;
 
         // get the 2-D coordinate of the tile in the vectorized tile
         const uint2 coordInTile = vectorizedTileIndexTo2DCoord<heightInVector, widthInVector>(indexInVectorizedTile);
@@ -558,7 +558,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     {
         const int subgroupCount = getWaveCount();
 
-        // perform n/2 ways warp reduce, so each iteration will perform a 2-way reduce operation,
+        // perform n/2 sum reduces, so each iteration will perform a 2-way reduce operation,
         // totally log2(n) steps, where n is the number of subgroups.
         for (int k = 1; k < subgroupCount; k <<= 1)
         {
@@ -602,6 +602,109 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
                 // wait for all subgroups finishing the addition.
                 GroupMemoryBarrierWithGroupSync();
+            }
+        }
+    }
+
+    // Sum reduce of the dOut
+    [require(cuda_spirv, subgroup_partitioned)]
+    [require(cuda_spirv, sm_6_6)]
+    VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
+        SPtr<uint4> sharedMemory,
+        in InArrayType dOut,
+        in int subgroupId,
+        Storage biasStorage,
+        Storage.Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Storage : IStorage<U>
+        where InArrayType : IArrayAccessor<U>
+    {
+        const uint laneId = WaveGetLaneIndex();
+        const int subgroupCount = getWaveCount();
+
+        // First, perform warp reduce, dOut's actual size is M
+        InArrayType localResult;
+        for (int i = 0; i < M; i++)
+        {
+            localResult[i] = WaveActiveSum(dOut[i]);
+        }
+
+        // TODO:
+        // Naive way is that we still have to store to the shared memory by tile size, because
+        // we are reuse the shared memory B for the shared memory saving sake. However, more smart
+        // way is that we can compute the usage here during compile time, and compare with the total
+        // size of the shared memory pool. Since this sum reduce compute is not overlapped with other
+        // computation, so we can actually freely use all the shared memory in the pool.
+        static const int elementPerVector = sizeof(uint4) / sizeof(U);
+        static const int NumTiles = (Uint4AlignedM + TileInfo.HeightInElementTileB - 1) / TileInfo.HeightInElementTileB;
+
+        // This loop is used to move the local result of each warp into the first warp
+        [ForceUnroll]
+        for (uint i = 0; i < NumTiles; i++)
+        {
+            const int startIndex = i * TileInfo.HeightInElementTileB;
+
+            // lane 0 of each warp will store the local result to the shared memory.
+            if (laneId == 0)
+            {
+                [ForceUnroll]
+                for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
+                {
+                    uint4 value;
+                    const uint offset = startIndex + j * elementPerVector;
+                    if (offset >= M)
+                        break;
+                    accessUint4Aligned<AccessOp.READ, U, U, InArrayType>(localResult, offset, value);
+                    sharedMemory[subgroupId * TileInfo.HeightInVectorTileB + j] = value;
+                }
+            }
+
+            GroupMemoryBarrierWithGroupSync();
+
+            // Now all the results are stored in the shared memory, we can perform warp reduce to get the final result.
+            if (subgroupId == 0)
+            {
+                if (laneId < subgroupCount)
+                {
+                    [ForceUnroll]
+                    for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
+                    {
+                        uint4 value = sharedMemory[laneId * TileInfo.HeightInVectorTileB + j];
+                        int offset = startIndex + j * elementPerVector;
+                        if (offset >= M)
+                            break;
+                        accessUint4Aligned<AccessOp.WRITE, U, U, InArrayType>(localResult, offset, value);
+                    }
+                }
+            }
+        }
+
+        // Now all the partial result are stored in the registers in the first warp, so we can perform the one more
+        // warp reduce to get the final result.
+        if (subgroupId == 0)
+        {
+            // Only perform the reduce for the lane ids smaller than the 'subgroupCount', because there
+            // are only 'subgroupCount' vectors in the shared memory.
+            WaveMask mask = WaveMaskBallot(0xFFFFFFFF, laneId < subgroupCount);
+            [ForceUnroll]
+            for (uint j = 0; j < M; j++)
+            {
+                localResult[j] = WaveMaskSum(mask, localResult[j]);
+            }
+
+            // spread the result writing to all threads in the first subgroup.
+            // Atomic add to the bias gradient storage buffer
+            static const int numIter = (M + SubgroupSize - 1) / SubgroupSize;
+            [ForceUnroll]
+            for (uint i = 0; i < numIter; i++)
+            {
+                const int index = i * SubgroupSize + laneId;
+                if (index >= M)
+                    break;
+
+                let offset = Storage.getOffset(biasAddress, index);
+                biasStorage.write(offset, localResult[index]);
             }
         }
     }
@@ -701,15 +804,76 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
+    [require(cooperative_matrix, subgroup_basic)]
+    internal static void initMatC<U, Storage, bool Bias>(
+        SPtr<uint4> shMemB,
+        inout MatC[TileInfo.NCoopMat] matC,
+        Optional<Storage> biasStorage,
+        Optional<Storage.Address> biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Storage : IStorage<U>
+    {
+        if (!Bias)
+        {
+            [ForceUnroll]
+            for (int i = 0; i < TileInfo.NCoopMat; i++)
+            {
+                matC[i].fill(T(0.0f));
+            }
+            return;
+        }
+
+        // Read the bias from global memory into the bias vector.
+        // Bias is like Matrix A, which is shared by all threads. So all the threads will read the same global address for bias.
+        U[TileInfo.Uint4AlignedK] biasVector;
+        [ForceUnroll]
+        for (int i = 0; i < K; i++)
+        {
+            let offset = Storage.getOffset(biasAddress.value, i);
+            biasVector[i] = biasStorage.value.read(offset);
+        }
+
+        [ForceUnroll]
+        for (int i = K; i < TileInfo.Uint4AlignedK; i++)
+        {
+            biasVector[i] = U(0.0f);
+        }
+
+        uint subgroupIndex = getWaveId();
+
+        [ForceUnroll]
+        for (int i = 0; i < TileInfo.NCoopMatRow; i++)
+        {
+            // We only need one subgroup to load the bias vector into the shared memory.
+            if (subgroupIndex == 0)
+                loadVectorToShB(shMemB, i, 0, biasVector);
+
+            // Wait so all threads in the group can access the shared memory
+            GroupMemoryBarrierWithGroupSync();
+
+            [ForceUnroll]
+            for (int j = 0; j < TileInfo.NCoopMatColumn; j++)
+            {
+                // Load bias vector into MatC.
+                int index = i * TileInfo.NCoopMatColumn + j;
+                matC[index].Load<ColumnMajor, uint4>( shMemB + j * CMShape.CoopMatCSizeInVector,
+                    TileInfo.HeightInVectorTileC);
+            }
+        }
+    }
+
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V>(InArrayType inputVector,
+    VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
         Storage weightStorage,
-        Storage.Address weightAddress)
+        Storage.Address weightAddress,
+        Optional<Storage> biasStorage,
+        Optional<Storage.Address> biasAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Storage : IStorage<U>
@@ -745,10 +909,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         MatC matC[TileInfo.NCoopMat];
 
-        for (int i = 0; i < TileInfo.NCoopMat; i++)
-        {
-            matC[i].fill(T(0.0f));
-        }
+        initMatC<U, Storage, Bias>(ptrB[0], matC, biasStorage, biasAddress);
 
         for (int k = 0; k < TileInfo.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
@@ -943,7 +1104,8 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
         const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T>( data, shA, shB, shC, weightStorage, weightAddress);
+        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T, false
+                            >( data, shA, shB, shC, weightStorage, weightAddress, none, none);
         return OutputVector(outputArray);
     }
 
@@ -974,8 +1136,8 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
 
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
