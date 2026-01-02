@@ -19,7 +19,6 @@ namespace Diagnostics
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
 %     local class_name = lua_module.toPascalCase(diagnostic.name) 
-%     local params = lua_module.getUniqueParams(diagnostic)
 GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 {
     GenericDiagnostic result;
@@ -71,6 +70,18 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
         span.range = SourceRange{$(span.location)};
         span.message = "$(span.message)";
         result.secondarySpans.add(span);
+    }
+%         end
+%     end
+
+%     if diagnostic.notes then
+    // Set notes
+%         for _, note in ipairs(diagnostic.notes) do
+    {
+        DiagnosticNote note;
+        note.span.range = SourceRange{$(note.location)};
+        note.message = "$(note.message)";
+        result.notes.add(note);
     }
 %         end
 %     end
