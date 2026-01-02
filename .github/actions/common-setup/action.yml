@@ -64,8 +64,11 @@ runs:
         CC=${{inputs.compiler}}
         CXX=${{inputs.compiler}}
         # infer C++ compiler
-        CXX=${CXX/gcc/g++}
-        CXX=${CXX/clang/clang++}
+        # Note: clang-cl is both C and C++ compiler, don't transform it
+        if [[ "$CXX" != "clang-cl" ]]; then
+          CXX=${CXX/gcc/g++}
+          CXX=${CXX/clang/clang++}
+        fi
         # Correct gcc version on older ubuntu
         if [[ "${{inputs.os}}" == linux* ]]; then
           gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
