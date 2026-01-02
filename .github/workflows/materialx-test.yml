@@ -1,0 +1,293 @@
+name: MaterialX Integration Tests
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  materialx-integration:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Download Slang Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          path: github_artifact
+
+      - name: Setup Slang Path
+        run: |
+          # Set up bin_dir for slangc
+          if [ "${{ inputs.os }}" == "windows" ]; then
+            bin_dir="$(pwd)/github_artifact/Release/bin"
+            SLANGC="${bin_dir}/slangc.exe"
+          else
+            bin_dir="$(pwd)/github_artifact/Release/bin"
+            SLANGC="${bin_dir}/slangc"
+
+            # Make executables executable on Unix systems
+            chmod +x "${bin_dir}"/* 2>/dev/null || echo "Could not chmod all files"
+            chmod +x "$SLANGC" || echo "Could not chmod slangc"
+          fi
+
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+          echo "SLANGC=$SLANGC" >> $GITHUB_ENV
+
+          # Verify slangc exists and is executable
+          if [ ! -f "$SLANGC" ]; then
+            echo "ERROR: slangc not found at: $SLANGC"
+            echo "Artifact directory contents:"
+            ls -laR github_artifact/ || true
+            exit 1
+          fi
+
+          echo "Found slangc at: $SLANGC"
+          "$SLANGC" --version || echo "Could not get slangc version"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Clone MaterialX
+        run: |
+          echo "===================================================================="
+          echo "MaterialX → Slang Integration Test"
+          echo "Platform: ${{ inputs.os }} | Config: ${{ inputs.config }}"
+          echo "===================================================================="
+
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          mkdir -p "$WORK_DIR"
+          cd "$WORK_DIR"
+
+          echo "Cloning MaterialX repository..."
+          git clone https://github.com/AcademySoftwareFoundation/MaterialX.git
+          cd MaterialX
+          # Pin to specific commit that includes generateshader.py
+          # TODO: Switch to stable release tag when available
+          git checkout 3bd5fa90225169d90e1cd83ca12c732a461025f8
+          echo "SUCCESS: MaterialX cloned at commit 3bd5fa9"
+
+      - name: Build MaterialX
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR/MaterialX"
+
+          echo "Configuring MaterialX build..."
+          mkdir -p build
+          cd build
+
+          cmake \
+            -DMATERIALX_BUILD_PYTHON=ON \
+            -DMATERIALX_INSTALL_PYTHON=OFF \
+            -DMATERIALX_BUILD_VIEWER=OFF \
+            -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
+            -DMATERIALX_BUILD_TESTS=OFF \
+            -DMATERIALX_BUILD_RENDER=OFF \
+            ..
+
+          echo "Building MaterialX (this may take a few minutes)..."
+          cmake --build . --config Release -j 4
+
+          echo "Installing MaterialX..."
+          cmake --install . --config Release --prefix ../install
+
+          echo "SUCCESS: MaterialX built and installed successfully"
+
+      - name: Generate Slang Shaders from MaterialX
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR"
+
+          # Set PYTHONPATH with correct separator for the platform
+          if [ "${{ inputs.os }}" == "windows" ]; then
+            export PYTHONPATH="$WORK_DIR/MaterialX/install/python;$PYTHONPATH"
+          else
+            export PYTHONPATH="$WORK_DIR/MaterialX/install/python:$PYTHONPATH"
+          fi
+
+          GENERATESHADER="$WORK_DIR/MaterialX/install/python/Scripts/generateshader.py"
+          MATERIALX_RESOURCES="$WORK_DIR/MaterialX/resources/Materials/TestSuite"
+
+          mkdir -p generated-shaders
+
+          echo "Generating Slang shaders from MaterialX test suite..."
+
+          # Find all .mtlx files and generate shaders
+          MTLX_FILES=($(find "$MATERIALX_RESOURCES" -name "*.mtlx" -type f | sort))
+          TOTAL_MTLX=${#MTLX_FILES[@]}
+          echo "Found $TOTAL_MTLX MaterialX documents"
+
+          SUCCESS_COUNT=0
+          FAILED_COUNT=0
+          SKIPPED_COUNT=0
+          CURRENT=0
+
+          for MATERIAL_PATH in "${MTLX_FILES[@]}"; do
+            CURRENT=$((CURRENT + 1))
+            RELATIVE_PATH="${MATERIAL_PATH#$MATERIALX_RESOURCES/}"
+            CATEGORY=$(dirname "$RELATIVE_PATH")
+            CATEGORY_DIR="generated-shaders/$CATEGORY"
+            mkdir -p "$CATEGORY_DIR"
+
+            echo "[$CURRENT/$TOTAL_MTLX] Generating $RELATIVE_PATH"
+
+            # Skip Blackbody.slang due to upstream MaterialX code generation issue
+            if [[ "$RELATIVE_PATH" == "pbrlib/bsdf/blackbody.mtlx" ]]; then
+              echo "  -> Skipped (MaterialX const issue)"
+              SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+              continue
+            fi
+
+            ERROR_LOG=$(mktemp)
+            if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>"$ERROR_LOG"; then
+              # Check if shader was created
+              if find "$CATEGORY_DIR" -name "*.slang" -newer "$GENERATESHADER" 2>/dev/null | grep -q .; then
+                SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
+                echo "  -> OK"
+              else
+                SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+                echo "  -> Skipped (no renderable)"
+              fi
+            else
+              FAILED_COUNT=$((FAILED_COUNT + 1))
+              echo "  -> FAILED"
+              # Show error for first failure only
+              if [ $FAILED_COUNT -eq 1 ]; then
+                echo "  First failure error:"
+                cat "$ERROR_LOG" | head -20
+              fi
+            fi
+            rm -f "$ERROR_LOG"
+          done
+
+          SHADER_COUNT=$(find generated-shaders -name "*.slang" -type f | wc -l | xargs)
+
+          echo "Generation complete:"
+          echo "  Success:  $SUCCESS_COUNT"
+          echo "  Skipped:  $SKIPPED_COUNT (no renderable elements or explicitly skipped)"
+          echo "  Failed:   $FAILED_COUNT"
+          echo "  Generated $SHADER_COUNT shaders"
+
+          if [ $FAILED_COUNT -gt 0 ]; then
+            echo "ERROR: Some shaders failed to generate"
+            exit 1
+          fi
+
+      - name: Compile Shaders with slangc
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/materialx-test"
+          cd "$WORK_DIR"
+
+          echo "Compiling shaders with slangc..."
+          echo "Using: $SLANGC"
+
+          SHADER_FILES=($(find generated-shaders -name "*.slang" -type f | sort))
+          TOTAL_SHADERS=${#SHADER_FILES[@]}
+          echo "Found $TOTAL_SHADERS generated shaders"
+
+          PASS_COUNT=0
+          FAIL_COUNT=0
+          SKIP_COUNT=0
+          FAILED_SHADERS=()
+          SKIPPED_SHADERS=()
+          CURRENT=0
+
+          for SHADER_PATH in "${SHADER_FILES[@]}"; do
+            CURRENT=$((CURRENT + 1))
+            RELATIVE_PATH="${SHADER_PATH#generated-shaders/}"
+            TEMP_OUT=$(mktemp)
+
+            echo "[$CURRENT/$TOTAL_SHADERS] Compiling $RELATIVE_PATH"
+
+            ERROR_LOG=$(mktemp)
+            if "$SLANGC" -target spirv -stage fragment -entry fragmentMain "$SHADER_PATH" -o "$TEMP_OUT" > /dev/null 2>"$ERROR_LOG"; then
+              PASS_COUNT=$((PASS_COUNT + 1))
+              echo "  -> OK"
+            else
+              FAIL_COUNT=$((FAIL_COUNT + 1))
+              FAILED_SHADERS+=("$RELATIVE_PATH")
+              echo "  -> FAILED"
+              # Show error for first failure only
+              if [ $FAIL_COUNT -eq 1 ]; then
+                echo "  First failure error:"
+                cat "$ERROR_LOG" | head -20
+              fi
+            fi
+
+            rm -f "$TEMP_OUT" "$ERROR_LOG"
+          done
+
+          TOTAL_TESTED=$((PASS_COUNT + FAIL_COUNT))
+          TOTAL_SHADERS=$((PASS_COUNT + FAIL_COUNT + SKIP_COUNT))
+
+          echo ""
+          echo "===================================================================="
+          echo "Results:"
+          echo "===================================================================="
+          echo "  Total shaders: $TOTAL_SHADERS"
+          echo "  Compiled:      $PASS_COUNT"
+          echo "  Skipped:       $SKIP_COUNT"
+          echo "  Failed:        $FAIL_COUNT"
+
+          if [ $SKIP_COUNT -gt 0 ]; then
+            echo ""
+            echo "Skipped shaders (known issues):"
+            for shader in "${SKIPPED_SHADERS[@]}"; do
+              echo "  - $shader"
+            done
+          fi
+
+          if [ $FAIL_COUNT -gt 0 ]; then
+            echo ""
+            echo "Failed shaders:"
+            for shader in "${FAILED_SHADERS[@]}"; do
+              echo "  - $shader"
+            done
+            echo ""
+            echo "FAILED: $FAIL_COUNT shaders failed compilation"
+            exit 1
+          fi
+
+          if [ $TOTAL_TESTED -gt 0 ]; then
+            PASS_RATE=$((PASS_COUNT * 100 / TOTAL_TESTED))
+            echo ""
+            echo "SUCCESS: All $PASS_COUNT tested shaders compiled ($PASS_RATE%)"
+          fi
+
+          echo "===================================================================="
+          echo "MaterialX → Slang Integration Test: PASSED"
+          echo "===================================================================="
+
+      - name: Upload Results on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: materialx-test-results-${{ inputs.os }}-${{ inputs.config }}
+          path: |
+            ${{ runner.temp }}/materialx-test/
+          retention-days: 3
