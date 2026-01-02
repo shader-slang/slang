@@ -101,7 +101,7 @@ internal static void atomicAddOneElement<T, U, BufferType, int NBytes, int BitsS
 }
 
 [ForceInline]
-internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>( out BufferType buffer, int startIndex, inout uint4 value)
+internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>(inout BufferType buffer, int startIndex, inout uint4 value)
     COMMON_TYPE_CONSTRAINTS
 {
     const int nBytes = sizeof(T);
@@ -136,7 +136,7 @@ internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>( out Buff
     }
 }
 
-internal void accessUint4<AccessOp Op, T, U, BufferType, bool IsAligned, int Stride>( BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
+internal void accessUint4<AccessOp Op, T, U, BufferType, bool IsAligned, int Stride>(BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
     COMMON_TYPE_CONSTRAINTS
 {
     if (IsAligned)

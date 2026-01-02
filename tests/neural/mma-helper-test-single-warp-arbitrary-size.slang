@@ -77,7 +77,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target>.Uint4Aligned
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType>(inputVector, ptrA, ptrB, ptrC, storage, 0);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
     // serialRead(tid, ptrC, 32);
     return res;
 }
