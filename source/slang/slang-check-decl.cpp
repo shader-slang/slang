@@ -9416,6 +9416,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                     }
                     else
                     {
+                        diagnostic.original_location = newDecl->getNameLoc();
                     }
                 }
                 else
@@ -9441,6 +9442,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
 
         if (hasConflict)
         {
+            if (getOptionSet().getBoolOption(CompilerOptionName::EnableRichDiagnostics))
+            {
+                getSink()->diagnose(diagnostic);
+            }
             return SLANG_FAIL;
         }
     }
