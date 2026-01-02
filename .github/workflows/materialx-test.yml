@@ -22,7 +22,7 @@ on:
 jobs:
   materialx-integration:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     defaults:
       run:
         shell: bash
