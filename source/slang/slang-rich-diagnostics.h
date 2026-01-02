@@ -3,19 +3,17 @@
 #ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
 #include "../compiler-core/slang-diagnostic-sink.h"
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-basic.h"
 
-// Forward declaration for Type
-namespace Slang
-{
-class Type;
-}
 
 //
 #include "slang-rich-diagnostics.h.fiddle"
 
 namespace Slang
 {
+
+class Type;
 
 namespace Diagnostics
 {
