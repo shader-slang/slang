@@ -54,6 +54,12 @@ local diagnostics = {
 			location = "function_location",
 			message = "redeclared here",
 		},
+		notes = {
+			{
+				message = "see previous definition of '{name : name}'",
+				location = "original_location",
+			},
+		},
 	},
 }
 
