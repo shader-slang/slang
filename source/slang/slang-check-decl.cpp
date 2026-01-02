@@ -9398,34 +9398,44 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         _addTargetModifiers(newDecl, newTargets);
 
         bool hasConflict = false;
+
+        Diagnostics::FunctionRedefinition diagnostic;
+
         for (auto& [target, value] : newTargets)
         {
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                // Redefinition
-                if (!hasConflict)
-                {
-                    getSink()->diagnose(
-                        newDecl,
-                        Diagnostics::functionRedefinition,
-                        newDecl->getName());
-                    hasConflict = true;
-                }
-
-                auto prevDecl = *found;
-                getSink()->diagnose(
-                    prevDecl,
-                    Diagnostics::seePreviousDefinitionOf,
-                    prevDecl->getName());
-
                 if (getOptionSet().getBoolOption(CompilerOptionName::EnableRichDiagnostics))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::FunctionRedefinition{
+                    if (!hasConflict)
+                    {
+                        diagnostic = Diagnostics::FunctionRedefinition{
                             .name = newDecl->getName(),
-                            .function_location = newDecl->getNameLoc()});
+                            .function_location = newDecl->getNameLoc()};
+                    }
+                    else
+                    {
+                    }
                 }
+                else
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(
+                            newDecl,
+                            Diagnostics::functionRedefinition,
+                            newDecl->getName());
+                    }
+
+                    auto prevDecl = *found;
+                    getSink()->diagnose(
+                        prevDecl,
+                        Diagnostics::seePreviousDefinitionOf,
+                        prevDecl->getName());
+                }
+                hasConflict = true;
             }
         }
 
