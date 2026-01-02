@@ -2,6 +2,7 @@
 
 #ifdef SLANG_PROTOTYPE_DIAGNOSTICS
 
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "slang-ast-type.h"
 
 //
@@ -59,7 +60,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     result.message = messageBuilder.produceString();
     
     // Set primary span
-    result.primarySpan.location = $(diagnostic.primary_span.location);
+    result.primarySpan.range = SourceRange{$(diagnostic.primary_span.location)};
     result.primarySpan.message = "$(diagnostic.primary_span.message)";
     
 %     if diagnostic.secondary_spans then
@@ -67,7 +68,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         for _, span in ipairs(diagnostic.secondary_spans) do
     {
         DiagnosticSpan span;
-        span.location = $(span.location);
+        span.range = SourceRange{$(span.location)};
         span.message = "$(span.message)";
         result.secondarySpans.add(span);
     }
