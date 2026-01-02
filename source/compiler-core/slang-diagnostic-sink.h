@@ -60,31 +60,6 @@ inline const char* getSeverityName(Severity severity)
     }
 }
 
-// Generic diagnostic representation for layout rendering
-struct DiagnosticSpan
-{
-    SourceLoc location;
-    Count length;
-    String message;
-};
-
-struct DiagnosticNote
-{
-    SourceLoc location;
-    Count length;
-    String message;
-};
-
-struct GenericDiagnostic
-{
-    int code;
-    Severity severity;
-    String message;
-    DiagnosticSpan primarySpan;
-    List<DiagnosticSpan> secondarySpans;
-    List<DiagnosticNote> notes;
-};
-
 // A structure to be used in static data describing different
 // diagnostic messages.
 struct DiagnosticInfo
