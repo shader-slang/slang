@@ -13,6 +13,7 @@ namespace Slang
 {
 struct RichDiagnostic;
 struct GenericDiagnostic;
+struct DiagnosticArg;
 } // namespace Slang
 
 namespace Slang
@@ -174,6 +175,8 @@ public:
                                          ///< overrides) into Error type messages
             LanguageServer =
                 0x10, ///< If set will format message in a way that is suitable for language server
+            AlwaysGenerateRichDiagnostics =
+                0x20, ///< Convert old style diagnostics to the new style
         };
     };
 
@@ -187,17 +190,28 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
     {
-        DiagnosticArg as[] = {DiagnosticArg(args)...};
-        return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        {
+            DiagnosticArg as[] = {DiagnosticArg(args)...};
+            return diagnoseRichImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
+        }
+        else
+        {
+            DiagnosticArg as[] = {DiagnosticArg(args)...};
+            return diagnoseImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
+        }
     }
 
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
-        // MSVC gets upset with the zero sized array above, so overload that case here
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        {
+            return diagnoseRichImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        }
+
         return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
     }
-
     template<typename D>
     bool diagnose(D const& d)
     {
@@ -314,8 +328,14 @@ protected:
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
-    // Returns true if a diagnostic is writte, doesn't return at all if the diagnostic is fatal
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseRichImpl(const GenericDiagnostic& d);
+
+    bool diagnoseRichImpl(
+        SourceLoc const& loc,
+        DiagnosticInfo const& info,
+        int argCount,
+        DiagnosticArg const* args);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info, SourceLoc const& location);
 

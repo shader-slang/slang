@@ -658,6 +658,27 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
     return true;
 }
 
+// Fallback to diagnose from the old diagnostic messages
+bool DiagnosticSink::diagnoseRichImpl(
+    SourceLoc const& loc,
+    DiagnosticInfo const& info,
+    int argCount,
+    DiagnosticArg const* args)
+{
+    StringBuilder sb;
+    formatDiagnosticMessage(sb, info.messageFormat, argCount, args);
+
+    GenericDiagnostic diagnostic;
+    diagnostic.code = info.id;
+    diagnostic.severity = info.severity;
+    diagnostic.message = sb.produceString();
+
+    diagnostic.primarySpan.loc = loc;
+    diagnostic.primarySpan.message = "";
+
+    return diagnoseRichImpl(diagnostic);
+}
+
 Severity DiagnosticSink::getEffectiveMessageSeverity(
     DiagnosticInfo const& info,
     SourceLoc const& location)

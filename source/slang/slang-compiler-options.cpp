@@ -408,5 +408,9 @@ void applySettingsToDiagnosticSink(
                 Severity::Warning,
                 Severity::Error);
     }
+    if (options.getBoolOption(CompilerOptionName::EnableRichDiagnostics))
+    {
+        targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
+    }
 }
 } // namespace Slang

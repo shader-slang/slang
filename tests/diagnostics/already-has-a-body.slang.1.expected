@@ -11,6 +11,7 @@ note: see previous definition of 'foo'
   |
 7 | int foo(){ /* original */ }
   |     ---
+
 }
 standard output = {
 }

@@ -444,6 +444,8 @@ String renderFromLayout(const DiagnosticLayout& layout)
         }
     }
 
+    ss << '\n';
+
     return ss;
 }
 

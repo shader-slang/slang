@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//TEST:SIMPLE(): -enable-experimental-rich-diagnostics
 
 // Failure to pass compile-time-constant data
 // where it is expected.
