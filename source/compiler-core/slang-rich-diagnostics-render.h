@@ -37,7 +37,6 @@ struct GenericDiagnostic
 
 String renderDiagnostic(SourceManager* sm, const GenericDiagnostic& diag);
 
-#define SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS 1
 #ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 int slangRichDiagnosticsUnitTest(int argc, char* argv[]);
 #endif
