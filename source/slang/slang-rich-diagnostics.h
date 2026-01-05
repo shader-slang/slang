@@ -24,17 +24,16 @@ namespace Diagnostics
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
 %     local class_name = lua_module.toPascalCase(diagnostic.name) 
-%     local params = lua_module.getUniqueParams(diagnostic)
 struct $(class_name)
 {
-%     for _, param in ipairs(params) do
-    $(param.cpp_type) $(param.name);
+%     for _, param in ipairs(diagnostic.params) do
+%         local type = lua_module.getCppType(param.type)
+%         local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+    $(type) $(param.name) = $(initializer);
 %     end
-    SourceLoc $(diagnostic.primary_span.location);
-%     if diagnostic.secondary_spans then
-%         for _, span in ipairs(diagnostic.secondary_spans) do
-    SourceLoc $(span.location);
-%         end
+
+%     for _, loc in ipairs(diagnostic.locations) do
+    SourceLoc $(loc.name) = SourceLoc{};
 %     end
 
     GenericDiagnostic toGenericDiagnostic() const;
