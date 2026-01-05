@@ -6,6 +6,7 @@
 
 # Unit test - RecordReplay fails on Linux GPU runner
 slang-unit-test-tool/RecordReplay_cpu_hello_world.internal
+slang-unit-test-tool/RecordReplay_gpu_printing.internal
 
 # Bug fix tests - T4 Vulkan validation issues
 tests/bugs/gh-4305.slang.4 (vk)
