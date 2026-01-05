@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cctype>
 #include <limits>
+#include <ranges>
 
 #ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 
@@ -33,21 +34,16 @@ namespace
 
 String repeat(char c, Int64 n)
 {
-    if (n <= 0)
-        return String();
-    StringBuilder sb;
-    for (Int64 i = 0; i < n; i++)
-        sb << c;
-    return sb;
+    String ret;
+    ret.appendRepeatedChar(c, n);
+    return ret;
 }
 
-String stripIndent(const String& text, Int64 indent)
+UnownedStringSlice stripIndent(const String& text, Int64 indent)
 {
-    if (indent == 0 || text.getLength() == 0)
-        return text;
-    String str = text;
-    Int64 usable = std::min(indent, Int64{str.getLength()});
-    return str.subString(Index(usable), str.getLength() - usable);
+    auto ret = text.getUnownedSlice();
+    Int64 usable = std::min(indent, Int64{text.getLength()});
+    return ret.subString(usable, ret.getLength() - usable);
 }
 
 // ============================================================================
@@ -171,6 +167,28 @@ size_t findCommonIndent(const List<LayoutBlock>& blocks)
     return (minIndent == std::numeric_limits<Index>::max()) ? 0 : minIndent;
 }
 
+//
+// Organizes diagnostic spans into a structured layout for terminal rendering.
+//
+// The function processes source code highlights through several stages:
+//
+// 1. Gutter Calculation:
+//    Determines the maximum line number to establish a consistent width for the
+//    left-hand gutter (line numbers).
+//
+// 2. Groups individual spans by their line number.
+//
+// 3. Block Segmentation
+//    Iterates through sorted line numbers to group contiguous lines into
+//    'LayoutBlocks'. If a jump in line numbers is detected (e.g., line 10
+//    followed by line 20), it closes the current block and starts a new one
+//    marked with a 'gap', allowing the renderer to insert ellipsis (...)
+//    between disconnected code snippets.
+//
+// 5. Indent Optimization:
+//    Calculates a common indentation across all blocks to shift the code
+//    horizontally, maximizing visible space by removing unnecessary leading whitespace.
+//
 SectionLayout buildSectionLayout(
     DiagnosticSink::SourceLocationLexer sll,
     SourceManager* sm,
@@ -264,6 +282,26 @@ struct LabelInfo
     String text;
 };
 
+//
+// Generates the multi-line underlines and pipes for a line of code
+//
+// The process follows a specific directional logic to handle overlapping or multi-line labels:
+//
+// 1. Forward Pass (Spans):
+//    Iterates through spans to build the primary underline row (using '^' or '-').
+//    It calculates spacing based on column offsets and collects label metadata.
+//
+// 2. Reverse Iteration (Left-to-Right):
+//    When building the "connector" row ('|') and subsequent label rows, the code
+//    iterates through the sorted labels in reverse (left-to-right). This ensures
+//    that vertical bars are drawn in the correct horizontal sequence.
+//
+// 3. Nested Iteration (Vertical Stacking):
+//    The final loop iterates through labels from right-to-left (the outer loop) to
+//    determine which label text to print on the current row. For each row, it
+//    traverses left-to-right (the inner reverse view) to draw the necessary
+//    vertical connectors for labels that haven't been printed yet.
+//
 List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
 {
     List<String> rows;
@@ -271,7 +309,7 @@ List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
         return rows;
 
     List<LabelInfo> labels;
-    String underline;
+    StringBuilder underlineBuilder;
     Int64 cursor = 1;
 
     for (const auto& span : line.spans)
@@ -279,65 +317,59 @@ List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
         Int64 effectiveColumn = std::max(Int64{1}, span.column - indentShift);
         Int64 length = std::max(Int64{1}, span.length);
         Int64 spaces = std::max(Int64{0}, effectiveColumn - cursor);
-        underline = underline + repeat(' ', spaces);
-        underline = underline + repeat(span.isPrimary ? '^' : '-', length);
+        underlineBuilder << repeat(' ', spaces) << repeat(span.isPrimary ? '^' : '-', length);
         cursor = effectiveColumn + length;
 
         if (span.label.getLength() > 0)
             labels.add(LabelInfo{effectiveColumn, span.label});
     }
 
+    labels.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
     if (labels.getCount() > 0)
     {
-        labels.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
-        underline = underline + " " + String(labels.getFirst().text);
+        underlineBuilder << " " << labels.getFirst().text;
         labels.removeAt(0);
     }
 
-    rows.add(underline);
+    rows.add(underlineBuilder.produceString());
     if (labels.getCount() == 0)
         return rows;
 
-    auto sortedLabels = labels;
-    sortedLabels.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
-
-    String connector;
+    StringBuilder connectorBuilder;
     Int64 pos = 1;
-    for (const auto& info : sortedLabels)
+    for (const auto& info : labels | std::views::reverse)
     {
         Int64 spaces = std::max(Int64{0}, info.column - pos);
-        connector = connector + repeat(' ', spaces) + "|";
+        connectorBuilder << repeat(' ', spaces) << "|";
         pos = info.column + 1;
     }
-    rows.add(connector);
+    rows.add(connectorBuilder.produceString());
 
     for (const auto& target : labels)
     {
-        List<LabelInfo> active;
-        for (const auto& candidate : labels)
-            if (candidate.column <= target.column)
-                active.add(candidate);
-
-        active.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
-
-        String labelRow;
+        StringBuilder labelRowBuilder;
         Int64 current = 1;
-        for (const auto& info : active)
+
+        for (const auto& info : labels | std::views::reverse)
         {
+            if (info.column > target.column)
+                break;
+
             Int64 spaces = std::max(Int64{0}, info.column - current);
-            labelRow = labelRow + repeat(' ', spaces);
+            labelRowBuilder << repeat(' ', spaces);
             if (info.column == target.column)
             {
-                labelRow = labelRow + String(info.text);
+                labelRowBuilder << info.text;
                 current = info.column + info.text.getLength();
             }
             else
             {
-                labelRow = labelRow + "|";
+                labelRowBuilder << "|";
                 current = info.column + 1;
             }
         }
-        rows.add(labelRow);
+
+        rows.add(labelRowBuilder.produceString());
     }
 
     return rows;
