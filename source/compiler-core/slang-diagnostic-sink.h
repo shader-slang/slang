@@ -318,11 +318,11 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    // Returns true if a diagnostic is writte, doesn't return at all if the diagnostic is fatal
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseImpl(
         SourceLoc const& pos,
         DiagnosticInfo info,
-        int argCount,
+        std::size_t argCount,
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
@@ -333,7 +333,7 @@ protected:
     bool diagnoseRichImpl(
         SourceLoc const& loc,
         DiagnosticInfo const& info,
-        int argCount,
+        std::size_t argCount,
         DiagnosticArg const* args);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info, SourceLoc const& location);

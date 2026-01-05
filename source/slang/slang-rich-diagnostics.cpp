@@ -44,8 +44,9 @@ UnownedStringSlice typeToPrintableString(Type* type)
 //         result.severity = Severity::Error;
 //
 //         result.message =
-//             (StringBuilder{} << "function '" << nameToPrintableString(name) << "' already has a
-//             body").produceString();
+//             (StringBuilder{} << "function '"
+//                              << nameToPrintableString(name)
+//                              << "' already has a body").produceString();
 //
 //         // Set primary span
 //         result.primarySpan.loc = function_location;

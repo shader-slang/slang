@@ -79,7 +79,7 @@ SourceLoc getDiagnosticPos(Token const& token)
 static void formatDiagnosticMessage(
     StringBuilder& sb,
     char const* format,
-    int argCount,
+    std::size_t argCount,
     DiagnosticArg const* args)
 {
     char const* spanBegin = format;
@@ -122,7 +122,7 @@ static void formatDiagnosticMessage(
         case '9':
             {
                 int index = d - '0';
-                if (index >= argCount)
+                if (index >= Index(argCount))
                 {
                     // TODO(tfoley): figure out what a good policy will be for "panic" situations
                     // like this
@@ -664,7 +664,7 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
 bool DiagnosticSink::diagnoseRichImpl(
     SourceLoc const& loc,
     DiagnosticInfo const& info,
-    int argCount,
+    std::size_t argCount,
     DiagnosticArg const* args)
 {
     StringBuilder sb;
@@ -714,7 +714,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(
 bool DiagnosticSink::diagnoseImpl(
     SourceLoc const& pos,
     DiagnosticInfo info,
-    int argCount,
+    std::size_t argCount,
     DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics

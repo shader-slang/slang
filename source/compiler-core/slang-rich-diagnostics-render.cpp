@@ -43,16 +43,11 @@ public:
         SourceManager* sm,
         DiagnosticSink::SourceLocationLexer sll,
         DiagnosticRenderOptions opts)
-        : m_sourceManager(sm), m_lexer(sll), m_options(opts)
+        : m_sourceManager(sm)
+        , m_lexer(sll)
+        , m_options(opts)
+        , m_glyphs(opts.enableUnicode ? s_unicodeGlyphs : s_asciiGlyphs)
     {
-        if (m_options.enableUnicode)
-        {
-            m_glyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
-        }
-        else
-        {
-            m_glyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
-        }
     }
 
     String render(const GenericDiagnostic& diag)
@@ -94,7 +89,10 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
-    } m_glyphs;
+    };
+    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+    const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
     struct LineHighlight
