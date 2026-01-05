@@ -137,15 +137,16 @@ LayoutSpan makeLayoutSpan(SourceManager* sm, const DiagnosticSpan& span, bool is
     LayoutSpan layoutSpan;
 
     // Use SourceManager to get humane (display) location
-    HumaneSourceLoc humane = sm->getHumaneLoc(span.loc);
+    HumaneSourceLoc humane = sm->getHumaneLoc(span.range.begin);
 
     layoutSpan.line = humane.line;
     layoutSpan.col = humane.column;
+    // Currently we have to use the SourceLocationLexer later to get the size after the fact
     layoutSpan.length =
-        -1; // Currently we have to use the SourceLocationLexer later to get the size after the fact
+        span.range.begin == span.range.end ? -1 : span.range.getOffset(span.range.end);
     layoutSpan.label = span.message;
     layoutSpan.isPrimary = isPrimary;
-    layoutSpan.startLoc = span.loc;
+    layoutSpan.startLoc = span.range.begin;
 
     return layoutSpan;
 }
@@ -202,7 +203,7 @@ SectionLayout buildSectionLayout(
             }
         }
 
-        if (sll && span.length == -1)
+        if (sll && span.length <= 0)
         {
             span.length = getLexedLength(sll, line.content, span.col);
         }
@@ -382,7 +383,7 @@ DiagnosticLayout createLayout(
     layout.header.message = diag.message;
 
     // Use SourceManager to get humane info for the primary location
-    HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.loc);
+    HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);
     layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
     layout.primaryLoc.line = humaneLoc.line;
     layout.primaryLoc.col = humaneLoc.column;
@@ -400,7 +401,7 @@ DiagnosticLayout createLayout(
         DiagnosticLayout::NoteEntry noteEntry;
         noteEntry.message = note.message;
 
-        HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.loc);
+        HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.range.begin);
         noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
         noteEntry.loc.line = noteHumane.line;
         noteEntry.loc.col = noteHumane.column;
@@ -796,19 +797,19 @@ String trimNewlines(const String& str)
 
 Int64 calculateFallbackLength(const UnownedStringSlice& line, Int64 col)
 {
-    if (col < 1 || col > Int64{line.getLength()))
+    if (col < 1 || col > Int64{line.getLength()})
         return 1;
-        Int64 start = col - 1;
-        Int64 len = 0;
-        for (Index i = start; i < line.getLength(); ++i)
-        {
-            char ch = line[i];
-            if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '_')
-                ++len;
-            else
-                break;
-        }
-        return len > 0 ? len : 1;
+    Int64 start = col - 1;
+    Int64 len = 0;
+    for (Index i = start; i < line.getLength(); ++i)
+    {
+        char ch = line[i];
+        if (std::isalnum(static_cast<unsigned char>(ch)) || ch == '_')
+            ++len;
+        else
+            break;
+    }
+    return len > 0 ? len : 1;
 }
 
 // ============================================================================
@@ -817,87 +818,86 @@ Int64 calculateFallbackLength(const UnownedStringSlice& line, Int64 col)
 
 Slang::SourceLoc calcSourceLoc(SourceView* view, Int64 lineIndex, Int64 columnOneBased)
 {
-        SLANG_ASSERT(view);
-        SourceFile* file = view->getSourceFile();
-        SourceFile::OffsetRange lineRange = file->getOffsetRangeAtLineIndex(Index(lineIndex));
-        uint32_t lineStart = lineRange.isValid() ? lineRange.start : 0;
-        uint32_t columnOffset = columnOneBased > 0 ? uint32_t(columnOneBased - 1) : 0;
-        if (lineRange.isValid())
-        {
-            uint32_t lineLength = lineRange.getCount();
-            if (columnOffset > lineLength)
-                columnOffset = lineLength;
-        }
-        Slang::SourceLoc base = view->getRange().begin;
-        return base + Int64(lineStart + columnOffset);
+    SLANG_ASSERT(view);
+    SourceFile* file = view->getSourceFile();
+    SourceFile::OffsetRange lineRange = file->getOffsetRangeAtLineIndex(Index(lineIndex));
+    uint32_t lineStart = lineRange.isValid() ? lineRange.start : 0;
+    uint32_t columnOffset = columnOneBased > 0 ? uint32_t(columnOneBased - 1) : 0;
+    if (lineRange.isValid())
+    {
+        uint32_t lineLength = lineRange.getCount();
+        if (columnOffset > lineLength)
+            columnOffset = lineLength;
+    }
+    Slang::SourceLoc base = view->getRange().begin;
+    return base + Int64(lineStart + columnOffset);
 }
 
 DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inputSpan)
 {
-        DiagnosticSpan outSpan;
-        outSpan.message = inputSpan.message;
+    DiagnosticSpan outSpan;
+    outSpan.message = inputSpan.message;
 
-        if (!view)
-            return outSpan;
-
-        SourceFile* file = view->getSourceFile();
-
-        // Convert 1-based line to 0-based index
-        Int64 lineIndex = std::max(0, inputSpan.location.line - 1);
-
-        // Resolve length if not provided (legacy fallback behavior)
-        Int64 length = inputSpan.length;
-        if (length <= 0)
-        {
-            // Fetch line content to calculate fallback length
-            UnownedStringSlice lineContent = file->getLineAtIndex(lineIndex);
-            length = calculateFallbackLength(lineContent, inputSpan.location.column);
-        }
-
-        Slang::SourceLoc begin = calcSourceLoc(view, lineIndex, inputSpan.location.column);
-        Slang::SourceLoc end = begin;
-        if (length > 1)
-            end = begin + Int64(length - 1);
-
-        outSpan.range = Slang::SourceRange(begin, end);
+    if (!view)
         return outSpan;
+
+    SourceFile* file = view->getSourceFile();
+
+    // Convert 1-based line to 0-based index
+    Int64 lineIndex = std::max(0l, inputSpan.location.line - 1);
+
+    // Resolve length if not provided (legacy fallback behavior)
+    Int64 length = inputSpan.length;
+    if (length <= 0)
+    {
+        // Fetch line content to calculate fallback length
+        UnownedStringSlice lineContent = file->getLineAtIndex(lineIndex);
+        length = calculateFallbackLength(lineContent, inputSpan.location.column);
+    }
+
+    Slang::SourceLoc begin = calcSourceLoc(view, lineIndex, inputSpan.location.column);
+    Slang::SourceLoc end =
+        calcSourceLoc(view, lineIndex, inputSpan.location.column + inputSpan.length);
+
+    outSpan.range = Slang::SourceRange(begin, end);
+    return outSpan;
 }
 
 GenericDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
 {
-        GenericDiagnostic outDiag;
-        outDiag.code = test.diagnostic.code;
-        outDiag.severity = test.diagnostic.severity;
-        outDiag.message = test.diagnostic.message;
+    GenericDiagnostic outDiag;
+    outDiag.code = test.diagnostic.code;
+    outDiag.severity = test.diagnostic.severity;
+    outDiag.message = test.diagnostic.message;
 
-        // Create the source infrastructure if not already present
-        if (!test.sourceFile)
-        {
-            PathInfo pathInfo = PathInfo::makePath(String(test.sourceFileName));
-            test.sourceFile = sm.createSourceFileWithString(pathInfo, test.sourceContent);
-        }
+    // Create the source infrastructure if not already present
+    if (!test.sourceFile)
+    {
+        PathInfo pathInfo = PathInfo::makePath(String(test.sourceFileName));
+        test.sourceFile = sm.createSourceFileWithString(pathInfo, test.sourceContent);
+    }
 
-        // Create view for the file
-        // Note: In a real compiler, SourceViews are managed; here we create one for the test case
-        SourceView* view = sm.createSourceView(test.sourceFile, nullptr, Slang::SourceLoc());
+    // Create view for the file
+    // Note: In a real compiler, SourceViews are managed; here we create one for the test case
+    SourceView* view = sm.createSourceView(test.sourceFile, nullptr, Slang::SourceLoc());
 
-        // Map spans
-        outDiag.primarySpan = createRenderSpan(view, test.diagnostic.primarySpan);
+    // Map spans
+    outDiag.primarySpan = createRenderSpan(view, test.diagnostic.primarySpan);
 
-        for (const auto& sec : test.diagnostic.secondarySpans)
-        {
-            outDiag.secondarySpans.add(createRenderSpan(view, sec));
-        }
+    for (const auto& sec : test.diagnostic.secondarySpans)
+    {
+        outDiag.secondarySpans.add(createRenderSpan(view, sec));
+    }
 
-        for (const auto& note : test.diagnostic.notes)
-        {
-            DiagnosticNote outNote;
-            outNote.message = note.message;
-            outNote.span = createRenderSpan(view, note.span);
-            outDiag.notes.add(outNote);
-        }
+    for (const auto& note : test.diagnostic.notes)
+    {
+        DiagnosticNote outNote;
+        outNote.message = note.message;
+        outNote.span = createRenderSpan(view, note.span);
+        outDiag.notes.add(outNote);
+    }
 
-        return outDiag;
+    return outDiag;
 }
 
 // ============================================================================
@@ -906,23 +906,23 @@ GenericDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
 
 void writeTempFile(const std::string& path, const std::string& content)
 {
-        std::ofstream file(path);
-        file << content << '\n';
+    std::ofstream file(path);
+    file << content << '\n';
 }
 
 Int64 runDiff(const std::string& expected, const std::string& actual)
 {
-        writeTempFile("expected.tmp", expected);
-        writeTempFile("actual.tmp", actual);
-        Int64 result = std::system("diff -u expected.tmp actual.tmp");
-        std::remove("expected.tmp");
-        std::remove("actual.tmp");
-        return result;
+    writeTempFile("expected.tmp", expected);
+    writeTempFile("actual.tmp", actual);
+    Int64 result = std::system("diff -u expected.tmp actual.tmp");
+    std::remove("expected.tmp");
+    std::remove("actual.tmp");
+    return result;
 }
 
 } // namespace
 
-Int64 slangRichDiagnosticsUnitTest(Int64 argc, char* argv[])
+int slangRichDiagnosticsUnitTest(int argc, char* argv[])
 {
     Int64 maxTests = -1;
     for (Int64 i = 1; i < argc; ++i)
@@ -940,57 +940,54 @@ Int64 slangRichDiagnosticsUnitTest(Int64 argc, char* argv[])
         return 0;
     }
 
-    Int64 testLimit = (maxTests == -1) ? Int64
-    {NUM_TESTS)
-                                       : std::min(maxTests, Int64{NUM_TESTS));
+    Int64 testLimit = (maxTests == -1) ? Int64{NUM_TESTS} : std::min(maxTests, Int64{NUM_TESTS});
 
-            std::cout << "Running " << testLimit << " test(s)...\n";
+    std::cout << "Running " << testLimit << " test(s)...\n";
 
-            Int64 passed = 0;
-            Int64 failed = 0;
+    Int64 passed = 0;
+    Int64 failed = 0;
 
-            SourceManager sm;
-            sm.initialize(nullptr, nullptr);
-            DiagnosticSink sink;
+    SourceManager sm;
+    sm.initialize(nullptr, nullptr);
+    DiagnosticSink sink;
 
-            for (Int64 i = 0; i < testLimit; ++i)
-            {
-                TestData& test = testCases[i];
+    for (Int64 i = 0; i < testLimit; ++i)
+    {
+        TestData& test = testCases[i];
 
-                // Reset source manager for each test to keep IDs deterministic if needed,
-                // or just to simulate fresh environment. For this harness, we reuse one sm
-                // but it doesn't matter much as long as SourceLocs are valid.
+        // Reset source manager for each test to keep IDs deterministic if needed,
+        // or just to simulate fresh environment. For this harness, we reuse one sm
+        // but it doesn't matter much as long as SourceLocs are valid.
 
-                std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
+        std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
 
-                // 1. Convert Input Data -> System Types
-                // This simulates how the compiler would already have these structures ready.
-                GenericDiagnostic renderDiag = createRenderDiagnostic(sm, test);
+        // 1. Convert Input Data -> System Types
+        // This simulates how the compiler would already have these structures ready.
+        GenericDiagnostic renderDiag = createRenderDiagnostic(sm, test);
 
-                // 2. Render using ONLY the system types and SourceManager
-                // The renderer has no access to 'test.sourceContent' or 'test.diagnostic' structs.
-                String actualOutput = trimNewlines(renderDiagnostic(&sm, renderDiag));
-                String expectedOutput = trimNewlines(test.expectedOutput);
+        // 2. Render using ONLY the system types and SourceManager
+        // The renderer has no access to 'test.sourceContent' or 'test.diagnostic' structs.
+        String actualOutput =
+            trimNewlines(renderDiagnostic(sink.getSourceLocationLexer(), &sm, renderDiag));
+        String expectedOutput = trimNewlines(test.expectedOutput);
 
-                if (actualOutput == expectedOutput)
-                {
-                    std::cout << "PASS\n";
-                    ++passed;
-                }
-                else
-                {
-                    std::cout << "FAIL - Output mismatch\nRunning diff...\n";
-                    runDiff(
-                        std::string(expectedOutput.getBuffer()),
-                        std::string(actualOutput.getBuffer()));
-                    ++failed;
-                }
-            }
+        if (actualOutput == expectedOutput)
+        {
+            std::cout << "PASS\n";
+            ++passed;
+        }
+        else
+        {
+            std::cout << "FAIL - Output mismatch\nRunning diff...\n";
+            runDiff(std::string(expectedOutput.getBuffer()), std::string(actualOutput.getBuffer()));
+            ++failed;
+        }
+    }
 
-            std::cout << "\nResults: " << passed << " passed, " << failed << " failed\n";
-            return failed > 0 ? 1 : 0;
+    std::cout << "\nResults: " << passed << " passed, " << failed << " failed\n";
+    return failed > 0 ? 1 : 0;
 }
 
 #endif // SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 
-    } // namespace Slang
+} // namespace Slang

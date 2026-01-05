@@ -671,7 +671,7 @@ bool DiagnosticSink::diagnoseRichImpl(
     diagnostic.severity = info.severity;
     diagnostic.message = sb.produceString();
 
-    diagnostic.primarySpan.loc = loc;
+    diagnostic.primarySpan.range = SourceRange{loc};
     diagnostic.primarySpan.message = "";
 
     return diagnoseRichImpl(diagnostic);
