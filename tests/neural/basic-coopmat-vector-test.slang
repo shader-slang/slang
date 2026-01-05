@@ -39,8 +39,8 @@ static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 static const int workgroupCount = BatchSize / SubgroupSize;
 
-typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize/SubgroupSize>;
-static const int ShMemSizeInBytes = ShMemSize.OfLayer1<InputSize, OutputSize>.Bytes;
+typealias ShMemSize = SharedMemorySize< ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize / SubgroupSize>;
+typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
 
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
@@ -73,14 +73,12 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias ShMemPool = SharedMemoryPool<ShMemSizeInBytes>;
+    typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
     typealias InVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, InputSize, SubgroupSize>;
     typealias OutVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
-
-    input.sharedMemoryPtr = ShMemPool.getPointer();
 
     BufferStorage weightStorage = BufferStorage(parameters);
     BufferStorage dweightStorage = BufferStorage(dParameters);
@@ -88,6 +86,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
 
     // Run the forward pass
     let outputVec = TestInlineVectorMatMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
+
     // serialRead<16, half>(tid, __getAddress(shMem[0]));
     // serialRead<16, half>(tid, __getAddress(shMem[0]) + 32);
 
@@ -95,7 +94,6 @@ void BasicTestWithoutBias(int tid, int resIndex)
     // (5*1 + 6*2 + 7*3 + 8*4) = 70.0
     bool isPassed = true;
     isPassed = isPassed && (outputVec[0] == 30.0 && outputVec[1] == 70.0);
-
 
     var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
     let dRes = OutVectorType(1.0f);
