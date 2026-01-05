@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef SLANG_PROTOTYPE_DIAGNOSTICS
-
 #include "../compiler-core/slang-diagnostic-sink.h"
 #include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-basic.h"
@@ -48,5 +46,3 @@ struct $(class_name)
 
 } // namespace Diagnostics
 } // namespace Slang
-
-#endif // SLANG_PROTOTYPE_DIAGNOSTICS

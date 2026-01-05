@@ -1,7 +1,5 @@
 #include "slang-rich-diagnostics.h"
 
-#ifdef SLANG_PROTOTYPE_DIAGNOSTICS
-
 #include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "slang-ast-type.h"
 
@@ -101,5 +99,3 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 
 } // namespace Diagnostics
 } // namespace Slang
-
-#endif // SLANG_PROTOTYPE_DIAGNOSTICS
