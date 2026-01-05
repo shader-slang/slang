@@ -28,477 +28,522 @@ namespace Slang
 namespace
 {
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-String repeat(char c, Int64 n)
+enum class TerminalColor
 {
-    String ret;
-    ret.appendRepeatedChar(c, n);
-    return ret;
-}
-
-UnownedStringSlice stripIndent(const String& text, Int64 indent)
-{
-    auto ret = text.getUnownedSlice();
-    Int64 usable = std::min(indent, Int64{text.getLength()});
-    return ret.subString(usable, ret.getLength() - usable);
-}
-
-// ============================================================================
-// DIAGNOSTIC LAYOUT & RENDERER (Uses SourceManager API only)
-// ============================================================================
-
-struct LayoutSpan
-{
-    Int64 line;
-    Int64 col;
-    Int64 length;
-    String label;
-    bool isPrimary;
-    Slang::SourceLoc startLoc;
+    Red,
+    Yellow,
+    Cyan,
+    Blue,
+    Bold,
+    Reset
 };
 
-struct LineHighlight
+struct DiagnosticRenderer
 {
-    Int64 column = 0;
-    Int64 length = 1;
-    String label;
-    bool isPrimary = false;
-};
-
-struct HighlightedLine
-{
-    Int64 number = 0;
-    UnownedStringSlice content;
-    List<LineHighlight> spans;
-};
-
-struct LayoutBlock
-{
-    bool showGap = false;
-    List<HighlightedLine> lines;
-};
-
-struct SectionLayout
-{
-    Int64 maxGutterWidth = 0;
-    size_t commonIndent = 0;
-    List<LayoutBlock> blocks;
-};
-
-struct DiagnosticLayout
-{
-    struct Header
+public:
+    DiagnosticRenderer(
+        SourceManager* sm,
+        DiagnosticSink::SourceLocationLexer sll,
+        DiagnosticRenderOptions opts)
+        : m_sourceManager(sm), m_lexer(sll), m_options(opts)
     {
-        String severity;
-        Int64 code = 0;
-        String message;
-    } header;
+        initGlyphs();
+    }
 
-    struct Location
+    String render(const GenericDiagnostic& diag)
     {
-        String fileName;
-        Int64 line = 0;
-        Int64 col = 0;
-        Int64 gutterIndent = 0;
-    } primaryLoc;
+        DiagnosticLayout layout = createLayout(diag);
+        return renderFromLayout(layout);
+    }
 
-    SectionLayout primarySection;
+private:
+    SourceManager* m_sourceManager;
+    DiagnosticSink::SourceLocationLexer m_lexer;
+    DiagnosticRenderOptions m_options;
 
-    struct NoteEntry
+    struct Glyphs
     {
-        String message;
-        Location loc;
-        SectionLayout section;
+        const char* primaryUnderline;
+        const char* primaryUnderlineJoin;
+        const char* secondaryUnderline;
+        const char* secondaryUnderlineJoin;
+        const char* vertical;
+        const char* corner;
+        const char* arrow;
+        const char* noteDash;
+    } m_glyphs;
+
+    void initGlyphs()
+    {
+        if (m_options.enableUnicode)
+        {
+            m_glyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
+        }
+        else
+        {
+            m_glyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+        }
+    }
+
+    struct LayoutSpan
+    {
+        Int64 line, col, length;
+        String label;
+        bool isPrimary;
+        Slang::SourceLoc startLoc;
     };
-    List<NoteEntry> notes;
-};
 
-Count getLexedLength(
-    DiagnosticSink::SourceLocationLexer sll,
-    const UnownedStringSlice& line,
-    Int64 col)
-{
-    if (sll)
+    struct LineHighlight
     {
-        return sll(line.tail(col - 1)).getLength();
-    }
-    return -1;
-}
+        Int64 column = 0;
+        Int64 length = 1;
+        String label;
+        bool isPrimary = false;
+    };
 
-LayoutSpan makeLayoutSpan(SourceManager* sm, const DiagnosticSpan& span, bool isPrimary)
-{
-    LayoutSpan layoutSpan;
-
-    // Use SourceManager to get humane (display) location
-    HumaneSourceLoc humane = sm->getHumaneLoc(span.range.begin);
-
-    layoutSpan.line = humane.line;
-    layoutSpan.col = humane.column;
-    // Currently we have to use the SourceLocationLexer later to get the size after the fact
-    layoutSpan.length =
-        span.range.begin == span.range.end ? -1 : span.range.getOffset(span.range.end);
-    layoutSpan.label = span.message;
-    layoutSpan.isPrimary = isPrimary;
-    layoutSpan.startLoc = span.range.begin;
-
-    return layoutSpan;
-}
-
-size_t findCommonIndent(const List<LayoutBlock>& blocks)
-{
-    Index minIndent = std::numeric_limits<Index>::max();
-    for (const auto& block : blocks)
+    struct HighlightedLine
     {
-        for (const auto& line : block.lines)
+        Int64 number = 0;
+        UnownedStringSlice content;
+        List<LineHighlight> spans;
+    };
+
+    struct LayoutBlock
+    {
+        bool showGap = false;
+        List<HighlightedLine> lines;
+    };
+
+    struct SectionLayout
+    {
+        Int64 maxGutterWidth = 0;
+        size_t commonIndent = 0;
+        List<LayoutBlock> blocks;
+    };
+
+    struct DiagnosticLayout
+    {
+        struct Header
         {
+            String severity;
+            Severity severityValue;
+            Int64 code = 0;
+            String message;
+        } header;
+        struct Location
+        {
+            String fileName;
+            Int64 line = 0;
+            Int64 col = 0;
+            Int64 gutterIndent = 0;
+        } primaryLoc;
+        SectionLayout primarySection;
+        struct NoteEntry
+        {
+            String message;
+            Location loc;
+            SectionLayout section;
+        };
+        List<NoteEntry> notes;
+    };
+
+    String color(TerminalColor c, const String& text) const
+    {
+        if (!m_options.enableTerminalColors)
+            return text;
+        const char* code = "";
+        switch (c)
+        {
+        case TerminalColor::Red:
+            code = "\x1B[31;1m";
+            break;
+        case TerminalColor::Yellow:
+            code = "\x1B[33;1m";
+            break;
+        case TerminalColor::Cyan:
+            code = "\x1B[36;1m";
+            break;
+        case TerminalColor::Blue:
+            code = "\x1B[34;1m";
+            break;
+        case TerminalColor::Bold:
+            code = "\x1B[1m";
+            break;
+        case TerminalColor::Reset:
+            code = "\x1B[0m";
+            break;
+        default:
+            return text;
+        }
+        return String(code) + text + "\x1B[0m";
+    }
+
+    String repeat(char c, Int64 n) const
+    {
+        String ret;
+        ret.appendRepeatedChar(c, n);
+        return ret;
+    }
+
+    String repeat(const char* s, Int64 n) const
+    {
+        String ret;
+        for (Int64 i = 0; i < n; ++i)
+            ret.append(s);
+        return ret;
+    }
+
+    //
+    // Organizes diagnostic spans into a structured layout for terminal rendering.
+    //
+    // The function processes source code highlights through several stages:
+    //
+    // 1. Gutter Calculation:
+    //    Determines the maximum line number to establish a consistent width for the
+    //    left-hand gutter (line numbers).
+    //
+    // 2. Groups individual spans by their line number.
+    //
+    // 3. Block Segmentation
+    //    Iterates through sorted line numbers to group contiguous lines into
+    //    'LayoutBlocks'. If a jump in line numbers is detected (e.g., line 10
+    //    followed by line 20), it closes the current block and starts a new one
+    //    marked with a 'gap', allowing the renderer to insert ellipsis (...)
+    //    between disconnected code snippets.
+    //
+    // 5. Indent Optimization:
+    //    Calculates a common indentation across all blocks to shift the code
+    //    horizontally, maximizing visible space by removing unnecessary leading whitespace.
+    //
+    SectionLayout buildSectionLayout(List<LayoutSpan>& spans)
+    {
+        SectionLayout section;
+        if (spans.getCount() == 0)
+            return section;
+
+        Int64 maxLineNum = 0;
+        for (const auto& span : spans)
+            maxLineNum = std::max(maxLineNum, span.line);
+        section.maxGutterWidth = Int64(std::to_string(std::max(Int64{1}, maxLineNum)).length());
+
+        Dictionary<Int64, HighlightedLine> grouped;
+        for (auto& span : spans)
+        {
+            HighlightedLine& line = grouped[span.line];
+            line.number = span.line;
             if (line.content.getLength() == 0)
-                continue;
-            Index indent = 0;
-            while (indent < line.content.getLength() &&
-                   (line.content[indent] == ' ' || line.content[indent] == '\t'))
-                ++indent;
-            if (indent < minIndent)
-                minIndent = indent;
-        }
-    }
-    return (minIndent == std::numeric_limits<Index>::max()) ? 0 : minIndent;
-}
-
-//
-// Organizes diagnostic spans into a structured layout for terminal rendering.
-//
-// The function processes source code highlights through several stages:
-//
-// 1. Gutter Calculation:
-//    Determines the maximum line number to establish a consistent width for the
-//    left-hand gutter (line numbers).
-//
-// 2. Groups individual spans by their line number.
-//
-// 3. Block Segmentation
-//    Iterates through sorted line numbers to group contiguous lines into
-//    'LayoutBlocks'. If a jump in line numbers is detected (e.g., line 10
-//    followed by line 20), it closes the current block and starts a new one
-//    marked with a 'gap', allowing the renderer to insert ellipsis (...)
-//    between disconnected code snippets.
-//
-// 5. Indent Optimization:
-//    Calculates a common indentation across all blocks to shift the code
-//    horizontally, maximizing visible space by removing unnecessary leading whitespace.
-//
-SectionLayout buildSectionLayout(
-    DiagnosticSink::SourceLocationLexer sll,
-    SourceManager* sm,
-    List<LayoutSpan>& spans)
-{
-    SectionLayout section;
-    if (spans.getCount() == 0)
-        return section;
-
-    Int64 maxLineNum = 0;
-    for (const auto& span : spans)
-        maxLineNum = std::max(maxLineNum, span.line);
-    section.maxGutterWidth = Int64(std::to_string(std::max(Int64{1}, maxLineNum)).length());
-
-    Dictionary<Int64, HighlightedLine> grouped;
-    for (auto& span : spans)
-    {
-        HighlightedLine& line = grouped[span.line];
-        line.number = span.line;
-
-        // Retrieve content if not already set
-        if (line.content.getLength() == 0)
-        {
-            SourceView* view = sm->findSourceView(span.startLoc);
-            if (view)
             {
-                SourceFile* file = view->getSourceFile();
-                // HumaneLoc line is 1-based, getLineAtIndex is 0-based
-                line.content = StringUtil::trimEndOfLine(file->getLineAtIndex(span.line - 1));
+                SourceView* view = m_sourceManager->findSourceView(span.startLoc);
+                if (view)
+                    line.content = StringUtil::trimEndOfLine(
+                        view->getSourceFile()->getLineAtIndex(span.line - 1));
             }
+            if (m_lexer && span.length <= 0)
+                span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
+            line.spans.add({span.col, span.length, span.label, span.isPrimary});
         }
 
-        if (sll && span.length <= 0)
+        List<Int64> lineNumbers;
+        for (auto& [num, line] : grouped)
         {
-            span.length = getLexedLength(sll, line.content, span.col);
+            line.spans.sort([](const auto& a, const auto& b) { return a.column < b.column; });
+            lineNumbers.add(num);
         }
+        lineNumbers.sort();
 
-        line.spans.add(LineHighlight{span.col, span.length, span.label, span.isPrimary});
-    }
-
-    for (auto& [_, line] : grouped)
-    {
-        line.spans.sort(
-            [](const LineHighlight& a, const LineHighlight& b)
+        LayoutBlock currentBlock;
+        Int64 prevLine = -1;
+        for (Int64 number : lineNumbers)
+        {
+            if (prevLine != -1 && number > prevLine + 1)
             {
-                if (a.column != b.column)
-                    return a.column < b.column;
-                return a.length < b.length;
-            });
-    }
-
-    List<Int64> lineNumbers;
-    for (const auto& [number, _] : grouped)
-        lineNumbers.add(number);
-    lineNumbers.sort();
-
-    LayoutBlock currentBlock;
-    Int64 prevLine = std::numeric_limits<Int64>::min();
-    for (Int64 number : lineNumbers)
-    {
-        bool hasGap = prevLine != std::numeric_limits<Int64>::min() && number > prevLine + 1;
-        if (hasGap && currentBlock.lines.getCount() > 0)
-        {
-            section.blocks.add(currentBlock);
-            currentBlock = LayoutBlock{};
-            currentBlock.showGap = true;
+                section.blocks.add(currentBlock);
+                currentBlock = {true};
+            }
+            currentBlock.lines.add(grouped[number]);
+            prevLine = number;
         }
-        else if (currentBlock.lines.getCount() == 0)
-        {
-            currentBlock.showGap = false;
-        }
-
-        currentBlock.lines.add(grouped[number]);
-        prevLine = number;
-    }
-
-    if (currentBlock.lines.getCount() > 0)
         section.blocks.add(currentBlock);
+        section.commonIndent = findCommonIndent(section.blocks);
+        return section;
+    }
 
-    section.commonIndent = findCommonIndent(section.blocks);
-    return section;
-}
+    size_t findCommonIndent(const List<LayoutBlock>& blocks)
+    {
+        Index minIndent = std::numeric_limits<Index>::max();
+        for (const auto& b : blocks)
+            for (const auto& l : b.lines)
+            {
+                if (l.content.getLength() == 0)
+                    continue;
+                Index i = 0;
+                while (i < l.content.getLength() && (l.content[i] == ' ' || l.content[i] == '\t'))
+                    ++i;
+                minIndent = std::min(minIndent, i);
+            }
+        return minIndent == std::numeric_limits<Index>::max() ? 0 : minIndent;
+    }
 
-// ============================================================================
-// RENDERING STRINGS
-// ============================================================================
+    void renderSourceLine(StringBuilder& ss, const HighlightedLine& line, Int64 indent)
+    {
+        UnownedStringSlice content =
+            line.content.tail(std::min((Int64)line.content.getLength(), indent));
+        if (!m_options.enableTerminalColors || line.spans.getCount() == 0)
+        {
+            ss << content;
+            return;
+        }
 
-struct LabelInfo
-{
-    Int64 column = 0;
-    String text;
+        Int64 cursor = 1;
+        for (const auto& span : line.spans)
+        {
+            Int64 start = span.column - indent;
+            if (start > cursor)
+                ss << content.subString(cursor - 1, start - cursor);
+
+            TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
+            ss << color(c, String(content.subString(std::max(0l, start - 1), span.length)));
+            cursor = start + span.length;
+        }
+        if (cursor - 1 < content.getLength())
+            ss << content.tail(cursor - 1);
+    }
+
+    //
+    // Generates the multi-line underlines and pipes for a line of code
+    //
+    // The process follows a specific directional logic to handle overlapping or multi-line labels:
+    //
+    // 1. Forward Pass (Spans):
+    //    Iterates through spans to build the primary underline row (using '^' or '-').
+    //    It calculates spacing based on column offsets and collects label metadata.
+    //
+    // 2. Reverse Iteration (Left-to-Right):
+    //    When building the "connector" row ('|') and subsequent label rows, the code
+    //    iterates through the sorted labels in reverse (left-to-right). This ensures
+    //    that vertical bars are drawn in the correct horizontal sequence.
+    //
+    // 3. Nested Iteration (Vertical Stacking):
+    //    The final loop iterates through labels from right-to-left (the outer loop) to
+    //    determine which label text to print on the current row. For each row, it
+    //    traverses left-to-right (the inner reverse view) to draw the necessary
+    //    vertical connectors for labels that haven't been printed yet.
+    //
+    List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
+    {
+        List<String> rows;
+        if (line.spans.getCount() == 0)
+            return rows;
+        struct Label
+        {
+            Int64 col;
+            String text;
+            bool isPrimary;
+        };
+        List<Label> labels;
+        StringBuilder sub;
+        Int64 cursor = 1;
+
+        for (Int64 i = 0; i < line.spans.getCount(); ++i)
+        {
+            const auto& span = line.spans[i];
+            const bool isLast = i == line.spans.getCount() - 1;
+            Int64 col = std::max(1l, span.column - indentShift);
+            const char* glyph =
+                span.isPrimary ? m_glyphs.primaryUnderline : m_glyphs.secondaryUnderline;
+            const char* joinGlyph = isLast           ? glyph
+                                    : span.isPrimary ? m_glyphs.primaryUnderlineJoin
+                                                     : m_glyphs.secondaryUnderlineJoin;
+            sub << repeat(' ', std::max(0l, col - cursor))
+                << color(
+                       span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan,
+                       joinGlyph + repeat(glyph, std::max(0l, span.length - 1)));
+            cursor = col + span.length;
+            if (span.label.getLength() > 0)
+                labels.add({col, span.label, span.isPrimary});
+        }
+        labels.sort([](const auto& a, const auto& b) { return a.col > b.col; });
+        if (labels.getCount() > 0)
+        {
+            sub << " " << labels[0].text;
+            labels.removeAt(0);
+        }
+        rows.add(sub.produceString());
+
+        while (labels.getCount() > 0)
+        {
+            StringBuilder conn;
+            Int64 p = 1;
+            for (const auto& l : labels | std::views::reverse)
+            {
+                conn << repeat(' ', l.col - p)
+                     << color(
+                            l.isPrimary ? TerminalColor::Red : TerminalColor::Cyan,
+                            m_glyphs.vertical);
+                p = l.col + 1;
+            }
+            rows.add(conn.produceString());
+
+            StringBuilder lab;
+            Int64 c = 1;
+            Label target = labels[0];
+            for (const auto& l : labels | std::views::reverse)
+            {
+                if (l.col > target.col)
+                    break;
+                lab << repeat(' ', l.col - c);
+                if (l.col == target.col)
+                {
+                    // Bend the bottom of the pipe towards the text
+                    lab << color(
+                               l.isPrimary ? TerminalColor::Red : TerminalColor::Cyan,
+                               m_glyphs.corner)
+                        << l.text;
+                    c = l.col + l.text.getLength();
+                }
+                else
+                {
+                    lab << color(
+                        l.isPrimary ? TerminalColor::Red : TerminalColor::Cyan,
+                        m_glyphs.vertical);
+                    c = l.col + 1;
+                }
+            }
+            rows.add(lab.produceString());
+            labels.removeAt(0);
+        }
+        return rows;
+    }
+
+    void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
+    {
+        for (const auto& block : section.blocks)
+        {
+            if (block.showGap)
+                ss << "...\n";
+            for (const auto& line : block.lines)
+            {
+                String label = String(line.number);
+                ss << repeat(' ', section.maxGutterWidth - label.getLength())
+                   << color(TerminalColor::Bold, label) << " "
+                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
+                renderSourceLine(ss, line, section.commonIndent);
+                ss << "\n";
+
+                auto rows = buildAnnotationRows(line, section.commonIndent);
+                for (const auto& row : rows)
+                    ss << repeat(' ', section.maxGutterWidth + 1)
+                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
+            }
+        }
+    }
+
+    DiagnosticLayout createLayout(const GenericDiagnostic& diag)
+    {
+        DiagnosticLayout layout;
+        layout.header.severity = getSeverityName(diag.severity);
+        layout.header.severityValue = diag.severity;
+        layout.header.code = diag.code;
+        layout.header.message = diag.message;
+
+        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
+        layout.primaryLoc.line = humaneLoc.line;
+        layout.primaryLoc.col = humaneLoc.column;
+
+        List<LayoutSpan> allSpans;
+        allSpans.add(makeLayoutSpan(diag.primarySpan, true));
+        for (const auto& s : diag.secondarySpans)
+            allSpans.add(makeLayoutSpan(s, false));
+
+        layout.primarySection = buildSectionLayout(allSpans);
+        layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
+
+        for (const auto& note : diag.notes)
+        {
+            DiagnosticLayout::NoteEntry noteEntry;
+            noteEntry.message = note.message;
+            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
+            noteEntry.loc.line = noteHumane.line;
+            noteEntry.loc.col = noteHumane.column;
+
+            List<LayoutSpan> noteSpans;
+            noteSpans.add(makeLayoutSpan(note.span, false));
+            noteEntry.section = buildSectionLayout(noteSpans);
+            noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
+            layout.notes.add(std::move(noteEntry));
+        }
+        return layout;
+    }
+
+    LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
+    {
+        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        return {
+            humane.line,
+            humane.column,
+            span.range.begin == span.range.end ? -1 : span.range.getOffset(span.range.end),
+            span.message,
+            isPrimary,
+            span.range.begin};
+    }
+
+    String renderFromLayout(const DiagnosticLayout& layout)
+    {
+        StringBuilder ss;
+        TerminalColor sevColor = (layout.header.severityValue == Severity::Error)
+                                     ? TerminalColor::Red
+                                     : TerminalColor::Yellow;
+        ss << color(sevColor, layout.header.severity);
+        String codeStr = String(layout.header.code);
+        while (codeStr.getLength() < 4)
+            codeStr = "0" + codeStr;
+        ss << "[E" << codeStr << "]" << ": " << color(TerminalColor::Bold, layout.header.message)
+           << "\n";
+        ss << repeat(' ', layout.primaryLoc.gutterIndent)
+           << color(TerminalColor::Blue, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
+           << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
+
+        if (layout.primarySection.blocks.getCount() > 0)
+        {
+            ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+               << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+            renderSectionBody(ss, layout.primarySection);
+        }
+        for (const auto& note : layout.notes)
+        {
+            ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
+            ss << repeat(' ', note.loc.gutterIndent)
+               << color(TerminalColor::Blue, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
+               << note.loc.line << ":" << note.loc.col << "\n";
+            if (note.section.blocks.getCount() > 0)
+            {
+                ss << repeat(' ', note.section.maxGutterWidth + 1)
+                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+                renderSectionBody(ss, note.section);
+            }
+        }
+        return ss.produceString();
+    }
 };
-
-//
-// Generates the multi-line underlines and pipes for a line of code
-//
-// The process follows a specific directional logic to handle overlapping or multi-line labels:
-//
-// 1. Forward Pass (Spans):
-//    Iterates through spans to build the primary underline row (using '^' or '-').
-//    It calculates spacing based on column offsets and collects label metadata.
-//
-// 2. Reverse Iteration (Left-to-Right):
-//    When building the "connector" row ('|') and subsequent label rows, the code
-//    iterates through the sorted labels in reverse (left-to-right). This ensures
-//    that vertical bars are drawn in the correct horizontal sequence.
-//
-// 3. Nested Iteration (Vertical Stacking):
-//    The final loop iterates through labels from right-to-left (the outer loop) to
-//    determine which label text to print on the current row. For each row, it
-//    traverses left-to-right (the inner reverse view) to draw the necessary
-//    vertical connectors for labels that haven't been printed yet.
-//
-List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
-{
-    List<String> rows;
-    if (line.spans.getCount() == 0)
-        return rows;
-
-    List<LabelInfo> labels;
-    StringBuilder underlineBuilder;
-    Int64 cursor = 1;
-
-    for (const auto& span : line.spans)
-    {
-        Int64 effectiveColumn = std::max(Int64{1}, span.column - indentShift);
-        Int64 length = std::max(Int64{1}, span.length);
-        Int64 spaces = std::max(Int64{0}, effectiveColumn - cursor);
-        underlineBuilder << repeat(' ', spaces) << repeat(span.isPrimary ? '^' : '-', length);
-        cursor = effectiveColumn + length;
-
-        if (span.label.getLength() > 0)
-            labels.add(LabelInfo{effectiveColumn, span.label});
-    }
-
-    labels.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column > b.column; });
-    if (labels.getCount() > 0)
-    {
-        underlineBuilder << " " << labels.getFirst().text;
-        labels.removeAt(0);
-    }
-
-    rows.add(underlineBuilder.produceString());
-    if (labels.getCount() == 0)
-        return rows;
-
-    StringBuilder connectorBuilder;
-    Int64 pos = 1;
-    for (const auto& info : labels | std::views::reverse)
-    {
-        Int64 spaces = std::max(Int64{0}, info.column - pos);
-        connectorBuilder << repeat(' ', spaces) << "|";
-        pos = info.column + 1;
-    }
-    rows.add(connectorBuilder.produceString());
-
-    for (const auto& target : labels)
-    {
-        StringBuilder labelRowBuilder;
-        Int64 current = 1;
-
-        for (const auto& info : labels | std::views::reverse)
-        {
-            if (info.column > target.column)
-                break;
-
-            Int64 spaces = std::max(Int64{0}, info.column - current);
-            labelRowBuilder << repeat(' ', spaces);
-            if (info.column == target.column)
-            {
-                labelRowBuilder << info.text;
-                current = info.column + info.text.getLength();
-            }
-            else
-            {
-                labelRowBuilder << "|";
-                current = info.column + 1;
-            }
-        }
-
-        rows.add(labelRowBuilder.produceString());
-    }
-
-    return rows;
-}
-
-void printAnnotationRow(StringBuilder& ss, Int64 gutterWidth, const String& content)
-{
-    if (content.getLength() == 0)
-        return;
-    ss << repeat(' ', gutterWidth + 1) << "| " << content << '\n';
-}
-
-void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
-{
-    for (const auto& block : section.blocks)
-    {
-        if (block.showGap)
-            ss << "...\n";
-
-        for (const auto& line : block.lines)
-        {
-            const String label =
-                line.number >= 0 ? String(std::to_string(line.number).c_str()) : "?";
-            Int64 padding = std::max(Int64{0}, section.maxGutterWidth - label.getLength());
-            ss << repeat(' ', padding) << label << " | "
-               << stripIndent(line.content, section.commonIndent) << '\n';
-
-            for (const auto& row : buildAnnotationRows(line, section.commonIndent))
-                printAnnotationRow(ss, section.maxGutterWidth, row);
-        }
-    }
-}
-
-DiagnosticLayout createLayout(
-    DiagnosticSink::SourceLocationLexer sll,
-    SourceManager* sm,
-    const GenericDiagnostic& diag)
-{
-    DiagnosticLayout layout;
-
-    layout.header.severity = getSeverityName(diag.severity);
-    layout.header.code = diag.code;
-    layout.header.message = diag.message;
-
-    // Use SourceManager to get humane info for the primary location
-    HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);
-    layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
-    layout.primaryLoc.line = humaneLoc.line;
-    layout.primaryLoc.col = humaneLoc.column;
-
-    List<LayoutSpan> allSpans;
-    allSpans.add(makeLayoutSpan(sm, diag.primarySpan, true));
-    for (const auto& s : diag.secondarySpans)
-        allSpans.add(makeLayoutSpan(sm, s, false));
-
-    layout.primarySection = buildSectionLayout(sll, sm, allSpans);
-    layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
-
-    for (const auto& note : diag.notes)
-    {
-        DiagnosticLayout::NoteEntry noteEntry;
-        noteEntry.message = note.message;
-
-        HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.range.begin);
-        noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
-        noteEntry.loc.line = noteHumane.line;
-        noteEntry.loc.col = noteHumane.column;
-
-        List<LayoutSpan> noteSpans;
-        noteSpans.add(makeLayoutSpan(sm, note.span, false));
-        noteEntry.section = buildSectionLayout(sll, sm, noteSpans);
-        noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
-
-        layout.notes.add(std::move(noteEntry));
-    }
-
-    return layout;
-}
-
-String renderFromLayout(const DiagnosticLayout& layout)
-{
-    StringBuilder ss;
-
-    ss << layout.header.severity << "[E";
-    String codeStr = String(layout.header.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
-    ss << codeStr << "]: " << layout.header.message << '\n';
-
-    ss << repeat(' ', layout.primaryLoc.gutterIndent) << "--> " << layout.primaryLoc.fileName << ":"
-       << layout.primaryLoc.line << ":" << layout.primaryLoc.col << '\n';
-
-    if (layout.primarySection.blocks.getCount() > 0)
-    {
-        ss << repeat(' ', layout.primarySection.maxGutterWidth + 1) << "|\n";
-        renderSectionBody(ss, layout.primarySection);
-    }
-
-    for (const auto& note : layout.notes)
-    {
-        ss << "\nnote: " << note.message << '\n';
-        ss << repeat(' ', note.loc.gutterIndent) << "--- " << note.loc.fileName << ":"
-           << note.loc.line << ":" << note.loc.col << '\n';
-        if (note.section.blocks.getCount() > 0)
-        {
-            ss << repeat(' ', note.section.maxGutterWidth + 1) << "|\n";
-            renderSectionBody(ss, note.section);
-        }
-    }
-
-    ss << '\n';
-
-    return ss;
-}
 
 } // namespace
-
-// ============================================================================
-// PUBLIC API IMPLEMENTATION
-// ============================================================================
 
 String renderDiagnostic(
     DiagnosticSink::SourceLocationLexer sll,
     SourceManager* sm,
+    DiagnosticRenderOptions options,
     const GenericDiagnostic& diag)
 {
-    DiagnosticLayout layout = createLayout(sll, sm, diag);
-    return renderFromLayout(layout);
+    DiagnosticRenderer renderer(sm, sll, options);
+    return renderer.render(diag);
 }
+
+} // namespace Slang
+
+namespace Slang
+{
 
 // ============================================================================
 // UNIT TEST FUNCTIONALITY
@@ -631,6 +676,7 @@ struct PixelShader {
    |            ----------- ^ ------------------- Int64
    |            |           |
    |            |           no implementation for `float4 + Int64`
+   |            |
    |            float4
 )",
      .diagnostic =
@@ -783,12 +829,13 @@ error[E0308]: mismatched types
  --> example.slang:8:28
   |
 2 | string name = "User";
-  | ----- defined as `string` here
+  | ------ defined as `string` here
 ...
 8 |     float result = 5.0 + data.name;
   |                    --- ^ --------- expected `float`
   |                    |   |
   |                    |   `+` cannot be applied to these types
+  |                    |
   |                    float
 )",
      .diagnostic = {
@@ -801,7 +848,7 @@ error[E0308]: mismatched types
              []()
          {
              List<TestDiagnosticSpan> spans;
-             spans.add({SourceLoc("example.slang", 2, 5), "defined as `string` here", 5});
+             spans.add({SourceLoc("example.slang", 2, 5), "defined as `string` here", 6});
              spans.add({SourceLoc("example.slang", 8, 24), "float", 3});
              spans.add({SourceLoc("example.slang", 8, 30), "expected `float`", 9});
              return spans;
@@ -957,12 +1004,28 @@ Int64 runDiff(const std::string& expected, const std::string& actual)
 int slangRichDiagnosticsUnitTest(int argc, char* argv[])
 {
     Int64 maxTests = -1;
+    bool useColor = false;
+    bool useUnicode = false;
+    bool forceOutput = false;
+
     for (Int64 i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--until") == 0 && i + 1 < argc)
         {
             maxTests = std::atoi(argv[i + 1]);
             ++i;
+        }
+        else if (std::strcmp(argv[i], "--color") == 0)
+        {
+            useColor = true;
+        }
+        else if (std::strcmp(argv[i], "--unicode") == 0)
+        {
+            useUnicode = true;
+        }
+        else if (std::strcmp(argv[i], "--output") == 0)
+        {
+            forceOutput = true;
         }
     }
 
@@ -983,27 +1046,43 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
     sm.initialize(nullptr, nullptr);
     DiagnosticSink sink;
 
+    DiagnosticRenderOptions options;
+    options.enableTerminalColors = useColor;
+    options.enableUnicode = useUnicode;
+
     for (Int64 i = 0; i < testLimit; ++i)
     {
         TestData& test = testCases[i];
 
-        // Reset source manager for each test to keep IDs deterministic if needed,
-        // or just to simulate fresh environment. For this harness, we reuse one sm
-        // but it doesn't matter much as long as SourceLocs are valid.
-
         std::cout << "\nTest " << (i + 1) << ": " << test.name << '\n';
 
         // 1. Convert Input Data -> System Types
-        // This simulates how the compiler would already have these structures ready.
         GenericDiagnostic renderDiag = createRenderDiagnostic(sm, test);
 
-        // 2. Render using ONLY the system types and SourceManager
-        // The renderer has no access to 'test.sourceContent' or 'test.diagnostic' structs.
+        // 2. Render using the provided options
         String actualOutput =
-            trimNewlines(renderDiagnostic(sink.getSourceLocationLexer(), &sm, renderDiag));
-        String expectedOutput = trimNewlines(test.expectedOutput);
+            renderDiagnostic(sink.getSourceLocationLexer(), &sm, options, renderDiag);
 
-        if (actualOutput == expectedOutput)
+        if (forceOutput)
+        {
+            std::cout << "--- Render Output ---\n";
+            std::cout << actualOutput.getBuffer();
+            std::cout << "---------------------\n";
+        }
+
+        // If color or unicode is enabled, we don't compare against expected text because
+        // the expected text doesn't contain ANSI escape sequences.
+        if (useColor || useUnicode)
+        {
+            std::cout << "Visual Check (Color/Unicode Enabled)\n";
+            ++passed;
+            continue;
+        }
+
+        String actualTrimmed = trimNewlines(actualOutput);
+        String expectedTrimmed = trimNewlines(test.expectedOutput);
+
+        if (actualTrimmed == expectedTrimmed)
         {
             std::cout << "PASS\n";
             ++passed;
@@ -1011,7 +1090,9 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
         else
         {
             std::cout << "FAIL - Output mismatch\nRunning diff...\n";
-            runDiff(std::string(expectedOutput.getBuffer()), std::string(actualOutput.getBuffer()));
+            runDiff(
+                std::string(expectedTrimmed.getBuffer()),
+                std::string(actualTrimmed.getBuffer()));
             ++failed;
         }
     }

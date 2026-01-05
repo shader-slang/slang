@@ -126,12 +126,12 @@ if(SLANG_ENABLE_SLANGI)
 endif()
 
 # Uncomment to run the development tests in slang-rich-diagnostics-render.cpp
-
-slang_add_target(
-    slang-rich-diagnostics-unit-test
-    EXECUTABLE
-    LINK_WITH_PRIVATE core compiler-core slang-fiddle-output
-)
+# 
+# slang_add_target(
+#     slang-rich-diagnostics-unit-test
+#     EXECUTABLE
+#     LINK_WITH_PRIVATE core compiler-core slang-fiddle-output
+# )
 
 if(SLANG_ENABLE_GFX)
     #

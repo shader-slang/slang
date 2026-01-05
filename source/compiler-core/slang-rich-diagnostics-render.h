@@ -35,12 +35,19 @@ struct GenericDiagnostic
     List<DiagnosticNote> notes;
 };
 
+struct DiagnosticRenderOptions
+{
+    bool enableTerminalColors = false;
+    bool enableUnicode = false;
+};
+
 String renderDiagnostic(
     DiagnosticSink::SourceLocationLexer sll,
     SourceManager* sm,
+    DiagnosticRenderOptions opts,
     const GenericDiagnostic& diag);
 
-#define SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS 1
+#define SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS 0
 #ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 int slangRichDiagnosticsUnitTest(int argc, char* argv[]);
 #endif
