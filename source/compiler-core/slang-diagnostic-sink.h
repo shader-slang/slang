@@ -237,10 +237,6 @@ public:
     void diagnoseRaw(Severity severity, char const* message);
     void diagnoseRaw(Severity severity, const UnownedStringSlice& message);
 
-    /// Diagnose using a rich diagnostic with multi-span support
-    /// This renders the diagnostic using the new layout engine
-    bool diagnoseRich(const RichDiagnostic& diagnostic);
-
     /// During propagation of an exception for an internal
     /// error, note that this source location was involved
     void noteInternalErrorLoc(SourceLoc const& loc);
