@@ -9414,10 +9414,8 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                             .name = newDecl->getName(),
                             .function_location = newDecl->getNameLoc()};
                     }
-                    else
-                    {
-                        diagnostic.original_location = newDecl->getNameLoc();
-                    }
+                    auto prevDecl = *found;
+                    diagnostic.original_location = prevDecl->getNameLoc();
                 }
                 else
                 {
