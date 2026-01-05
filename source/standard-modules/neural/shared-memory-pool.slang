@@ -14,7 +14,7 @@ internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared
 
 internal interface ISharedMemoryPool
 {
-    static SPtr<uint4> getPointer();
+    internal static SPtr<uint4> getPointer();
 }
 
 public interface ISharedMemorySize
@@ -22,9 +22,10 @@ public interface ISharedMemorySize
     public static const uint Bytes;
 }
 
-public struct SharedMemoryPool<int Bytes> : ISharedMemoryPool
+public struct SharedMemoryPool<ShMemSize: ISharedMemorySize> : ISharedMemoryPool
 {
-    internal static groupshared uint4 data[Bytes / sizeof(uint4)];
+    public static const uint sizeInBytes = ShMemSize.Bytes;
+    internal static groupshared uint4 data[sizeInBytes / sizeof(uint4)];
     VISIBILITY_LEVEL static SPtr<uint4> getPointer()
     {
         return __getAddress(data[0]);

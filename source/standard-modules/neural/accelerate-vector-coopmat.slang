@@ -1011,8 +1011,6 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
     public typealias Differential = AccelerateVectorCoopMat<T.Differential, ShMemPool, N, SubgroupSize>;
 
     public static const int Size = N;
-
-    public no_diff SPtr<uint4> sharedMemoryPtr;
     public no_diff ShMemPool shMemPool;
 
     private typealias DTypeMatC = half;
