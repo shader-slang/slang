@@ -46,8 +46,8 @@ String stripIndent(const String& text, Int64 indent)
     if (indent == 0 || text.getLength() == 0)
         return text;
     String str = text;
-    Index usable = std::min(Index{indent}, str.getLength());
-    return str.subString(usable, str.getLength() - usable);
+    Int64 usable = std::min(indent, Int64{str.getLength()});
+    return str.subString(Index(usable), str.getLength() - usable);
 }
 
 // ============================================================================
