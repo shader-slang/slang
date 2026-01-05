@@ -580,19 +580,18 @@ String renderDiagnostic(
 namespace Slang
 {
 
-// ============================================================================
-// UNIT TEST FUNCTIONALITY
-// ============================================================================
+//
+// Tests to use while developing
+//
 
 #ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 
 namespace
 {
 
-// ----------------------------------------------------------------------------
-// TEST DATA DEFINITIONS (INPUT)
-// These structures match the user-provided test cases exactly.
-// ----------------------------------------------------------------------------
+//
+// Some structures for describing a test case
+//
 
 struct SourceLoc
 {
@@ -652,9 +651,9 @@ struct TestData
     SourceFile* sourceFile = nullptr;
 };
 
-// ============================================================================
-// TEST DATA
-// ============================================================================
+//
+//
+//
 
 TestData testCases[] = {
     {.name = "undeclared_identifier",
@@ -892,14 +891,12 @@ error[E0308]: mismatched types
 
 const size_t NUM_TESTS = sizeof(testCases) / sizeof(testCases[0]);
 
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
+//
+//
+//
 
 String trimNewlines(const String& str)
 {
-    // Harness output comparisons assume deterministic framing, so we aggressively
-    // trim leading/trailing newline noise that often shows up in raw heredoc data.
     Index start = 0;
     while (start < str.getLength() && (str[start] == '\n' || str[start] == '\r'))
         ++start;
@@ -926,9 +923,9 @@ Int64 calculateFallbackLength(const UnownedStringSlice& line, Int64 col)
     return len > 0 ? len : 1;
 }
 
-// ============================================================================
-// CONVERSION: TestData -> RenderDiagnostic
-// ============================================================================
+//
+// TestData -> RenderDiagnostic
+//
 
 Slang::SourceLoc calcSourceLoc(SourceView* view, Int64 lineIndex, Int64 columnOneBased)
 {
@@ -992,7 +989,6 @@ GenericDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
     }
 
     // Create view for the file
-    // Note: In a real compiler, SourceViews are managed; here we create one for the test case
     SourceView* view = sm.createSourceView(test.sourceFile, nullptr, Slang::SourceLoc());
 
     // Map spans
@@ -1014,9 +1010,9 @@ GenericDiagnostic createRenderDiagnostic(SourceManager& sm, TestData& test)
     return outDiag;
 }
 
-// ============================================================================
-// MAIN HARNESS
-// ============================================================================
+//
+//
+//
 
 void writeTempFile(const std::string& path, const std::string& content)
 {
