@@ -10,6 +10,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // CHECK:      C8

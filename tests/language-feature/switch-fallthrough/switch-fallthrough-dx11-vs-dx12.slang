@@ -1,4 +1,4 @@
-// fallthrough-target-legalization.slang
+// switch-fallthrough-dx11-vs-dx12.slang
 //
 // Test that generated output for targets that don't support fall-through
 // (DXBC/DX11, WGSL) eliminates fall-through, while targets that do support
