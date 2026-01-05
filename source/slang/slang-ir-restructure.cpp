@@ -81,6 +81,64 @@ struct ControlFlowRestructuringContext
     bool preserveFallThrough = true;
 };
 
+/// Check if a block or any of its reachable blocks (within a case)
+/// branches unconditionally to the target block.
+/// This is used to detect if a switch case falls through to the next case.
+static bool caseBlocksFallThroughTo(
+    IRBlock* caseLabel,
+    IRBlock* targetBlock,
+    IRBlock* breakLabel,
+    HashSet<IRBlock*>& visited)
+{
+    if (!caseLabel || !targetBlock)
+        return false;
+
+    if (visited.contains(caseLabel))
+        return false;
+    visited.add(caseLabel);
+
+    // Don't follow branches to the break label
+    if (caseLabel == breakLabel)
+        return false;
+
+    // If we reached the target, there's fall-through
+    if (caseLabel == targetBlock)
+        return true;
+
+    auto terminator = caseLabel->getTerminator();
+    if (!terminator)
+        return false;
+
+    switch (terminator->getOp())
+    {
+    case kIROp_UnconditionalBranch:
+        {
+            auto branch = as<IRUnconditionalBranch>(terminator);
+            auto target = branch->getTargetBlock();
+            if (target == targetBlock)
+                return true;
+            if (target == breakLabel)
+                return false;
+            return caseBlocksFallThroughTo(target, targetBlock, breakLabel, visited);
+        }
+    case kIROp_ConditionalBranch:
+        {
+            auto branch = as<IRConditionalBranch>(terminator);
+            if (caseBlocksFallThroughTo(branch->getTrueBlock(), targetBlock, breakLabel, visited))
+                return true;
+            if (caseBlocksFallThroughTo(branch->getFalseBlock(), targetBlock, breakLabel, visited))
+                return true;
+            return false;
+        }
+    case kIROp_Switch:
+        // A nested switch - would need to analyze its cases, but for now just return false
+        return false;
+    default:
+        // Return, loop, etc. - don't follow
+        return false;
+    }
+}
+
 /// Convert a range of blocks in the IR CFG into a region.
 ///
 /// We want to generate a region that stands in for the
@@ -477,6 +535,9 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                 //
                 bool defaultLabelHandled = false;
 
+                // Track whether we've warned about fall-through being restructured
+                bool warnedAboutFallthrough = false;
+
                 // If the `default` case just branches to
                 // the join point, then we don't need to
                 // do anything with it.
@@ -564,18 +625,33 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     // However, if the target doesn't support fall-through (e.g., HLSL/WGSL),
                     // we should NOT set the end label to the next case, so that each case
                     // body will be treated as terminating independently.
-                    if (ctx->preserveFallThrough && caseIndex < caseCount)
+                    // Determine the potential fall-through target
+                    IRBlock* potentialFallThroughTarget = nullptr;
+                    if (caseIndex < caseCount)
                     {
-                        caseEndLabel = switchInst->getCaseLabel(caseIndex);
+                        potentialFallThroughTarget = switchInst->getCaseLabel(caseIndex);
                     }
-                    else if (ctx->preserveFallThrough && !defaultLabelHandled &&
-                             defaultLabel != breakLabel)
+                    else if (!defaultLabelHandled && defaultLabel != breakLabel)
                     {
-                        // If there's no next explicit case, but there's a default
-                        // case that we haven't processed yet, set it as the end label.
-                        // This allows fall-through from the last explicit case to default.
-                        // Only do this when the target supports fall-through.
-                        caseEndLabel = defaultLabel;
+                        potentialFallThroughTarget = defaultLabel;
+                    }
+
+                    if (ctx->preserveFallThrough && potentialFallThroughTarget)
+                    {
+                        caseEndLabel = potentialFallThroughTarget;
+                    }
+                    else if (!ctx->preserveFallThrough && potentialFallThroughTarget &&
+                             !warnedAboutFallthrough && ctx->getSink())
+                    {
+                        // Check if this case actually falls through
+                        HashSet<IRBlock*> visited;
+                        if (caseBlocksFallThroughTo(
+                                caseLabel, potentialFallThroughTarget, breakLabel, visited))
+                        {
+                            ctx->getSink()->diagnose(
+                                switchInst, Diagnostics::switchFallthroughRestructured);
+                            warnedAboutFallthrough = true;
+                        }
                     }
 
                     // Now we can actually generate the region.
