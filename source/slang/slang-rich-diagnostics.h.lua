@@ -78,23 +78,4 @@ function M.getDiagnostics()
 	return diagnostics_module
 end
 
--- Get unique parameters from a diagnostic's message parts
-function M.getUniqueParams(diagnostic)
-	local seen_params = {}
-	local params = {}
-
-	for _, part in ipairs(diagnostic.message_parts) do
-		if part.type == "interpolation" and not seen_params[part.param_name] then
-			seen_params[part.param_name] = true
-			table.insert(params, {
-				name = part.param_name,
-				type = part.param_type,
-				cpp_type = M.getCppType(part.param_type),
-			})
-		end
-	end
-
-	return params
-end
-
 return M
