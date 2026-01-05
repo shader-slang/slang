@@ -499,8 +499,8 @@ private:
         String codeStr = String(layout.header.code);
         while (codeStr.getLength() < 4)
             codeStr = "0" + codeStr;
-        ss << "[E" << codeStr << "]" << ": " << color(TerminalColor::Bold, layout.header.message)
-           << "\n";
+        ss << "[E" << codeStr << "]"
+           << ": " << color(TerminalColor::Bold, layout.header.message) << "\n";
         ss << repeat(' ', layout.primaryLoc.gutterIndent)
            << color(TerminalColor::Blue, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
            << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
