@@ -8,7 +8,7 @@
 namespace Slang
 {
 
-class SourceManager;
+struct SourceManager;
 
 /// Layout engine for rendering rich diagnostics with multi-span support
 ///
