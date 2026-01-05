@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
       options: --user root
 
     defaults:
@@ -25,46 +25,13 @@ jobs:
         shell: bash
 
     steps:
-      # Git must be installed before checkout for submodules to work in containers
-      - name: Install Git
-        run: |
-          apt-get update && apt-get install -y git
-          git --version
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "2"
-
-      - name: Install build dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            build-essential \
-            ninja-build \
-            curl \
-            unzip \
-            python3 \
-            libx11-dev \
-            libxcursor-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxi-dev \
-            libgl1-mesa-dev \
-            libvulkan-dev \
-            vulkan-validationlayers \
-            spirv-tools \
-            glslang-tools \
-            wget \
-            ca-certificates
-          rm -rf /var/lib/apt/lists/*
-
-          # Install CMake 3.30 (required for CMakePresets.json version 6)
-          wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
-          tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /opt
-          rm cmake-3.30.0-linux-x86_64.tar.gz
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
 
       - name: Build Slang with CUDA
         run: |

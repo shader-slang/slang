@@ -95,6 +95,7 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
         kPointerSize = (int)sizeof(void*);
         break;
     }
@@ -692,6 +693,53 @@ struct Std140LayoutRules : IRTypeLayoutRules
     }
 };
 
+struct LLVMLayoutRules : IRTypeLayoutRules
+{
+    LLVMLayoutRules() { ruleName = IRTypeLayoutRuleName::LLVM; }
+
+    virtual Result calcSizeAndAlignment(
+        CompilerOptionSet& optionSet,
+        IRType* type,
+        IRSizeAndAlignment* outSizeAndAlignment)
+    {
+        if (type->getOp() == kIROp_BoolType)
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(1, 1);
+            return SLANG_OK;
+        }
+        return IRTypeLayoutRules::calcSizeAndAlignment(optionSet, type, outSizeAndAlignment);
+    }
+
+    virtual IRIntegerValue adjustOffset(
+        IRIntegerValue offset,
+        IRIntegerValue elementSize,
+        IRType* lastFieldType,
+        IRIntegerValue lastFieldAlignment)
+    {
+        SLANG_UNUSED(elementSize);
+        SLANG_UNUSED(lastFieldType);
+        return align(offset, (int)lastFieldAlignment);
+    }
+
+    virtual IRSizeAndAlignment alignCompositeElement(IRSizeAndAlignment elementSize)
+    {
+        IRSizeAndAlignment alignedSize = elementSize;
+        alignedSize.size = align(alignedSize.size, alignedSize.alignment);
+        return alignedSize;
+    }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count)
+    {
+        // Round alignment to next power of two
+        IRIntegerValue alignment = element.alignment;
+        while (alignment < element.size * count)
+            alignment *= 2;
+        return IRSizeAndAlignment(element.size * count, (int)alignment);
+    }
+};
+
 Result getNaturalSizeAndAlignment(
     CompilerOptionSet& optionSet,
     IRType* type,
@@ -759,6 +807,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getC()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getLLVM()
+{
+    static LLVMLayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getConstantBuffer()
 {
     static ConstantBufferLayoutRules rules;
@@ -780,6 +834,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getC();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
+    case IRTypeLayoutRuleName::LLVM:
+        return getLLVM();
     default:
         return nullptr;
     }

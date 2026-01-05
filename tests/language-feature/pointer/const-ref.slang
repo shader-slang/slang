@@ -4,6 +4,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -slang -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -vk -compute -output-using-type -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -cuda -compute -output-using-type -shaderobj
+// Uses barriers, so not yet supported on LLVM.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER): -llvm -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

@@ -146,6 +146,78 @@ static void _foldAndSimplifyLoopIteration(
     }
 }
 
+// If a loop induction param has uses outside of the loop, create
+// a duplicate var before the loop inst, and insert an update to the
+// variable at start of each iteration. Then replace all outside
+// uses to load from the new var instead.
+// This transformation ensures that any uses of induction variables
+// outside of the loop will get the up-to-date value after
+// unrolling the loop.
+//
+//
+// For reference, the following code will create a situation where an induction param is
+// used outside the loop:
+// ```
+//    int sum = 0; // sum is an induction variable.
+//    for (int i = 0; i < N; i++) {
+//        sum += i;
+//    }
+//    use(sum);
+// ```
+static void allocVarForLoopInductionPhiParam(
+    IRModule* module,
+    IRLoop* loopInst,
+    List<IRBlock*>& blocks)
+{
+    // Collect all blocks in the loop into a set so we can
+    // quickly check if a use is inside or outside the loop.
+    HashSet<IRBlock*> loopBlocks;
+    for (auto b : blocks)
+        loopBlocks.add(b);
+
+    auto targetBlock = loopInst->getTargetBlock();
+
+    struct NewBreakParamInfo
+    {
+        IRVar* inductionVar;             // The new variable created before the loop inst.
+        IRParam* originalInductionParam; // The original induction param in the targetBlock.
+    };
+
+    // Collect all induction params that have uses outside of the loop.
+    ShortList<NewBreakParamInfo> newBreakParams;
+    for (auto param : targetBlock->getParams())
+    {
+        ShortList<IRUse*> outsideUses;
+        for (auto use = param->firstUse; use; use = use->nextUse)
+        {
+            auto userBlock = getBlock(use->getUser());
+            if (!loopBlocks.contains(userBlock))
+            {
+                outsideUses.add(use);
+            }
+        }
+        if (outsideUses.getCount() != 0)
+        {
+            IRBuilder builder(module);
+            builder.setInsertBefore(loopInst);
+            auto inductionVar = builder.emitVar(param->getDataType());
+            if (auto nameHintDecor = param->findDecoration<IRNameHintDecoration>())
+            {
+                builder.addNameHintDecoration(inductionVar, nameHintDecor->getName());
+            }
+            newBreakParams.add({inductionVar, param});
+            setInsertAfterOrdinaryInst(&builder, param);
+            builder.emitStore(inductionVar, param);
+            for (auto use : outsideUses)
+            {
+                builder.setInsertBefore(use->getUser());
+                auto newParam = builder.emitLoad(param->getDataType(), inductionVar);
+                builder.replaceOperand(use, newParam);
+            }
+        }
+    }
+}
+
 // Unroll loop up to a predefined maximum number of iterations.
 // Returns true if we can statically determine that the loop terminated within the iteration limit.
 // This operation assumes the loop does not have `continue` jumps, i.e. continueBlock ==
@@ -168,6 +240,15 @@ static bool _unrollLoop(
     auto maxIterations = _getLoopMaxIterationsToUnroll(loopInst);
     if (maxIterations < 0)
         return true;
+
+    // If the loop contains any induction variables (phi params in the header block)
+    // that are used outside of the loop, we need to make sure these uses are referencing
+    // the up-to-date value after unrolling the loop.
+    // The simplest way to achieve this is to create a duplicate `Var` before the loop inst
+    // and copy the value of the param to the new var at start of each iteration.
+    // Then replace all outside uses to loads from the new var instead.
+    //
+    allocVarForLoopInductionPhiParam(module, loopInst, blocks);
 
     // We assume all `continue`s are eliminated and turned into multi-level breaks
     // before this operation.
@@ -287,7 +368,7 @@ static bool _unrollLoop(
         builder.setInsertInto(firstIterationBreakBlock);
         {
             IRCloneEnv paramCloneEnv;
-            List<IRInst*> newParams;
+            ShortList<IRInst*> newParams;
             for (auto param : loopTargetBlock->getParams())
             {
                 newParams.add(cloneInst(&paramCloneEnv, &builder, param));
@@ -299,8 +380,8 @@ static bool _unrollLoop(
                 loopTargetBlock,
                 loopInst->getBreakBlock(),
                 loopInst->getContinueBlock(),
-                newParams.getCount(),
-                newParams.getBuffer()));
+                (UInt)newParams.getCount(),
+                newParams.getArrayView().getBuffer()));
             loopInst->removeAndDeallocate();
 
             // Update `loopInst` to represent the remaining loop iterations that are yet to be
@@ -483,6 +564,7 @@ bool unrollLoopsInFunc(
         simplifyCFG(func, CFGSimplificationOptions::getDefault());
         eliminateDeadCode(func);
     }
+    sortBlocksInFunc(func);
     return true;
 }
 
