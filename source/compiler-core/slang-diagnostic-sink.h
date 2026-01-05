@@ -8,16 +8,8 @@
 #include "slang-token.h"
 #include "slang.h"
 
-// Forward declaration for rich diagnostics
 namespace Slang
 {
-struct GenericDiagnostic;
-struct DiagnosticArg;
-} // namespace Slang
-
-namespace Slang
-{
-
 enum class Severity
 {
     Disable,
@@ -156,6 +148,8 @@ struct DiagnosticArg
     }
 };
 
+struct GenericDiagnostic;
+
 class DiagnosticSink
 {
 public:
@@ -189,6 +183,7 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
     {
+        // If we want to force generation of rich diagnostics do that here
         if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
         {
             DiagnosticArg as[] = {DiagnosticArg(args)...};
@@ -204,13 +199,21 @@ public:
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
+        // If we want to force generation of rich diagnostics do that here
         if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
         {
             return diagnoseRichImpl(getDiagnosticPos(pos), info, 0, nullptr);
         }
-
-        return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        else
+        {
+            return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        }
     }
+
+    //
+    // This template function should be called with the structs generated from
+    // slang-diagnostics.lua (defined in slang-rich-diagnostics.h)
+    //
     template<typename D>
     bool diagnose(D const& d)
     {
@@ -324,8 +327,9 @@ protected:
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
     // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
-    bool diagnoseRichImpl(const GenericDiagnostic& d);
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
 
+    // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(
         SourceLoc const& loc,
         DiagnosticInfo const& info,

@@ -22,6 +22,49 @@ UnownedStringSlice typeToPrintableString(Type* type)
 }
 
 // Generate member function implementations
+//
+// This section generates a function which goes from this specific diagnostic struct, for example:
+//
+//     struct FunctionRedefinition
+//     {
+//         Name* name = nullptr;
+//
+//         SourceLoc function_location = SourceLoc{};
+//         SourceLoc original_location = SourceLoc{};
+//
+//         GenericDiagnostic toGenericDiagnostic() const;
+//     };
+//
+// to GenericDiagnostic, with a function that looks something like this:
+//
+//     GenericDiagnostic FunctionRedefinition::toGenericDiagnostic() const
+//     {
+//         GenericDiagnostic result;
+//         result.code = 30201;
+//         result.severity = Severity::Error;
+//
+//         result.message =
+//             (StringBuilder{} << "function '" << nameToPrintableString(name) << "' already has a
+//             body").produceString();
+//
+//         // Set primary span
+//         result.primarySpan.loc = function_location;
+//         result.primarySpan.message = "redeclared here";
+//
+//         // Set notes
+//         {
+//             DiagnosticNote note;
+//             note.span.loc = original_location;
+//             note.message = (StringBuilder{} << "see previous definition of '"
+//                                             << nameToPrintableString(name) << "'")
+//                                .produceString();
+//             result.notes.add(note);
+//         }
+//
+//         return result;
+//     }
+//
+//
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()

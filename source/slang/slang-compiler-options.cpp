@@ -408,7 +408,7 @@ void applySettingsToDiagnosticSink(
                 Severity::Warning,
                 Severity::Error);
     }
-    if (options.getBoolOption(CompilerOptionName::EnableRichDiagnostics))
+    if (options.shouldEmitRichDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
     }
