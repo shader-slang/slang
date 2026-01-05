@@ -1,10 +1,8 @@
-// switch-fallthrough-dx11-vs-dx12.slang
+// fallthrough-target-legalization.slang
 //
-// Test that generated HLSL for DXBC (DX11) eliminates fall-through, while 
-// generated HLSL for DXIL (DX12) and plain HLSL preserves fall-through.
-//
-// For DXBC (DX11/FXC) - each case should have an explicit break, no fall-through
-// For DXIL (DX12/DXC) or plain HLSL - Case 0 should fall through to case 1
+// Test that generated output for targets that don't support fall-through
+// (DXBC/DX11, WGSL) eliminates fall-through, while targets that do support
+// it (DXIL/DX12, plain HLSL) preserve fall-through.
 
 // Plain HLSL output (assumes DXC) - fall-through should be preserved
 // This test runs on all platforms
@@ -13,6 +11,9 @@
 // DXBC (DX11) HLSL output - fall-through should be eliminated
 // This test only runs on Windows with FXC
 //TEST:SIMPLE(filecheck=CHECK-DXBC): -target dxbc -pass-through none -entry computeMain -stage compute
+
+// WGSL output - fall-through should be eliminated (WGSL doesn't support fall-through)
+//TEST:SIMPLE(filecheck=CHECK-WGSL): -target wgsl -entry computeMain -stage compute
 
 // HLSL should have fall-through - case 0 does NOT have break before case 1
 // CHECK-HLSL: case int(0):
@@ -25,6 +26,12 @@
 // CHECK-DXBC: x_{{.*}} = int(100)
 // CHECK-DXBC: break
 // CHECK-DXBC: case int(1):
+
+// WGSL should NOT have fall-through - case 0 has break before case 1
+// CHECK-WGSL: case i32(0):
+// CHECK-WGSL: x_{{.*}} = i32(100)
+// CHECK-WGSL: break
+// CHECK-WGSL: case i32(1):
 
 RWStructuredBuffer<int> outputBuffer;
 
