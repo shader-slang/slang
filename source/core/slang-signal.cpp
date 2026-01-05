@@ -3,6 +3,7 @@
 #include "slang-exception.h"
 #include "slang-platform.h"
 #include "stdio.h"
+
 #include <chrono>
 #include <fstream>
 #include <iomanip> // for std::put_time
@@ -66,8 +67,9 @@ void handleAssert(char const* message)
     // to capture those assertions to a file or specific stream for debugging.
     //
     StringBuilder outputTarget;
-    if (SLANG_SUCCEEDED(
-            PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT_OUTPUT"), outputTarget)))
+    if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+            UnownedStringSlice("SLANG_ASSERT_OUTPUT"),
+            outputTarget)))
     {
         UnownedStringSlice outputSlice = outputTarget.getUnownedSlice();
         const char* output = outputSlice.begin();
@@ -115,7 +117,10 @@ void handleAssert(char const* message)
             else
             {
                 // If file can't be opened, fall back to stderr
-                fprintf(stderr, "Failed to open SLANG_ASSERT_OUTPUT file: %s\n", outputSlice.begin());
+                fprintf(
+                    stderr,
+                    "Failed to open SLANG_ASSERT_OUTPUT file: %s\n",
+                    outputSlice.begin());
                 fprintf(stderr, "%s", fullMessage.c_str());
                 fflush(stderr);
             }
