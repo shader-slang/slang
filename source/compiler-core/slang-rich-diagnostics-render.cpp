@@ -258,7 +258,7 @@ private:
             if (prevLine != -1 && number > prevLine + 1)
             {
                 section.blocks.add(currentBlock);
-                currentBlock = {true};
+                currentBlock = {true, {}};
             }
             currentBlock.lines.add(grouped[number]);
             prevLine = number;
