@@ -1248,6 +1248,15 @@ void HLSLSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
     }
 }
 
+bool HLSLSourceEmitter::supportsSwitchFallThrough()
+{
+    // FXC (used for DXBC/DX11) doesn't support fall-through in switch statements.
+    // DXC (used for DXIL/DX12) does support fall-through.
+    // When emitting just HLSL source, we assume DXC (the modern compiler).
+    auto target = getTarget();
+    return target != CodeGenTarget::DXBytecode && target != CodeGenTarget::DXBytecodeAssembly;
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch (decoration->getOp())

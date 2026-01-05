@@ -75,6 +75,10 @@ struct ControlFlowRestructuringContext
 
     /// The region tree we are in the process of building.
     RegionTree* regionTree = nullptr;
+
+    /// Whether to preserve fall-through structure in switch statements.
+    /// When false, fall-through is not preserved (legacy behavior for HLSL/WGSL).
+    bool preserveFallThrough = true;
 };
 
 /// Convert a range of blocks in the IR CFG into a region.
@@ -556,15 +560,21 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     // If there *is* a next `case`, then we will set its
                     // label up as the "end" label when emitting
                     // the statements inside the block.
-                    if (caseIndex < caseCount)
+                    //
+                    // However, if the target doesn't support fall-through (e.g., HLSL/WGSL),
+                    // we should NOT set the end label to the next case, so that each case
+                    // body will be treated as terminating independently.
+                    if (ctx->preserveFallThrough && caseIndex < caseCount)
                     {
                         caseEndLabel = switchInst->getCaseLabel(caseIndex);
                     }
-                    else if (!defaultLabelHandled && defaultLabel != breakLabel)
+                    else if (ctx->preserveFallThrough && !defaultLabelHandled &&
+                             defaultLabel != breakLabel)
                     {
                         // If there's no next explicit case, but there's a default
                         // case that we haven't processed yet, set it as the end label.
                         // This allows fall-through from the last explicit case to default.
+                        // Only do this when the target supports fall-through.
                         caseEndLabel = defaultLabel;
                     }
 
@@ -638,7 +648,10 @@ static RefPtr<Region> generateRegionsForIRBlocks(
     return resultRegion;
 }
 
-RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, DiagnosticSink* sink)
+RefPtr<RegionTree> generateRegionTreeForFunc(
+    IRGlobalValueWithCode* code,
+    DiagnosticSink* sink,
+    bool preserveFallThrough)
 {
     RefPtr<RegionTree> regionTree = new RegionTree();
     regionTree->irCode = code;
@@ -646,6 +659,7 @@ RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, Diagno
     ControlFlowRestructuringContext restructuringContext;
     restructuringContext.sink = sink;
     restructuringContext.regionTree = regionTree;
+    restructuringContext.preserveFallThrough = preserveFallThrough;
 
     regionTree->rootRegion = generateRegionsForIRBlocks(
         &restructuringContext,

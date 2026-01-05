@@ -3751,7 +3751,12 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     // Compute a structured region tree that can represent
     // the control flow of our function.
     //
-    RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(code, getSink());
+    // Pass whether this target supports fall-through in switch statements.
+    // Targets like HLSL/WGSL don't support fall-through, so the restructure
+    // pass will use legacy behavior that doesn't preserve fall-through.
+    //
+    RefPtr<RegionTree> regionTree =
+        generateRegionTreeForFunc(code, getSink(), supportsSwitchFallThrough());
 
     // Now that we've computed the region tree, we have
     // an opportunity to perform some last-minute transformations
