@@ -221,10 +221,10 @@ private:
         if (spans.getCount() == 0)
             return section;
 
-        Int64 maxLineNum = 0;
+        Int64 maxLineNum = 1;
         for (const auto& span : spans)
             maxLineNum = std::max(maxLineNum, span.line);
-        section.maxGutterWidth = Int64(std::to_string(std::max(Int64{1}, maxLineNum)).length());
+        section.maxGutterWidth = static_cast<Int64>(std::log10(maxLineNum)) + 1;
 
         Dictionary<Int64, HighlightedLine> grouped;
         for (auto& span : spans)
@@ -302,7 +302,7 @@ private:
                 ss << content.subString(cursor - 1, start - cursor);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            ss << color(c, String(content.subString(std::max(0l, start - 1), span.length)));
+            ss << color(c, String(content.subString(std::max(Int64{0}, start - 1), span.length)));
             cursor = start + span.length;
         }
         if (cursor - 1 < content.getLength())
@@ -348,16 +348,16 @@ private:
         {
             const auto& span = line.spans[i];
             const bool isLast = i == line.spans.getCount() - 1;
-            Int64 col = std::max(1l, span.column - indentShift);
+            Int64 col = std::max(Int64{1}, span.column - indentShift);
             const char* glyph =
                 span.isPrimary ? m_glyphs.primaryUnderline : m_glyphs.secondaryUnderline;
             const char* joinGlyph = isLast           ? glyph
                                     : span.isPrimary ? m_glyphs.primaryUnderlineJoin
                                                      : m_glyphs.secondaryUnderlineJoin;
-            sub << repeat(' ', std::max(0l, col - cursor))
+            sub << repeat(' ', std::max(Int64{0}, col - cursor))
                 << color(
                        span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan,
-                       joinGlyph + repeat(glyph, std::max(0l, span.length - 1)));
+                       joinGlyph + repeat(glyph, std::max(Int64{0}, span.length - 1)));
             cursor = col + span.length;
             if (span.label.getLength() > 0)
                 labels.add({col, span.label, span.isPrimary});
@@ -923,7 +923,7 @@ DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inpu
     SourceFile* file = view->getSourceFile();
 
     // Convert 1-based line to 0-based index
-    Int64 lineIndex = std::max(0l, inputSpan.location.line - 1);
+    Int64 lineIndex = std::max(Int64{0}, inputSpan.location.line - 1);
 
     // Resolve length if not provided (legacy fallback behavior)
     Int64 length = inputSpan.length;
