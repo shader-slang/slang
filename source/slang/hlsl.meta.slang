@@ -18719,6 +18719,11 @@ static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES = 0x100;
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200;
 
+/// Forces unknown opaque and unknown transparent as opaque and transparent during traversal.
+/// Used with Opacity Micromaps (OMM) - DXR 1.2+
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_FORCE_OMM_2_STATE = 0x400;
+
 // 10.1.2 - Ray Description Structure
 /// Describes a ray for traversal through an acceleration structure.
 /// @category raytracing
@@ -19024,31 +19029,6 @@ void TraceRay(
     }
 }
 
-// NOTE!
-// The name of the following functions may change when DXR supports
-// a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
-//
-// https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
-
-__generic<payload_t>
-[require(hlsl, raytracing_motionblur)]
-void __traceMotionRayHLSL(
-        RaytracingAccelerationStructure AccelerationStructure,
-        uint RayFlags,
-        uint InstanceInclusionMask,
-        uint RayContributionToHitGroupIndex,
-        uint MultiplierForGeometryContributionToHitGroupIndex,
-        uint MissShaderIndex,
-        RayDesc Ray,
-        float CurrentTime,
-        inout payload_t Payload)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "TraceMotionRay";
-    }
-}
-
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [require(glsl, raytracing_motionblur_raygen_closesthit_miss)]
 void __traceMotionRay(
@@ -19084,7 +19064,7 @@ void __traceMotionRay(
 /// @remarks Extended version of TraceRay with motion blur support
 /// @category raytracing
 [ForceInline]
-[require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
+[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -19099,18 +19079,6 @@ void TraceMotionRay(
 {
     __target_switch
     {
-    case hlsl:
-        __traceMotionRayHLSL(
-            AccelerationStructure,
-            RayFlags,
-            InstanceInclusionMask,
-            RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex,
-            MissShaderIndex,
-            Ray,
-            CurrentTime,
-            __forceVarIntoRayPayloadStructTemporarily(Payload));
-        return;
     case glsl:
     {
         [__vulkanRayPayload]
@@ -19501,10 +19469,10 @@ uint PrimitiveIndex()
 
 /// Returns the ray origin in object space of the current instance.
 /// @return Object-space position where the ray originated
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -19522,10 +19490,10 @@ float3 ObjectRayOrigin()
 
 /// Returns the ray direction in object space of the current instance.
 /// @return Object-space direction vector of the ray
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -19640,12 +19608,11 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
+[require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
     {
-    case hlsl:  __intrinsic_asm "RayCurrentTime";
     case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
     case spirv:
         return spirv_asm
@@ -20447,6 +20414,19 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 ///
 ///cannot use a cap for struct with unequal target support
 ///since it will propegate rules to children.
+
+/// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#rayquery-flags
+/// @category raytracing
+typedef uint RAYQUERY_FLAG;
+
+/// No options selected
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_NONE = 0x00;
+
+/// Flag to specify rayquery object supports Opacity Micromaps.
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
+
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
@@ -21594,7 +21574,7 @@ struct HitObject
                     hitObj);
                 return hitObj;
             }
-        case glsl:
+        case glsl_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -21619,8 +21599,33 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                __glslTraceRayEXT(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+                    InstanceInclusionMask,                              // cullMask
+                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
+                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction,
+                    Ray.TMax,
+                    __rayPayloadLocation(p));
+
+                // Write the payload out
+                Payload = p;
+            }
         case cuda: __intrinsic_asm "optixTraverse";
-        case spirv:
+        case spirv_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -21654,13 +21659,47 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectTraceRayEXT
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ &p;
+                };
+
+                // Write the payload out
+                Payload = p;
+            }
         }
     }
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject TraceMotionRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -21674,18 +21713,7 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            __traceMotionRayHLSL(
-                AccelerationStructure,
-                RayFlags,
-                InstanceInclusionMask,
-                RayContributionToHitGroupIndex,
-                MultiplierForGeometryContributionToHitGroupIndex,
-                MissShaderIndex,
-                Ray,
-                CurrentTime,
-                __forceVarIntoRayPayloadStructTemporarily(Payload));
-        case glsl:
+        case glsl_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -21711,8 +21739,34 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                __glslTraceMotionRayEXT(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
+                    InstanceInclusionMask,                              // cullMask
+                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
+                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction,
+                    Ray.TMax,
+                    CurrentTime,
+                    __rayPayloadLocation(p));
+
+                // Write the payload out
+                Payload = p;
+            }
         case cuda: __intrinsic_asm "optixTraverse";
-        case spirv:
+        case spirv_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -21749,6 +21803,43 @@ struct HitObject
                 // Write the payload out
                 Payload = p;
             }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpCapability RayTracingMotionBlurNV;
+                    OpHitObjectTraceRayMotionEXT
+                        /**/ &__return_val
+                        /**/ $AccelerationStructure
+                        /**/ $RayFlags
+                        /**/ $InstanceInclusionMask
+                        /**/ $RayContributionToHitGroupIndex
+                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime
+                        /**/ &p;
+                };
+
+                // Write the payload out
+                Payload = p;
+            }
         }
 
     }
@@ -21760,7 +21851,11 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -21774,9 +21869,9 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            HitObject hitObj;
-            __hlslMakeHit(
+        case hlsl_nvapi:
+            HitObject hitObj_nvapi;
+            __hlslMakeHit_NVAPI(
                 AccelerationStructure,
                 InstanceIndex,
                 GeometryIndex,
@@ -21786,8 +21881,22 @@ struct HitObject
                 MultiplierForGeometryContributionToHitGroupIndex,
                 Ray,
                 attributes,
-                hitObj);
-            return hitObj;
+                hitObj_nvapi);
+            return hitObj_nvapi;
+        case hlsl:
+            HitObject hitObj_dxr;
+            __hlslMakeHit_DXR(
+                AccelerationStructure,
+                InstanceIndex,
+                GeometryIndex,
+                PrimitiveIndex,
+                HitKind,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                Ray,
+                attributes,
+                hitObj_dxr);
+            return hitObj_dxr;
         case glsl:
             {
                 // Save the attributes
@@ -21809,7 +21918,7 @@ struct HitObject
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 // Save the attributes
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -21846,7 +21955,9 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -21861,7 +21972,6 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "MakeMotionHit";
         case glsl:
         {
             // Save the attributes
@@ -21884,7 +21994,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -21929,7 +22039,10 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21975,7 +22088,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -22008,7 +22121,9 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
+    [require(spirv_nv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22043,7 +22158,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spirv_nv:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -22080,6 +22195,9 @@ struct HitObject
         /// table.
     [__requiresNVAPI]
     [ForceInline]
+    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss(
         uint MissShaderIndex,
@@ -22087,11 +22205,13 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case glsl_nv:
+            __intrinsic_asm "hitObjectRecordMissNV($2, $0, $1.Origin, $1.TMin, $1.Direction, $1.TMax)";
         case glsl:
-            __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+            __intrinsic_asm "hitObjectRecordMissEXT($2, 0, $0, $1.Origin, $1.TMin, $1.Direction, $1.TMax)";
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -22110,13 +22230,34 @@ struct HitObject
                         /**/ $tmax;
                 };
             }
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                let rayFlags = 0u;  // EXT requires RayFlags, default to 0
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissEXT
+                        /**/ &__return_val
+                        /**/ $rayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
         }
     }
 
         /// See MakeMiss but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss(
         uint MissShaderIndex,
         RayDesc Ray,
@@ -22124,11 +22265,13 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
-        case glsl:
+        case glsl_nv:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case glsl:
+            // EXT requires RayFlags parameter - use 0 as default
+            __glslMakeMotionMissEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spirv_nv:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -22150,27 +22293,54 @@ struct HitObject
                         /**/ $CurrentTime;
                 };
             }
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                let rayFlags = 0u;  // EXT requires RayFlags, default to 0
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpCapability RayTracingMotionBlurNV;
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissMotionEXT
+                        /**/ &__return_val
+                        /**/ $rayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime;
+                };
+            }
         }
     }
 
-        /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
+        /// Creates a HitObject representing "NOP" (no operation) which is neither a hit nor a miss. Invoking a
         /// NOP hit object using HitObject::Invoke has no effect. Reordering by hit objects using
         /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
-    [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             __intrinsic_asm "($0 = NvMakeNop())";
-        case glsl:
+        case glsl_nv:
             __glslMakeNop(__return_val);
+        case glsl:
+            __glslMakeNopEXT(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
-        case spirv:
+        case spirv_nv:
             spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -22178,27 +22348,51 @@ struct HitObject
                 OpHitObjectRecordEmptyNV
                     /**/ &__return_val;
             };
+        case spirv:
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                OpHitObjectRecordEmptyEXT
+                    /**/ &__return_val;
+            };
+        case hlsl:
+            // DXR 1.3 native path (hlsl without nvapi)
+            __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
         }
     }
 
-    [require(hlsl, ser)]
+    [__requiresNVAPI]
+    [require(hlsl_nvapi, ser_nvapi)]
     __generic<payload_t>
-    static void __InvokeHLSL(
+    static void __InvokeHLSL_NVAPI(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvInvokeHitObject";
+        case hlsl_nvapi: __intrinsic_asm "NvInvokeHitObject";
+        }
+    }
+
+    [require(hlsl, ser_dxr)]
+    __generic<payload_t>
+    static void __InvokeHLSL_DXR(
+        HitObject HitOrMiss,
+        inout payload_t Payload)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "dx::HitObject::Invoke";
         }
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
-        /// shader is invoked.
-    [__requiresNVAPI]
+        /// shader is invoked. (NVAPI/SPIRV/CUDA variant with AccelerationStructure parameter)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -22206,12 +22400,12 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            __InvokeHLSL(
+        case hlsl_nvapi:
+            __InvokeHLSL_NVAPI(
                 AccelerationStructure,
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
-        case glsl:
+        case glsl_nv:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -22224,7 +22418,40 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                __glslInvokeEXT(HitOrMiss, __rayPayloadLocation(p));
+
+                // Write payload result
+                Payload = p;
+            }
         case cuda: __intrinsic_asm "optixInvoke";
+        case spirv_nv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
+                    OpHitObjectExecuteShaderNV
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+
+                // Write payload result
+                Payload = p;
+            }
         case spirv:
             {
                 [__vulkanRayPayload]
@@ -22235,9 +22462,9 @@ struct HitObject
 
                 spirv_asm
                 {
-                OpExtension "SPV_NV_shader_invocation_reorder";
-                OpCapability ShaderInvocationReorderNV;
-                    OpHitObjectExecuteShaderNV
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectExecuteShaderEXT
                         /**/ &HitOrMiss
                         /**/ &p;
                 };
@@ -22248,8 +22475,24 @@ struct HitObject
         }
     }
 
+        /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
+        /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void Invoke<payload_t>(
+        HitObject HitOrMiss,
+        inout payload_t Payload)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __InvokeHLSL_DXR(
+                HitOrMiss,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
+        }
+    }
+
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
@@ -22257,20 +22500,27 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
-        case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsMissEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsMissNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsMissEXT &this;
+            };
         }
     }
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
@@ -22278,20 +22528,27 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
-        case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsHitEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsHitNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsHitEXT &this;
+            };
         }
     }
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
@@ -22299,35 +22556,49 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
-        case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsEmptyEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsEmptyNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsEmptyEXT &this;
+            };
         }
     }
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
+        /// Note: This is an NVAPI/SPIRV/CUDA extension. DXR 1.3 uses individual accessors (GetRayTMin, GetRayTCurrent, etc.)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             __intrinsic_asm ".GetRayDesc";
-        case glsl:
+        case glsl_nv:
             {
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
+        case glsl:
+            {
+                RayDesc ray = { __glslGetRayWorldOriginEXT(), __glslGetTMinEXT(), __glslGetRayWorldDirectionEXT(), __glslGetTMaxEXT() };
+                return ray;
+            }
         case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -22338,11 +22609,21 @@ struct HitObject
                 %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
                 result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                %origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+                %tmin:$$float = OpHitObjectGetRayTMinEXT &this;
+                %direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+                %tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
+                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+            };
         }
     }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22350,33 +22631,50 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetShaderTableIndex";
-        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetShaderTableIndex";
+        case glsl_nv: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexEXT &this;
+            };
         }
     }
 
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
-    uint SetShaderTableIndex(uint RecordIndex)
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    void SetShaderTableIndex(uint RecordIndex)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".SetShaderTableIndex";
+        case hlsl:
+            __intrinsic_asm ".SetShaderTableIndex";
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
+        case glsl:
+            __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
+        case spirv:
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                OpHitObjectSetShaderBindingTableRecordIndexEXT &this $RecordIndex;
+            };
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22384,21 +22682,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetInstanceIndex";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetInstanceIndex";
+        case glsl_nv: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceIdNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceIdEXT &this;
+            };
         }
     }
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22406,21 +22712,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetInstanceID";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetInstanceID";
+        case glsl_nv: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceCustomIndexEXT &this;
+            };
         }
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22428,21 +22742,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetGeometryIndex";
-        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetGeometryIndex";
+        case glsl_nv: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetGeometryIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetGeometryIndexEXT &this;
+            };
         }
     }
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22450,21 +22772,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
-        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetPrimitiveIndex";
+        case glsl_nv: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetPrimitiveIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetPrimitiveIndexEXT &this;
+            };
         }
     }
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -22472,30 +22802,40 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetHitKind";
-        case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetHitKind";
+        case glsl_nv: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetHitKindEXT($0)";
         case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetHitKindNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetHitKindEXT &this;
+            };
         }
     }
 
     /// Returns the cluster ID of the current hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
+    /// Note: This is an NVAPI/SPIRV/CUDA extension, not available in DXR 1.3.
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
     int GetClusterID()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetClusterID";
+        case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
         case spirv:
@@ -22608,95 +22948,153 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
+        /// Returns 4x3 world-to-object transform matrix. Valid if the hit object represents a hit.
+        /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetWorldToObject3x4() and GetWorldToObject4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetWorldToObject";
-        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
-        case spirv:
+        case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
+        case glsl_nv: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetWorldToObjectNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetWorldToObjectEXT &this;
+            };
         }
     }
 
-    [__requiresNVAPI]
+        /// Returns 4x3 object-to-world transform matrix. Valid if the hit object represents a hit.
+        /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetObjectToWorld3x4() and GetObjectToWorld4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetObjectToWorld";
-        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case spirv:
+        case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
+        case glsl_nv: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetObjectToWorldEXT &this;
+            };
         }
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
-        case glsl:
+        case glsl_nv:
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float = OpHitObjectGetCurrentTimeNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetCurrentTimeEXT &this
+            };
         }
     }
 
+        /// Returns object-space ray origin. Valid if the hit object represents a hit.
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
-        case glsl:
+        case hlsl:
+            __intrinsic_asm ".GetObjectRayOrigin";
+        case glsl_nv:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayOriginEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayOriginEXT &this
+            };
         }
     }
 
+        /// Returns object-space ray direction. Valid if the hit object represents a hit.
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
-        case glsl:
+        case hlsl:
+            __intrinsic_asm ".GetObjectRayDirection";
+        case glsl_nv:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
-        case spirv:
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayDirectionNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayDirectionEXT &this
             };
         }
     }
@@ -22706,44 +23104,69 @@ struct HitObject
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
-        case glsl:
+        case glsl_nv:
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetShaderRecordBufferHandleEXT($0)";
+        case spirv_nv:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleEXT &this
+            };
         }
     }
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             {
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
+            }
+        case hlsl:
+            // DXR 1.3 native - direct method call
+            __intrinsic_asm ".GetAttributes";
+        case glsl_nv:
+            {
+                // Work out the location
+                int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
+
+                // Load the attributes from the location (NV version)
+                __glslGetAttributes(attributeLocation);
+
+                // Return the attributes
+                return __hitObjectAttributes<attr_t>();
             }
         case glsl:
             {
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
-                // Load the attributes from the location
-                __glslGetAttributes(attributeLocation);
+                // Load the attributes from the location (EXT version)
+                __glslGetAttributesEXT(attributeLocation);
 
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
         case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
-        case spirv:
+        case spirv_nv:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
                 spirv_asm
@@ -22754,11 +23177,21 @@ struct HitObject
                 };
                 return *attr;
             }
+        case spirv:
+            {
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectGetAttributesEXT &this $attr;
+                };
+                return *attr;
+            }
         }
     }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
-    [__requiresNVAPI]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
@@ -22769,22 +23202,252 @@ struct HitObject
         }
     }
 
+    //
+    // DXR 1.3-only methods (not available in NVAPI/SPIRV/CUDA)
+    //
+
+        /// Returns the ray flags associated with the hit object. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    uint GetRayFlags()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayFlags";
+        case glsl: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetRayFlagsEXT &this;
+            };
+        }
+    }
+
+        /// Returns the parametric starting point (TMin) of the ray. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float GetRayTMin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayTMin";
+        case glsl: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetRayTMinEXT &this;
+            };
+        }
+    }
+
+        /// Returns the parametric ending point (T value at hit/miss). Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float GetRayTCurrent()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayTCurrent";
+        }
+    }
+
+        /// Returns the world-space ray origin. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 GetWorldRayOrigin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldRayOrigin";
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+            };
+        }
+    }
+
+        /// Returns the world-space ray direction. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 GetWorldRayDirection()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldRayDirection";
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+            };
+        }
+    }
+
+        /// Returns the 3x4 object-to-world transform matrix. Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float3x4 GetObjectToWorld3x4()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld3x4";
+        }
+    }
+
+        /// Returns the 4x3 object-to-world transform matrix (transposed). Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float4x3 GetObjectToWorld4x3()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld4x3";
+        }
+    }
+
+        /// Returns the 3x4 world-to-object transform matrix. Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float3x4 GetWorldToObject3x4()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject3x4";
+        }
+    }
+
+        /// Returns the 4x3 world-to-object transform matrix (transposed). Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float4x3 GetWorldToObject4x3()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject4x3";
+        }
+    }
+
+        /// Creates a HitObject representing a miss with specified ray flags.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder - includes RayFlags parameter.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static HitObject MakeMiss(
+        uint RayFlags,
+        uint MissShaderIndex,
+        RayDesc Ray)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($3 = dx::HitObject::MakeMiss($0, $1, $2))";
+        case glsl:
+            __glslMakeMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissEXT
+                        /**/ &__return_val
+                        /**/ $RayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
+        }
+    }
+
+        /// Creates a HitObject from a committed hit in a RayQuery.
+        /// The RayQuery must have a committed hit (COMMITTED_TRIANGLE_HIT or COMMITTED_PROCEDURAL_PRIMITIVE_HIT).
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen)]
+    __generic<let rayFlagsGeneric : RAY_FLAG>
+    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric> Query)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($1 = dx::HitObject::FromRayQuery($0))";
+        }
+    }
+
+        /// Creates a HitObject from a committed hit in a RayQuery with custom hit attributes.
+        /// The RayQuery must have a committed procedural hit (COMMITTED_PROCEDURAL_PRIMITIVE_HIT).
+        /// CommittedCustomHitKind specifies the user-defined hit kind (must be >= HIT_KIND_USER_DEFINED_MIN).
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen)]
+    __generic<let rayFlagsGeneric : RAY_FLAG, attr_t>
+    static HitObject FromRayQuery(
+        RayQuery<rayFlagsGeneric> Query,
+        uint CommittedCustomHitKind,
+        attr_t CommittedCustomAttribs)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($3 = dx::HitObject::FromRayQuery($0, $1, $2))";
+        }
+    }
+
     ///
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl_nvapi:
+            __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl:
+            // DXR 1.3 native path - use method call syntax
+            __intrinsic_asm ".GetAttributes";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22798,13 +23461,14 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
     [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
-    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
         uint PrimitiveIndex,
@@ -22817,12 +23481,30 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHit";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void __hlslMakeHit_DXR<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        RayDesc Ray,
+        attr_t attributes,
+        out HitObject hitObj)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
+        }
+    }
+
+    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -22836,7 +23518,8 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl_nvapi: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::TraceRay($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
@@ -22846,7 +23529,7 @@ struct HitObject
 
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslMakeMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -22857,15 +23540,36 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordMissNV";
         }
     }
 
-    // "void hitObjectRecordMissNV(hitObjectNV, uint, vec3, float, vec3, float);"
+    // EXT version with RayFlags parameter
+    // "void hitObjectRecordMissEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float);"
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslMakeMissEXT(
+        out HitObject hitObj,
+        uint RayFlags,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectRecordMissEXT";
+        }
+    }
+
+    // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionMiss(
         out HitObject hitObj,
         uint MissShaderIndex,
@@ -22877,80 +23581,162 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissMotionNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordMissMotionNV";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj)
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordEmptyNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordEmptyNV";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslMakeNopEXT(out HitObject hitObj)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectRecordEmptyEXT";
+        }
+    }
+
+    // EXT version with RayFlags parameter
+    // "void hitObjectRecordMissMotionEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float, float);"
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    static void __glslMakeMotionMissEXT(
+        out HitObject hitObj,
+        uint RayFlags,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax,
+        float CurrentTime)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectRecordMissMotionEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 __glslGetRayWorldDirectionEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 __glslGetRayWorldOriginEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     float __glslGetTMax()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float __glslGetTMaxEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     float __glslGetTMin()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float __glslGetTMinEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
         }
     }
 
     // "void hitObjectRecordHitWithIndexNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslMakeHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -22967,7 +23753,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
         }
     }
 
@@ -22975,7 +23761,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -22993,14 +23779,14 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
         }
     }
 
     // "void hitObjectRecordHitNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslMakeHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -23018,7 +23804,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordHitNV";
         }
     }
 
@@ -23026,7 +23812,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
         out HitObject hitObj,
         RaytracingAccelerationStructure accelerationStructure,
@@ -23045,25 +23831,37 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitMotionNV";
+        case glsl_nv: __intrinsic_asm "hitObjectRecordHitMotionNV";
         }
     }
 
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation)
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case glsl_nv: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    void __glslGetAttributesEXT(int attributeLocation)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -23080,14 +23878,38 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayNV";
+        case glsl_nv: __intrinsic_asm "hitObjectTraceRayNV";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslTraceRayEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
         RaytracingAccelerationStructure accelerationStructure,
@@ -23105,20 +23927,60 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case glsl_nv: __intrinsic_asm "hitObjectTraceRayMotionNV";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    static void __glslTraceMotionRayEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float currentTime,
+        int payload)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_nv, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
         HitObject hitObj,
         int payload)
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectExecuteShaderNV";
+        case glsl_nv: __intrinsic_asm "hitObjectExecuteShaderNV";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslInvokeEXT(
+        HitObject hitObj,
+        int payload)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
 };
@@ -23128,26 +23990,35 @@ struct HitObject
     /// Applications should set this to the lowest value required to represent all possible values in
     /// CoherenceHint. For best performance, all threads should provide the same value for
     /// NumCoherenceHintBits.
-    /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
+    /// Where possible, reordering will also attempt to retain locality in the thread's launch indices
     /// (DispatchRaysIndex in DXR).
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case glsl_nv: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHintNV $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -23168,24 +24039,33 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case glsl_nv: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -23196,25 +24076,69 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // ```
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case glsl_nv: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder()";
-    case spirv:
+    case spirv_nv:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss;
         };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss;
+        };
+    }
+}
+
+// DXR 1.3 naming: MaybeReorderThread (alias for ReorderThread for DXR compatibility)
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a coherence hint value.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    }
+}
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a hit object and coherence hint.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    }
+}
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a hit object.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( HitObject HitOrMiss )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     }
 }
 
