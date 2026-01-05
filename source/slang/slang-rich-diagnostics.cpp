@@ -13,6 +13,16 @@ namespace Slang
 namespace Diagnostics
 {
 
+UnownedStringSlice nameToPrintableString(Name* name)
+{
+    return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
+}
+
+UnownedStringSlice typeToPrintableString(Type* type)
+{
+    return type ? type->toString().getUnownedSlice() : UnownedStringSlice{"<unknown type>"};
+}
+
 // Generate member function implementations
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
@@ -24,43 +34,37 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     GenericDiagnostic result;
     result.code = $(diagnostic.code);
     result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
-    
-    // Build message by interpolating parameters using StringBuilder
-    StringBuilder messageBuilder;
-%     for _, part in ipairs(diagnostic.message_parts) do
-%         if part.type == "text" then
-    messageBuilder << "$(part.content:gsub('"', '\\"'))";
-%         elseif part.type == "interpolation" then
-%             if part.param_type == "string" then
-    messageBuilder << $(part.param_name);
-%             elseif part.param_type == "name" then
-    if ($(part.param_name))
-    {
-        messageBuilder << $(part.param_name)->text;
-    }
-    else
-    {
-        messageBuilder << "<unknown name>";
-    }
-%             elseif part.param_type == "type" then
-    if ($(part.param_name))
-    {
-        messageBuilder << $(part.param_name)->toString();
-    }
-    else
-    {
-        messageBuilder << "<unknown type>";
-    }
-%             elseif part.param_type == "int" then
-    messageBuilder << $(part.param_name);
-%             end
+
+%   local buildMessage = function(parts)
+%     local emitPart = function(part)
+%       if part.type == "text" then
+          "$(part.content:gsub('"', '\\"'))"
+%       elseif part.type == "interpolation" then
+%         if part.param_type == "name" then
+          nameToPrintableString($(part.param_name))
+%         elseif part.param_type == "type" then
+          typeToPrintableString($(part.param_name))
+%         else
+          $(part.param_name)
 %         end
+%       end
 %     end
-    result.message = messageBuilder.produceString();
+%
+%     if #parts == 1 then
+        $(emitPart(parts[1]))
+%     else
+        (StringBuilder{}
+%       for _, part in ipairs(parts) do
+          << $(emitPart(part))
+%       end
+        ).produceString()
+%     end
+%   end    
+    result.message = $(buildMessage(diagnostic.message_parts));
     
     // Set primary span
     result.primarySpan.range = SourceRange{$(diagnostic.primary_span.location)};
-    result.primarySpan.message = "$(diagnostic.primary_span.message)";
+    result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
     
 %     if diagnostic.secondary_spans then
     // Set secondary spans
@@ -68,7 +72,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     {
         DiagnosticSpan span;
         span.range = SourceRange{$(span.location)};
-        span.message = "$(span.message)";
+        span.message = $(buildMessage(span.message_parts));
         result.secondarySpans.add(span);
     }
 %         end
@@ -80,7 +84,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     {
         DiagnosticNote note;
         note.span.range = SourceRange{$(note.location)};
-        note.message = "$(note.message)";
+        note.message = $(buildMessage(note.message_parts));
         result.notes.add(note);
     }
 %         end
