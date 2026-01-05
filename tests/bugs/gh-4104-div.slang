@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target glsl
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -profile cs_6_6 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -profile cs_6_6 -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-directly
 
