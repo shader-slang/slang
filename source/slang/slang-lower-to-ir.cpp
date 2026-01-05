@@ -7745,6 +7745,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     }
                 }
             }
+            else if (auto switchStmt = as<SwitchStmt>(stmt))
+            {
+                collectAssignments(switchStmt->body);
+            }
+            // CaseStmt and DefaultStmt don't have body members -
+            // they're just labels, and their body statements are
+            // siblings in the parent SeqStmt, which we already handle.
         }
 
         void collectAssignmentsFromExpr(Expr* expr)
@@ -7837,6 +7844,17 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             {
                 collectUsesFromExpr(returnStmt->expression);
             }
+            else if (auto switchStmt = as<SwitchStmt>(stmt))
+            {
+                collectUsesFromExpr(switchStmt->condition);
+                collectUses(switchStmt->body);
+            }
+            else if (auto caseStmt = as<CaseStmt>(stmt))
+            {
+                collectUsesFromExpr(caseStmt->expr);
+                // CaseStmt body statements are siblings in the parent SeqStmt
+            }
+            // DefaultStmt has no body member - body statements are siblings
         }
 
         void collectUsesFromExpr(Expr* expr)
