@@ -217,36 +217,18 @@ local function process_diagnostics(diagnostics_table)
 				table.insert(all_errors, err)
 			end
 		else
-			-- Check for duplicate names with informative error
 			if seen_names[diag.name] then
-				table.insert(
-					all_errors,
-					"duplicate diagnostic name '"
-						.. diag.name
-						.. "' at index "
-						.. i
-						.. ", previously used by diagnostic at index "
-						.. seen_names[diag.name]
-				)
+				table.insert(all_errors, "duplicate diagnostic name '" .. diag.name .. "' at index " .. i)
 			else
 				seen_names[diag.name] = i
 			end
 
-			-- Check for duplicate codes with informative error
 			if seen_codes[diag.code] then
-				table.insert(
-					all_errors,
-					diagnostic_name
-						.. " has duplicate code "
-						.. diag.code
-						.. ", previously used by diagnostic at index "
-						.. seen_codes[diag.code]
-				)
+				table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
 			else
 				seen_codes[diag.code] = i
 			end
 
-			-- Collect all interpolants and locations
 			local params = {}
 			local locations = {}
 			local seen_params = {}
@@ -259,58 +241,65 @@ local function process_diagnostics(diagnostics_table)
 				end
 			end
 
-			local function add_params_from_string(msg)
-				local success, parts = pcall(parse_message, msg)
-				if success then
-					for _, part in ipairs(parts) do
-						if part.type == "interpolation" and not seen_params[part.param_name] then
-							table.insert(params, { name = part.param_name, type = part.param_type })
-							seen_params[part.param_name] = true
-						end
+			-- Uniformly processes a span/message object: parses interpolants and adds locations
+			local function process_message_container(container, context_path)
+				local success, parts = pcall(parse_message, container.message)
+				if not success then
+					table.insert(all_errors, context_path .. ": " .. parts)
+					return nil
+				end
+
+				-- Extract params for the global diagnostic param list
+				for _, part in ipairs(parts) do
+					if part.type == "interpolation" and not seen_params[part.param_name] then
+						table.insert(params, { name = part.param_name, type = part.param_type })
+						seen_params[part.param_name] = true
 					end
 				end
-				return success, parts
+
+				-- Add location if it exists (for spans/notes)
+				if container.location then
+					add_location(container.location)
+				end
+
+				-- Attach the parsed parts back to the object for C++ generation
+				container.message_parts = parts
+				return parts
 			end
 
-			-- Process main message
-			local success, message_parts = add_params_from_string(diag.message)
+			-- 1. Process main message (treated as a container without a location)
+			local main_msg_container = { message = diag.message }
+			local main_parts = process_message_container(main_msg_container, diagnostic_name .. ".message")
 
-			if not success then
-				table.insert(all_errors, diagnostic_name .. ".message: " .. message_parts)
-			else
-				-- Process primary span
-				add_location(diag.primary_span.location)
-				add_params_from_string(diag.primary_span.message)
+			-- 2. Process primary span
+			process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
 
-				-- Process secondary spans
-				if diag.secondary_spans then
-					for _, span in ipairs(diag.secondary_spans) do
-						add_location(span.location)
-						add_params_from_string(span.message)
-					end
+			-- 3. Process secondary spans
+			if diag.secondary_spans then
+				for j, span in ipairs(diag.secondary_spans) do
+					process_message_container(span, diagnostic_name .. ".secondary_spans[" .. j .. "]")
 				end
-
-				-- Process notes (extracting interpolants and locations)
-				if diag.notes then
-					for _, note in ipairs(diag.notes) do
-						add_location(note.location)
-						add_params_from_string(note.message)
-					end
-				end
-
-				table.insert(processed, {
-					name = diag.name,
-					code = diag.code,
-					severity = diag.severity,
-					message = diag.message,
-					message_parts = message_parts,
-					params = params, -- Unique list of all {name, type} across all messages
-					locations = locations, -- Unique list of all location names
-					primary_span = diag.primary_span,
-					secondary_spans = diag.secondary_spans,
-					notes = diag.notes,
-				})
 			end
+
+			-- 4. Process notes
+			if diag.notes then
+				for j, note in ipairs(diag.notes) do
+					process_message_container(note, diagnostic_name .. ".notes[" .. j .. "]")
+				end
+			end
+
+			table.insert(processed, {
+				name = diag.name,
+				code = diag.code,
+				severity = diag.severity,
+				message = diag.message,
+				message_parts = main_parts,
+				params = params,
+				locations = locations,
+				primary_span = diag.primary_span,
+				secondary_spans = diag.secondary_spans or {},
+				notes = diag.notes or {},
+			})
 		end
 	end
 
