@@ -11,7 +11,6 @@
 // Forward declaration for rich diagnostics
 namespace Slang
 {
-struct RichDiagnostic;
 struct GenericDiagnostic;
 struct DiagnosticArg;
 } // namespace Slang
