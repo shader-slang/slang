@@ -27,7 +27,7 @@ struct DiagnosticNote
 //
 struct GenericDiagnostic
 {
-    int code;
+    Int64 code;
     Severity severity;
     String message;
     DiagnosticSpan primarySpan;
