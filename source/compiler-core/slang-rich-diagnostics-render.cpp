@@ -443,6 +443,8 @@ private:
                 }
             }
             rows.add(lab.produceString());
+            // O(n^2), but it's not like we're going to be rendering
+            // diagnostics with hundreds of labels
             labels.removeAt(0);
         }
         return rows;
@@ -525,7 +527,7 @@ private:
     String renderFromLayout(const DiagnosticLayout& layout)
     {
         StringBuilder ss;
-        TerminalColor sevColor = (layout.header.severityValue == Severity::Error)
+        TerminalColor sevColor = (layout.header.severityValue >= Severity::Error)
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
