@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(): 
-//DIAGNOSTIC_TEST:SIMPLE(): -enable-experimental-rich-diagnostics
+//TEST:SIMPLE(): -enable-experimental-rich-diagnostics
 
-int foo(){}
-int foo(){}
+int foo(){ /* original */ }
+int foo(){ /* redefinition */ }
