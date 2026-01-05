@@ -3,13 +3,24 @@
 // Test fall-through behavior with nested switch statements.
 // Variables modified in outer switch cases should be visible in inner switches
 // and maintain their values through fall-through.
-//
-// This is currently NOT supported in Slang but is planned for implementation.
 
-// DISABLED until true fall-through is implemented
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+// DX11 and WGSL don't support fall-through natively, but the restructure
+// pass legalizes fall-through by inlining code, so tests should still pass.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+
+// CHECK:      B
+// CHECK-NEXT: C
+// CHECK-NEXT: A
+// CHECK-NEXT: 2
+// CHECK-NEXT: 3
+// CHECK-NEXT: 1
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: FFFFFFFF
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6 7 8], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

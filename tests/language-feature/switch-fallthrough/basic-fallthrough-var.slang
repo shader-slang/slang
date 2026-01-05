@@ -4,15 +4,13 @@
 // falls through to the next case. A variable modified in the first
 // case should retain its value in the fall-through target.
 //
-// This is currently NOT supported in Slang but is planned for implementation.
-
-// DX11/FXC doesn't support fall-through, but DX12/DXC does
-// WGSL doesn't support fall-through at all
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+// DX11 and WGSL don't support fall-through natively, but the restructure
+// pass legalizes fall-through by inlining code, so tests should still pass.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // CHECK:      64
 // CHECK-NEXT: B

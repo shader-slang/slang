@@ -6,13 +6,19 @@
 //
 // This tests the optimization where we only use IRVar for variables
 // that actually need it.
-//
-// This is currently NOT supported in Slang but is planned for implementation.
 
-// DISABLED until true fall-through is implemented
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+// DX11 and WGSL don't support fall-through natively, but the restructure
+// pass legalizes fall-through by inlining code, so tests should still pass.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+
+// CHECK:      267
+// CHECK-NEXT: 25E
+// CHECK-NEXT: FFFFFFFF
+// CHECK-NEXT: FFFFFFFF
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;

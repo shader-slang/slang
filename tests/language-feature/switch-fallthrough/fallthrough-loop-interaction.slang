@@ -3,13 +3,19 @@
 // Test interaction between fall-through and loops.
 // Variables modified in loops should retain their final value
 // when falling through to the next case.
-//
-// This is currently NOT supported in Slang but is planned for implementation.
 
-// DISABLED until true fall-through is implemented
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -vk -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE: -cpu -shaderobj
+// DX11 and WGSL don't support fall-through natively, but the restructure
+// pass legalizes fall-through by inlining code, so tests should still pass.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+
+// CHECK:      73
+// CHECK-NEXT: 64
+// CHECK-NEXT: C8
+// CHECK-NEXT: FFFFFFFF
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
