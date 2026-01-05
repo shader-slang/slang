@@ -31,12 +31,12 @@ namespace
 // HELPER FUNCTIONS
 // ============================================================================
 
-String repeat(char c, int n)
+String repeat(char c, Int64 n)
 {
     if (n <= 0)
         return String();
     StringBuilder sb;
-    for (int i = 0; i < n; i++)
+    for (Int64 i = 0; i < n; i++)
         sb << c;
     return sb;
 }
@@ -56,9 +56,9 @@ String stripIndent(const String& text, size_t indent)
 
 struct LayoutSpan
 {
-    int line;
-    int col;
-    int length;
+    Int64 line;
+    Int64 col;
+    Int64 length;
     String label;
     bool isPrimary;
     Slang::SourceLoc startLoc;
@@ -66,15 +66,15 @@ struct LayoutSpan
 
 struct LineHighlight
 {
-    int column = 0;
-    int length = 1;
+    Int64 column = 0;
+    Int64 length = 1;
     String label;
     bool isPrimary = false;
 };
 
 struct HighlightedLine
 {
-    int number = 0;
+    Int64 number = 0;
     UnownedStringSlice content;
     List<LineHighlight> spans;
 };
@@ -87,7 +87,7 @@ struct LayoutBlock
 
 struct SectionLayout
 {
-    int maxGutterWidth = 0;
+    Int64 maxGutterWidth = 0;
     size_t commonIndent = 0;
     List<LayoutBlock> blocks;
 };
@@ -97,16 +97,16 @@ struct DiagnosticLayout
     struct Header
     {
         String severity;
-        int code = 0;
+        Int64 code = 0;
         String message;
     } header;
 
     struct Location
     {
         String fileName;
-        int line = 0;
-        int col = 0;
-        int gutterIndent = 0;
+        Int64 line = 0;
+        Int64 col = 0;
+        Int64 gutterIndent = 0;
     } primaryLoc;
 
     SectionLayout primarySection;
@@ -120,7 +120,10 @@ struct DiagnosticLayout
     List<NoteEntry> notes;
 };
 
-int getLexedLength(DiagnosticSink::SourceLocationLexer sll, const UnownedStringSlice& line, int col)
+Count getLexedLength(
+    DiagnosticSink::SourceLocationLexer sll,
+    const UnownedStringSlice& line,
+    Int64 col)
 {
     if (sll)
     {
@@ -136,8 +139,8 @@ LayoutSpan makeLayoutSpan(SourceManager* sm, const DiagnosticSpan& span, bool is
     // Use SourceManager to get humane (display) location
     HumaneSourceLoc humane = sm->getHumaneLoc(span.loc);
 
-    layoutSpan.line = static_cast<int>(humane.line);
-    layoutSpan.col = static_cast<int>(humane.column);
+    layoutSpan.line = static_cast<Int64>(humane.line);
+    layoutSpan.col = static_cast<Int64>(humane.column);
     layoutSpan.length =
         -1; // Currently we have to use the SourceLocationLexer later to get the size after the fact
     layoutSpan.label = span.message;
@@ -176,12 +179,12 @@ SectionLayout buildSectionLayout(
     if (spans.getCount() == 0)
         return section;
 
-    int maxLineNum = 0;
+    Int64 maxLineNum = 0;
     for (const auto& span : spans)
         maxLineNum = std::max(maxLineNum, span.line);
-    section.maxGutterWidth = static_cast<int>(std::to_string(std::max(1, maxLineNum)).length());
+    section.maxGutterWidth = static_cast<Int64>(std::to_string(std::max(1l, maxLineNum)).length());
 
-    Dictionary<int, HighlightedLine> grouped;
+    Dictionary<Int64, HighlightedLine> grouped;
     for (auto& span : spans)
     {
         HighlightedLine& line = grouped[span.line];
@@ -218,16 +221,16 @@ SectionLayout buildSectionLayout(
             });
     }
 
-    List<int> lineNumbers;
+    List<Int64> lineNumbers;
     for (const auto& [number, _] : grouped)
         lineNumbers.add(number);
     lineNumbers.sort();
 
     LayoutBlock currentBlock;
-    int prevLine = std::numeric_limits<int>::min();
-    for (int number : lineNumbers)
+    Int64 prevLine = std::numeric_limits<Int64>::min();
+    for (Int64 number : lineNumbers)
     {
-        bool hasGap = prevLine != std::numeric_limits<int>::min() && number > prevLine + 1;
+        bool hasGap = prevLine != std::numeric_limits<Int64>::min() && number > prevLine + 1;
         if (hasGap && currentBlock.lines.getCount() > 0)
         {
             section.blocks.add(currentBlock);
@@ -256,7 +259,7 @@ SectionLayout buildSectionLayout(
 
 struct LabelInfo
 {
-    int column = 0;
+    Int64 column = 0;
     String text;
 };
 
@@ -268,13 +271,13 @@ List<String> buildAnnotationRows(const HighlightedLine& line, size_t indentShift
 
     List<LabelInfo> labels;
     String underline;
-    int cursor = 1;
+    Int64 cursor = 1;
 
     for (const auto& span : line.spans)
     {
-        int effectiveColumn = std::max(1, span.column - static_cast<int>(indentShift));
-        int length = std::max(1, span.length);
-        int spaces = std::max(0, effectiveColumn - cursor);
+        Int64 effectiveColumn = std::max(1l, span.column - static_cast<Int64>(indentShift));
+        Int64 length = std::max(1l, span.length);
+        Int64 spaces = std::max(0l, effectiveColumn - cursor);
         underline = underline + repeat(' ', spaces);
         underline = underline + repeat(span.isPrimary ? '^' : '-', length);
         cursor = effectiveColumn + length;
@@ -298,10 +301,10 @@ List<String> buildAnnotationRows(const HighlightedLine& line, size_t indentShift
     sortedLabels.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
     String connector;
-    int pos = 1;
+    Int64 pos = 1;
     for (const auto& info : sortedLabels)
     {
-        int spaces = std::max(0, info.column - pos);
+        Int64 spaces = std::max(0l, info.column - pos);
         connector = connector + repeat(' ', spaces) + "|";
         pos = info.column + 1;
     }
@@ -317,15 +320,15 @@ List<String> buildAnnotationRows(const HighlightedLine& line, size_t indentShift
         active.sort([](const LabelInfo& a, const LabelInfo& b) { return a.column < b.column; });
 
         String labelRow;
-        int current = 1;
+        Int64 current = 1;
         for (const auto& info : active)
         {
-            int spaces = std::max(0, info.column - current);
+            Int64 spaces = std::max(0l, info.column - current);
             labelRow = labelRow + repeat(' ', spaces);
             if (info.column == target.column)
             {
                 labelRow = labelRow + String(info.text);
-                current = info.column + static_cast<int>(info.text.getLength());
+                current = info.column + static_cast<Int64>(info.text.getLength());
             }
             else
             {
@@ -339,7 +342,7 @@ List<String> buildAnnotationRows(const HighlightedLine& line, size_t indentShift
     return rows;
 }
 
-void printAnnotationRow(StringBuilder& ss, int gutterWidth, const String& content)
+void printAnnotationRow(StringBuilder& ss, Int64 gutterWidth, const String& content)
 {
     if (content.getLength() == 0)
         return;
@@ -357,7 +360,8 @@ void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
         {
             const String label =
                 line.number >= 0 ? String(std::to_string(line.number).c_str()) : "?";
-            int padding = std::max(0, section.maxGutterWidth - static_cast<int>(label.getLength()));
+            Int64 padding =
+                std::max(0l, section.maxGutterWidth - static_cast<Int64>(label.getLength()));
             ss << repeat(' ', padding) << label << " | "
                << stripIndent(line.content, section.commonIndent) << '\n';
 
@@ -381,8 +385,8 @@ DiagnosticLayout createLayout(
     // Use SourceManager to get humane info for the primary location
     HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.loc);
     layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
-    layout.primaryLoc.line = static_cast<int>(humaneLoc.line);
-    layout.primaryLoc.col = static_cast<int>(humaneLoc.column);
+    layout.primaryLoc.line = static_cast<Int64>(humaneLoc.line);
+    layout.primaryLoc.col = static_cast<Int64>(humaneLoc.column);
 
     List<LayoutSpan> allSpans;
     allSpans.add(makeLayoutSpan(sm, diag.primarySpan, true));
@@ -399,8 +403,8 @@ DiagnosticLayout createLayout(
 
         HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.loc);
         noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
-        noteEntry.loc.line = static_cast<int>(noteHumane.line);
-        noteEntry.loc.col = static_cast<int>(noteHumane.column);
+        noteEntry.loc.line = static_cast<Int64>(noteHumane.line);
+        noteEntry.loc.col = static_cast<Int64>(noteHumane.column);
 
         List<LayoutSpan> noteSpans;
         noteSpans.add(makeLayoutSpan(sm, note.span, false));
@@ -481,14 +485,14 @@ namespace
 struct SourceLoc
 {
     String fileName;
-    int line;
-    int column;
+    Int64 line;
+    Int64 column;
 
     SourceLoc()
         : line(0), column(0)
     {
     }
-    SourceLoc(const String& file, int ln, int col)
+    SourceLoc(const String& file, Int64 ln, Int64 col)
         : fileName(file), line(ln), column(col)
     {
     }
@@ -498,13 +502,13 @@ struct TestDiagnosticSpan
 {
     SourceLoc location;
     String message;
-    int length;
+    Int64 length;
 
     TestDiagnosticSpan()
         : length(0)
     {
     }
-    TestDiagnosticSpan(const SourceLoc& loc, const String& msg, int len = 0)
+    TestDiagnosticSpan(const SourceLoc& loc, const String& msg, Int64 len = 0)
         : location(loc), message(msg), length(len)
     {
     }
@@ -518,7 +522,7 @@ struct TestDiagnosticNote
 
 struct TestGenericDiagnostic
 {
-    int code;
+    Int64 code;
     Severity severity;
     String message;
     TestDiagnosticSpan primarySpan;
@@ -576,7 +580,7 @@ error[E1001]: use of undeclared identifier 'someSampler'
     float4 position : POSITION;
     float2 texCoord : TEXCOORD0;
     float4 color : COLOR;
-    int invalid_field; // This field has issues
+    Int64 invalid_field; // This field has issues
 };
 
 struct PixelShader {
@@ -585,31 +589,31 @@ struct PixelShader {
     }
 }
 )",
-     .expectedOutput = R"(error[E1002]: cannot add `float4` and `int`
+     .expectedOutput = R"(error[E1002]: cannot add `float4` and `Int64`
   --> example.slang:10:28
    |
- 5 | int invalid_field; // This field has issues
+ 5 | Int64 invalid_field; // This field has issues
    | ----------------- field declared here
 ...
 10 |     return color * 2.0 + input.invalid_field; // Type mismatch
-   |            ----------- ^ ------------------- int
+   |            ----------- ^ ------------------- Int64
    |            |           |
-   |            |           no implementation for `float4 + int`
+   |            |           no implementation for `float4 + Int64`
    |            float4
 )",
      .diagnostic =
          {.code = 1002,
           .severity = Severity::Error,
-          .message = "cannot add `float4` and `int`",
+          .message = "cannot add `float4` and `Int64`",
           .primarySpan =
-              {SourceLoc("example.slang", 10, 28), "no implementation for `float4 + int`", 1},
+              {SourceLoc("example.slang", 10, 28), "no implementation for `float4 + Int64`", 1},
           .secondarySpans =
               []()
           {
               List<TestDiagnosticSpan> spans;
               spans.add({SourceLoc("example.slang", 5, 5), "field declared here", 17});
               spans.add({SourceLoc("example.slang", 10, 16), "float4", 11});
-              spans.add({SourceLoc("example.slang", 10, 30), "int", 19});
+              spans.add({SourceLoc("example.slang", 10, 30), "Int64", 19});
               return spans;
           }(),
           .notes = List<TestDiagnosticNote>()}},
@@ -622,7 +626,7 @@ struct PixelShader {
 
 struct PixelShader {
     float4 main(VertexInput input) : SV_Target {
-        int x = undefinedVariable; // Undefined variable
+        Int64 x = undefinedVariable; // Undefined variable
         return float4(x, 0, 0, 1);
     }
 }
@@ -631,7 +635,7 @@ struct PixelShader {
 error[E1003]: use of undeclared identifier 'undefinedVariable'
  --> example.slang:7:17
   |
-7 | int x = undefinedVariable; // Undefined variable
+7 | Int64 x = undefinedVariable; // Undefined variable
   |         ^^^^^^^^^^^^^^^^^ not found in this scope
 )",
      .diagnostic =
@@ -791,12 +795,12 @@ String trimNewlines(const String& str)
     return str.subString(start, end - start);
 }
 
-int calculateFallbackLength(const UnownedStringSlice& line, int col)
+Int64 calculateFallbackLength(const UnownedStringSlice& line, Int64 col)
 {
-    if (col < 1 || col > static_cast<int>(line.getLength()))
+    if (col < 1 || col > static_cast<Int64>(line.getLength()))
         return 1;
-    int start = col - 1;
-    int len = 0;
+    Int64 start = col - 1;
+    Int64 len = 0;
     for (Index i = start; i < line.getLength(); ++i)
     {
         char ch = line[i];
@@ -812,7 +816,7 @@ int calculateFallbackLength(const UnownedStringSlice& line, int col)
 // CONVERSION: TestData -> RenderDiagnostic
 // ============================================================================
 
-Slang::SourceLoc calcSourceLoc(SourceView* view, int lineIndex, int columnOneBased)
+Slang::SourceLoc calcSourceLoc(SourceView* view, Int64 lineIndex, Int64 columnOneBased)
 {
     SLANG_ASSERT(view);
     SourceFile* file = view->getSourceFile();
@@ -826,7 +830,7 @@ Slang::SourceLoc calcSourceLoc(SourceView* view, int lineIndex, int columnOneBas
             columnOffset = lineLength;
     }
     Slang::SourceLoc base = view->getRange().begin;
-    return base + Int(lineStart + columnOffset);
+    return base + Int64(lineStart + columnOffset);
 }
 
 DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inputSpan)
@@ -840,10 +844,10 @@ DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inpu
     SourceFile* file = view->getSourceFile();
 
     // Convert 1-based line to 0-based index
-    int lineIndex = std::max(0, inputSpan.location.line - 1);
+    Int64 lineIndex = std::max(0, inputSpan.location.line - 1);
 
     // Resolve length if not provided (legacy fallback behavior)
-    int length = inputSpan.length;
+    Int64 length = inputSpan.length;
     if (length <= 0)
     {
         // Fetch line content to calculate fallback length
@@ -854,7 +858,7 @@ DiagnosticSpan createRenderSpan(SourceView* view, const TestDiagnosticSpan& inpu
     Slang::SourceLoc begin = calcSourceLoc(view, lineIndex, inputSpan.location.column);
     Slang::SourceLoc end = begin;
     if (length > 1)
-        end = begin + Int(length - 1);
+        end = begin + Int64(length - 1);
 
     outSpan.range = Slang::SourceRange(begin, end);
     return outSpan;
@@ -907,11 +911,11 @@ void writeTempFile(const std::string& path, const std::string& content)
     file << content << '\n';
 }
 
-int runDiff(const std::string& expected, const std::string& actual)
+Int64 runDiff(const std::string& expected, const std::string& actual)
 {
     writeTempFile("expected.tmp", expected);
     writeTempFile("actual.tmp", actual);
-    int result = std::system("diff -u expected.tmp actual.tmp");
+    Int64 result = std::system("diff -u expected.tmp actual.tmp");
     std::remove("expected.tmp");
     std::remove("actual.tmp");
     return result;
@@ -919,10 +923,10 @@ int runDiff(const std::string& expected, const std::string& actual)
 
 } // namespace
 
-int slangRichDiagnosticsUnitTest(int argc, char* argv[])
+Int64 slangRichDiagnosticsUnitTest(Int64 argc, char* argv[])
 {
-    int maxTests = -1;
-    for (int i = 1; i < argc; ++i)
+    Int64 maxTests = -1;
+    for (Int64 i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--until") == 0 && i + 1 < argc)
         {
@@ -937,19 +941,19 @@ int slangRichDiagnosticsUnitTest(int argc, char* argv[])
         return 0;
     }
 
-    int testLimit = (maxTests == -1) ? static_cast<int>(NUM_TESTS)
-                                     : std::min(maxTests, static_cast<int>(NUM_TESTS));
+    Int64 testLimit = (maxTests == -1) ? static_cast<Int64>(NUM_TESTS)
+                                       : std::min(maxTests, static_cast<Int64>(NUM_TESTS));
 
     std::cout << "Running " << testLimit << " test(s)...\n";
 
-    int passed = 0;
-    int failed = 0;
+    Int64 passed = 0;
+    Int64 failed = 0;
 
     SourceManager sm;
     sm.initialize(nullptr, nullptr);
     DiagnosticSink sink;
 
-    for (int i = 0; i < testLimit; ++i)
+    for (Int64 i = 0; i < testLimit; ++i)
     {
         TestData& test = testCases[i];
 
