@@ -10,6 +10,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=ALIGNED):-vk -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-cuda -compute -output-using-type -xslang -matrix-layout-row-major -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=PACKED): -slang -output-using-type -shaderobj -mtl
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=PACKED):-llvm -compute -output-using-type -xslang -fvk-use-scalar-layout -xslang -matrix-layout-row-major -shaderobj
 
 // matrix<R, C>
 //TEST_INPUT:cbuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 0.0 0.0  10.0 20.0 0.0 0.0 ]):name matrixBuffer
