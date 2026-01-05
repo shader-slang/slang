@@ -28,15 +28,13 @@ namespace Slang
 namespace
 {
 
-enum class TerminalColor
-{
-    Red,
-    Yellow,
-    Cyan,
-    Blue,
-    Bold,
-    Reset
-};
+//
+// The general structure of the below is that we take a 'GenericDiagnostic' (which contains the
+// diagnostic without regard for how it's presented to the user) and convert that into a
+// 'DiagnosticLayout' (which concerns itself with the logical layout of a diagnostic, if not the
+// specifics of pasting characters and that) using 'createLayout'. From there we call
+// 'renderFromLayout' which actually puts the lines and characters together
+//
 
 struct DiagnosticRenderer
 {
@@ -47,7 +45,14 @@ public:
         DiagnosticRenderOptions opts)
         : m_sourceManager(sm), m_lexer(sll), m_options(opts)
     {
-        initGlyphs();
+        if (m_options.enableUnicode)
+        {
+            m_glyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
+        }
+        else
+        {
+            m_glyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+        }
     }
 
     String render(const GenericDiagnostic& diag)
@@ -61,46 +66,47 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
+    enum class TerminalColor
+    {
+        Red,
+        Yellow,
+        Cyan,
+        Blue,
+        Bold,
+        Reset
+    };
+
     struct Glyphs
     {
+        // the underlines are characters such as
+        // ┬──────────, where the first character there is the 'Join' one, it
+        // joins the underline to the column going to the message
         const char* primaryUnderline;
         const char* primaryUnderlineJoin;
         const char* secondaryUnderline;
         const char* secondaryUnderlineJoin;
+
+        // A vertical pipe
         const char* vertical;
+        // A north-east corner, from the bottom of the pipe to introduce text on the right
         const char* corner;
+
+        // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
     } m_glyphs;
 
-    void initGlyphs()
-    {
-        if (m_options.enableUnicode)
-        {
-            m_glyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
-        }
-        else
-        {
-            m_glyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
-        }
-    }
-
-    struct LayoutSpan
-    {
-        Int64 line, col, length;
-        String label;
-        bool isPrimary;
-        Slang::SourceLoc startLoc;
-    };
-
+    // A single highlight on a line, with an optional label to be connected
     struct LineHighlight
     {
-        Int64 column = 0;
-        Int64 length = 1;
-        String label;
-        bool isPrimary = false;
+        Int64 column;
+        Int64 length;
+        String label;   // May be empty
+        bool isPrimary; // Does this one deserve special attention
     };
 
+    // A line of source code, along with some sections which are highlighted
+    // and labeled
     struct HighlightedLine
     {
         Int64 number = 0;
@@ -108,19 +114,22 @@ private:
         List<LineHighlight> spans;
     };
 
+    // A collection of nearby HighlightedLines
     struct LayoutBlock
     {
         bool showGap = false;
         List<HighlightedLine> lines;
     };
 
+    // A collection of blocks
     struct SectionLayout
     {
-        Int64 maxGutterWidth = 0;
-        size_t commonIndent = 0;
+        Int64 maxGutterWidth;
+        size_t commonIndent;
         List<LayoutBlock> blocks;
     };
 
+    // A full diagnostic, sorted and ready for rendering
     struct DiagnosticLayout
     {
         struct Header
@@ -130,6 +139,7 @@ private:
             Int64 code = 0;
             String message;
         } header;
+
         struct Location
         {
             String fileName;
@@ -137,7 +147,9 @@ private:
             Int64 col = 0;
             Int64 gutterIndent = 0;
         } primaryLoc;
+
         SectionLayout primarySection;
+
         struct NoteEntry
         {
             String message;
@@ -147,6 +159,7 @@ private:
         List<NoteEntry> notes;
     };
 
+    // Introduce and reset a terminal color
     String color(TerminalColor c, const String& text) const
     {
         if (!m_options.enableTerminalColors)
@@ -185,6 +198,7 @@ private:
         return ret;
     }
 
+    // s should be a single width character
     String repeat(const char* s, Int64 n) const
     {
         String ret;
@@ -215,6 +229,21 @@ private:
     //    Calculates a common indentation across all blocks to shift the code
     //    horizontally, maximizing visible space by removing unnecessary leading whitespace.
     //
+
+    //
+    // Layout span what's given to each section in buildSectionLayout, these
+    // are sorted and merged into HighlightedLines
+    //
+    struct LayoutSpan
+    {
+        Int64 line;
+        Int64 col;
+        Int64 length;
+        String label;
+        bool isPrimary;
+        Slang::SourceLoc startLoc;
+    };
+
     SectionLayout buildSectionLayout(List<LayoutSpan>& spans)
     {
         SectionLayout section;
@@ -268,7 +297,7 @@ private:
         return section;
     }
 
-    size_t findCommonIndent(const List<LayoutBlock>& blocks)
+    Int64 findCommonIndent(const List<LayoutBlock>& blocks)
     {
         Index minIndent = std::numeric_limits<Index>::max();
         for (const auto& b : blocks)
@@ -284,6 +313,10 @@ private:
         return minIndent == std::numeric_limits<Index>::max() ? 0 : minIndent;
     }
 
+    //
+    // Render a line of source code, and if there are colors enabled render it
+    // with colors matching the highlights
+    //
     void renderSourceLine(StringBuilder& ss, const HighlightedLine& line, Int64 indent)
     {
         UnownedStringSlice content =
@@ -351,7 +384,7 @@ private:
             Int64 col = std::max(Int64{1}, span.column - indentShift);
             const char* glyph =
                 span.isPrimary ? m_glyphs.primaryUnderline : m_glyphs.secondaryUnderline;
-            const char* joinGlyph = isLast           ? glyph
+            const char* joinGlyph = isLast || (!span.label.getLength()) ? glyph
                                     : span.isPrimary ? m_glyphs.primaryUnderlineJoin
                                                      : m_glyphs.secondaryUnderlineJoin;
             sub << repeat(' ', std::max(Int64{0}, col - cursor))
