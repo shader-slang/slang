@@ -1966,6 +1966,7 @@ static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStrin
     if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
         SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
+        fprintf(stderr, "Error: Unable to parse diagnostics for diagnostic test\n");
         return false;
     }
 
@@ -2636,9 +2637,10 @@ TestResult runSimpleLineTest(TestContext* context, TestInput& input)
 
     // Parse all the diagnostics so we can extract line numbers
     auto diagnostics = ArtifactDiagnostics::create();
-    if (SLANG_FAILED(ParseDiagnosticUtil::parseDiagnostics(
-            exeRes.standardError.getUnownedSlice(),
-            diagnostics)) ||
+    if (SLANG_FAILED(
+            ParseDiagnosticUtil::parseDiagnostics(
+                exeRes.standardError.getUnownedSlice(),
+                diagnostics)) ||
         diagnostics->getCount() <= 0)
     {
         // Write out the diagnostics which couldn't be parsed.
@@ -3948,7 +3950,8 @@ TestResult runComputeComparisonImpl(
                   nullptr,
                   ".expected.txt",
                   actualOutputContent,
-                  [](const auto& a, const auto& e) {
+                  [](const auto& a, const auto& e)
+                  {
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
@@ -5364,13 +5367,14 @@ SlangResult innerMain(int argc, char** argv)
         context.setInnerMainFunc("slangi", &SlangITool::innerMain);
     }
 
-    SLANG_RETURN_ON_FAIL(Options::parse(
-        argc,
-        argv,
-        &categorySet,
-        StdWriters::getOut(),
-        StdWriters::getError(),
-        &context.options));
+    SLANG_RETURN_ON_FAIL(
+        Options::parse(
+            argc,
+            argv,
+            &categorySet,
+            StdWriters::getOut(),
+            StdWriters::getError(),
+            &context.options));
 
     Options& options = context.options;
 
