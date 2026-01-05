@@ -1,0 +1,16 @@
+result code = -1
+standard error = {
+error[E30201]: function 'foo' already has a body
+ --> tests/diagnostics/already-has-a-body.slang:8:5
+  |
+8 | int foo(){ /* redefinition */ }
+  |     ^^^ redeclared here
+
+note: see previous definition of 'foo'
+ --- tests/diagnostics/already-has-a-body.slang:7:5
+  |
+7 | int foo(){ /* original */ }
+  |     ---
+}
+standard output = {
+}
