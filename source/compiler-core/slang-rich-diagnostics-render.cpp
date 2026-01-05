@@ -182,7 +182,7 @@ SectionLayout buildSectionLayout(
     Int64 maxLineNum = 0;
     for (const auto& span : spans)
         maxLineNum = std::max(maxLineNum, span.line);
-    section.maxGutterWidth = Int64(std::to_string(std::max(1l, maxLineNum)).length());
+    section.maxGutterWidth = Int64(std::to_string(std::max(Int64{1}, maxLineNum)).length());
 
     Dictionary<Int64, HighlightedLine> grouped;
     for (auto& span : spans)
@@ -275,9 +275,9 @@ List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
 
     for (const auto& span : line.spans)
     {
-        Int64 effectiveColumn = std::max(1l, span.column - indentShift);
-        Int64 length = std::max(1l, span.length);
-        Int64 spaces = std::max(0l, effectiveColumn - cursor);
+        Int64 effectiveColumn = std::max(Int64{1}, span.column - indentShift);
+        Int64 length = std::max(Int64{1}, span.length);
+        Int64 spaces = std::max(Int64{0}, effectiveColumn - cursor);
         underline = underline + repeat(' ', spaces);
         underline = underline + repeat(span.isPrimary ? '^' : '-', length);
         cursor = effectiveColumn + length;
@@ -304,7 +304,7 @@ List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
     Int64 pos = 1;
     for (const auto& info : sortedLabels)
     {
-        Int64 spaces = std::max(0l, info.column - pos);
+        Int64 spaces = std::max(Int64{0}, info.column - pos);
         connector = connector + repeat(' ', spaces) + "|";
         pos = info.column + 1;
     }
@@ -323,7 +323,7 @@ List<String> buildAnnotationRows(const HighlightedLine& line, Int64 indentShift)
         Int64 current = 1;
         for (const auto& info : active)
         {
-            Int64 spaces = std::max(0l, info.column - current);
+            Int64 spaces = std::max(Int64{0}, info.column - current);
             labelRow = labelRow + repeat(' ', spaces);
             if (info.column == target.column)
             {
@@ -360,7 +360,7 @@ void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
         {
             const String label =
                 line.number >= 0 ? String(std::to_string(line.number).c_str()) : "?";
-            Int64 padding = std::max(0l, section.maxGutterWidth - label.getLength());
+            Int64 padding = std::max(Int64{0}, section.maxGutterWidth - label.getLength());
             ss << repeat(' ', padding) << label << " | "
                << stripIndent(line.content, section.commonIndent) << '\n';
 
