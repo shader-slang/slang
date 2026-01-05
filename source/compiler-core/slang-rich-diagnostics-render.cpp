@@ -61,7 +61,7 @@ struct LayoutSpan
     int length;
     String label;
     bool isPrimary;
-    Slang::SourceLoc startLoc; // Keep for finding source file later
+    Slang::SourceLoc startLoc;
 };
 
 struct LineHighlight
@@ -75,7 +75,7 @@ struct LineHighlight
 struct HighlightedLine
 {
     int number = 0;
-    String content;
+    UnownedStringSlice content;
     List<LineHighlight> spans;
 };
 
@@ -120,19 +120,29 @@ struct DiagnosticLayout
     List<NoteEntry> notes;
 };
 
+int getLexedLength(DiagnosticSink::SourceLocationLexer sll, const UnownedStringSlice& line, int col)
+{
+    if (sll)
+    {
+        return sll(line.tail(col - 1)).getLength();
+    }
+    return -1;
+}
+
 LayoutSpan makeLayoutSpan(SourceManager* sm, const DiagnosticSpan& span, bool isPrimary)
 {
     LayoutSpan layoutSpan;
 
     // Use SourceManager to get humane (display) location
-    HumaneSourceLoc humane = sm->getHumaneLoc(span.range.begin);
+    HumaneSourceLoc humane = sm->getHumaneLoc(span.loc);
 
     layoutSpan.line = static_cast<int>(humane.line);
     layoutSpan.col = static_cast<int>(humane.column);
-    layoutSpan.length = static_cast<int>(span.range.getSize() + 1); // +1 because inclusive range
+    layoutSpan.length =
+        -1; // Currently we have to use the SourceLocationLexer later to get the size after the fact
     layoutSpan.label = span.message;
     layoutSpan.isPrimary = isPrimary;
-    layoutSpan.startLoc = span.range.begin;
+    layoutSpan.startLoc = span.loc;
 
     return layoutSpan;
 }
@@ -157,7 +167,10 @@ size_t findCommonIndent(const List<LayoutBlock>& blocks)
     return (minIndent == std::numeric_limits<Index>::max()) ? 0 : minIndent;
 }
 
-SectionLayout buildSectionLayout(SourceManager* sm, const List<LayoutSpan>& spans)
+SectionLayout buildSectionLayout(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    List<LayoutSpan>& spans)
 {
     SectionLayout section;
     if (spans.getCount() == 0)
@@ -169,7 +182,7 @@ SectionLayout buildSectionLayout(SourceManager* sm, const List<LayoutSpan>& span
     section.maxGutterWidth = static_cast<int>(std::to_string(std::max(1, maxLineNum)).length());
 
     Dictionary<int, HighlightedLine> grouped;
-    for (const auto& span : spans)
+    for (auto& span : spans)
     {
         HighlightedLine& line = grouped[span.line];
         line.number = span.line;
@@ -184,6 +197,11 @@ SectionLayout buildSectionLayout(SourceManager* sm, const List<LayoutSpan>& span
                 // HumaneLoc line is 1-based, getLineAtIndex is 0-based
                 line.content = StringUtil::trimEndOfLine(file->getLineAtIndex(span.line - 1));
             }
+        }
+
+        if (sll && span.length == -1)
+        {
+            span.length = getLexedLength(sll, line.content, span.col);
         }
 
         line.spans.add(LineHighlight{span.col, span.length, span.label, span.isPrimary});
@@ -349,7 +367,10 @@ void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     }
 }
 
-DiagnosticLayout createLayout(SourceManager* sm, const GenericDiagnostic& diag)
+DiagnosticLayout createLayout(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     DiagnosticLayout layout;
 
@@ -358,7 +379,7 @@ DiagnosticLayout createLayout(SourceManager* sm, const GenericDiagnostic& diag)
     layout.header.message = diag.message;
 
     // Use SourceManager to get humane info for the primary location
-    HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);
+    HumaneSourceLoc humaneLoc = sm->getHumaneLoc(diag.primarySpan.loc);
     layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
     layout.primaryLoc.line = static_cast<int>(humaneLoc.line);
     layout.primaryLoc.col = static_cast<int>(humaneLoc.column);
@@ -368,7 +389,7 @@ DiagnosticLayout createLayout(SourceManager* sm, const GenericDiagnostic& diag)
     for (const auto& s : diag.secondarySpans)
         allSpans.add(makeLayoutSpan(sm, s, false));
 
-    layout.primarySection = buildSectionLayout(sm, allSpans);
+    layout.primarySection = buildSectionLayout(sll, sm, allSpans);
     layout.primaryLoc.gutterIndent = layout.primarySection.maxGutterWidth;
 
     for (const auto& note : diag.notes)
@@ -376,14 +397,14 @@ DiagnosticLayout createLayout(SourceManager* sm, const GenericDiagnostic& diag)
         DiagnosticLayout::NoteEntry noteEntry;
         noteEntry.message = note.message;
 
-        HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.range.begin);
+        HumaneSourceLoc noteHumane = sm->getHumaneLoc(note.span.loc);
         noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
         noteEntry.loc.line = static_cast<int>(noteHumane.line);
         noteEntry.loc.col = static_cast<int>(noteHumane.column);
 
         List<LayoutSpan> noteSpans;
         noteSpans.add(makeLayoutSpan(sm, note.span, false));
-        noteEntry.section = buildSectionLayout(sm, noteSpans);
+        noteEntry.section = buildSectionLayout(sll, sm, noteSpans);
         noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
 
         layout.notes.add(std::move(noteEntry));
@@ -432,9 +453,12 @@ String renderFromLayout(const DiagnosticLayout& layout)
 // PUBLIC API IMPLEMENTATION
 // ============================================================================
 
-String renderDiagnostic(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnostic(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
-    DiagnosticLayout layout = createLayout(sm, diag);
+    DiagnosticLayout layout = createLayout(sll, sm, diag);
     return renderFromLayout(layout);
 }
 

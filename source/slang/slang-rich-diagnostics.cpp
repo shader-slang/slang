@@ -63,7 +63,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     result.message = $(buildMessage(diagnostic.message_parts));
     
     // Set primary span
-    result.primarySpan.range = SourceRange{$(diagnostic.primary_span.location)};
+    result.primarySpan.loc = $(diagnostic.primary_span.location);
     result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
     
 %     if diagnostic.secondary_spans then
@@ -71,7 +71,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         for _, span in ipairs(diagnostic.secondary_spans) do
     {
         DiagnosticSpan span;
-        span.range = SourceRange{$(span.location)};
+        span.loc = $(span.location);
         span.message = $(buildMessage(span.message_parts));
         result.secondarySpans.add(span);
     }
@@ -83,7 +83,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         for _, note in ipairs(diagnostic.notes) do
     {
         DiagnosticNote note;
-        note.span.range = SourceRange{$(note.location)};
+        note.span.loc = $(note.location);
         note.message = $(buildMessage(note.message_parts));
         result.notes.add(note);
     }

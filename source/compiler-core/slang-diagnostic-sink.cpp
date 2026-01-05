@@ -634,7 +634,7 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
         m_errorCount++;
     }
 
-    String message = renderDiagnostic(getSourceManager(), diagnostic);
+    String message = renderDiagnostic(getSourceLocationLexer(), getSourceManager(), diagnostic);
 
     if (writer)
     {

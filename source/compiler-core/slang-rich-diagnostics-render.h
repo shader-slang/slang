@@ -12,7 +12,9 @@ struct SourceManager;
 
 struct DiagnosticSpan
 {
-    Slang::SourceRange range;
+    // TODO: allow getting ranges instead of Locs here, currently we fall
+    // back to using SourceLocationLexer
+    Slang::SourceLoc loc;
     String message;
 };
 
@@ -35,7 +37,10 @@ struct GenericDiagnostic
     List<DiagnosticNote> notes;
 };
 
-String renderDiagnostic(SourceManager* sm, const GenericDiagnostic& diag);
+String renderDiagnostic(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag);
 
 #ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
 int slangRichDiagnosticsUnitTest(int argc, char* argv[]);
