@@ -5,8 +5,10 @@
 //
 // This is currently NOT supported in Slang but is planned for implementation.
 
-// DX11 only supports trivial fall-through, WGSL doesn't support fall-through at all
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj
+// DX11/FXC doesn't support fall-through, but DX12/DXC does
+// WGSL doesn't support fall-through at all
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
