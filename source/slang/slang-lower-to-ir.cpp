@@ -45,6 +45,9 @@
 // Natural layout
 #include "slang-ast-natural-layout.h"
 
+// AST iteration for fall-through variable collection
+#include "slang-ast-iterator.h"
+
 namespace Slang
 {
 
@@ -7688,217 +7691,53 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         }
     }
 
-    // Collect all variable references (reads and writes) in a statement
+    // Collect all variable references (reads and writes) in a statement.
+    // Uses ASTIterator for comprehensive traversal of all AST node types.
     struct VarRefCollector
     {
         HashSet<VarDeclBase*> assignedVars;
         HashSet<VarDeclBase*> usedVars;
 
-        void collectAssignments(Stmt* stmt)
+        void collect(Stmt* stmt)
         {
             if (!stmt)
                 return;
 
-            if (auto exprStmt = as<ExpressionStmt>(stmt))
-            {
-                collectAssignmentsFromExpr(exprStmt->expression);
-            }
-            else if (auto blockStmt = as<BlockStmt>(stmt))
-            {
-                collectAssignments(blockStmt->body);
-            }
-            else if (auto seqStmt = as<SeqStmt>(stmt))
-            {
-                for (auto child : seqStmt->stmts)
-                    collectAssignments(child);
-            }
-            else if (auto ifStmt = as<IfStmt>(stmt))
-            {
-                collectAssignments(ifStmt->positiveStatement);
-                collectAssignments(ifStmt->negativeStatement);
-            }
-            else if (auto forStmt = as<ForStmt>(stmt))
-            {
-                collectAssignments(forStmt->statement);
-            }
-            else if (auto whileStmt = as<WhileStmt>(stmt))
-            {
-                collectAssignments(whileStmt->statement);
-            }
-            else if (auto doWhileStmt = as<DoWhileStmt>(stmt))
-            {
-                collectAssignments(doWhileStmt->statement);
-            }
-            else if (auto declStmt = as<DeclStmt>(stmt))
-            {
-                // Variable declarations with initializers count as assignments
-                if (auto varDecl = as<VarDecl>(declStmt->decl))
-                {
-                    if (varDecl->initExpr)
-                    {
-                        assignedVars.add(varDecl);
-                    }
-                }
-            }
-            else if (auto switchStmt = as<SwitchStmt>(stmt))
-            {
-                collectAssignments(switchStmt->body);
-            }
-            // CaseStmt and DefaultStmt don't have body members -
-            // they're just labels, and their body statements are
-            // siblings in the parent SeqStmt, which we already handle.
-        }
+            auto noFilter = [](DeclBase*) { return true; };
 
-        void collectAssignmentsFromExpr(Expr* expr)
-        {
-            if (!expr)
-                return;
-
-            if (auto assignExpr = as<AssignExpr>(expr))
-            {
-                // Check if left side is a variable reference
-                if (auto varExpr = as<VarExpr>(assignExpr->left))
+            iterateAST(
+                stmt,
+                noFilter,
+                [&](SyntaxNode* node)
                 {
-                    if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
-                    {
-                        assignedVars.add(varDecl);
-                    }
-                }
-                // Also check right side for uses
-                collectUsesFromExpr(assignExpr->right);
-            }
-            else if (auto opAssignExpr = as<OperatorExpr>(expr))
-            {
-                // Check for compound assignment operators (+=, -=, etc.)
-                // These both read and write the variable
-                if (opAssignExpr->arguments.getCount() >= 1)
-                {
-                    if (auto varExpr = as<VarExpr>(opAssignExpr->arguments[0]))
+                    // Track variable uses (reads)
+                    if (auto varExpr = as<VarExpr>(node))
                     {
                         if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
                         {
-                            // Check if this is a compound assignment
-                            auto opName = opAssignExpr->functionExpr;
-                            if (opName)
+                            usedVars.add(varDecl);
+                        }
+                    }
+                    // Track assignments
+                    else if (auto assignExpr = as<AssignExpr>(node))
+                    {
+                        if (auto varExpr = as<VarExpr>(assignExpr->left))
+                        {
+                            if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
                             {
                                 assignedVars.add(varDecl);
-                                usedVars.add(varDecl);
                             }
                         }
                     }
-                }
-            }
-            else if (auto invokeExpr = as<InvokeExpr>(expr))
-            {
-                for (auto arg : invokeExpr->arguments)
-                    collectUsesFromExpr(arg);
-            }
-        }
-
-        void collectUses(Stmt* stmt)
-        {
-            if (!stmt)
-                return;
-
-            if (auto exprStmt = as<ExpressionStmt>(stmt))
-            {
-                collectUsesFromExpr(exprStmt->expression);
-            }
-            else if (auto blockStmt = as<BlockStmt>(stmt))
-            {
-                collectUses(blockStmt->body);
-            }
-            else if (auto seqStmt = as<SeqStmt>(stmt))
-            {
-                for (auto child : seqStmt->stmts)
-                    collectUses(child);
-            }
-            else if (auto ifStmt = as<IfStmt>(stmt))
-            {
-                collectUsesFromExpr(ifStmt->predicate);
-                collectUses(ifStmt->positiveStatement);
-                collectUses(ifStmt->negativeStatement);
-            }
-            else if (auto forStmt = as<ForStmt>(stmt))
-            {
-                collectUsesFromExpr(forStmt->predicateExpression);
-                collectUsesFromExpr(forStmt->sideEffectExpression);
-                collectUses(forStmt->statement);
-            }
-            else if (auto whileStmt = as<WhileStmt>(stmt))
-            {
-                collectUsesFromExpr(whileStmt->predicate);
-                collectUses(whileStmt->statement);
-            }
-            else if (auto doWhileStmt = as<DoWhileStmt>(stmt))
-            {
-                collectUsesFromExpr(doWhileStmt->predicate);
-                collectUses(doWhileStmt->statement);
-            }
-            else if (auto returnStmt = as<ReturnStmt>(stmt))
-            {
-                collectUsesFromExpr(returnStmt->expression);
-            }
-            else if (auto switchStmt = as<SwitchStmt>(stmt))
-            {
-                collectUsesFromExpr(switchStmt->condition);
-                collectUses(switchStmt->body);
-            }
-            else if (auto caseStmt = as<CaseStmt>(stmt))
-            {
-                collectUsesFromExpr(caseStmt->expr);
-                // CaseStmt body statements are siblings in the parent SeqStmt
-            }
-            // DefaultStmt has no body member - body statements are siblings
-        }
-
-        void collectUsesFromExpr(Expr* expr)
-        {
-            if (!expr)
-                return;
-
-            if (auto varExpr = as<VarExpr>(expr))
-            {
-                if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
-                {
-                    usedVars.add(varDecl);
-                }
-            }
-            else if (auto invokeExpr = as<InvokeExpr>(expr))
-            {
-                for (auto arg : invokeExpr->arguments)
-                    collectUsesFromExpr(arg);
-                collectUsesFromExpr(invokeExpr->functionExpr);
-            }
-            else if (auto memberExpr = as<MemberExpr>(expr))
-            {
-                collectUsesFromExpr(memberExpr->baseExpression);
-            }
-            else if (auto indexExpr = as<IndexExpr>(expr))
-            {
-                collectUsesFromExpr(indexExpr->baseExpression);
-                for (auto indexArg : indexExpr->indexExprs)
-                    collectUsesFromExpr(indexArg);
-            }
-            else if (auto assignExpr = as<AssignExpr>(expr))
-            {
-                collectUsesFromExpr(assignExpr->right);
-            }
-            else if (auto selectExpr = as<SelectExpr>(expr))
-            {
-                for (auto arg : selectExpr->arguments)
-                    collectUsesFromExpr(arg);
-            }
-            else if (auto operatorExpr = as<OperatorExpr>(expr))
-            {
-                for (auto arg : operatorExpr->arguments)
-                    collectUsesFromExpr(arg);
-            }
-            else if (auto castExpr = as<TypeCastExpr>(expr))
-            {
-                for (auto arg : castExpr->arguments)
-                    collectUsesFromExpr(arg);
-            }
+                    // Track variable declarations with initializers
+                    else if (auto varDecl = as<VarDecl>(node))
+                    {
+                        if (varDecl->initExpr)
+                        {
+                            assignedVars.add(varDecl);
+                        }
+                    }
+                });
         }
     };
 
@@ -7948,23 +7787,23 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // If this clause doesn't terminate, it falls through
             if (!clause.terminates)
             {
-                // Collect variables assigned in the source clause
+                // Collect variable references in the source clause
                 VarRefCollector sourceCollector;
                 for (auto bodyStmt : clause.bodyStmts)
                 {
-                    sourceCollector.collectAssignments(bodyStmt);
+                    sourceCollector.collect(bodyStmt);
                 }
 
-                // Collect variables used in the target clause
+                // Collect variable references in the target clause
                 auto& targetClause = clauses[i + 1];
                 VarRefCollector targetCollector;
                 for (auto bodyStmt : targetClause.bodyStmts)
                 {
-                    targetCollector.collectUses(bodyStmt);
+                    targetCollector.collect(bodyStmt);
                 }
 
                 // Variables that are assigned in source AND used in target
-                // need IRVar treatment
+                // need IRVar treatment to preserve fall-through semantics
                 for (auto var : sourceCollector.assignedVars)
                 {
                     if (targetCollector.usedVars.contains(var))
@@ -7974,9 +7813,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 }
 
                 // Also, variables used in source that are then used in target
-                // (if they could have different values) - this handles the
-                // case where a variable is read in source, then read again
-                // in target after fall-through
+                // need IRVar treatment - this handles the case where a variable
+                // is read in source, then read again in target after fall-through
                 for (auto var : sourceCollector.usedVars)
                 {
                     if (targetCollector.usedVars.contains(var))
