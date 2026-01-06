@@ -1,16 +1,8 @@
-// fallthrough-target-legalization.slang
-//
-// Test that generated output for targets that don't support fall-through
-// (DXBC/DX11, WGSL) eliminates fall-through, while targets that do support
-// it (DXIL/DX12, plain HLSL) preserve fall-through.
+// HLSL output for DXC - fall-through should be preserved
+//TEST:SIMPLE(filecheck=CHECK-HLSL6): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
 
-// Plain HLSL output (assumes DXC) - fall-through should be preserved
-// This test runs on all platforms
-//TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -entry computeMain -stage compute
-
-// DXBC (DX11) HLSL output - fall-through should be eliminated
-// This test only runs on Windows with FXC
-//TEST:SIMPLE(filecheck=CHECK-DXBC): -target dxbc -pass-through none -entry computeMain -stage compute
+// HLSL output for FXC - fall-through should be eliminated
+//TEST:SIMPLE(filecheck=CHECK-HLSL5): -target hlsl -profile cs_5_1 -pass-through none -entry computeMain -stage compute
 
 // WGSL output - fall-through should be eliminated (WGSL doesn't support fall-through)
 //TEST:SIMPLE(filecheck=CHECK-WGSL): -target wgsl -entry computeMain -stage compute
@@ -18,21 +10,21 @@
 // Metal output - fall-through should be preserved (Metal supports fall-through)
 //TEST:SIMPLE(filecheck=CHECK-METAL): -target metal -entry computeMain -stage compute
 
-// HLSL should have fall-through - case 0 does NOT have break before case 1
-// No warning should be emitted for HLSL (supports fall-through)
-// CHECK-HLSL-NOT: warning 41026
-// CHECK-HLSL: case int(0):
-// CHECK-HLSL: x_{{.*}} = int(100)
-// CHECK-HLSL-NOT: break
-// CHECK-HLSL: case int(1):
+// HLSL SM 6.0+ should have fall-through - case 0 does NOT have break before case 1
+// Warning should NOT be emitted for DXC (supports fall-through)
+// CHECK-HLSL6-NOT: warning 41026
+// CHECK-HLSL6: case int(0):
+// CHECK-HLSL6: x_{{.*}} = int(100)
+// CHECK-HLSL6-NOT: break
+// CHECK-HLSL6: case int(1):
 
-// DXBC should NOT have fall-through - case 0 has break before case 1
-// Warning should be emitted for DXBC (doesn't support fall-through)
-// CHECK-DXBC: warning 41026
-// CHECK-DXBC: case int(0):
-// CHECK-DXBC: x_{{.*}} = int(100)
-// CHECK-DXBC: break
-// CHECK-DXBC: case int(1):
+// HLSL SM 5.x should NOT have fall-through - case 0 has break before case 1
+// Warning should be emitted for FXC (doesn't support fall-through)
+// CHECK-HLSL5: warning 41026
+// CHECK-HLSL5: case int(0):
+// CHECK-HLSL5: x_{{.*}} = int(100)
+// CHECK-HLSL5: break
+// CHECK-HLSL5: case int(1):
 
 // WGSL should NOT have fall-through - case 0 has break before case 1
 // Warning should be emitted for WGSL (doesn't support fall-through)
