@@ -1203,13 +1203,15 @@ alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_E
 /// [EXT]
 alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderEXT;
 
-/// Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def glsl_nv : glsl + GL_NV_shader_invocation_reorder;
+/// SER (Shader Execution Reordering) on GLSL with NVIDIA NV extension.
+/// Used in __target_switch cases for NV-specific GLSL code paths.
+/// [Compound]
+alias ser_glsl_nv = glsl + _GL_NV_shader_invocation_reorder;
 
-/// Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def spirv_nv : spirv + spvShaderInvocationReorderNV;
+/// SER (Shader Execution Reordering) on SPIRV with NVIDIA NV capability.
+/// Used in __target_switch cases for NV-specific SPIRV code paths.
+/// [Compound]
+alias ser_spirv_nv = spirv + spvShaderInvocationReorderNV;
 
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
@@ -1253,6 +1255,11 @@ alias ser_dxr = raytracing + ser_hlsl_native;
 /// [Compound]
 alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
+/// NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
+/// Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
+/// [Compound]
+alias ser_nv = raytracing + GL_NV_shader_invocation_reorder | cuda;
+
 /// Capabilities needed for raytracing-motionblur
 /// [Compound]
 alias motionblur = GL_NV_ray_tracing_motion_blur | cuda;
@@ -1265,6 +1272,9 @@ alias raytracing_motionblur =  raytracing + motionblur | cuda;
 /// Capabilities needed for shader-execution-reordering and motion-blur
 /// [Compound]
 alias ser_motion = ser + motionblur;
+/// NVIDIA-specific SER + motion blur
+/// [Compound]
+alias ser_nv_motion = ser_nv + motionblur;
 /// Capabilities needed for realtime clocks
 /// [Compound]
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
@@ -2492,6 +2502,18 @@ alias ser_raygen = raygen + ser;
 /// Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias ser_raygen_closesthit_miss = raygen_closesthit_miss + ser;
+
+/// NVIDIA-specific SER for raygen stage (GLSL/SPIRV NV paths)
+/// [Compound]
+alias ser_nv_raygen = raygen + ser_nv;
+
+/// NVIDIA-specific SER for raygen, closesthit, miss stages (GLSL/SPIRV NV paths)
+/// [Compound]
+alias ser_nv_raygen_closesthit_miss = raygen_closesthit_miss + ser_nv;
+
+/// NVIDIA-specific SER + motion blur for raygen, closesthit, miss stages
+/// [Compound]
+alias ser_nv_motion_raygen_closesthit_miss = raygen_closesthit_miss + ser_nv_motion;
 
 /// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
 /// [Compound]

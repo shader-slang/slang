@@ -3455,7 +3455,17 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("hitObjectNV");
+            // Use EXT type if target has GL_EXT_shader_invocation_reorder capability,
+            // otherwise fall back to NV for backward compatibility
+            auto targetCaps = getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectEXT");
+            }
+            else
+            {
+                m_writer->emit("hitObjectNV");
+            }
             return;
         }
     case kIROp_TextureFootprintType:

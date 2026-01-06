@@ -30,9 +30,6 @@ Targets
 `glsl`
 > Represents the GLSL code generation target.
 
-`glsl_nv`
-> Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-
 `hlsl`
 > Represents the HLSL code generation target.
 
@@ -47,9 +44,6 @@ Targets
 
 `spirv`
 > Represents the SPIR-V code generation target.
-
-`spirv_nv`
-> Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
 
 `textualTarget`
 > Represents a non-assembly code generation target.
@@ -1313,6 +1307,10 @@ Compound Capabilities
 `ser_dxr_raygen_closesthit_miss`
 > Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen, closesthit, miss stages.
 
+`ser_glsl_nv`
+> SER (Shader Execution Reordering) on GLSL with NVIDIA NV extension.
+> Used in __target_switch cases for NV-specific GLSL code paths.
+
 `ser_motion`
 > Capabilities needed for shader-execution-reordering and motion-blur
 
@@ -1322,6 +1320,22 @@ Compound Capabilities
 `ser_motion_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
 
+`ser_nv`
+> NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
+> Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
+
+`ser_nv_motion`
+> NVIDIA-specific SER + motion blur
+
+`ser_nv_motion_raygen_closesthit_miss`
+> NVIDIA-specific SER + motion blur for raygen, closesthit, miss stages
+
+`ser_nv_raygen`
+> NVIDIA-specific SER for raygen stage (GLSL/SPIRV NV paths)
+
+`ser_nv_raygen_closesthit_miss`
+> NVIDIA-specific SER for raygen, closesthit, miss stages (GLSL/SPIRV NV paths)
+
 `ser_nvapi`
 > Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)
 
@@ -1330,6 +1344,10 @@ Compound Capabilities
 
 `ser_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
+
+`ser_spirv_nv`
+> SER (Shader Execution Reordering) on SPIRV with NVIDIA NV capability.
+> Used in __target_switch cases for NV-specific SPIRV code paths.
 
 `shader5_sm_4_0`
 > Capabilities required to use sm_4_0 features apart of GL_ARB_gpu_shader5
