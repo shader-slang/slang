@@ -1,7 +1,13 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
 
 import neural;
 #pragma warning(disable: 41017)
@@ -32,29 +38,31 @@ typealias DType = float;
 // TEST_INPUT:ubuffer(data=[0], stride=4, count=4096):name=inputBuffer
 RWStructuredBuffer<DType> inputBuffer;
 
+// TEST_INPUT:ubuffer(data=[0], stride=4, count=64):name=biasBuffer
+RWStructuredBuffer<DType> biasBuffer;
+
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-// TEST_INPUT:ubuffer(stride=4, count=64):out, name=resultBuffer
-RWStructuredBuffer<uint> resultBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=4096):name=debugBuffer
-RWStructuredBuffer<DType> debugBuffer;
+// // TEST_INPUT:ubuffer(stride=4, count=64):out, name=resultBuffer
+//RWStructuredBuffer<uint> resultBuffer;
+
+// // TEST_INPUT:ubuffer(stride=4, count=1024):out, name=debugBuffer
+// RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
 
 // Allocate large enough shared memory in this test.
 groupshared uint4 s_sharedMemoryA[256];
-groupshared uint4 s_sharedMemoryB[256];
-
-groupshared uint4 s_sharedMemoryC[512];
+groupshared uint4 s_sharedMemoryB[512];
 
 groupshared bool s_resultMem[BatchSize/32];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
 // Initialize the weight matrix as identity matrix.
-void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
+void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
 {
     if (InputSize <= BatchSize)
     {
@@ -63,7 +71,7 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
 
         // InputSize mount of threads are enough to fill the input buffer
         int index = tid * InputSize + tid;
-        if (clear)
+        if (Clear)
             inputBuffer[index] = DType(0);
         else
             inputBuffer[index] = DType(1);
@@ -75,12 +83,20 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
         {
             int row = tid + i * BatchSize;
             int index = row * InputSize + row;
-            if (clear)
+            if (Clear)
                 inputBuffer[index] = DType(0);
             else
                 inputBuffer[index] = DType(1);
         }
     }
+}
+
+void initBias(uint tid)
+{
+    if (tid < 64)
+        biasBuffer[tid] = DType(tid);
+
+    AllMemoryBarrierWithGroupSync();
 }
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
@@ -103,13 +119,16 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
     // In this test, we can safely share the shMemB and shMemC, because they are always used at different time.
     // And they are always the same size.
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = __getAddress(s_sharedMemoryC[0]);
+    SPtr ptrC = ptrB;
 
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+#if !TEST_BIAS
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+#else
+    Storage biasStorage = Storage(biasBuffer);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, storage, 0,
+                                                                                    biasStorage, Optional<Storage.Address>(0));
+#endif
 
-    // GroupMemoryBarrierWithGroupSync();
-
-    // only take a look at the first warp's shared memory
     // serialRead<DType>(tid, ptrC, 32);
     return res;
 }
@@ -157,7 +176,12 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
     {
-        if (output[i] != DType(tid + 1))
+#if !TEST_BIAS
+        DType expected = DType(tid + 1);
+#else
+        DType expected = DType(tid + 1) + DType(i);
+#endif
+        if (abs(output[i] - expected) > 1e-3)
         {
             res = false;
             break;
@@ -169,6 +193,7 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+
     __target_switch
     {
     case cuda:
@@ -190,7 +215,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     // we can reduce the result further
     if (laneId == 0)
     {
-        // Note max subgroupIndex is "BatchSize/32 - 1"
         s_resultMem[subgroupIndex] = res;
     }
 
@@ -215,16 +239,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
             outputBuffer[resIndex] = finalResult ? 1 : 0;
         }
     }
-
-    // if (resIndex == 4)
-    // {
-    //     for (int i = 0; i < OutputSize; i++)
-    //     {
-    //         int rowIdx = tid;
-    //         int index = rowIdx * OutputSize + i;
-    //         debugBuffer[index] = DType(outputVector[i]);
-    //     }
-    // }
 }
 
 
@@ -232,57 +246,59 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
+    initBias(tid);
+
     {
-        identityWeightMatrix<4>(tid);
+        identityWeightMatrix<4, false>(tid);
         AllMemoryBarrierWithGroupSync();
 
         test<4, 4>(tid, 0);
 
         AllMemoryBarrierWithGroupSync();
-        identityWeightMatrix<4>(tid, true);
+        identityWeightMatrix<4, true>(tid);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        identityWeightMatrix<8>(tid);
+        identityWeightMatrix<8, false>(tid);
         AllMemoryBarrierWithGroupSync();
 
         test<8, 8>(tid, 1);
 
         AllMemoryBarrierWithGroupSync();
-        identityWeightMatrix<8>(tid, true);
+        identityWeightMatrix<8, true>(tid);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        identityWeightMatrix<16>(tid);
+        identityWeightMatrix<16, false>(tid);
         AllMemoryBarrierWithGroupSync();
 
         test<16, 16>(tid, 2);
 
         AllMemoryBarrierWithGroupSync();
-        identityWeightMatrix<16>(tid, true);
+        identityWeightMatrix<16, true>(tid);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        identityWeightMatrix<32>(tid);
+        identityWeightMatrix<32, false>(tid);
         AllMemoryBarrierWithGroupSync();
 
         test<32, 32>(tid, 3);
-
         AllMemoryBarrierWithGroupSync();
-        identityWeightMatrix<32>(tid, true);
+
+        identityWeightMatrix<32, true>(tid);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        AllMemoryBarrierWithGroupSync();
-        identityWeightMatrix<64>(tid);
+        identityWeightMatrix<64, false>(tid);
         AllMemoryBarrierWithGroupSync();
 
         test<64, 64>(tid, 4);
     }
+
 
     // BUFFER: 1
     // BUFFER-NEXT: 1

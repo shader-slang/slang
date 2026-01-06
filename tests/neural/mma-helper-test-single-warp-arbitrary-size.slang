@@ -1,8 +1,12 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 import neural;
 #pragma warning(disable: 41017)
@@ -17,6 +21,9 @@ typealias DType = float;
 // Make the weight matrix a 64x64 matrix in row major order
 // TEST_INPUT:ubuffer(data=[0], stride=4, count=4096):name=inputBuffer
 RWStructuredBuffer<DType> inputBuffer;
+
+// TEST_INPUT:ubuffer(data=[0], stride=4, count=64):name=biasBuffer
+RWStructuredBuffer<DType> biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -51,6 +58,14 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
             inputBuffer[index] = DType(0.5);
         }
     }
+
+    if (tid == 0)
+    {
+        for (int i = 0; i < 64; i++)
+        {
+            biasBuffer[i] = DType(i);
+        }
+    }
 }
 
 
@@ -77,7 +92,13 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target>.Uint4Aligned
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
+#if !TEST_BIAS
     let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+#else
+    Storage biasStorage = Storage(biasBuffer);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, storage, 0,
+                                                                                      biasStorage, Optional<Storage.Address>(0));
+#endif
     // serialRead(tid, ptrC, 32);
     return res;
 }
@@ -132,9 +153,13 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     bool res = true;
     if (tid < OutputSize)
     {
-        DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
         for (int i = 0; i < OutputSize; i++)
         {
+#if !TEST_BIAS
+            DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
+#else
+            DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5) + DType(i);
+#endif
             if (outputVector[i] != DType(expected))
             {
                 res = false;

@@ -1,5 +1,12 @@
 implementing neural;
 
+#ifndef UNIT_TEST
+#define VISIBILITY_LEVEL public
+#else
+#define VISIBILITY_LEVEL internal
+#endif
+
+
 interface IArrayAccessor<T> : IRWArray<T>
 {
     internal void atomicAdd(int index, T value)
@@ -18,10 +25,11 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
 
 internal extension<T, int N> Array<T, N> : IArrayAccessor<T> {}
 
-internal enum AccessOp
+VISIBILITY_LEVEL enum AccessOp : uint32_t
 {
     READ,
     WRITE,
+    ACCUMULATE,
     ATOMIC_ADD,
 }
 
@@ -54,30 +62,7 @@ internal static void readOneElement<T, U, BufferType, int NBytes, int BitsShiftP
 }
 
 [ForceInline]
-internal static void writeOneElement<T, U, BufferType, int NBytes, int BitsShiftPerWrite>(out BufferType buffer, int bufferIdx, int elementIdx, uint value)
-    COMMON_TYPE_CONSTRAINTS
-{
-    const uint shift = BitsShiftPerWrite * elementIdx;
-    U convertedValue;
-    switch (NBytes)
-    {
-    case 1:
-        convertedValue = __realCast<U>(bit_cast<T>((uint8_t)(value >> shift)));
-        break;
-    case 2:
-        convertedValue = __realCast<U>(bit_cast<T>((uint16_t)(value >> shift)));
-        break;
-    case 4:
-        convertedValue = __realCast<U>(bit_cast<T>((uint)(value >> shift)));
-        break;
-    default:
-        static_assert(false, "Unsupported data type T");
-    }
-    buffer[bufferIdx] = convertedValue;
-}
-
-[ForceInline]
-internal static void atomicAddOneElement<T, U, BufferType, int NBytes, int BitsShiftPerWrite>(inout BufferType buffer, int bufferIdx, int elementIdx, uint value)
+internal static void writeOneElement<T, U, BufferType, int NBytes, int BitsShiftPerWrite, AccessOp Op>(inout BufferType buffer, int bufferIdx, int elementIdx, uint value)
     COMMON_TYPE_CONSTRAINTS
 {
     const uint shift = BitsShiftPerWrite * elementIdx;
@@ -97,7 +82,20 @@ internal static void atomicAddOneElement<T, U, BufferType, int NBytes, int BitsS
         static_assert(false, "Unsupported data type T");
     }
 
-    buffer.atomicAdd(bufferIdx, convertedValue);
+    switch (Op)
+    {
+    case AccessOp.WRITE:
+        buffer[bufferIdx] = convertedValue;
+        break;
+    case AccessOp.ACCUMULATE:
+        buffer[bufferIdx] = buffer[bufferIdx] +convertedValue;
+        break;
+    case AccessOp.ATOMIC_ADD:
+        buffer.atomicAdd(bufferIdx, convertedValue);
+        break;
+    default:
+        static_assert(false, "Unsupported access operation");
+    }
 }
 
 [ForceInline]
@@ -124,10 +122,9 @@ internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>(inout Buf
                 readOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
                 break;
             case AccessOp.WRITE:
-                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
-                break;
+            case AccessOp.ACCUMULATE:
             case AccessOp.ATOMIC_ADD:
-                atomicAddOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite>(buffer, index, j, value[i]);
+                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerWrite, Op>(buffer, index, j, value[i]);
                 break;
             default:
                 static_assert(false, "Unsupported access operation");
@@ -190,10 +187,9 @@ internal void accessUint4<AccessOp Op, T, U, BufferType, bool IsAligned, int Str
                 readOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
                 break;
             case AccessOp.WRITE:
-                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
-                break;
+            case AccessOp.ACCUMULATE:
             case AccessOp.ATOMIC_ADD:
-                atomicAddOneElement<T, U, BufferType, nBytes, BitsShiftPerRead>(buffer, index, j, value[i]);
+                writeOneElement<T, U, BufferType, nBytes, BitsShiftPerRead, Op>(buffer, index, j, value[i]);
                 break;
             default:
                 static_assert(false, "Unsupported access operation");

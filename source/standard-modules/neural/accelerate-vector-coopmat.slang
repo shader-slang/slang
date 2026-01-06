@@ -387,7 +387,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void vectorLoadStore<U, InputArray, bool isStore = false>(
+    internal static void vectorLoadStore<U, InputArray, AccessOp Op = AccessOp.READ>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
@@ -399,9 +399,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // select the correct shared memory layout configurations.
         // In store case, we actually store the MatC, whose data type could not be `half`.
-        const uint elementPerVector = isStore ? CMShape.ElementCountPerVectorMatC : CMShape.ElementCountPerVector;
-        const uint heightInVectorTile = isStore ? TileInfo.HeightInVectorTileC : TileInfo.HeightInVectorTileB;
-        const uint sharedMemSizeInVector = isStore ? ShMemInfo.SharedMemSizeInVectorMatC : ShMemInfo.SharedMemSizeInVectorMatB;
+        const uint elementPerVector = Op != AccessOp.READ ? CMShape.ElementCountPerVectorMatC : CMShape.ElementCountPerVector;
+        const uint heightInVectorTile = Op != AccessOp.READ ? TileInfo.HeightInVectorTileC : TileInfo.HeightInVectorTileB;
+        const uint sharedMemSizeInVector = Op != AccessOp.READ ? ShMemInfo.SharedMemSizeInVectorMatC : ShMemInfo.SharedMemSizeInVectorMatB;
 
         // In store case, we actually store the MatC. So the shared memory size could be different from MatB.
         SPtr<uint4> sharedMemoryBSubgroup = sharedMemoryB + subgroupIndex * sharedMemSizeInVector;
@@ -410,6 +410,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         const uint indexInVectorizedTile = laneId * heightInVectorTile;
         const uint yOffset = (tileIndex * heightInVectorTile) * elementPerVector;
 
+        [ForceUnroll]
         for (uint yInTile = 0; yInTile < heightInVectorTile; yInTile++)
         {
             const int startIndex = yInTile * elementPerVector + yOffset;
@@ -419,21 +420,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // thread will definitely have its thread-local vector available.
 
             bool isOutOfRange;
-            if (isStore)
-            {
-                // for vector store, the length of output vector has length of M in normal case
-                // and K in transpose case.
-                isOutOfRange = TransposeA ? (startIndex >= K) : (startIndex >= M);
 
-                // No padding needs for writing back to local vector.
-                if (isOutOfRange)
-                    return;
-
-                // in store case, we always store MatC, so the data type is T.
-                uint4 value = sharedMemoryBSubgroup[indexInVectorizedTile + yInTile];
-                accessUint4Aligned<AccessOp.WRITE, T, U, InputArray>(inoutVector, startIndex, value);
-            }
-            else
+            if (Op == AccessOp.READ)
             {
                 // For vector load, we are performing MMA, so the input vector has length of K
                 // in normal case, and M in transpose case.
@@ -451,6 +439,20 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // Note we can only use half type for matrix A and B, the value must be packed by 8 half type elements.
                 accessUint4Aligned<AccessOp.READ, half, U, InputArray>(inoutVector, startIndex, value);
                 sharedMemoryBSubgroup[indexInVectorizedTile + yInTile] = value;
+            }
+            else
+            {
+                // for vector store, the length of output vector has length of M in normal case
+                // and K in transpose case.
+                isOutOfRange = TransposeA ? (startIndex >= K) : (startIndex >= M);
+
+                // No padding needs for writing back to local vector.
+                if (isOutOfRange)
+                    return;
+
+                // in store case, we always store MatC, so the data type is T.
+                uint4 value = sharedMemoryBSubgroup[indexInVectorizedTile + yInTile];
+                accessUint4Aligned<Op, T, U, InputArray>(inoutVector, startIndex, value);
             }
         }
 # if 0
@@ -496,7 +498,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             where U : __BuiltinFloatingPointType
             where InputArray : IArrayAccessor<U>
     {
-        vectorLoadStore<U, InputArray, false>(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
+        vectorLoadStore<U, InputArray, AccessOp.READ>(sharedMemoryB, tileIndex, subgroupIndex, inputVector);
     }
 
     // Load the input vector into shared memory. Each input vector is a column of the matrix B.
@@ -504,15 +506,15 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // column of the matrix B.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void storeVectorFromShB<U, InputArray>(
+    VISIBILITY_LEVEL static void storeVectorFromShB<U, InputArray, AccessOp Op = AccessOp.WRITE>(
         SPtr<uint4> sharedMemoryB,
         int tileIndex,
         int subgroupIndex,
-        out InputArray outputVector)
+        inout InputArray inoutVector)
             where U : __BuiltinFloatingPointType
             where InputArray : IArrayAccessor<U>
     {
-        vectorLoadStore<U, InputArray, true>(sharedMemoryB, tileIndex, subgroupIndex, outputVector);
+        vectorLoadStore<U, InputArray, Op>(sharedMemoryB, tileIndex, subgroupIndex, inoutVector);
     }
 
     // Read one complete vector into the shared memory. Different from the loadVectorToShB,
@@ -554,7 +556,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     }
 
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void sumReduce<int ROW, int COLUMN>(inout MatC matC[ROW*COLUMN], in int subgroupId, SPtr<uint4> sharedMemory)
+    internal static void sumReduceTiles<int ROW, int COLUMN>(inout MatC matC[ROW*COLUMN], in int subgroupId, SPtr<uint4> sharedMemory)
     {
         const int subgroupCount = getWaveCount();
 
@@ -779,7 +781,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         GroupMemoryBarrierWithGroupSync();
         // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
-        sumReduce<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryB);
+        sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryB);
 
         if (subgroupIndex == 0)
         {
@@ -800,65 +802,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, true>;
                 MMA.storeShA<U, Storage>(sharedMemoryB, i, weightStorage, weightAddress);
-            }
-        }
-    }
-
-    [require(cooperative_matrix, subgroup_basic)]
-    internal static void initMatC<U, Storage, bool Bias>(
-        SPtr<uint4> shMemB,
-        inout MatC[TileInfo.NCoopMat] matC,
-        Optional<Storage> biasStorage,
-        Optional<Storage.Address> biasAddress)
-        where U : __BuiltinFloatingPointType
-        where U.Differential == U
-        where Storage : IStorage<U>
-    {
-        if (!Bias)
-        {
-            [ForceUnroll]
-            for (int i = 0; i < TileInfo.NCoopMat; i++)
-            {
-                matC[i].fill(T(0.0f));
-            }
-            return;
-        }
-
-        // Read the bias from global memory into the bias vector.
-        // Bias is like Matrix A, which is shared by all threads. So all the threads will read the same global address for bias.
-        U[TileInfo.Uint4AlignedK] biasVector;
-        [ForceUnroll]
-        for (int i = 0; i < K; i++)
-        {
-            let offset = Storage.getOffset(biasAddress.value, i);
-            biasVector[i] = biasStorage.value.read(offset);
-        }
-
-        [ForceUnroll]
-        for (int i = K; i < TileInfo.Uint4AlignedK; i++)
-        {
-            biasVector[i] = U(0.0f);
-        }
-
-        uint subgroupIndex = getWaveId();
-
-        [ForceUnroll]
-        for (int i = 0; i < TileInfo.NCoopMatRow; i++)
-        {
-            // We only need one subgroup to load the bias vector into the shared memory.
-            if (subgroupIndex == 0)
-                loadVectorToShB(shMemB, i, 0, biasVector);
-
-            // Wait so all threads in the group can access the shared memory
-            GroupMemoryBarrierWithGroupSync();
-
-            [ForceUnroll]
-            for (int j = 0; j < TileInfo.NCoopMatColumn; j++)
-            {
-                // Load bias vector into MatC.
-                int index = i * TileInfo.NCoopMatColumn + j;
-                matC[index].Load<ColumnMajor, uint4>( shMemB + j * CMShape.CoopMatCSizeInVector,
-                    TileInfo.HeightInVectorTileC);
             }
         }
     }
@@ -906,10 +849,24 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // fetch first tile of Matrix A and Matrix B into shared memory
         // Iterate over the K dimension, T.COLUMN is column of Matrix A.
         uint bufferIndex = 0;
-
         MatC matC[TileInfo.NCoopMat];
+        [ForceUnroll]
+        for (int i = 0; i < TileInfo.NCoopMat; i++)
+        {
+            matC[i].fill(T(0.0f));
+        }
 
-        initMatC<U, Storage, Bias>(ptrB[0], matC, biasStorage, biasAddress);
+        OutArrayType outputVector;
+        if (Bias)
+        {
+            [ForceUnroll]
+            for (int i = 0; i < M; i++)
+            {
+                Storage.Address offset = Storage.getOffset(biasAddress.value, i);
+                U bias = biasStorage.value.read(offset);
+                outputVector[i] = __realCast<V>(bias);
+            }
+        }
 
         for (int k = 0; k < TileInfo.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
@@ -976,28 +933,36 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
         }
 
-        // Write back the result to shared memory C. We store the result in column major because each column is
+        // Write back the result to shared memory B. We store the result in column major because each column is
         // actually the output vector of the matrix-vector multiply, which is also a thread-local vector.
-        // TODO: First, get the offset of C for each warp.
-        OutArrayType outputVector;
 
         // Get start address of the shared memory for current warp.
         SPtr<uint4> ptrPerWarp = ptrC + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatC;
 
+        [ForceUnroll]
         for (int i = 0; i < TileInfo.NCoopMatRow; i ++)
         {
+            [ForceUnroll]
             for (int j = 0; j < TileInfo.NCoopMatColumn; j ++)
             {
                 int index = i * TileInfo.NCoopMatColumn + j;
                 matC[index].Store<ColumnMajor, uint4>(ptrPerWarp + j * CMShape.CoopMatCSizeInVector,
                                 TileInfo.HeightInVectorTileC);
             }
-            // Store one row of tiled result matrix back to the thread-local vector.
-            storeVectorFromShB(ptrC, i, subgroupIndex, outputVector);
+
+            if (Bias)
+            {
+                storeVectorFromShB<V, OutArrayType, AccessOp.ACCUMULATE>(ptrC, i, subgroupIndex, outputVector);
+            }
+            else
+            {
+                storeVectorFromShB<V, OutArrayType, AccessOp.WRITE>(ptrC, i, subgroupIndex, outputVector);
+            }
 
             // Wave sync is good enough, because shared memory C is only shared by each subgroup.
             GroupMemoryBarrierWithWaveSync();
         }
+
         return outputVector;
     }
 }
@@ -1130,8 +1095,6 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
 
         // This.Differential is the derivative of the input vector, which is the output
         // of the mma operation.
-        // This.Differential outArray;
-
         // dIn = W^T * dOut;
 #if 1
         let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
