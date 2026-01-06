@@ -10,7 +10,6 @@
 
 namespace Slang
 {
-
 enum class Severity
 {
     Disable,
@@ -149,6 +148,8 @@ struct DiagnosticArg
     }
 };
 
+struct GenericDiagnostic;
+
 class DiagnosticSink
 {
 public:
@@ -167,6 +168,8 @@ public:
                                          ///< overrides) into Error type messages
             LanguageServer =
                 0x10, ///< If set will format message in a way that is suitable for language server
+            AlwaysGenerateRichDiagnostics =
+                0x20, ///< Convert old style diagnostics to the new style
         };
     };
 
@@ -180,15 +183,41 @@ public:
     template<typename P, typename... Args>
     bool diagnose(P const& pos, DiagnosticInfo const& info, Args const&... args)
     {
-        DiagnosticArg as[] = {DiagnosticArg(args)...};
-        return diagnoseImpl(getDiagnosticPos(pos), info, sizeof...(args), as);
+        // If we want to force generation of rich diagnostics do that here
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        {
+            DiagnosticArg as[] = {DiagnosticArg(args)...};
+            return diagnoseRichImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
+        }
+        else
+        {
+            DiagnosticArg as[] = {DiagnosticArg(args)...};
+            return diagnoseImpl(getDiagnosticPos(pos), info, (int)sizeof...(args), as);
+        }
     }
 
     template<typename P>
     bool diagnose(P const& pos, DiagnosticInfo const& info)
     {
-        // MSVC gets upset with the zero sized array above, so overload that case here
-        return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        // If we want to force generation of rich diagnostics do that here
+        if (isFlagSet(Flag::AlwaysGenerateRichDiagnostics))
+        {
+            return diagnoseRichImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        }
+        else
+        {
+            return diagnoseImpl(getDiagnosticPos(pos), info, 0, nullptr);
+        }
+    }
+
+    //
+    // This template function should be called with the structs generated from
+    // slang-diagnostics.lua (defined in slang-rich-diagnostics.h)
+    //
+    template<typename D>
+    bool diagnose(D const& d)
+    {
+        return diagnoseRichImpl(d.toGenericDiagnostic());
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
@@ -289,13 +318,23 @@ public:
     ISlangWriter* writer = nullptr;
 
 protected:
-    // Returns true if a diagnostic is actually written.
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseImpl(
         SourceLoc const& pos,
         DiagnosticInfo info,
-        int argCount,
+        std::size_t argCount,
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
+
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+
+    // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
+    bool diagnoseRichImpl(
+        SourceLoc const& loc,
+        DiagnosticInfo const& info,
+        std::size_t argCount,
+        DiagnosticArg const* args);
 
     Severity getEffectiveMessageSeverity(DiagnosticInfo const& info, SourceLoc const& location);
 
