@@ -7721,9 +7721,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     // Track assignments
                     else if (auto assignExpr = as<AssignExpr>(node))
                     {
-                        if (auto varExpr = as<VarExpr>(assignExpr->left))
+                        if (auto leftVarExpr = as<VarExpr>(assignExpr->left))
                         {
-                            if (auto varDecl = as<VarDeclBase>(varExpr->declRef.getDecl()))
+                            if (auto varDecl = as<VarDeclBase>(leftVarExpr->declRef.getDecl()))
                             {
                                 assignedVars.add(varDecl);
                             }
