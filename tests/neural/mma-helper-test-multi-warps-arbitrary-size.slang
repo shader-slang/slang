@@ -9,14 +9,13 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 import neural;
+import common;
 #pragma warning(disable: 41017)
 
 #if TEST_HALF
 typealias DType = half;
-static const half epsilon = 0.3h;
 #else
 typealias DType = float;
-static const float epsilon = 0.1f;
 #endif
 
 // This test verifies that the tiled MMA load operations work correctly.
@@ -74,19 +73,10 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
         for (int j = 0; j < InputSize; j++)
         {
             int index = startIndex + j;
-            inputBuffer[index] = DType(0.1f);
+            inputBuffer[index] = DType(0.125f);
         }
     }
 }
-
-void initBias(uint tid)
-{
-    if (tid < 64)
-        biasBuffer[tid] = DType(tid);
-
-    AllMemoryBarrierWithGroupSync();
-}
-
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM]
 testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
@@ -181,14 +171,15 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
     for (int i = 0; i < OutputSize; i++)
     {
-        DType scaleFactor = DType(0.1f);
+        DType scaleFactor = DType(0.125f);
 #if !TEST_BIAS
-        DType expected = DType(tid + 1) * DType(InputSize) * scaleFactor;
+        DType expected = DType((tid + 1) * InputSize) * DType(scaleFactor);
 #else
-        DType expected = DType(tid + 1) * DType(InputSize) * scaleFactor + DType(i);
+        DType expected = DType((tid + 1) * InputSize) * DType(scaleFactor) + DType(i);
 #endif
-        if (abs(outputVector[i] - expected) > epsilon)
+        if (!equals(outputVector[i], expected))
         {
+            // printf("tid: %d, i: %d, expected: %.4f, actual: %.4f\n", tid, i, float(expected), float(outputVector[i]));
             res = false;
             break;
         }
@@ -230,7 +221,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    initBias(tid);
+    initBias<DType, 64>(tid, biasBuffer);
 
     {
         fillWeightMatrix<3, 5>(tid);

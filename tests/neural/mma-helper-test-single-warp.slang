@@ -10,8 +10,9 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
-import neural;
 #pragma warning(disable: 41017)
+import neural;
+import common;
 
 #if TEST_HALF
 typealias DType = half;
@@ -171,16 +172,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         break;
     }
 
-    // if (tid == 1)
-    // {
-    //     // expect 2 2 2 2 + 0 1 2 3 = 2 3 4 5
-    //     for (int i = 0; i < OutputSize; i++)
-    //     {
-    //         printf("%.1f ", float(outputVector[i]));
-    //     }
-    //     printf("\n");
-    // }
-
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
     {
@@ -189,7 +180,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 #else
         DType expected = DType(tid + i + 1);
 #endif
-        if (outputVector[i] != expected)
+        if (!equals(outputVector[i], expected))
         {
             res = false;
             break;
@@ -206,6 +197,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
+    initBias<DType, 64>(tid, biasBuffer);
+
     {
         identityWeightMatrix<4>(tid);
         GroupMemoryBarrierWithWaveSync();
