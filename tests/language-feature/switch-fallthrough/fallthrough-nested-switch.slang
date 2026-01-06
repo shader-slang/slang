@@ -60,6 +60,7 @@ int test(int outer, int inner)
     return result;
 }
 
+[shader("compute")]
 [numthreads(9, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {

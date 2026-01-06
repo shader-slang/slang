@@ -51,6 +51,7 @@ int test(int val)
     return result;
 }
 
+[shader("compute")]
 [numthreads(5, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
