@@ -4,8 +4,9 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
-import neural;
 #pragma warning(disable: 41017)
+import neural;
+import common;
 
 #if TEST_HALF
 typealias DType = half;
@@ -197,7 +198,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     for (int i = 0; i < COL; i++)
     {
         DType expected = DType(scaleFactor * (i + 1.0f) * (tid + 1.0f));
-        if (outputVector[i] != DType(expected))
+        if (!equals(outputVector[i], expected))
         {
             res = false;
             break;

@@ -8,9 +8,10 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
-
-import neural;
 #pragma warning(disable: 41017)
+import neural;
+import common;
+
 
 #if TEST_HALF
 typealias DType = half;
@@ -89,14 +90,6 @@ void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
                 inputBuffer[index] = DType(1);
         }
     }
-}
-
-void initBias(uint tid)
-{
-    if (tid < 64)
-        biasBuffer[tid] = DType(tid);
-
-    AllMemoryBarrierWithGroupSync();
 }
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
@@ -181,7 +174,7 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
 #else
         DType expected = DType(tid + 1) + DType(i);
 #endif
-        if (abs(output[i] - expected) > 1e-3)
+        if (!equals(output[i], expected))
         {
             res = false;
             break;
@@ -246,7 +239,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    initBias(tid);
+    initBias<DType, 64>(tid, biasBuffer);
 
     {
         identityWeightMatrix<4, false>(tid);
