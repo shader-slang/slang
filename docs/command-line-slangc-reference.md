@@ -1340,8 +1340,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
-* `glsl_nv` 
-* `spirv_nv` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
@@ -1458,6 +1456,8 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
 * `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
+* `glsl_nv` 
+* `spirv_nv` 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
@@ -1686,6 +1686,10 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_raygen_closesthit_miss_spirv_nv` 
+* `ser_raygen_closesthit_miss_spirv_ext` 
+* `ser_raygen_closesthit_miss_glsl_nv` 
+* `ser_raygen_closesthit_miss_glsl_ext` 
 * `ser_any_closesthit_intersection_miss` 
 * `ser_anyhit_closesthit_intersection` 
 * `ser_anyhit_closesthit` 
