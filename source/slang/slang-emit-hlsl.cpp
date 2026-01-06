@@ -1618,6 +1618,7 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
     {
         m_writer->emit(" : ");
         m_writer->emit(semanticDecoration->getSemanticName());
+        m_writer->emit(semanticDecoration->getSemanticIndex());
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
