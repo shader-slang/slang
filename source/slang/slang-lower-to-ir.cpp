@@ -7657,10 +7657,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     // when we encounter a new case/default label.
     // We use an index instead of a pointer because adding to the List
     // may reallocate and invalidate pointers.
-    void extractCaseClauses(
-        Stmt* inStmt,
-        List<CaseClauseInfo>& clauses,
-        Index& currentClauseIndex)
+    void extractCaseClauses(Stmt* inStmt, List<CaseClauseInfo>& clauses, Index& currentClauseIndex)
     {
         Stmt* stmt = inStmt;
 
