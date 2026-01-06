@@ -108,7 +108,6 @@ void BasicTestWithoutBias(int tid, int resIndex)
     isPassed = isPassed &&
         dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
-
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
     //    = [[1, 2, 3, 4]; [1, 2, 3, 4]]
