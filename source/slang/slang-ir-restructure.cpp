@@ -640,16 +640,21 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     {
                         caseEndLabel = potentialFallThroughTarget;
                     }
-                    else if (!ctx->preserveFallThrough && potentialFallThroughTarget &&
-                             !warnedAboutFallthrough && ctx->getSink())
+                    else if (
+                        !ctx->preserveFallThrough && potentialFallThroughTarget &&
+                        !warnedAboutFallthrough && ctx->getSink())
                     {
                         // Check if this case actually falls through
                         HashSet<IRBlock*> visited;
                         if (caseBlocksFallThroughTo(
-                                caseLabel, potentialFallThroughTarget, breakLabel, visited))
+                                caseLabel,
+                                potentialFallThroughTarget,
+                                breakLabel,
+                                visited))
                         {
                             ctx->getSink()->diagnose(
-                                switchInst, Diagnostics::switchFallthroughRestructured);
+                                switchInst,
+                                Diagnostics::switchFallthroughRestructured);
                             warnedAboutFallthrough = true;
                         }
                     }
