@@ -19,24 +19,32 @@
 //TEST:SIMPLE(filecheck=CHECK-METAL): -target metal -entry computeMain -stage compute
 
 // HLSL should have fall-through - case 0 does NOT have break before case 1
+// No warning should be emitted for HLSL (supports fall-through)
+// CHECK-HLSL-NOT: warning 41026
 // CHECK-HLSL: case int(0):
 // CHECK-HLSL: x_{{.*}} = int(100)
 // CHECK-HLSL-NOT: break
 // CHECK-HLSL: case int(1):
 
 // DXBC should NOT have fall-through - case 0 has break before case 1
+// Warning should be emitted for DXBC (doesn't support fall-through)
+// CHECK-DXBC: warning 41026
 // CHECK-DXBC: case int(0):
 // CHECK-DXBC: x_{{.*}} = int(100)
 // CHECK-DXBC: break
 // CHECK-DXBC: case int(1):
 
 // WGSL should NOT have fall-through - case 0 has break before case 1
+// Warning should be emitted for WGSL (doesn't support fall-through)
+// CHECK-WGSL: warning 41026
 // CHECK-WGSL: case i32(0):
 // CHECK-WGSL: x_{{.*}} = i32(100)
 // CHECK-WGSL: break
 // CHECK-WGSL: case i32(1):
 
 // Metal should have fall-through - case 0 does NOT have break before case 1
+// No warning should be emitted for Metal (supports fall-through)
+// CHECK-METAL-NOT: warning 41026
 // CHECK-METAL: case int(0):
 // CHECK-METAL: x_{{.*}} = int(100)
 // CHECK-METAL-NOT: break

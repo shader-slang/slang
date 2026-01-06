@@ -2636,7 +2636,7 @@ DIAGNOSTIC(
     "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
-    41025,
+    41026,
     Warning,
     switchFallthroughRestructured,
     "switch fall-through is not supported by this target and will be restructured; "
