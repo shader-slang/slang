@@ -21,6 +21,7 @@ feature is implemented.
 
 - `basic-fallthrough-var.slang` - Basic variable modification across fall-through
 - `fallthrough-chain.slang` - Chain of fall-through cases
+- `fallthrough-transitive-chain.slang` - Variables assigned in one case, used 2+ cases later
 - `fallthrough-to-default.slang` - Fall-through from case to default
 - `fallthrough-var-declared-in-case.slang` - Variable scoping with fall-through
 - `fallthrough-mixed-break-and-fallthrough.slang` - Mix of break and fall-through
