@@ -7653,12 +7653,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     };
 
     // Extract case clauses from a switch body for analysis
-    // Note: currentClause is passed by reference so we can update it
-    // when we encounter a new case/default label
+    // Note: currentClauseIndex is passed by reference so we can update it
+    // when we encounter a new case/default label.
+    // We use an index instead of a pointer because adding to the List
+    // may reallocate and invalidate pointers.
     void extractCaseClauses(
         Stmt* inStmt,
         List<CaseClauseInfo>& clauses,
-        CaseClauseInfo*& currentClause)
+        Index& currentClauseIndex)
     {
         Stmt* stmt = inStmt;
 
@@ -7672,7 +7674,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             for (auto childStmt : seqStmt->stmts)
             {
-                extractCaseClauses(childStmt, clauses, currentClause);
+                extractCaseClauses(childStmt, clauses, currentClauseIndex);
             }
         }
         else if (as<CaseStmt>(stmt) || as<DefaultStmt>(stmt))
@@ -7681,14 +7683,14 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             CaseClauseInfo newClause;
             newClause.labelStmt = stmt;
             clauses.add(newClause);
-            currentClause = &clauses.getLast();
+            currentClauseIndex = clauses.getCount() - 1;
         }
         else if (!as<EmptyStmt>(stmt))
         {
             // Add to current clause's body
-            if (currentClause)
+            if (currentClauseIndex >= 0)
             {
-                currentClause->bodyStmts.add(stmt);
+                clauses[currentClauseIndex].bodyStmts.add(stmt);
             }
         }
     }
@@ -7919,8 +7921,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     {
         // Extract case clauses from the switch body
         List<CaseClauseInfo> clauses;
-        CaseClauseInfo* currentClause = nullptr;
-        extractCaseClauses(stmt->body, clauses, currentClause);
+        Index currentClauseIndex = -1;
+        extractCaseClauses(stmt->body, clauses, currentClauseIndex);
 
         // Check which clauses terminate and which fall through
         for (Index i = 0; i < clauses.getCount(); i++)
