@@ -1,6 +1,7 @@
 // slang-diagnostic-sink.cpp
 #include "slang-diagnostic-sink.h"
 
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-char-util.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-memory-arena.h"
@@ -78,7 +79,7 @@ SourceLoc getDiagnosticPos(Token const& token)
 static void formatDiagnosticMessage(
     StringBuilder& sb,
     char const* format,
-    int argCount,
+    std::size_t argCount,
     DiagnosticArg const* args)
 {
     char const* spanBegin = format;
@@ -121,7 +122,7 @@ static void formatDiagnosticMessage(
         case '9':
             {
                 int index = d - '0';
-                if (index >= argCount)
+                if (index >= Index(argCount))
                 {
                     // TODO(tfoley): figure out what a good policy will be for "panic" situations
                     // like this
@@ -624,6 +625,62 @@ bool DiagnosticSink::diagnoseImpl(
     return true;
 }
 
+bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
+{
+    if (diagnostic.severity >= Severity::Error)
+    {
+        m_errorCount++;
+    }
+
+    String message = renderDiagnostic(
+        getSourceLocationLexer(),
+        getSourceManager(),
+        {.enableTerminalColors = false},
+        diagnostic);
+
+    if (writer)
+    {
+        writer->write(message.begin(), message.getLength());
+    }
+    else
+    {
+        outputBuffer.append(message);
+    }
+
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseRichImpl(diagnostic);
+    }
+
+    if (diagnostic.severity >= Severity::Fatal)
+    {
+        // TODO: figure out a better policy for aborting compilation
+        SLANG_ABORT_COMPILATION("fatal error encountered");
+    }
+    return true;
+}
+
+// Fallback to diagnose from the old diagnostic messages
+bool DiagnosticSink::diagnoseRichImpl(
+    SourceLoc const& loc,
+    DiagnosticInfo const& info,
+    std::size_t argCount,
+    DiagnosticArg const* args)
+{
+    StringBuilder sb;
+    formatDiagnosticMessage(sb, info.messageFormat, argCount, args);
+
+    GenericDiagnostic diagnostic;
+    diagnostic.code = info.id;
+    diagnostic.severity = info.severity;
+    diagnostic.message = sb.produceString();
+
+    diagnostic.primarySpan.range = SourceRange{loc};
+    diagnostic.primarySpan.message = "";
+
+    return diagnoseRichImpl(diagnostic);
+}
+
 Severity DiagnosticSink::getEffectiveMessageSeverity(
     DiagnosticInfo const& info,
     SourceLoc const& location)
@@ -657,7 +714,7 @@ Severity DiagnosticSink::getEffectiveMessageSeverity(
 bool DiagnosticSink::diagnoseImpl(
     SourceLoc const& pos,
     DiagnosticInfo info,
-    int argCount,
+    std::size_t argCount,
     DiagnosticArg const* args)
 {
     // Override the severity in the 'info' structure to pass it further into formatDiagnostics
@@ -879,6 +936,5 @@ void outputExceptionDiagnostic(DiagnosticSink& sink, slang::IBlob** outDiagnosti
     }
     sink.getBlobIfNeeded(outDiagnostics);
 }
-
 
 } // namespace Slang

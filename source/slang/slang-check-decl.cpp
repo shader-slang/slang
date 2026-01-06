@@ -17,6 +17,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -9396,31 +9397,58 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         _addTargetModifiers(newDecl, newTargets);
 
         bool hasConflict = false;
+
+        //
+        // Example testcase for new diagnostics, the flow below is very much as
+        // it was except instead of emitting diagnostics as we go, we build up
+        // this Diagnositcs::FunctionRedefinition struct and emit it at the end
+        //
+        Diagnostics::FunctionRedefinition diagnostic;
+
         for (auto& [target, value] : newTargets)
         {
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                // Redefinition
-                if (!hasConflict)
+                if (getOptionSet().shouldEmitRichDiagnostics())
                 {
+                    if (!hasConflict)
+                    {
+                        diagnostic = Diagnostics::FunctionRedefinition{
+                            .name = newDecl->getName(),
+                            .function_location = newDecl->getNameLoc()};
+                    }
+                    auto prevDecl = *found;
+                    diagnostic.original_location = prevDecl->getNameLoc();
+                }
+                else
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(
+                            newDecl,
+                            Diagnostics::functionRedefinition,
+                            newDecl->getName());
+                    }
+
+                    auto prevDecl = *found;
                     getSink()->diagnose(
-                        newDecl,
-                        Diagnostics::functionRedefinition,
-                        newDecl->getName());
-                    hasConflict = true;
+                        prevDecl,
+                        Diagnostics::seePreviousDefinitionOf,
+                        prevDecl->getName());
                 }
 
-                auto prevDecl = *found;
-                getSink()->diagnose(
-                    prevDecl,
-                    Diagnostics::seePreviousDefinitionOf,
-                    prevDecl->getName());
+                hasConflict = true;
             }
         }
 
         if (hasConflict)
         {
+            if (getOptionSet().shouldEmitRichDiagnostics())
+            {
+                getSink()->diagnose(diagnostic);
+            }
             return SLANG_FAIL;
         }
     }

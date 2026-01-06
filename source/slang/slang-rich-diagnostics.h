@@ -1,15 +1,9 @@
 #pragma once
 
-#ifdef SLANG_PROTOTYPE_DIAGNOSTICS
-
 #include "../compiler-core/slang-diagnostic-sink.h"
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-basic.h"
 
-// Forward declaration for Type
-namespace Slang
-{
-class Type;
-}
 
 //
 #include "slang-rich-diagnostics.h.fiddle"
@@ -17,21 +11,7 @@ class Type;
 namespace Slang
 {
 
-// Generic diagnostic representation for layout rendering
-struct DiagnosticSpan
-{
-    SourceLoc location;
-    String message;
-};
-
-struct GenericDiagnostic
-{
-    int code;
-    String severity;
-    String message;
-    DiagnosticSpan primarySpan;
-    List<DiagnosticSpan> secondarySpans;
-};
+class Type;
 
 namespace Diagnostics
 {
@@ -41,18 +21,17 @@ namespace Diagnostics
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
-%     local params = lua_module.getUniqueParams(diagnostic)
+%     local class_name = lua_module.toPascalCase(diagnostic.name) 
 struct $(class_name)
 {
-%     for _, param in ipairs(params) do
-    $(param.cpp_type) $(param.name);
+%     for _, param in ipairs(diagnostic.params) do
+%         local type = lua_module.getCppType(param.type)
+%         local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+    $(type) $(param.name) = $(initializer);
 %     end
-    SourceLoc $(diagnostic.primary_span.location);
-%     if diagnostic.secondary_spans then
-%         for _, span in ipairs(diagnostic.secondary_spans) do
-    SourceLoc $(span.location);
-%         end
+
+%     for _, loc in ipairs(diagnostic.locations) do
+    SourceLoc $(loc.name) = SourceLoc{};
 %     end
 
     GenericDiagnostic toGenericDiagnostic() const;
@@ -67,5 +46,3 @@ struct $(class_name)
 
 } // namespace Diagnostics
 } // namespace Slang
-
-#endif // SLANG_PROTOTYPE_DIAGNOSTICS
