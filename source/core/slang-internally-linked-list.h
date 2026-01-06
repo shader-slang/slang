@@ -119,7 +119,7 @@ private:
 };
 
 template<typename T>
-using InternallyLinkedListNode = InternallyLinkedList<T>::Node;
+using InternallyLinkedListNode = typename InternallyLinkedList<T>::Node;
 
 } // namespace Slang
 
