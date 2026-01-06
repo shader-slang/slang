@@ -1,15 +1,22 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 import neural;
 #pragma warning(disable: 41017)
 
 #if TEST_HALF
 typealias DType = half;
+static const half epsilon = 0.3h;
 #else
 typealias DType = float;
+static const float epsilon = 0.1f;
 #endif
 
 // This test verifies that the tiled MMA load operations work correctly.
@@ -32,10 +39,13 @@ typealias DType = float;
 // TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
 RWStructuredBuffer<DType> inputBuffer;
 
+// TEST_INPUT:ubuffer(data=[0], stride=4, count=64):name=biasBuffer
+RWStructuredBuffer<DType> biasBuffer;
+
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-// TEST_INPUT:ubuffer(stride=4, count=4096):name=debugBuffer
+// TEST_INPUT:ubuffer(stride=4, count=512):out, name=debugBuffer
 RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
@@ -43,13 +53,13 @@ static const int SubgroupSize = 32;
 
 // Allocate large enough shared memory in this test.
 groupshared uint4 s_sharedMemoryA[256];
-groupshared uint4 s_sharedMemoryB[256];
+groupshared uint4 s_sharedMemoryB[512];
 
 groupshared bool s_resultMem[BatchSize/32];
 
 typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
-// Initialize the weight matrix as 0.5
+// Initialize the weight matrix as 0.1
 void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
 {
     uint numIter = (OutputSize + BatchSize - 1) / BatchSize;
@@ -64,9 +74,17 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
         for (int j = 0; j < InputSize; j++)
         {
             int index = startIndex + j;
-            inputBuffer[index] = DType(0.5);
+            inputBuffer[index] = DType(0.1f);
         }
     }
+}
+
+void initBias(uint tid)
+{
+    if (tid < 64)
+        biasBuffer[tid] = DType(tid);
+
+    AllMemoryBarrierWithGroupSync();
 }
 
 
@@ -93,12 +111,17 @@ testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
     // In this test, we can safely share the shMemB and shMemC, because they are always used at different time.
     // And they are always the same size.
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
+    SPtr ptrC = ptrB;
 
+#if !TEST_BIAS
     let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+#else
+    Storage biasStorage = Storage(biasBuffer);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, storage, 0,
+                                                                                    biasStorage, Optional<Storage.Address>(0));
+#endif
 
     // serialRead<DType>(tid, ptrC, 32);
-
     return res;
 }
 
@@ -156,11 +179,15 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 
     bool res = true;
 
-
-    DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5);
     for (int i = 0; i < OutputSize; i++)
     {
-        if (outputVector[i] != DType(expected))
+        DType scaleFactor = DType(0.1f);
+#if !TEST_BIAS
+        DType expected = DType(tid + 1) * DType(InputSize) * scaleFactor;
+#else
+        DType expected = DType(tid + 1) * DType(InputSize) * scaleFactor + DType(i);
+#endif
+        if (abs(outputVector[i] - expected) > epsilon)
         {
             res = false;
             break;
@@ -176,9 +203,10 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     // we can reduce the result further
     if (laneId == 0)
     {
-        // Note max subgroupIndex is "BatchSize/32 - 1"
         s_resultMem[subgroupIndex] = res;
     }
+
+    AllMemoryBarrierWithGroupSync();
 
     int warpCount = BatchSize / 32;
     bool finalResult = true;
@@ -202,6 +230,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
+    initBias(tid);
+
     {
         fillWeightMatrix<3, 5>(tid);
         AllMemoryBarrierWithGroupSync();

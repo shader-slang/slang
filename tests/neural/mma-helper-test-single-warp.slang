@@ -1,13 +1,17 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 import neural;
 #pragma warning(disable: 41017)
-
-// This test verifies that the tiled MMA load operations work correctly.
 
 #if TEST_HALF
 typealias DType = half;
@@ -15,8 +19,13 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
+
 // TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
 RWStructuredBuffer<DType> inputBuffer;
+
+
+// TEST_INPUT:ubuffer(stride=4, count=64):name=biasBuffer
+RWStructuredBuffer<DType> biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -61,12 +70,25 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
                 inputBuffer[index] = DType(1);
         }
     }
+
+#if TEST_BIAS
+    if (tid == 0)
+    {
+        // We always fill the bias buffer with the index of the thread.
+        for (int i = 0; i < 64; i++)
+        {
+            biasBuffer[i] = DType(i);
+        }
+    }
+#endif
 }
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
+
+
 
     // Construct the input vector as follow:
     // x = tid + 1
@@ -85,7 +107,12 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
+#if !TEST_BIAS
     let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+#else
+    Storage biasStorage = Storage(biasBuffer);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>( inputVector, ptrA, ptrB, ptrC, storage, 0, biasStorage, Optional<Storage.Address>(0));
+#endif
 
     return res;
 }
@@ -144,10 +171,25 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         break;
     }
 
+    // if (tid == 1)
+    // {
+    //     // expect 2 2 2 2 + 0 1 2 3 = 2 3 4 5
+    //     for (int i = 0; i < OutputSize; i++)
+    //     {
+    //         printf("%.1f ", float(outputVector[i]));
+    //     }
+    //     printf("\n");
+    // }
+
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
     {
-        if (outputVector[i] != DType(tid + 1))
+#if !TEST_BIAS
+        DType expected = DType(tid + 1);
+#else
+        DType expected = DType(tid + i + 1);
+#endif
+        if (outputVector[i] != expected)
         {
             res = false;
             break;
