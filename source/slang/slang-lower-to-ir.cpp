@@ -7588,10 +7588,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // - Variables assigned in a case that falls through to another case
         // - Variables used (read) in a case that can be reached via fall-through
         HashSet<VarDeclBase*> fallThroughVars;
-
-        // Track which case indices have fall-through INTO them
-        // (i.e., the previous case doesn't end with break/return/etc.)
-        HashSet<Index> fallThroughTargetIndices;
     };
 
     // === Fall-through detection helpers ===
@@ -7952,9 +7948,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // If this clause doesn't terminate, it falls through
             if (!clause.terminates)
             {
-                // Mark the next clause as a fall-through target
-                info->fallThroughTargetIndices.add(i + 1);
-
                 // Collect variables assigned in the source clause
                 VarRefCollector sourceCollector;
                 for (auto bodyStmt : clause.bodyStmts)
