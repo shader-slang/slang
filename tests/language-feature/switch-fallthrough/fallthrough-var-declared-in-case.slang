@@ -23,10 +23,10 @@ RWStructuredBuffer<int> outputBuffer;
 int test(int val)
 {
     int result = 0;
-    
+
     // Variable declared BEFORE switch - this pattern should work
     int x;
-    
+
     switch(val)
     {
     case 0:
@@ -45,7 +45,7 @@ int test(int val)
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -61,4 +61,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3: result = -1
     outputBuffer[tid] = test(int(tid));
 }
-

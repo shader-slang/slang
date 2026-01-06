@@ -25,7 +25,7 @@ int test(int val)
 {
     int result = 0;
     int x = 10;
-    
+
     switch(val)
     {
     case 0:
@@ -42,7 +42,7 @@ int test(int val)
         result = -1;
         break;
     }
-    
+
     return result;
 }
 

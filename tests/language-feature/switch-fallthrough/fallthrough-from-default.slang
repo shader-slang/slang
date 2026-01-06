@@ -25,7 +25,7 @@ int test(int val)
 {
     int result = 0;
     int multiplier = 1;
-    
+
     switch(val)
     {
     case 0:
@@ -47,7 +47,7 @@ int test(int val)
         result = 50 * multiplier;
         break;
     }
-    
+
     return result;
 }
 
@@ -62,8 +62,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=2: case 2 -> result = 300
     // tid=3: case 3 directly -> multiplier = 1, result = 50 * 1 = 50
     //   Wait, but val=3 matches case 3, so it won't go through default!
-    // tid=4: default (val=4 doesn't match any case) -> multiplier = 10, 
+    // tid=4: default (val=4 doesn't match any case) -> multiplier = 10,
     //        then falls through to case 3, result = 50 * 10 = 500
     outputBuffer[tid] = test(int(tid));
 }
-

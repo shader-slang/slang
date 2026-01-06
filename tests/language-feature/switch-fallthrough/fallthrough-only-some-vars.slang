@@ -29,7 +29,7 @@ int test(int val)
     int shared_var = 1;      // Used across fall-through - needs IRVar
     int case0_only = 100;    // Only used in case 0 - can use IRParam
     int case1_only = 200;    // Only used in case 1 - can use IRParam
-    
+
     switch(val)
     {
     case 0:
@@ -40,7 +40,7 @@ int test(int val)
         shared_var = shared_var + 5;
         case1_only = case1_only * 3;  // 600
         return shared_var + case1_only;
-        
+
     default:
         return -1;
     }
@@ -58,4 +58,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3: -1 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

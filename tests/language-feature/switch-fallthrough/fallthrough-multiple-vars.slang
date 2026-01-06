@@ -25,7 +25,7 @@ int test(int val)
     int a = 1;
     int b = 10;
     int c = 100;
-    
+
     switch(val)
     {
     case 0:
@@ -43,7 +43,7 @@ int test(int val)
         // case 1: a=1, b=10, c=111
         // case 2: a=1, b=10, c=100
         return a * 1000 + b * 10 + c % 1000;
-        
+
     default:
         return -1;
     }
@@ -61,4 +61,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3: -1 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

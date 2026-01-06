@@ -25,7 +25,7 @@ int test(int val)
 {
     int result = 0;
     int sum = 0;
-    
+
     switch(val)
     {
     case 0:
@@ -38,16 +38,16 @@ int test(int val)
         // When entering directly: sum = 0
         result = sum + 100;
         break;
-        
+
     case 2:
         result = 200;
         break;
-        
+
     default:
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -63,4 +63,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3: result = -1 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

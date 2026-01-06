@@ -22,7 +22,7 @@ RWStructuredBuffer<int> outputBuffer;
 int test(int val)
 {
     int result = 0;
-    
+
     switch(val)
     {
     case 0:
@@ -37,7 +37,7 @@ int test(int val)
         result = 200;
         break;
     }
-    
+
     return result;
 }
 
@@ -53,4 +53,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3 and above: 999 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

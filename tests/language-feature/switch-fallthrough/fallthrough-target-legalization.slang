@@ -48,7 +48,7 @@ int test(int val)
 {
     int result = 0;
     int x = 10;
-    
+
     switch(val)
     {
     case 0:
@@ -64,7 +64,7 @@ int test(int val)
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -75,4 +75,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     uint tid = dispatchThreadID.x;
     outputBuffer[tid] = test(int(tid));
 }
-

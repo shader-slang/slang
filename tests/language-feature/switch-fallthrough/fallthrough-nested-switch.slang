@@ -30,7 +30,7 @@ int test(int outer, int inner)
 {
     int result = 0;
     int x = 1;
-    
+
     switch(outer)
     {
     case 0:
@@ -51,12 +51,12 @@ int test(int outer, int inner)
             break;
         }
         break;
-        
+
     default:
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -79,4 +79,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int inner = int(tid) % 3;
     outputBuffer[tid] = test(outer, inner);
 }
-

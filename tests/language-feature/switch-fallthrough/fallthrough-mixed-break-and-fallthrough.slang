@@ -28,7 +28,7 @@ int test(int val)
 {
     int result = 0;
     int x = 1;
-    
+
     switch(val)
     {
     case 0:
@@ -38,11 +38,11 @@ int test(int val)
         x = x * 3;
         result = x;
         break;  // This case breaks
-        
+
     case 2:
         result = 100;
         break;  // This case breaks
-        
+
     case 3:
         x = x * 5;
         // Fall through
@@ -52,12 +52,12 @@ int test(int val)
     case 5:
         result = x;
         break;  // Final case in chain breaks
-        
+
     default:
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -77,4 +77,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=7: result = -1 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

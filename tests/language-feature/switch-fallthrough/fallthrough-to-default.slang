@@ -23,7 +23,7 @@ int test(int val)
 {
     int result = 0;
     int multiplier = 1;
-    
+
     switch(val)
     {
     case 0:
@@ -39,7 +39,7 @@ int test(int val)
         result = 200;
         break;
     }
-    
+
     return result;
 }
 
@@ -55,4 +55,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // tid=3: multiplier=1 (unchanged), result = 50 * 1 = 50 (default)
     outputBuffer[tid] = test(int(tid));
 }
-

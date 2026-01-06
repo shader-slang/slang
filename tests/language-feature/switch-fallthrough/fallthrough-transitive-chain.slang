@@ -22,7 +22,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // tid=0: 131 = 0x83
-// tid=1: 122 = 0x7A  
+// tid=1: 122 = 0x7A
 // tid=2: 102 = 0x66
 // tid=3: 101 = 0x65
 // tid=4: -1 = 0xFFFFFFFF
@@ -42,7 +42,7 @@ int test(int val)
     int a = 1;   // Assigned in case 0, used in case 2 (skips case 1)
     int b = 1;   // Assigned in case 1, used in case 3 (skips case 2)
     int c = 100;
-    
+
     switch(val)
     {
     case 0:
@@ -58,7 +58,7 @@ int test(int val)
     case 3:
         c = c + b;  // Use 'b' which was set 2 cases ago
         return c;
-        
+
     default:
         return -1;
     }

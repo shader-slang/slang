@@ -29,7 +29,7 @@ int test(int val, bool flag)
 {
     int result = 0;
     int x = 1;
-    
+
     switch(val)
     {
     case 0:
@@ -41,12 +41,12 @@ int test(int val, bool flag)
     case 1:
         result = x * 2;
         break;
-        
+
     default:
         result = -1;
         break;
     }
-    
+
     return result;
 }
 
@@ -65,4 +65,3 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     bool flag = (tid % 2) == 0;
     outputBuffer[tid] = test(val, flag);
 }
-
