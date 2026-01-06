@@ -7756,6 +7756,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         Index currentClauseIndex = -1;
         extractCaseClauses(stmt->body, clauses, currentClauseIndex);
 
+        if (clauses.getCount() == 0)
+            return;
+
         // Check which clauses terminate and which fall through
         for (Index i = 0; i < clauses.getCount(); i++)
         {
@@ -7774,8 +7777,20 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             }
         }
 
-        // Find fall-through patterns: clause i falls through to clause i+1
-        // if clause i has a non-empty body that doesn't terminate
+        // Pre-compute variable references for each clause
+        List<VarRefCollector> collectors;
+        collectors.setCount(clauses.getCount());
+        for (Index i = 0; i < clauses.getCount(); i++)
+        {
+            for (auto bodyStmt : clauses[i].bodyStmts)
+            {
+                collectors[i].collect(bodyStmt);
+            }
+        }
+
+        // Find fall-through patterns with transitive analysis.
+        // If clause i falls through to i+1, and i+1 falls through to i+2,
+        // we need to check if variables assigned in i are used in i+2.
         for (Index i = 0; i < clauses.getCount() - 1; i++)
         {
             auto& clause = clauses[i];
@@ -7787,40 +7802,35 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             // If this clause doesn't terminate, it falls through
             if (!clause.terminates)
             {
-                // Collect variable references in the source clause
-                VarRefCollector sourceCollector;
-                for (auto bodyStmt : clause.bodyStmts)
+                // Check all subsequent clauses that are reachable via fall-through
+                for (Index j = i + 1; j < clauses.getCount(); j++)
                 {
-                    sourceCollector.collect(bodyStmt);
-                }
+                    auto& targetClause = clauses[j];
 
-                // Collect variable references in the target clause
-                auto& targetClause = clauses[i + 1];
-                VarRefCollector targetCollector;
-                for (auto bodyStmt : targetClause.bodyStmts)
-                {
-                    targetCollector.collect(bodyStmt);
-                }
-
-                // Variables that are assigned in source AND used in target
-                // need IRVar treatment to preserve fall-through semantics
-                for (auto var : sourceCollector.assignedVars)
-                {
-                    if (targetCollector.usedVars.contains(var))
+                    // Variables that are assigned in source AND used in target
+                    // need IRVar treatment to preserve fall-through semantics
+                    for (auto var : collectors[i].assignedVars)
                     {
-                        info->fallThroughVars.add(var);
+                        if (collectors[j].usedVars.contains(var))
+                        {
+                            info->fallThroughVars.add(var);
+                        }
                     }
-                }
 
-                // Also, variables used in source that are then used in target
-                // need IRVar treatment - this handles the case where a variable
-                // is read in source, then read again in target after fall-through
-                for (auto var : sourceCollector.usedVars)
-                {
-                    if (targetCollector.usedVars.contains(var))
+                    // Also, variables used in source that are then used in target
+                    // need IRVar treatment - this handles the case where a variable
+                    // is read in source, then read again in target after fall-through
+                    for (auto var : collectors[i].usedVars)
                     {
-                        info->fallThroughVars.add(var);
+                        if (collectors[j].usedVars.contains(var))
+                        {
+                            info->fallThroughVars.add(var);
+                        }
                     }
+
+                    // Stop if this target clause terminates (ends the fall-through chain)
+                    if (targetClause.terminates || targetClause.bodyStmts.getCount() == 0)
+                        break;
                 }
             }
         }
