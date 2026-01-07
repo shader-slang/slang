@@ -300,6 +300,11 @@ Reports compiler performance benchmark results for each intermediate pass (impli
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
 
 
+<a id="report-dynamic-dispatch-sites"></a>
+### -report-dynamic-dispatch-sites
+Reports information about dynamic dispatch sites for interface calls. 
+
+
 <a id="skip-spirv-validation"></a>
 ### -skip-spirv-validation
 Skips spirv validation. 
@@ -883,6 +888,11 @@ Embed downstream IR into emitted slang IR
 <a id="experimental-feature"></a>
 ### -experimental-feature
 Enable experimental features (loading builtin neural module) 
+
+
+<a id="enable-experimental-rich-diagnostics"></a>
+### -enable-experimental-rich-diagnostics
+Enable experimental rich diagnostics with enhanced formatting and details 
 
 
 
