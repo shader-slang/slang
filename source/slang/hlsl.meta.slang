@@ -7511,8 +7511,8 @@ vector<float,N> asfloat(vector<uint,N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
-matrix<float,N,M> asfloat(matrix< int,N,M> x)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
+matrix<float,N,M> asfloat(matrix<int,N,M> x)
 {
     __target_switch
     {
@@ -7524,7 +7524,7 @@ matrix<float,N,M> asfloat(matrix< int,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
     __target_switch
@@ -7750,7 +7750,7 @@ vector<int, N> asint(vector<uint, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<float, N, M> x)
 {
     __target_switch
@@ -7763,7 +7763,7 @@ matrix<int, N, M> asint(matrix<float, N, M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<uint, N, M> x)
 {
     __target_switch
@@ -7906,7 +7906,7 @@ vector<uint, N> asuint(vector<int, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint,N,M> asuint(matrix<float,N,M> x)
 {
     __target_switch
@@ -7919,7 +7919,7 @@ matrix<uint,N,M> asuint(matrix<float,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint, N, M> asuint(matrix<int, N, M> x)
 {
     __target_switch
@@ -14112,7 +14112,7 @@ vector<int, N> sign(vector<T, N> x)
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<int, N, M> sign(matrix<T, N, M> x)
 {
     __target_switch
@@ -14687,7 +14687,7 @@ vector<T,N> tanpi(vector<T,N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -14695,6 +14695,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     {
     case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
+    case metal: __intrinsic_asm "transpose";
     case spirv: return spirv_asm {
         OpTranspose $$matrix<T, M, N> result $x
     };
