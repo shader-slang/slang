@@ -1340,7 +1340,11 @@ DIAGNOSTIC(
 
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
-
+DIAGNOSTIC(
+    31125,
+    Error,
+    attributeUsageAttributeMustBeOnNonGenericStruct,
+    "[__AttributeUsage] can only be applied to non-generic struct definitions")
 DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 
 DIAGNOSTIC(
@@ -2914,6 +2918,17 @@ DIAGNOSTIC(
     Error,
     dynamicDispatchOnPotentiallyUninitializedExistential,
     "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
+DIAGNOSTIC(
+    50102,
+    Note,
+    dynamicDispatchCodeGeneratedHere,
+    "generated dynamic dispatch code for this site. $0 possible types: '$1'")
+DIAGNOSTIC(
+    50103,
+    Note,
+    specializedDynamicDispatchCodeGeneratedHere,
+    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. "
+    "specialization arguments: '$2'.")
 
 DIAGNOSTIC(
     52000,

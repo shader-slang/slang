@@ -1,4 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -35,6 +36,7 @@ float f(uint id, float x)
         obj = C();
 
     return obj.calc(x);
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated specialized dynamic dispatch code{{.*}} 3 possible types:
 }
 
 
