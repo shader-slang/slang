@@ -208,7 +208,10 @@ struct GlobalVarTranslationContext
                     {
                         varLayoutBuilder.setUserSemantic("VERTEX_IN_", inputVarIndex);
                         if (!key->findDecoration<IRSemanticDecoration>())
-                            builder.addSemanticDecoration(key, toSlice("VERTEX_IN_"), inputVarIndex);
+                            builder.addSemanticDecoration(
+                                key,
+                                toSlice("VERTEX_IN_"),
+                                inputVarIndex);
                     }
                     inputVarIndex++;
                 }
@@ -331,13 +334,19 @@ struct GlobalVarTranslationContext
                         {
                             varLayoutBuilder.setSystemValueSemantic("SV_TARGET", outputVarIndex);
                             if (!key->findDecoration<IRSemanticDecoration>())
-                                builder.addSemanticDecoration(key, toSlice("SV_TARGET"), outputVarIndex);
+                                builder.addSemanticDecoration(
+                                    key,
+                                    toSlice("SV_TARGET"),
+                                    outputVarIndex);
                         }
                         else if (entryPointDecor->getProfile().getStage() == Stage::Vertex)
                         {
                             varLayoutBuilder.setUserSemantic("COLOR", outputVarIndex);
                             if (!key->findDecoration<IRSemanticDecoration>())
-                                builder.addSemanticDecoration(key, toSlice("COLOR"), outputVarIndex);
+                                builder.addSemanticDecoration(
+                                    key,
+                                    toSlice("COLOR"),
+                                    outputVarIndex);
                         }
                         outputVarIndex++;
                     }
