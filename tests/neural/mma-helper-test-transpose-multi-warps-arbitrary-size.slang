@@ -39,7 +39,7 @@ RWStructuredBuffer<DType> inputBuffer;
 RWStructuredBuffer<uint> outputBuffer;
 
 // // TEST_INPUT:ubuffer(stride=4, count=256):out, name=debugBuffer
-// RWStructuredBuffer<half> debugBuffer;
+// RWStructuredBuffer<DType> debugBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
@@ -223,6 +223,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         // Note max subgroupIndex is "BatchSize/32 - 1"
         s_resultMem[subgroupIndex] = res;
     }
+
+    AllMemoryBarrierWithGroupSync();
 
     int warpCount = BatchSize / 32;
     bool finalResult = true;
