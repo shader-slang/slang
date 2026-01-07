@@ -966,6 +966,8 @@ Result linkAndOptimizeIR(
             //
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
+            specOptions.reportDynamicDispatchSites =
+                codeGenContext->shouldReportDynamicDispatchSites();
             changed |=
                 SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
@@ -1039,6 +1041,7 @@ Result linkAndOptimizeIR(
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
+        specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
@@ -1919,7 +1922,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(performIntrinsicFunctionInlining);
     }
 
-    SLANG_PASS(eliminateMultiLevelBreak);
+    SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {

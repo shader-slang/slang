@@ -2919,6 +2919,8 @@ struct LLVMEmitter
         LLVMInst* llvmFunc,
         FuncEpilogueCallback epilogueCallback)
     {
+        sortBlocksInFunc(code);
+
         // Create all blocks first, so that branch instructions can refer
         // to blocks that haven't been filled in yet.
         for (auto irBlock : code->getBlocks())

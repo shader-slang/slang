@@ -2186,14 +2186,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 &fieldParentInfo,
                 field,
                 nameHintSB);
-            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
-            {
-                ScalarizedTupleValImpl::Element element;
-                element.val = fieldVal;
-                element.key = field->getKey();
 
-                tupleValImpl->elements.add(element);
-            }
+            ScalarizedTupleValImpl::Element element = {};
+            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                element.val = fieldVal;
+            element.key = field->getKey();
+
+            tupleValImpl->elements.add(element);
         }
 
         return ScalarizedVal::tuple(tupleValImpl);
@@ -2286,6 +2285,9 @@ ScalarizedVal extractField(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return ScalarizedVal::value(builder->emitFieldExtract(
             getFieldType(val.irValue->getDataType(), fieldKey),
@@ -2427,6 +2429,9 @@ ScalarizedVal adaptType(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return adaptType(builder, val.irValue, toType, fromType);
         break;
@@ -2465,6 +2470,8 @@ void assign(
 {
     switch (left.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return;
     case ScalarizedVal::Flavor::arrayIndex:
         {
             // Get the rhs value
@@ -2568,6 +2575,9 @@ ScalarizedVal getSubscriptVal(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return ScalarizedVal::value(
             builder->emitElementExtract(elementType, val.irValue, indexVal));
@@ -2713,6 +2723,9 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return builder->getVoidValue();
+
     case ScalarizedVal::Flavor::value:
         return val.irValue;
 
@@ -2766,6 +2779,9 @@ ScalarizedVal getPtrToVal(IRBuilder* builder, ScalarizedVal val)
 
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
         // The easy case is when the input `val` is using the
         // `ScalarizedVal::Flavor::address` case, since in that
         // case it holds an IR pointer that already *is* a pointer
@@ -2848,6 +2864,9 @@ ScalarizedVal dereferenceVal(IRBuilder* builder, ScalarizedVal ptr)
 
     switch (ptr.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
         // One easy case is when the input pointer is directly
         // represented as an IR instruction, since we can then
         // use that same instruction to encode a `ScalarizedVal`
@@ -3464,6 +3483,7 @@ static void legalizeMeshOutputParam(
     case ScalarizedVal::Flavor::value:
     case ScalarizedVal::Flavor::address:
     case ScalarizedVal::Flavor::typeAdapter:
+    case ScalarizedVal::Flavor::none:
         break;
     }
 
