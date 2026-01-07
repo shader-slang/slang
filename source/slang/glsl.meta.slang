@@ -5641,7 +5641,7 @@ public void hitObjectTraceRayNV(
     {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder:
     {
         HitObject::__glslTraceRay(
             hitObject,
@@ -5657,7 +5657,7 @@ public void hitObjectTraceRayNV(
             Tmax,
             payload);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderNV:
     {
         spirv_asm
         {
@@ -5704,7 +5704,7 @@ public void hitObjectTraceRayMotionNV(
     {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder_motion:
     {
         HitObject::__glslTraceMotionRay(
             hitObject,
@@ -5721,7 +5721,7 @@ public void hitObjectTraceRayMotionNV(
             currentTime,
             payload);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderMotionNV:
     {
         spirv_asm
         {
@@ -5770,7 +5770,7 @@ public void hitObjectRecordHitNV(
     {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder:
     {
         HitObject::__glslMakeHit(
             hitObject,
@@ -5787,7 +5787,7 @@ public void hitObjectRecordHitNV(
             Tmax,
             attributeLocation);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderNV:
     {
         spirv_asm
         {
@@ -5836,7 +5836,7 @@ public void hitObjectRecordHitMotionNV(
     {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder_motion:
     {
         HitObject::__glslMakeMotionHit(
             hitObject,
@@ -5854,7 +5854,7 @@ public void hitObjectRecordHitMotionNV(
             currentTime,
             attributeLocation);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderMotionNV:
     {
         spirv_asm
         {
@@ -5903,7 +5903,7 @@ public void hitObjectRecordHitWithIndexNV(
 {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder:
     {
         HitObject::__glslMakeHitWithIndex(
             hitObject,
@@ -5919,7 +5919,7 @@ public void hitObjectRecordHitWithIndexNV(
             Tmax,
             attributeLocation);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderNV:
     {
         spirv_asm
         {
@@ -5966,7 +5966,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
     {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder_motion:
     {
         HitObject::__glslMakeMotionHitWithIndex(
             hitObject,
@@ -5983,7 +5983,7 @@ public void hitObjectRecordHitWithIndexMotionNV(
             currentTime,
             attributeLocation);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderMotionNV:
     {
         spirv_asm
         {
@@ -6072,11 +6072,11 @@ public void hitObjectExecuteShaderNV(
 {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder:
     {
         HitObject::__glslInvoke(hitObject, payload);
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderNV:
     {
         spirv_asm
         {
@@ -6259,11 +6259,11 @@ public void hitObjectGetAttributesNV(
 {
     __target_switch
     {
-    case ser_glsl_nv:
+    case _GL_NV_shader_invocation_reorder:
     {
         __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
     }
-    case ser_spirv_nv:
+    case spvShaderInvocationReorderNV:
     {
         spirv_asm
         {

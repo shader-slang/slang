@@ -559,6 +559,10 @@ Extensions
 `GL_NV_shader_invocation_reorder`
 > Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
 
+`GL_NV_shader_invocation_reorder_motion`
+> Represents the GL_NV_shader_invocation_reorder + motion blur combined extension (NVIDIA-specific).
+> Used for motion blur variants of SER functions that require both extensions.
+
 `GL_NV_shader_subgroup_partitioned`
 > Represents the GL_NV_shader_subgroup_partitioned extension.
 
@@ -820,6 +824,10 @@ Extensions
 
 `spvShaderInvocationReorderEXT`
 > Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
+
+`spvShaderInvocationReorderMotionNV`
+> Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
+> Used for motion blur variants of SER functions that require both extensions.
 
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
@@ -1186,8 +1194,8 @@ Compound Capabilities
 `meshshading`
 > Ccapabilities required to use mesh shading features
 
-`motionblur`
-> Capabilities needed for raytracing-motionblur
+`motionblur_nv`
+> Capabilities needed for raytracing-motionblur (NVIDIA-specific)
 
 `nonuniformqualifier`
 > Capabilities required to use NonUniform qualifier
