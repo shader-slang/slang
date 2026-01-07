@@ -1617,8 +1617,25 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
         m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
-        m_writer->emit(semanticDecoration->getSemanticIndex());
+        auto semanticName = semanticDecoration->getSemanticName();
+        m_writer->emit(semanticName);
+
+        // Only emit semantic index for semantics that accept them.
+        // User semantics (non-SV_*) always accept indices.
+        // System semantics only accept indices for: SV_Target, SV_ClipDistance, SV_CullDistance
+        bool shouldEmitIndex = true;
+        if (semanticName.startsWithCaseInsensitive(toSlice("SV_")))
+        {
+            // Check if this is one of the system semantics that accepts an index
+            shouldEmitIndex = semanticName.caseInsensitiveEquals(toSlice("SV_Target")) ||
+                              semanticName.caseInsensitiveEquals(toSlice("SV_ClipDistance")) ||
+                              semanticName.caseInsensitiveEquals(toSlice("SV_CullDistance"));
+        }
+
+        if (shouldEmitIndex)
+        {
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+        }
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
