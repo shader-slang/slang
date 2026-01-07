@@ -609,12 +609,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto parent = inst; parent; parent = parent->getParent())
         {
-            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
-                continue;
+            if (as<IRBlock>(parent))
+            {
+                // Search backwards from `inst` inside this block for a DebugScope instruction.
+                for (auto prev = inst->getPrevInst(); prev; prev = prev->getPrevInst())
+                {
+                    if (auto debugScope = as<IRDebugScope>(prev))
+                    {
+                        return ensureInst(debugScope->getScope());
+                    }
+                }
+            }
+            else if (as<IRFunc>(parent) || as<IRModuleInst>(parent))
+            {
+                SpvInst* spvInst = nullptr;
+                if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
+                    return spvInst;
+            }
 
-            SpvInst* spvInst = nullptr;
-            if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
-                return spvInst;
+            inst = parent;
         }
         return nullptr;
     }
@@ -1422,7 +1435,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
+    static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
         SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
@@ -1458,12 +1471,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::IncomingCallableData:
             return SpvStorageClassIncomingCallableDataKHR;
         case AddressSpace::HitObjectAttribute:
-            {
-                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                    return SpvStorageClassHitObjectAttributeEXT;
-                return SpvStorageClassHitObjectAttributeNV;
-            }
+            return SpvStorageClassHitObjectAttributeNV;
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
         case AddressSpace::ShaderRecordBuffer:
@@ -2218,25 +2226,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeRayQuery(inst);
 
         case kIROp_HitObjectType:
-            {
-                // Use EXT if target has spvShaderInvocationReorderEXT capability,
-                // otherwise fall back to NV for backward compatibility
-                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-                    return emitOpTypeHitObjectEXT(inst);
-                }
-                else
-                {
-                    ensureExtensionDeclaration(
-                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-                    return emitOpTypeHitObject(inst);
-                }
-            }
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+            return emitOpTypeHitObject(inst);
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -2552,7 +2544,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
+    static SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
     {
         SpvStorageClass storageClass = SpvStorageClassFunction;
         if (ptrType && ptrType->hasAddressSpace())
@@ -2575,33 +2567,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return true;
         default:
             return false;
-        }
-    }
-
-    SpvCapability getImageFormatCapability(SpvImageFormat format)
-    {
-        switch (format)
-        {
-        case SpvImageFormatUnknown:
-        case SpvImageFormatRgba32f:
-        case SpvImageFormatRgba16f:
-        case SpvImageFormatR32f:
-        case SpvImageFormatRgba8:
-        case SpvImageFormatRgba8Snorm:
-        case SpvImageFormatRgba32i:
-        case SpvImageFormatRgba16i:
-        case SpvImageFormatRgba8i:
-        case SpvImageFormatR32i:
-        case SpvImageFormatRgba32ui:
-        case SpvImageFormatRgba16ui:
-        case SpvImageFormatRgba8ui:
-        case SpvImageFormatR32ui:
-            return SpvCapabilityShader;
-        case SpvImageFormatR64ui:
-        case SpvImageFormatR64i:
-            return SpvCapabilityInt64ImageEXT;
-        default:
-            return SpvCapabilityStorageImageExtendedFormats;
         }
     }
 
@@ -2861,6 +2826,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // The op itself
         //
         auto sampledElementType = getSPIRVSampledElementType(sampledType);
+
+        // If the sampled element type is a 64-bit integer, we need the Int64ImageEXT capability
+        // regardless of the image format.
+        if (sampledElementType->getOp() == kIROp_Int64Type ||
+            sampledElementType->getOp() == kIROp_UInt64Type)
+        {
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_shader_image_int64"));
+            requireSPIRVCapability(SpvCapabilityInt64ImageEXT);
+        }
+
         if (inst->isCombined())
         {
             auto imageType = emitOpTypeImage(
@@ -8818,7 +8793,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        return builder.getStringValue(toSlice("unamed"));
+        return builder.getStringValue(toSlice("unnamed"));
     }
 
     Dictionary<IRType*, SpvInst*> m_mapTypeToDebugType;
@@ -8836,7 +8811,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(type);
         if (IRFuncType* funcType = as<IRFuncType>(type))
         {
-            SpvInst* returnType = emitDebugType(funcType->getResultType());
+            SpvInst* returnType = ensureInst(m_voidType);
+            if (!as<IRVoidType>(funcType->getResultType()))
+            {
+                returnType = emitDebugType(funcType->getResultType());
+            }
 
             List<SpvInst*> argTypes;
             for (UInt i = 0; i < funcType->getParamCount(); ++i)

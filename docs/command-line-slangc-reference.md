@@ -300,6 +300,11 @@ Reports compiler performance benchmark results for each intermediate pass (impli
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
 
 
+<a id="report-dynamic-dispatch-sites"></a>
+### -report-dynamic-dispatch-sites
+Reports information about dynamic dispatch sites for interface calls. 
+
+
 <a id="skip-spirv-validation"></a>
 ### -skip-spirv-validation
 Skips spirv validation. 
@@ -573,6 +578,40 @@ Specify the space index for the system defined global bindless resource array.
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
 Emit debug data to a separate file, and strip it from the main output file. 
+
+
+<a id="emit-cpu-via-cpp"></a>
+### -emit-cpu-via-cpp
+Generate CPU targets using C++ (default) 
+
+
+<a id="emit-cpu-via-llvm"></a>
+### -emit-cpu-via-llvm
+Generate CPU targets using LLVM 
+
+
+<a id="llvm-target-triple"></a>
+### -llvm-target-triple
+
+**-llvm-target-triple &lt;target triple&gt;**
+
+Sets the target triple for the LLVM target, enabling cross compilation. The default value is the host platform. 
+
+
+<a id="llvm-cpu"></a>
+### -llvm-cpu
+
+**-llvm-cpu &lt;cpu name&gt;**
+
+Sets the target CPU for the LLVM target, enabling the extensions and features of that CPU. The default value is "generic". 
+
+
+<a id="llvm-features"></a>
+### -llvm-features
+
+**-llvm-features &lt;a1,+enable,-disable,...&gt;**
+
+Sets a comma-separates list of architecture-specific features for the LLVM targets. 
 
 
 
@@ -849,6 +888,11 @@ Embed downstream IR into emitted slang IR
 <a id="experimental-feature"></a>
 ### -experimental-feature
 Enable experimental features (loading builtin neural module) 
+
+
+<a id="enable-experimental-rich-diagnostics"></a>
+### -enable-experimental-rich-diagnostics
+Enable experimental rich diagnostics with enhanced formatting and details 
 
 
 
@@ -1128,7 +1172,7 @@ Target
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
-* `object-code` : Object code 
+* `object-code`, `shader-object-code` : Object code for host execution (shader style) 
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
@@ -1137,6 +1181,9 @@ Target
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
 * `slangvm`, `slang-vm` : Slang VM byte code 
+* `host-object-code` : Object code for host execution (host style) 
+* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style) 
+* `llvm-shader-ir` : LLVM IR assembly (shader style) 
 
 <a id="stage"></a>
 ## stage
@@ -1185,6 +1232,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spirv` 
 * `wgsl` 
 * `slangvm` 
+* `llvm` 
 * `glsl_spirv_1_0` 
 * `glsl_spirv_1_1` 
 * `glsl_spirv_1_2` 
@@ -1230,7 +1278,6 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
-* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1274,7 +1321,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
-* `spvShaderInvocationReorderEXT` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1297,9 +1343,6 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
-* `glsl_nv` 
-* `spirv_nv` 
-* `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1307,15 +1350,23 @@ A capability describes an optional feature that a target may or may not support.
 * `any_gfx_target` 
 * `any_cpp_target` 
 * `cpp_cuda` 
+* `cpp_llvm` 
+* `cpp_cuda_llvm` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 
+* `cpp_cuda_glsl_hlsl_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv` 
+* `cpp_cuda_glsl_hlsl_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_spirv_wgsl_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm` 
 * `cpp_cuda_hlsl` 
 * `cpp_cuda_hlsl_spirv` 
 * `cpp_cuda_hlsl_metal_spirv` 
@@ -1328,12 +1379,14 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_glsl_hlsl` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
+* `cuda_glsl_hlsl_spirv_llvm` 
 * `cuda_glsl_hlsl_spirv_wgsl` 
 * `cuda_glsl_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_metal_spirv_wgsl` 
 * `cuda_glsl_spirv` 
 * `cuda_glsl_metal_spirv` 
 * `cuda_glsl_metal_spirv_wgsl` 
+* `cuda_glsl_metal_spirv_wgsl_llvm` 
 * `cuda_hlsl` 
 * `cuda_hlsl_spirv` 
 * `glsl_hlsl_spirv` 
@@ -1404,15 +1457,12 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
-* `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
-* `ser_nvapi` 
-* `ser_dxr` 
 * `ser` 
 * `motionblur` 
 * `rayquery` 
@@ -1636,8 +1686,6 @@ A capability describes an optional feature that a target may or may not support.
 * `ser_anyhit_closesthit` 
 * `ser_motion_raygen_closesthit_miss` 
 * `ser_motion_raygen` 
-* `ser_dxr_raygen_closesthit_miss` 
-* `ser_dxr_raygen` 
 * `all` 
 
 <a id="file-extension"></a>

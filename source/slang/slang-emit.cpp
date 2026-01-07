@@ -15,6 +15,7 @@
 #include "slang-emit-cuda.h"
 #include "slang-emit-glsl.h"
 #include "slang-emit-hlsl.h"
+#include "slang-emit-llvm.h"
 #include "slang-emit-metal.h"
 #include "slang-emit-slang.h"
 #include "slang-emit-source-writer.h"
@@ -814,6 +815,9 @@ Result linkAndOptimizeIR(
         {
         case CodeGenTarget::HostCPPSource:
         case CodeGenTarget::HostVM:
+        case CodeGenTarget::HostLLVMIR:
+        case CodeGenTarget::HostObjectCode:
+        case CodeGenTarget::HostHostCallable:
             break;
         case CodeGenTarget::CUDASource:
         case CodeGenTarget::CUDAHeader:
@@ -823,6 +827,9 @@ Result linkAndOptimizeIR(
 
         case CodeGenTarget::CPPSource:
         case CodeGenTarget::CPPHeader:
+        case CodeGenTarget::ShaderLLVMIR:
+        case CodeGenTarget::ShaderObjectCode:
+        case CodeGenTarget::ShaderHostCallable:
             passOptions.alwaysCreateCollectedParam = true;
             [[fallthrough]];
         default:
@@ -844,6 +851,12 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CUDASource:
     case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         break;
     }
 
@@ -953,6 +966,8 @@ Result linkAndOptimizeIR(
             //
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
+            specOptions.reportDynamicDispatchSites =
+                codeGenContext->shouldReportDynamicDispatchSites();
             changed |=
                 SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
@@ -1023,6 +1038,7 @@ Result linkAndOptimizeIR(
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
+        specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
@@ -1363,6 +1379,23 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
     }
 
+    if (isCPUTargetViaLLVM(targetRequest))
+    {
+        // The LLVM targets are special in that we always lower all matrices
+        // into arrays of vectors, because matrices aren't (yet?) built-in types
+        // in LLVM. Due to this, lowerBufferElementTypeToStorageType needs to
+        // occur earlier than usual, because otherwise it no longer knows what
+        // is a matrix and can't generate proper code for column/row-major
+        // matrix loads/stores.
+        BufferElementTypeLoweringOptions bufferElementTypeLoweringOptions = {};
+        bufferElementTypeLoweringOptions.loweringPolicyKind =
+            BufferElementTypeLoweringPolicyKind::LLVM;
+        SLANG_PASS(
+            lowerBufferElementTypeToStorageType,
+            targetProgram,
+            bufferElementTypeLoweringOptions);
+    }
+
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
 
     SLANG_PASS(legalizeVectorTypes, sink);
@@ -1626,6 +1659,9 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         {
             SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
         }
@@ -1732,6 +1768,10 @@ Result linkAndOptimizeIR(
             SLANG_PASS(transformParamsToConstRef, codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
+        [[fallthrough]];
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderHostCallable:
         SLANG_PASS(moveGlobalVarInitializationToEntryPoints, targetProgram);
         SLANG_PASS(introduceExplicitGlobalContext, target);
         if (target == CodeGenTarget::CPPSource || target == CodeGenTarget::CPPHeader)
@@ -1878,7 +1918,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(performIntrinsicFunctionInlining);
     }
 
-    SLANG_PASS(eliminateMultiLevelBreak);
+    SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -2800,6 +2840,64 @@ SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& ou
 
     outArtifact = ArtifactUtil::createArtifactForCompileTarget(SLANG_HOST_VM);
     outArtifact->addRepresentationUnknown(byteCodeBlob);
+
+    return SLANG_OK;
+}
+
+SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact)
+{
+    auto target = codeGenContext->getTargetFormat();
+
+    ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
+    if (!library)
+    {
+        codeGenContext->getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::unableToGenerateCodeForTarget,
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        return SLANG_FAIL;
+    }
+
+    LinkedIR linkedIR;
+    LinkingAndOptimizationOptions linkingAndOptimizationOptions;
+    linkingAndOptimizationOptions.shouldLegalizeExistentialAndResourceTypes = false;
+    SLANG_RETURN_ON_FAIL(
+        linkAndOptimizeIR(codeGenContext, linkingAndOptimizationOptions, linkedIR));
+
+    auto irModule = linkedIR.module;
+
+    ComPtr<ISlangBlob> blob;
+
+    switch (target)
+    {
+    // At this point there should be no difference between host style and shader
+    // style from LLVM's perspective: the shader style has already been
+    // lowered/legalized into host style.
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+        {
+            IArtifact* artifact = nullptr;
+            emitLLVMObjectFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
+        }
+        break;
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+        {
+            IArtifact* artifact = nullptr;
+            emitLLVMAssemblyFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
+        }
+        break;
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+        {
+            IArtifact* artifact = nullptr;
+            emitLLVMJITFromIR(codeGenContext, irModule, &artifact);
+            outArtifact = ComPtr<IArtifact>(artifact);
+        }
+        break;
+    }
 
     return SLANG_OK;
 }

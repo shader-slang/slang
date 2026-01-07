@@ -222,21 +222,14 @@ struct IntroduceExplicitGlobalContextPass
                     // skip any global-scope parameters that are varying instead of
                     // uniform.
                     //
-                    switch (m_target)
+                    if (isCUDATarget(m_target) || isCPUTarget(m_target))
                     {
-                    case CodeGenTarget::CUDASource:
-                    case CodeGenTarget::CUDAHeader:
-                    case CodeGenTarget::CPPSource:
-                    case CodeGenTarget::CPPHeader:
-                        {
-                            auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
-                            SLANG_ASSERT(layoutDecor);
-                            auto layout = as<IRVarLayout>(layoutDecor->getLayout());
-                            SLANG_ASSERT(layout);
-                            if (isVaryingParameter(layout))
-                                continue;
-                        }
-                        break;
+                        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
+                        SLANG_ASSERT(layoutDecor);
+                        auto layout = as<IRVarLayout>(layoutDecor->getLayout());
+                        SLANG_ASSERT(layout);
+                        if (isVaryingParameter(layout))
+                            continue;
                     }
 
                     // Because of upstream passes, we expect there to be only a
@@ -298,7 +291,7 @@ struct IntroduceExplicitGlobalContextPass
         // it is responsible for introducing the explicit entry-point
         // parameter that is used for passing in the global param(s).
         //
-        if (m_target != CodeGenTarget::CPPSource && m_target != CodeGenTarget::CPPHeader)
+        if (!isCPUTarget(m_target))
         {
             if (m_globalParams.getCount() == 0 && m_globalVars.getCount() == 0)
             {
@@ -513,8 +506,7 @@ struct IntroduceExplicitGlobalContextPass
             globalParam.entryPointParam->insertBefore(firstOrdinary);
         }
 
-        if ((m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader) &&
-            m_globalParams.getCount() == 0)
+        if (isCPUTarget(m_target) && m_globalParams.getCount() == 0)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*

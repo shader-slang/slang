@@ -1381,21 +1381,36 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // SPIRV does not allow using merge block directly as true/false block,
         // so we need to create an intermediate block if this is the case.
         IRBuilder builder(inst);
-        if (inst->getTrueBlock() == inst->getAfterBlock())
+
+        auto addIntermediateBlock = [&](auto& replaceBlock)
         {
             builder.setInsertBefore(inst->getAfterBlock());
             auto newBlock = builder.emitBlock();
+
+            // Add an IRDebugLine to the block we're creating. Find the first
+            // IRDebugLine in the 'after' block, and copy that.
+            for (auto afterInst : inst->getAfterBlock()->getChildren())
+            {
+                if (auto debugLine = as<IRDebugLine>(afterInst))
+                {
+                    IRCloneEnv cloneEnv;
+                    cloneInst(&cloneEnv, &builder, debugLine);
+                    break;
+                }
+            }
+
             builder.emitBranch(inst->getAfterBlock());
-            inst->trueBlock.set(newBlock);
+            replaceBlock.set(newBlock);
             addToWorkList(newBlock);
+        };
+
+        if (inst->getTrueBlock() == inst->getAfterBlock())
+        {
+            addIntermediateBlock(inst->trueBlock);
         }
         if (inst->getFalseBlock() == inst->getAfterBlock())
         {
-            builder.setInsertBefore(inst->getAfterBlock());
-            auto newBlock = builder.emitBlock();
-            builder.emitBranch(inst->getAfterBlock());
-            inst->falseBlock.set(newBlock);
-            addToWorkList(newBlock);
+            addIntermediateBlock(inst->falseBlock);
         }
     }
 

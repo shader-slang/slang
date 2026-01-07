@@ -38,6 +38,18 @@ static inline void _writePair(
     builder << name << ": " << value << ",\n";
 }
 
+// Specialization for const char* to handle null pointers
+template<typename T>
+static inline void _writePair(
+    Slang::StringBuilder& builder,
+    int indent,
+    T const& name,
+    const char* value)
+{
+    _writeIndent(builder, indent);
+    builder << name << ": " << (value ? value : "null") << ",\n";
+}
+
 template<typename T, typename U>
 static inline void _writePairNoComma(
     Slang::StringBuilder& builder,
@@ -47,6 +59,18 @@ static inline void _writePairNoComma(
 {
     _writeIndent(builder, indent);
     builder << name << ": " << value << "\n";
+}
+
+// Specialization for const char* to handle null pointers
+template<typename T>
+static inline void _writePairNoComma(
+    Slang::StringBuilder& builder,
+    int indent,
+    T const& name,
+    const char* value)
+{
+    _writeIndent(builder, indent);
+    builder << name << ": " << (value ? value : "null") << "\n";
 }
 
 class ScopeWritterForKey

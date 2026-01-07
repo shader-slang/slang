@@ -43,26 +43,20 @@ jobs:
           fi
           echo "should-run=$shouldRun" >> $GITHUB_OUTPUT
 
-  # Linux builds
+  # Linux builds (containerized builds on GitHub-hosted runners)
   build-linux-debug-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
+    uses: ./.github/workflows/ci-slang-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
       runs-on: '["ubuntu-22.04"]'
 
   build-linux-release-gcc-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-build.yml
+    uses: ./.github/workflows/ci-slang-build-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
       runs-on: '["ubuntu-22.04"]'
 
@@ -123,32 +117,22 @@ jobs:
       config: release
       runs-on: '["Windows", "self-hosted", "GCP-T4"]'
 
-  # Linux tests
+  # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: debug
-      runs-on: '["ubuntu-22.04"]'
-      test-category: smoke
-      server-count: 1
+      server-count: 4
 
   test-linux-release-gcc-x86_64:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
+    uses: ./.github/workflows/ci-slang-test-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
-      runs-on: '["ubuntu-22.04"]'
-      test-category: full
-      server-count: 1
+      server-count: 4
 
   # macOS tests
   test-macos-debug-clang-aarch64:
@@ -162,6 +146,7 @@ jobs:
       config: debug
       runs-on: '["macos-latest"]'
       test-category: smoke
+      full-gpu-tests: true
       server-count: 3
 
   test-macos-release-clang-aarch64:
@@ -241,8 +226,8 @@ jobs:
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
-            echo "❌ One or more CI jobs failed or were cancelled"
+            echo "One or more CI jobs failed or were cancelled"
             exit 1
           fi
 
-          echo "✅ All CI jobs completed successfully (passed or skipped)!"
+          echo "All CI jobs completed successfully (passed or skipped)!"

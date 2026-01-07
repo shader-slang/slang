@@ -72,7 +72,7 @@ static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet
 
     String metalSDKPath = path;
 
-#if defined(SLANG_APPLE_FAMILY)
+#if SLANG_APPLE_FAMILY
     // Use xcrun command to find the metal compiler.
     CommandLine xcrunCmdLine;
     ExecutableLocation xcrunLocation("xcrun");

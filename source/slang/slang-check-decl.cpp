@@ -17,6 +17,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -2646,7 +2647,10 @@ bool isDefaultInitializable(VarDeclBase* varDecl)
     return true;
 }
 
-static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type* type)
+static Expr* constructDefaultConstructorForType(
+    SemanticsVisitor* visitor,
+    Type* type,
+    SourceLoc loc)
 {
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
@@ -2677,6 +2681,7 @@ static Expr* constructDefaultConstructorForType(SemanticsVisitor* visitor, Type*
     if (visitor->isCStyleType(type, visitSet))
     {
         auto initListExpr = visitor->getASTBuilder()->create<InitializerListExpr>();
+        initListExpr->loc = loc;
         initListExpr->type = visitor->getASTBuilder()->getInitializerListType();
         Expr* outExpr = nullptr;
         auto fromType = type;
@@ -2699,7 +2704,8 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto defaultInitExpr =
+            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
         return defaultInitExpr;
     }
@@ -9391,31 +9397,58 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         _addTargetModifiers(newDecl, newTargets);
 
         bool hasConflict = false;
+
+        //
+        // Example testcase for new diagnostics, the flow below is very much as
+        // it was except instead of emitting diagnostics as we go, we build up
+        // this Diagnositcs::FunctionRedefinition struct and emit it at the end
+        //
+        Diagnostics::FunctionRedefinition diagnostic;
+
         for (auto& [target, value] : newTargets)
         {
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                // Redefinition
-                if (!hasConflict)
+                if (getOptionSet().shouldEmitRichDiagnostics())
                 {
+                    if (!hasConflict)
+                    {
+                        diagnostic = Diagnostics::FunctionRedefinition{
+                            .name = newDecl->getName(),
+                            .function_location = newDecl->getNameLoc()};
+                    }
+                    auto prevDecl = *found;
+                    diagnostic.original_location = prevDecl->getNameLoc();
+                }
+                else
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(
+                            newDecl,
+                            Diagnostics::functionRedefinition,
+                            newDecl->getName());
+                    }
+
+                    auto prevDecl = *found;
                     getSink()->diagnose(
-                        newDecl,
-                        Diagnostics::functionRedefinition,
-                        newDecl->getName());
-                    hasConflict = true;
+                        prevDecl,
+                        Diagnostics::seePreviousDefinitionOf,
+                        prevDecl->getName());
                 }
 
-                auto prevDecl = *found;
-                getSink()->diagnose(
-                    prevDecl,
-                    Diagnostics::seePreviousDefinitionOf,
-                    prevDecl->getName());
+                hasConflict = true;
             }
         }
 
         if (hasConflict)
         {
+            if (getOptionSet().shouldEmitRichDiagnostics())
+            {
+                getSink()->diagnose(diagnostic);
+            }
             return SLANG_FAIL;
         }
     }
@@ -12768,7 +12801,8 @@ void checkDerivativeAttributeImpl(
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType &&
+                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         attr,
@@ -13610,9 +13644,8 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type))
+    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
     {
-        expr->loc = varDecl->loc;
         return expr;
     }
 
