@@ -6505,40 +6505,56 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
                              (matB.m_layout == Layout::RowMajor ? 1 : 0);
 
-    switch(encodedLayout)
+    switch (encodedLayout)
     {
-        // 00011
-        case 0x3:
-            MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::RowMajor, saturatingAccumulation>::eval(
-                matD,
-                matA,
-                matB,
-                matC);
-            break;
-        // 00010
-        case 0x2:
-            MMAHelper<AType, BType, CType, DType, shape, Layout::RowMajor, Layout::ColMajor, saturatingAccumulation>::eval(
-                matD,
-                matA,
-                matB,
-                matC);
-            break;
-        // 0001
-        case 0x01:
-            MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::RowMajor, saturatingAccumulation>::eval(
-                matD,
-                matA,
-                matB,
-                matC);
-            break;
-        // 0000
-        case 0x00:
-            MMAHelper<AType, BType, CType, DType, shape, Layout::ColMajor, Layout::ColMajor, saturatingAccumulation>::eval(
-                matD,
-                matA,
-                matB,
-                matC);
-            break;
+    // 00011
+    case 0x3:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 00010
+    case 0x2:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0001
+    case 0x01:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0000
+    case 0x00:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
     }
 
     return matD;

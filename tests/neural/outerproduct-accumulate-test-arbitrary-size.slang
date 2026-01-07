@@ -4,9 +4,10 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
-import neural;
-#pragma warning(disable: 41017)
 
+#pragma warning(disable: 41017)
+import neural;
+import common;
 
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
@@ -185,48 +186,33 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         resultBuffer[resIndex] = res ? 1 : 0;
 }
 
-void cleanOutputBuffer<int InputSize, int OutputSize>(uint tid)
-{
-    int size = OutputSize * InputSize;
-    int numIter = (size + WorkgroupSize - 1) / WorkgroupSize;
-    for (int i = 0; i < numIter; i++)
-    {
-        int index = i * WorkgroupSize + tid;
-        if (index >= size)
-            break;
-
-        outputBuffer[index] = DType(0.0f);
-    }
-    AllMemoryBarrierWithGroupSync();
-}
-
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
-        cleanOutputBuffer<3, 15>(tid);
+        setBufferOneValue<3 * 15, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<3, 15>(tid, 0);
         AllMemoryBarrierWithGroupSync();
     }
     // BUFFER: 1
 
     {
-        cleanOutputBuffer<20, 30>(tid);
+        setBufferOneValue<20 * 30, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<20, 30>(tid, 1);
         AllMemoryBarrierWithGroupSync();
     }
     // BUFFER-NEXT: 1
 
     {
-        cleanOutputBuffer<49, 17>(tid);
+        setBufferOneValue<49 * 17, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<49, 17>(tid, 2);
         AllMemoryBarrierWithGroupSync();
     }
     // BUFFER-NEXT: 1
 
     {
-        cleanOutputBuffer<33, 9>(tid);
+        setBufferOneValue<33 * 9, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<33, 9>(tid, 3);
         AllMemoryBarrierWithGroupSync();
     }
