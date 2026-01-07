@@ -1054,9 +1054,11 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         set { data[index] = newValue; }
     }
 
-    private OutputVector linearTransformOnTarget<Storage, OutputVector, TargetEnum Target>(
-        Storage weightStorage,
-        no_diff Storage.Address weightAddress)
+    private OutputVector linearTransformOnTarget<Storage, OutputVector, TargetEnum Target, bool Bias>(
+        Storage weight,
+        no_diff Storage.Address weightAddress,
+        no_diff Optional<Storage> bias,
+        no_diff Optional<Storage.Address> biasAddress)
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
         where Storage.Address == Storage.Differential.Address
@@ -1067,15 +1069,17 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
         const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T, false
-                            >( data, shA, shB, shC, weightStorage, weightAddress, none, none);
+        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
+                            >( data, shA, shB, shC, weight, weightAddress, bias, biasAddress);
         return OutputVector(outputArray);
     }
 
-    private static void linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum Target>(
+    private static void linearTransformBwdOnTarget< Storage, OutputVector, TargetEnum Target, bool Bias>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Storage> dWeightStorage,
         no_diff Storage.Address dWeightAddress,
+        Optional<DifferentialPtrPair<Storage>> biasStorage,
+        no_diff Optional<Storage.Address> biasAddress,
         OutputVector.Differential doutput)
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
@@ -1117,6 +1121,19 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
                                     T, This
                                   >( shA, shB, doutput, dthis.p, dWeightStorage.d, dWeightAddress);
 #endif
+
+        if (Bias)
+        {
+            // VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
+            //     SPtr<uint4> sharedMemory,
+            //     in InArrayType dOut,
+            //     in int subgroupId,
+            //     Storage biasStorage,
+            //     Storage.Address biasAddress)
+            const int subgroupIndex = getWaveId();
+            MMA.sumReduceRows<T.Differential, Storage.Differential, OutputVector.Differential
+                >(shB, doutput, subgroupIndex, biasStorage.value.d, biasAddress.value);
+        }
     }
 
     // Linear transformation without bias
@@ -1133,9 +1150,9 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         __target_switch
         {
         case cuda:
-            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.CUDA>(weightStorage, weightAddress);
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.CUDA, false>(weightStorage, weightAddress, none, none);
         case spirv:
-            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.SPIR_V>(weightStorage, weightAddress);
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.SPIR_V, false>(weightStorage, weightAddress, none, none);
         }
     }
 
@@ -1151,16 +1168,20 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
             where OutputVector : IVector<T>
             where OutputVector.Differential : IVector<T.Differential>
     {
+        Optional<DifferentialPtrPair<Storage>> biasStorage = {};
         __target_switch
         {
         case cuda:
-            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.CUDA>(dthis, dWeightStorage, dWeightAddress, doutput);
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
         case spirv:
-            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.SPIR_V>(dthis, dWeightStorage, dWeightAddress, doutput);
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
         }
     }
 
+
+
     [Differentiable]
+    [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Storage, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
@@ -1171,8 +1192,36 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
             where Storage.Address == Storage.Differential.Address
             where OutputVector : IVector<T>
     {
-        OutputVector output = OutputVector();
-        return output;
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.CUDA, true>(weightStorage, weightAddress, biasStorage, biasAddress);
+        case spirv:
+            return no_diff linearTransformOnTarget<Storage, OutputVector, TargetEnum.SPIR_V, true>(weightStorage, weightAddress, biasStorage, biasAddress);
+        }
+    }
+
+    // Backward of linear transformation with bias
+    static void linearTransformBwd<Storage, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Storage> dWeightStorage,
+        DifferentialPtrPair<Storage> dBiasStorage,
+        no_diff Storage.Address dWeightAddress,
+        no_diff Storage.Address dBiasAddress,
+        OutputVector.Differential doutput)
+            where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
+    {
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.CUDA, true>( dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<Storage, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
+        }
     }
 
     [Differentiable]

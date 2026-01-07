@@ -21,8 +21,8 @@ RWStructuredBuffer<float> parametersFloat;
 RWStructuredBuffer<ElementType> parameters;
 
 // Create a buffer to store the test result
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=testResult
-RWStructuredBuffer<uint2> testResult;
+//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
+RWStructuredBuffer<uint> testResult;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):name=dInput
 RWStructuredBuffer<ElementType> dInput;
@@ -45,7 +45,7 @@ typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
 typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
 [Differentiable]
-OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
+OutputVector MatVecMul<InputVector, OutputVector>(
     InputVector input,
     BufferStorage weightStorage,
     BufferStorage.Address weightAddress)
@@ -56,19 +56,19 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     return outputVec;
 }
 
-// [Differentiable]
-// OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
-//     InputVector input,
-//     BufferStorage weightStorage,
-//     BufferStorage biasStorage,
-//     BufferStorage.Address weightAddress,
-//     BufferStorage.Address biasAddress)
-//     where InputVector : IVector<ElementType, 4>
-//     where OutputVector : IVector<ElementType, 2>
-// {
-//     var outputVec = input.linearTransform<2, BufferStorage, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
-//     return outputVec;
-// }
+[Differentiable]
+OutputVector MatVecMulAdd<InputVector, OutputVector>(
+    InputVector input,
+    BufferStorage weightStorage,
+    BufferStorage biasStorage,
+    BufferStorage.Address weightAddress,
+    BufferStorage.Address biasAddress)
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
+{
+    var outputVec = input.linearTransform<BufferStorage, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
+    return outputVec;
+}
 
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
@@ -85,7 +85,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     BufferStorage.Address weightAddress = 0;
 
     // Run the forward pass
-    let outputVec = TestInlineVectorMatMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
+    let outputVec = MatVecMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
 
     // serialRead<16, half>(tid, __getAddress(shMem[0]));
     // serialRead<16, half>(tid, __getAddress(shMem[0]) + 32);
@@ -102,7 +102,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     // Run the backward pass
     // dInput = W^T * dOutput
     // dInput = {6, 8, 10, 12}
-    bwd_diff(TestInlineVectorMatMul<InVectorType, OutVectorType>)
+    bwd_diff(MatVecMul<InVectorType, OutVectorType>)
                 (dPair, weightDiffPair, weightAddress, dRes);
 
     isPassed = isPassed &&
@@ -120,9 +120,70 @@ void BasicTestWithoutBias(int tid, int resIndex)
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
-        testResult[resIndex].x = isPassed ? 1 : 0;
+        testResult[resIndex] = isPassed ? 1 : 0;
     }
 }
+
+// Basic test on MatMul with bias, this test covers both forward and backward pass
+void BasicTestWithBias(int tid, int resIndex)
+{
+    typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
+    typealias InVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, InputSize, SubgroupSize>;
+    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+
+    ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
+    InVectorType input = InVectorType(inputData);
+
+    BufferStorage weightStorage = BufferStorage(parameters);
+    BufferStorage biasStorage = BufferStorage(parameters);
+    BufferStorage dweightStorage = BufferStorage(dParameters);
+    BufferStorage dbiasStorage = BufferStorage(dParameters);
+
+    BufferStorage.Address weightAddress = 0;
+    BufferStorage.Address biasAddress = 8;
+
+    // Run the forward pass
+    let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightStorage, biasStorage, weightAddress, biasAddress);
+
+    bool isPassed = true;
+    isPassed = isPassed && (outputVec[0] == ElementType(39.0) && outputVec[1] == ElementType(80.0));
+
+
+    var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
+    var biasDiffPair = DifferentialPtrPair<BufferStorage>(biasStorage, dbiasStorage);
+    let dOutput = OutVectorType(1.0);
+    var dPair = diffPair(input);
+
+    // Run the backward pass
+    // dInput = W^T * dOutput
+    // dInput = {6, 8, 10, 12}
+    bwd_diff(MatVecMulAdd<InVectorType, OutVectorType>)
+                ( dPair, weightDiffPair, biasDiffPair, weightAddress, biasAddress, dOutput);
+
+    isPassed = isPassed &&
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
+
+
+    // dW = dOutput * dInput^T
+    // dW = [1, 1]^T * [1, 2, 3, 4]
+    //    = [[1, 2, 3, 4]; [1, 2, 3, 4]]
+    isPassed = isPassed &&
+        dParameters[0] == 32.0 && dParameters[1] == 64.0 && dParameters[2] == 96.0 && dParameters[3] == 128.0 &&
+        dParameters[4] == 32.0 && dParameters[5] == 64.0 && dParameters[6] == 96.0 && dParameters[7] == 128.0;
+
+    // dBias = dOutput
+    // dBias = {1, 1}
+    isPassed = isPassed &&
+        dParameters[8] == 32.0 && dParameters[9] == 32.0;
+
+
+    isPassed = WaveActiveAllTrue(isPassed);
+    if (tid == 0)
+    {
+        testResult[resIndex] = isPassed ? 1 : 0;
+    }
+}
+
 
 // This function is just used for debugging, not for verification. So keep it here.
 void serialRead<int Stride, T : __BuiltinFloatingPointType>(uint tid, SPtr<uint4> sharedMem)
@@ -188,5 +249,9 @@ void computeMain(uint tid : SV_DispatchThreadID)
     setupParameters(tid);
     GroupMemoryBarrierWithWaveSync();
     BasicTestWithoutBias(tid, 0);
+    // BUFFER: 1
+
+    cleanupDParameters();
+    BasicTestWithBias(tid, 1);
     // BUFFER: 1
 }
