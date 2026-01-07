@@ -20,6 +20,7 @@ bool isUnreachableRootBlock(IRBlock* block)
 struct EliminateMultiLevelBreakContext
 {
     IRModule* irModule;
+    TargetProgram* targetProgram;
 
     struct BreakableRegionInfo : RefObject
     {
@@ -599,14 +600,15 @@ struct EliminateMultiLevelBreakContext
             }
         }
 
-        legalizeDefUse(func);
+        legalizeDefUse(func, targetProgram);
     }
 };
 
-void eliminateMultiLevelBreak(IRModule* irModule)
+void eliminateMultiLevelBreak(IRModule* irModule, TargetProgram* targetProgram)
 {
     EliminateMultiLevelBreakContext context;
     context.irModule = irModule;
+    context.targetProgram = targetProgram;
     for (auto globalInst : irModule->getGlobalInsts())
     {
         if (auto codeInst = as<IRGlobalValueWithCode>(globalInst))
@@ -616,10 +618,14 @@ void eliminateMultiLevelBreak(IRModule* irModule)
     }
 }
 
-void eliminateMultiLevelBreakForFunc(IRModule* irModule, IRGlobalValueWithCode* func)
+void eliminateMultiLevelBreakForFunc(
+    TargetProgram* targetProgram,
+    IRModule* irModule,
+    IRGlobalValueWithCode* func)
 {
     EliminateMultiLevelBreakContext context;
     context.irModule = irModule;
+    context.targetProgram = targetProgram;
     context.processFunc(func);
 }
 

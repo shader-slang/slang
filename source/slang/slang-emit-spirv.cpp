@@ -609,12 +609,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         for (auto parent = inst; parent; parent = parent->getParent())
         {
-            if (!as<IRFunc>(parent) && !as<IRModuleInst>(parent))
-                continue;
+            if (as<IRBlock>(parent))
+            {
+                // Search backwards from `inst` inside this block for a DebugScope instruction.
+                for (auto prev = inst->getPrevInst(); prev; prev = prev->getPrevInst())
+                {
+                    if (auto debugScope = as<IRDebugScope>(prev))
+                    {
+                        return ensureInst(debugScope->getScope());
+                    }
+                }
+            }
+            else if (as<IRFunc>(parent) || as<IRModuleInst>(parent))
+            {
+                SpvInst* spvInst = nullptr;
+                if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
+                    return spvInst;
+            }
 
-            SpvInst* spvInst = nullptr;
-            if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
-                return spvInst;
+            inst = parent;
         }
         return nullptr;
     }
@@ -8798,7 +8811,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(type);
         if (IRFuncType* funcType = as<IRFuncType>(type))
         {
-            SpvInst* returnType = emitDebugType(funcType->getResultType());
+            SpvInst* returnType = ensureInst(m_voidType);
+            if (!as<IRVoidType>(funcType->getResultType()))
+            {
+                returnType = emitDebugType(funcType->getResultType());
+            }
 
             List<SpvInst*> argTypes;
             for (UInt i = 0; i < funcType->getParamCount(); ++i)

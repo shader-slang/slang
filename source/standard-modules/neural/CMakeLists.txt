@@ -39,7 +39,8 @@ elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY slangc)
 else()
-    set(SLANG_COMPILER)
+    # As a fallback, use the system-installed `slangc` compiler
+    set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY)
 endif()
 
