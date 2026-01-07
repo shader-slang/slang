@@ -1402,6 +1402,7 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
 * `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
+* `spvShaderInvocationReorderMotionNV` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
@@ -1461,6 +1462,7 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
 * `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
+* `GL_NV_shader_invocation_reorder_motion` : enables the GL_NV_shader_invocation_reorder_motion extension 
 * `ser_glsl_nv` 
 * `ser_spirv_nv` 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
@@ -1473,7 +1475,7 @@ A capability describes an optional feature that a target may or may not support.
 * `ser_dxr` 
 * `ser` 
 * `ser_nv` 
-* `motionblur` 
+* `motionblur_nv` 
 * `rayquery` 
 * `raytracing_motionblur` 
 * `ser_motion` 
