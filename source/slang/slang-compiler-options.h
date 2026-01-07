@@ -373,6 +373,11 @@ struct CompilerOptionSet
         return getBoolOption(CompilerOptionName::EmitSeparateDebug);
     }
 
+    bool shouldEmitRichDiagnostics()
+    {
+        return getBoolOption(CompilerOptionName::EnableRichDiagnostics);
+    }
+
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);

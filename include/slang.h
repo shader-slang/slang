@@ -162,6 +162,9 @@ Most applications should not need to touch this section.
     #ifndef SLANG_WIIU
         #define SLANG_WIIU 0
     #endif
+    #ifndef SLANG_WASM
+        #define SLANG_WASM 0
+    #endif
 #endif /* SLANG_PLATFORM */
 
 /* Shorthands for "families" of compilers/platforms */
@@ -448,6 +451,10 @@ convention for interface methods.
 
 #ifndef SLANG_PROCESSOR_POWER_PC_64
     #define SLANG_PROCESSOR_POWER_PC_64 0
+#endif
+
+#ifndef SLANG_PROCESSOR_WASM
+    #define SLANG_PROCESSOR_WASM 0
 #endif
 
 // Processor families
@@ -1097,9 +1104,11 @@ typedef uint32_t SlangSizeT;
         LLVMCPU,          // string
         LLVMFeatures,     // string
 
-        CountOf,
+        EnableRichDiagnostics, // bool, enable the experimental rich diagnostics
 
         ReportDynamicDispatchSites, // bool
+
+        CountOf,
     };
 
     enum class CompilerOptionValueKind

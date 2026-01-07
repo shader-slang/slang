@@ -987,6 +987,10 @@ void initCommandOptions(CommandOptions& options)
          "-experimental-feature",
          nullptr,
          "Enable experimental features (loading builtin neural module)"},
+        {OptionKind::EnableRichDiagnostics,
+         "-enable-experimental-rich-diagnostics",
+         nullptr,
+         "Enable experimental rich diagnostics with enhanced formatting and details"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2339,6 +2343,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
+        case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::ReportDetailedPerfBenchmark:
