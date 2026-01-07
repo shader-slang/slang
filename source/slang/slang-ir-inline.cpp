@@ -1159,7 +1159,6 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         bool hasForceInline = false;
-        bool hasUserDefinedDerivative = false;
         for (auto decor : info.callee->getDecorations())
         {
             switch (decor->getOp())
@@ -1172,14 +1171,16 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 break;
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_ForwardDerivativeDecoration:
-                hasUserDefinedDerivative = true;
-                break;
+            case kIROp_BackwardDifferentiableDecoration:
+            case kIROp_ForwardDifferentiableDecoration:
+                return false;
             }
         }
-        if (!hasForceInline || hasUserDefinedDerivative)
+        if (!hasForceInline)
         {
             return false;
         }
+
         if (auto result = m_funcCanInline.tryGetValue(info.callee))
             return *result;
         bool canInline = true;
