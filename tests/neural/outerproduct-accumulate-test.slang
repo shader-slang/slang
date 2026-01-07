@@ -1,12 +1,13 @@
 
 // On Vulkan, we can only test float type for now because atomicAdd is not supported for half on our CI machine.
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
 
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
-import neural;
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
+
 #pragma warning(disable: 41017)
-
+import neural;
+import common;
 
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
@@ -184,45 +185,30 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         resultBuffer[resIndex] = res ? 1 : 0;
 }
 
-void cleanOutputBuffer<int InputSize, int OutputSize>(uint tid)
-{
-    int size = OutputSize * InputSize;
-    int numIter = (size + WorkgroupSize - 1) / WorkgroupSize;
-    for (int i = 0; i < numIter; i++)
-    {
-        int index = i * WorkgroupSize + tid;
-        if (index >= size)
-            break;
-
-        outputBuffer[index] = DType(0.0f);
-    }
-    AllMemoryBarrierWithGroupSync();
-}
-
 [shader("compute")]
 [numthreads(WorkgroupSize, 1, 1)]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
     {
-        cleanOutputBuffer<8, 8>(tid);
+        setBufferOneValue<8 * 8, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<8, 8>(tid, 0);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        cleanOutputBuffer<16, 16>(tid);
+        setBufferOneValue<16 * 16, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<16, 16>(tid, 1);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        cleanOutputBuffer<32, 32>(tid);
+        setBufferOneValue<32 * 32, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<32, 32>(tid, 2);
         AllMemoryBarrierWithGroupSync();
     }
 
     {
-        cleanOutputBuffer<64, 64>(tid);
+        setBufferOneValue<64 * 64, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
         test<64, 64>(tid, 3);
         AllMemoryBarrierWithGroupSync();
     }

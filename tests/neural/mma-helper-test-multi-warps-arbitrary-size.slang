@@ -185,31 +185,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         }
     }
 
-    // each warp will check the result
-    res = WaveActiveAllTrue(res);
-
-    int subgroupIndex = tid / 32;
-    int laneId = WaveGetLaneIndex();
-    // use first lane of each warp to write the result to the shared memory so that
-    // we can reduce the result further
-    if (laneId == 0)
-    {
-        s_resultMem[subgroupIndex] = res;
-    }
-
-    AllMemoryBarrierWithGroupSync();
-
-    int warpCount = BatchSize / 32;
-    bool finalResult = true;
-    // We will use the "warpCount" threads in the first warp to reduce the result.
-    if (tid < warpCount)
-    {
-        finalResult = s_resultMem[tid];
-    }
-
-    finalResult = WaveActiveAllTrue(finalResult);
-
-    // Finally, use the first thread to write the result to the output buffer.
+    bool finalResult = collectResults<BatchSize>(tid, res);
     if (tid == 0)
     {
         outputBuffer[resIndex] = finalResult ? 1 : 0;
