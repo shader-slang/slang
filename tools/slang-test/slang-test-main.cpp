@@ -1966,6 +1966,7 @@ static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStrin
     if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
         SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
+        fprintf(stderr, "Error: Unable to parse diagnostics for diagnostic test\n");
         return false;
     }
 
