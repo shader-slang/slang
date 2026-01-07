@@ -1,6 +1,6 @@
 // Test all GLSL EXT SER intrinsics (GL_EXT_shader_invocation_reorder)
 
-//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl
+//TEST:SIMPLE(filecheck=CHECK_GLSL): -allow-glsl -stage raygeneration -entry main -target glsl -capability GL_EXT_shader_invocation_reorder -capability GL_NV_ray_tracing_motion_blur
 
 import glsl;
 

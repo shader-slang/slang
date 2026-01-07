@@ -786,6 +786,11 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// [EXT]
 def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
 
+/// Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
+/// Used for motion blur variants of SER functions that require both extensions.
+/// [EXT]
+alias spvShaderInvocationReorderMotionNV = spvShaderInvocationReorderNV + spvRayTracingMotionBlurNV;
+
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
@@ -951,6 +956,7 @@ def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
 def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_EXT_shader_invocation_reorder : _GLSL_460;
+alias _GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
@@ -1203,6 +1209,11 @@ alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_E
 /// [EXT]
 alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderEXT;
 
+/// Represents the GL_NV_shader_invocation_reorder + motion blur combined extension (NVIDIA-specific).
+/// Used for motion blur variants of SER functions that require both extensions.
+/// [EXT]
+alias GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder_motion | spvShaderInvocationReorderMotionNV;
+
 /// SER (Shader Execution Reordering) on GLSL with NVIDIA NV extension.
 /// Used in __target_switch cases for NV-specific GLSL code paths.
 /// [Compound]
@@ -1260,21 +1271,21 @@ alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_s
 /// [Compound]
 alias ser_nv = raytracing + GL_NV_shader_invocation_reorder | cuda;
 
-/// Capabilities needed for raytracing-motionblur
+/// Capabilities needed for raytracing-motionblur (NVIDIA-specific)
 /// [Compound]
-alias motionblur = GL_NV_ray_tracing_motion_blur | cuda;
+alias motionblur_nv = GL_NV_ray_tracing_motion_blur | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
 alias rayquery = GL_EXT_ray_query | _sm_6_3;
 /// Capabilities needed for compute-shader rayquery and motion-blur
 /// [Compound]
-alias raytracing_motionblur =  raytracing + motionblur | cuda;
+alias raytracing_motionblur =  raytracing + motionblur_nv | cuda;
 /// Capabilities needed for shader-execution-reordering and motion-blur
 /// [Compound]
-alias ser_motion = ser + motionblur;
+alias ser_motion = ser + motionblur_nv;
 /// NVIDIA-specific SER + motion blur
 /// [Compound]
-alias ser_nv_motion = ser_nv + motionblur;
+alias ser_nv_motion = ser_nv + motionblur_nv;
 /// Capabilities needed for realtime clocks
 /// [Compound]
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
