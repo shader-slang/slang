@@ -44,10 +44,16 @@ RUN apt-get update && apt-get install -y \
     libxi-dev \
     libgl1-mesa-dev \
     libvulkan-dev \
-    vulkan-validationlayers \
     spirv-tools \
     glslang-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install newer Vulkan validation layers from LunarG
+RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - && \
+    wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list && \
+    apt-get update && \
+    apt-get install -y vulkan-validationlayers && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
