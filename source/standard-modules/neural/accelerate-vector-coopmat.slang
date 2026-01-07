@@ -779,10 +779,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
         }
 
-        GroupMemoryBarrierWithGroupSync();
         // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
         sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryB);
 
+        // Only the first subgroup need to store the result to the global memory.
         if (subgroupIndex == 0)
         {
             // Store the result shared memory. We store one row of the cooperative matrix at a time.
@@ -795,6 +795,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(sharedMemoryB + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC, StrideInVectorTileC);
                 }
 
+                GroupMemoryBarrierWithWaveSync();
+
                 // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
                 // In forward pass, the tile in the shared memory is in shape M x T_ROW_A, which is one column of cooperative matrices.
                 // while the result here is in shape T_ROW_A x K, which is one row of cooperative matrices.
@@ -802,6 +804,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, true>;
                 MMA.storeShA<U, Storage>(sharedMemoryB, i, weightStorage, weightAddress);
+
+                // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
+                GroupMemoryBarrierWithWaveSync();
             }
         }
     }
@@ -889,13 +894,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             {
                 loadShA<U, Storage>(ptrA[0], tileIndex, weightStorage, weightAddress);
                 loadVectorToShB(ptrB[0], tileIndex, subgroupIndex, inputVector);
-                // For single buffer, we always need to sync the workgroup so the data is ready for all threads.
+
                 // The reason that we have to sync the whole workgroup is that for matrix A, the tile is shared by
-                // all workgroups.
-                // The alternative solution to increase the performance is that we can duplicate the tile for each
-                // subgroup, so each subgroup can perform it's own MMA operatiion, because we matrix B is only shared
-                // by each subgroup. However, this solution will waste lots of shared memory as there are up to 32 subgroups
-                // in the workgroup.
+                // whole workgroup.
+
+                // TODO:
+                // The alternative solution to duplicate the tile A to each subgroup, so we will only need warp sync here.
+                // But that will waste lots of shared memory and increase memory transactions. We need benchmark to see
+                // which solution is better.
                 GroupMemoryBarrierWithGroupSync();
             }
 
@@ -950,6 +956,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                                 TileInfo.HeightInVectorTileC);
             }
 
+            // Make sure the data in shared memory is visible to all threads in the warp.
+            GroupMemoryBarrierWithWaveSync();
+
             if (Bias)
             {
                 storeVectorFromShB<V, OutArrayType, AccessOp.ACCUMULATE>(ptrC, i, subgroupIndex, outputVector);
@@ -959,7 +968,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 storeVectorFromShB<V, OutArrayType, AccessOp.WRITE>(ptrC, i, subgroupIndex, outputVector);
             }
 
-            // Wave sync is good enough, because shared memory C is only shared by each subgroup.
+            // wati until all threads in the warp finish reading shared memory and storing to local vector.
             GroupMemoryBarrierWithWaveSync();
         }
 
