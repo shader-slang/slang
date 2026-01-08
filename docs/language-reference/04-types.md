@@ -1,12 +1,6 @@
-> Note: This document is a work in progress. It is both incomplete and, in many cases, inaccurate.
+# Types
 
-Types
-=====
-
-This section defines the kinds of types supported by Slang.
-
-Types in Slang do not necessarily prescribe a single _layout_ in memory.
-The discussion of each type will specify any guarantees about layout it provides; any details of layout not specified here may depend on the target platform, compiler options, and context in which a type is used.
+The types in the Slang language consists of the following categories:
 
 * [4a - Fundamental Types](04-types-fundamental.md)
 * [4b - Vector and Matrix Types](04-types-vector.md)
@@ -14,21 +8,28 @@ The discussion of each type will specify any guarantees about layout it provides
 * [4d - Array types](04-types-array.md)
 * [4e - Opaque types](04-types-opaque.md)
 
+Types in Slang do not generally have identical memory layouts in different targets. The provided guarantees
+are discussed with each type. Any details of layout not specified may depend on the target language, target
+device, compiler options, and the context in which a type is used.
 
-Known and Unknown Size
-----------------------
 
-Every type has either known or unknown size.
-Types with unknown size arise in a few ways:
+## Known and Unknown Size
 
-* An unknown-size array type has unknown size
-
-* A structure type has unknown size if any field type has unknown size
+Every type has either a known or an unknown size. Types with unknown size generally stem from unknown-length
+arrays:
+* An unknown-length array type has an unknown size.
+* The size of a structure type is unknown if it has a non-static data member with unknown size.
 
 The use of types with unknown size is restricted as follows:
-
 * A type with unknown size cannot be used as the element type of an array
-
 * A type with unknown size can only be used as the last field of a structure type
+* A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function,
+  etc. Specific built-in generic types/functions may support unknown-size types, and this will be documented
+  on the specific type/function.
+* A type with unknown size cannot be instantiated as a variable.
 
-* A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function, etc. Specific built-in generic types/functions may support unknown-size types, and this will be documented on the specific type/function.
+> Remark: Unknown size is different to unspecified or target-specified size. [Opaque types](04-types-opaque.md)
+> have target-specified sizes, sizes of [structures](04-types-struct.md) and [arrays](04-types-array.md) are subject to
+> target-specific alignment rules, and certain [4a - Fundamental Types](04-types-fundamental.md) such as
+> `bool` have target-specified size. Unspecified-sized types are not subject to the restrictions of
+> unknown-sized types.
