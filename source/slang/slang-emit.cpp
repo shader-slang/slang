@@ -44,6 +44,7 @@
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
+#include "slang-ir-lower-switch-to-if.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
@@ -1921,6 +1922,12 @@ Result linkAndOptimizeIR(
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
     }
+
+    // Lower switch statements to if-else chains for correct reconvergence.
+    // This must run before eliminateMultiLevelBreak so that any continue
+    // statements that now cross our synthetic loop boundary are handled.
+    // See GitHub issue #6441.
+    SLANG_PASS(lowerSwitchToIf, targetProgram);
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
