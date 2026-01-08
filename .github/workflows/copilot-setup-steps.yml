@@ -10,8 +10,9 @@ on:
 
 jobs:
   copilot-setup-steps:
-    # Use self-hosted ARC runner with GPU support for Copilot
-    runs-on: [self-hosted, Linux, GPU, arc]
+    # Use GitHub larger runner with GPU support for Copilot
+    # Avoids path mapping issues with ARC runners (/runner vs /home/runner)
+    runs-on: slang-larger-runner-1
 
     permissions:
       contents: read
@@ -33,8 +34,6 @@ jobs:
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
-        -v /runner/_work:/home/runner/work
-        -v /runner/externals:/home/runner/externals
 
     defaults:
       run:
