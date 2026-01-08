@@ -5794,8 +5794,19 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else
         {
             auto optType = lowerType(context, expr->type);
-            auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal.val);
+            // `none` for Optional<T> should not require materializing a well-formed dummy `T`.
+            //
+            // The payload is semantically irrelevant when `hasValue == false`, and attempting to
+            // synthesize a default value here can produce malformed IR for compiler-synthesized
+            // aggregate types (e.g. `DifferentialPair<T>`), leading to crashes during
+            // specialization.
+            //
+            // Use a default-constructed placeholder of type `T` so that later passes don't treat
+            // the payload as an uninitialized value (core module compilation treats warnings as
+            // fatal during bootstrapping).
+            auto valueType = lowerType(context, as<OptionalType>(expr->type)->getValueType());
+            auto defaultVal = context->irBuilder->emitDefaultConstruct(valueType);
+            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal);
             return LoweredValInfo::simple(irVal);
         }
     }
@@ -6072,8 +6083,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(falseBlock);
-        auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal.val);
+        // See `visitMakeOptionalExpr`: don't materialize a default `T` just to represent `none`.
+        auto valueType = lowerType(context, as<OptionalType>(expr->type)->getValueType());
+        auto defaultVal = builder->emitDefaultConstruct(valueType);
+        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal);
         builder->emitStore(var, noneVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(afterBlock);
