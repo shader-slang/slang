@@ -18,31 +18,12 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
-      packages: read
 
-    container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      options: >-
-        --gpus all
-        --user root
-        --device /dev/nvidia-modeset:/dev/nvidia-modeset
-        --device /dev/dri:/dev/dri
-        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
-        -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
-
-    defaults:
-      run:
-        shell: bash
+    # No container - Copilot does not support containers
+    # Known issue: https://github.com/orgs/community/discussions/170315
+    # Run directly on larger runner which has full toolchain
 
     steps:
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
