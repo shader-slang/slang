@@ -40,6 +40,13 @@ jobs:
           tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /tmp
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
+
+          # Install CUDA Toolkit 12.4.1 (matching container image)
+          wget -q https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_550.54.15_linux.run
+          sudo sh cuda_12.4.1_550.54.15_linux.run --silent --toolkit --no-opengl-libs --no-drm
+          echo "/usr/local/cuda-12.4/bin" >> $GITHUB_PATH
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
       - name: Verify GPU access
         run: |
