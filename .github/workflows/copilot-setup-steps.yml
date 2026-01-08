@@ -10,45 +10,36 @@ on:
 
 jobs:
   copilot-setup-steps:
-    # Use self-hosted ARC runner with GPU support for Copilot
-    runs-on: [self-hosted, Linux, GPU, arc]
+    # Use GitHub larger runner with GPU support for Copilot
+    # Avoids path mapping issues with ARC runners (/runner vs /home/runner)
+    runs-on: slang-larger-runner-1
 
     permissions:
       contents: read
       pull-requests: write
       checks: write
-      packages: read
 
-    container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-      options: >-
-        --gpus all
-        --user root
-        --device /dev/nvidia-modeset:/dev/nvidia-modeset
-        --device /dev/dri:/dev/dri
-        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
-        -v /usr/share/nvidia:/usr/share/nvidia:ro
-        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
-        -v /runner/_work:/home/runner/work
-        -v /runner/externals:/home/runner/externals
-
-    defaults:
-      run:
-        shell: bash
+    # No container - Copilot does not support containers
+    # Known issue: https://github.com/orgs/community/discussions/170315
+    # Run directly on larger runner which has full toolchain
 
     steps:
-      - name: Configure Git safe directory
-        run: git config --global --add safe.directory '*'
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 2
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential ninja-build git python3 wget
+
+          # Install CMake 3.30 (required for CMakePresets.json version 6)
+          wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
+          tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /tmp
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
 
       - name: Verify GPU access
         run: |
