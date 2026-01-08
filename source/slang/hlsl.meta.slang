@@ -21730,46 +21730,102 @@ struct HitObject
         case cuda: __intrinsic_asm "optixTraverse";
         case spvShaderInvocationReorderNV:
             {
-                // Function overloading: calls int or payload_t overload based on T
-                __spirvTraceRayHitObjectNV(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,
-                    InstanceInclusionMask,
-                    RayContributionToHitGroupIndex,
-                    MultiplierForGeometryContributionToHitGroupIndex,
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    Payload);  // Let overload resolution select int vs payload_t
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                // and pass compile-time constant to __rayPayloadFromLocation
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        p);
+                    Payload = p;
+                }
             }
         case spirv:
             {
-                // Function overloading: calls int or payload_t overload based on T
-                __spirvTraceRayHitObjectEXT(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,
-                    InstanceInclusionMask,
-                    RayContributionToHitGroupIndex,
-                    MultiplierForGeometryContributionToHitGroupIndex,
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    Payload);  // Let overload resolution select int vs payload_t
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                // and pass compile-time constant to __rayPayloadFromLocation
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        p);
+                    Payload = p;
+                }
             }
         }
     }
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+        ///
+        /// Generic payload parameter T can be:
+        /// - payload_t: for HLSL data-based API (payload structure)
+        /// - int: for GLSL location-based API (payload location ID)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
-    static HitObject TraceMotionRay<payload_t>(
+    static HitObject TraceMotionRay<T>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
         uint InstanceInclusionMask,
@@ -21778,136 +21834,190 @@ struct HitObject
         uint MissShaderIndex,
         RayDesc Ray,
         float CurrentTime,
-        inout payload_t Payload)
+        inout T Payload)
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __glslTraceMotionRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceMotionRay(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    CurrentTime,
-                    __rayPayloadLocation(p));
+                    __glslTraceMotionRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case glsl:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __glslTraceMotionRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceMotionRayEXT(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    CurrentTime,
-                    __rayPayloadLocation(p));
+                    __glslTraceMotionRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case cuda: __intrinsic_asm "optixTraverse";
         case spvShaderInvocationReorderNV:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                if (T is int)
                 {
-                    OpExtension "SPV_NV_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderNV;
-                    OpExtension "SPV_NV_ray_tracing_motion_blur";
-                    OpCapability RayTracingMotionBlurNV;
-                    OpHitObjectTraceRayMotionNV
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ $CurrentTime
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceMotionRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceMotionRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        p);
+                    Payload = p;
+                }
             }
         case spirv:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                if (T is int)
                 {
-                    OpExtension "SPV_EXT_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderEXT;
-                    OpExtension "SPV_NV_ray_tracing_motion_blur";
-                    OpCapability RayTracingMotionBlurNV;
-                    OpHitObjectTraceRayMotionEXT
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ $CurrentTime
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceMotionRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceMotionRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        p);
+                    Payload = p;
+                }
             }
         }
 
@@ -22294,26 +22404,8 @@ struct HitObject
                 };
             }
         case spirv:
-            {
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                let rayFlags = 0u;  // EXT requires RayFlags, default to 0
-                spirv_asm
-                {
-                    OpExtension "SPV_EXT_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderEXT;
-                    OpHitObjectRecordMissEXT
-                        /**/ &__return_val
-                        /**/ $rayFlags
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax;
-                };
-            }
+            // EXT requires RayFlags, default to 0
+            __spirvRecordMissEXT(__return_val, 0u, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         }
     }
 
@@ -22412,13 +22504,7 @@ struct HitObject
                     /**/ &__return_val;
             };
         case spirv:
-            spirv_asm
-            {
-                OpExtension "SPV_EXT_shader_invocation_reorder";
-                OpCapability ShaderInvocationReorderEXT;
-                OpHitObjectRecordEmptyEXT
-                    /**/ &__return_val;
-            };
+            __spirvRecordEmptyEXT(__return_val);
         case hlsl:
             // DXR 1.3 native path (hlsl without nvapi)
             __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
@@ -22519,20 +22605,8 @@ struct HitObject
             {
                 [__vulkanRayPayload]
                 static payload_t p;
-
-                // Save the payload
                 p = Payload;
-
-                spirv_asm
-                {
-                    OpExtension "SPV_EXT_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderEXT;
-                    OpHitObjectExecuteShaderEXT
-                        /**/ &HitOrMiss
-                        /**/ &p;
-                };
-
-                // Write payload result
+                __spirvExecuteShaderEXT(HitOrMiss, p);
                 Payload = p;
             }
         }
@@ -23433,26 +23507,8 @@ struct HitObject
             __intrinsic_asm "($3 = dx::HitObject::MakeMiss($0, $1, $2))";
         case _GL_EXT_shader_invocation_reorder:
             __glslMakeMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
-        case spvShaderInvocationReorderEXT:
-            {
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
-                {
-                    OpExtension "SPV_EXT_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderEXT;
-                    OpHitObjectRecordMissEXT
-                        /**/ &__return_val
-                        /**/ $RayFlags
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax;
-                };
-            }
+        case spirv:
+            __spirvRecordMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         }
     }
 
@@ -24084,8 +24140,331 @@ struct HitObject
         };
     }
 
+    // SPIR-V motion ray helpers - Function overloading for location-based (int) and data-based (payload_t) APIs
+
+    // NV motion ray (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionNV)]
+    static void __spirvTraceMotionRayHitObjectNV<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        float CurrentTime,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &p;
+        };
+    }
+
+    // NV motion ray (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionNV)]
+    static void __spirvTraceMotionRayHitObjectNV(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $CurrentTime
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // EXT motion ray (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvTraceMotionRayHitObjectEXT<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        float CurrentTime,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &p;
+        };
+    }
+
+    // EXT motion ray (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvTraceMotionRayHitObjectEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $CurrentTime
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // ============================================================================
+    // SPIRV EXT helpers for other SER operations (RecordMiss, RecordEmpty, etc.)
+    // These centralize SPIRV assembly to enable GLSL functions to delegate here.
+    // ============================================================================
+
+    // RecordMiss EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordMissEXT(
+        out HitObject hitObject,
+        uint rayFlags,
+        uint missShaderIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordMissEXT
+                /**/ &hitObject
+                /**/ $rayFlags
+                /**/ $missShaderIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax;
+        };
+    }
+
+    // RecordMissMotion EXT helper
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvRecordMissMotionEXT(
+        out HitObject hitObject,
+        uint rayFlags,
+        uint missShaderIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float currentTime)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordMissMotionEXT
+                /**/ &hitObject
+                /**/ $rayFlags
+                /**/ $missShaderIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $currentTime;
+        };
+    }
+
+    // RecordEmpty EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordEmptyEXT(out HitObject hitObject)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordEmptyEXT &hitObject;
+        };
+    }
+
+    // ExecuteShader EXT helper (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvExecuteShaderEXT(HitObject hitObject, int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectExecuteShaderEXT &hitObject __rayPayloadFromLocation(payload);
+        };
+    }
+
+    // ExecuteShader EXT helper (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectExecuteShaderEXT &hitObject &p;
+        };
+    }
+
+    // SetShaderBindingTableRecordIndex EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvSetShaderTableIndexEXT(out HitObject hitObject, uint sbtRecordIndex)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectSetShaderBindingTableRecordIndexEXT &hitObject $sbtRecordIndex;
+        };
+    }
+
+    // RecordFromQuery EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordFromQueryEXT(out HitObject hitObject, RayQuery<0> rayQuery)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordFromQueryEXT &hitObject &rayQuery;
+        };
+    }
+
+    // ReorderThread EXT helpers
+
+    // With hint only
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHintEXT(uint coherenceHint, uint numCoherenceHintBitsFromLSB)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT $coherenceHint $numCoherenceHintBitsFromLSB;
+        };
+    }
+
+    // With hitObject only
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHitObjectEXT(HitObject hitObject)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &hitObject;
+        };
+    }
+
+    // With hitObject and hint
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHitObjectAndHintEXT(HitObject hitObject, uint coherenceHint, uint numCoherenceHintBitsFromLSB)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &hitObject $coherenceHint $numCoherenceHintBitsFromLSB;
+        };
+    }
+
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
@@ -24106,6 +24485,7 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 

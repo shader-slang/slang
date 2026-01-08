@@ -1489,8 +1489,8 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             else
             {
-                SLANG_UNEXPECTED(
-                    "HitObjectType requires either SM 6.9+ (DXR 1.3 native) or hlsl_nvapi capability");
+                SLANG_UNEXPECTED("HitObjectType requires either SM 6.9+ (DXR 1.3 native) or "
+                                 "hlsl_nvapi capability");
             }
             return;
         }
