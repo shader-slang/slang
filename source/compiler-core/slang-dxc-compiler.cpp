@@ -553,19 +553,11 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case DebugInfoType::None:
         break;
 
-    case DebugInfoType::Minimal:
-        // Minimal: Line numbers only, for stack traces and basic source correlation
-        // DXC only supports -Zi (full debug info) or -Zs (small PDB without debug metadata).
-        // Testing shows -Zs generates NO debug metadata at all (!DIFile, !DICompileUnit, etc.)
-        // For minimal debug info, we use -Zi (same as Standard and Maximal level).
-
-    case DebugInfoType::Standard:
-    case DebugInfoType::Maximal:
-        // Standard: Full debug information including local variables, types, etc.
+    // DXC only supports -Zi (full debug info) or -Zs (small PDB without debug metadata).
+    // Testing shows -Zs generates NO debug metadata at all (!DIFile, !DICompileUnit, etc.)
+    // For all debug levels, we use -Zi to generate full debug info
+    default:
         args.add(L"-Zi");
-        break;
-
-        break;
     }
 
     // Slang strives to produce correct code, and by default
