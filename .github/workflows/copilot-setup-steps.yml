@@ -49,7 +49,9 @@ jobs:
           # Verify and configure CUDA paths
           if [ -d /usr/local/cuda-12.4 ]; then
             echo "CUDA installed successfully"
-            ls /usr/local/cuda-12.4/bin/nvcc || echo "nvcc not found in expected location"
+            # Fix permissions - installer creates files with restrictive permissions
+            sudo chmod -R a+rX /usr/local/cuda-12.4
+            ls -la /usr/local/cuda-12.4/bin/nvcc
             echo "/usr/local/cuda-12.4/bin" >> $GITHUB_PATH
             echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
           else
