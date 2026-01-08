@@ -1248,6 +1248,22 @@ void HLSLSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
     }
 }
 
+bool HLSLSourceEmitter::supportsSwitchFallThrough()
+{
+    // FXC (SM 5.x and earlier) doesn't support fall-through in switch statements.
+    // DXC (SM 6.0 and later) does support fall-through.
+    //
+    // We use m_effectiveProfile which includes the fallback logic that sets
+    // SM for DXBC targets when no profile is explicitly specified.
+    if (m_effectiveProfile.getFamily() == ProfileFamily::DX)
+    {
+        // SM 6.0+ supports fall-through, SM 5.x and earlier do not
+        return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_0;
+    }
+    // For non-DX profiles targeting HLSL, assume modern compiler (supports fall-through)
+    return true;
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch (decoration->getOp())

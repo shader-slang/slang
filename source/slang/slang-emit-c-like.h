@@ -640,6 +640,11 @@ protected:
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
 
+    /// Returns true if this target supports fall-through in switch statements.
+    /// Targets like HLSL (FXC) and WGSL don't support fall-through.
+    /// This is used by the restructure pass to decide whether to preserve fall-through.
+    virtual bool supportsSwitchFallThrough() { return true; }
+
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);
 
