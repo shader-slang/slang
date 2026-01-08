@@ -33,7 +33,25 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build git python3 wget
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            git \
+            python3 \
+            python3-pip \
+            wget \
+            curl \
+            unzip \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            spirv-tools \
+            glslang-tools \
+            ca-certificates
 
           # Install CMake 3.30 (required for CMakePresets.json version 6)
           wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
@@ -45,6 +63,8 @@ jobs:
           # Install CUDA Toolkit 12.4.1 (matching container image)
           wget -q https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_550.54.15_linux.run
           sudo sh cuda_12.4.1_550.54.15_linux.run --silent --toolkit --no-opengl-libs --no-drm || echo "CUDA install returned error but may have partially succeeded"
+          # Remove installer (4GB file) to prevent it from being committed
+          rm -f cuda_12.4.1_550.54.15_linux.run
 
           # Verify and configure CUDA paths
           if [ -d /usr/local/cuda-12.4 ]; then
