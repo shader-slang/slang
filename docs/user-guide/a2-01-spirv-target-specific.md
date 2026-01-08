@@ -132,9 +132,9 @@ You can use OpDemoteToHelperInvocation by explicitly specifying the capability, 
 
 As an example, the following command-line arguments can control the behavior of `discard` when targeting SPIR-V.
 ```
-slangc.exe test.slang -target spir-v -profile spir-v_1_5 # emits OpKill 
-slangc.exe test.slang -target spir-v -profile spir-v_1_6 # emits OpDemoteToHelperInvocation 
-slangc.exe test.slang -target spir-v -capability SPV_EXT_demote_to_helper_invocation -profile spir-v_1_5 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spirv -profile spirv_1_5 # emits OpKill 
+slangc.exe test.slang -target spirv -profile spirv_1_6 # emits OpDemoteToHelperInvocation 
+slangc.exe test.slang -target spirv -capability SPV_EXT_demote_to_helper_invocation -profile spirv_1_5 # emits OpDemoteToHelperInvocation 
 ```
 
 
