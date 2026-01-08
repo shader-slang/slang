@@ -21602,9 +21602,13 @@ struct HitObject
 
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+        ///
+        /// Generic payload parameter T can be:
+        /// - payload_t: for HLSL data-based API (payload structure)
+        /// - int: for GLSL location-based API (payload location ID)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
-    static HitObject TraceRay<payload_t>(
+    static HitObject TraceRay<T>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
         uint InstanceInclusionMask,
@@ -21612,7 +21616,7 @@ struct HitObject
         uint MultiplierForGeometryContributionToHitGroupIndex,
         uint MissShaderIndex,
         RayDesc Ray,
-        inout payload_t Payload)
+        inout T Payload)
     {
         __target_switch
         {
@@ -21633,122 +21637,130 @@ struct HitObject
             }
         case _GL_NV_shader_invocation_reorder:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    // T is int: Payload is already a location, pass directly to GLSL helper
+                    int payloadLoc = reinterpret<int>(Payload);  // Use reinterpret for T→int cast
+                    __glslTraceRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Convert data to location via __rayPayloadLocation
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceRay(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    __rayPayloadLocation(p));
+                    __glslTraceRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case glsl:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    // T is int: Payload is already a location, pass directly to GLSL helper
+                    int payloadLoc = reinterpret<int>(Payload);  // Use reinterpret for T→int cast
+                    __glslTraceRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Convert data to location via __rayPayloadLocation
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceRayEXT(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    __rayPayloadLocation(p));
+                    __glslTraceRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case cuda: __intrinsic_asm "optixTraverse";
         case spvShaderInvocationReorderNV:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
-                {
-                    OpExtension "SPV_NV_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderNV;
-                    OpHitObjectTraceRayNV
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                // Function overloading: calls int or payload_t overload based on T
+                __spirvTraceRayHitObjectNV(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,
+                    InstanceInclusionMask,
+                    RayContributionToHitGroupIndex,
+                    MultiplierForGeometryContributionToHitGroupIndex,
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction,
+                    Ray.TMax,
+                    Payload);  // Let overload resolution select int vs payload_t
             }
         case spirv:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
-                {
-                    OpExtension "SPV_EXT_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderEXT;
-                    OpHitObjectTraceRayEXT
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                // Function overloading: calls int or payload_t overload based on T
+                __spirvTraceRayHitObjectEXT(
+                    __return_val,
+                    AccelerationStructure,
+                    RayFlags,
+                    InstanceInclusionMask,
+                    RayContributionToHitGroupIndex,
+                    MultiplierForGeometryContributionToHitGroupIndex,
+                    MissShaderIndex,
+                    Ray.Origin,
+                    Ray.TMin,
+                    Ray.Direction,
+                    Ray.TMax,
+                    Payload);  // Let overload resolution select int vs payload_t
             }
         }
     }
@@ -23877,6 +23889,8 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -23895,6 +23909,7 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayNV";
+        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
@@ -23919,7 +23934,154 @@ struct HitObject
         __target_switch
         {
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
+        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
+    }
+
+    // SPIR-V helpers - Function overloading for location-based (int) and data-based (payload_t) APIs
+
+    // NV data-based (for HLSL API)
+    [require(spirv, spvShaderInvocationReorderNV)]
+    static void __spirvTraceRayHitObjectNV<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectTraceRayNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &p;
+        };
+    }
+
+    // NV location-based (for GLSL API) - same name, different signature
+    [require(spirv, spvShaderInvocationReorderNV)]
+    static void __spirvTraceRayHitObjectNV(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectTraceRayNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // EXT data-based (for HLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvTraceRayHitObjectEXT<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectTraceRayEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &p;
+        };
+    }
+
+    // EXT location-based (for GLSL API) - same name as data-based, different signature
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvTraceRayHitObjectEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectTraceRayEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ __rayPayloadFromLocation(payload)
+        };
     }
 
     __glsl_extension(GL_EXT_ray_tracing)

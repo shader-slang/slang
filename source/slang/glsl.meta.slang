@@ -5678,47 +5678,17 @@ public void hitObjectTraceRayNV(
     vec3 direction,
     float Tmax,
     constexpr int payload)
-    {
-    __target_switch
-    {
-    case _GL_NV_shader_invocation_reorder:
-    {
-        HitObject::__glslTraceRay(
-            hitObject,
-            topLevel,
-            rayFlags,
-            cullMask,
-            sbtRecordOffset,
-            sbtRecordStride,
-            missIndex,
-            origin,
-            Tmin,
-            direction,
-            Tmax,
-            payload);
-    }
-    case spvShaderInvocationReorderNV:
-    {
-        spirv_asm
-        {
-            OpExtension "SPV_NV_shader_invocation_reorder";
-            OpCapability ShaderInvocationReorderNV;
-            OpHitObjectTraceRayNV
-                &hitObject
-                /**/ $topLevel
-                /**/ $rayFlags
-                /**/ $cullMask
-                /**/ $sbtRecordOffset
-                /**/ $sbtRecordStride
-                /**/ $missIndex
-                /**/ $origin
-                /**/ $Tmin
-                /**/ $direction
-                /**/ $Tmax
-                /**/ __rayPayloadFromLocation(payload)
-        };
-    }
-    }
+{
+    // Unified call to HitObject::TraceRay<int> - type checking handles location-based API
+    hitObject = HitObject::TraceRay(
+        topLevel,
+        rayFlags,
+        cullMask,
+        sbtRecordOffset,
+        sbtRecordStride,
+        missIndex,
+        RayDesc(origin, Tmin, direction, Tmax),
+        payload);
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
@@ -6398,46 +6368,16 @@ public void hitObjectTraceRayEXT(
     float Tmax,
     constexpr int payload)
 {
-    __target_switch
-    {
-    case _GL_EXT_shader_invocation_reorder:
-    {
-        HitObject::__glslTraceRayEXT(
-            hitObject,
-            topLevel,
-            rayFlags,
-            cullMask,
-            sbtRecordOffset,
-            sbtRecordStride,
-            missIndex,
-            origin,
-            Tmin,
-            direction,
-            Tmax,
-            payload);
-    }
-    case spvShaderInvocationReorderEXT:
-    {
-        spirv_asm
-        {
-            OpExtension "SPV_EXT_shader_invocation_reorder";
-            OpCapability ShaderInvocationReorderEXT;
-            OpHitObjectTraceRayEXT
-                &hitObject
-                /**/ $topLevel
-                /**/ $rayFlags
-                /**/ $cullMask
-                /**/ $sbtRecordOffset
-                /**/ $sbtRecordStride
-                /**/ $missIndex
-                /**/ $origin
-                /**/ $Tmin
-                /**/ $direction
-                /**/ $Tmax
-                /**/ __rayPayloadFromLocation(payload)
-        };
-    }
-    }
+    // Unified call to HitObject::TraceRay<int> - type checking handles location-based API
+    hitObject = HitObject::TraceRay(
+        topLevel,
+        rayFlags,
+        cullMask,
+        sbtRecordOffset,
+        sbtRecordStride,
+        missIndex,
+        RayDesc(origin, Tmin, direction, Tmax),
+        payload);
 }
 
 __glsl_extension(GL_EXT_ray_tracing)
