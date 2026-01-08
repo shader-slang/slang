@@ -2445,8 +2445,10 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     IRInst* op1,
     IRInst* op2)
 {
+    /*
     if (auto arrayType = as<IRArrayType>(primalType))
     {
+        SLANG_UNEXPECTED("Array dadd Should not be needed");
         // TODO: This case should really not be necessary anymore
         auto diffElementType =
             (IRType*)this->getDifferentialForType(builder, arrayType->getElementType());
@@ -2476,6 +2478,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     }
     else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
     {
+        SLANG_UNEXPECTED("Diff pair dadd Should not be needed");
         // TODO: This case should really not be necessary anymore
         auto diffType = (IRType*)this->getDiffTypeFromPairType(builder, diffPairUserType);
         auto diffWitness = this->getDiffTypeWitnessFromPairType(builder, diffPairUserType);
@@ -2492,7 +2495,8 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
         auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
         return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primal, diff);
     }
-    else if (as<IRInterfaceType>(primalType))
+    else */
+    if (as<IRInterfaceType>(primalType))
     {
         // If our type is existential, we need to handle the case where
         // one or both of our operands are null-type.
@@ -2534,8 +2538,9 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     IRBuilder* builder,
     IRType* primalType)
 {
-    if (auto arrayType = as<IRArrayType>(primalType))
+    /*if (auto arrayType = as<IRArrayType>(primalType))
     {
+        SLANG_UNEXPECTED("Array dzero Should not be needed");
         // TODO: This case should really not be necessary anymore
         auto diffElementType =
             (IRType*)this->getDifferentialForType(builder, arrayType->getElementType());
@@ -2546,6 +2551,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     }
     else if (auto diffPairUserType = as<IRDifferentialPairUserCodeType>(primalType))
     {
+        SLANG_UNEXPECTED("Diff pair dzero Should not be needed");
         // TODO: This case should really not be necessary anymore.
         auto primalZero = emitDZeroOfDiffInstType(builder, diffPairUserType->getValueType());
         auto diffZero = primalZero;
@@ -2554,7 +2560,8 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
         auto diffDiffPairType = builder->getDifferentialPairUserCodeType(diffType, diffWitness);
         return builder->emitMakeDifferentialPairUserCode(diffDiffPairType, primalZero, diffZero);
     }
-    else if (as<IRInterfaceType>(primalType) || as<IRAssociatedType>(primalType))
+    else */
+    if (as<IRInterfaceType>(primalType))
     {
         // Pack a null value into an existential type.
         auto existentialZero = builder->emitMakeExistential(
@@ -2563,6 +2570,11 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
             this->sharedContext->nullDifferentialWitness);
 
         return existentialZero;
+    }
+    else if (as<IRAssociatedType>(primalType))
+    {
+        // Should never see this case.
+        SLANG_UNEXPECTED("unexpected associated type during transposition");
     }
 
     auto zeroMethod = this->getZeroMethodForType(builder, primalType);
@@ -2834,6 +2846,7 @@ bool canTypeBeStored(IRInst* type)
         return false;
     }
 }
+#if 0
 
 struct AutoDiffPass : public InstPassBase
 {
@@ -3912,7 +3925,7 @@ struct AutoDiffPass : public InstPassBase
             break;
         case kIROp_SynthesizedBackwardDerivativeWitnessTable:
             {
-                SLANG_UNEXPECTED("not implemented yet");
+                SLANG_UNEXPECTED("shouldn't appear");
             }
             break;
         case kIROp_MakeIDifferentiableWitness:
@@ -4136,6 +4149,7 @@ protected:
 
     DifferentiableTypeConformanceContext diffTypeConformanceContext;
 };
+#endif
 
 void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
 {
@@ -4184,6 +4198,7 @@ void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSi
     }
 }
 
+/*
 bool processAutodiffCalls(
     TargetProgram* target,
     IRModule* module,
@@ -4202,6 +4217,7 @@ bool processAutodiffCalls(
 
     return modified;
 }
+    */
 
 struct RemoveDetachInstsPass : InstPassBase
 {

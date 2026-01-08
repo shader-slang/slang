@@ -10,12 +10,14 @@ namespace Slang
 struct ExtractPrimalFuncContext
 {
     IRModule* module;
-    AutoDiffTranscriberBase* backwardPrimalTranscriber;
+    AutoDiffSharedContext* autodiffContext;
+    DifferentiableTypeConformanceContext differentiableTypeConformanceContext;
 
-    void init(IRModule* inModule, AutoDiffTranscriberBase* transcriber)
+    ExtractPrimalFuncContext(IRModule* inModule, AutoDiffSharedContext* autodiffContext)
+        : module(inModule)
+        , autodiffContext(autodiffContext)
+        , differentiableTypeConformanceContext(autodiffContext)
     {
-        module = inModule;
-        backwardPrimalTranscriber = transcriber;
     }
 
     IRInst* cloneGenericHeader(IRBuilder& builder, IRCloneEnv& cloneEnv, IRGeneric* gen)
@@ -82,46 +84,21 @@ struct ExtractPrimalFuncContext
         IRBuilder builder(module);
         builder.setInsertBefore(destFunc);
         IRFuncType* originalFuncType = nullptr;
-        // outIntermediateType = createIntermediateType(destFunc);
+
         outIntermediateType = builder.createStructType();
         builder.addDecoration(outIntermediateType, kIROp_OptimizableTypeDecoration);
         builder.addCheckpointIntermediateDecoration(outIntermediateType, originalFunc);
         outIntermediateType->sourceLoc = originalFunc->sourceLoc;
 
-        /*GenericChildrenMigrationContext migrationContext;
-        migrationContext.init(
-            as<IRGeneric>(findOuterGeneric(originalFunc)),
-            as<IRGeneric>(findOuterGeneric(destFunc)),
-            destFunc);
-
-        if (auto origGeneric = as<IRGeneric>(findOuterGeneric(originalFunc)))
-        {
-            // Clone in everything else except the return value.
-            IRBuilder subBuilder(destFunc);
-            builder.setInsertAfter(findOuterGeneric(destFunc)->getFirstBlock()->getLastParam());
-
-            // Clone in any hoistable insts.
-            for (auto child = origGeneric->getFirstBlock()->getFirstOrdinaryInst(); child;
-                 child = child->getNextInst())
-            {
-                if ((child != originalFunc) && !as<IRReturn>(child) &&
-                    !as<IRGlobalValueWithCode>(child))
-                    migrationContext.cloneInst(&subBuilder, child);
-            }
-        }*/
-
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
-        SLANG_RELEASE_ASSERT(originalFuncType);
-        List<IRType*> paramTypes;
-        for (UInt i = 0; i < originalFuncType->getParamCount(); i++)
-            paramTypes.add((IRType*)originalFuncType->getParamType(i));
+        IRInst* args[] = {originalFuncType, outIntermediateType};
+        auto applyFuncType = differentiableTypeConformanceContext.resolveType(
+            &builder,
+            builder.emitIntrinsicInst(builder.getTypeKind(), kIROp_ApplyForBwdFuncType, 2, args));
+        SLANG_RELEASE_ASSERT(as<IRFuncType>(applyFuncType));
 
-        // paramTypes.add(builder.getOutType((IRType*)outIntermediateType));
-        /*auto resultType =
-            (IRType*)migrationContext.cloneInst(&builder, originalFuncType->getResultType());*/
-        auto newFuncType = builder.getFuncType(paramTypes, (IRType*)outIntermediateType);
-        return newFuncType;
+        return applyFuncType;
     }
 
     IRInst* insertIntoReturnBlock(IRBuilder& builder, IRInst* inst)
@@ -192,6 +169,21 @@ struct ExtractPrimalFuncContext
     void storeInst(IRBuilder& builder, IRInst* inst, IRInst* intermediateOutput)
     {
         auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
+        field->sourceLoc = inst->sourceLoc;
+        auto key = field->getKey();
+        if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
+            cloneDecoration(nameHint, key);
+        builder.addPrimalValueStructKeyDecoration(inst, key);
+        builder.emitStore(
+            builder
+                .emitFieldAddress(builder.getPtrType(inst->getFullType()), intermediateOutput, key),
+            inst);
+    }
+
+    void storeReturnValue(IRBuilder& builder, IRInst* inst, IRInst* intermediateOutput)
+    {
+        auto field = addIntermediateContextField(inst->getDataType(), intermediateOutput);
+        builder.addReturnValueContextFieldDecoration(field);
         field->sourceLoc = inst->sourceLoc;
         auto key = field->getKey();
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
@@ -376,7 +368,7 @@ struct ExtractPrimalFuncContext
                 if (!as<IRVoidType>(returnValue->getDataType()))
                 {
                     // If we have a non-void return, store it in the output intermediary.
-                    storeInst(builder, returnValue, outIntermediary);
+                    storeReturnValue(builder, returnValue, outIntermediary);
                     if (returnValue->findDecoration<IRPrimalValueStructKeyDecoration>())
                     {
                         returnValueKey =
@@ -524,10 +516,14 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     }
     */
 
+    /*
     ExtractPrimalFuncContext context;
     context.init(
         autodiffContext->moduleInst->getModule(),
         autodiffContext->transcriberSet.primalTranscriber);
+    */
+
+    ExtractPrimalFuncContext context(autodiffContext->moduleInst->getModule(), autodiffContext);
 
     intermediateType = nullptr;
     IRInst* returnValueKey = nullptr;

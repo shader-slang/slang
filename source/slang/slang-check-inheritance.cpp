@@ -602,16 +602,41 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
-                        SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
-                        transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
-                            baseFacet->subtypeWitness,
-                            facet->subtypeWitness);
-                        additionalSubtypeWitnesses.addIfNotExists(
-                            facet->origin.type,
-                            transitiveWitness);
-                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                        // TODO: De-duplicate the logic in the two branches.
+                        if (auto baseInterfaceDeclRef =
+                                baseFacet->origin.declRef.as<InterfaceDecl>())
                         {
-                            supTypeWorkList.add(interfaceDeclRef);
+                            auto thisTypeDecl = baseInterfaceDeclRef.getDecl()->getThisTypeDecl();
+                            auto lookupSubstitution = SubstitutionSet(
+                                _getASTBuilder()->getLookupDeclRef(
+                                    baseFacet->subtypeWitness,
+                                    thisTypeDecl));
+                            auto transitiveWitness =
+                                as<SubtypeWitness>(baseFacet->subtypeWitness->substitute(
+                                    _getASTBuilder(),
+                                    lookupSubstitution));
+                            additionalSubtypeWitnesses.addIfNotExists(
+                                facet->origin.type,
+                                transitiveWitness);
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            {
+                                supTypeWorkList.add(interfaceDeclRef);
+                            }
+                        }
+                        else
+                        {
+                            SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
+                            transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
+                                baseFacet->subtypeWitness,
+                                facet->subtypeWitness);
+
+                            additionalSubtypeWitnesses.addIfNotExists(
+                                facet->origin.type,
+                                transitiveWitness);
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            {
+                                supTypeWorkList.add(interfaceDeclRef);
+                            }
                         }
                     }
                 }

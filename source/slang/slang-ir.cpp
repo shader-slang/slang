@@ -3107,6 +3107,43 @@ static IRCompilerDictionaryScope* findScope(IRCompilerDictionary* dict)
     return nullptr;
 }
 
+IRCompilerDictionaryEntry* IRBuilder::fetchCompilerDictionaryEntry(
+    IRCompilerDictionary* dict,
+    IRInst* translationInst)
+{
+    IRCompilerDictionaryScope* scope = findScope(dict);
+    SLANG_ASSERT(scope);
+
+    List<IRInst*>& keyVals = *getModule()->getContainerPool().getList<IRInst>();
+
+    keyVals.reserve(2 + translationInst->getOperandCount());
+    keyVals.add(scope);
+    keyVals.add(getIntValue(getUIntType(), (UInt)translationInst->getOp()));
+    for (UInt ii = 0; ii < translationInst->getOperandCount(); ++ii)
+    {
+        keyVals.add(translationInst->getOperand(ii));
+    }
+
+    auto entry = _getCompilerDictionaryEntry(keyVals);
+    getModule()->getContainerPool().free(&keyVals);
+
+    return entry;
+}
+
+void IRBuilder::setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst)
+{
+    if (auto existingVal = entry->getValue())
+    {
+        // Invalid.
+        SLANG_UNEXPECTED("Translation entry already exists");
+    }
+
+    auto currentLoc = getInsertLoc();
+    setInsertInto(entry);
+    emitIntrinsicInst(getVoidType(), kIROp_CompilerDictionaryValue, 1, &valueInst);
+    setInsertLoc(currentLoc);
+}
+
 void IRBuilder::addCompilerDictionaryEntry(
     IRCompilerDictionary* dict,
     IRInst* translationInst,
@@ -8143,51 +8180,6 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             {
                 setsToUpdate.add(as<IRSetBase>(user));
             }
-
-            /*{
-                    // Set insts need their operands sorted
-                auto module = user->getModule();
-                SLANG_ASSERT(module);
-
-                List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                    operands.add(user->getOperand(ii));
-
-                auto getUniqueId = [&](IRInst* inst) -> UInt
-                {
-                    auto uniqueIDMap = module->getUniqueIdMap();
-                    auto existingId = uniqueIDMap->tryGetValue(inst);
-                    if (existingId)
-                        return *existingId;
-
-                    auto id = uniqueIDMap->getCount();
-                    uniqueIDMap->add(inst, id);
-                    return (UInt)id;
-                };
-
-                operands.sort(
-                    [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
-
-                Int newIndexOfOther = -1;
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                {
-                    if (operands[ii] == other)
-                        newIndexOfOther = ii;
-                    user->getOperandUse(ii)->usedValue = operands[ii];
-                }
-                // invariant.
-                SLANG_ASSERT(newIndexOfOther >= 0);
-
-                // In case we changed the IRUse that is pointing to our inst.
-                auto newUse = user->getOperandUse(UInt(newIndexOfOther));
-                if (newUse != uu)
-                {
-                    // Splice out `uu` from the use list.
-                    if (uu->prevLink)
-                }
-
-                module->getContainerPool().free(&operands);
-            }*/
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.

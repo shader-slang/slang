@@ -23,9 +23,9 @@ struct DiffTransposePass
             Simple,
             Swizzle,
             GetElement,
-            GetDifferential,
             FieldExtract,
             DifferentialPairGetElementUserCode,
+            DifferentialPairGetElement,
             Invalid
         };
 
@@ -637,9 +637,6 @@ struct DiffTransposePass
         }
 
         auto returnInst = as<IRReturn>(terminalDiffBlocks[0]->getTerminator());
-        // auto diffReturnType = diffTypeContext.getDiffTypeFromPairType(
-        //     &builder,
-        //     as<IRDifferentialPairType>(returnInst->getVal()->getDataType()));
 
         // If our return type is not void, then transpose it into an input parameter.
         auto diffReturnType = returnInst->getVal()->getDataType();
@@ -1796,23 +1793,13 @@ struct DiffTransposePass
                 as<IRDifferentialPairGetDifferential>(fwdInst),
                 revValue);
 
+        case kIROp_DifferentialPairGetPrimal:
+            return transposeGetPrimal(builder, as<IRDifferentialPairGetPrimal>(fwdInst), revValue);
+
         case kIROp_MakeDifferentialPairUserCode:
-            return transposeMakePairUserCode(
-                builder,
-                as<IRMakeDifferentialPairUserCode>(fwdInst),
-                revValue);
-
         case kIROp_DifferentialPairGetPrimalUserCode:
-            return transposeGetPrimalUserCode(
-                builder,
-                as<IRDifferentialPairGetPrimalUserCode>(fwdInst),
-                revValue);
-
         case kIROp_DifferentialPairGetDifferentialUserCode:
-            return transposeGetDifferentialUserCode(
-                builder,
-                as<IRDifferentialPairGetDifferentialUserCode>(fwdInst),
-                revValue);
+            SLANG_UNEXPECTED("should not see these anymore");
 
         case kIROp_MakeVector:
             return transposeMakeVector(builder, fwdInst, revValue);
@@ -1999,21 +1986,27 @@ struct DiffTransposePass
     }
 
     TranspositionResult transposeMakePair(
-        IRBuilder*,
+        IRBuilder* builder,
         IRMakeDifferentialPair* fwdMakePair,
         IRInst* revValue)
     {
-        // Even though makePair returns a pair of (primal, differential)
-        // revValue will only contain the reverse-value for 'differential'
-        //
-        // (P = (A, dA)) -> (dA += dP)
-        //
-        return TranspositionResult(
-            List<RevGradient>(RevGradient(
-                RevGradient::Flavor::Simple,
-                fwdMakePair->getDifferentialValue(),
-                revValue,
-                fwdMakePair)));
+        TranspositionResult result;
+        result.revPairs.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMakePair->getPrimal(),
+            builder->emitDifferentialPairGetPrimal(
+                fwdMakePair->getPrimal()->getDataType(),
+                revValue),
+            fwdMakePair));
+        result.revPairs.add(RevGradient(
+            RevGradient::Flavor::Simple,
+            fwdMakePair->getDifferentialValue(),
+            builder->emitDifferentialPairGetDifferential(
+                fwdMakePair->getDifferentialValue()->getDataType(),
+                revValue),
+            fwdMakePair));
+
+        return result;
     }
 
     TranspositionResult transposeGetDifferential(
@@ -2022,9 +2015,17 @@ struct DiffTransposePass
         IRInst* revValue)
     {
         // (A = GetDiff(P)) -> (dP.d += dA)
+        /*
         return TranspositionResult(
             List<RevGradient>(RevGradient(
                 RevGradient::Flavor::Simple,
+                fwdGetDiff->getBase(),
+                revValue,
+                fwdGetDiff)));
+        */
+        return TranspositionResult(
+            List<RevGradient>(RevGradient(
+                RevGradient::Flavor::DifferentialPairGetElement,
                 fwdGetDiff->getBase(),
                 revValue,
                 fwdGetDiff)));
@@ -2065,6 +2066,21 @@ struct DiffTransposePass
                 fwdGetDiff)));
     }
 
+    TranspositionResult transposeGetPrimal(
+        IRBuilder*,
+        IRDifferentialPairGetPrimal* fwdGetPrimal,
+        IRInst* revValue)
+    {
+        // (A = x.p) -> (dX = DiffPairUserCode(0, dA))
+        return TranspositionResult(
+            List<RevGradient>(RevGradient(
+                RevGradient::Flavor::DifferentialPairGetElement,
+                fwdGetPrimal->getBase(),
+                revValue,
+                fwdGetPrimal)));
+    }
+
+    /*
     TranspositionResult transposeGetPrimalUserCode(
         IRBuilder*,
         IRDifferentialPairGetPrimalUserCode* fwdGetPrimal,
@@ -2078,6 +2094,7 @@ struct DiffTransposePass
                 revValue,
                 fwdGetPrimal)));
     }
+    */
 
     TranspositionResult transposeMakeVectorFromScalar(
         IRBuilder* builder,
@@ -3069,6 +3086,8 @@ struct DiffTransposePass
         IRType* aggPrimalType,
         List<RevGradient> gradients)
     {
+        // deprecate.
+        SLANG_UNEXPECTED("should not be seen anymore");
         List<RevGradient> simpleGradients;
 
         for (auto gradient : gradients)
@@ -3112,6 +3131,50 @@ struct DiffTransposePass
         return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
     }
 
+    RevGradient materializeDifferentialPairGetElementGradients(
+        IRBuilder* builder,
+        IRType* aggPrimalType,
+        List<RevGradient> gradients)
+    {
+        List<RevGradient> simpleGradients;
+
+        for (auto gradient : gradients)
+        {
+            // Peek at the fwd-mode get element inst to see what type we need to
+            // materialize.
+            if (auto fwdGetDiff = as<IRDifferentialPairGetDifferential>(gradient.fwdGradInst))
+            {
+                auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
+                    builder,
+                    fwdGetDiff->getBase()->getDataType()));
+                simpleGradients.add(RevGradient(
+                    gradient.targetInst,
+                    builder->emitMakeDifferentialPair(
+                        baseType,
+                        diffTypeContext.emitDZeroOfDiffInstType(builder, baseType->getValueType()),
+                        gradient.revGradInst),
+                    gradient.fwdGradInst));
+            }
+            else if (auto fwdGetPrimal = as<IRDifferentialPairGetPrimal>(gradient.fwdGradInst))
+            {
+                auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
+                    builder,
+                    fwdGetPrimal->getBase()->getDataType()));
+                simpleGradients.add(RevGradient(
+                    gradient.targetInst,
+                    builder->emitMakeDifferentialPair(
+                        baseType,
+                        gradient.revGradInst,
+                        diffTypeContext.emitDZeroOfDiffInstType(
+                            builder,
+                            fwdGetPrimal->getFullType())),
+                    gradient.fwdGradInst));
+            }
+        }
+
+        return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
+    }
+
     RevGradient materializeGradientSet(
         IRBuilder* builder,
         IRType* aggPrimalType,
@@ -3132,7 +3195,13 @@ struct DiffTransposePass
             return materializeGetElementGradients(builder, aggPrimalType, gradients);
 
         case RevGradient::Flavor::DifferentialPairGetElementUserCode:
-            return materializeDifferentialPairUserCodeGetElementGradients(
+            return materializeDifferentialPairGetElementGradients(
+                builder,
+                aggPrimalType,
+                gradients);
+
+        case RevGradient::Flavor::DifferentialPairGetElement:
+            return materializeDifferentialPairGetElementGradients(
                 builder,
                 aggPrimalType,
                 gradients);
@@ -3322,15 +3391,6 @@ struct DiffTransposePass
         IRType* aggPrimalType,
         List<RevGradient> gradients)
     {
-        // If we're dealing with the differential-pair types, we need to use a different
-        // aggregation method, since a differential pair is really a 'hybrid'
-        // primal-differential type.
-        //
-        if (as<IRDifferentialPairType>(aggPrimalType))
-        {
-            SLANG_UNEXPECTED("Should not occur");
-        }
-
         // Process non-simple gradients into simple gradients.
         // TODO: This is where we can improve efficiency later.
         // For instance if we have one gradient each for var.x, var.y and var.z

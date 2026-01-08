@@ -1601,8 +1601,11 @@ IRVar* emitIndexedLocalVar(
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
+
+    /*
     if (shouldInitialize)
         varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
+    */
 
     return var;
 }
@@ -2763,6 +2766,7 @@ static bool shouldStoreInst(IRInst* inst)
                 return true;
             }
 
+
             // If not, we'll default to recomputing calls that don't have side effects & don't
             // load from non-local variables. A previous data-flow pass should have already tagged
             // functions with the appropriate decorations.
@@ -2770,6 +2774,13 @@ static bool shouldStoreInst(IRInst* inst)
             auto callee = getResolvedInstForDecorations(inst->getOperand(0), true);
             if (callee->findDecoration<IRReadNoneDecoration>())
                 return false;
+
+            // Treat 'get-val' funcs as effectively a simple extraction.
+            if (callee->getOp() == kIROp_BackwardContextGetValFromLegacyBwdDiffFunc ||
+                callee->getOp() == kIROp_BackwardContextGetPrimalVal)
+            {
+                return false;
+            }
 
             break;
         }

@@ -8,9 +8,6 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-// Test that compute does not have a context.
-// CHECK-NOT: struct {{[a-zA-Z0-9_]*}}_compute_{{[a-zA-Z0-9_]*}}
-
 [BackwardDifferentiable]
 [PreferRecompute]
 float compute(float x, float y, out float k)

@@ -1,15 +1,13 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=REPORT):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
-
-// Test that compute does not have a context.
-// CHECK-NOT: struct {{[a-zA-Z0-9_]*}}_compute_{{[a-zA-Z0-9_]*}}
 
 [BackwardDifferentiable]
 [PreferRecompute]
@@ -35,14 +33,9 @@ float infinitesimal(float x)
 // around (must not cache the outvar from 'compute()')
 // 
 // Further, if loop exit value inference is working correctly, 
-// then there should be no context type at all.
-// 
-// CHECK-NOT: struct s_bwd_prop_computeLoop_Intermediates
+// then there should be no additional context beyond the input parameter.
 //
-// Check that the signature of the s_bwd_prop_computeLoop function only
-// contains an inout DiffPair_float_0 and a float.
-//
-// CHECK: void s_bwd_prop_computeLoop{{[_0-9]*}}(inout DiffPair_float{{[_0-9]*}} dpy{{[_0-9]*}}, float {{[_a-zA-Z0-9]*}})
+// REPORT-DAG: 4 bytes associated with function: 'computeLoop'
 //
 
 [BackwardDifferentiable]
@@ -63,8 +56,9 @@ float computeLoop(float y)
 
 // Since computeLoop is recomputed, test_simple_loop should have nothing to store
 // therefore we check that there is no intermediate context type generated for test_simple_loop.
-
-// CHECK-NOT: struct {{[a-zA-Z0-9_]*}}test_simple_loop{{[a-zA-Z0-9_]*}}
+//
+// REPORT-DAG: 4 bytes associated with function: 'test_simple_loop'
+//
 [BackwardDifferentiable]
 float test_simple_loop(float y)
 {  

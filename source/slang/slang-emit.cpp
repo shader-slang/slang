@@ -264,6 +264,21 @@ static void reportCheckpointIntermediates(
         IRSizeAndAlignment structSize;
         getNaturalSizeAndAlignment(optionSet, structType, &structSize);
 
+        for (auto field : structType->getFields())
+        {
+            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
+            {
+                // Remove the size of the return value context field from the struct size
+                // TODO: Does this account for alignment & padding properly?
+                //
+                IRType* fieldType = field->getFieldType();
+                IRSizeAndAlignment fieldSize;
+                getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+                structSize.size -= fieldSize.size;
+                break;
+            }
+        }
+
         // Reporting happens before empty structs are optimized out
         // and we still want to keep the checkpointing decorations,
         // so we end up needing to check for non-zero-ness
@@ -280,6 +295,9 @@ static void reportCheckpointIntermediates(
 
         for (auto field : structType->getFields())
         {
+            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
+                continue;
+
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
             getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
@@ -1503,6 +1521,28 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
+
+    // get rid of weak-use insts and any dictionaries in the
+    // module inst.
+    //
+    // -- put into a pass --
+    List<IRInst*> weakUseInsts;
+    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
+    {
+        if (insts->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(insts);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+
+    irModule->getTranslationDict()->removeAndDeallocate();
+    irModule->setTranslationDict(nullptr);
+
+    // -----
+
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
     if (target == CodeGenTarget::HostVM)
@@ -2009,27 +2049,6 @@ Result linkAndOptimizeIR(
     default:
         break;
     }
-
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
-
-    irModule->getTranslationDict()->removeAndDeallocate();
-    irModule->setTranslationDict(nullptr);
-
-    // -----
 
     if (!isSPIRV(targetRequest->getTarget()))
     {

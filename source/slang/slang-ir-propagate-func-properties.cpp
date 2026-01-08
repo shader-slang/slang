@@ -387,4 +387,19 @@ bool propagateFuncProperties(IRModule* module)
 
     return changed;
 }
+
+bool propagatePropertiesForSingleFunc(IRModule* module, IRFunc* f)
+{
+    ReadNoneFuncPropertyPropagationContext readNoneContext;
+    bool changed = false;
+    IRBuilder builder(module);
+    if (readNoneContext.canProcess(f))
+        changed |= readNoneContext.propagate(builder, f);
+
+    NoSideEffectFuncPropertyPropagationContext noSideEffectContext;
+    if (noSideEffectContext.canProcess(f))
+        changed |= noSideEffectContext.propagate(builder, f);
+
+    return changed;
+}
 } // namespace Slang

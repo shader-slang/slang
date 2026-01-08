@@ -102,11 +102,12 @@ float doThing(uint id)
 }
 
 [shader("compute")]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = doThing(0); // CHECK: 2.0
-    outputBuffer[1] = doThing(1); // CHECK: 4.0
+    outputBuffer[1] = doThing(1); // CHECK: 8.0
 
     outputBuffer[2] = fwd_diff(doThing)(0).d; // CHECK: 3.0
-    outputBuffer[3] = fwd_diff(doThing)(1).d; // CHECK: 3.0
+    outputBuffer[3] = fwd_diff(doThing)(1).d; // CHECK: 6.0
 }

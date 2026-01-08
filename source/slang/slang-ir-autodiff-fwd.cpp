@@ -9,6 +9,7 @@
 #include "slang-ir-init-local-var.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-propagate-func-properties.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
@@ -183,6 +184,7 @@ InstPair ForwardDiffTranscriber::transcribeDifferentiableTypeAnnotation(
     IRBuilder* builder,
     IRInst* origInst)
 {
+    SLANG_UNEXPECTED("Should not be used anymore");
     auto primalAnnotation =
         as<IRDifferentiableTypeAnnotation>(maybeCloneForPrimalInst(builder, origInst));
 
@@ -746,10 +748,49 @@ static void emitCalleeAnnotationsForHigherOrderDiff(
     {
         IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(
             getGenericReturnVal(context->sharedContext->forwardDifferentiableInterfaceType));
+
+        IRInterfaceType* bwdDiffInterfaceType = cast<IRInterfaceType>(
+            getGenericReturnVal(context->sharedContext->backwardDifferentiableInterfaceType));
+
+        IRInterfaceType* bwdCallableInterfaceType = cast<IRInterfaceType>(
+            getGenericReturnVal(context->sharedContext->backwardCallableInterfaceType));
+
+        // Key for `primal.fwd_diff`
         auto fwdDiffReqKey = cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(0))
                                  ->getRequirementKey();
+        // Key for `primal.fwd_diff : IForwardDifferentiable`
         auto fwdDiffTableReqKey =
             cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(1))
+                ->getRequirementKey();
+
+        // Key for `primal.fwd_diff : IBackwardDifferentiable`
+        auto bwdDiffTableReqKey =
+            cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(2))
+                ->getRequirementKey();
+
+        // Key for contextType in IBackwardDifferentiable table
+        auto bwdDiffContextTypeReqKey =
+            cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(0))
+                ->getRequirementKey();
+
+        // Key for contextType : IBackwardCallable in IBackwardDifferentiable table
+        auto bwdDiffContextTypeCallableConformanceReqKey =
+            cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(1))
+                ->getRequirementKey();
+
+        // Key for `apply` in IBackwardDifferentiable table
+        auto bwdDiffApplyReqKey =
+            cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(2))
+                ->getRequirementKey();
+
+        // Key for 'operator()' (back-prop) in IBackwardCallable table
+        auto bwdCallableOpReqKey =
+            cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(0))
+                ->getRequirementKey();
+
+        // Key for 'getVal()' in IBackwardCallable table
+        auto bwdCallableGetValReqKey =
+            cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(1))
                 ->getRequirementKey();
 
         IRInst* callee = primalCallee;
@@ -787,6 +828,8 @@ static void emitCalleeAnnotationsForHigherOrderDiff(
                 kIROp_AssociatedInstAnnotation,
                 3,
                 args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::ForwardDerivative});
         }
 
         {
@@ -799,6 +842,145 @@ static void emitCalleeAnnotationsForHigherOrderDiff(
                 kIROp_AssociatedInstAnnotation,
                 3,
                 args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::ForwardDerivativeWitnessTable});
+        }
+
+        // Lookup `primal.fwd_diff : IBackwardDifferentiable`
+        auto higherOrderBwdDiffTable = _lookupWitness(
+            builder,
+            fwdDiffTable,
+            bwdDiffTableReqKey,
+            builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                context->sharedContext->backwardDifferentiableInterfaceType,
+                1,
+                &fwdDiffCallee)));
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)ValAssociationKind::BackwardDerivativeWitnessTable),
+                higherOrderBwdDiffTable};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::BackwardDerivativeWitnessTable});
+        }
+
+        // Lookup contextType in IBackwardDifferentiable table
+        auto higherOrderContextType = _lookupWitness(
+            builder,
+            higherOrderBwdDiffTable,
+            bwdDiffContextTypeReqKey,
+            (IRType*)builder->getTypeKind());
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)ValAssociationKind::BackwardDerivativeContext),
+                higherOrderContextType};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::BackwardDerivativeContext});
+        }
+
+        // Lookup `apply` in IBackwardDifferentiable table
+        IRInst* bwdApplyFuncTypeOperands[] = {fwdDiffCallee->getFullType(), higherOrderContextType};
+        auto higherOrderBwdDiffFunc = _lookupWitness(
+            builder,
+            higherOrderBwdDiffTable,
+            bwdDiffApplyReqKey,
+            (IRType*)builder->emitIntrinsicInst(
+                builder->getTypeKind(),
+                kIROp_ApplyForBwdFuncType,
+                2,
+                bwdApplyFuncTypeOperands));
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)ValAssociationKind::BackwardDerivativeApply),
+                higherOrderBwdDiffFunc};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::BackwardDerivativeApply});
+        }
+
+        // Lookup contextType : IBackwardCallable in IBackwardDifferentiable table
+        auto higherOrderContextCallableTable = _lookupWitness(
+            builder,
+            higherOrderBwdDiffTable,
+            bwdDiffContextTypeCallableConformanceReqKey,
+            builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                context->sharedContext->backwardCallableInterfaceType,
+                1,
+                &fwdDiffCallee)));
+
+        // Lookup 'operator()' (back-prop) in IBackwardCallable table
+        IRInst* bwdCallableFuncTypeOperands[] = {
+            fwdDiffCallee->getFullType(),
+            higherOrderContextType};
+        auto higherOrderBwdPropFunc = _lookupWitness(
+            builder,
+            higherOrderContextCallableTable,
+            bwdCallableOpReqKey,
+            (IRType*)builder->emitIntrinsicInst(
+                builder->getTypeKind(),
+                kIROp_BwdCallableFuncType,
+                2,
+                bwdCallableFuncTypeOperands));
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)ValAssociationKind::BackwardDerivativePropagate),
+                higherOrderBwdPropFunc};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::BackwardDerivativePropagate});
+        }
+
+        // Lookup 'getVal()' in IBackwardCallable table
+        IRInst* funcResultTypeOperands[] = {fwdDiffCallee->getFullType(), higherOrderContextType};
+        auto higherOrderGetValFunc = _lookupWitness(
+            builder,
+            higherOrderContextCallableTable,
+            bwdCallableGetValReqKey,
+            (IRType*)builder->emitIntrinsicInst(
+                builder->getTypeKind(),
+                kIROp_FuncResultType,
+                2,
+                funcResultTypeOperands));
+
+        {
+            IRInst* args[] = {
+                fwdDiffCallee,
+                builder->getIntValue((int)ValAssociationKind::BackwardDerivativeContextGetVal),
+                higherOrderGetValFunc};
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_AssociatedInstAnnotation,
+                3,
+                args);
+            context->associationCache.remove(
+                {fwdDiffCallee, ValAssociationKind::BackwardDerivativeContextGetVal});
         }
     }
 }
@@ -827,16 +1009,11 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     }
 
     auto primalCallee = findOrTranscribePrimalInst(builder, origCallee);
-    IRInst* diffCallee = nullptr;
+    IRInst* diffCallee = (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+        primalCallee,
+        ValAssociationKind::ForwardDerivative));
 
-    if (auto assocFwdDiffCallee =
-            (this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
-                primalCallee,
-                ValAssociationKind::ForwardDerivative)))
-    {
-        diffCallee = assocFwdDiffCallee;
-    }
-    else
+    if (!diffCallee || as<IRVoidLit>(diffCallee))
     {
         // TODO: It may be better to lower this as a SynthesizedFuncDecl from the front-end
         // if a function is backward-differentiable, but not forward-differentiable.
@@ -874,6 +1051,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         getSink()->diagnose(
             origCall->sourceLoc,
             Diagnostics::encounteredNonDifferentiableFunctionDuringHigherOrderDiff);
+        IRInst* primalCall = maybeCloneForPrimalInst(builder, origCall);
+        return InstPair(primalCall, nullptr);
     }
 
     if (!diffCallee)
@@ -911,16 +1090,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         auto primalType = primalArg->getDataType();
         auto originalParamType = calleeType->getParamType(ii);
         auto diffParamType = diffCalleeType->getParamType(ii);
-        /*if (!isNoDiffType(originalParamType) &&
-            differentiableTypeConformanceContext.isDifferentiableType(originalParamType))
-        {*/
-        /*if (isNoDiffType(primalType))
-        {
-            while (auto attrType = as<IRAttributedType>(primalType))
-                primalType = attrType->getBaseType();
-            while (auto attrType = as<IRAttributedType>(origType))
-                origType = attrType->getBaseType();
-        }*/
+
         auto [originalParamPassingMode, originalParamBaseType] =
             splitParameterDirectionAndType(originalParamType);
         if (differentiableTypeConformanceContext.isDifferentiableType(originalParamBaseType))
@@ -930,12 +1100,25 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
             case ParameterDirectionInfo::In:
                 {
                     auto diffArg = findOrTranscribeDiffInst(&argBuilder, origArg);
-                    if (!diffArg)
-                        diffArg = getDifferentialZeroOfType(&argBuilder, primalType);
-
-                    // If a pair type can be formed, this must be non-null.
-                    SLANG_RELEASE_ASSERT(diffArg);
                     auto pairType = tryGetDiffPairType(&argBuilder, primalType);
+
+                    if (!diffArg)
+                    {
+                        diffArg = getDifferentialZeroOfType(&argBuilder, originalParamBaseType);
+
+                        // If there is no differential arg, it's still possible that we have a
+                        // argument pair type (i.e. type is differentiable, but there was no value
+                        // in this particular instance).
+                        //
+                        // If not, then we'll construct the pair type from the parameter base type,
+                        // which may be a super-type of the argument type. Note: It's important to
+                        // not default to the parameter type because of the potential sub-type
+                        // relationship.
+                        //
+                        if (!pairType)
+                            pairType = tryGetDiffPairType(&argBuilder, originalParamBaseType);
+                    }
+
                     auto diffPair =
                         argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffArg);
                     markDiffPairTypeInst(&argBuilder, diffPair, pairType);
@@ -1770,10 +1953,16 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(
         diffDiffVal = getDifferentialZeroOfType(builder, origDiffVal->getDataType());
     SLANG_ASSERT(diffDiffVal);
 
-    auto primalPairType = findOrTranscribePrimalInst(builder, origInst->getFullType());
-    auto diffPairType = findOrTranscribeDiffInst(builder, origInst->getFullType());
+    auto primalPairType = getOrCreateDiffPairType(
+        builder,
+        primalVal->getDataType()); // findOrTranscribePrimalInst(builder, origInst->getFullType());
+    auto diffPairType = getOrCreateDiffPairType(
+        builder,
+        diffPrimalVal
+            ->getDataType()); // findOrTranscribeDiffInst(builder, origInst->getFullType());
     if (origInst->getOp() == kIROp_MakeDifferentialPairUserCode)
     {
+        SLANG_UNEXPECTED("should not see MakeDifferentialPairUserCode op here");
         auto primalPair = builder->emitMakeDifferentialPairUserCode(
             (IRType*)primalPairType,
             primalVal,
@@ -1786,10 +1975,14 @@ InstPair ForwardDiffTranscriber::transcribeMakeDifferentialPair(
     }
     else if (origInst->getOp() == kIROp_MakeDifferentialPair)
     {
-        auto primalPair =
-            builder->emitMakeDifferentialPair((IRType*)primalPairType, primalVal, diffPrimalVal);
-        auto diffPair =
-            builder->emitMakeDifferentialPair((IRType*)diffPairType, primalDiffVal, diffDiffVal);
+        auto primalPair = builder->emitMakeDifferentialValuePair(
+            (IRType*)primalPairType,
+            primalVal,
+            diffPrimalVal);
+        auto diffPair = builder->emitMakeDifferentialValuePair(
+            (IRType*)diffPairType,
+            primalDiffVal,
+            diffDiffVal);
         return InstPair(primalPair, diffPair);
     }
     else
@@ -1959,58 +2152,12 @@ InstPair ForwardDiffTranscriber::transcribeWrapExistential(IRBuilder* builder, I
 // Create an empty func to represent the transcribed func of `origFunc`.
 InstPair ForwardDiffTranscriber::transcribeFuncHeader(IRBuilder* inBuilder, IRFunc* origFunc)
 {
-    /*if (auto fwdDecor = origFunc->findDecoration<IRForwardDerivativeDecoration>())
-    {
-        // If we reach here, the function must have been used directly in a `call` inst, and
-        // therefore can't be a generic. Generic function are always referenced with `specialize`
-        // inst and the handling logic for custom derivatives is implemented in
-        // `transcribeSpecialize`.
-        SLANG_RELEASE_ASSERT(fwdDecor->getForwardDerivativeFunc()->getOp() == kIROp_Func);
-        return InstPair(origFunc, fwdDecor->getForwardDerivativeFunc());
-    }*/
-
     IRFunc* diffFunc = nullptr;
     diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
-
-    // If we're transcribing a function as a 'value' (i.e. maybe embedded in a generic, keep the
-    // insert location unchanged). If we're transcribing it as a declaration, we should
-    // insert into the module.
-    //
-    /*auto origOuterGen = as<IRGeneric>(findOuterGeneric(origFunc));
-    if (!origOuterGen || findInnerMostGenericReturnVal(origOuterGen) != origFunc)
-    {
-        // Dealing with a declaration.. insert into module scope.
-        IRBuilder subBuilder = *inBuilder;
-        subBuilder.setInsertInto(inBuilder->getModule());
-        diffFunc = transcribeFuncHeaderImpl(&subBuilder, origFunc);
-    }
-    else
-    {
-        diffFunc = transcribeFuncHeaderImpl(inBuilder, origFunc);
-    }
-
-    if (auto outerGen = findOuterGeneric(diffFunc))
-    {
-        IRBuilder subBuilder = *inBuilder;
-        subBuilder.setInsertBefore(origFunc);
-        auto specialized =
-            specializeWithGeneric(subBuilder, outerGen, as<IRGeneric>(findOuterGeneric(origFunc)));
-        subBuilder.addForwardDerivativeDecoration(origFunc, specialized);
-    }
-    else
-    {
-        inBuilder->addForwardDerivativeDecoration(origFunc, diffFunc);
-    }*/
 
     inBuilder->addFloatingModeOverrideDecoration(diffFunc, FloatingPointMode::Fast);
 
     copyOriginalDecorations(origFunc, diffFunc);
-
-    /*FuncBodyTranscriptionTask task;
-    task.type = FuncBodyTranscriptionTaskType::Forward;
-    task.originalFunc = origFunc;
-    task.resultFunc = diffFunc;
-    autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);*/
 
     return InstPair(origFunc, diffFunc);
 }
@@ -2212,7 +2359,9 @@ void ForwardDiffTranscriber::_transcribeFuncImpl(
     this->transcribeFunc(inBuilder, origFunc, cast<IRFunc>(fwdDiffFunc));
 
     fwdDiffFunc = maybeHoist(*inBuilder, fwdDiffFunc);
+    stripTempDecorations(fwdDiffFunc);
     copyDebugInfo(origFunc, fwdDiffFunc);
+    propagatePropertiesForSingleFunc(inBuilder->getModule(), cast<IRFunc>(fwdDiffFunc));
 }
 
 // Transcribe a function definition.
@@ -2359,8 +2508,10 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_MakeStruct:
         return transcribeMakeStruct(builder, origInst);
 
-    case kIROp_LookupWitnessMethod:
-        return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
+        /*
+        case kIROp_LookupWitnessMethod:
+            return transcribeLookupInterfaceMethod(builder, as<IRLookupWitnessMethod>(origInst));
+        */
 
     case kIROp_Call:
         return transcribeCall(builder, as<IRCall>(origInst));
@@ -2543,6 +2694,7 @@ InstPair ForwardDiffTranscriber::transcribeInstImpl(IRBuilder* builder, IRInst* 
     case kIROp_GetResultError:
     case kIROp_MakeOptionalNone:
     case kIROp_OptionalHasValue:
+    case kIROp_LookupWitnessMethod:
         return transcribeNonDiffInst(builder, origInst);
 
         // A call to createDynamicObject<T>(arbitraryData) cannot provide a diff value,
@@ -2592,10 +2744,34 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
 {
     SLANG_UNUSED(primalType);
 
-    if (auto diffPairType = tryGetDiffPairType(builder, (IRType*)origParam->getFullType()))
+    auto [origParamPassingMode, origParamBaseType] =
+        splitParameterDirectionAndType(origParam->getFullType());
+
+    auto diffPairBaseType =
+        (IRType*)this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+            origParamBaseType,
+            ValAssociationKind::DifferentialPairType);
+    bool isMixedDifferential = true;
+
+    if (!diffPairBaseType)
     {
-        IRInst* diffPairParam = builder->emitParam(diffPairType);
-        builder->markInstAsMixedDifferential(diffPairParam);
+        diffPairBaseType =
+            (IRType*)this->differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                origParamBaseType,
+                ValAssociationKind::DifferentialPtrPairType);
+        if (diffPairBaseType)
+            isMixedDifferential = false;
+    }
+
+    if (diffPairBaseType)
+    {
+        IRInst* diffPairParam = builder->emitParam(
+            fromDirectionAndType(builder, origParamPassingMode, diffPairBaseType));
+
+        if (isMixedDifferential)
+            builder->markInstAsMixedDifferential(diffPairParam);
+        else
+            builder->markInstAsPrimal(diffPairParam);
 
         auto diffPairVarName = makeDiffPairName(origParam);
         if (diffPairVarName.getLength() > 0)
@@ -2603,16 +2779,20 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
 
         SLANG_ASSERT(diffPairParam);
 
-        if (as<IRDifferentialPairType>(diffPairType) || as<IRDifferentialPtrPairType>(diffPairType))
+        if (origParamPassingMode.kind == ParameterDirectionInfo::Kind::In)
         {
             auto diffType = differentiateType(builder, (IRType*)origParam->getFullType());
+
+            // TODO: Should we be marking these as primal??
             return InstPair(
                 builder->emitDifferentialPairGetPrimal(diffPairParam),
                 builder->emitDifferentialPairGetDifferential(diffType, diffPairParam));
         }
-        else if (auto pairPtrType = asRelevantPtrType(diffPairType))
+        else if (
+            origParamPassingMode.kind == ParameterDirectionInfo::Kind::Out ||
+            origParamPassingMode.kind == ParameterDirectionInfo::Kind::BorrowInOut)
         {
-            auto ptrInnerPairType = as<IRDifferentialPairTypeBase>(pairPtrType->getValueType());
+            auto ptrInnerPairType = as<IRDifferentialPairTypeBase>(diffPairBaseType);
             // Make a local copy of the parameter for primal and diff parts.
             auto primal = builder->emitVar(ptrInnerPairType->getValueType());
 
@@ -2620,17 +2800,20 @@ InstPair ForwardDiffTranscriber::transcribeFuncParam(
                 builder,
                 cast<IRPtrTypeBase>(origParam->getDataType())->getValueType());
             auto diff = builder->emitVar(diffType);
+
             markDiffTypeInst(builder, diff, builder->getPtrType(ptrInnerPairType->getValueType()));
 
             IRInst* primalInitVal = nullptr;
             IRInst* diffInitVal = nullptr;
-            if (as<IROutParamType>(diffPairType))
+            if (origParamPassingMode.kind == ParameterDirectionInfo::Kind::Out)
             {
+                // Out
                 primalInitVal = builder->emitDefaultConstruct(ptrInnerPairType->getValueType());
                 diffInitVal = builder->emitDefaultConstructRaw(diffType);
             }
             else
             {
+                // BorrowInOut
                 auto initVal = builder->emitLoad(diffPairParam);
                 markDiffPairTypeInst(builder, initVal, ptrInnerPairType);
 
@@ -2767,19 +2950,18 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(1))->getRequirementKey(),
         higherOrderFwdDiffFwdWitness);
 
-    /*auto higherOrderFwdDiffBwdWitness = builder.emitIntrinsicInst(
+    auto higherOrderFwdDiffBwdWitness = builder.emitIntrinsicInst(
         (IRType*)builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->backwardDifferentiableInterfaceType,
             List<IRInst*>(higherOrderfwdDiffFn)),
         kIROp_SynthesizedBackwardDerivativeWitnessTable,
         1,
-        &higherOrderfwdDiffFn);*/
+        &higherOrderfwdDiffFn);
     builder.createWitnessTableEntry(
         newWitnessTable,
         as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
-        /*higherOrderFwdDiffBwdWitness*/
-        builder.getVoidValue());
+        higherOrderFwdDiffBwdWitness);
 
     List<IRInst*> args = {
         fwdDiffFunc,
@@ -2792,6 +2974,120 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         kIROp_AssociatedInstAnnotation,
         args.getCount(),
         args.getBuffer());
+
+    return newWitnessTable;
+}
+
+IRInst* maybeTranslateBackwardDerivativeWitness(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedBackwardDerivativeWitnessTable* translateInst)
+{
+    auto bwdDiffWitnessSynInst = as<IRSynthesizedBackwardDerivativeWitnessTable>(translateInst);
+    auto baseFunc = bwdDiffWitnessSynInst->getOperand(0);
+    auto baseConformanceType = cast<IRInterfaceType>(
+        getGenericReturnVal(sharedContext->backwardDifferentiableInterfaceType));
+
+    IRBuilder builder(sharedContext->moduleInst);
+    builder.setInsertAfter(translateInst);
+    auto newWitnessTable = builder.createWitnessTable(
+        (IRType*)cast<IRWitnessTableType>(bwdDiffWitnessSynInst->getDataType())
+            ->getConformanceType(),
+        (IRType*)baseFunc);
+
+    // For now, we're going to hardcode the fact that the IBackwardDifferentiable interface
+    // always contains exactly 3 requirements, the context-type, context-type : IBackwardCallable,
+    // apply and bwd_diff (legacy)
+    //
+    // This will help us catch errors if the interface definition changes.
+    //
+    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 4);
+    IRInst* typeOperand = baseFunc->getFullType();
+
+    auto contextType = builder.emitIntrinsicInst(
+        builder.getTypeKind(),
+        kIROp_BackwardDiffIntermediateContextType,
+        1,
+        &baseFunc);
+    builder.createWitnessTableEntry(
+        newWitnessTable,
+        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(0))->getRequirementKey(),
+        contextType);
+    {
+        auto callableConformanceBaseType = cast<IRInterfaceType>(
+            getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
+        SLANG_ASSERT(callableConformanceBaseType->getRequirementCount() == 2);
+
+        auto callableConformanceType = builder.emitSpecializeInst(
+            builder.getTypeKind(),
+            sharedContext->backwardCallableInterfaceType,
+            List<IRInst*>(baseFunc));
+        auto callableWitnessTable =
+            builder.createWitnessTable((IRType*)callableConformanceType, (IRType*)contextType);
+
+        IRInst* propFuncOperands[] = {typeOperand, contextType};
+        auto propFunc = builder.emitIntrinsicInst(
+            (IRType*)builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                kIROp_BwdCallableFuncType,
+                2,
+                propFuncOperands),
+            kIROp_BackwardDifferentiatePropagate,
+            1,
+            &baseFunc);
+        builder.createWitnessTableEntry(
+            callableWitnessTable,
+            as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(0))
+                ->getRequirementKey(),
+            propFunc);
+
+        IRInst* getValFuncOperands[] = {typeOperand};
+        auto getValFunc = builder.emitIntrinsicInst(
+            (IRType*)builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                kIROp_FuncResultType,
+                1,
+                getValFuncOperands),
+            kIROp_BackwardContextGetPrimalVal,
+            1,
+            &baseFunc);
+        builder.createWitnessTableEntry(
+            callableWitnessTable,
+            as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(1))
+                ->getRequirementKey(),
+            getValFunc);
+
+        builder.createWitnessTableEntry(
+            newWitnessTable,
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(1))
+                ->getRequirementKey(),
+            callableWitnessTable);
+    }
+
+    {
+        IRInst* applyFuncTypeOperands[] = {typeOperand, contextType};
+        auto applyFunc = builder.emitBackwardDifferentiatePrimalInst(
+            (IRType*)builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                kIROp_ApplyForBwdFuncType,
+                2,
+                applyFuncTypeOperands),
+            baseFunc);
+        builder.createWitnessTableEntry(
+            newWitnessTable,
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))
+                ->getRequirementKey(),
+            applyFunc);
+    }
+
+    {
+        // This should never be required, so we just emit a poison value.
+        builder.createWitnessTableEntry(
+            newWitnessTable,
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(3))
+                ->getRequirementKey(),
+            builder.emitPoison(builder.getVoidType()));
+    }
 
     return newWitnessTable;
 }

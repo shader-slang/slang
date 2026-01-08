@@ -2231,7 +2231,17 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto builder = getBuilder();
         auto voidType = builder->getVoidType();
-        return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
+
+        // TODO: This is required because otherwise, the none table
+        // gets inserted into the current location (due to the witness-table
+        // hoisting logic that is okay with inserting into block of a generic)
+        //
+        auto oldLoc = builder->getInsertLoc();
+        builder->setInsertInto(builder->getModule());
+        auto noneTable = builder->createWitnessTable(voidType, voidType);
+        builder->setInsertLoc(oldLoc);
+
+        return LoweredValInfo::simple(noneTable);
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)

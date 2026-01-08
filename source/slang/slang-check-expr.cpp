@@ -1399,6 +1399,81 @@ Expr* SemanticsVisitor::resolveOverloadedExpr(
     return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, getSink());
 }
 
+Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto builtinRequirement =
+                declRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>())
+        {
+            if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType ||
+                builtinRequirement->kind == BuiltinRequirementKind::DifferentialPtrType)
+            {
+                // We are trying to get differential type from a differential type.
+                // The result is itself.
+                return type;
+            }
+        }
+    }
+
+    type = resolveType(type);
+    auto witness = as<SubtypeWitness>(
+        tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType()));
+
+    if (witness)
+    {
+        // If we're dealing with an interface type that requires conformance to one of the
+        // differentiable type interfaces, then we'll use the differentiable type interface
+        // itself as the derivative type.
+        //
+        if (auto declRefType = as<DeclRefType>(type))
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                return witness->getSup();
+
+        auto diffTypeLookupResult = lookUpMember(
+            getASTBuilder(),
+            this,
+            getName("Differential"),
+            type,
+            nullptr,
+            Slang::LookupMask::type,
+            Slang::LookupOptions::None);
+
+        diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
+
+        if (!diffTypeLookupResult.isValid())
+        {
+            return nullptr;
+        }
+        else if (diffTypeLookupResult.isOverloaded())
+        {
+            return nullptr;
+        }
+        else
+        {
+            SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = type;
+            baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
+
+            NameLoc nameLoc = NameLoc();
+            if (auto declRefType = as<DeclRefType>(type))
+            {
+                nameLoc.name = declRefType->getDeclRef().getName();
+                nameLoc.loc = declRefType->getDeclRef().getLoc();
+            }
+
+            auto diffTypeExpr = ConstructLookupResultExpr(
+                diffTypeLookupResult.item,
+                baseTypeExpr,
+                nameLoc.name,
+                nameLoc.loc,
+                baseTypeExpr);
+
+            return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
+        }
+    }
+}
+
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
     if (auto ptrType = as<PtrTypeBase>(type))
@@ -1800,58 +1875,95 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
     }
 
     bool hasDiffValueConformance = false;
-    if (auto witness = tryGetInterfaceConformanceWitness(
-            type,
-            getASTBuilder()->getDifferentiableInterfaceType()))
+    if (isDeclRefTypeOf<InterfaceDecl>(type))
     {
-        hasDiffValueConformance = true;
-        auto diffType = maybeRegisterVal(
-            this,
-            type,
-            type,
-            getName("Differential"),
-            ValAssociationKind::DifferentialType);
-        this->getParentDifferentiableAttribute()->addAssocVal(
-            type,
-            (SlangInt)ValAssociationKind::DifferentialPairType,
-            getCurrentASTBuilder()->getDifferentialPairType(type, witness));
-        auto dzeroFunc = maybeRegisterVal(
-            this,
-            type,
-            type,
-            getName("dzero"),
-            ValAssociationKind::DifferentialZero);
-        auto daddFunc = maybeRegisterVal(
-            this,
-            type,
-            type,
-            getName("dadd"),
-            ValAssociationKind::DifferentialAdd);
-    }
-
-    if (auto witness = tryGetInterfaceConformanceWitness(
-            type,
-            getASTBuilder()->getDifferentiableRefInterfaceType()))
-    {
-        if (hasDiffValueConformance)
+        // Existential types. There's not a proper way to represent
+        // the differential of an existential type (yet).
+        //
+        // We'll 'cheat' a bit and register it as IDifferentiable.
+        //
+        // The backend will take treat it as an existential pair.
+        //
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableInterfaceType()))
         {
-            if (auto declRefType = as<DeclRefType>(type))
-                getSink()->diagnose(
-                    declRefType->getDeclRef(),
-                    Diagnostics::typeCannotConformToBothValueAndPointerDiffInterfaces,
-                    type);
-            return;
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)ValAssociationKind::DifferentialPairType,
+                getCurrentASTBuilder()->getDifferentialPairType(type, witness));
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)ValAssociationKind::DifferentialType,
+                getCurrentASTBuilder()->getDifferentiableInterfaceType());
+            // Leave the rest unregistered for now. The backend will take care of it.
         }
-        auto diffPtrType = maybeRegisterVal(
-            this,
-            type,
-            type,
-            getName("Differential"),
-            ValAssociationKind::DifferentialPtrType);
-        this->getParentDifferentiableAttribute()->addAssocVal(
-            type,
-            (SlangInt)ValAssociationKind::DifferentialPtrPairType,
-            getCurrentASTBuilder()->getDifferentialPtrPairType(type, witness));
+        else if (
+            auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableRefInterfaceType()))
+        {
+            // Unsupported at the moment.
+            SLANG_UNEXPECTED("existential differentiable pointer types not supported");
+        }
+    }
+    else
+    {
+        // Lower associated information for a regular type.
+
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableInterfaceType()))
+        {
+            hasDiffValueConformance = true;
+            auto diffType = maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("Differential"),
+                ValAssociationKind::DifferentialType);
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)ValAssociationKind::DifferentialPairType,
+                getCurrentASTBuilder()->getDifferentialPairType(type, witness));
+            auto dzeroFunc = maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("dzero"),
+                ValAssociationKind::DifferentialZero);
+            auto daddFunc = maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("dadd"),
+                ValAssociationKind::DifferentialAdd);
+        }
+
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableRefInterfaceType()))
+        {
+            if (hasDiffValueConformance)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                    getSink()->diagnose(
+                        declRefType->getDeclRef(),
+                        Diagnostics::typeCannotConformToBothValueAndPointerDiffInterfaces,
+                        type);
+                return;
+            }
+            auto diffPtrType = maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("Differential"),
+                ValAssociationKind::DifferentialPtrType);
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)ValAssociationKind::DifferentialPtrPairType,
+                getCurrentASTBuilder()->getDifferentialPtrPairType(type, witness));
+        }
     }
 
     /* General check for types that may not be decl-ref-type, but still have some conformance to
@@ -3150,6 +3262,15 @@ static Expr* convertHigherOrderExprToLookup(
 
         if (result.isValid() && !result.isOverloaded())
         {
+            if (auto funcAliasDeclRef = result.item.declRef.as<FuncAliasDecl>())
+            {
+                result.item.declRef = substituteDeclRef(
+                                          SubstitutionSet(result.item.declRef),
+                                          getCurrentASTBuilder(),
+                                          funcAliasDeclRef.getDecl()->targetDeclRef)
+                                          .as<CallableDecl>();
+            }
+
             // Return the lookup result.
             auto lookupResultExpr = visitor->createLookupResultExpr(
                 lookupName,
@@ -3228,7 +3349,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (pp < invoke->arguments.getCount())
                 {
                     argExpr = invoke->arguments[pp];
-                    if (funcDeclBase)
+                    if (funcDeclBase && funcDeclBase->getParameters().getCount() > pp)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
@@ -3633,14 +3754,21 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 context->getName("fwd_diff"),
                 ValAssociationKind::ForwardDerivative))
         {
-            // Also lower the associated fwd-diff table.
-            // TODO: lower the bwd-diff table too.
+            // Lower the associated fwd_diff : IForwardDifferentiable witness table
             maybeRegisterWitness(
                 context,
                 funcAsType,
                 declRef.declRefBase,
                 context->getASTBuilder()->getForwardDiffFuncInterfaceType(funcAsType),
                 ValAssociationKind::ForwardDerivativeWitnessTable);
+
+            // Lower the fwd_diff : IBackwardDifferentiable witness table
+            maybeRegisterWitness(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getASTBuilder()->getBackwardDiffFuncInterfaceType(funcAsType),
+                ValAssociationKind::BackwardDerivativeWitnessTable);
         }
 
         if (maybeRegisterVal(
@@ -3797,7 +3925,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+                if (fnExpr->declRef)
+                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
         maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type);
@@ -4008,7 +4137,10 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         }
     }
 
-    return tryGetDifferentialPairType(primalParamType);
+    if (auto diffPairType = tryGetDifferentialPairType(primalParamType))
+        return diffPairType;
+    else
+        return primalParamType;
 }
 
 Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
@@ -4016,7 +4148,7 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
     if (auto modifiedType = as<ModifiedType>(primalType))
     {
         if (modifiedType->findModifier<NoDiffModifierVal>())
-            return modifiedType->getBase();
+            return nullptr;
     }
 
     if (auto typePack = as<ConcreteTypePack>(primalType))
@@ -4026,7 +4158,8 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
         for (Index i = 0; i < typePack->getTypeCount(); i++)
         {
             auto t = typePack->getElementType(i);
-            diffTypes.add(tryGetDifferentialPairType(t));
+            auto diffPairType = tryGetDifferentialPairType(t);
+            diffTypes.add((diffPairType ? diffPairType : t));
         }
         return m_astBuilder->getTypePack(diffTypes.getArrayView());
     }
@@ -4036,6 +4169,9 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
         // DifferentialPair<each P>`.
         auto eachType = m_astBuilder->getEachType(primalType);
         auto diffPairEachType = tryGetDifferentialPairType(eachType);
+        if (!diffPairEachType)
+            diffPairEachType = eachType;
+
         if (auto expandType = as<ExpandType>(primalType))
         {
             List<Type*> capturedTypePacks;
@@ -4068,7 +4204,8 @@ Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
             return m_astBuilder->getDifferentialPtrPairType(primalType, conformanceWitness);
         }
     }
-    return primalType;
+
+    return nullptr;
 }
 
 Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType thisQualType)
@@ -4089,10 +4226,9 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
     }
 
 
-    // The diff return type is float if primal return type is float
-    // void otherwise.
-    //
-    auto resultType = tryGetDifferentialPairType(originalType->getResultType());
+    auto resultType = originalType->getResultType();
+    if (auto resultPairType = tryGetDifferentialPairType(resultType))
+        resultType = resultPairType;
 
     // No support for differentiating function that throw errors, for now.
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
@@ -4105,11 +4241,6 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType 
         {
             paramTypes.add(diffThisType);
         }
-
-        /*if (auto diffThisType = tryGetDifferentialType(m_astBuilder, thisType))
-        {
-            paramTypes.add(diffThisType);
-        }*/
     }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
@@ -4142,56 +4273,79 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        auto originalParamType = originalType->getParamTypeWithDirectionWrapper(i);
+        auto paramValType = originalType->getParamValueType(i);
+        auto paramDirection = originalType->getParamDirection(i);
 
-        if (auto outType = as<OutType>(originalParamType))
+        switch (paramDirection)
         {
-            auto diffElementType = tryGetDifferentialType(m_astBuilder, outType->getValueType());
-            if (diffElementType)
+        case ParamPassingMode::Out:
             {
-                paramTypes.add(diffElementType);
+                auto diffElementType = tryGetDifferentialValueType(m_astBuilder, paramValType);
+                if (diffElementType)
+                    paramTypes.add(diffElementType);
+
+                break;
             }
-            else
+        case ParamPassingMode::In:
             {
-                continue;
-            }
-        }
-        else if (auto derivType = _toDifferentialParamType(originalParamType))
-        {
-            if (as<DifferentialPairType>(derivType))
-            {
-                // An `in` differentiable parameter becomes an `inout` parameter.
-                derivType = m_astBuilder->getBorrowInOutParamType(derivType);
-            }
-            else if (auto inoutType = as<BorrowInOutParamType>(derivType))
-            {
-                if (!as<DifferentialPairType>(inoutType->getValueType()))
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    // An `inout` non differentiable parameter becomes an `in` parameter
-                    // (removing `out`).
-                    derivType = m_astBuilder->getModifiedType(
-                        inoutType->getValueType(),
-                        {m_astBuilder->getNoDiffModifierVal()});
+                    if (as<DifferentialPairType>(diffPairValType))
+                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    else if (as<DifferentialPtrPairType>(diffPairValType))
+                        paramTypes.add(diffPairValType);
                 }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
             }
-            else
+        case ParamPassingMode::BorrowInOut:
             {
-                // If the type is not a pair, it must be a non-differentiable,
-                // we'll wrap it in a NoDiff, so that any changes to the type
-                // that may make it differentiable in the future don't affect
-                // the function signature
-                //
-                derivType = m_astBuilder->getModifiedType(
-                    derivType,
-                    {m_astBuilder->getNoDiffModifierVal()});
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
+            }
+        case ParamPassingMode::BorrowIn:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()})));
+                }
+
+                break;
+            }
+        case ParamPassingMode::Ref:
+            {
+                // Not allowed..
+                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
             }
 
-            paramTypes.add(derivType);
+            break;
         }
     }
 
     // Last parameter is the initial derivative of the original return type
-    auto dOutType = tryGetDifferentialType(m_astBuilder, originalType->getResultType());
+    auto dOutType = tryGetDifferentialValueType(m_astBuilder, originalType->getResultType());
     if (dOutType)
         paramTypes.add(dOutType);
 

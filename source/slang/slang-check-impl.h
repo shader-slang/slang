@@ -1649,6 +1649,9 @@ public:
     // Construct the differential for 'type', if it exists.
     Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
     Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialValueType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialPtrType(ASTBuilder* builder, Type* type);
+
 
     // Helper function to check if a struct can be used as its own differential type.
     bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl);

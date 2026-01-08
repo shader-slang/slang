@@ -861,7 +861,11 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     {
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
-            [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
+            [&](IRUntaggedUnionType* inst)
+            {
+                if (inst->hasUses())
+                    return lowerUntaggedUnionType(inst);
+            });
 
         replaceNoneTypeElementWithVoidType();
     }

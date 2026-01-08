@@ -28,6 +28,69 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     IRInst* translationResult = nullptr;
     IRBuilder subBuilder(inst->getModule());
     subBuilder.setInsertBefore(inst);
+
+    switch (inst->getOp())
+    {
+        // For higher order differentiation, we can synthesize new tables for
+        // conformance to IForwardDifferentiable and IBackwardDifferentiable
+        //
+    case kIROp_SynthesizedForwardDerivativeWitnessTable:
+        {
+            return memoize(maybeTranslateForwardDerivativeWitness(
+                &autodiffContext,
+                sink,
+                cast<IRSynthesizedForwardDerivativeWitnessTable>(inst)));
+        }
+        break;
+    case kIROp_SynthesizedBackwardDerivativeWitnessTable:
+        {
+            return memoize(maybeTranslateBackwardDerivativeWitness(
+                &autodiffContext,
+                sink,
+                cast<IRSynthesizedBackwardDerivativeWitnessTable>(inst)));
+        }
+        break;
+    case kIROp_MakeIDifferentiableWitness:
+        {
+            IRBuilder builder(autodiffContext.moduleInst);
+            DifferentiableTypeConformanceContext ctx(&autodiffContext);
+            auto baseType = inst->getOperand(0);
+            SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
+            if (as<IRDifferentialPairType>(baseType) ||
+                as<IRDifferentialPairUserCodeType>(baseType))
+            {
+                return memoize(ctx.buildDifferentiablePairWitness(
+                    &builder,
+                    cast<IRDifferentialPairTypeBase>(baseType),
+                    DiffConformanceKind::Value));
+            }
+            else if (as<IRDifferentialPtrPairType>(baseType))
+            {
+                return memoize(ctx.buildDifferentiablePairWitness(
+                    &builder,
+                    cast<IRDifferentialPtrPairType>(baseType),
+                    DiffConformanceKind::Ptr));
+            }
+        }
+        break;
+    // Translate special func-types.
+    case kIROp_ApplyForBwdFuncType:
+    case kIROp_ForwardDiffFuncType:
+    case kIROp_FuncResultType:
+    case kIROp_BwdCallableFuncType:
+    case kIROp_BackwardDiffFuncType:
+        {
+            DifferentiableTypeConformanceContext ctx(&autodiffContext);
+            ctx.setFunc(inst->getParent());
+            translationResult = ctx.resolveType(&subBuilder, inst);
+        }
+        break;
+    }
+
+    // Stop here if we are only translating witnesses.
+    if (m_translateWitnessesOnly)
+        return translationResult;
+
     switch (inst->getOp())
     {
     case kIROp_BackwardDifferentiate:
@@ -191,66 +254,6 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             }
         }
         break;
-    // For higher order differentiation, we can synthesize new tables for
-    // conformance to IForwardDifferentiable and IBackwardDifferentiable
-    //
-    case kIROp_SynthesizedForwardDerivativeWitnessTable:
-        {
-            return memoize(maybeTranslateForwardDerivativeWitness(
-                &autodiffContext,
-                sink,
-                cast<IRSynthesizedForwardDerivativeWitnessTable>(inst)));
-        }
-        break;
-    case kIROp_SynthesizedBackwardDerivativeWitnessTable:
-        {
-            SLANG_UNEXPECTED("not implemented yet");
-        }
-        break;
-    case kIROp_MakeIDifferentiableWitness:
-        {
-            IRBuilder builder(autodiffContext.moduleInst);
-            DifferentiableTypeConformanceContext ctx(&autodiffContext);
-            auto baseType = inst->getOperand(0);
-            SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
-            if (as<IRDifferentialPairType>(baseType) ||
-                as<IRDifferentialPairUserCodeType>(baseType))
-            {
-                return memoize(ctx.buildDifferentiablePairWitness(
-                    &builder,
-                    cast<IRDifferentialPairTypeBase>(baseType),
-                    DiffConformanceKind::Value));
-            }
-            else if (as<IRDifferentialPtrPairType>(baseType))
-            {
-                return memoize(ctx.buildDifferentiablePairWitness(
-                    &builder,
-                    cast<IRDifferentialPtrPairType>(baseType),
-                    DiffConformanceKind::Ptr));
-            }
-        }
-        break;
-    case kIROp_SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc:
-        {
-            SLANG_ASSERT("not supported anymore.. ");
-            return memoize(maybeTranslateBackwardDerivativeWitnessFromLegacyBwdDiffFunc(
-                &autodiffContext,
-                sink,
-                cast<IRSynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc>(inst)));
-        }
-        break;
-    // Translate special func-types.
-    case kIROp_ApplyForBwdFuncType:
-    case kIROp_ForwardDiffFuncType:
-    case kIROp_FuncResultType:
-    case kIROp_BwdCallableFuncType:
-    case kIROp_BackwardDiffFuncType:
-        {
-            DifferentiableTypeConformanceContext ctx(&autodiffContext);
-            ctx.setFunc(inst->getParent());
-            translationResult = ctx.resolveType(&subBuilder, inst);
-        }
-        break;
     default:
         break;
     }
@@ -273,6 +276,9 @@ static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
     //
     auto requirementKey = lookupInst->getRequirementKey();
     auto satisfyingVal = findWitnessTableEntry(witnessTable, requirementKey);
+
+    lookupInst->replaceUsesWith(satisfyingVal);
+    lookupInst->removeAndDeallocate();
 
     return satisfyingVal;
 }
@@ -325,7 +331,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return nullptr;
 
     // Don't attempt to resolve insts that are potentially recursive.
-    if (as<IRInterfaceType>(inst))
+    if (as<IRInterfaceType>(inst) || as<IRWitnessTable>(inst))
     {
         return inst;
     }
@@ -391,9 +397,11 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     }
 
     // Assume at this point that we have a specializable inst with resolved operands.
-    if (auto specializedInst = builder.tryLookupCompilerDictionaryValue(
-            ctx->getModule()->getTranslationDict(),
-            instWithCanonicalOperands))
+    auto entry = builder.fetchCompilerDictionaryEntry(
+        ctx->getModule()->getTranslationDict(),
+        instWithCanonicalOperands);
+
+    if (auto specializedInst = entry->getValue())
     {
         instWithCanonicalOperands->replaceUsesWith(specializedInst);
         return specializedInst;
@@ -401,10 +409,13 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
     auto memoize = [&](IRInst* resultInst)
     {
+        /*
         builder.addCompilerDictionaryEntry(
             ctx->getModule()->getTranslationDict(),
             instWithCanonicalOperands,
             resultInst);
+        */
+        builder.setCompilerDictionaryEntryValue(entry, resultInst);
         return resultInst;
     };
 

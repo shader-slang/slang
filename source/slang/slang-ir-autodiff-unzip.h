@@ -71,29 +71,6 @@ struct DiffUnzipPass
         // a use from the primal or diff part of the program.
         builder->setInsertBefore(unzippedFunc->getFirstBlock()->getTerminator());
 
-        /*
-        TODO(sai): old code. remove
-        for (auto fwdParam = unzippedFunc->getFirstParam(); fwdParam;
-             fwdParam = fwdParam->getNextParam())
-        {
-            auto type = fwdParam->getFullType();
-            if (auto ptrType = asRelevantPtrType(type))
-            {
-                type = ptrType->getValueType();
-            }
-            if (auto pairType = as<IRDifferentialPairType>(type))
-            {
-                IRInst* diffType = diffTypeContext.getDiffTypeFromPairType(builder, pairType);
-                if (auto ptrType = asRelevantPtrType(fwdParam->getFullType()))
-                    diffType = builder->getPtrType(ptrType->getOp(), (IRType*)diffType);
-                auto primalRef = builder->emitPrimalParamRef(fwdParam);
-                auto diffRef = builder->emitDiffParamRef((IRType*)diffType, fwdParam);
-                builder->markInstAsDifferential(diffRef, pairType->getValueType());
-                primalMap[fwdParam] = primalRef;
-                diffMap[fwdParam] = diffRef;
-            }
-        }*/
-
         // Functions need to have at least two blocks at this point (one for parameters,
         // and atleast one for code)
         //
@@ -258,35 +235,11 @@ struct DiffUnzipPass
         auto baseFn = _getOriginalFunc(mixedCall);
         SLANG_RELEASE_ASSERT(baseFn);
 
-        // AD 2.0 logic..
-        /*auto bwdDiffWitness = diffTypeContext.tryGetWitnessOfKind(
-            baseFn,
-            DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardDifferentiable);
-
-        auto bwdDiffWitnessType = as<IRWitnessTableType>(bwdDiffWitness->getDataType());
-        auto bwdDiffWitnessInterface =
-            as<IRInterfaceType>(bwdDiffWitnessType->getConformanceType());
-        // TODO: remove hardcoded index (use key)
-        IRInterfaceRequirementEntry* applyBwdMethodEntry =
-            as<IRInterfaceRequirementEntry>(bwdDiffWitnessInterface->getOperand(2));
-
-        // TODO: Need to lower annotations for _functions_ and not witness tables.
-        // This will force the front-end to lower a proper func-type in the context of the function.
-        // Right now, we aare using the witness table's requirement type, which won't have
-        // info for the associated types.
-        //
-        auto applyBwdFunc = _lookupWitness(
-            primalBuilder,
-            bwdDiffWitness,
-            applyBwdMethodEntry->getRequirementKey(),
-            cast<IRFuncType>(diffTypeContext.resolveType(
-                primalBuilder,
-                applyBwdMethodEntry->getRequirementVal())));*/
-
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             ValAssociationKind::BackwardDerivativeApply);
-        auto applyBwdFuncType = cast<IRFuncType>(applyBwdFunc->getDataType());
+        auto applyBwdFuncType = cast<IRFuncType>(
+            diffTypeContext.resolveType(&globalBuilder, applyBwdFunc->getDataType()));
 
         List<IRInst*> applyFuncArgs;
         for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
@@ -305,24 +258,6 @@ struct DiffUnzipPass
             applyFuncArgs);
         primalBuilder->markInstAsPrimal(contextVal);
 
-        /*auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
-            baseFn,
-            DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardPropCallable);
-        auto bwdCallableWitnessType = as<IRWitnessTableType>(bwdCallableWitness->getDataType());
-        auto bwdCallableWitnessInterface =
-            as<IRInterfaceType>(bwdCallableWitnessType->getConformanceType());
-        // TODO: remove hardcoded index (use key)
-        IRInterfaceRequirementEntry* getValMethodEntry =
-            as<IRInterfaceRequirementEntry>(bwdCallableWitnessInterface->getOperand(1));
-
-        auto getValFunc = _lookupWitness(
-            primalBuilder,
-            bwdCallableWitness,
-            getValMethodEntry->getRequirementKey(),
-            cast<IRFuncType>(diffTypeContext.resolveType(
-                primalBuilder,
-                getValMethodEntry->getRequirementVal())));
-        primalBuilder->markInstAsPrimal(getValFunc);*/
         auto getValFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
             ValAssociationKind::BackwardDerivativeContextGetVal);
@@ -332,7 +267,8 @@ struct DiffUnzipPass
         // This will serve as the primal part of the mixed call.
         //
         auto primalReturnVal = primalBuilder->emitCallInst(
-            as<IRFuncType>(getValFunc->getDataType())->getResultType(),
+            as<IRFuncType>(diffTypeContext.resolveType(&globalBuilder, getValFunc->getDataType()))
+                ->getResultType(),
             getValFunc,
             List<IRInst*>(contextVal));
         primalBuilder->markInstAsPrimal(primalReturnVal);
@@ -368,7 +304,8 @@ struct DiffUnzipPass
         {
             const auto& [paramDirection, paramType] =
                 splitParameterDirectionAndType(baseFuncType->getParamType(ii));
-            if (auto diffType = diffTypeContext.getDifferentialForType(diffBuilder, paramType))
+            if (auto diffType =
+                    diffTypeContext.tryGetDifferentiableValueType(diffBuilder, paramType))
             {
                 fwdPropFuncParamTypes.add(
                     fromDirectionAndType(diffBuilder, paramDirection, (IRType*)diffType));
@@ -380,8 +317,9 @@ struct DiffUnzipPass
         }
 
         IRType* fwdPropFuncResultType = nullptr;
-        if (auto diffType =
-                diffTypeContext.getDifferentialForType(diffBuilder, baseFuncType->getResultType()))
+        if (auto diffType = diffTypeContext.tryGetDifferentiableValueType(
+                diffBuilder,
+                baseFuncType->getResultType()))
         {
             fwdPropFuncResultType = (IRType*)diffType;
         }
@@ -396,7 +334,6 @@ struct DiffUnzipPass
         // ....
         auto fwdPropFuncInst =
             diffBuilder->emitForwardDifferentiatePropagateInst(fwdPropFuncType, baseFn);
-        // diffBuilder->markInstAsDifferential(fwdPropFuncInst, fwdPropFuncType, primalReturnVal);
 
         auto fwdPropCall = diffBuilder->emitCallInst(
             fwdPropFuncType->getResultType(),
@@ -408,208 +345,6 @@ struct DiffUnzipPass
             primalReturnVal);
 
         return InstPair(primalReturnVal, fwdPropCall);
-
-        /* old code..
-        auto primalFuncType =
-            autodiffContext->transcriberSet.primalTranscriber->differentiateFunctionType(
-                primalBuilder,
-                baseFn,
-                as<IRFuncType>(baseFn->getDataType()));
-
-        IRInst* intermediateType = getIntermediateType(primalBuilder, baseFn);
-
-        IRVar* intermediateVar = nullptr;
-        if (!as<IRVoidType>(intermediateType))
-        {
-            intermediateVar = primalBuilder->emitVar((IRType*)intermediateType);
-            primalBuilder->markInstAsPrimal(intermediateVar);
-        }
-
-        IRInst* primalFn = nullptr;
-        if (intermediateVar)
-        {
-            primalBuilder->addBackwardDerivativePrimalContextDecoration(
-                intermediateVar,
-                intermediateVar);
-            primalFn =
-                primalBuilder->emitBackwardDifferentiatePrimalInst((IRType*)primalFuncType, baseFn);
-        }
-        else
-        {
-            // If we decided not to use diff-primal func that stores an reuse context,
-            // we can just call the original function instead.
-            primalFn = baseFn;
-        }
-        List<IRInst*> primalArgs;
-        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
-        {
-            auto arg = mixedCall->getArg(ii);
-            if (isRelevantDifferentialPair(arg->getDataType()))
-            {
-                primalArgs.add(lookupPrimalInst(arg));
-            }
-            else
-            {
-                primalArgs.add(arg);
-            }
-        }
-        if (intermediateType->getOp() != kIROp_VoidType)
-            primalArgs.add(intermediateVar);
-
-        auto mixedDecoration = mixedCall->findDecoration<IRMixedDifferentialInstDecoration>();
-        SLANG_ASSERT(mixedDecoration);
-
-        IRType* primalType = mixedCall->getFullType();
-        IRType* diffType = mixedCall->getFullType();
-        IRType* resultType = mixedCall->getFullType();
-        if (auto fwdPairResultType = as<IRDifferentialPairType>(mixedDecoration->getPairType()))
-        {
-            primalType = fwdPairResultType->getValueType();
-            diffType =
-                (IRType*)diffTypeContext.getDiffTypeFromPairType(&globalBuilder, fwdPairResultType);
-            SLANG_ASSERT(diffType);
-            resultType = fwdPairResultType;
-        }
-
-        auto primalVal = primalBuilder->emitCallInst(primalType, primalFn, primalArgs);
-        if (intermediateVar)
-            primalBuilder->addBackwardDerivativePrimalContextDecoration(primalVal, intermediateVar);
-        primalBuilder->markInstAsPrimal(primalVal);
-
-        auto resolvedPrimalFuncType = as<IRFuncType>(getResolvedInstForDecorations(primalFuncType));
-        SLANG_RELEASE_ASSERT(resolvedPrimalFuncType);
-
-        SLANG_RELEASE_ASSERT(mixedCall->getArgCount() <= resolvedPrimalFuncType->getParamCount());
-
-        List<IRInst*> diffArgs;
-        for (UIndex ii = 0; ii < mixedCall->getArgCount(); ii++)
-        {
-            auto arg = mixedCall->getArg(ii);
-
-            // Depending on the type and direction of each argument,
-            // we might need to prepare a different value for the transposition logic to produce
-            // the correct final argument in the propagate function call.
-            if (isRelevantDifferentialPair(arg->getDataType()))
-            {
-                auto primalArg = lookupPrimalInst(arg);
-                auto diffArg = lookupDiffInst(arg);
-
-                // If arg is a mixed differential (pair), it should have already been split.
-                SLANG_ASSERT(primalArg);
-                SLANG_ASSERT(diffArg);
-                auto primalParamType = resolvedPrimalFuncType->getParamType(ii);
-
-                if (const auto outType = as<IROutParamType>(primalParamType))
-                {
-                    // For `out` parameters that expects an input derivative to propagate
-                    // through, we insert a `LoadReverseGradient` inst here to signify the logic
-                    // in `transposeStore` that this argument should actually be the currently
-                    // accumulated derivative on this variable. The end purpose is that we will
-                    // generate a load(diffArg) in the final transposed code and use that as the
-                    // argument for the call, but we can't just emit a normal load inst here
-                    // because the transposition logic will turn loads into stores.
-                    auto outDiffType = cast<IRPtrTypeBase>(diffArg->getDataType())->getValueType();
-                    auto gradArg = diffBuilder->emitLoadReverseGradient(outDiffType, diffArg);
-                    diffBuilder->markInstAsDifferential(gradArg, primalArg->getDataType());
-                    diffArgs.add(gradArg);
-                }
-                else if (const auto inoutType = as<IRBorrowInOutParamType>(primalParamType))
-                {
-                    // Since arg is split into separate vars, we need a new temp var that
-                    // represents the remerged diff pair.
-                    auto diffPairType = as<IRDifferentialPairType>(
-                        as<IRPtrTypeBase>(arg->getDataType())->getValueType());
-                    auto primalValueType = diffPairType->getValueType();
-
-                    // We can't simply reuse primalArg for an inout parameter since this will
-                    // represent the value after the primal call which can potentially alter
-                    // primalArg. Therefore, we will find the first store into primalArg, and
-                    // create a temp var holding that value (i.e. value prior to primal call)
-                    //
-                    auto storeUse = findUniqueStoredVal(cast<IRVar>(primalArg));
-                    auto storeInst = cast<IRStore>(storeUse->getUser());
-
-                    auto storedVal = storeInst->getVal();
-
-                    // Emit the temp var into the primal blocks since it's holding a primal
-                    // value.
-                    auto tempPrimalVar = primalBuilder->emitVar(primalValueType);
-                    primalBuilder->emitStore(tempPrimalVar, storedVal);
-
-                    auto diffPairRef = diffBuilder->emitReverseGradientDiffPairRef(
-                        arg->getDataType(),
-                        tempPrimalVar,
-                        diffArg);
-                    diffBuilder->markInstAsDifferential(diffPairRef, primalValueType);
-                    diffArgs.add(diffPairRef);
-                }
-                else
-                {
-                    // For ordinary differentiable input parameters, we make sure to provide
-                    // a differential pair. The actual logic that generates an inout variable
-                    // will be handled in `transposeCall()`.
-                    auto pairArg = diffBuilder->emitMakeDifferentialPair(
-                        arg->getDataType(),
-                        primalArg,
-                        diffArg);
-
-                    diffBuilder->markInstAsDifferential(pairArg, primalArg->getDataType());
-                    diffArgs.add(pairArg);
-                }
-            }
-            else
-            {
-                if (as<IRBorrowInOutParamType>(resolvedPrimalFuncType->getParamType(ii)))
-                {
-                    // For 'inout' parameter we need to create a temp var to hold the value
-                    // before the primal call. This logic is similar to the 'inout' case for
-                    // differentiable params only we don't need to deal with pair types.
-                    //
-                    auto tempPrimalVar = primalBuilder->emitVar(
-                        as<IRPtrTypeBase>(arg->getDataType())->getValueType());
-
-                    auto storeUse = findUniqueStoredVal(cast<IRVar>(arg));
-                    auto storeInst = cast<IRStore>(storeUse->getUser());
-                    auto storedVal = storeInst->getVal();
-
-                    primalBuilder->emitStore(tempPrimalVar, storedVal);
-
-                    diffArgs.add(tempPrimalVar);
-                }
-                else
-                {
-                    // For pure 'in' type. Simply re-use the original argument inst.
-                    //
-                    // For 'out' type parameters, it doesn't really matter what we pass in here,
-                    // since the tranposition logic will discard the argument anyway (we'll pass
-                    // in the old arg, just to keep the number of arguments consistent)
-                    //
-                    diffArgs.add(arg);
-                }
-            }
-        }
-
-        auto newFwdCallee = diffBuilder->emitForwardDifferentiateInst(fwdCalleeType, baseFn);
-
-        diffBuilder->markInstAsDifferential(newFwdCallee);
-
-        auto callInst = diffBuilder->emitCallInst(resultType, newFwdCallee, diffArgs);
-        diffBuilder->markInstAsDifferential(callInst, primalType);
-
-        if (intermediateVar)
-        {
-            auto validationScope = disableIRValidationScope();
-            diffBuilder->addBackwardDerivativePrimalContextDecoration(callInst, intermediateVar);
-        }
-
-        IRInst* diffVal = nullptr;
-        if (as<IRDifferentialPairType>(callInst->getDataType()))
-        {
-            diffVal = diffBuilder->emitDifferentialPairGetDifferential(diffType, callInst);
-            diffBuilder->markInstAsDifferential(diffVal, primalType);
-        }
-        return InstPair(primalVal, diffVal);
-        */
     }
 
     InstPair splitMakePair(IRBuilder*, IRBuilder*, IRMakeDifferentialPair* mixedPair)
@@ -940,6 +675,9 @@ struct DiffUnzipPass
                     fromDirectionAndType(&diffBuilder, pairDirection, diffType));
                 diffBuilder.markInstAsDifferential(diffParam, primalType);
 
+                primalParam->sourceLoc = fwdParam->sourceLoc;
+                diffParam->sourceLoc = fwdParam->sourceLoc;
+
                 primalMap[fwdParam] = primalParam;
                 diffMap[fwdParam] = diffParam;
             }
@@ -948,6 +686,7 @@ struct DiffUnzipPass
                 // Move to primal block.
                 fwdParam->insertAtEnd(primalBlock);
                 auto diffParam = diffBuilder.emitParam(diffBuilder.getVoidType());
+                diffParam->sourceLoc = fwdParam->sourceLoc;
                 primalMap[fwdParam] = fwdParam;
             }
         }

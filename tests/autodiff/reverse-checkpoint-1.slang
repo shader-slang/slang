@@ -10,7 +10,7 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-//CHK: note: checkpointing context of 8 bytes associated with function: 'g'
+//CHK: note: checkpointing context of 4 bytes associated with function: 'g'
 [BackwardDifferentiable]
 [PreferCheckpoint]
 float g(float x)
@@ -18,15 +18,14 @@ float g(float x)
     return log(x);
 }
 
-//CHK: note: checkpointing context of 16 bytes associated with function: 'f'
+//CHK: note: checkpointing context of 12 bytes associated with function: 'f'
 [BackwardDifferentiable]
 float f(int p, float x)
 {
     float y = 1.0;
     // Test that phi parameter can be restored.
     if (p == 0)
-        //CHK:([[@LINE+2]]): note: 8 bytes (s_bwdCallableCtx_g_{{[0-9]+}}) used to checkpoint the following item:
-        //CHK:([[@LINE+1]]): note: 4 bytes (float) used to checkpoint the following item:
+        //CHK:([[@LINE+1]]): note: 8 bytes (s_bwdCallableCtx_g_{{[0-9]+}}) used to checkpoint the following item:
         y = g(x);
 
     return y * y;

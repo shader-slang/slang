@@ -56,7 +56,11 @@ struct InstWithContext
         {
         case kIROp_Func:
             {
-                SLANG_ASSERT(inst->getParent()->getParent() == context);
+                if (as<IRDecoration>(inst))
+                    SLANG_ASSERT(inst->getParent()->getParent()->getParent() == context);
+                else
+                    SLANG_ASSERT(inst->getParent()->getParent() == context);
+
                 break;
             }
         case kIROp_Specialize:
@@ -389,6 +393,10 @@ bool isConcreteType(IRInst* inst)
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
         return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+    case kIROp_DifferentialPairType:
+        return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
+    case kIROp_AttributedType:
+        return isConcreteType(cast<IRAttributedType>(inst)->getBaseType());
     default:
         break;
     }
@@ -427,6 +435,19 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
             getArrayStride(arrayType));
     }
 
+    if (auto attributedType = as<IRAttributedType>(type))
+    {
+        List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+        for (auto attr : attributedType->getAllAttrs())
+            attrs.add(attr);
+
+        auto newAttributedType = builder.getAttributedType(
+            (IRType*)makeInfoForConcreteType(module, attributedType->getBaseType()),
+            attrs);
+        module->getContainerPool().free(&attrs);
+        return newAttributedType;
+    }
+
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
@@ -460,6 +481,7 @@ IROp getSetOpFromType(IRType* type)
     case kIROp_ApplyForBwdFuncType:
     case kIROp_BwdCallableFuncType:
     case kIROp_BackwardDiffFuncType:
+    case kIROp_FuncResultType:
         return kIROp_FuncSet;
     default:
         break;
@@ -521,6 +543,14 @@ bool isOptionalExistentialType(IRInst* inst)
 {
     if (auto optionalType = as<IROptionalType>(inst))
         if (auto interfaceType = as<IRInterfaceType>(optionalType->getValueType()))
+            return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
+    return false;
+}
+
+bool isExistentialDifferentialPairType(IRInst* inst)
+{
+    if (auto diffPairType = as<IRDifferentialPairTypeBase>(inst))
+        if (auto interfaceType = as<IRInterfaceType>(diffPairType->getValueType()))
             return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
     return false;
 }
@@ -824,6 +854,24 @@ struct TypeFlowSpecializationContext
                     cast<IRTypeSet>(info2->getOperand(0))));
         }
 
+        if (as<IRAttributedType>(info1) && as<IRAttributedType>(info2))
+        {
+            SLANG_ASSERT(info1->getOp() == info2->getOp());
+
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : as<IRAttributedType>(info1)->getAllAttrs())
+                attrs.add(attr);
+
+            auto unionAttributedType = builder.getAttributedType(
+                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return unionAttributedType;
+        }
+
         SLANG_UNEXPECTED("Unhandled propagation info types in unionPropagationInfo");
     }
 
@@ -975,6 +1023,16 @@ struct TypeFlowSpecializationContext
         }
     }
 
+    bool isEntryPoint(IRFunc* func)
+    {
+        return func->findDecoration<IRPyExportDecoration>() != nullptr ||
+               func->findDecoration<IREntryPointDecoration>() != nullptr ||
+               func->findDecoration<IRDllExportDecoration>() != nullptr ||
+               func->findDecoration<IRHLSLExportDecoration>() != nullptr ||
+               func->findDecoration<IRCudaDeviceExportDecoration>() != nullptr ||
+               func->findDecoration<IRCudaKernelDecoration>() != nullptr;
+    }
+
     void performInformationPropagation()
     {
         // This method contains the main loop responsible for propagating information across all
@@ -1008,7 +1066,8 @@ struct TypeFlowSpecializationContext
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
-                discoverContext(func, workQueue);
+                if (isEntryPoint(func))
+                    discoverContext(func, workQueue);
 
         // Process until fixed point.
         while (workQueue.hasItems())
@@ -1115,6 +1174,17 @@ struct TypeFlowSpecializationContext
             break;
         case kIROp_GetOptionalValue:
             info = analyzeGetOptionalValue(context, as<IRGetOptionalValue>(inst));
+            break;
+        case kIROp_MakeDifferentialPair:
+            info = analyzeMakeDifferentialPair(context, as<IRMakeDifferentialPair>(inst));
+            break;
+        case kIROp_DifferentialPairGetDifferential:
+            info = analyzeDifferentialPairGetDifferential(
+                context,
+                as<IRDifferentialPairGetDifferential>(inst));
+            break;
+        case kIROp_DifferentialPairGetPrimal:
+            info = analyzeDifferentialPairGetPrimal(context, as<IRDifferentialPairGetPrimal>(inst));
             break;
         }
 
@@ -1670,6 +1740,192 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    IRInst* analyzeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
+    {
+        SLANG_UNUSED(context);
+
+        if (isExistentialDifferentialPairType(inst->getDataType()))
+        {
+            // DifferentialPair<IFoo>
+            IRBuilder builder(module);
+
+            AssociationLookupContext ctx;
+            auto primalInfo = as<IRTaggedUnionType>(tryGetInfo(context, inst->getPrimal()));
+            if (!primalInfo)
+                return none();
+
+            auto diffInfo = as<IRTaggedUnionType>(tryGetInfo(context, inst->getDifferential()));
+            if (!diffInfo)
+                return none();
+
+            /*HashSet<IRInst*> diffWitnessSet;
+            forEachInSet(
+                module,
+                cast<IRTypeSet>(primalInfo->getTypeSet()),
+                [&](IRInst* typeInst)
+                {
+                    auto diffPairType = as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
+                        typeInst,
+                        ValAssociationKind::DifferentialPairType));
+
+                    if (diffPairType)
+                    {
+                        // Table for primal : IDifferentiable
+                        diffWitnessSet.add(cast<IRWitnessTable>(diffPairType->getWitness()));
+                    }
+                });
+
+            auto witnessInfo = makeTaggedUnionType(
+                as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, diffWitnessSet)));*/
+
+            // return builder.getDifferentialPairType(primalInfo, witnessInfo);
+
+            return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
+        }
+        else if (!isGlobalInst(inst->getDataType()))
+        {
+            // DifferentialPair<T> where T is generic/abstract
+            IRBuilder builder(module);
+            auto primalInfo = as<IRUntaggedUnionType>(tryGetInfo(context, inst->getPrimal()));
+            if (!primalInfo)
+                return none();
+            auto diffInfo = as<IRUntaggedUnionType>(tryGetInfo(context, inst->getDifferential()));
+            if (!diffInfo)
+                return none();
+
+            // HashSet<IRInst*> diffTypeSet;
+            // AssociationLookupContext ctx;
+            /*
+            forEachInSet(
+                module,
+                cast<IRTypeSet>(primalInfo->getSet()),
+                [&](IRInst* typeInst)
+                {
+                    auto diffPairType = as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
+                        typeInst,
+                        ValAssociationKind::DifferentialPairType));
+                    auto diffType =
+                        ctx.tryGetAssociationOfKind(typeInst, ValAssociationKind::DifferentialType);
+
+                    if (diffType)
+                    {
+                        // Table for primal : IDifferentiable
+                        diffTypeSet.add(diffType);
+                    }
+                });
+            */
+
+            /*
+            auto diffUntaggedUnionType =
+                makeUntaggedUnionType(as<IRTypeSet>(builder.getSet(kIROp_TypeSet, diffTypeSet)));*/
+
+            if (primalInfo->getSet()->isSingleton() && diffInfo->getSet()->isSingleton())
+                return none();
+
+            // return builder.getDifferentialPairType(primalInfo, witnessInfo);
+            return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
+        }
+        else
+        {
+            // DifferentialPair<ConcreteType> - concrete type.
+            return none();
+        }
+    }
+
+    IRInst* analyzeDifferentialPairGetPrimal(IRInst* context, IRDifferentialPairGetPrimal* inst)
+    {
+        SLANG_UNUSED(context);
+        IRBuilder builder(module);
+        if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
+        {
+            if (auto pairType = as<IRTupleType>(pairInfo))
+            {
+                return pairType->getOperand(0);
+            }
+        }
+
+        return none();
+    }
+
+    IRInst* analyzeDifferentialPairGetDifferential(
+        IRInst* context,
+        IRDifferentialPairGetDifferential* inst)
+    {
+        SLANG_UNUSED(context);
+        IRBuilder builder(module);
+        AssociationLookupContext ctx;
+        if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
+        {
+            /*
+            if (auto pairType = as<IRDifferentialPairType>(pairInfo))
+            {
+                IRTypeSet* primalTypeSet = nullptr;
+                bool isTaggedUnion = false;
+
+                if (auto primalTaggedUnion = as<IRTaggedUnionType>(pairType->getValueType()))
+                {
+                    primalTypeSet = cast<IRTypeSet>(primalTaggedUnion->getTypeSet());
+                    isTaggedUnion = true;
+                }
+                else if (
+                    auto primalUntaggedUnion = as<IRUntaggedUnionType>(pairType->getValueType()))
+                {
+                    primalTypeSet = cast<IRTypeSet>(primalUntaggedUnion->getSet());
+                    isTaggedUnion = false;
+                }
+                else
+                {
+                    // Concrete type case - nothing dynamic to specialize.
+                    return none();
+                }
+
+                HashSet<IRInst*> diffWitnessSet;
+                HashSet<IRInst*> diffTypeSet;
+                forEachInSet(
+                    module,
+                    primalTypeSet,
+                    [&](IRInst* typeInst)
+                    {
+                        auto diffType = (ctx.tryGetAssociationOfKind(
+                            typeInst,
+                            ValAssociationKind::DifferentialType));
+                        if (diffType)
+                            diffTypeSet.add(diffType);
+
+                        auto diffDiffPairType =
+                            as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
+                                diffType,
+                                ValAssociationKind::DifferentialPairType));
+                        if (diffDiffPairType)
+                        {
+                            // Table for .Differential : IDifferentiable
+                            diffWitnessSet.add(
+                                cast<IRWitnessTable>(diffDiffPairType->getWitness()));
+                        }
+                    });
+
+                if (isTaggedUnion)
+                {
+                    return makeTaggedUnionType(
+                        as<IRWitnessTableSet>(
+                            builder.getSet(kIROp_WitnessTableSet, diffWitnessSet)));
+                }
+                else
+                {
+                    return makeUntaggedUnionType(
+                        as<IRTypeSet>(builder.getSet(kIROp_TypeSet, diffTypeSet)));
+                }
+            }
+            */
+            if (auto pairType = as<IRTupleType>(pairInfo))
+            {
+                return pairType->getOperand(1);
+            }
+        }
+
+        return none();
+    }
+
     // Get the witness table inst to be used for the 'none' case of
     // an optional witness table.
     //
@@ -1797,6 +2053,18 @@ struct TypeFlowSpecializationContext
                     }
 
                     auto resolvedTable = translationContext.resolveInst(table);
+
+                    // TODO: Make 'none witness' values a proper thing instead of three different
+                    // possibilities..
+                    //
+                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
+                        (as<IRWitnessTable>(resolvedTable)->getConformanceType()->getOp() ==
+                         kIROp_VoidType))
+                    {
+                        results.add(builder.getVoidValue());
+                        return;
+                    }
+
                     results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
                 });
 
@@ -2657,6 +2925,28 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
+    bool removeAnnotations(IRFunc* func)
+    {
+        bool hasChanges = false;
+
+        List<IRInst*>& annotationsToRemove = *module->getContainerPool().getList<IRInst>();
+        for (auto block : func->getBlocks())
+        {
+            for (auto child : block->getChildren())
+                if (as<IRAssociatedInstAnnotation>(child))
+                    annotationsToRemove.add(child);
+        }
+
+        for (auto annotation : annotationsToRemove)
+        {
+            hasChanges = true;
+            annotation->removeAndDeallocate();
+        }
+
+        module->getContainerPool().free(&annotationsToRemove);
+        return hasChanges;
+    }
+
     bool specializeFunc(IRFunc* func)
     {
         // When specializing a func, we
@@ -2827,7 +3117,11 @@ struct TypeFlowSpecializationContext
             hasChanges |= specializeStructType(structType);
 
         for (auto func : funcsToProcess)
+        {
+            hasChanges |= removeAnnotations(func);
+            hasChanges |= eliminateDeadCode(func);
             hasChanges |= specializeFunc(func);
+        }
 
         for (auto func : funcsToProcess)
             hasChanges |= resolveTypesInFunc(func);
@@ -2847,6 +3141,25 @@ struct TypeFlowSpecializationContext
     {
         if (!info)
             return nullptr;
+
+        if (auto attributedType = as<IRAttributedType>(info))
+        {
+            if (auto specializedValueType = getLoweredType(attributedType->getBaseType()))
+            {
+                IRBuilder builder(module);
+
+                List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+                for (auto attr : attributedType->getAllAttrs())
+                    attrs.add(attr);
+
+                auto newAttributedType =
+                    builder.getAttributedType((IRType*)specializedValueType, attrs);
+                module->getContainerPool().free(&attrs);
+                return newAttributedType;
+            }
+            else
+                return nullptr;
+        }
 
         if (auto ptrType = as<IRPtrTypeBase>(info))
         {
@@ -2871,6 +3184,26 @@ struct TypeFlowSpecializationContext
             }
             else
                 return nullptr;
+        }
+
+        if (auto tupleType = as<IRTupleType>(info))
+        {
+            IRBuilder builder(module);
+            List<IRType*> specializedElementTypes;
+            specializedElementTypes.reserve(tupleType->getOperandCount());
+
+            for (UIndex i = 0; i < tupleType->getOperandCount(); ++i)
+            {
+                auto elementType = tupleType->getOperand(i);
+                if (auto specializedElementType = getLoweredType(elementType))
+                {
+                    specializedElementTypes.add(specializedElementType);
+                }
+                else
+                    return nullptr;
+            }
+
+            return builder.getTupleType(specializedElementTypes);
         }
 
         if (auto taggedUnion = as<IRTaggedUnionType>(info))
@@ -2983,6 +3316,16 @@ struct TypeFlowSpecializationContext
             return specializeOptionalHasValue(context, as<IROptionalHasValue>(inst));
         case kIROp_GetOptionalValue:
             return specializeGetOptionalValue(context, as<IRGetOptionalValue>(inst));
+        case kIROp_MakeDifferentialPair:
+            return specializeMakeDifferentialPair(context, as<IRMakeDifferentialPair>(inst));
+        case kIROp_DifferentialPairGetDifferential:
+            return specializeDifferentialPairGetDifferential(
+                context,
+                as<IRDifferentialPairGetDifferential>(inst));
+        case kIROp_DifferentialPairGetPrimal:
+            return specializeDifferentialPairGetPrimal(
+                context,
+                as<IRDifferentialPairGetPrimal>(inst));
         default:
             {
                 // Default case: replace inst type with specialized type (if available)
@@ -3223,6 +3566,22 @@ struct TypeFlowSpecializationContext
         else if (currentType == nullptr)
         {
             return newType;
+        }
+        else if (as<IRAttributedType>(currentType) && as<IRAttributedType>(newType))
+        {
+            // Merge the base types of both attributed types
+            auto baseCurrentType = as<IRAttributedType>(currentType)->getBaseType();
+            auto baseNewType = as<IRAttributedType>(newType)->getBaseType();
+            auto mergedBaseType = updateType(baseCurrentType, baseNewType);
+
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : as<IRAttributedType>(currentType)->getAllAttrs())
+                attrs.add(attr);
+
+            auto mergedAttributedType = builder.getAttributedType((IRType*)mergedBaseType, attrs);
+            module->getContainerPool().free(&attrs);
+            return mergedAttributedType;
         }
         else if (as<IRTaggedUnionType>(currentType) && as<IRTaggedUnionType>(newType))
         {
@@ -3566,6 +3925,9 @@ struct TypeFlowSpecializationContext
 
         if (isNoneCallee(callee))
             return false;
+
+        if (isGlobalInst(callee))
+            callee = translationContext.resolveInst(callee);
 
         List<IRInst*>& callArgs = *module->getContainerPool().getList<IRInst>();
 
@@ -3919,6 +4281,59 @@ struct TypeFlowSpecializationContext
         inst->replaceUsesWith(inst->getWrappedValue());
         inst->removeAndDeallocate();
         return true;
+    }
+
+    bool specializeMakeDifferentialPair(IRInst* context, IRMakeDifferentialPair* inst)
+    {
+        if (auto tupleType = as<IRTupleType>(tryGetInfo(context, inst)))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitMakeTuple(inst->getPrimal(), inst->getDifferential());
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
+    }
+
+    bool specializeDifferentialPairGetDifferential(
+        IRInst* context,
+        IRDifferentialPairGetDifferential* inst)
+    {
+        if (auto tupleType = as<IRTupleType>(inst->getBase()->getDataType()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitGetTupleElement(
+                (IRType*)getLoweredType(tupleType->getOperand(1)),
+                inst->getBase(),
+                1);
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
+    }
+
+    bool specializeDifferentialPairGetPrimal(IRInst* context, IRDifferentialPairGetPrimal* inst)
+    {
+        if (auto tupleType = as<IRTupleType>(inst->getBase()->getDataType()))
+        {
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            auto newInst = builder.emitGetTupleElement(
+                (IRType*)getLoweredType(tupleType->getOperand(0)),
+                inst->getBase(),
+                0);
+            inst->replaceUsesWith(newInst);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        return false;
     }
 
     bool specializeCreateExistentialObject(IRInst* context, IRCreateExistentialObject* inst)

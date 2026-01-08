@@ -1329,7 +1329,7 @@ void syncTorchCudaStream()
 
 /// Constructs a `DifferentialPair` value from a primal value and a differential value.
 __generic<T: IDifferentiable>
-__intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
+__intrinsic_op($(kIROp_MakeDifferentialPair))
 DifferentialPair<T> diffPair(T primal, T.Differential diff);
 
 /// Constructs a `DifferentialPair` value from a primal value and a zero differential value.
@@ -2048,6 +2048,7 @@ VECTOR_MATRIX_BINARY_DIFF_IMPL(fmod)
 // Raise to a power
 __generic<T : __BuiltinFloatingPointType>
 [PreferRecompute]
+[Differentiable]
 [ForwardDerivativeOf(pow)]
 DifferentialPair<T> __d_pow(DifferentialPair<T> dpx, DifferentialPair<T> dpy)
 {

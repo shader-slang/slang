@@ -1958,17 +1958,8 @@ bool doesModuleUseAutodiff(IRInst* inst)
     case kIROp_Call:
         if (auto callee = getResolvedInstForDecorations(inst->getOperand(0)))
         {
-            switch (callee->getOp())
-            {
-            case kIROp_ForwardDifferentiate:
-            case kIROp_BackwardDifferentiate:
-            case kIROp_BackwardDifferentiatePrimal:
-            case kIROp_BackwardDifferentiatePropagate:
-            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
-            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
-            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+            if (as<IRTranslateBase>(callee))
                 return true;
-            }
         }
         return false;
     case kIROp_DifferentialPairGetDifferentialUserCode:

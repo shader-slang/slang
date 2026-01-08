@@ -7,11 +7,9 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
 
-typealias IDFloat = __BuiltinFloatingPointType & IDifferentiable;
-
 namespace myintrinsiclib
 {
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_myexp<T>)]
     T myexp(T x)
     {
@@ -29,7 +27,7 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_myexp(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
@@ -39,7 +37,7 @@ namespace myintrinsiclib
 
     
     // Sine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_mysin<T>)]
     T mysin(T x)
     {
@@ -57,7 +55,7 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_mysin(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
@@ -66,7 +64,7 @@ namespace myintrinsiclib
     }
 
     // Cosine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_mycos<T>)]
     T mycos(T x)
     {
@@ -84,7 +82,7 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_mycos(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
@@ -93,7 +91,7 @@ namespace myintrinsiclib
     }
 
     // Sine and cosine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     __target_intrinsic(hlsl, "sincos($0, $1, $2)")
     __target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
     [ForwardDerivative(d_mysincos<T>)]
@@ -103,7 +101,7 @@ namespace myintrinsiclib
         c = cos(x);
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     void d_mysincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
     {
         T _s;

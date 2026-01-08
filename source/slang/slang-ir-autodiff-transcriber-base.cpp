@@ -198,9 +198,9 @@ IRInst* AutoDiffTranscriberBase::maybeCloneForPrimalInst(IRBuilder* builder, IRI
             inst,
             [&](IRInst* user)
             {
-                if (auto diffAnnotation = as<IRDifferentiableTypeAnnotation>(user))
+                if (auto diffAnnotation = as<IRAssociatedInstAnnotation>(user))
                 {
-                    if (diffAnnotation->getBaseType() == inst)
+                    if (diffAnnotation->getTarget() == inst)
                         maybeCloneForPrimalInst(builder, user);
                 }
             });
@@ -292,6 +292,66 @@ IRType* AutoDiffTranscriberBase::getOrCreateDiffPairType(IRBuilder* builder, IRI
     return getOrCreateDiffPairType(builder, primalType, witness);*/
 }
 
+static void emitAnnotationsFromWitnessTable(
+    DifferentiableTypeConformanceContext* context,
+    IRBuilder* builder,
+    IRInst* targetInst,
+    IRInst* witnessTable)
+{
+    auto diffType = _lookupWitness(
+        builder,
+        witnessTable,
+        context->sharedContext->differentialAssocTypeStructKey,
+        builder->getTypeType());
+    {
+        IRInst* args[] = {
+            targetInst,
+            builder->getIntValue((IRIntegerValue)ValAssociationKind::DifferentialType),
+            diffType};
+        builder->emitIntrinsicInst(builder->getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
+        context->associationCache.remove({targetInst, ValAssociationKind::DifferentialType});
+    }
+
+    auto diffDZeroMethod = _lookupWitness(
+        builder,
+        witnessTable,
+        context->sharedContext->zeroMethodStructKey,
+        context->sharedContext->zeroMethodType);
+
+    {
+        IRInst* args[] = {
+            targetInst,
+            builder->getIntValue((IRIntegerValue)ValAssociationKind::DifferentialZero),
+            diffDZeroMethod};
+        builder->emitIntrinsicInst(builder->getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
+        context->associationCache.remove({targetInst, ValAssociationKind::DifferentialZero});
+    }
+
+    auto diffDAddMethod = _lookupWitness(
+        builder,
+        witnessTable,
+        context->sharedContext->addMethodStructKey,
+        context->sharedContext->addMethodType);
+    {
+        IRInst* args[] = {
+            targetInst,
+            builder->getIntValue((IRIntegerValue)ValAssociationKind::DifferentialAdd),
+            diffDAddMethod};
+        builder->emitIntrinsicInst(builder->getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
+        context->associationCache.remove({targetInst, ValAssociationKind::DifferentialAdd});
+    }
+
+    auto diffPairType = builder->getDifferentialPairType((IRType*)targetInst, witnessTable);
+    {
+        IRInst* args[] = {
+            targetInst,
+            builder->getIntValue((IRIntegerValue)ValAssociationKind::DifferentialPairType),
+            diffPairType};
+        builder->emitIntrinsicInst(builder->getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
+        context->associationCache.remove({targetInst, ValAssociationKind::DifferentialPairType});
+    }
+}
+
 static void addTypeAnnotationsForHigherOrderDiff(
     IRBuilder* builder,
     DifferentiableTypeConformanceContext* differentiableTypeConformanceContext,
@@ -299,32 +359,57 @@ static void addTypeAnnotationsForHigherOrderDiff(
     IRType* diffType)
 {
     // Check if the diffType already has an annotation.
-    if (differentiableTypeConformanceContext->lookUpConformanceForType(
+    if (!differentiableTypeConformanceContext->isDifferentiableType(diffType))
+    {
+        // TODO: lower the witness as a sepearate annotation rather than going through the pair.
+        auto diffWitness = as<IRDifferentialPairType>(
+                               differentiableTypeConformanceContext->tryGetAssociationOfKind(
+                                   origType,
+                                   ValAssociationKind::DifferentialPairType))
+                               ->getWitness();
+        if (as<IRStructKey>(diffWitness))
+        {
+            // For now, we'll ignore this case (happens for existential types)
+            // Existential types cannot be higher-order differentiated at the moment.
+            return;
+        }
+
+        // Differential : IDifferentiable
+        auto diffWitnessDiffWitness = _lookupWitness(
+            builder,
+            diffWitness,
+            differentiableTypeConformanceContext->sharedContext
+                ->differentialAssocTypeWitnessStructKey,
+            builder->getWitnessTableType(
+                differentiableTypeConformanceContext->sharedContext->differentiableInterfaceType));
+
+        emitAnnotationsFromWitnessTable(
+            differentiableTypeConformanceContext,
+            builder,
             diffType,
-            DiffConformanceKind::Any))
-        return;
+            diffWitnessDiffWitness);
+    }
 
-    // Orig : IDifferentiable
-    /*
-    auto diffWitness = differentiableTypeConformanceContext->lookUpConformanceForType(
-        origType,
-        DiffConformanceKind::Any);
-    */
-    auto diffWitness = differentiableTypeConformanceContext->tryGetDifferentiableWitness(
-        builder,
-        origType,
-        DiffConformanceKind::Any);
+    auto pairType =
+        as<IRDifferentialPairType>(differentiableTypeConformanceContext->tryGetAssociationOfKind(
+            origType,
+            ValAssociationKind::DifferentialPairType));
+    if (pairType && !differentiableTypeConformanceContext->isDifferentiableType(pairType))
+    {
+        IRInst* args[] = {pairType};
+        auto synWitnessTable = builder->emitIntrinsicInst(
+            builder->getWitnessTableType(
+                differentiableTypeConformanceContext->sharedContext->differentiableInterfaceType),
+            kIROp_MakeIDifferentiableWitness,
+            1,
+            args);
 
-    // Differential : IDifferentiable
-    auto diffWitnessDiffWitness = _lookupWitness(
-        builder,
-        diffWitness,
-        differentiableTypeConformanceContext->sharedContext->differentialAssocTypeWitnessStructKey,
-        builder->getWitnessTableType(
-            differentiableTypeConformanceContext->sharedContext->differentiableInterfaceType));
-
-    IRInst* args[] = {diffType, diffWitnessDiffWitness};
-    builder->emitIntrinsicInst(builder->getVoidType(), kIROp_DifferentiableTypeAnnotation, 2, args);
+        emitAnnotationsFromWitnessTable(
+            differentiableTypeConformanceContext,
+            builder,
+            pairType,
+            synWitnessTable);
+    }
 }
 
 IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* origType)
@@ -340,52 +425,18 @@ IRType* AutoDiffTranscriberBase::differentiateType(IRBuilder* builder, IRType* o
             return nullptr;
     }
 
-    // Special-case for differentiable existential types.
-    /*
-    if (as<IRInterfaceType>(origType))
-    {
-        if (differentiableTypeConformanceContext.lookUpConformanceForType(
-                origType,
-                DiffConformanceKind::Value))
-            return autoDiffSharedContext->differentiableInterfaceType;
-        else if (differentiableTypeConformanceContext.lookUpConformanceForType(
-                     origType,
-                     DiffConformanceKind::Ptr))
-            return autoDiffSharedContext->differentiablePtrInterfaceType;
-        else
-            return nullptr;
-    }
-    else if (as<IRAssociatedType>(origType))
-    {
-        SLANG_UNEXPECTED("unexpected associated type during auto-diff");
-    }
-    */
-
     auto primalType = lookupPrimalInst(builder, origType, origType);
-    /*
-    if (primalType->getOp() == kIROp_Param && primalType->getParent() &&
-        primalType->getParent()->getParent() &&
-        primalType->getParent()->getParent()->getOp() == kIROp_Generic)
-    {
-        auto diffType =
-            (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, origType);
-        return (IRType*)findOrTranscribePrimalInst(builder, diffType);
-    }
-    return (IRType*)transcribe(builder, origType);*/
 
     // AD 2.0
-    // TODO: Replace with tryGetAssociationOfKind()
     if (auto diffValueType = differentiableTypeConformanceContext.tryGetAssociationOfKind(
             origType,
             ValAssociationKind::DifferentialType))
     {
-        /*
         addTypeAnnotationsForHigherOrderDiff(
             builder,
             &differentiableTypeConformanceContext,
             origType,
-            diffValueType);
-        */
+            (IRType*)diffValueType);
         return (IRType*)diffValueType;
     }
     else if (
@@ -423,7 +474,8 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
         else
             return nullptr;
 
-    case kIROp_ArrayType:
+
+        /*case kIROp_ArrayType:
         {
             auto primalArrayType = as<IRArrayType>(primalType);
             if (auto diffElementType =
@@ -433,17 +485,18 @@ IRType* AutoDiffTranscriberBase::_differentiateTypeImpl(IRBuilder* builder, IRTy
                 return nullptr;
         }
 
-    case kIROp_DifferentialPairType:
-    case kIROp_DifferentialPtrPairType:
-        {
-            auto primalPairType = as<IRDifferentialPairTypeBase>(primalType);
-            return getOrCreateDiffPairType(
-                builder,
-                differentiateType(builder, primalPairType->getValueType()),
-                differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(
+        case kIROp_DifferentialPairType:
+        case kIROp_DifferentialPtrPairType:
+            {
+                auto primalPairType = as<IRDifferentialPairTypeBase>(primalType);
+                return getOrCreateDiffPairType(
                     builder,
-                    primalPairType));
-        }
+                    differentiateType(builder, primalPairType->getValueType()),
+                    differentiableTypeConformanceContext.getDiffTypeWitnessFromPairType(
+                        builder,
+                        primalPairType));
+            }
+        */
 
     case kIROp_DifferentialPairUserCodeType:
         {
@@ -692,12 +745,21 @@ IRType* AutoDiffTranscriberBase::tryGetDiffPairType(IRBuilder* builder, IRType* 
     // If we're not, then the split & merge are no-ops.
     //
     auto [passingMode, baseType] = splitParameterDirectionAndType(originalType);
-    return fromDirectionAndType(
-        builder,
-        passingMode,
-        (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+    auto basePairType = differentiableTypeConformanceContext.tryGetAssociationOfKind(
+        baseType,
+        ValAssociationKind::DifferentialPairType);
+
+    if (!basePairType)
+    {
+        basePairType = differentiableTypeConformanceContext.tryGetAssociationOfKind(
             baseType,
-            ValAssociationKind::DifferentialPairType));
+            ValAssociationKind::DifferentialPtrPairType);
+    }
+
+    if (!basePairType)
+        return nullptr;
+
+    return fromDirectionAndType(builder, passingMode, (IRType*)basePairType);
 }
 
 InstPair AutoDiffTranscriberBase::transcribeParam(IRBuilder* builder, IRParam* origParam)
@@ -978,7 +1040,8 @@ InstPair AutoDiffTranscriberBase::transcribeBlockImpl(
 
 InstPair AutoDiffTranscriberBase::transcribeNonDiffInst(IRBuilder* builder, IRInst* origInst)
 {
-    auto primal = cloneInst(&cloneEnv, builder, origInst);
+    // auto primal = cloneInst(&cloneEnv, builder, origInst);
+    auto primal = maybeCloneForPrimalInst(builder, origInst);
     return InstPair(primal, nullptr);
 }
 

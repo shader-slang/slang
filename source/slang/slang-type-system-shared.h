@@ -157,21 +157,23 @@ enum class ValAssociationKind
     // Associations for differentiable functions/callables.
     ForwardDerivative = 1,
     ForwardDerivativeWitnessTable = 2,
-    BackwardDerivativeApply = 3,
-    BackwardDerivativeContext = 4,
-    BackwardDerivativeContextGetVal = 5,
-    BackwardDerivativePropagate = 6,
+    BackwardDerivativeWitnessTable = 3,
+
+    BackwardDerivativeApply = 4,
+    BackwardDerivativeContext = 5,
+    BackwardDerivativeContextGetVal = 6,
+    BackwardDerivativePropagate = 7,
 
     // Associations for differentiable types.
-    DifferentialPairType = 7,
-    DifferentialPairMake = 8,
-    DifferentialPairGetPrimal = 9,
-    DifferentialPairGetDifferential = 10,
-    DifferentialType = 11,
-    DifferentialPtrType = 12,
-    DifferentialPtrPairType = 13,
-    DifferentialZero = 14,
-    DifferentialAdd = 15,
+    DifferentialPairType = 8,
+    DifferentialPairMake = 9,
+    DifferentialPairGetPrimal = 10,
+    DifferentialPairGetDifferential = 11,
+    DifferentialType = 12,
+    DifferentialPtrType = 13,
+    DifferentialPtrPairType = 14,
+    DifferentialZero = 15,
+    DifferentialAdd = 16,
 };
 
 

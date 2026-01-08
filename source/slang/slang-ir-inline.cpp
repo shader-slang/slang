@@ -396,16 +396,20 @@ struct InliningPassBase
             callerDebugFunc = findExistingDebugFunc(callerFunc);
 
             builder.setInsertBefore(call);
-            newDebugInlinedAt = builder.emitDebugInlinedAt(
-                lastDebugLine->getLineStart(),
-                lastDebugLine->getColStart(),
-                lastDebugLine->getSource(),
-                callerDebugFunc,
-                callDebugInlinedAt);
 
-            if (newDebugInlinedAt && calleeDebugFunc)
+            if (callerDebugFunc)
             {
-                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+                newDebugInlinedAt = builder.emitDebugInlinedAt(
+                    lastDebugLine->getLineStart(),
+                    lastDebugLine->getColStart(),
+                    lastDebugLine->getSource(),
+                    callerDebugFunc,
+                    callDebugInlinedAt);
+
+                if (newDebugInlinedAt)
+                {
+                    return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+                }
             }
         }
         return DebugInlineInfo();

@@ -151,7 +151,9 @@ extension myfloat4 : IDifferentiable
 typedef DifferentialPair<myfloat4> dpfloat4;
 typedef DifferentialPair<myfloat3> dpfloat3;
 
-extension float : MyLinearArithmeticType
+interface MyLinearArithmeticDifferentiableType : IDifferentiable, MyLinearArithmeticType { };
+
+extension float : MyLinearArithmeticDifferentiableType
 {
     [Differentiable]
     static float ladd(float a, float b)
@@ -178,7 +180,6 @@ extension float : MyLinearArithmeticType
     }
 };
 
-typealias MyLinearArithmeticDifferentiableType = IDifferentiable & MyLinearArithmeticType;
 
 __generic<T : MyLinearArithmeticDifferentiableType>
 [Differentiable]

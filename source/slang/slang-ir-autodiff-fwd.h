@@ -616,4 +616,9 @@ IRInst* maybeTranslateForwardDerivativeWitness(
     DiagnosticSink* sink,
     IRSynthesizedForwardDerivativeWitnessTable* translateInst);
 
+IRInst* maybeTranslateBackwardDerivativeWitness(
+    AutoDiffSharedContext* sharedContext,
+    DiagnosticSink* sink,
+    IRSynthesizedBackwardDerivativeWitnessTable* translateInst);
+
 } // namespace Slang

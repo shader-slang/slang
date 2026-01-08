@@ -3493,6 +3493,12 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* translationInst,
         IRInst* resultInst);
 
+    IRCompilerDictionaryEntry* fetchCompilerDictionaryEntry(
+        IRCompilerDictionary* dict,
+        IRInst* translationInst);
+
+    void setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst);
+
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
@@ -4305,9 +4311,18 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         auto taggedUnionType = cast<IRTaggedUnionType>(taggedUnion->getDataType());
 
-        IRInst* typeSet = taggedUnionType->getTypeSet();
-        auto valueOfTypeSetType = cast<IRUntaggedUnionType>(
-            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &typeSet));
+        IRTypeSet* typeSet = taggedUnionType->getTypeSet();
+        IRType* valueOfTypeSetType = nullptr;
+        if (!typeSet->isSingleton())
+        {
+            IRInst* operand = typeSet;
+            valueOfTypeSetType = cast<IRUntaggedUnionType>(
+                emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &operand));
+        }
+        else
+        {
+            valueOfTypeSetType = (IRType*)typeSet->getElement(0);
+        }
 
         return cast<IRGetValueFromTaggedUnion>(
             emitIntrinsicInst(valueOfTypeSetType, kIROp_GetValueFromTaggedUnion, 1, &taggedUnion));
@@ -4730,6 +4745,11 @@ $(type_info.return_type) $(type_info.method_name)(
             kIROp_RequirePreludeDecoration,
             getCapabilityValue(CapabilitySet{caps}),
             getStringValue(prelude));
+    }
+
+    void addReturnValueContextFieldDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ReturnValueContextFieldDecoration);
     }
 
     IRInst* getSemanticVersionValue(SemanticVersion const& value)

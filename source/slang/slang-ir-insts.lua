@@ -2218,6 +2218,9 @@ local insts = {
 				},
 			},
 			{
+				ReturnValueContextFieldDecoration = { },
+			},
+			{
 				derivativeMemberDecoration = {
 					-- Used by the auto-diff pass to hold a reference to a
 					-- differential member of a type in its associated differential type.

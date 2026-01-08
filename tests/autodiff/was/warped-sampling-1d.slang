@@ -72,6 +72,7 @@ struct Intersection : IDifferentiable
 
 [BackwardDerivative(d_loadLineSegment)]
 [ForwardDerivative(fwd_loadLineSegment)]
+[PreferRecompute(SideEffectBehavior.Allow)]
 LineSegment loadLineSegment(uint id)
 {
     return {endpointBuffer[id * 2], endpointBuffer[id * 2 + 1], colorBuffer[id]};

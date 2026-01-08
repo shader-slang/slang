@@ -749,5 +749,6 @@ return {
 	["CompilerDictionaryEntry"] = 752,
 	["CompilerDictionaryValue"] = 753,
 	["CompilerDictionary"] = 754,
-	["CompilerDictionaryScope"] = 755
+	["CompilerDictionaryScope"] = 755,
+	["Decoration.ReturnValueContextFieldDecoration"] = 756
 }

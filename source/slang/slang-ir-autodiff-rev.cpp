@@ -10,6 +10,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-propagate-func-properties.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
@@ -468,14 +469,6 @@ InstPair BackwardDiffTranscriberBase::transcribeFuncHeader(IRBuilder* inBuilder,
         result = transcribeFuncHeaderImpl(inBuilder, origFunc);
     }
 
-    FuncBodyTranscriptionTask task;
-    task.originalFunc = as<IRFunc>(result.primal);
-    task.resultFunc = as<IRFunc>(result.differential);
-    task.type = diffTaskType;
-    if (task.resultFunc)
-    {
-        autoDiffSharedContext->followUpFunctionsToTranscribe.add(task);
-    }
     return result;
 }
 
@@ -918,20 +911,22 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     {
         const auto& [direction, paramType] =
             splitParameterDirectionAndType(targetFunc->getParamType(i));
-        auto diffParamType = (IRType*)differentiableTypeConformanceContext.getDifferentialForType(
-            builder,
-            paramType);
+        auto diffValueParamType =
+            (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+                paramType,
+                ValAssociationKind::DifferentialType);
 
-        if (diffParamType)
+        if (diffValueParamType)
             propagateParamTypes.add(
-                fromDirectionAndType(builder, transposeDirection(direction), diffParamType));
+                fromDirectionAndType(builder, transposeDirection(direction), diffValueParamType));
         else
             propagateParamTypes.add(builder->getVoidType());
     }
 
     auto resultType = targetFunc->getResultType();
-    auto diffResultType =
-        (IRType*)differentiableTypeConformanceContext.getDifferentialForType(builder, resultType);
+    auto diffResultType = (IRType*)differentiableTypeConformanceContext.tryGetAssociationOfKind(
+        resultType,
+        ValAssociationKind::DifferentialType);
     if (diffResultType)
     {
         propagateResultType =
@@ -973,6 +968,10 @@ void BackwardDiffTranscriberBase::_transcribeFuncImpl(
     copyDebugInfo(targetFunc, applyFunc);
     copyDebugInfo(targetFunc, propagateFunc);
     copyDebugInfo(targetFunc, getValFunc);
+
+    propagatePropertiesForSingleFunc(builder->getModule(), propagateFunc);
+    propagatePropertiesForSingleFunc(builder->getModule(), applyFunc);
+    propagatePropertiesForSingleFunc(builder->getModule(), getValFunc);
 
     IRBuilder subBuilder = *builder;
 
@@ -2031,20 +2030,8 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     auto legacyBwdDiffFuncType = as<IRFuncType>(this->legacyBwdDiffFunc->getDataType());
 
     auto outerParent = as<IRGeneric>(findOuterGeneric(primalFunc));
-    diffTypeContext.setFunc(outerParent ? outerParent : primalFunc);
 
-    IRInst* primalFuncType = this->primalFunc->getDataType();
-
-    /*
-    auto applyForBwdFuncType = as<IRFuncType>(diffTypeContext.resolveType(
-        builder,
-        (IRType*)
-            builder->emitIntrinsicInst(nullptr, kIROp_ApplyForBwdFuncType, 1, &primalFuncType)));
-    auto bwdPropFuncType = as<IRFuncType>(diffTypeContext.resolveType(
-        builder,
-        (IRType*)
-            builder->emitIntrinsicInst(nullptr, kIROp_BwdCallableFuncType, 2, &primalFuncType)));
-    */
+    auto primalFuncType = cast<IRFuncType>(this->primalFunc->getDataType());
 
     List<IRInst*> applyForBwdFuncTypeParams;
     applyForBwdFuncTypeParams.add(primalFunc->getDataType());
@@ -2220,7 +2207,9 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
     //
     IRStructKey* resultKeyInst = contextTypeBuilder.createStructKey();
     auto resultFieldType = as<IRFuncType>(primalFunc->getDataType())->getResultType();
-    contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
+    auto returnValueContextField =
+        contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
+    contextTypeBuilder.addReturnValueContextFieldDecoration(returnValueContextField);
 
     getValFunc->setFullType(getValFuncType);
     IRBuilder getValFuncBuilder(builder->getModule());
@@ -2243,9 +2232,39 @@ LegacyToNewBackwardDiffTranslationFuncContext::Result LegacyToNewBackwardDiffTra
 
     // Now we need to emit the call to the primal function in the apply function
     List<IRInst*> primalFuncArgs;
+
+    List<IRParam*> applyFuncParams;
     for (auto param : applyFunc->getParams())
     {
-        primalFuncArgs.add(param);
+        applyFuncParams.add(param);
+    }
+
+    for (UIndex ii = 0; ii < applyForBwdFuncType->getParamCount(); ii++)
+    {
+        auto param = applyFuncParams[ii];
+        auto primalFuncParamType = primalFuncType->getParamType(ii);
+
+        if (!diffTypeContext.tryGetAssociationOfKind(
+                primalFuncParamType,
+                ValAssociationKind::DifferentialPtrType))
+        {
+            // Simple case: just pass the param as-is.
+            primalFuncArgs.add(param);
+        }
+        else
+        {
+            // Our param is a ptr-like type that has a differential component, so the param
+            // represents a pair.
+            auto [paramPassingMode, paramBaseType] =
+                splitParameterDirectionAndType(param->getDataType());
+
+            // Handle the other modes later.
+            SLANG_ASSERT(paramPassingMode == ParameterDirectionInfo::Kind::In);
+
+            // We need to extract the primal part of the pair and pass that.
+            primalFuncArgs.add(
+                applyFuncBuilder.emitDifferentialPtrPairGetPrimal(primalFuncParamType, param));
+        }
     }
 
     // Call the primal function and store the result in the context
