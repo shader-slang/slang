@@ -555,25 +555,16 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
 
     case DebugInfoType::Minimal:
         // Minimal: Line numbers only, for stack traces and basic source correlation
-        // This avoids the expensive debug variable processing that causes performance issues
-        args.add(L"-gline-tables-only");
-        break;
+        // DXC only supports -Zi (full debug info) or -Zs (small PDB without debug metadata).
+        // Testing shows -Zs generates NO debug metadata at all (!DIFile, !DICompileUnit, etc.)
+        // For minimal debug info, we use -Zi (same as Standard and Maximal level).
 
     case DebugInfoType::Standard:
+    case DebugInfoType::Maximal:
         // Standard: Full debug information including local variables, types, etc.
         args.add(L"-Zi");
         break;
 
-    case DebugInfoType::Maximal:
-        // Maximal: Maximum debug information
-        // Include full debug info and potentially disable optimizations that hinder debugging
-        args.add(L"-Zi");
-        // For maximal debug, also disable optimizations if not explicitly set to something else
-        // This overrides any previous optimization level
-        if (options.optimizationLevel != OptimizationLevel::None)
-        {
-            args.add(L"-Od");
-        }
         break;
     }
 
