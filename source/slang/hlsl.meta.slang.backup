@@ -22243,8 +22243,26 @@ struct HitObject
                 };
             }
         case spirv:
-            // EXT requires RayFlags, default to 0
-            __spirvRecordMissEXT(__return_val, 0u, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                let rayFlags = 0u;  // EXT requires RayFlags, default to 0
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissEXT
+                        /**/ &__return_val
+                        /**/ $rayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
         }
     }
 
@@ -22343,7 +22361,13 @@ struct HitObject
                     /**/ &__return_val;
             };
         case spirv:
-            __spirvRecordEmptyEXT(__return_val);
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                OpHitObjectRecordEmptyEXT
+                    /**/ &__return_val;
+            };
         case hlsl:
             // DXR 1.3 native path (hlsl without nvapi)
             __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
@@ -22444,8 +22468,20 @@ struct HitObject
             {
                 [__vulkanRayPayload]
                 static payload_t p;
+
+                // Save the payload
                 p = Payload;
-                __spirvExecuteShaderEXT(HitOrMiss, p);
+
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectExecuteShaderEXT
+                        /**/ &HitOrMiss
+                        /**/ &p;
+                };
+
+                // Write payload result
                 Payload = p;
             }
         }
@@ -23346,8 +23382,26 @@ struct HitObject
             __intrinsic_asm "($3 = dx::HitObject::MakeMiss($0, $1, $2))";
         case _GL_EXT_shader_invocation_reorder:
             __glslMakeMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
-        case spirv:
-            __spirvRecordMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case spvShaderInvocationReorderEXT:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissEXT
+                        /**/ &__return_val
+                        /**/ $RayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax;
+                };
+            }
         }
     }
 
@@ -24141,12 +24195,9 @@ struct HitObject
         };
     }
 
-    // ============================================================================
-    // SPIRV EXT helpers for other SER operations (RecordMiss, RecordEmpty, etc.)
-    // These centralize SPIRV assembly to enable GLSL functions to delegate here.
-    // ============================================================================
+    // SPIR-V helpers for Record/Execute operations - EXT only
 
-    // RecordMiss EXT helper
+    // RecordMiss EXT
     [require(spirv, spvShaderInvocationReorderEXT)]
     static void __spirvRecordMissEXT(
         out HitObject hitObject,
@@ -24172,7 +24223,7 @@ struct HitObject
         };
     }
 
-    // RecordMissMotion EXT helper
+    // RecordMissMotion EXT
     [require(spirv, spvShaderInvocationReorderMotionEXT)]
     static void __spirvRecordMissMotionEXT(
         out HitObject hitObject,
@@ -24202,7 +24253,7 @@ struct HitObject
         };
     }
 
-    // RecordEmpty EXT helper
+    // RecordEmpty EXT
     [require(spirv, spvShaderInvocationReorderEXT)]
     static void __spirvRecordEmptyEXT(out HitObject hitObject)
     {
@@ -24214,9 +24265,11 @@ struct HitObject
         };
     }
 
-    // ExecuteShader EXT helper (location-based for GLSL API)
+    // ExecuteShader EXT (location-based)
     [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvExecuteShaderEXT(HitObject hitObject, int payload)
+    static void __spirvExecuteShaderEXT(
+        HitObject hitObject,
+        int payload)
     {
         spirv_asm
         {
@@ -24226,77 +24279,45 @@ struct HitObject
         };
     }
 
-    // ExecuteShader EXT helper (data-based for HLSL API)
+    // GetAttributes EXT
     [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
+    static void __spirvGetAttributesEXT<attr_t>(
+        HitObject hitObject,
+        __Addr<attr_t> attr)
     {
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderEXT;
-            OpHitObjectExecuteShaderEXT &hitObject &p;
+            OpHitObjectGetAttributesEXT &hitObject $attr;
         };
     }
 
-    // SetShaderBindingTableRecordIndex EXT helper
+    // SetShaderTableIndex EXT
     [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvSetShaderTableIndexEXT(out HitObject hitObject, uint sbtRecordIndex)
+    static void __spirvSetShaderTableIndexEXT(
+        out HitObject hitObject,
+        uint RecordIndex)
     {
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderEXT;
-            OpHitObjectSetShaderBindingTableRecordIndexEXT &hitObject $sbtRecordIndex;
+            OpHitObjectSetShaderBindingTableRecordIndexEXT &hitObject $RecordIndex;
         };
     }
 
-    // RecordFromQuery EXT helper
+    // RecordFromQuery EXT
     [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvRecordFromQueryEXT(out HitObject hitObject, RayQuery<0> rayQuery)
+    static void __spirvRecordFromQueryEXT(
+        out HitObject hitObject,
+        RayQuery rayQuery)
     {
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderEXT;
             OpHitObjectRecordFromQueryEXT &hitObject &rayQuery;
-        };
-    }
-
-    // ReorderThread EXT helpers
-
-    // With hint only
-    [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvReorderThreadWithHintEXT(uint coherenceHint, uint numCoherenceHintBitsFromLSB)
-    {
-        spirv_asm
-        {
-            OpExtension "SPV_EXT_shader_invocation_reorder";
-            OpCapability ShaderInvocationReorderEXT;
-            OpReorderThreadWithHintEXT $coherenceHint $numCoherenceHintBitsFromLSB;
-        };
-    }
-
-    // With hitObject only
-    [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvReorderThreadWithHitObjectEXT(HitObject hitObject)
-    {
-        spirv_asm
-        {
-            OpExtension "SPV_EXT_shader_invocation_reorder";
-            OpCapability ShaderInvocationReorderEXT;
-            OpReorderThreadWithHitObjectEXT &hitObject;
-        };
-    }
-
-    // With hitObject and hint
-    [require(spirv, spvShaderInvocationReorderEXT)]
-    static void __spirvReorderThreadWithHitObjectAndHintEXT(HitObject hitObject, uint coherenceHint, uint numCoherenceHintBitsFromLSB)
-    {
-        spirv_asm
-        {
-            OpExtension "SPV_EXT_shader_invocation_reorder";
-            OpCapability ShaderInvocationReorderEXT;
-            OpReorderThreadWithHitObjectEXT &hitObject $coherenceHint $numCoherenceHintBitsFromLSB;
         };
     }
 
