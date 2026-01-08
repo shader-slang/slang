@@ -63,6 +63,8 @@ jobs:
           # Install CUDA Toolkit 12.4.1 (matching container image)
           wget -q https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_550.54.15_linux.run
           sudo sh cuda_12.4.1_550.54.15_linux.run --silent --toolkit --no-opengl-libs --no-drm || echo "CUDA install returned error but may have partially succeeded"
+          # Remove installer (4GB file) to prevent it from being committed
+          rm -f cuda_12.4.1_550.54.15_linux.run
 
           # Verify and configure CUDA paths
           if [ -d /usr/local/cuda-12.4 ]; then
