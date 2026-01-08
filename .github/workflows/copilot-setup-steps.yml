@@ -33,7 +33,25 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential ninja-build git python3 wget
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            git \
+            python3 \
+            python3-pip \
+            wget \
+            curl \
+            unzip \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            spirv-tools \
+            glslang-tools \
+            ca-certificates
 
           # Install CMake 3.30 (required for CMakePresets.json version 6)
           wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
