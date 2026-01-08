@@ -8033,8 +8033,8 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
     ComPtr<ISlangBlob> outBlob;
     UnownedStringSlice content;
 
-    // Only embed source content for Maximal debug level
-    if (context->debugInfoLevel == DebugInfoLevel::Maximal)
+    // Only embed source content for Standard and Maximal debug level
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
         if (path.hasFileFoundPath())
         {
@@ -12968,11 +12968,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
-            // For Maximal level, include the source content, otherwise just the path
+            // For Standard and Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel == DebugInfoLevel::Maximal ||
-                 context->debugInfoLevel == DebugInfoLevel::Standard)
+                (context->debugInfoLevel >= DebugInfoLevel::Standard)
                     ? source->getContent()
                     : UnownedStringSlice(),
                 source->isIncludedFile());

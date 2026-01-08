@@ -561,7 +561,9 @@ static SlangResult _parseGCCFamilyLine(
     switch (options.debugInfoType)
     {
     case DebugInfoType::None:
-        // No debug information
+        //gcc accepts -g0, but it is effectively the same as not passing -g at all.
+        // No debug info is generated.
+        cmdLine.addArg("-g0");
         break;
 
     case DebugInfoType::Minimal:
@@ -572,17 +574,12 @@ static SlangResult _parseGCCFamilyLine(
 
     case DebugInfoType::Standard:
         // Standard: Full debug information (GCC default level)
-        cmdLine.addArg("-g");
+        cmdLine.addArg("-g2");
         break;
 
     case DebugInfoType::Maximal:
         // Maximal: Maximum debug information including macro definitions
         cmdLine.addArg("-g3");
-        // Also disable optimizations for better debugging experience
-        if (options.optimizationLevel != OptimizationLevel::None)
-        {
-            cmdLine.addArg("-O0");
-        }
         break;
     }
 

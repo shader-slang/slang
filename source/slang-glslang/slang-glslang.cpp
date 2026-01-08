@@ -292,7 +292,7 @@ static int glslang_optimizeSPIRV(
     // line information into all SPIR-V instructions. This avoids loss of
     // information when instructions are deleted or moved. Later, remove
     // redundant information to minimize final SPRIR-V size.
-    if (debugInfoType >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
+    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         optimizer.RegisterPass(spvtools::CreatePropagateLineInfoPass());
     }
@@ -509,7 +509,7 @@ static int glslang_optimizeSPIRV(
         }
     }
 
-    if (debugInfoType >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
+    if (debugInfoType != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         optimizer.RegisterPass(spvtools::CreateRedundantLineInfoElimPass());
     }
