@@ -385,6 +385,8 @@ RefPtr<ComponentType> ComponentType::specialize(
             Math::Max(consumedArgCount, getSpecializationParamCount()),
             specializationArgCount);
     }
+    if (sink->getErrorCount() != 0)
+        return nullptr;
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 

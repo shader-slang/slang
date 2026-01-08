@@ -663,10 +663,14 @@ SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func
 
     eliminateContinueBlocksInFunc(func->getModule(), func);
 
-    eliminateMultiLevelBreakForFunc(func->getModule(), func);
+    eliminateMultiLevelBreakForFunc(autoDiffSharedContext->targetProgram, func->getModule(), func);
 
     IRCFGNormalizationPass cfgPass = {this->getSink()};
-    normalizeCFG(autoDiffSharedContext->moduleInst->getModule(), func, cfgPass);
+    normalizeCFG(
+        autoDiffSharedContext->targetProgram,
+        autoDiffSharedContext->moduleInst->getModule(),
+        func,
+        cfgPass);
 
     return SLANG_OK;
 }
