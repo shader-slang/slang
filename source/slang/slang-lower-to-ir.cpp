@@ -5802,8 +5802,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else
         {
             auto optType = lowerType(context, expr->type);
-            auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal.val);
+            // `none` for Optional<T> no longer requires a payload value from the front-end.
+            // The Optional-type lowering pass will synthesize a default-constructed placeholder.
+            auto irVal = context->irBuilder->emitMakeOptionalNone(optType);
             return LoweredValInfo::simple(irVal);
         }
     }
@@ -6080,8 +6081,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(falseBlock);
-        auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal.val);
+        // See `visitMakeOptionalExpr`: no longer need to pass a defaultVal.
+        auto noneVal = builder->emitMakeOptionalNone(optType);
         builder->emitStore(var, noneVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(afterBlock);
