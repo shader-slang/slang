@@ -3468,7 +3468,8 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             }
             else
             {
-                SLANG_UNEXPECTED("HitObjectType requires GL_EXT or GL_NV shader_invocation_reorder capability");
+                SLANG_UNEXPECTED(
+                    "HitObjectType requires GL_EXT or GL_NV shader_invocation_reorder capability");
             }
             return;
         }
