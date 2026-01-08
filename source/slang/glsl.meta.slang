@@ -6360,7 +6360,7 @@ public void hitObjectTraceRayEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
     {
         HitObject::__glslTraceRayEXT(
             hitObject,
@@ -6376,7 +6376,7 @@ public void hitObjectTraceRayEXT(
             Tmax,
             payload);
     }
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -6424,7 +6424,7 @@ public void hitObjectTraceRayMotionEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder_motion:
     {
         HitObject::__glslTraceMotionRayEXT(
             hitObject,
@@ -6441,7 +6441,7 @@ public void hitObjectTraceRayMotionEXT(
             currentTime,
             payload);
     }
-    case spirv:
+    case spvShaderInvocationReorderMotionEXT:
     {
         spirv_asm
         {
@@ -6485,11 +6485,11 @@ public void hitObjectRecordMissEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
     {
         __intrinsic_asm "hitObjectRecordMissEXT($0, $1, $2, $3, $4, $5, $6)";
     }
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -6527,11 +6527,11 @@ public void hitObjectRecordMissMotionEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder_motion:
     {
         __intrinsic_asm "hitObjectRecordMissMotionEXT($0, $1, $2, $3, $4, $5, $6, $7)";
     }
-    case spirv:
+    case spvShaderInvocationReorderMotionEXT:
     {
         spirv_asm
         {
@@ -6563,11 +6563,11 @@ public void hitObjectRecordEmptyEXT(inout hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
     {
         __intrinsic_asm "hitObjectRecordEmptyEXT($0)";
     }
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -6590,11 +6590,11 @@ public void hitObjectExecuteShaderEXT(hitObjectEXT hitObject, int payload)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
     {
         HitObject::__glslInvokeEXT(hitObject, payload);
     }
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -6651,9 +6651,9 @@ public float hitObjectGetRayTMinEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6673,9 +6673,9 @@ public float hitObjectGetRayTMaxEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6695,9 +6695,9 @@ public uint hitObjectGetRayFlagsEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6717,9 +6717,9 @@ public vec3 hitObjectGetWorldRayOriginEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6739,9 +6739,9 @@ public vec3 hitObjectGetWorldRayDirectionEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         return spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6871,13 +6871,13 @@ public void hitObjectGetAttributesEXT<attr_t>(hitObjectEXT hitObject, out attr_t
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         {
             int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
             hitObject.__glslGetAttributesEXT(attributeLocation);
             attributes = __hitObjectAttributes<attr_t>();
         }
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         {
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
             spirv_asm
@@ -6912,9 +6912,9 @@ public void hitObjectSetShaderBindingTableRecordIndexEXT(inout hitObjectEXT hitO
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6947,9 +6947,9 @@ public void reorderThreadEXT(uint coherenceHint, uint numCoherenceHintBitsFromLS
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHintEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6971,9 +6971,9 @@ public void reorderThreadEXT(hitObjectEXT hitObject)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHitObjectEXT($0)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -6994,9 +6994,9 @@ public void reorderThreadEXT(hitObjectEXT hitObject, uint coherenceHint, uint nu
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHitObjectAndHintEXT($0, $1, $2)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7019,9 +7019,9 @@ public void hitObjectRecordFromQueryEXT(inout hitObjectEXT hitObject, rayQueryEX
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectRecordFromQueryEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7044,9 +7044,9 @@ public void hitObjectGetIntersectionTriangleVertexPositionsEXT(hitObjectEXT hitO
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectGetIntersectionTriangleVertexPositionsEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_KHR_ray_tracing_position_fetch";
@@ -7070,9 +7070,9 @@ public void hitObjectReorderExecuteEXT(hitObjectEXT hitObject, int payload)
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectReorderExecuteEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7094,9 +7094,9 @@ public void hitObjectReorderExecuteEXT(hitObjectEXT hitObject, uint coherenceHin
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectReorderExecuteEXT($0, $1, $2, $3)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         spirv_asm
         {
             OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -7132,9 +7132,9 @@ public void hitObjectTraceReorderExecuteEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -7182,9 +7182,9 @@ public void hitObjectTraceReorderExecuteEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectTraceReorderExecuteEXT";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
     {
         spirv_asm
         {
@@ -7236,9 +7236,9 @@ public void hitObjectTraceMotionReorderExecuteEXT(
 {
     __target_switch
     {
-    case glsl:
+    case _GL_EXT_shader_invocation_reorder_motion:
         __intrinsic_asm "hitObjectTraceMotionReorderExecuteEXT";
-    case spirv:
+    case spvShaderInvocationReorderMotionEXT:
     {
         spirv_asm
         {

@@ -481,6 +481,10 @@ Extensions
 `GL_EXT_shader_invocation_reorder`
 > Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
 
+`GL_EXT_shader_invocation_reorder_motion`
+> Represents the GL_EXT_shader_invocation_reorder + motion blur combined extension (cross-vendor SER with NV motion blur).
+> Used for motion blur variants of EXT SER functions.
+
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
 
@@ -824,6 +828,10 @@ Extensions
 
 `spvShaderInvocationReorderEXT`
 > Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
+
+`spvShaderInvocationReorderMotionEXT`
+> Represents the SPIR-V capability for shader invocation reorder EXT + motion blur (cross-vendor SER with NV motion blur).
+> Used for motion blur variants of EXT SER functions.
 
 `spvShaderInvocationReorderMotionNV`
 > Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
@@ -1315,10 +1323,6 @@ Compound Capabilities
 `ser_dxr_raygen_closesthit_miss`
 > Collection of capabilities for DXR 1.3 native SER (HLSL only) with raygen, closesthit, miss stages.
 
-`ser_glsl_nv`
-> SER (Shader Execution Reordering) on GLSL with NVIDIA NV extension.
-> Used in __target_switch cases for NV-specific GLSL code paths.
-
 `ser_motion`
 > Capabilities needed for shader-execution-reordering and motion-blur
 
@@ -1352,10 +1356,6 @@ Compound Capabilities
 
 `ser_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
-
-`ser_spirv_nv`
-> SER (Shader Execution Reordering) on SPIRV with NVIDIA NV capability.
-> Used in __target_switch cases for NV-specific SPIRV code paths.
 
 `shader5_sm_4_0`
 > Capabilities required to use sm_4_0 features apart of GL_ARB_gpu_shader5

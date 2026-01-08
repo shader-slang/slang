@@ -791,6 +791,11 @@ def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
 /// [EXT]
 alias spvShaderInvocationReorderMotionNV = spvShaderInvocationReorderNV + spvRayTracingMotionBlurNV;
 
+/// Represents the SPIR-V capability for shader invocation reorder EXT + motion blur (cross-vendor SER with NV motion blur).
+/// Used for motion blur variants of EXT SER functions.
+/// [EXT]
+alias spvShaderInvocationReorderMotionEXT = spvShaderInvocationReorderEXT + spvRayTracingMotionBlurNV;
+
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
 def spvRayTracingClusterAccelerationStructureNV : SPV_NV_cluster_acceleration_structure;
@@ -957,6 +962,7 @@ def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
 def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_EXT_shader_invocation_reorder : _GLSL_460;
 alias _GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
+alias _GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
@@ -1214,15 +1220,10 @@ alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL
 /// [EXT]
 alias GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder_motion | spvShaderInvocationReorderMotionNV;
 
-/// SER (Shader Execution Reordering) on GLSL with NVIDIA NV extension.
-/// Used in __target_switch cases for NV-specific GLSL code paths.
-/// [Compound]
-alias ser_glsl_nv = glsl + _GL_NV_shader_invocation_reorder;
-
-/// SER (Shader Execution Reordering) on SPIRV with NVIDIA NV capability.
-/// Used in __target_switch cases for NV-specific SPIRV code paths.
-/// [Compound]
-alias ser_spirv_nv = spirv + spvShaderInvocationReorderNV;
+/// Represents the GL_EXT_shader_invocation_reorder + motion blur combined extension (cross-vendor SER with NV motion blur).
+/// Used for motion blur variants of EXT SER functions.
+/// [EXT]
+alias GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder_motion | spvShaderInvocationReorderMotionEXT;
 
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
