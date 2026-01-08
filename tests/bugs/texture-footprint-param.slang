@@ -7,5 +7,5 @@
 [shader("vertex")]
 void main(TextureFootprint<1> a) {
     // Just reference the parameter to avoid DCE
-    var dummy = a.isSingleLevel;
+    let dummy = a.isSingleLevel;
 }

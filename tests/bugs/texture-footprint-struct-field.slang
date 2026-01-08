@@ -11,5 +11,5 @@ struct MyStruct {
 
 [shader("vertex")]
 void main(MyStruct s) {
-    var dummy = s.someValue;
+    let dummy = s.someValue;
 }
