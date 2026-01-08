@@ -22527,7 +22527,7 @@ struct HitObject
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
         case spvShaderInvocationReorderNV:
             return spirv_asm
-            {
+             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsHitNV &this;
@@ -22657,9 +22657,9 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".SetShaderTableIndex";
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
-        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
-        case spirv:
+        case spvShaderInvocationReorderEXT:
             spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -23210,8 +23210,8 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayFlags";
-        case glsl: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
-        case spirv:
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
+        case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -23232,8 +23232,8 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayTMin";
-        case glsl: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
-        case spirv:
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
+        case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -23266,8 +23266,8 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetWorldRayOrigin";
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
-        case spirv:
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
+        case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -23288,8 +23288,8 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetWorldRayDirection";
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
-        case spirv:
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
+        case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
                 OpExtension "SPV_EXT_shader_invocation_reorder";
@@ -23362,9 +23362,9 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm "($3 = dx::HitObject::MakeMiss($0, $1, $2))";
-        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
             __glslMakeMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
-        case spirv:
+        case spvShaderInvocationReorderEXT:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -23814,7 +23814,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
@@ -23861,7 +23861,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
@@ -23912,7 +23912,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        case _GL_EXT_shader_invocation_reorder_motion: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
@@ -23939,7 +23939,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectExecuteShaderEXT";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
 };
