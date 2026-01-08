@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage vertex
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry main -stage vertex
 
 // Test that a struct containing TextureFootprint as a field can be used as parameter
 
-//CHECK: define void @main
+//CHECK: OpEntryPoint Vertex {{%\w+}} "main"
 
 struct MyStruct {
     TextureFootprint<1> footprint;

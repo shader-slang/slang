@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry main -stage compute
 
 // Test that TextureFootprint can be used as a return type without crashing
 
-//CHECK: define void @main
+//CHECK: OpEntryPoint GLCompute {{%\w+}} "main"
 
 [shader("compute")]
 [numthreads(1,1,1)]

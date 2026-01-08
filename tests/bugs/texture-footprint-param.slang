@@ -1,8 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry main -stage vertex
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry main -stage vertex
 
 // Test that TextureFootprint can be used as a parameter without crashing
 
-//CHECK: define void @main
+//CHECK: OpEntryPoint Vertex {{%\w+}} "main"
 
 [shader("vertex")]
 void main(TextureFootprint<1> a) {
