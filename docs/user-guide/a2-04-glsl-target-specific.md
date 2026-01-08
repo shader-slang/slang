@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/glsl-target-specific
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a2-04-glsl-target-specific.html
 ---
 
 # GLSL-Specific Functionalities
