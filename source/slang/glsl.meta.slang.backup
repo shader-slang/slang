@@ -6393,9 +6393,13 @@ public void hitObjectRecordMissEXT(
     __target_switch
     {
     case _GL_EXT_shader_invocation_reorder:
+    {
         __intrinsic_asm "hitObjectRecordMissEXT($0, $1, $2, $3, $4, $5, $6)";
-    case spirv:
+    }
+    case spvShaderInvocationReorderEXT:
+    {
         HitObject::__spirvRecordMissEXT(hitObject, rayFlags, missShaderIndex, origin, Tmin, direction, Tmax);
+    }
     }
 }
 
@@ -6419,9 +6423,13 @@ public void hitObjectRecordMissMotionEXT(
     __target_switch
     {
     case _GL_EXT_shader_invocation_reorder_motion:
+    {
         __intrinsic_asm "hitObjectRecordMissMotionEXT($0, $1, $2, $3, $4, $5, $6, $7)";
-    case spirv:
+    }
+    case spvShaderInvocationReorderMotionEXT:
+    {
         HitObject::__spirvRecordMissMotionEXT(hitObject, rayFlags, missShaderIndex, origin, Tmin, direction, Tmax, currentTime);
+    }
     }
 }
 
@@ -6436,9 +6444,13 @@ public void hitObjectRecordEmptyEXT(inout hitObjectEXT hitObject)
     __target_switch
     {
     case _GL_EXT_shader_invocation_reorder:
+    {
         __intrinsic_asm "hitObjectRecordEmptyEXT($0)";
-    case spirv:
+    }
+    case spvShaderInvocationReorderEXT:
+    {
         HitObject::__spirvRecordEmptyEXT(hitObject);
+    }
     }
 }
 
@@ -6453,9 +6465,13 @@ public void hitObjectExecuteShaderEXT(hitObjectEXT hitObject, int payload)
     __target_switch
     {
     case _GL_EXT_shader_invocation_reorder:
+    {
         HitObject::__glslInvokeEXT(hitObject, payload);
-    case spirv:
+    }
+    case spvShaderInvocationReorderEXT:
+    {
         HitObject::__spirvExecuteShaderEXT(hitObject, payload);
+    }
     }
 }
 
@@ -6731,12 +6747,7 @@ public void hitObjectGetAttributesEXT<attr_t>(hitObjectEXT hitObject, out attr_t
     case spvShaderInvocationReorderEXT:
         {
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
-            spirv_asm
-            {
-                OpExtension "SPV_EXT_shader_invocation_reorder";
-                OpCapability ShaderInvocationReorderEXT;
-                OpHitObjectGetAttributesEXT &hitObject $attr;
-            };
+            HitObject::__spirvGetAttributesEXT(hitObject, attr);
             attributes = *attr;
         }
     }
@@ -6765,7 +6776,7 @@ public void hitObjectSetShaderBindingTableRecordIndexEXT(inout hitObjectEXT hitO
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         HitObject::__spirvSetShaderTableIndexEXT(hitObject, sbtRecordIndex);
     }
 }
@@ -6793,8 +6804,15 @@ public void reorderThreadEXT(uint coherenceHint, uint numCoherenceHintBitsFromLS
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHintEXT($0, $1)";
-    case spirv:
-        HitObject::__spirvReorderThreadWithHintEXT(coherenceHint, numCoherenceHintBitsFromLSB);
+    case spvShaderInvocationReorderEXT:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT
+                /**/ $coherenceHint
+                /**/ $numCoherenceHintBitsFromLSB;
+        };
     }
 }
 
@@ -6810,8 +6828,14 @@ public void reorderThreadEXT(hitObjectEXT hitObject)
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHitObjectEXT($0)";
-    case spirv:
-        HitObject::__spirvReorderThreadWithHitObjectEXT(hitObject);
+    case spvShaderInvocationReorderEXT:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT
+                &hitObject;
+        };
     }
 }
 
@@ -6827,8 +6851,16 @@ public void reorderThreadEXT(hitObjectEXT hitObject, uint coherenceHint, uint nu
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "reorderThreadWithHitObjectAndHintEXT($0, $1, $2)";
-    case spirv:
-        HitObject::__spirvReorderThreadWithHitObjectAndHintEXT(hitObject, coherenceHint, numCoherenceHintBitsFromLSB);
+    case spvShaderInvocationReorderEXT:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT
+                &hitObject
+                $coherenceHint
+                $numCoherenceHintBitsFromLSB;
+        };
     }
 }
 
@@ -6844,7 +6876,7 @@ public void hitObjectRecordFromQueryEXT(inout hitObjectEXT hitObject, rayQueryEX
     {
     case _GL_EXT_shader_invocation_reorder:
         __intrinsic_asm "hitObjectRecordFromQueryEXT($0, $1)";
-    case spirv:
+    case spvShaderInvocationReorderEXT:
         HitObject::__spirvRecordFromQueryEXT(hitObject, rayQuery);
     }
 }

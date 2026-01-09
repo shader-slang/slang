@@ -148,6 +148,7 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
+
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
