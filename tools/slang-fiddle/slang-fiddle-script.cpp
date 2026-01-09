@@ -2,6 +2,7 @@
 #include "slang-fiddle-script.h"
 
 #include "compiler-core/slang-diagnostic-sink.h"
+#include "core/slang-io.h"
 #include "lua/lapi.h"
 #include "lua/lauxlib.h"
 #include "lua/lualib.h"
@@ -13,6 +14,11 @@ namespace fiddle
 DiagnosticSink* _sink = nullptr;
 StringBuilder* _builder = nullptr;
 Count _templateCounter = 0;
+
+// Test generation mode globals
+static String _testGenOutputDir;
+static bool _isTestGenMode = false;
+static StringBuilder _testGenTemplateBuffer;
 
 static void _writeLuaMessage(Severity severity, String const& message)
 {
@@ -69,7 +75,15 @@ int _raw(lua_State* L)
     size_t size = 0;
     char const* buffer = lua_tolstring(L, 1, &size);
 
-    _builder->append(UnownedStringSlice(buffer, size));
+    // In test-gen mode, accumulate in template buffer instead
+    if (_isTestGenMode)
+    {
+        _testGenTemplateBuffer.append(UnownedStringSlice(buffer, size));
+    }
+    else
+    {
+        _builder->append(UnownedStringSlice(buffer, size));
+    }
     return 0;
 }
 
@@ -89,12 +103,22 @@ int _splice(lua_State* L)
     // got printed to the output (unless it is
     // nil).
     //
-    _builder->append(spliceBuilder.produceString());
+    String spliced = spliceBuilder.produceString();
     if (!lua_isnil(L, -1))
     {
         size_t size = 0;
         char const* buffer = luaL_tolstring(L, -1, &size);
-        _builder->append(UnownedStringSlice(buffer, size));
+        spliced.append(UnownedStringSlice(buffer, size));
+    }
+
+    // In test-gen mode, accumulate in template buffer
+    if (_isTestGenMode)
+    {
+        _testGenTemplateBuffer.append(spliced);
+    }
+    else
+    {
+        _builder->append(spliced);
     }
     return 0;
 }
@@ -113,6 +137,67 @@ int _template(lua_State* L)
     _builder->append("\n#endif\n");
 
     return 0;
+}
+
+// emit_test_file(filename) - for test generation mode
+// Writes accumulated template buffer to file and clears it
+int _emitTestFile(lua_State* L)
+{
+    // Check if we're in test-gen mode
+    if (!_isTestGenMode)
+    {
+        return luaL_error(L, "emit_test_file() only available in test-gen mode");
+    }
+
+    // Get filename argument
+    if (!lua_isstring(L, 1))
+    {
+        return luaL_error(L, "emit_test_file(): filename must be a string");
+    }
+    size_t filenameLen = 0;
+    const char* filename = lua_tolstring(L, 1, &filenameLen);
+
+    // Create String from filename
+    String filenameStr = String(UnownedStringSlice(filename, filenameLen));
+
+    // Get accumulated template content
+    String content = _testGenTemplateBuffer.produceString();
+
+    // Clear the buffer for next iteration
+    _testGenTemplateBuffer.clear();
+
+    // Build full output path (supports subdirectories)
+    String outputPath = Path::combine(_testGenOutputDir, filenameStr);
+
+    // Ensure output directory exists (including any subdirectories)
+    String outputDir = Path::getParentDirectory(outputPath);
+    if (outputDir.getLength() > 0)
+    {
+        SlangResult dirResult = Path::createDirectory(outputDir);
+        if (SLANG_FAILED(dirResult))
+        {
+            return luaL_error(
+                L,
+                "emit_test_file(): failed to create directory: %s",
+                outputDir.getBuffer());
+        }
+    }
+
+    // Write the file
+    SlangResult result = File::writeAllText(outputPath, content);
+
+    if (SLANG_FAILED(result))
+    {
+        return luaL_error(L, "emit_test_file(): failed to write file: %s", outputPath.getBuffer());
+    }
+
+    // Print what was generated
+    String msg = "Generated: ";
+    msg.append(filenameStr);
+    msg.append("\n");
+    _writeLuaMessage(Severity::Note, msg);
+
+    return 0; // No return values
 }
 
 lua_State* L = nullptr;
@@ -168,6 +253,13 @@ void ensureLuaInitialized()
 
     lua_pushcclosure(L, &_template, 0);
     lua_setglobal(L, "TEMPLATE");
+
+    // Register emit_test_file for test generation mode
+    if (_isTestGenMode)
+    {
+        lua_pushcclosure(L, &_emitTestFile, 0);
+        lua_setglobal(L, "emit_test_file");
+    }
 
     install_path_searcher(L);
 
@@ -298,5 +390,29 @@ String evaluateLuaExpression(
     lua_pop(L, 2);
 
     return result;
+}
+
+void setTestGenMode(bool enabled)
+{
+    _isTestGenMode = enabled;
+
+    // If enabling test gen mode after Lua is initialized, register the function
+    if (enabled && L)
+    {
+        lua_pushcclosure(L, &_emitTestFile, 0);
+        lua_setglobal(L, "emit_test_file");
+    }
+}
+
+void setTestGenOutputDir(const String& outputDir)
+{
+    _testGenOutputDir = outputDir;
+
+    // Create the output directory if it doesn't exist
+    if (_testGenOutputDir.getLength() > 0)
+    {
+        // Ensure directory exists
+        Path::createDirectoryRecursive(_testGenOutputDir);
+    }
 }
 } // namespace fiddle

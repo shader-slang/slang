@@ -4,6 +4,7 @@
 #include "slang-fiddle-diagnostics.h"
 #include "slang-fiddle-options.h"
 #include "slang-fiddle-scrape.h"
+#include "slang-fiddle-script.h"
 #include "slang-fiddle-template.h"
 
 #if 0
@@ -332,6 +333,45 @@ public:
 
     void checkModule() { fiddle::checkModule(this->logicalModule, &sink); }
 
+    void executeTestGenMode()
+    {
+        // For test generation mode, use FIDDLE's normal template processing
+        // RAW() and SPLICE() accumulate in _testGenTemplateBuffer
+        // emit_test_file() writes the buffer and clears it
+
+        // Set test-gen mode in script system
+        fiddle::setTestGenMode(true);
+        fiddle::setTestGenOutputDir(options.testGenOutputDir);
+
+        // Read the input template file
+        String inputPath = options.testGenInputFile;
+        String inputText;
+        if (SLANG_FAILED(File::readAllText(inputPath, inputText)))
+        {
+            sink.diagnose(SourceLoc(), fiddle::Diagnostics::couldNotReadInputFile, inputPath);
+            return;
+        }
+
+        // Register the source file
+        PathInfo inputPathInfo = PathInfo::makeFromString(inputPath);
+        SourceFile* inputSourceFile =
+            sourceManager.createSourceFileWithString(inputPathInfo, inputText);
+        SourceView* inputSourceView =
+            sourceManager.createSourceView(inputSourceFile, nullptr, SourceLoc());
+
+        // Parse templates from the file (normal FIDDLE processing)
+        RefPtr<TextTemplateFile> textTemplateFile = parseTextTemplate(inputSourceView);
+        if (!textTemplateFile || sink.getErrorCount())
+            return;
+
+        // Execute the templates (which will call emit_test_file())
+        // The output from RAW/SPLICE goes to _testGenTemplateBuffer instead of _builder
+        StringBuilder dummyBuilder;
+        generateTextTemplateOutputs(inputPath, textTemplateFile, dummyBuilder, &sink);
+        if (sink.getErrorCount())
+            return;
+    }
+
     void execute(int argc, char const* const* argv)
     {
         // We start by parsing any command-line options
@@ -340,6 +380,13 @@ public:
         options.parse(sink, argc, argv);
         if (sink.getErrorCount())
             return;
+
+        // Check if we're in test generation mode
+        if (options.fiddleMode == FiddleMode::TestGen)
+        {
+            executeTestGenMode();
+            return;
+        }
 
         // All of the code that get scraped will be
         // organized into a single logical module,
