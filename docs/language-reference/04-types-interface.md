@@ -6,17 +6,70 @@ methods defined by the interface.
 
 An interface consists of:
 
-- Any number of member function prototypes, which a concrete type inheriting from the interface must provide.
-- Any number of member functions, which are added to the inheriting type (either a concrete `struct` or
-  another `interface`).
-  - Member functions may be overridden by inheriting types using the `override` keyword with the member
+- Any number of member function prototypes, including constructors. A concrete type inheriting from the
+  interface must provide compatible member function implementations with the same names.
+- Any number of member functions with the implementation body, which are added to the inheriting type (either
+  a concrete `struct` or another `interface`). Constructors are not allowed.
+  - Inheriting types may override member functions by using the `override` keyword with a compatible member
     function declaration.
+- Any number of property declarations. Interface may declare either `get()` or `set()` or both methods without
+  the implementation body. A concrete type inheriting from the interface must provide implementations for
+  the properties. A property may be implemented by:
+  - Implementing compatible `get()` and `set()` methods as required by the interface.; OR
+  - Providing a compatible variable with a matching name.
+- Any number of associated named types, which a concrete inheriting type must provide. An associated named
+  type may be provided by:
+  - Declaring a nested `struct` with the same name. OR
+  - Defining a type alias for the name with `typealias` or `typedef`.
+- Any number of `static` `const` data members without initializers. A concrete inheriting type must provide
+  compatible static data members with the same names and types.
 
 The interface member functions may be static or non-static.
 
 An object inheriting from an interface can be converted to the interface type.
 
 An interface may also inherit from another interface. The inherited members add to the inheriting interface.
+
+A member function implementation is compatible with an interface member function when:
+- The implementation function can be called with the parameter types of the interface.; AND
+- The implementation function return type can be converted to the interface type.
+
+A member property (or variable) is compatible with an interface member property when the implementation
+property (or variable) is convertible to the interface property and vice versa.
+
+> Remark 1: The test for an inheriting member function compatibility is equivalent to whether a wrapper
+> function with the interface member function signature may invoke the inheriting member function, passing the
+> parameters and the return value as is.
+>
+> For example:
+> ```hlsl
+> interface IBase
+> {
+>     // a member function that a concrete type
+>     // must provide
+>     int32_t someFunc(int8_t a, int16_t b);
+> }
+>
+> struct Test : IBase
+> {
+>     // Implementation of IBase.someFunc(). This is
+>     // compatible because the corresponding wrapper
+>     // is well-formed (see below)
+>     int16_t someFunc(int a, int32_t b)
+>     {
+>         return int16_t(a + b);
+>     }
+> }
+>
+> // A wrapper invoking Test.someFunc() with the
+> // parameters and the return value of the interface
+> // member function declaration
+> int32_t IBase_wrapper_Test_someFunc(
+>     Test obj, int8_t a, int16_t b)
+> {
+>     return obj.someFunc(a, b);
+> }
+> ```
 
 
 ## Interface-Conforming Variants
@@ -53,6 +106,10 @@ interface IBase
     // a member function that concrete types
     // must define
     int getA();
+
+    // a static const data member that concrete types
+    // must define
+    static const int8_t bias;
 }
 
 interface ITest : IBase
@@ -64,14 +121,18 @@ interface ITest : IBase
     // to be overridden by ConcreteInt16
     int someFunc()
     {
-        return getA() + 2;
+        return getA() + bias;
     }
 
+    // a static member function thet ConcreteInt16 and
+    // ConcreteInt32 must provide.
     static int getUnderlyingWidth();
 }
 
 struct ConcreteInt32 : ITest
 {
+    static const int8_t bias = 3;
+
     int32_t a;
 
     int32_t getA()
@@ -87,6 +148,8 @@ struct ConcreteInt32 : ITest
 
 struct ConcreteInt16 : ITest
 {
+    static const int8_t bias = 1;
+
     int16_t a;
 
     int getA()
@@ -149,7 +212,7 @@ void main(uint3 id : SV_DispatchThreadID)
         ret = getValSquared(val);
     }
 
-    outputBuffer[id.x] = float(ret);
+    outputBuffer[id.x] = ret;
 
     // An interface variant. Declaring this imposes
     // restrictions on the types conforming to the
@@ -171,7 +234,7 @@ void main(uint3 id : SV_DispatchThreadID)
 
     // Note: Invoking a member function of an interface variant
     // has the overhead of dynamic dispatching.
-    outputBuffer[id.x] += float(iobj.someFunc());
+    outputBuffer[id.x] += iobj.someFunc();
 
     // Dynamic dispatch overhead also here.
     outputBuffer[id.x] += iobj.getUnderlyingWidth();
