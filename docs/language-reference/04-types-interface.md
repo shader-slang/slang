@@ -19,24 +19,28 @@ An object inheriting from an interface can be converted to the interface type.
 An interface may also inherit from another interface. The inherited members add to the inheriting interface.
 
 
-## Interface Objects
+## Interface-Conforming Variants
 
-A variable may be defined with an interface type in which case it is called an *interface object*. An
-interface object is a *variant*, which may have any type conforming to the interface. When an interface object
-is instantiated, the following restrictions apply:
+A variable declared with an interface type is an *interface-conforming variant*–or *interface variant* for
+short. An interface variant may have any type conforming to the interface. When an interface variant is
+instantiated, the following restrictions apply:
 
 - The types conforming to the interface type may not have data members with opaque types such as `Texture2D`
 - The types conforming to the interface type may not have data members with non-copyable types
 - The types conforming to the interface type may not have data members with unsized types
 
-Further, invoking a member function of an interface object has performance overhead due to dynamic
+Further, invoking a member function of an interface variant has performance overhead due to dynamic
 dispatching.
 
 > Remark 1: Function parameters with interface types do not impose the above restrictions when invoked with
 > variables with types known at compile time.
 
-> Remark 2: Initializing an interface object using the default initializer is deprecated. Invoking a
-> default-initialized interface object is undefined behavior.
+> Remark 2: Initializing an interface variant using the default initializer is deprecated. Invoking a
+> default-initialized interface variant is undefined behavior.
+
+> Remark 3: In `slangc`, an interface variant is said to have an
+> [existential type](https://en.wikipedia.org/wiki/Type_system#Existential_types), meaning that its type
+> exists such that it conforms to the specified interface.
 
 
 ## Example
@@ -111,7 +115,7 @@ int getValSquared(ITest i)
 }
 
 // This function creates a concrete object and returns
-// it as an interface object.
+// it as an interface variant.
 ITest createConcrete(bool is32, uint initialValue)
 {
     if (is32)
@@ -147,7 +151,7 @@ void main(uint3 id : SV_DispatchThreadID)
 
     outputBuffer[id.x] = float(ret);
 
-    // An interface object. Declaring this imposes
+    // An interface variant. Declaring this imposes
     // restrictions on the types conforming to the
     // interface.
     ITest iobj;
@@ -155,17 +159,17 @@ void main(uint3 id : SV_DispatchThreadID)
     if ((id.x & 1) == 1)
     {
         // create and assign a ConcreteInt32 object to the
-        // interface object
+        // interface variant
         iobj = createConcrete(true, id.y);
     }
     else
     {
         // create and assign a ConcreteInt16 object to the
-        // interface object
+        // interface variant
         iobj = createConcrete(false, id.y);
     }
 
-    // Note: Invoking a member function of an interface object
+    // Note: Invoking a member function of an interface variant
     // has the overhead of dynamic dispatching.
     outputBuffer[id.x] += float(iobj.someFunc());
 
@@ -177,10 +181,10 @@ void main(uint3 id : SV_DispatchThreadID)
 
 # Memory Layout and Dispatch Mechanism
 
-The memory layout of an interface object is unspecified. Type-based dynamic dispatching of a member function
+The memory layout of an interface variant is unspecified. Type-based dynamic dispatching of a member function
 invocation is unspecified. Both are subject to change in future versions of `slangc`.
 
-## Non-Normative Description of Interface Objects
+## Non-Normative Description of Interface Variants
 
 > Remark: The contents of this section is informational only and subject to change.
 
