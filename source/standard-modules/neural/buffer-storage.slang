@@ -10,6 +10,7 @@ Supports offset-based addressing and atomic operations for gradient accumulation
 - `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
 @category neural
 */
+
 public struct StructuredBufferStorage<T> : IStorage<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
@@ -52,6 +53,22 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     public T read(Address address)
     {
         return m_buffer[address + m_baseAddress];
+    }
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        uint4 value;
+        accessUint4<AccessOp.READ, DstType, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
+        return value;
+    }
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        accessUint4<AccessOp.ATOMIC_ADD, SrcType, T, BufferType, IsAligned, ActualBoundary>(m_buffer, baseAddress, address, value);
     }
 
     /**
