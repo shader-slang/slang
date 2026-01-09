@@ -7,6 +7,7 @@
 // attempts to specialize shader code.
 
 #include "slang-lookup.h"
+#include "slang-profile.h"
 
 namespace Slang
 {
@@ -596,6 +597,109 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 Diagnostics::unhandledModOnEntryPointParameter,
                 "keyword 'packoffset'",
                 param->getName());
+        }
+    }
+
+    // Validate system-value semantics for entry point parameters.
+    // Check if semantics are valid for the given stage and direction.
+    if (stage != Stage::Unknown)
+    {
+        auto session = linkage->getSessionImpl();
+        auto namePool = linkage->getNamePool();
+        auto astBuilder = linkage->getASTBuilder();
+        auto coreScope = session->coreLanguageScope;
+
+        if (coreScope)
+        {
+            CapabilitySet stageCapSet((CapabilityName)getAtomFromStage(stage));
+
+            // Collect declarations to validate: parameters + return type (as output only)
+            struct SemanticToValidate
+            {
+                Decl* decl;
+                HLSLSimpleSemantic* semantic;
+                bool isOutput;
+            };
+            List<SemanticToValidate> toValidate;
+
+            for (const auto& param : entryPointFuncDecl->getParameters())
+            {
+                if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
+                {
+                    bool isOutput =
+                        param->hasModifier<OutModifier>() || param->hasModifier<InOutModifier>();
+                    toValidate.add({param, semantic, isOutput});
+                }
+            }
+
+            if (auto returnSemantic = entryPointFuncDecl->findModifier<HLSLSimpleSemantic>())
+                toValidate.add({entryPointFuncDecl, returnSemantic, true});
+
+            for (const auto& item : toValidate)
+            {
+                String semanticName = String(item.semantic->name.getContent());
+                String lowerName = semanticName.toLower();
+                if (!lowerName.startsWith("sv_"))
+                    continue;
+
+                String baseName = String(lowerName.subString(3, lowerName.getLength() - 3));
+
+                // Strip trailing digits to handle numbered semantics like SV_Target0, SV_Target1
+                while (baseName.getLength() > 0 &&
+                       baseName[baseName.getLength() - 1] >= '0' &&
+                       baseName[baseName.getLength() - 1] <= '9')
+                {
+                    baseName = baseName.subString(0, baseName.getLength() - 1);
+                }
+
+                auto inLookupResult = lookUp(
+                    astBuilder,
+                    nullptr,
+                    namePool->getName("__sv_" + baseName + "_in"),
+                    coreScope);
+                auto outLookupResult = lookUp(
+                    astBuilder,
+                    nullptr,
+                    namePool->getName("__sv_" + baseName + "_out"),
+                    coreScope);
+
+                bool inDeclExists = inLookupResult.isValid() && !inLookupResult.isOverloaded();
+                bool outDeclExists = outLookupResult.isValid() && !outLookupResult.isOverloaded();
+
+                if (!inDeclExists && !outDeclExists)
+                {
+                    sink->diagnose(
+                        item.decl->loc,
+                        Diagnostics::unknownSystemValueSemantic,
+                        semanticName);
+                    continue;
+                }
+
+                // Check if the semantic is valid for the required direction
+                bool declExists = item.isOutput ? outDeclExists : inDeclExists;
+                if (!declExists)
+                {
+                    sink->diagnose(
+                        item.decl->loc,
+                        Diagnostics::systemSemanticNotValidForDirection,
+                        semanticName,
+                        item.isOutput ? "output" : "input");
+                    continue;
+                }
+
+                auto& lookupResult = item.isOutput ? outLookupResult : inLookupResult;
+                auto requireCapAttr =
+                    lookupResult.item.declRef.getDecl()->findModifier<RequireCapabilityAttribute>();
+                if (requireCapAttr && requireCapAttr->capabilitySet &&
+                    CapabilitySet(requireCapAttr->capabilitySet).isIncompatibleWith(stageCapSet))
+                {
+                    sink->diagnose(
+                        item.decl->loc,
+                        Diagnostics::systemSemanticNotValidForStage,
+                        semanticName,
+                        getStageText(stage));
+                }
+            }
         }
     }
 

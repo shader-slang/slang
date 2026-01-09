@@ -4467,3 +4467,248 @@ typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)A
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
+//@hidden:
+
+// --- Fragment-only output semantics ---
+[require(fragment)]
+out int __sv_depth_out : SV_Depth;
+
+[require(fragment)]
+out int __sv_depthgreaterequal_out : SV_DepthGreaterEqual;
+
+[require(fragment)]
+out int __sv_depthlessequal_out : SV_DepthLessEqual;
+
+[require(fragment)]
+out int __sv_target_out : SV_Target;
+
+[require(fragment)]
+out int __sv_stencilref_out : SV_StencilRef;
+
+// --- Fragment-only input semantics ---
+[require(fragment)]
+in int __sv_isfrontface_in : SV_IsFrontFace;
+
+[require(fragment)]
+in int __sv_sampleindex_in : SV_SampleIndex;
+
+[require(fragment)]
+in int __sv_barycentrics_in : SV_Barycentrics;
+
+[require(fragment)]
+in int __sv_innercoverage_in : SV_InnerCoverage;
+
+[require(fragment)]
+in int __sv_vulkansampleposition_in : SV_VulkanSamplePosition;
+
+[require(fragment)]
+in int __sv_pointcoord_in : SV_PointCoord;
+
+// --- Fragment input and output semantics ---
+[require(fragment)]
+in int __sv_coverage_in : SV_Coverage;
+
+[require(fragment)]
+out int __sv_coverage_out : SV_Coverage;
+
+// --- Vertex input semantics ---
+[require(vertex)]
+in int __sv_vertexid_in : SV_VertexID;
+
+[require(vertex)]
+in int __sv_instanceid_in : SV_InstanceID;
+
+[require(vertex)]
+in int __sv_startvertexlocation_in : SV_StartVertexLocation;
+
+[require(vertex)]
+in int __sv_startinstancelocation_in : SV_StartInstanceLocation;
+
+[require(vertex)]
+in int __sv_vulkanvertexid_in : SV_VulkanVertexID;
+
+[require(vertex)]
+in int __sv_vulkaninstanceid_in : SV_VulkanInstanceID;
+
+// --- SV_Position: output from vertex/geometry/domain/mesh, input to fragment/geometry/hull ---
+[require(vertex)]
+[require(geometry)]
+[require(domain)]
+[require(mesh)]
+out int __sv_position_out : SV_Position;
+
+[require(fragment)]
+[require(geometry)]
+[require(hull)]
+in int __sv_position_in : SV_Position;
+
+// --- Compute/mesh/amplification input semantics ---
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+in int __sv_dispatchthreadid_in : SV_DispatchThreadID;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+in int __sv_groupid_in : SV_GroupID;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+in int __sv_groupindex_in : SV_GroupIndex;
+
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+in int __sv_groupthreadid_in : SV_GroupThreadID;
+
+// --- Geometry shader semantics ---
+[require(geometry)]
+in int __sv_gsinstanceid_in : SV_GSInstanceID;
+
+// --- SV_PrimitiveID: input to fragment/geometry/hull/domain, output from geometry/mesh ---
+[require(fragment)]
+[require(geometry)]
+[require(hull)]
+[require(domain)]
+in int __sv_primitiveid_in : SV_PrimitiveID;
+
+[require(geometry)]
+[require(mesh)]
+out int __sv_primitiveid_out : SV_PrimitiveID;
+
+// --- Tessellation semantics ---
+[require(domain)]
+in int __sv_domainlocation_in : SV_DomainLocation;
+
+[require(hull)]
+in int __sv_outputcontrolpointid_in : SV_OutputControlPointID;
+
+[require(hull)]
+[require(domain)]
+in int __sv_tessfactor_in : SV_TessFactor;
+
+[require(hull)]
+out int __sv_tessfactor_out : SV_TessFactor;
+
+// --- Clip/Cull distance: output from vertex/geometry/domain/mesh, input to fragment ---
+[require(vertex)]
+[require(geometry)]
+[require(domain)]
+[require(mesh)]
+out int __sv_clipdistance_out : SV_ClipDistance;
+
+[require(fragment)]
+in int __sv_clipdistance_in : SV_ClipDistance;
+
+[require(vertex)]
+[require(geometry)]
+[require(domain)]
+[require(mesh)]
+out int __sv_culldistance_out : SV_CullDistance;
+
+[require(fragment)]
+in int __sv_culldistance_in : SV_CullDistance;
+
+// --- Render target/viewport array index: output from vertex/geometry/domain/mesh, input to fragment ---
+[require(vertex)]
+[require(geometry)]
+[require(domain)]
+[require(mesh)]
+out int __sv_rendertargetarrayindex_out : SV_RenderTargetArrayIndex;
+
+[require(fragment)]
+in int __sv_rendertargetarrayindex_in : SV_RenderTargetArrayIndex;
+
+[require(vertex)]
+[require(geometry)]
+[require(domain)]
+[require(mesh)]
+out int __sv_viewportarrayindex_out : SV_ViewportArrayIndex;
+
+[require(fragment)]
+in int __sv_viewportarrayindex_in : SV_ViewportArrayIndex;
+
+// --- Point size: output from vertex/geometry ---
+[require(vertex)]
+[require(geometry)]
+out int __sv_pointsize_out : SV_PointSize;
+
+// --- View ID: input to multiple stages ---
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(fragment)]
+[require(mesh)]
+in int __sv_viewid_in : SV_ViewID;
+
+// --- Draw/Device index: input to vertex and other stages ---
+[require(vertex)]
+[require(mesh)]
+in int __sv_drawindex_in : SV_DrawIndex;
+
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(fragment)]
+[require(mesh)]
+[require(compute)]
+in int __sv_deviceindex_in : SV_DeviceIndex;
+
+// --- Wave/subgroup intrinsics: available in all stages ---
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(fragment)]
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+[require(raygen)]
+[require(closesthit)]
+[require(miss)]
+[require(anyhit)]
+[require(intersection)]
+[require(callable)]
+in int __sv_wavelanecount_in : SV_WaveLaneCount;
+
+[require(vertex)]
+[require(hull)]
+[require(domain)]
+[require(geometry)]
+[require(fragment)]
+[require(compute)]
+[require(mesh)]
+[require(amplification)]
+[require(raygen)]
+[require(closesthit)]
+[require(miss)]
+[require(anyhit)]
+[require(intersection)]
+[require(callable)]
+in int __sv_wavelaneindex_in : SV_WaveLaneIndex;
+
+[require(fragment)]
+in int __sv_quadlaneindex_in : SV_QuadLaneIndex;
+
+// --- Shading rate: input to fragment ---
+[require(fragment)]
+in int __sv_shadingrate_in : SV_ShadingRate;
+
+// --- Ray tracing semantics ---
+[require(closesthit)]
+[require(anyhit)]
+in int __sv_intersectionattributes_in : SV_IntersectionAttributes;
+
+[require(closesthit)]
+[require(anyhit)]
+[require(miss)]
+in int __sv_raypayload_in : SV_RayPayload;
+
+[require(closesthit)]
+[require(anyhit)]
+[require(miss)]
+out int __sv_raypayload_out : SV_RayPayload;
