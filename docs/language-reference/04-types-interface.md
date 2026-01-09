@@ -37,8 +37,107 @@ A member function implementation is compatible with an interface member function
 A member property (or variable) is compatible with an interface member property when the implementation
 property (or variable) is convertible to the interface property and vice versa.
 
-> Remark 1: The test for an inheriting member function compatibility is equivalent to whether a wrapper
-> function with the interface member function signature may invoke the inheriting member function, passing the
+Example:
+```hlsl
+interface IReq
+{
+}
+
+interface ITest
+{
+    // Static data member requirement
+    static const int staticDataMember;
+
+    // Static member function requirement
+    static float staticMethod(int a);
+
+    // Property requirement
+    property testProp : float
+    {
+        get(); // must be readable
+        set(); // must be writable
+    }
+
+    // Constructor requirement
+    __init(float f);
+
+    // Non-static member function requirement
+    float someMethod(int a);
+
+    // Overridable non-static member function
+    // with default implementation.
+    float someMethodWithDefaultImplementation(int a)
+    {
+        return testProp + float(a);
+    }
+
+    // Associated type requirement
+    associatedtype AssocType;
+
+    // Associated type requirement, provided type must
+    // conform to IReq
+    associatedtype AssocTypeWithRequirement : IReq;
+}
+
+struct TestClass : ITest
+{
+    // Required data member
+    static const int staticDataMember = 5;
+
+    // Required static member function
+    static float staticMethod(int a)
+    {
+        return float(a) * float(a);
+    }
+
+    float propUnderlyingValue;
+
+    // Required constructor
+    __init(float f)
+    {
+        propUnderlyingValue = f + 1.0f;
+    }
+
+    // Required property
+    //
+    // Note that alternatively, a data member
+    // "float testProp;" could have also be provided.
+    property testProp : float
+    {
+        get()
+        {
+            return propUnderlyingValue - 1.0f;
+        }
+
+        set(float newVal)
+        {
+            propUnderlyingValue = newVal + 1.0f;
+        }
+    }
+
+    // Required non-static member function
+    //
+    // Note that the parameters and the return value
+    // are not required to match as long as they are
+    // compatible.
+    float someMethod(int64_t a)
+    {
+        return float(a) * propUnderlyingValue;
+    }
+
+    // Required associated type provided by using a
+    // type alias.
+    typealias AssocType = int;
+
+    // Required associated type provided by a nested type.
+    struct AssocTypeWithRequirement : IReq
+    {
+    }
+}
+```
+
+> Remark: The test for an inheriting member function compatibility is equivalent to whether a wrapper function
+> with the interface member function signature may invoke the inheriting member function, passing the
 > parameters and the return value as is.
 >
 > For example:
