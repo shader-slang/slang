@@ -783,32 +783,38 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryB);
 
         // Only the first subgroup need to store the result to the global memory.
-        if (subgroupIndex == 0)
+
+        const bool isFirstSubgroup = subgroupIndex == 0;
+        // Store the result shared memory. We store one row of the cooperative matrix at a time.
+        for (uint i = 0; i < CoopMatCRows; i++)
         {
-            // Store the result shared memory. We store one row of the cooperative matrix at a time.
-            for (uint i = 0; i < CoopMatCRows; i++)
+            for (uint j = 0; j < CoopMatCColumns; j++)
             {
-                for (uint j = 0; j < CoopMatCColumns; j++)
+                // Save the result to shared memory in row major, because this is cache friendly for global memory access.
+                // As each row of the tile will be corresponding to the contiguous global memory.
+                if (isFirstSubgroup)
                 {
-                    // Save the result to shared memory in row major, because this is cache friendly for global memory access.
-                    // As each row of the tile will be corresponding to the contiguous global memory.
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(sharedMemoryB + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC, StrideInVectorTileC);
                 }
+            }
+            GroupMemoryBarrierWithWaveSync();
 
-                GroupMemoryBarrierWithWaveSync();
-
-                // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
-                // In forward pass, the tile in the shared memory is in shape M x T_ROW_A, which is one column of cooperative matrices.
-                // while the result here is in shape T_ROW_A x K, which is one row of cooperative matrices.
-                // So we can use transposed version of LoadShA/StoreShA to store the result. Because in transpose version, the major-ness is along
-                // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
+            // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
+            // In forward pass, the tile in the shared memory is in shape M x T_ROW_A, which is one column of cooperative matrices.
+            // while the result here is in shape T_ROW_A x K, which is one row of cooperative matrices.
+            // So we can use transposed version of LoadShA/StoreShA to store the result. Because in transpose version, the major-ness is along
+            // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
+            if (isFirstSubgroup)
+            {
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, true>;
                 MMA.storeShA<U, Storage>(sharedMemoryB, i, weightStorage, weightAddress);
-
-                // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
-                GroupMemoryBarrierWithWaveSync();
             }
+
+            // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
+            GroupMemoryBarrierWithWaveSync();
         }
+
+        AllMemoryBarrierWithGroupSync();
     }
 
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
