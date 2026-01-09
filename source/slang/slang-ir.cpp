@@ -6612,7 +6612,10 @@ UInt IRBuilder::getUniqueID(IRInst* inst)
     if (existingId)
         return *existingId;
 
-    auto id = uniqueIDMap->getCount();
+    // Note: the ID sequence starts from 1 to ensure that IDs in
+    // zero-initialized memory do not get confused with generated IDs.
+    // (Issue #9191)
+    auto id = uniqueIDMap->getCount() + 1U;
     uniqueIDMap->add(inst, id);
     return id;
 }
