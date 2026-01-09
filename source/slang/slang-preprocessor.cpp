@@ -814,6 +814,10 @@ private:
     /// Indicate that whether this invocation is at the start of a line, this can be determined by
     /// the macro invocation token.
     bool m_isStartOfLine = false;
+
+    /// Track whether we have already returned the first token from this macro expansion.
+    /// This is used to ensure we only set AtStartOfLine on the first token, not all tokens.
+    bool m_hasReturnedFirstToken = false;
 };
 
 // Playing back macro bodies for macro invocations is one part of the expansion process, and the
@@ -1995,8 +1999,11 @@ Token MacroInvocation::_readTokenImpl()
             // Before returning, we need to check whether this macro invocation is
             // at start of line, if it is, we must mark the first token as start of line
             // as well, otherwise the expanded code could be invalid.
-            if (m_isStartOfLine)
+            if (m_isStartOfLine && !m_hasReturnedFirstToken)
+            {
                 token.flags |= TokenFlag::AtStartOfLine;
+                m_hasReturnedFirstToken = true;
+            }
             return token;
         }
 
@@ -2022,8 +2029,11 @@ Token MacroInvocation::_readTokenImpl()
             // Before returning, we need to check whether this macro invocation is
             // at start of line, if it is, we must mark the first token as start of line
             // as well, otherwise the expanded code could be invalid.
-            if (m_isStartOfLine)
+            if (m_isStartOfLine && !m_hasReturnedFirstToken)
+            {
                 token.flags |= TokenFlag::AtStartOfLine;
+                m_hasReturnedFirstToken = true;
+            }
             return token;
         }
 
