@@ -4,8 +4,10 @@ A `struct` is a type consisting of an ordered sequence of members.
 
 A struct member is declared in the struct body and is one of the following:
 - Data member (*aka.* field); declared as a variable
+- A constructor
 - Member function; declared as a function
 - Nested type; declared as type or type alias
+- A property declaration.
 
 A data member and a member function can be declared with the `static` keyword.
 
@@ -34,6 +36,96 @@ An object is an *instance* of a `struct`. An instance consists of all non-static
 `struct`. The data members may be initialized using an initializer list or a constructor. For details, see
 [variable declarations](07-declarations.md).
 
+## Constructors
+
+When a user-provided constructor is defined for a `struct`, a constructor is executed on object
+instantiation. A constructor can have any number of parameters. A constructor does not have a return
+type. More than one constructors may be defined in which case overload resolution is performed to select the
+most appropriate constructor given the parameters.
+
+The constructor parameters are provided in the optional initializer list. When an initializer is not provided,
+the no-parameter constructor is invoked.
+
+If a non-`static` data member is not initialized by the constructor, it has an undefined state after object
+instantiation.
+
+`const` data members cannot be initialized by the constructor.
+
+
+Example:
+```hlsl
+struct TestClass
+{
+    int a, b;
+
+    __init()
+    {
+        a = 1;
+        b = 2;
+    }
+
+
+    __init(int _a)
+    {
+        a = 1;
+        b = 2;
+    }
+
+    __init(int _a, int _b)
+    {
+        a = _a;
+        b = _b;
+    }
+}
+
+TestClass obj1;
+// obj1.a = 1;
+// obj1.b = 2;
+//
+// Note: TestClass obj1 = { }; also calls the constructor
+// without parameters
+
+TestClass obj2 = { 42 };
+// obj2.a = 42;
+// obj2.b = 2;
+
+TestClass obj3 = { 42, 43 };
+// obj3.a = 42;
+// obj3.b = 43;
+
+```
+
+When no user-provided constructor is defined, an aggregate initialization is performed, instead. In aggregate
+initialization, an initializer list contains values for the `struct` non-`static` data members. If the
+initializer list does not contain enough values, the remaining data members are default-initialized. If no
+initializer list is provided, a class without a user-provided constructor is instantiated in an undefined
+state.
+
+> Remark 1: When a class without user-provided constructor is instantiated without an initializer list, the
+> object's initial state is undefined. This includes data members which have members with user-provided
+> constructors.
+>
+> ```hlsl
+> struct TestField
+> {
+>     int x;
+>     __init() { x = 5; }
+> }
+>
+> struct TestClass
+> {
+>     int a, b;
+>     TestField f;
+> }
+>
+> // note: obj is instantiated with an undefined state
+> // regardless of TestField having a user-provided constructor.
+>
+> TestClass obj;
+> ```
+
+> Remark 2: Accessing data members in an undefined state is undefined behavior.
+
 
 ## Non-static Member Functions
 
@@ -51,14 +143,19 @@ Non-static member functions cannot be accessed without an object.
 > a non-`const` member function.
 
 
+## Properties
+
+TODO
+
+
 ## Accessing Members and Nested Types
 
-The static `struct` members and nested types are accessed using either `.` or `::`. Their semantics in this
-context is identical.
+The static `struct` members and nested types are accessed using either \``.`\` or \``::`\`. Their semantics in
+this context is identical.
 
-Non-static object members are accessed using the member of object operator `.`.
+Non-static object members are accessed using the member of object operator \``.`\`.
 
-> Remark: `.` is the recommended syntax for all member access.
+> Remark: The recommended operator for all member access is \``.`\`.
 
 
 ### Example:
