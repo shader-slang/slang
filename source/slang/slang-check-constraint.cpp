@@ -150,6 +150,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
             if (!bestType)
             {
                 bestType = candidateType;
+                bestCost = conversionCost;
             }
             else
             {
@@ -170,7 +171,15 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
             }
         }
         if (bestType)
+        {
+            // Track the conversion cost for type promotion in the constraint system.
+            // This cost represents promoting a type (e.g., int -> float) to satisfy
+            // an interface constraint (e.g., __BuiltinFloatingPointType).
+            // This ensures that overload resolution prefers exact type matches over
+            // candidates that require type promotion.
+            constraints->typePromotionCost += bestCost;
             return bestType;
+        }
     }
 
     // If `interfaceType` represents some generic interface type, such as `IFoo<T>`, and `type`
@@ -795,6 +804,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         if (!constrainedGenericParams.contains(typeParamDecl))
             outBaseCost += kConversionCost_UnconstraintGenericParam;
     }
+
+    // Add the accumulated type promotion cost from constraint solving.
+    // This includes costs from promoting types to satisfy interface constraints
+    // (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+    outBaseCost += system->typePromotionCost;
 
     return m_astBuilder->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView);
 }
