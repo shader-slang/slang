@@ -251,6 +251,7 @@ jobs:
 
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "$bin_dir" >> $GITHUB_PATH
 
       - name: Run slangpy tests
         run: |
@@ -275,10 +276,27 @@ jobs:
 
           echo "Copying new slang libraries..."
           cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+          cp -v "$bin_dir"/slangc* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy slangc"; exit 1; }
 
-          # Create symlink for the old library version that slangpy extension was linked against
-          echo "Creating symlink for slangpy compatibility..."
-          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.21.2"
+          # This is kind of awkward because the version numbers might be
+          # different between the old libslang-compiler and the new one, so
+          # we need to make sure we overwrite the old one. This logic also
+          # tries to avoid making assumptions about filename extension due to
+          # differences in macos and Linux conventions.
+
+          # There should only be one libslang-compiler library present; the
+          # one that slangpy linked to.
+          OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
+          echo "old slang library location: $OLD_SLANGLIB"
+
+          # Find the new libslang-compiler library via developer symlink
+          # filename. This is unlikely to still be a symlink since it went
+          # through artifactory, but in practice symlink or not shouldn't
+          # matter, since we copy the rest of the libraries over.
+          NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
+          echo "new slang library location: $NEW_SLANGLIB"
+
+          cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"

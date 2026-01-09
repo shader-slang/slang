@@ -216,8 +216,10 @@ jobs:
           echo "lib_dir location: $lib_dir"
           # Copy library files
           if [[ "${{ inputs.os }}" == "windows" ]]; then
-            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+            cp -v "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           else
+            cp -v "$bin_dir"/slangc* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy slangc"; exit 1; }
+
             # This is kind of awkward because the version numbers might be
             # different between the old libslang-compiler and the new one, so
             # we need to make sure we overwrite the old one. This logic also
