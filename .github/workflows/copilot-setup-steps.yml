@@ -10,22 +10,99 @@ on:
 
 jobs:
   copilot-setup-steps:
-    runs-on: ubuntu-latest
+    # Use GitHub larger runner with GPU support for Copilot
+    # Avoids path mapping issues with ARC runners (/runner vs /home/runner)
+    runs-on: slang-larger-runner-1
 
     permissions:
       contents: read
       pull-requests: write
       checks: write
 
+    # No container - Copilot does not support containers
+    # Known issue: https://github.com/orgs/community/discussions/170315
+    # Run directly on larger runner which has full toolchain
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          submodules: "recursive"
-          fetch-depth: "2"
-      - uses: ./.github/actions/format-setup
-      - name: setup environment
+          submodules: recursive
+          fetch-depth: 2
+
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libx11-dev
-          cmake --preset default --fresh
-          cmake --workflow --preset debug
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            git \
+            python3 \
+            python3-pip \
+            wget \
+            curl \
+            unzip \
+            libx11-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxi-dev \
+            libgl1-mesa-dev \
+            libvulkan-dev \
+            spirv-tools \
+            glslang-tools \
+            ca-certificates
+
+          # Install CMake 3.30 (required for CMakePresets.json version 6)
+          wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
+          tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /tmp
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
+          sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
+
+          # Install CUDA Toolkit 12.4.1 (matching container image)
+          wget -q https://developer.download.nvidia.com/compute/cuda/12.4.1/local_installers/cuda_12.4.1_550.54.15_linux.run
+          sudo sh cuda_12.4.1_550.54.15_linux.run --silent --toolkit --no-opengl-libs --no-drm || echo "CUDA install returned error but may have partially succeeded"
+          # Remove installer (4GB file) to prevent it from being committed
+          rm -f cuda_12.4.1_550.54.15_linux.run
+
+          # Verify and configure CUDA paths
+          if [ -d /usr/local/cuda-12.4 ]; then
+            echo "CUDA installed successfully"
+            # Fix permissions - installer creates files with restrictive permissions
+            sudo chmod -R a+rX /usr/local/cuda-12.4
+            ls -la /usr/local/cuda-12.4/bin/nvcc
+            echo "/usr/local/cuda-12.4/bin" >> $GITHUB_PATH
+            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+          else
+            echo "WARNING: CUDA not installed at /usr/local/cuda-12.4"
+            ls -la /usr/local/ | grep cuda || echo "No CUDA directories found"
+          fi
+
+      - name: Verify GPU access
+        run: |
+          export PATH=/usr/local/cuda-12.4/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH
+
+          echo "=== GPU Information ==="
+          nvidia-smi
+          echo "=== CMake version ==="
+          cmake --version
+          echo "=== CUDA version ==="
+          nvcc --version
+
+      - name: Configure CMake
+        run: |
+          export PATH=/usr/local/cuda-12.4/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH
+
+          cmake --preset default --fresh \
+            -DSLANG_ENABLE_CUDA=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+
+      - name: Build Slang
+        run: |
+          export PATH=/usr/local/cuda-12.4/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:$LD_LIBRARY_PATH
+
+          cmake --build --preset debug -j$(nproc)
