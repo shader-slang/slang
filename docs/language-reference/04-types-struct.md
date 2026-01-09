@@ -25,7 +25,7 @@ A structure may conform to one or more [interface](04-types-interface.md) types.
 
 A structure may be extended with a [type extension](04-types-extension.md).
 
-> Remark: Structure inheriting from another structure is deprecated.
+> Remark: Structure inheriting from another structure is deprecated. It may not work as expected.
 
 
 ## Objects
@@ -57,6 +57,9 @@ The static `struct` members and nested types are accessed using either `.` or `:
 context is identical.
 
 Non-static object members are accessed using the member of object operator `.`.
+
+> Remark: `.` is the recommended syntax for all member access.
+
 
 ### Example:
 
@@ -119,13 +122,13 @@ struct TestStruct
 TestStruct obj = { };
 
 // instantiate an object of type NestedStruct
-TestStruct::NestedStruct obj2 = { };
+TestStruct.NestedStruct obj2 = { };
 
 // access an object data member directly
 obj.a = 42;
 
 // access a static data member directly
-int tmp0 = TestStruct::b + TestStruct::NestedStruct::c;
+int tmp0 = TestStruct.b + TestStruct.NestedStruct.c;
 
 // invoke object member functions
 int tmp1 = obj.getA();
@@ -136,7 +139,8 @@ int tmp2 = obj.incrementAndReturnA();
 // '.' can be used to resolve scope
 int tmp3 = TestStruct.getB();
 
-// '::' is equivalent to '.' for static member access
+// '::' is equivalent to '.' for static member access,
+// but '.' is recommended.
 int tmp4 = TestStruct::incrementAndReturnB();
 ```
 
