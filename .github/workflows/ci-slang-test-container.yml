@@ -255,58 +255,61 @@ jobs:
 
       - name: Run slangpy tests
         run: |
-          python3 --version
-          echo "Cleaning up existing installations and installing slangpy..."
+          # 1. Setup paths
+          SITE_PACKAGES=$(python3 -m site --user-site)
+          SLANGPY_DIR="$SITE_PACKAGES/slangpy"
 
-          # Try to uninstall existing slangpy
-          python3 -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+          # Fallback to system site-packages if user-site doesn't exist
+          if [ ! -d "$SLANGPY_DIR" ]; then
+              SITE_PACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])")
+              SLANGPY_DIR="$SITE_PACKAGES/slangpy"
+          fi
 
-          # Install slangpy
-          python3 -m pip install --verbose slangpy --user
+          echo "Targeting slangpy at: $SLANGPY_DIR"
 
-          # Get site packages directory
-          SITE_PACKAGES=$(python3 -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
-          echo "Site packages directory: $SITE_PACKAGES"
-          echo "bin_dir location: $bin_dir"
-          echo "lib_dir location: $lib_dir"
+          # 2. Install slangpy
+          python3 -m pip uninstall -y slangpy || true
+          python3 -m pip install slangpy --user --verbose
 
-          # Remove old slang libraries and copy new ones
-          echo "Removing old slang libraries..."
-          rm -f "$SITE_PACKAGES/slangpy"/libslang*
+          # 3. Handle the slangc path hack (Issue 696)
+          SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
+          mkdir -p "$SLANGC_TARGET_DIR"
+          cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/slangc"
+          chmod +x "$SLANGC_TARGET_DIR/slangc"
 
-          echo "Copying new slang libraries..."
-          cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
-          cp -v "$bin_dir"/slangc* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy slangc"; exit 1; }
+          # 4. Copy new libraries and slangc into the slangpy package
+          echo "Updating slangpy package binaries..."
+          cp -v "$lib_dir"/libslang*.* "$SLANGPY_DIR/"
+          cp -v "$bin_dir/slangc" "$SLANGPY_DIR/"
 
-          # This is kind of awkward because the version numbers might be
-          # different between the old libslang-compiler and the new one, so
-          # we need to make sure we overwrite the old one. This logic also
-          # tries to avoid making assumptions about filename extension due to
-          # differences in macos and Linux conventions.
+          # 5. Fix versioned library dependencies via symlinks
+          EXT_MOD=$(find "$SLANGPY_DIR" -name "slangpy_ext*.so" | head -n 1)
+          echo "Inspecting extension: $EXT_MOD"
 
-          # There should only be one libslang-compiler library present; the
-          # one that slangpy linked to.
-          OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
-          echo "old slang library location: $OLD_SLANGLIB"
+          if [ -f "$EXT_MOD" ]; then
+              for LIB_BASE in "libslang-compiler" "libslang-rt" "libslang"; do
+                  # Use -m1 to ensure only the first match is returned
+                  WANTED=$(readelf -d "$EXT_MOD" | grep -Po "$LIB_BASE\.so\.[0-9.]+" | head -n 1)
+                  if [ -n "$WANTED" ]; then
+                      echo "Creating symlink: $SLANGPY_DIR/$WANTED -> $LIB_BASE.so"
+                      # Ensure we are inside the directory when linking to avoid path issues
+                      (cd "$SLANGPY_DIR" && ln -sf "$LIB_BASE.so" "$WANTED")
+                  else
+                      echo "No versioned dependency found for $LIB_BASE"
+                  fi
+              done
+          else
+              echo "Error: Extension module not found!"
+              exit 1
+          fi
 
-          # Find the new libslang-compiler library via developer symlink
-          # filename. This is unlikely to still be a symlink since it went
-          # through artifactory, but in practice symlink or not shouldn't
-          # matter, since we copy the rest of the libraries over.
-          NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
-          echo "new slang library location: $NEW_SLANGLIB"
-
-          cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
-
-          echo "Listing files in slangpy directory..."
-          ls -la "$SITE_PACKAGES/slangpy/"
-
-          echo "Installing python packages..."
+          # 6. Install test dependencies
+          echo "Installing test dependencies..."
           curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
           python3 -m pip install -r requirements-dev.txt --user
-          python3 -m pip install pytest-github-actions-annotate-failures --user
-          python3 -m pip install pytest-xdist --user
+          python3 -m pip install pytest-github-actions-annotate-failures pytest-xdist --user
 
-          echo "Running pytest on slangpy tests..."
+          # 7. Run tests
+          echo "Running pytest..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          python3 -m pytest "$SLANGPY_DIR/tests" -ra -n auto --maxprocesses=3

@@ -1,7 +1,5 @@
 // main.cpp
 
-// test change
-
 #include "slang.h"
 
 SLANG_API void spSetCommandLineCompilerMode(SlangCompileRequest* request);
