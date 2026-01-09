@@ -146,9 +146,9 @@ int tmp4 = TestStruct::incrementAndReturnB();
 
 # Memory Layout
 
-## Base Layout
+## Natural Layout
 
-The *base layout* for a structure type uses the following rules:
+The *natural layout* for a structure type uses the following rules:
 
 - The alignment of a structure is the maximum of 1, alignment of any member, and alignment of any parent type.
 - The data is laid out in order of:
@@ -172,18 +172,18 @@ The following algorithm may be used:
 
 When this algorithm completes, `size` and `alignment` will be the size and alignment of the structure type.
 
-> Remark: Most target platforms do not use the base layout directly, but it provides a baseline for defining
-> other layouts. Any layout for a structure type must guarantee an alignment at least as large as the standard
-> layout.
+> Remark: Most target platforms do not use the natural layout directly, but it provides a baseline for
+> defining other layouts. Any layout for a structure type must guarantee an alignment at least as large as the
+> standard layout.
 
 ## C-Style Layout
 
-The C-style layout of a structure type differs from the base layout in that the structure size is rounded up
-to the structure alignment. This mirrors the layout rules used by typical C/C++ compilers.
+The C-style layout of a structure type differs from the natural layout in that the structure size is rounded
+up to the structure alignment. This mirrors the layout rules used by typical C/C++ compilers.
 
 ## D3D Constant Buffer Layout
 
-D3D constant buffer layout is similar to the base layout with two differences:
+D3D constant buffer layout is similar to the natural layout with two differences:
 
 - The minimum alignment is 16.
 - If a data member crosses a 16-byte boundary and its offset is not aligned by 16, the offset is rounded up to the

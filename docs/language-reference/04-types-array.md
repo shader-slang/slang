@@ -100,12 +100,12 @@ type. The use of an unknown-length array type for the declaration is a convenien
 
 ## Memory Layout
 
-### Base Layout
+### Natural Layout
 
 The _stride_ of an array element type is the size of the element rounded up to the smallest multiple of its
 alignment. The stride defines the byte offset difference between adjacent elements.
 
-The base layout rules for an array type `T[]` or `T[N]`:
+The natural layout rules for an array type `T[]` or `T[N]`:
 
 * Element `i` of the array starts at a byte offset relative to the array base address that is `i` times the
   element stride of the array.
@@ -116,10 +116,10 @@ The base layout rules for an array type `T[]` or `T[N]`:
 
 ### C-Style Layout
 
-The C-style layout of an array type differs from the base layout in that the array size is `N` times the
+The C-style layout of an array type differs from the natural layout in that the array size is `N` times the
 element stride.
 
 ### D3D Constant Buffer Layout
 
-The D3D constant buffer layout of an array type differs from the base layout in that the array size is `N`
+The D3D constant buffer layout of an array type differs from the natural layout in that the array size is `N`
 times the element stride.
