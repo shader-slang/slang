@@ -11,12 +11,10 @@ struct ExtractPrimalFuncContext
 {
     IRModule* module;
     AutoDiffSharedContext* autodiffContext;
-    DifferentiableTypeConformanceContext differentiableTypeConformanceContext;
+    DifferentiableTypeConformanceContext diffTypeContext;
 
     ExtractPrimalFuncContext(IRModule* inModule, AutoDiffSharedContext* autodiffContext)
-        : module(inModule)
-        , autodiffContext(autodiffContext)
-        , differentiableTypeConformanceContext(autodiffContext)
+        : module(inModule), autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
     {
     }
 
@@ -93,7 +91,7 @@ struct ExtractPrimalFuncContext
         originalFuncType = as<IRFuncType>(originalFunc->getDataType());
 
         IRInst* args[] = {originalFuncType, outIntermediateType};
-        auto applyFuncType = differentiableTypeConformanceContext.resolveType(
+        auto applyFuncType = diffTypeContext.resolveType(
             &builder,
             builder.emitIntrinsicInst(builder.getTypeKind(), kIROp_ApplyForBwdFuncType, 2, args));
         SLANG_RELEASE_ASSERT(as<IRFuncType>(applyFuncType));
@@ -459,7 +457,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     IRFunc* func,
     IRFunc* originalFunc,
     HoistedPrimalsInfo* primalsInfo,
-    // ParameterBlockTransposeInfo& paramInfo,
     IRInst*& intermediateType,
     IRFunc*& getValFunc)
 {
@@ -589,18 +586,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             removePhiArgs(inst);
         inst->removeAndDeallocate();
     }
-
-    // auto paramBlock = func->getFirstBlock();
-    // auto paramPreludeBlock = paramBlock->getNextBlock();
-
-    // TODO: old code... (remove)
-    // Remove primal blocks from the propagate func & wire the param block directly to the first
-    // recompute block.
-    //
-    /*{
-        auto terminator = cast<IRUnconditionalBranch>(paramPreludeBlock->getTerminator());
-        builder.replaceOperand(&(terminator->block), firstRecomputeBlock);
-    }*/
 
     // Erase all primal blocks (except for the param & prelude blocks).
     // TODO: Lots of ways to clean this up.

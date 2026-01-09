@@ -1945,6 +1945,24 @@ struct IRConstantKey
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
+struct ValAssociationCacheKey
+{
+    IRInst* inst;
+    ValAssociationKind associationKind;
+    bool operator==(const ValAssociationCacheKey& other) const
+    {
+        return inst == other.inst && associationKind == other.associationKind;
+    }
+
+    HashCode getHashCode() const
+    {
+        Hasher hasher;
+        hasher.hashValue(inst);
+        hasher.hashValue(static_cast<int>(associationKind));
+        return hasher.getResult();
+    }
+};
+
 // State owned by IRModule for global value deduplication.
 // Not supposed to be used/instantiated outside IRModule.
 struct IRDeduplicationContext
@@ -2049,6 +2067,11 @@ public:
     IRDeduplicationContext* getDeduplicationContext() const { return &m_deduplicationContext; }
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
+
+    Dictionary<ValAssociationCacheKey, IRInst*>* getAssociatedInstCache()
+    {
+        return &m_associationCache;
+    }
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
@@ -2178,8 +2201,10 @@ private:
     Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
 
     // Translation cache.
-    // Dictionary<IRInst*, IRWeakUse*> m_mapInstToTranslation;
     IRCompilerDictionary* m_translationDict = nullptr;
+
+    // (inst, association-kind) -> associated-inst
+    Dictionary<ValAssociationCacheKey, IRInst*> m_associationCache;
 };
 
 

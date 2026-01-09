@@ -163,112 +163,6 @@ bool isNeverDiffFuncType(IRFuncType* const funcType)
     return true;
 }
 
-IRInst* DifferentialPairTypeBuilder::findSpecializationForParam(
-    IRInst* specializeInst,
-    IRInst* genericParam)
-{
-    // Get base generic that's being specialized.
-    auto genericType = as<IRGeneric>(as<IRSpecialize>(specializeInst)->getBase());
-    SLANG_ASSERT(genericType);
-
-    // Find the index of genericParam in the base generic.
-    int paramIndex = -1;
-    int currentIndex = 0;
-    for (auto param : genericType->getParams())
-    {
-        if (param == genericParam)
-            paramIndex = currentIndex;
-        currentIndex++;
-    }
-
-    SLANG_ASSERT(paramIndex >= 0);
-
-    // Return the corresponding operand in the specialization inst.
-    return specializeInst->getOperand(1 + paramIndex);
-}
-
-IRInst* DifferentialPairTypeBuilder::emitFieldAccessor(
-    IRBuilder* builder,
-    IRInst* baseInst,
-    IRStructKey* key)
-{
-    IRInst* pairType = nullptr;
-    if (auto basePtrType = asRelevantPtrType(baseInst->getDataType()))
-    {
-        auto loweredType = lowerDiffPairType(builder, basePtrType->getValueType());
-
-        pairType = builder->getPtrType((IRType*)loweredType);
-    }
-    else
-    {
-        auto loweredType = lowerDiffPairType(builder, baseInst->getDataType());
-        pairType = loweredType;
-    }
-
-    if (auto basePairStructType = as<IRStructType>(pairType))
-    {
-        return as<IRFieldExtract>(builder->emitFieldExtract(
-            findStructField(basePairStructType, key)->getFieldType(),
-            baseInst,
-            key));
-    }
-    else if (auto ptrType = asRelevantPtrType(pairType))
-    {
-        if (auto ptrInnerSpecializedType = as<IRSpecialize>(ptrType->getValueType()))
-        {
-            auto genericType =
-                findInnerMostGenericReturnVal(as<IRGeneric>(ptrInnerSpecializedType->getBase()));
-            if (const auto genericBasePairStructType = as<IRStructType>(genericType))
-            {
-                return as<IRFieldAddress>(builder->emitFieldAddress(
-                    builder->getPtrType((IRType*)findSpecializationForParam(
-                        ptrInnerSpecializedType,
-                        findStructField(ptrInnerSpecializedType, key)->getFieldType())),
-                    baseInst,
-                    key));
-            }
-        }
-        else if (auto ptrBaseStructType = as<IRStructType>(ptrType->getValueType()))
-        {
-            return as<IRFieldAddress>(builder->emitFieldAddress(
-                builder->getPtrType(
-                    (IRType*)findStructField(ptrBaseStructType, key)->getFieldType()),
-                baseInst,
-                key));
-        }
-    }
-    else if (auto specializedType = as<IRSpecialize>(pairType))
-    {
-        auto genericType = findInnerMostGenericReturnVal(as<IRGeneric>(specializedType->getBase()));
-        if (auto genericBasePairStructType = as<IRStructType>(genericType))
-        {
-            return as<IRFieldExtract>(builder->emitFieldExtract(
-                (IRType*)findSpecializationForParam(
-                    specializedType,
-                    findStructField(genericBasePairStructType, key)->getFieldType()),
-                baseInst,
-                key));
-        }
-        else if (auto genericPtrType = asRelevantPtrType(genericType))
-        {
-            if (auto genericPairStructType = as<IRStructType>(genericPtrType->getValueType()))
-            {
-                return as<IRFieldAddress>(builder->emitFieldAddress(
-                    builder->getPtrType((IRType*)findSpecializationForParam(
-                        specializedType,
-                        findStructField(genericPairStructType, key)->getFieldType())),
-                    baseInst,
-                    key));
-            }
-        }
-    }
-    else
-    {
-        SLANG_UNEXPECTED("Unrecognized field. Cannot emit field accessor");
-    }
-    return nullptr;
-}
-
 bool isExistentialOrRuntimeInst(IRInst* inst)
 {
     if (auto lookup = as<IRLookupWitnessMethod>(inst))
@@ -326,206 +220,6 @@ IRInst* getCacheKey(IRBuilder* builder, IRInst* primalType)
     return primalType;
 }
 
-IRInst* DifferentialPairTypeBuilder::emitPrimalFieldAccess(
-    IRBuilder* builder,
-    IRType* loweredPairType,
-    IRInst* baseInst)
-{
-    if (isRuntimeType(loweredPairType))
-    {
-        // Do nothing.
-        return nullptr;
-    }
-    else
-    {
-        return emitFieldAccessor(builder, baseInst, this->globalPrimalKey);
-    }
-}
-
-IRInst* DifferentialPairTypeBuilder::emitDiffFieldAccess(
-    IRBuilder* builder,
-    IRType* loweredPairType,
-    IRInst* baseInst)
-{
-    if (isRuntimeType(loweredPairType))
-    {
-        // Do nothing.
-        return nullptr;
-    }
-    else
-    {
-        return emitFieldAccessor(builder, baseInst, this->globalDiffKey);
-    }
-}
-
-IRStructKey* DifferentialPairTypeBuilder::_getOrCreateDiffStructKey()
-{
-    if (!this->globalDiffKey)
-    {
-        IRBuilder builder(sharedContext->moduleInst);
-        // Insert directly at top level (skip any generic scopes etc.)
-        builder.setInsertInto(sharedContext->moduleInst);
-
-        this->globalDiffKey = builder.createStructKey();
-        builder.addNameHintDecoration(
-            this->globalDiffKey,
-            UnownedTerminatedStringSlice("differential"));
-    }
-
-    return this->globalDiffKey;
-}
-
-IRStructKey* DifferentialPairTypeBuilder::_getOrCreatePrimalStructKey()
-{
-    if (!this->globalPrimalKey)
-    {
-        // Insert directly at top level (skip any generic scopes etc.)
-        IRBuilder builder(sharedContext->moduleInst);
-        builder.setInsertInto(sharedContext->moduleInst);
-
-        this->globalPrimalKey = builder.createStructKey();
-        builder.addNameHintDecoration(
-            this->globalPrimalKey,
-            UnownedTerminatedStringSlice("primal"));
-    }
-
-    return this->globalPrimalKey;
-}
-
-IRInst* DifferentialPairTypeBuilder::_createDiffPairType(IRType* origBaseType, IRType* diffType)
-{
-    switch (origBaseType->getOp())
-    {
-    case kIROp_LookupWitnessMethod:
-    case kIROp_Specialize:
-    case kIROp_Param:
-        return nullptr;
-    default:
-        break;
-    }
-
-    IRBuilder builder(sharedContext->moduleInst);
-    builder.setInsertBefore(diffType);
-
-    auto pairStructType = builder.createStructType();
-    StringBuilder nameBuilder;
-    nameBuilder << "DiffPair_";
-    getTypeNameHint(nameBuilder, origBaseType);
-    builder.addNameHintDecoration(pairStructType, nameBuilder.toString().getUnownedSlice());
-
-    builder.createStructField(pairStructType, _getOrCreatePrimalStructKey(), origBaseType);
-    builder.createStructField(pairStructType, _getOrCreateDiffStructKey(), (IRType*)diffType);
-    return pairStructType;
-}
-
-
-IRInst* DifferentialPairTypeBuilder::lowerDiffPairType(IRBuilder* builder, IRType* originalPairType)
-{
-    IRInst* result = nullptr;
-    auto pairType = as<IRDifferentialPairTypeBase>(originalPairType);
-    if (!pairType)
-        return originalPairType;
-
-    // We make our type cache keyed on the primal type, not the pair type.
-    // This is because there may be duplicate pair types for the same
-    // primal type but different witness tables, and we don't want to treat
-    // them as distinct.
-    // We might want to consider making witness tables part of IR
-    // deduplication (make them HOISTABLE insts), but that is a bigger
-    // change. Another alternative is to make the witness operand of
-    // `IRDifferentialPairTypeBase` be child instead of an operand
-    // so that it is not considered part of the type for deduplication
-    // purposes.
-
-    auto primalType = pairType->getValueType();
-
-    if (isRuntimeType(primalType))
-    {
-        // Do nothing.
-        return originalPairType;
-    }
-    else if (auto typePack = as<IRTypePack>(primalType))
-    {
-        // Lower DiffPair(TypePack(a_0, a_1, ...), MakeWitnessPack(w_0, w_1, ...)) as
-        // TypePack(DiffPair(a_0, w_0), DiffPair(a_1, w_1), ...)
-        //
-        auto cacheKey = primalType;
-        if (pairTypeCache.tryGetValue(cacheKey, result))
-            return result;
-
-        auto packWitness = pairType->getWitness();
-
-        // Right now we only support concrete witness tables for type packs.
-        auto concretePackWitness = as<IRWitnessTable>(packWitness);
-        SLANG_ASSERT(concretePackWitness);
-
-        // Get diff type pack.
-        IRTypePack* diffTypePack = nullptr;
-
-        if (concretePackWitness->getConformanceType() ==
-            this->sharedContext->differentiableInterfaceType)
-            diffTypePack = as<IRTypePack>(findWitnessTableEntry(
-                concretePackWitness,
-                this->sharedContext->differentialAssocTypeStructKey));
-        else if (
-            concretePackWitness->getConformanceType() ==
-            this->sharedContext->differentiablePtrInterfaceType)
-            diffTypePack = as<IRTypePack>(findWitnessTableEntry(
-                concretePackWitness,
-                this->sharedContext->differentialAssocRefTypeStructKey));
-        else
-            SLANG_UNEXPECTED("Unexpected witness table");
-
-        SLANG_ASSERT(diffTypePack);
-
-        List<IRType*> args;
-        for (UInt i = 0; i < typePack->getOperandCount(); i++)
-        {
-            auto type = (IRType*)typePack->getOperand(i);
-            auto diffType = (IRType*)typePack->getOperand(i);
-
-            if (pairTypeCache.tryGetValue(type, result))
-            {
-                args.add((IRType*)result);
-                continue;
-            }
-
-            // Lower the diff pair type.
-            auto loweredPairType = (IRType*)_createDiffPairType(type, diffType);
-
-            pairTypeCache.add(type, loweredPairType);
-            args.add(loweredPairType);
-        }
-
-        auto loweredTypePack = builder->getTypePack(args.getCount(), args.getBuffer());
-        // TODO: Unify the cache between the three cases.
-        pairTypeCache.add(cacheKey, loweredTypePack);
-
-        return loweredTypePack;
-    }
-    else
-    {
-        auto cacheKey = primalType;
-        if (pairTypeCache.tryGetValue(primalType, result))
-            return result;
-
-        if (as<IRParam, IRDynamicCastBehavior::NoUnwrap>(primalType))
-        {
-            result = nullptr;
-            return result;
-        }
-
-        auto diffType = _getDiffTypeFromPairType(sharedContext, builder, pairType);
-        if (!diffType)
-            return result;
-
-        // Concrete case.
-        result = _createDiffPairType(primalType, (IRType*)diffType);
-        pairTypeCache.add(cacheKey, result);
-
-        return result;
-    }
-}
 
 IRInterfaceType* findDifferentiableRefInterface(IRModuleInst* moduleInst)
 {
@@ -746,6 +440,10 @@ IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     IRInst* target,
     ValAssociationKind kind)
 {
+    IRBuilder builder(sharedContext->moduleInst);
+    return builder.tryLookupAnnotation(target, kind);
+
+    /*
     if (!target)
         return nullptr;
 
@@ -769,6 +467,7 @@ IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
 
     associationCache.add(key, result);
     return result;
+    */
 }
 
 
@@ -1095,6 +794,71 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
         List<IRInst*>());
 }
 
+
+void DifferentiableTypeConformanceContext::markDiffTypeInst(
+    IRBuilder* builder,
+    IRInst* diffInst,
+    IRType* primalType)
+{
+    // Ignore module-level insts.
+    if (as<IRModuleInst>(diffInst->getParent()))
+        return;
+
+    // Also ignore generic-container-level insts.
+    if (as<IRBlock>(diffInst->getParent()) && as<IRGeneric>(diffInst->getParent()->getParent()))
+        return;
+
+    // TODO: This logic is a bit of a hack. We need to determine if the type is
+    // relevant to ptr-type computation or not, or more complex applications
+    // that use dynamic dispatch + ptr types will fail.
+    //
+    if (as<IRType>(diffInst))
+    {
+        builder->markInstAsDifferential(diffInst, nullptr);
+        return;
+    }
+
+    SLANG_ASSERT(diffInst);
+    SLANG_ASSERT(primalType);
+
+    if (isDifferentiableValueType(primalType))
+    {
+        builder->markInstAsDifferential(diffInst, primalType);
+    }
+    else if (isDifferentiablePtrType(primalType))
+    {
+        builder->markInstAsPrimal(diffInst);
+    }
+    else
+    {
+        // Stop-gap solution to go with differential inst for now.
+        builder->markInstAsDifferential(diffInst, primalType);
+    }
+}
+
+void DifferentiableTypeConformanceContext::markDiffPairTypeInst(
+    IRBuilder* builder,
+    IRInst* diffPairInst,
+    IRType* pairType)
+{
+    SLANG_ASSERT(diffPairInst);
+    SLANG_ASSERT(pairType);
+    SLANG_ASSERT(as<IRDifferentialPairTypeBase>(pairType));
+
+    if (as<IRDifferentialPairType>(pairType))
+    {
+        builder->markInstAsMixedDifferential(diffPairInst, pairType);
+    }
+    else if (as<IRDifferentialPtrPairType>(pairType))
+    {
+        builder->markInstAsPrimal(diffPairInst);
+    }
+    else
+    {
+        SLANG_UNEXPECTED("unexpected differentiable type");
+    }
+}
+
 void copyCheckpointHints(
     IRBuilder* builder,
     IRGlobalValueWithCode* oldInst,
@@ -1409,15 +1173,6 @@ struct RemoveTypeAnnotationInstsPass : InstPassBase
     }
     void processModule()
     {
-        processInstsOfType<IRDifferentiableTypeAnnotation>(
-            kIROp_DifferentiableTypeAnnotation,
-            [&](IRDifferentiableTypeAnnotation* annotation) { annotation->removeAndDeallocate(); });
-
-        // TODO: Unify this with the above.
-        processInstsOfType<IRWitnessTableAnnotation>(
-            kIROp_WitnessTableAnnotation,
-            [&](IRWitnessTableAnnotation* annotation) { annotation->removeAndDeallocate(); });
-
         processInstsOfType<IRAssociatedInstAnnotation>(
             kIROp_AssociatedInstAnnotation,
             [&](IRAssociatedInstAnnotation* annotation) { annotation->removeAndDeallocate(); });
@@ -1745,6 +1500,19 @@ void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc)
             cloneDecoration(decor, destFunc);
             break;
         default:
+            break;
+        }
+    }
+}
+
+void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc)
+{
+    for (auto decor : origFunc->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        case kIROp_ForceInlineDecoration:
+            cloneDecoration(decor, diffFunc);
             break;
         }
     }

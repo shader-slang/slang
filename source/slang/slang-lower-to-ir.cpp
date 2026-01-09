@@ -3965,17 +3965,7 @@ void lowerAssociatedVal(IRGenContext* context, IRInst* irKey, SlangInt id, Val* 
     }
 
     if (irAssocVal)
-    {
-        IRInst* args[] = {
-            irKey,
-            context->irBuilder->getIntValue(context->irBuilder->getIntType(), id),
-            irAssocVal};
-        context->irBuilder->emitIntrinsicInst(
-            context->irBuilder->getVoidType(),
-            kIROp_AssociatedInstAnnotation,
-            3,
-            args);
-    }
+        context->irBuilder->addAnnotation(irKey, (ValAssociationKind)id, irAssocVal);
 };
 
 void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
@@ -11917,141 +11907,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             diffAttr->resolveDictionaryKeys();
         }
 
-        // If our function is differentiable, register a callback so the derivative
-        // annotations for types can be lowered.
-        //
-        /*
-        if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
-        {
-            auto diffAttr = decl->findModifier<DifferentiableAttribute>();
-
-            auto diffTypeWitnessMap = diffAttr->getMapTypeToIDifferentiableWitness();
-            diffAttr->resolveDictionaryKeys();
-            OrderedDictionary<Type*, SubtypeWitness*> resolveddiffTypeWitnessMap;
-
-            // Go through each entry in the map and resolve the key.
-            for (auto& entry : diffTypeWitnessMap)
-            {
-                auto resolvedKey = as<Type>(entry.key->resolve());
-                resolveddiffTypeWitnessMap[resolvedKey] =
-                    as<SubtypeWitness>(as<Val>(entry.value)->resolve());
-            }
-
-            auto lowerAssociatedVal = [&](IRInst* irKey, SlangInt id, Val* associatedVal)
-            {
-                IRInst* irAssocVal = nullptr;
-                if (auto associatedDeclRef = as<DeclRefBase>(associatedVal))
-                {
-                    if (auto funcAliasDeclRef =
-                            DeclRef<Decl>(associatedDeclRef).as<FuncAliasDecl>())
-                    {
-                        associatedDeclRef = substituteDeclRef(
-                            SubstitutionSet(associatedDeclRef),
-                            getCurrentASTBuilder(),
-                            funcAliasDeclRef.getDecl()->targetDeclRef);
-                    }
-
-                    if (auto funcDeclRef = DeclRef<Decl>(associatedDeclRef).as<FunctionDeclBase>())
-                    {
-                        FuncDeclBaseTypeInfo innerInfo;
-                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
-
-                        auto targetDeclRefInfo =
-                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
-
-                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-                        irAssocVal = _targetIRFunc;
-                    }
-                    else if (
-                        auto typeAliasDeclRef =
-                            DeclRef<Decl>(associatedDeclRef).as<TypeAliasDecl>())
-                    {
-
-                        auto typeToLower = substituteType(
-                            SubstitutionSet(typeAliasDeclRef),
-                            getCurrentASTBuilder(),
-                            typeAliasDeclRef.getDecl()->type);
-                        irAssocVal = lowerType(subContext, typeToLower);
-                    }
-                    else
-                    {
-                        // Assume that we have a direct reference to a type here...
-                        LoweredValInfo info =
-                            emitDeclRef(subContext, associatedDeclRef, subBuilder->getTypeKind());
-                        SLANG_ASSERT(info.flavor == LoweredValInfo::Flavor::Simple);
-                        if (info.flavor == LoweredValInfo::Flavor::Simple)
-                        {
-                            irAssocVal = getSimpleVal(subContext, info);
-                        }
-                    }
-                }
-                else
-                {
-                    auto loweredVal = lowerVal(subContext, associatedVal);
-                    SLANG_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-                    irAssocVal = getSimpleVal(subContext, loweredVal);
-                }
-
-                if (irAssocVal)
-                {
-                    IRInst* args[] = {
-                        irKey,
-                        context->irBuilder->getIntValue(context->irBuilder->getIntType(), id),
-                        irAssocVal};
-                    context->irBuilder->emitIntrinsicInst(
-                        context->irBuilder->getVoidType(),
-                        kIROp_AssociatedInstAnnotation,
-                        3,
-                        args);
-                }
-            };
-
-            subContext->registerTypeCallback(
-                [&](IRGenContext* context, Type* type, IRType* irType)
-                {
-                    if (workingTypeSet.contains(type))
-                        return irType;
-
-                    if (diffAttr->hasAssociatedVals(type))
-                    {
-                        workingTypeSet.add(type);
-
-                        auto dict = diffAttr->tryGetAssociatedVals(type);
-                        for (auto idValPair : dict)
-                        {
-                            lowerAssociatedVal(irType, idValPair.key, idValPair.value->resolve());
-                        }
-
-                        workingTypeSet.remove(type);
-                    }
-
-                    return irType;
-                });
-
-            subContext->registerDeclRefCallback(
-                [&](IRGenContext* context, DeclRefBase* val, IRInst* irVal)
-                {
-                    if (workingSet.contains(val))
-                        return irVal;
-
-                    if (diffAttr->hasAssociatedVals(val))
-                    {
-                        workingSet.add(val);
-
-                        auto dict = diffAttr->tryGetAssociatedVals(val);
-                        for (auto idValPair : dict)
-                        {
-                            lowerAssociatedVal(irVal, idValPair.key, idValPair.value->resolve());
-                        }
-
-                        workingSet.remove(val);
-                    }
-                    return irVal;
-                });
-        }
-        */
-
         // Register the value now, to avoid any possible infinite recursion when lowering the body
         // or attributes.
         IRInst* irFunc = subBuilder->createFunc();
@@ -12464,9 +12319,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
             }
         }
-
-        subContext->registerTypeCallback(nullptr);
-        subContext->registerDeclRefCallback(nullptr);
 
         getBuilder()->addHighLevelDeclDecoration(irFunc, decl);
 

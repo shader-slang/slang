@@ -1749,7 +1749,6 @@ struct TypeFlowSpecializationContext
             // DifferentialPair<IFoo>
             IRBuilder builder(module);
 
-            AssociationLookupContext ctx;
             auto primalInfo = as<IRTaggedUnionType>(tryGetInfo(context, inst->getPrimal()));
             if (!primalInfo)
                 return none();
@@ -1757,28 +1756,6 @@ struct TypeFlowSpecializationContext
             auto diffInfo = as<IRTaggedUnionType>(tryGetInfo(context, inst->getDifferential()));
             if (!diffInfo)
                 return none();
-
-            /*HashSet<IRInst*> diffWitnessSet;
-            forEachInSet(
-                module,
-                cast<IRTypeSet>(primalInfo->getTypeSet()),
-                [&](IRInst* typeInst)
-                {
-                    auto diffPairType = as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
-                        typeInst,
-                        ValAssociationKind::DifferentialPairType));
-
-                    if (diffPairType)
-                    {
-                        // Table for primal : IDifferentiable
-                        diffWitnessSet.add(cast<IRWitnessTable>(diffPairType->getWitness()));
-                    }
-                });
-
-            auto witnessInfo = makeTaggedUnionType(
-                as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, diffWitnessSet)));*/
-
-            // return builder.getDifferentialPairType(primalInfo, witnessInfo);
 
             return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
         }
@@ -1793,36 +1770,9 @@ struct TypeFlowSpecializationContext
             if (!diffInfo)
                 return none();
 
-            // HashSet<IRInst*> diffTypeSet;
-            // AssociationLookupContext ctx;
-            /*
-            forEachInSet(
-                module,
-                cast<IRTypeSet>(primalInfo->getSet()),
-                [&](IRInst* typeInst)
-                {
-                    auto diffPairType = as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
-                        typeInst,
-                        ValAssociationKind::DifferentialPairType));
-                    auto diffType =
-                        ctx.tryGetAssociationOfKind(typeInst, ValAssociationKind::DifferentialType);
-
-                    if (diffType)
-                    {
-                        // Table for primal : IDifferentiable
-                        diffTypeSet.add(diffType);
-                    }
-                });
-            */
-
-            /*
-            auto diffUntaggedUnionType =
-                makeUntaggedUnionType(as<IRTypeSet>(builder.getSet(kIROp_TypeSet, diffTypeSet)));*/
-
             if (primalInfo->getSet()->isSingleton() && diffInfo->getSet()->isSingleton())
                 return none();
 
-            // return builder.getDifferentialPairType(primalInfo, witnessInfo);
             return builder.getTupleType(List<IRType*>({primalInfo, diffInfo}));
         }
         else
@@ -1853,70 +1803,8 @@ struct TypeFlowSpecializationContext
     {
         SLANG_UNUSED(context);
         IRBuilder builder(module);
-        AssociationLookupContext ctx;
         if (auto pairInfo = tryGetInfo(context, inst->getOperand(0)))
         {
-            /*
-            if (auto pairType = as<IRDifferentialPairType>(pairInfo))
-            {
-                IRTypeSet* primalTypeSet = nullptr;
-                bool isTaggedUnion = false;
-
-                if (auto primalTaggedUnion = as<IRTaggedUnionType>(pairType->getValueType()))
-                {
-                    primalTypeSet = cast<IRTypeSet>(primalTaggedUnion->getTypeSet());
-                    isTaggedUnion = true;
-                }
-                else if (
-                    auto primalUntaggedUnion = as<IRUntaggedUnionType>(pairType->getValueType()))
-                {
-                    primalTypeSet = cast<IRTypeSet>(primalUntaggedUnion->getSet());
-                    isTaggedUnion = false;
-                }
-                else
-                {
-                    // Concrete type case - nothing dynamic to specialize.
-                    return none();
-                }
-
-                HashSet<IRInst*> diffWitnessSet;
-                HashSet<IRInst*> diffTypeSet;
-                forEachInSet(
-                    module,
-                    primalTypeSet,
-                    [&](IRInst* typeInst)
-                    {
-                        auto diffType = (ctx.tryGetAssociationOfKind(
-                            typeInst,
-                            ValAssociationKind::DifferentialType));
-                        if (diffType)
-                            diffTypeSet.add(diffType);
-
-                        auto diffDiffPairType =
-                            as<IRDifferentialPairType>(ctx.tryGetAssociationOfKind(
-                                diffType,
-                                ValAssociationKind::DifferentialPairType));
-                        if (diffDiffPairType)
-                        {
-                            // Table for .Differential : IDifferentiable
-                            diffWitnessSet.add(
-                                cast<IRWitnessTable>(diffDiffPairType->getWitness()));
-                        }
-                    });
-
-                if (isTaggedUnion)
-                {
-                    return makeTaggedUnionType(
-                        as<IRWitnessTableSet>(
-                            builder.getSet(kIROp_WitnessTableSet, diffWitnessSet)));
-                }
-                else
-                {
-                    return makeUntaggedUnionType(
-                        as<IRTypeSet>(builder.getSet(kIROp_TypeSet, diffTypeSet)));
-                }
-            }
-            */
             if (auto pairType = as<IRTupleType>(pairInfo))
             {
                 return pairType->getOperand(1);

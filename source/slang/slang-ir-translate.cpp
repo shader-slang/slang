@@ -366,22 +366,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         auto resolvedOperand = ctx->resolveInst(operand);
         if (resolvedOperand != operand)
             changed = true;
-        // operands.add(resolvedOperand);
     }
-
-    // If any operand changed, we need to recreate the instruction.
-    /*
-    IRInst* instWithCanonicalOperands = inst;
-    if (changed)
-    {
-        IRBuilder builder(ctx->getModule());
-        builder.setInsertBefore(inst);
-        instWithCanonicalOperands = builder.emitIntrinsicInst(
-            inst->getDataType(),
-            inst->getOp(),
-            operands.getCount(),
-            operands.getBuffer());
-    }*/
 
     // Extract effective inst post-resolution. (the inst may have changed).
     IRInst* instWithCanonicalOperands = instRef->getOperand(0);
@@ -407,12 +392,6 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
     auto memoize = [&](IRInst* resultInst)
     {
-        /*
-        builder.addCompilerDictionaryEntry(
-            ctx->getModule()->getTranslationDict(),
-            instWithCanonicalOperands,
-            resultInst);
-        */
         builder.setCompilerDictionaryEntryValue(entry, resultInst);
         return resultInst;
     };

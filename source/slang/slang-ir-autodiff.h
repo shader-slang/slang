@@ -39,14 +39,6 @@ typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
 struct AutoDiffTranscriberBase;
 
-struct DiffTranscriberSet
-{
-    AutoDiffTranscriberBase* forwardTranscriber = nullptr;
-    AutoDiffTranscriberBase* primalTranscriber = nullptr;
-    AutoDiffTranscriberBase* propagateTranscriber = nullptr;
-    AutoDiffTranscriberBase* backwardTranscriber = nullptr;
-};
-
 enum class DiffConformanceKind
 {
     Any = 0,  // Perform actions for any conformance (infer from context)
@@ -83,7 +75,6 @@ struct AutoDiffSharedContext
     // `IDifferential`.
     IRStructKey* differentialAssocTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocTypeWitnessTableType = nullptr;
-
 
     // The struct key for the 'zero()' associated type
     // defined inside IDifferential. We use this to lookup the
@@ -133,8 +124,6 @@ struct AutoDiffSharedContext
     bool isInterfaceAvailable = false;
     bool isPtrInterfaceAvailable = false;
 
-    DiffTranscriberSet transcriberSet;
-
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
 
 private:
@@ -177,7 +166,6 @@ private:
             getInterfaceEntryAtIndex(differentiableInterfaceType, 5)->getRequirementKey());
     }
 
-
     IRStructKey* findDifferentialPtrTypeStructKey()
     {
         return cast<IRStructKey>(
@@ -200,60 +188,13 @@ private:
     IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
 };
 
-struct AssociationLookupContext
-{
-    struct ValAssociationCacheKey
-    {
-        IRInst* inst;
-        ValAssociationKind associationKind;
-        bool operator==(const ValAssociationCacheKey& other) const
-        {
-            return inst == other.inst && associationKind == other.associationKind;
-        }
-
-        HashCode getHashCode() const
-        {
-            Hasher hasher;
-            hasher.hashValue(inst);
-            hasher.hashValue(static_cast<int>(associationKind));
-            return hasher.getResult();
-        }
-    };
-
-    // (inst, association-kind) -> associated-inst
-    Dictionary<ValAssociationCacheKey, IRInst*> associationCache;
-
-    IRInst* tryGetAssociationOfKind(IRInst* target, ValAssociationKind kind)
-    {
-        ValAssociationCacheKey key = {target, kind};
-        if (IRInst* cachedResult; associationCache.tryGetValue(key, cachedResult))
-            return cachedResult;
-
-        IRInst* result = nullptr;
-        for (auto use = target->firstUse; use; use = use->nextUse)
-        {
-            if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
-            {
-                if (annotation->getConformanceID() == (IRIntegerValue)kind &&
-                    annotation->getTarget() == target)
-                {
-                    result = annotation->getInst();
-                    break;
-                }
-            }
-        }
-
-        associationCache.add(key, result);
-        return result;
-    }
-};
-
 struct DifferentiableTypeConformanceContext
 {
     AutoDiffSharedContext* sharedContext;
 
     IRGlobalValueWithCode* parentFunc = nullptr;
 
+    /*
     struct ValAssociationCacheKey
     {
         IRInst* inst;
@@ -273,7 +214,7 @@ struct DifferentiableTypeConformanceContext
     };
 
     // (inst, association-kind) -> associated-inst
-    Dictionary<ValAssociationCacheKey, IRInst*> associationCache;
+    Dictionary<ValAssociationCacheKey, IRInst*> associationCache;*/
 
     IRFunc* existentialDAddFunc = nullptr;
 
@@ -557,6 +498,27 @@ struct DifferentiableTypeConformanceContext
         return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
     }
 
+    IRType* tryGetDiffPairType(IRBuilder* builder, IRType* originalType)
+    {
+        // In case we're dealing with a parameter type, we need to split out the direction first.
+        // If we're not, then the split & merge are no-ops.
+        //
+        auto [passingMode, baseType] = splitParameterDirectionAndType(originalType);
+        auto basePairType =
+            tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPairType);
+
+        if (!basePairType)
+        {
+            basePairType =
+                tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPtrPairType);
+        }
+
+        if (!basePairType)
+            return nullptr;
+
+        return fromDirectionAndType(builder, passingMode, (IRType*)basePairType);
+    }
+
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
     // Note that inside a generic block, this will be a witness table lookup instruction
@@ -634,63 +596,12 @@ struct DifferentiableTypeConformanceContext
         IRInst* op2);
 
     IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType);
+
+    void markDiffTypeInst(IRBuilder* builder, IRInst* diffInst, IRType* primalType);
+
+    void markDiffPairTypeInst(IRBuilder* builder, IRInst* diffPairInst, IRType* pairType);
 };
 
-
-struct DifferentialPairTypeBuilder
-{
-    DifferentialPairTypeBuilder() = default;
-
-    DifferentialPairTypeBuilder(AutoDiffSharedContext* sharedContext)
-        : sharedContext(sharedContext)
-    {
-    }
-
-    IRInst* findSpecializationForParam(IRInst* specializeInst, IRInst* genericParam);
-
-    IRInst* emitFieldAccessor(IRBuilder* builder, IRInst* baseInst, IRStructKey* key);
-
-    IRInst* emitPrimalFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
-
-    IRInst* emitDiffFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
-
-    IRStructKey* _getOrCreateDiffStructKey();
-
-    IRStructKey* _getOrCreatePrimalStructKey();
-
-    IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType);
-
-    IRInst* lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
-
-    struct PairStructKey
-    {
-        IRInst* originalType;
-        IRInst* diffType;
-    };
-
-    // Cache from pair types to lowered type.
-    Dictionary<IRInst*, IRInst*> pairTypeCache;
-
-    // Even more caches for easier access to original primal/diff types
-    // (Only used for existential pair types). For regular pair types,
-    // these are easy to find right on the type itself.
-    //
-    Dictionary<IRInst*, IRType*> primalTypeMap;
-    Dictionary<IRInst*, IRType*> diffTypeMap;
-
-
-    IRStructKey* globalPrimalKey = nullptr;
-
-    IRStructKey* globalDiffKey = nullptr;
-
-    IRInst* genericDiffPairType = nullptr;
-
-    List<IRInst*> generatedTypeList;
-
-    AutoDiffSharedContext* sharedContext = nullptr;
-
-    IRInterfaceType* commonDiffPairInterface = nullptr;
-};
 
 void stripAutoDiffDecorations(IRModule* module);
 void stripTempDecorations(IRInst* inst);
@@ -769,5 +680,21 @@ bool isDifferentialOrRecomputeBlock(IRBlock* block);
 
 void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
 
+void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
+
+inline bool isDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRDifferentialInstDecoration>();
+}
+
+inline bool isPrimalInst(IRInst* inst)
+{
+    return inst->findDecoration<IRPrimalInstDecoration>() || (as<IRConstant>(inst) != nullptr);
+}
+
+inline bool isMixedDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRMixedDifferentialInstDecoration>();
+}
 
 }; // namespace Slang

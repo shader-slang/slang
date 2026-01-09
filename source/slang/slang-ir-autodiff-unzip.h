@@ -4,9 +4,7 @@
 #include "slang-compiler.h"
 #include "slang-ir-autodiff-fwd.h"
 #include "slang-ir-autodiff-primal-hoist.h"
-#include "slang-ir-autodiff-propagate.h"
 #include "slang-ir-autodiff-region.h"
-#include "slang-ir-autodiff-transcriber-base.h"
 #include "slang-ir-autodiff.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-ssa.h"
@@ -15,8 +13,6 @@
 
 namespace Slang
 {
-
-struct ParameterBlockTransposeInfo;
 
 struct DiffUnzipPass
 {

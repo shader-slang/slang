@@ -309,7 +309,7 @@ struct UseOrPseudoUse
 //   from the original block, but located in the corresponding the reverse
 //   diff region so their results are accessible in the diff block for
 //   derivative computation.
-// - A 'diff' block, which contains the transcribed instructions from the
+// - A 'diff' block, which contains the translated instructions from the
 //   original block.
 struct BlockSplitInfo : public RefObject
 {

@@ -3200,6 +3200,40 @@ IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
     return entry->getValue();
 }
 
+void IRBuilder::addAnnotation(IRInst* target, ValAssociationKind kind, IRInst* annotation)
+{
+    IRInst* args[] = {target, getIntValue(getUIntType(), (UInt)kind), annotation};
+    emitIntrinsicInst(getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
+    this->getModule()->getAssociatedInstCache()->remove({target, kind});
+}
+
+IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
+{
+    if (!target)
+        return nullptr;
+
+    ValAssociationCacheKey key = {target, kind};
+    if (IRInst* cachedResult; getModule()->getAssociatedInstCache()->tryGetValue(key, cachedResult))
+        return cachedResult;
+
+    IRInst* result = nullptr;
+    for (auto use = target->firstUse; use; use = use->nextUse)
+    {
+        if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
+        {
+            if (annotation->getConformanceID() == (IRIntegerValue)kind &&
+                annotation->getTarget() == target)
+            {
+                result = annotation->getInst();
+                break;
+            }
+        }
+    }
+
+    getModule()->getAssociatedInstCache()->add(key, result);
+    return result;
+}
+
 IRInst* IRBuilder::emitDebugSource(
     UnownedStringSlice fileName,
     UnownedStringSlice source,
@@ -8163,8 +8197,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                     dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                     addToWorkList(user, existingVal);
 
-                    if (!user->hasUses() && (as<IRDifferentiableTypeAnnotation>(user) ||
-                                             as<IRAssociatedInstAnnotation>(user)))
+                    if (!user->hasUses() && (as<IRAssociatedInstAnnotation>(user)))
                         duplicateAnnotations.add(user);
                 }
                 else

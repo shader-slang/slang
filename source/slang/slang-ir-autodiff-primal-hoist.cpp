@@ -30,7 +30,7 @@ bool containsOperand(IRInst* inst, IRInst* operand)
     return false;
 }
 
-static bool isDifferentialInst(IRInst* inst)
+static bool _isDifferentialInst(IRInst* inst)
 {
     auto parent = inst->getParent();
     if (parent->findDecoration<IRDifferentialInstDecoration>())
@@ -443,7 +443,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
         {
-            if (!isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
+            if (!_isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
                 !as<IRBlock>(operand->get()) && !(as<IRModuleInst>(operand->get()->getParent())) &&
                 !isDifferentialBlock(getBlock(operand->get())))
                 workList.add(operand);
@@ -486,15 +486,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
             // General case: we'll add all primal operands to the work list.
             addPrimalOperandsToWorkList(child);
-
-            // Also add type annotations to the list, since these have to be made available to the
-            // function context.
-            //
-            if (as<IRDifferentiableTypeAnnotation>(child))
-            {
-                checkpointInfo->recomputeSet.add(child);
-                addPrimalOperandsToWorkList(child);
-            }
 
             // We'll be conservative with the decorations we consider as differential uses
             // of a primal inst, in order to avoid weird behaviour with some decorations
@@ -550,7 +541,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
                 checkpointInfo->recomputeSet.add(result.instToRecompute);
 
-                if (isDifferentialInst(use.user) && use.irUse)
+                if (_isDifferentialInst(use.user) && use.irUse)
                     usesToReplace.add(use.irUse);
 
                 if (auto param = as<IRParam>(result.instToRecompute))
@@ -673,7 +664,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 //
                 for (auto use = var->firstUse; use; use = use->nextUse)
                 {
-                    if (isDifferentialInst(use->getUser()))
+                    if (_isDifferentialInst(use->getUser()))
                         usesToReplace.add(use);
                 }
             }
@@ -701,7 +692,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
                 for (auto use = call->firstUse; use; use = use->nextUse)
                 {
-                    if (isDifferentialInst(use->getUser()))
+                    if (_isDifferentialInst(use->getUser()))
                         usesToReplace.add(use);
                 }
             }

@@ -817,38 +817,6 @@ struct SpecializationContext
         return false;
     }
 
-    /*bool maybeSpecializeContextTypeOf(IRInst* inst)
-    {
-        // TODO: This is a hack.. we need a nicer way to specialize a
-        // context type lookup.
-        //
-        auto operand = inst->getOperand(0);
-        for (auto use = operand->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (auto annotation = as<IRWitnessTableAnnotation>(user))
-            {
-                if (annotation->getTarget() == inst)
-                {
-                    if (auto wtType =
-    as<IRWitnessTableType>(annotation->getWitnessTable()->getDataType()))
-                    {
-                        if (auto nameHintDecor =
-    wtType->getConformanceType()->findDecoration<IRNameHintDecoration>())
-                        {
-                            if (nameHintDecor->getName() ==
-    UnownedStringSlice("IBackwardDifferentiable"))
-                            {
-                                contextTypeInst = annotation->getWitnessTable()->get
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }*/
-
     // Specializing lookup on witness tables is a general
     // transformation that helps with both generic and
     // existential-based code.

@@ -769,24 +769,6 @@ struct IRPrimalSubstitute : IRInst
 };
 
 FIDDLE()
-struct IRDifferentiableTypeAnnotation : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRWitnessTableAnnotation : IRInst
-{
-    FIDDLE(leafInst())
-    IRInst* getTarget() { return getOperand(0); }
-    IRInst* getWitnessTable() { return getOperand(1); }
-    IRInst* getConformanceType()
-    {
-        return as<IRWitnessTableType>(getWitnessTable()->getDataType())->getConformanceType();
-    }
-};
-
-FIDDLE()
 struct IRAssociatedInstAnnotation : IRInst
 {
     FIDDLE(leafInst())
@@ -3500,6 +3482,10 @@ $(type_info.return_type) $(type_info.method_name)(
     void setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst);
 
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
+
+    // Annotation helpers.
+    void addAnnotation(IRInst* target, ValAssociationKind kind, IRInst* value);
+    IRInst* tryLookupAnnotation(IRInst* target, ValAssociationKind kind);
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 

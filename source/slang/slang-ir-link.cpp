@@ -913,9 +913,14 @@ void cloneGlobalValueWithCodeCommon(
                 }
                 else
                 {
+                    /*
+                    // TODO(sai): Only clone IRAssociatedInstAnnotation if autodiff is enabled & its
+                    // autodiff related.
+                    //
                     if (oi->getOp() == kIROp_DifferentiableTypeAnnotation &&
                         !context->getShared()->useAutodiff)
                         continue;
+                    */
                     cloneInst(context, builder, oi);
                 }
             }
@@ -2212,8 +2217,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
             // and any global parameters if preserve-params option is set.
             if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
                 sharedContext->useAutodiff &&
-                    (as<IRDifferentiableTypeAnnotation>(inst) ||
-                     as<IRWitnessTableAnnotation>(inst) || as<IRAssociatedInstAnnotation>(inst) ||
+                    (as<IRAssociatedInstAnnotation>(inst) ||
                      inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
             {
                 auto cloned = cloneValue(context, inst);

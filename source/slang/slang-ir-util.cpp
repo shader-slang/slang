@@ -78,7 +78,7 @@ bool isPointerOfType(IRInst* type, IRInst* elementType)
 
 bool isAnnotation(IRInst* inst)
 {
-    return as<IRDifferentiableTypeAnnotation>(inst) || as<IRAssociatedInstAnnotation>(inst);
+    return as<IRAssociatedInstAnnotation>(inst);
 }
 
 bool isPtrToClassType(IRInst* type)
@@ -1567,11 +1567,6 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    // Resolve the function to get all its decorations
-    // auto resolvedFunc = getResolvedInstForDecorations(func);
-    // if (!resolvedFunc)
-    //    return;
-
     traverseUsers<IRAssociatedInstAnnotation>(
         callee,
         [&](IRAssociatedInstAnnotation* annotation)
@@ -1579,49 +1574,6 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
             if (annotation->getTarget() == callee)
                 callback(annotation->getInst());
         });
-
-    // We'll scan for appropriate decorations and return
-    // the function references.
-    //
-    // TODO: In the future, as we get more function transformation
-    // passes, we might want to create a parent class for such
-    // decorations that associate functions with each other.
-    //
-    /*for (auto decor : resolvedFunc->getDecorations())
-    {
-        switch (decor->getOp())
-        {
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-            if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
-            {
-                auto associatedCallee = as<IRUserDefinedBackwardDerivativeDecoration>(decor)
-                                            ->getBackwardDerivativeFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        case kIROp_ForwardDerivativeDecoration:
-            if (as<IRForwardDerivativeDecoration>(decor))
-            {
-                auto associatedCallee =
-                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        case kIROp_PrimalSubstituteDecoration:
-            if (as<IRPrimalSubstituteDecoration>(decor))
-            {
-                auto associatedCallee =
-                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        default:
-            break;
-        }
-    }*/
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
