@@ -4189,6 +4189,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastIntToPtr:
             result = emitCastIntToPtr(parent, inst);
             break;
+        case kIROp_BuiltinCast:
+            result = emitBuiltinCast(parent, inst);
+            break;
         case kIROp_PtrCast:
         case kIROp_BitCast:
             result = emitOpBitcast(parent, inst, inst->getDataType(), inst->getOperand(0));
@@ -4900,6 +4903,85 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             subscript->getCoord(),
             subscript->hasSampleCoord() ? subscript->getSampleCoord()
                                         : builder.getIntValue(builder.getIntType(), 0));
+    }
+
+    SpvInst* emitBuiltinCast(SpvInstParent* parent, IRInst* inst)
+    {
+        // `BuiltinCast` is used as a fallback cast in Slang IR when there is no explicit
+        // cast opcode to represent the conversion. For SPIR-V output, it most commonly
+        // appears during legalization of builtins (e.g. tessellation factors) where we
+        // need to reshape between vector and array types.
+        IRInst* value = inst->getOperand(0);
+        IRType* fromType = value->getDataType();
+        IRType* toType = inst->getDataType();
+
+        if (isTypeEqual(fromType, toType))
+        {
+            auto inner = ensureInst(value);
+            registerInst(inst, inner);
+            return inner;
+        }
+
+        // Handle vector <-> array reshapes with identical element type and count.
+        if (auto fromVecType = as<IRVectorType>(fromType))
+        {
+            if (auto toArrayType = as<IRArrayTypeBase>(toType))
+            {
+                if (!isTypeEqual(fromVecType->getElementType(), toArrayType->getElementType()))
+                    SLANG_UNIMPLEMENTED_X("BuiltinCast(vector->array): mismatched element types");
+
+                auto fromCount = getIntVal(fromVecType->getElementCount());
+                auto toCount = getIntVal(toArrayType->getElementCount());
+                if (fromCount != toCount)
+                    SLANG_UNIMPLEMENTED_X("BuiltinCast(vector->array): mismatched element count");
+
+                List<SpvInst*> elements;
+                for (IRIntegerValue i = 0; i < fromCount; ++i)
+                {
+                    elements.add(emitOpCompositeExtract(
+                        parent,
+                        nullptr,
+                        fromVecType->getElementType(),
+                        value,
+                        makeArray(SpvLiteralInteger::from32((uint32_t)i))));
+                }
+
+                return emitCompositeConstruct(parent, inst, toType, elements);
+            }
+        }
+        else if (auto fromArrayType = as<IRArrayTypeBase>(fromType))
+        {
+            if (auto toVecType = as<IRVectorType>(toType))
+            {
+                if (!isTypeEqual(fromArrayType->getElementType(), toVecType->getElementType()))
+                    SLANG_UNIMPLEMENTED_X("BuiltinCast(array->vector): mismatched element types");
+
+                auto fromCount = getIntVal(fromArrayType->getElementCount());
+                auto toCount = getIntVal(toVecType->getElementCount());
+                if (fromCount != toCount)
+                    SLANG_UNIMPLEMENTED_X("BuiltinCast(array->vector): mismatched element count");
+
+                List<SpvInst*> elements;
+                for (IRIntegerValue i = 0; i < fromCount; ++i)
+                {
+                    elements.add(emitOpCompositeExtract(
+                        parent,
+                        nullptr,
+                        toVecType->getElementType(),
+                        value,
+                        makeArray(SpvLiteralInteger::from32((uint32_t)i))));
+                }
+
+                return emitCompositeConstruct(parent, inst, toType, elements);
+            }
+        }
+
+        // If we reach here, this is a BuiltinCast we don't know how to lower yet.
+        String e = "unimplemented: BuiltinCast lowering for:\n" +
+                   dumpIRToString(
+                       inst,
+                       {IRDumpOptions::Mode::Detailed, IRDumpOptions::Flag::DumpDebugIds});
+        SLANG_UNIMPLEMENTED_X(e.getBuffer());
     }
 
     SpvInst* emitGetStringHash(IRInst* inst)
