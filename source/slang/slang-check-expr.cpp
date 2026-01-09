@@ -4807,7 +4807,6 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     LambdaDecl* lambdaStructDecl = m_astBuilder->create<LambdaDecl>();
     auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
-    m_parentFunc->addMember(lambdaStructDecl);
     synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
     StringBuilder nameBuilder;
@@ -4817,6 +4816,11 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         nameBuilder << getText(m_parentFunc->getName());
         nameBuilder << "_";
         nameBuilder << m_parentFunc->getDirectMemberDeclCount();
+        m_parentFunc->addMember(lambdaStructDecl);
+    }
+    else
+    {
+        m_outerScope->containerDecl->addMember(lambdaStructDecl);
     }
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
@@ -4826,6 +4830,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     synthesizer.pushScopeForContainer(funcDecl);
     funcDecl->loc = lambdaExpr->loc;
     funcDecl->nameAndLoc.name = getName("()");
+    funcDecl->nameAndLoc.loc = lambdaExpr->loc;
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
     addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());

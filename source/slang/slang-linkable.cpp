@@ -396,6 +396,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType** outSpecializedComponentType,
     ISlangBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
     List<SpecializationArg> expandedArgs;
@@ -920,7 +921,7 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     SemanticsVisitor visitor(context);
 
-    auto checkedExpr = visitor.CheckTerm(expr);
+    auto checkedExpr = visitor.CheckExpr(expr);
 
     if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {

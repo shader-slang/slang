@@ -858,6 +858,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            StringBuilder typeSB;
+            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            m_writer->emit(typeSB);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
@@ -1202,10 +1212,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     IRCoopMatrixType* coopMatType,
     StringBuilder& outStr)
 {
-    uint32_t rowCount = (uint32_t) static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
-    uint32_t colCount =
-        (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
-    uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+    uint32_t rowCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    uint32_t colCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    uint32_t matrixUse = (uint32_t)static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
 
     auto typeOp = coopMatType->getElementType()->getOp();
     auto typeName = getBuiltinTypeName(typeOp);

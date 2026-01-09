@@ -201,56 +201,32 @@ struct __align__(1) bool1
 {
     bool x;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
-    {
-        return (&x)[idx];
-    }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
-    {
-        return (&x)[idx];
-    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
 };
 
 struct __align__(2) bool2
 {
     bool x, y;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
-    {
-        return (&x)[idx];
-    }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
-    {
-        return (&x)[idx];
-    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
 };
 
 struct __align__(1) bool3
 {
     bool x, y, z;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
-    {
-        return (&x)[idx];
-    }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
-    {
-        return (&x)[idx];
-    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
 };
 
 struct __align__(4) bool4
 {
     bool x, y, z, w;
 
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx)
-    {
-        return (&x)[idx];
-    }
-    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const
-    {
-        return (&x)[idx];
-    }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL bool& operator[](int idx) { return (&x)[idx]; }
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL const bool& operator[](int idx) const { return (&x)[idx]; }
 };
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool __ldg(const bool* ptr)
@@ -5812,6 +5788,9 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
 struct WmmaFragment
 {
+    __device__ WmmaFragment() {}
+    __device__ WmmaFragment(T scalarValue) { fill(scalarValue); }
+
     typedef WmmaFragment<T, M, N, K, R> This;
     template<Layout layout>
     void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
