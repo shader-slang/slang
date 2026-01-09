@@ -157,7 +157,6 @@ public:
                         hasReadNoneCall = true;
                         break;
                     }
-                    break;
                 }
             }
             if (hasReadNoneCall)
