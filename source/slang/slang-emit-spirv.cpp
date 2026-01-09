@@ -2427,6 +2427,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitDebugInlinedAt(
                 getSection(SpvLogicalSectionID::ConstantsAndTypes),
                 as<IRDebugInlinedAt>(inst));
+        case kIROp_Load:
+            // Load instructions should only appear inside function bodies,
+            // not at global scope. If we encounter one here, it's likely
+            // being referenced from unreachable code or a dead code path.
+            // We return an undefined value to satisfy any references.
+            {
+                // Check if we've already handled this load
+                SpvInst* existing = nullptr;
+                if (m_mapIRInstToSpvInst.tryGetValue(inst, existing))
+                    return existing;
+                    
+                auto loadType = inst->getDataType();
+                auto spvType = ensureInst(loadType);
+                
+                // Emit OpUndef and register it
+                InstConstructScope scope(this, SpvOpUndef, nullptr);
+                SpvInst* undef = scope;
+                emitOperand(kResultID);
+                emitOperand(spvType);
+                getSection(SpvLogicalSectionID::ConstantsAndTypes)->addInst(undef);
+                
+                // Register this undef with the load instruction
+                registerInst(inst, undef);
+                return undef;
+            }
         default:
             {
                 if (isSpecConstRateType(inst->getFullType()))

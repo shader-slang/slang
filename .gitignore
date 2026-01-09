@@ -131,3 +131,4 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+cmake-*.tar.gz
