@@ -24,7 +24,6 @@ struct DiffTransposePass
             Swizzle,
             GetElement,
             FieldExtract,
-            DifferentialPairGetElementUserCode,
             DifferentialPairGetElement,
             Invalid
         };
@@ -67,9 +66,7 @@ struct DiffTransposePass
     };
 
     DiffTransposePass(AutoDiffSharedContext* autodiffContext)
-        : autodiffContext(autodiffContext)
-        , pairBuilder(autodiffContext)
-        , diffTypeContext(autodiffContext)
+        : autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
     {
     }
 
@@ -543,20 +540,6 @@ struct DiffTransposePass
 
     void transposeDiffBlocksInFunc(IRFunc* revDiffFunc, FuncTranspositionInfo transposeInfo)
     {
-        // TODO (sai): We really to make this method stateless
-        // (i.e. not store per-func info in 'this')
-        // since it is reused for every reverse-mode call.
-        //
-        // Grab all differentiable type information.
-        diffTypeContext.setFunc(revDiffFunc);
-
-        // Pre-load the address map with any insts
-        // that already have pre-defined addresses for
-        // storing gradients.
-        // TODO(sai): old code, remove
-        // for (auto pair : transposeInfo.transposeInstMap)
-        //    accumulatorAddrMap[pair.key] = pair.value;
-
         // Note down terminal primal and terminal differential blocks
         // since we need to link them up at the end.
         auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
@@ -1288,22 +1271,6 @@ struct DiffTransposePass
         auto fwdPropCalleeFuncType = cast<IRFuncType>(fwdPropCallee->getDataType());
 
         auto baseFn = fwdPropCallee->getBaseFn();
-        /*auto bwdCallableWitness = diffTypeContext.tryGetWitnessOfKind(
-            baseFn,
-            DifferentiableTypeConformanceContext::FunctionConformanceKind::BackwardPropCallable);
-        auto bwdCallableWitnessType = as<IRWitnessTableType>(bwdCallableWitness->getDataType());
-        auto bwdCallableWitnessInterface =
-            as<IRInterfaceType>(bwdCallableWitnessType->getConformanceType());
-        // TODO: remove hardcoded index (use key)
-        IRInterfaceRequirementEntry* bwdPropMethodEntry =
-            as<IRInterfaceRequirementEntry>(bwdCallableWitnessInterface->getOperand(0));
-
-        auto bwdPropFunc = _lookupWitness(
-            builder,
-            bwdCallableWitness,
-            bwdPropMethodEntry->getRequirementKey(),
-            cast<IRFuncType>(
-                diffTypeContext.resolveType(builder, bwdPropMethodEntry->getRequirementVal())));*/
 
         auto bwdPropFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
@@ -1375,253 +1342,6 @@ struct DiffTransposePass
         {
             gradients.add(
                 RevGradient(RevGradient::Flavor::Simple, src, builder->emitLoad(dest), src));
-        }
-
-        return TranspositionResult(gradients);
-    }
-
-    // Old code..
-    TranspositionResult _transposeCall(IRBuilder* builder, IRCall* fwdCall, IRInst* revValue)
-    {
-        auto fwdDiffCallee = as<IRForwardDifferentiate>(fwdCall->getCallee());
-
-        // If the callee is not a fwd-differentiate(fn), then there's only two
-        // cases. This is a call to something that doesn't need to be transposed
-        // or this is a user-written function calling something that isn't marked
-        // with IRForwardDifferentiate, but is handling differentials.
-        // We currently do not handle the latter.
-        // However, if we see a callee with no parameters, we can just skip over.
-        // since there's nothing to backpropagate to.
-        //
-        if (!fwdDiffCallee)
-        {
-            if (fwdCall->getArgCount() == 0)
-            {
-                return TranspositionResult(List<RevGradient>());
-            }
-            else
-            {
-                SLANG_UNIMPLEMENTED_X(
-                    "This case should only trigger on a user-defined fwd-mode function"
-                    " calling another user-defined function not marked with __fwd_diff()");
-            }
-        }
-
-        auto baseFn = fwdDiffCallee->getBaseFn();
-
-        List<IRInst*> args;
-        List<IRType*> argTypes;
-        List<bool> argRequiresLoad;
-
-        auto getDiffPairType = [](IRType* type)
-        {
-            if (auto ptrType = asRelevantPtrType(type))
-                type = ptrType->getValueType();
-            return as<IRDifferentialPairType>(type);
-        };
-
-        struct DiffValWriteBack
-        {
-            IRInst* destVar;
-            IRInst* srcTempPairVar;
-        };
-        List<DiffValWriteBack> writebacks;
-
-        auto baseFnType = as<IRFuncType>(getResolvedInstForDecorations(baseFn->getDataType()));
-
-        SLANG_RELEASE_ASSERT(baseFnType);
-        SLANG_RELEASE_ASSERT(fwdCall->getArgCount() == baseFnType->getParamCount());
-
-        for (UIndex ii = 0; ii < fwdCall->getArgCount(); ii++)
-        {
-            auto arg = fwdCall->getArg(ii);
-            auto paramType = baseFnType->getParamType(ii);
-
-            if (as<IRLoadReverseGradient>(arg))
-            {
-                // Original parameters that are `out DifferentiableType` will turn into
-                // a `in Differential` parameter. The split logic will insert LoadReverseGradient
-                // insts to inform us this case. Here we just need to generate a load of the
-                // derivative variable and use it as the final argument.
-                args.add(builder->emitLoad(arg->getOperand(0)));
-                argTypes.add(args.getLast()->getDataType());
-                argRequiresLoad.add(false);
-            }
-            else if (auto instPair = as<IRReverseGradientDiffPairRef>(arg))
-            {
-                // An argument to an inout parameter will come in the form of a
-                // ReverseGradientDiffPairRef(primalVar, diffVar) inst after splitting. In order to
-                // perform the call, we need a temporary var to store the DiffPair.
-                auto pairType = as<IRPtrTypeBase>(arg->getDataType())->getValueType();
-                auto tempVar = builder->emitVar(pairType);
-                auto primalVal = builder->emitLoad(instPair->getPrimal());
-
-                auto diffVal = builder->emitLoad(instPair->getDiff());
-                auto pairVal = builder->emitMakeDifferentialPair(pairType, primalVal, diffVal);
-                builder->emitStore(tempVar, pairVal);
-                args.add(tempVar);
-                argTypes.add(builder->getBorrowInOutParamType(pairType));
-                argRequiresLoad.add(false);
-                writebacks.add(DiffValWriteBack{instPair->getDiff(), tempVar});
-            }
-            else if (!asRelevantPtrType(arg->getDataType()) && getDiffPairType(arg->getDataType()))
-            {
-                // Normal differentiable input parameter will become an inout DiffPair parameter
-                // in the propagate func. The split logic has already prepared the initial value
-                // to pass in. We need to define a temp variable with this initial value and pass
-                // in the temp variable as argument to the inout parameter.
-
-                auto makePairArg = as<IRMakeDifferentialPair>(arg);
-                SLANG_RELEASE_ASSERT(makePairArg);
-
-                auto pairType = as<IRDifferentialPairType>(arg->getDataType());
-                auto var = builder->emitVar(arg->getDataType());
-
-                auto diffZero =
-                    diffTypeContext.emitDZeroOfDiffInstType(builder, pairType->getValueType());
-
-                // Initialize this var to (arg.primal, 0).
-                builder->emitStore(
-                    var,
-                    builder->emitMakeDifferentialPair(
-                        arg->getDataType(),
-                        makePairArg->getPrimalValue(),
-                        diffZero));
-
-                args.add(var);
-                argTypes.add(builder->getBorrowInOutParamType(pairType));
-                argRequiresLoad.add(true);
-            }
-            else
-            {
-                if (as<IROutParamType>(paramType))
-                {
-                    args.add(nullptr);
-                    argRequiresLoad.add(false);
-                }
-                else if (as<IRBorrowInOutParamType>(paramType))
-                {
-                    arg = builder->emitLoad(arg);
-                    args.add(arg);
-                    argTypes.add(arg->getDataType());
-                    argRequiresLoad.add(false);
-                }
-                else
-                {
-                    args.add(arg);
-                    argTypes.add(arg->getDataType());
-                    argRequiresLoad.add(false);
-                }
-            }
-        }
-
-        if (revValue)
-        {
-            args.add(revValue);
-            argTypes.add(revValue->getDataType());
-            argRequiresLoad.add(false);
-        }
-
-        // If the callee provides a primal implementation that produces continuation context for
-        // propagation phase we grab it and pass it as argument to the propagation function.
-        //
-        if (auto primalContextDecor =
-                fwdCall->findDecoration<IRBackwardDerivativePrimalContextDecoration>())
-        {
-            auto primalContextVar = primalContextDecor->getBackwardDerivativePrimalContextVar();
-
-            auto contextLoad = builder->emitLoad(primalContextVar);
-
-            args.add(contextLoad);
-            argTypes.add(as<IRPtrTypeBase>(primalContextVar->getDataType())->getValueType());
-            argRequiresLoad.add(false);
-        }
-
-        auto revFnType =
-            this->autodiffContext->transcriberSet.propagateTranscriber->differentiateFunctionType(
-                builder,
-                getResolvedInstForDecorations(baseFn),
-                baseFnType);
-
-        IRInst* revCallee = nullptr;
-        if (getResolvedInstForDecorations(baseFn)->getOp() == kIROp_LookupWitnessMethod)
-        {
-            // This is an interface method call, we can simply transcribe it here.
-            auto specialize = as<IRSpecialize>(baseFn);
-            auto innerFn = baseFn;
-            if (specialize)
-                innerFn = specialize->getBase();
-            auto lookupWitness = as<IRLookupWitnessMethod>(innerFn);
-            SLANG_RELEASE_ASSERT(lookupWitness);
-            auto diffDecor = lookupWitness->getRequirementKey()
-                                 ->findDecoration<IRBackwardDerivativeDecoration>();
-            SLANG_RELEASE_ASSERT(diffDecor);
-            auto diffKey = diffDecor->getBackwardDerivativeFunc();
-            revCallee = builder->emitLookupInterfaceMethodInst(
-                builder->getTypeKind(),
-                lookupWitness->getWitnessTable(),
-                diffKey);
-            if (specialize)
-            {
-                List<IRInst*> specArgs;
-                for (UInt i = 0; i < specialize->getArgCount(); i++)
-                    specArgs.add(specialize->getArg(i));
-                revCallee = builder->emitSpecializeInst(
-                    builder->getTypeKind(),
-                    revCallee,
-                    specArgs.getCount(),
-                    specArgs.getBuffer());
-            }
-            revCallee->setFullType(revFnType);
-        }
-        else
-        {
-            // All other calls, we insert a `backwardDifferentiate` inst so we will process it in a
-            // follow-up iteration.
-            revCallee = builder->emitBackwardDifferentiatePropagateInst(revFnType, baseFn);
-        }
-
-        List<IRInst*> callArgs;
-        for (auto arg : args)
-            if (arg)
-                callArgs.add(arg);
-        builder->emitCallInst(revFnType->getResultType(), revCallee, callArgs);
-
-        // Writeback result gradient to their corresponding splitted variable.
-        for (auto wb : writebacks)
-        {
-            auto loadedPair = builder->emitLoad(wb.srcTempPairVar);
-            auto diffType = as<IRPtrTypeBase>(wb.destVar->getDataType())->getValueType();
-            auto loadedDiff = builder->emitDifferentialPairGetDifferential(diffType, loadedPair);
-            builder->emitStore(wb.destVar, loadedDiff);
-        }
-
-        List<RevGradient> gradients;
-        for (Index ii = 0; ii < args.getCount(); ii++)
-        {
-            if (!args[ii])
-                continue;
-
-            // Is this arg relevant to auto-diff?
-            if (auto diffPairType = getDiffPairType(args[ii]->getDataType()))
-            {
-                // If this is ptr typed, ignore (the gradient will be accumulated on the
-                // pointer) automatically.
-                //
-                if (argRequiresLoad[ii])
-                {
-                    auto diffArgType = (IRType*)diffTypeContext.getDifferentialForType(
-                        builder,
-                        diffPairType->getValueType());
-                    gradients.add(RevGradient(
-                        RevGradient::Flavor::Simple,
-                        fwdCall->getArg(ii),
-                        builder->emitDifferentialPairGetDifferential(
-                            diffArgType,
-                            builder->emitLoad(args[ii])),
-                        nullptr));
-                }
-            }
         }
 
         return TranspositionResult(gradients);
@@ -1795,11 +1515,6 @@ struct DiffTransposePass
 
         case kIROp_DifferentialPairGetPrimal:
             return transposeGetPrimal(builder, as<IRDifferentialPairGetPrimal>(fwdInst), revValue);
-
-        case kIROp_MakeDifferentialPairUserCode:
-        case kIROp_DifferentialPairGetPrimalUserCode:
-        case kIROp_DifferentialPairGetDifferentialUserCode:
-            SLANG_UNEXPECTED("should not see these anymore");
 
         case kIROp_MakeVector:
             return transposeMakeVector(builder, fwdInst, revValue);
@@ -2031,41 +1746,6 @@ struct DiffTransposePass
                 fwdGetDiff)));
     }
 
-    TranspositionResult transposeMakePairUserCode(
-        IRBuilder* builder,
-        IRMakeDifferentialPairUserCode* fwdMakePair,
-        IRInst* revValue)
-    {
-        List<RevGradient> gradients;
-        gradients.add(RevGradient(
-            RevGradient::Flavor::Simple,
-            fwdMakePair->getPrimalValue(),
-            builder->emitDifferentialPairGetPrimalUserCode(revValue),
-            fwdMakePair));
-        gradients.add(RevGradient(
-            RevGradient::Flavor::Simple,
-            fwdMakePair->getDifferentialValue(),
-            builder->emitDifferentialPairGetDifferentialUserCode(
-                fwdMakePair->getDifferentialValue()->getFullType(),
-                revValue),
-            fwdMakePair));
-        return TranspositionResult(gradients);
-    }
-
-    TranspositionResult transposeGetDifferentialUserCode(
-        IRBuilder*,
-        IRDifferentialPairGetDifferentialUserCode* fwdGetDiff,
-        IRInst* revValue)
-    {
-        // (A = x.p) -> (dX = DiffPairUserCode(dA, 0))
-        return TranspositionResult(
-            List<RevGradient>(RevGradient(
-                RevGradient::Flavor::DifferentialPairGetElementUserCode,
-                fwdGetDiff->getBase(),
-                revValue,
-                fwdGetDiff)));
-    }
-
     TranspositionResult transposeGetPrimal(
         IRBuilder*,
         IRDifferentialPairGetPrimal* fwdGetPrimal,
@@ -2079,22 +1759,6 @@ struct DiffTransposePass
                 revValue,
                 fwdGetPrimal)));
     }
-
-    /*
-    TranspositionResult transposeGetPrimalUserCode(
-        IRBuilder*,
-        IRDifferentialPairGetPrimalUserCode* fwdGetPrimal,
-        IRInst* revValue)
-    {
-        // (A = x.p) -> (dX = DiffPairUserCode(0, dA))
-        return TranspositionResult(
-            List<RevGradient>(RevGradient(
-                RevGradient::Flavor::DifferentialPairGetElementUserCode,
-                fwdGetPrimal->getBase(),
-                revValue,
-                fwdGetPrimal)));
-    }
-    */
 
     TranspositionResult transposeMakeVectorFromScalar(
         IRBuilder* builder,
@@ -2572,10 +2236,12 @@ struct DiffTransposePass
         SLANG_ASSERT(primalType);
 
         // If we reach this point, revValue must be a differentiable type.
-        auto revTypeWitness = diffTypeContext.tryGetDifferentiableWitness(
-            builder,
-            fwdInst->getDataType(),
-            DiffConformanceKind::Value);
+        // TODO: Maybe avoid going through the differentiable pair type..
+        auto revTypeWitness =
+            as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
+                                           fwdInst->getDataType(),
+                                           ValAssociationKind::DifferentialPairType))
+                ->getWitness();
         SLANG_ASSERT(revTypeWitness);
 
         auto baseExistential = fwdInst->getOperand(0);
@@ -2723,26 +2389,6 @@ struct DiffTransposePass
                     builder->setInsertBefore(nextBlock->getTerminator());
                 return;
             }
-
-            /*
-            if (auto firstBranch = as<IRUnconditionalBranch>(firstBlock->getTerminator()))
-            {
-                auto secondBlock = firstBranch->getTargetBlock();
-
-                if (block == firstBlock || block == secondBlock)
-                {
-                    if (auto branch = as<IRUnconditionalBranch>(firstBlock->getTerminator()))
-                    {
-                        if (auto ordInst = secondBlock->getFirstOrdinaryInst())
-                            builder->setInsertAfter(ordInst);
-                        else
-                            builder->setInsertBefore(secondBlock->getTerminator());
-
-                        return;
-                    }
-                }
-            }
-            */
         }
 
         setInsertAfterOrdinaryInst(builder, inst);
@@ -3081,56 +2727,6 @@ struct DiffTransposePass
             return RevGradient(targetInst, elementGrads[0], nullptr);
     }
 
-    RevGradient materializeDifferentialPairUserCodeGetElementGradients(
-        IRBuilder* builder,
-        IRType* aggPrimalType,
-        List<RevGradient> gradients)
-    {
-        // deprecate.
-        SLANG_UNEXPECTED("should not be seen anymore");
-        List<RevGradient> simpleGradients;
-
-        for (auto gradient : gradients)
-        {
-            // Peek at the fwd-mode get element inst to see what type we need to
-            // materialize.
-            if (auto fwdGetDiff =
-                    as<IRDifferentialPairGetDifferentialUserCode>(gradient.fwdGradInst))
-            {
-                auto baseType =
-                    as<IRDifferentialPairUserCodeType>(diffTypeContext.getDifferentialForType(
-                        builder,
-                        fwdGetDiff->getBase()->getDataType()));
-                simpleGradients.add(RevGradient(
-                    gradient.targetInst,
-                    builder->emitMakeDifferentialPairUserCode(
-                        baseType,
-                        diffTypeContext.emitDZeroOfDiffInstType(builder, baseType->getValueType()),
-                        gradient.revGradInst),
-                    gradient.fwdGradInst));
-            }
-            else if (
-                auto fwdGetPrimal = as<IRDifferentialPairGetPrimalUserCode>(gradient.fwdGradInst))
-            {
-                auto baseType =
-                    as<IRDifferentialPairUserCodeType>(diffTypeContext.getDifferentialForType(
-                        builder,
-                        fwdGetPrimal->getBase()->getDataType()));
-                simpleGradients.add(RevGradient(
-                    gradient.targetInst,
-                    builder->emitMakeDifferentialPairUserCode(
-                        baseType,
-                        gradient.revGradInst,
-                        diffTypeContext.emitDZeroOfDiffInstType(
-                            builder,
-                            fwdGetPrimal->getFullType())),
-                    gradient.fwdGradInst));
-            }
-        }
-
-        return materializeSimpleGradients(builder, aggPrimalType, simpleGradients);
-    }
-
     RevGradient materializeDifferentialPairGetElementGradients(
         IRBuilder* builder,
         IRType* aggPrimalType,
@@ -3193,12 +2789,6 @@ struct DiffTransposePass
 
         case RevGradient::Flavor::GetElement:
             return materializeGetElementGradients(builder, aggPrimalType, gradients);
-
-        case RevGradient::Flavor::DifferentialPairGetElementUserCode:
-            return materializeDifferentialPairGetElementGradients(
-                builder,
-                aggPrimalType,
-                gradients);
 
         case RevGradient::Flavor::DifferentialPairGetElement:
             return materializeDifferentialPairGetElementGradients(
@@ -3504,15 +3094,11 @@ struct DiffTransposePass
 
     DifferentiableTypeConformanceContext diffTypeContext;
 
-    DifferentialPairTypeBuilder pairBuilder;
-
     IRBlock* tempInvBlock;
 
     Dictionary<IRInst*, List<RevGradient>> gradientsMap;
 
     Dictionary<IRInst*, IRInst*> accumulatorAddrMap;
-
-    Dictionary<IRInst*, IRVar*> inverseVarMap;
 
     List<IRInst*> usedPtrs;
 
@@ -3522,17 +3108,7 @@ struct DiffTransposePass
 
     Dictionary<IRBlock*, IRInst*> afterBlockMap;
 
-    List<PendingBlockTerminatorEntry> pendingBlocks;
-
     Dictionary<IRBlock*, List<IRInst*>> phiGradsMap;
-
-    Dictionary<IRInst*, IRInst*> inverseValueMap;
-
-    List<IRUse*> primalUsesToHoist;
-
-    Dictionary<IRStore*, IRBlock*> mapStoreToDefBlock;
-
-    IRCloneEnv typeInstCloneEnv = {};
 
     IRInst* dOutParam;
 };

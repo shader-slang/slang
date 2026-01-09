@@ -152,17 +152,6 @@ struct ExtractPrimalFuncContext
         auto structField =
             genTypeBuilder.createStructField(structType, structKey, (IRType*)fieldType);
 
-        /*
-        if (auto witness = backwardPrimalTranscriber->tryGetDifferentiableWitness(
-                &genTypeBuilder,
-                (IRType*)fieldType,
-                DiffConformanceKind::Value))
-        {
-            genTypeBuilder.addIntermediateContextFieldDifferentialTypeDecoration(
-                structField,
-                witness);
-        }
-        */
         return structField;
     }
 
@@ -234,14 +223,6 @@ struct ExtractPrimalFuncContext
             auto funcType = builder.getFuncType(paramTypes, returnType);
             getValFunc->setFullType(funcType);
         }
-
-        // Add name hint decoration
-        /*if (auto nameHint = intermediateType->findDecoration<IRNameHintDecoration>())
-        {
-            StringBuilder funcName;
-            funcName << "s_getVal_" << nameHint->getName();
-            builder.addNameHintDecoration(getValFunc, UnownedStringSlice(funcName.getBuffer()));
-        }*/
 
         // Create parameter block
         builder.setInsertInto(getValFunc);
@@ -497,32 +478,6 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
             if (auto decor = inst->findDecoration<IRKeepAliveDecoration>())
                 decor->removeAndDeallocate();
 
-    /* old code..
-    // Remove propagate func specific primal insts from cloned func.
-    for (auto inst : paramInfo.propagateFuncSpecificPrimalInsts)
-    {
-        IRInst* newInst = nullptr;
-        if (subEnv.mapOldValToNew.tryGetValue(inst, newInst))
-        {
-            newInst->removeAndDeallocate();
-        }
-    }
-
-    HashSet<IRInst*> newPrimalParams;
-    for (auto param : func->getParams())
-    {
-        if (paramInfo.primalFuncParams.contains(param))
-            newPrimalParams.add(subEnv.mapOldValToNew.getValue(param));
-    }
-    */
-
-    /*
-    ExtractPrimalFuncContext context;
-    context.init(
-        autodiffContext->moduleInst->getModule(),
-        autodiffContext->transcriberSet.primalTranscriber);
-    */
-
     ExtractPrimalFuncContext context(autodiffContext->moduleInst->getModule(), autodiffContext);
 
     intermediateType = nullptr;
@@ -540,14 +495,7 @@ IRFunc* DiffUnzipPass::extractPrimalFunc(
     {
         nameHint->removeAndDeallocate();
     }
-    /*if (auto originalNameHint = originalFunc->findDecoration<IRNameHintDecoration>())
-    {
-        auto primalName = String("s_primal_ctx_") + UnownedStringSlice(originalNameHint->getName());
-        builder.addNameHintDecoration(
-            primalFunc,
-            builder.getStringValue(primalName.getUnownedSlice()));
 
-    }*/
     builder.addDecoration(primalFunc, kIROp_IgnoreSideEffectsDecoration);
     markNonContextParamsAsSideEffectFree(&builder, primalFunc);
 

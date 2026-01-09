@@ -27,15 +27,8 @@ struct DiffPairLoweringPass : InstPassBase
             {
                 if (isRuntimeType(pairType->getValueType()))
                 {
-                    auto result = pairBuilder->emitExistentialMakePair(
-                        builder,
-                        loweredPairType,
-                        makePairInst->getPrimalValue(),
-                        makePairInst->getDifferentialValue());
-
-                    makePairInst->replaceUsesWith(result);
-                    makePairInst->removeAndDeallocate();
-                    return result;
+                    // Do nothing.
+                    return makePairInst;
                 }
                 else if (auto typePack = as<IRTypePack>(pairType->getValueType()))
                 {
@@ -164,14 +157,11 @@ struct DiffPairLoweringPass : InstPassBase
                 {
                 case kIROp_DifferentialPairGetDifferential:
                 case kIROp_DifferentialPairGetPrimal:
-                case kIROp_DifferentialPairGetDifferentialUserCode:
-                case kIROp_DifferentialPairGetPrimalUserCode:
                 case kIROp_DifferentialPtrPairGetDifferential:
                 case kIROp_DifferentialPtrPairGetPrimal:
                     lowerPairAccess(builder, inst);
                     break;
 
-                case kIROp_MakeDifferentialPairUserCode:
                 case kIROp_MakeDifferentialPtrPair:
                 case kIROp_MakeDifferentialPair:
                     lowerMakePair(builder, inst);
@@ -216,185 +206,11 @@ private:
     DifferentialPairTypeBuilder pairBuilderStorage;
 };
 
-struct DiffWitnessTranslationPass : InstPassBase
-{
-public:
-    DiffWitnessTranslationPass(AutoDiffSharedContext* context)
-        : InstPassBase(context->moduleInst->getModule()), diffTypeConformanceContext(context)
-    {
-    }
-
-    bool processModule()
-    {
-        bool modified = false;
-        processAllInsts(
-            [&](IRInst* inst)
-            {
-                // TODO: Replace this logic with something lighter weight.
-                diffTypeConformanceContext.setFunc(inst);
-                switch (inst->getOp())
-                {
-                case kIROp_MakeIDifferentiableWitness:
-                    {
-                        IRBuilder builder(module);
-                        auto baseType = inst->getOperand(0);
-                        SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
-                        auto confType =
-                            cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-                        if (as<IRDifferentialPairType>(baseType) ||
-                            as<IRDifferentialPairUserCodeType>(baseType))
-                        {
-                            auto synWitness =
-                                diffTypeConformanceContext.buildDifferentiablePairWitness(
-                                    &builder,
-                                    cast<IRDifferentialPairTypeBase>(baseType),
-                                    DiffConformanceKind::Value);
-                            inst->replaceUsesWith(synWitness);
-                            inst->removeAndDeallocate();
-                            modified = true;
-                        }
-                        else if (as<IRDifferentialPtrPairType>(baseType))
-                        {
-                            auto synWitness =
-                                diffTypeConformanceContext.buildDifferentiablePairWitness(
-                                    &builder,
-                                    cast<IRDifferentialPtrPairType>(baseType),
-                                    DiffConformanceKind::Ptr);
-                            inst->replaceUsesWith(synWitness);
-                            inst->removeAndDeallocate();
-                            modified = true;
-                        }
-                        break;
-                    }
-                }
-            });
-
-        return modified;
-    }
-
-private:
-    DifferentiableTypeConformanceContext diffTypeConformanceContext;
-};
-
 bool processPairTypes(AutoDiffSharedContext* context)
 {
     DiffPairLoweringPass pairLoweringPass(context);
     return pairLoweringPass.processModule();
 }
 
-bool processDiffTypeWitnessSynthesisInsts(AutoDiffSharedContext* context)
-{
-    DiffWitnessTranslationPass witnessSynthesisPass(context);
-    return witnessSynthesisPass.processModule();
-}
-
-struct DifferentialPairUserCodeTranscribePass : public InstPassBase
-{
-    DifferentialPairUserCodeTranscribePass(IRModule* module)
-        : InstPassBase(module)
-    {
-    }
-
-    IRInst* rewritePairType(IRBuilder* builder, IRType* pairType)
-    {
-        builder->setInsertBefore(pairType);
-        auto originalPairType = as<IRDifferentialPairType>(pairType);
-        return builder->getDifferentialPairUserCodeType(
-            originalPairType->getValueType(),
-            originalPairType->getWitness());
-    }
-
-    IRInst* rewriteMakePair(IRBuilder* builder, IRMakeDifferentialPair* inst)
-    {
-        auto pairType = as<IRDifferentialPairType>(inst->getDataType());
-        builder->setInsertBefore(inst);
-        auto newInst = builder->emitMakeDifferentialPairUserCode(
-            (IRType*)pairType,
-            inst->getPrimalValue(),
-            inst->getDifferentialValue());
-        inst->replaceUsesWith(newInst);
-        inst->removeAndDeallocate();
-        return newInst;
-    }
-
-    IRInst* rewritePairAccess(IRBuilder* builder, IRInst* inst)
-    {
-        if (auto getDiffInst = as<IRDifferentialPairGetDifferential>(inst))
-        {
-            builder->setInsertBefore(inst);
-
-            auto newInst = builder->emitDifferentialPairGetDifferentialUserCode(
-                (IRType*)inst->getFullType(),
-                getDiffInst->getBase());
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-        }
-        else if (auto getPrimalInst = as<IRDifferentialPairGetPrimal>(inst))
-        {
-            builder->setInsertBefore(inst);
-            auto newInst = builder->emitDifferentialPairGetPrimalUserCode(getPrimalInst->getBase());
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-        }
-        return inst;
-    }
-
-    bool processInstWithChildren(IRBuilder* builder, IRInst* instWithChildren)
-    {
-        SLANG_UNUSED(instWithChildren);
-
-        bool modified = false;
-
-        processAllInsts(
-            [&](IRInst* inst)
-            {
-                switch (inst->getOp())
-                {
-                case kIROp_DifferentialPairGetDifferential:
-                case kIROp_DifferentialPairGetPrimal:
-                    rewritePairAccess(builder, inst);
-                    break;
-
-                case kIROp_MakeDifferentialPair:
-                    rewriteMakePair(builder, as<IRMakeDifferentialPair>(inst));
-                    break;
-
-                default:
-                    break;
-                }
-            });
-
-        OrderedDictionary<IRInst*, IRInst*> pendingReplacements;
-        processInstsOfType<IRDifferentialPairType>(
-            kIROp_DifferentialPairType,
-            [&](IRDifferentialPairType* inst)
-            {
-                if (auto loweredType = rewritePairType(builder, inst))
-                {
-                    pendingReplacements.add(inst, loweredType);
-                    modified = true;
-                }
-            });
-        for (auto replacement : pendingReplacements)
-        {
-            replacement.key->replaceUsesWith(replacement.value);
-            replacement.key->removeAndDeallocate();
-        }
-
-        return modified;
-    }
-
-    bool processModule()
-    {
-        IRBuilder builder(module);
-        return processInstWithChildren(&builder, module->getModuleInst());
-    }
-};
-
-void rewriteDifferentialPairToUserCode(IRModule* module)
-{
-    DifferentialPairUserCodeTranscribePass pairRewritePass(module);
-    pairRewritePass.processModule();
-}
 
 } // namespace Slang

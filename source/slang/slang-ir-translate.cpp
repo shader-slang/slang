@@ -56,8 +56,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             DifferentiableTypeConformanceContext ctx(&autodiffContext);
             auto baseType = inst->getOperand(0);
             SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
-            if (as<IRDifferentialPairType>(baseType) ||
-                as<IRDifferentialPairUserCodeType>(baseType))
+            if (as<IRDifferentialPairType>(baseType))
             {
                 return memoize(ctx.buildDifferentiablePairWitness(
                     &builder,
@@ -81,7 +80,6 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     case kIROp_BackwardDiffFuncType:
         {
             DifferentiableTypeConformanceContext ctx(&autodiffContext);
-            ctx.setFunc(inst->getParent());
             translationResult = ctx.resolveType(&subBuilder, inst);
         }
         break;

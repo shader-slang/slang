@@ -1962,8 +1962,6 @@ bool doesModuleUseAutodiff(IRInst* inst)
                 return true;
         }
         return false;
-    case kIROp_DifferentialPairGetDifferentialUserCode:
-    case kIROp_DifferentialPairGetPrimalUserCode:
     case kIROp_DifferentialPtrPairGetPrimal:
     case kIROp_DifferentialPtrPairGetDifferential:
         return true;

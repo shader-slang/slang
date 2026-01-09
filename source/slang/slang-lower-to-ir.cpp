@@ -2266,7 +2266,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     });
 
             auto undefined = getBuilder()->emitPoison(operands[1]->getFullType());
-            // return getBuilder()->getDifferentialPairUserCodeType(primalType, undefined);
             return getBuilder()->getDifferentialPairType(primalType, undefined);
         }
         else

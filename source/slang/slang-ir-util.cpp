@@ -295,7 +295,6 @@ bool isValueType(IRInst* dataType)
     case kIROp_ResultType:
     case kIROp_OptionalType:
     case kIROp_DifferentialPairType:
-    case kIROp_DifferentialPairUserCodeType:
     case kIROp_DynamicType:
     case kIROp_AnyValueType:
     case kIROp_ArrayType:

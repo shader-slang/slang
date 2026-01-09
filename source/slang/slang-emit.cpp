@@ -393,7 +393,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
-    case kIROp_MakeDifferentialPairUserCode:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:

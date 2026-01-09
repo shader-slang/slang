@@ -51,8 +51,6 @@ struct DiffUnzipPass
 
     void unzipDiffInsts(IRFunc* func)
     {
-        diffTypeContext.setFunc(func);
-
         // Build a map of blocks to loop regions.
         // This will be used later to insert tracking indices
         //
@@ -745,7 +743,8 @@ struct DiffUnzipPass
         // Remove insts that were split.
         for (auto inst : splitInsts)
         {
-            if (!isDifferentiableType(diffTypeContext, inst->getDataType()))
+            // TODO: This is odd.. why do we need this?
+            if (!diffTypeContext.isDifferentiableType(inst->getDataType()))
             {
                 inst->replaceUsesWith(lookupPrimalInst(inst));
             }

@@ -74,7 +74,7 @@ public:
         UInt paramIndex = 0;
         for (auto paramType : calleeFuncType->getParamTypes())
         {
-            if (isDifferentiableType(diffTypeContext, paramType))
+            if (diffTypeContext.isDifferentiableType(paramType))
             {
                 auto arg = callInst->getArg(paramIndex);
                 if (!as<IRConstant>(arg))
@@ -135,13 +135,13 @@ public:
             case kIROp_Var:
                 {
                     auto valueType = as<IRPtrTypeBase>(addr->getDataType())->getValueType();
-                    return isDifferentiableType(diffTypeContext, valueType);
+                    return diffTypeContext.isDifferentiableType(valueType);
                 }
             case kIROp_Param:
                 {
                     auto [passingMode, valueType] =
                         splitParameterDirectionAndType(addr->getDataType());
-                    return isDifferentiableType(diffTypeContext, valueType);
+                    return diffTypeContext.isDifferentiableType(valueType);
                 }
             case kIROp_FieldAddress:
                 if (!as<IRFieldAddress>(addr)->getField() ||
@@ -152,8 +152,7 @@ public:
                 addr = as<IRFieldAddress>(addr)->getBase();
                 break;
             case kIROp_GetElementPtr:
-                if (!isDifferentiableType(
-                        diffTypeContext,
+                if (!diffTypeContext.isDifferentiableType(
                         as<IRPtrTypeBase>(as<IRGetElementPtr>(addr)->getBase()->getDataType())
                             ->getValueType()))
                     return false;
@@ -183,7 +182,7 @@ public:
                     CheckDifferentiabilityPassContext::DifferentiableLevel::Forward);
             }
         default:
-            return isDifferentiableType(diffTypeContext, inst->getDataType());
+            return diffTypeContext.isDifferentiableType(inst->getDataType());
         }
     }
 
@@ -252,7 +251,6 @@ public:
             return;
 
         DifferentiableTypeConformanceContext diffTypeContext(&sharedContext);
-        diffTypeContext.setFunc(funcInst);
 
         // We compute and track three different set of insts to complete our
         // data flow analysis.
@@ -270,7 +268,7 @@ public:
         bool isDifferentiableReturnType = false;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
-            if (isDifferentiableType(diffTypeContext, param->getFullType()))
+            if (diffTypeContext.isDifferentiableType(param->getFullType()))
             {
                 produceDiffSet.add(param);
                 carryNonTrivialDiffSet.add(param);
@@ -278,7 +276,7 @@ public:
         }
         if (auto funcType = as<IRFuncType>(funcInst->getDataType()))
         {
-            if (isDifferentiableType(diffTypeContext, funcType->getResultType()))
+            if (diffTypeContext.isDifferentiableType(funcType->getResultType()))
             {
                 isDifferentiableReturnType = true;
             }
@@ -300,7 +298,7 @@ public:
                            diffTypeContext,
                            as<IRCall>(inst)->getCallee(),
                            requiredDiffLevel) &&
-                           isDifferentiableType(diffTypeContext, inst->getFullType());
+                           diffTypeContext.isDifferentiableType(inst->getFullType());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -311,7 +309,7 @@ public:
             default:
                 // default case is to assume the inst produces a diff value if any
                 // of its operands produces a diff value.
-                if (!isDifferentiableType(diffTypeContext, inst->getFullType()))
+                if (!diffTypeContext.isDifferentiableType(inst->getFullType()))
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
@@ -337,7 +335,7 @@ public:
                            diffTypeContext,
                            as<IRCall>(inst)->getCallee(),
                            requiredDiffLevel) &&
-                       isDifferentiableType(diffTypeContext, inst->getFullType());
+                       diffTypeContext.isDifferentiableType(inst->getFullType());
             case kIROp_Load:
                 // We don't have more knowledge on whether diff is available at the destination
                 // address. Just assume it is producing diff if the dest address can hold a
@@ -348,7 +346,7 @@ public:
             default:
                 // default case is to assume the inst produces a diff value if any
                 // of its operands produces a diff value.
-                if (!isDifferentiableType(diffTypeContext, inst->getFullType()))
+                if (!diffTypeContext.isDifferentiableType(inst->getFullType()))
                     return false;
                 for (UInt i = 0; i < inst->getOperandCount(); i++)
                 {
@@ -426,8 +424,7 @@ public:
                         {
                             auto storeInst = as<IRStore>(inst);
                             if (canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()) &&
-                                isDifferentiableType(
-                                    diffTypeContext,
+                                diffTypeContext.isDifferentiableType(
                                     as<IRStore>(inst)->getPtr()->getDataType()))
                             {
                                 addToExpectDiffWorkList(storeInst->getVal());
@@ -438,7 +435,7 @@ public:
                         if (auto returnVal = as<IRReturn>(inst)->getVal())
                         {
                             if (isDifferentiableReturnType &&
-                                isDifferentiableType(diffTypeContext, returnVal->getDataType()))
+                                diffTypeContext.isDifferentiableType(returnVal->getDataType()))
                             {
                                 addToExpectDiffWorkList(inst);
                             }
@@ -464,7 +461,7 @@ public:
                     // If inst's type is differentiable, and it is in expectDiffInstWorkList,
                     // then some user is expecting the result of the call to produce a derivative.
                     // In this case we need to issue a diagnostic.
-                    if (isDifferentiableType(diffTypeContext, inst->getFullType()) &&
+                    if (diffTypeContext.isDifferentiableType(inst->getFullType()) &&
                         !isDifferentiableFunc(diffTypeContext, callee, requiredDiffLevel))
                     {
                         // No need to fail here if the function is no_diff in
@@ -525,7 +522,7 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!isDifferentiableType(diffTypeContext, paramType))
+                        if (!diffTypeContext.isDifferentiableType(paramType))
                             continue;
                         addToExpectDiffWorkList(arg);
                     }
@@ -537,7 +534,7 @@ public:
                 for (UInt opIndex = 0; opIndex < inst->getOperandCount(); opIndex++)
                 {
                     auto operand = inst->getOperand(opIndex);
-                    if (isDifferentiableType(diffTypeContext, operand->getFullType()))
+                    if (diffTypeContext.isDifferentiableType(operand->getFullType()))
                     {
                         addToExpectDiffWorkList(operand);
                     }
@@ -606,7 +603,7 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!isDifferentiableType(diffTypeContext, paramType))
+                        if (!diffTypeContext.isDifferentiableType(paramType))
                             continue;
                         if (as<IROutParamTypeBase>(paramType))
                         {

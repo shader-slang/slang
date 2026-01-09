@@ -3600,7 +3600,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPtrPair(IRType* type, IRInst* primal, IRInst* differential);
-    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
@@ -3803,8 +3802,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitDifferentialValuePairGetPrimal(IRType* primalType, IRInst* diffPair);
     IRInst* emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair);
 
-    IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
-    IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(IRType* type, UInt argCount, IRInst* const* args);
     IRInst* emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue);
     IRInst* emitMakeCompositeFromScalar(IRType* type, IRInst* scalarValue);
