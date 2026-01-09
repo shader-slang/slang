@@ -51,5 +51,22 @@ RefPtr<IRModule> generateIRForTypeConformance(
     TypeConformance* typeConformance,
     Int conformanceIdOverride,
     DiagnosticSink* sink);
+
+/// Generate IR for an entry point wrapper function and add it to an existing IR module.
+///
+/// This function creates an entry point wrapper with the appropriate signature
+/// (replacing `varying in` parameters with `borrow in` parameters) that calls
+/// through to the ordinary function. This allows the same function to be used
+/// both as an entry point and as a callable function.
+///
+/// This is typically called during initial IR generation for entry points discovered
+/// via [shader(...)] attributes, but can also be called after module loading to add
+/// entry points discovered via API (e.g., findAndCheckEntryPoint).
+///
+void addEntryPointToExistingIR(
+    IRModule* irModule,
+    EntryPoint* entryPoint,
+    String moduleName,
+    DiagnosticSink* sink);
 } // namespace Slang
 #endif
