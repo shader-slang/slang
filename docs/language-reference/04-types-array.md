@@ -8,26 +8,25 @@ object.
 
 ```hlsl
 // (1) 1-dimensional array of length N
-ElementType varName[N];
-ElementType[N] varName;
 var varName : ElementType[N];
+ElementType[N] varName;
+ElementType varName[N];
 
 // (2) N-element array of M-element arrays
 //
-// Note the order of length specifiers
-ElementType varName[N][M];
-ElementType[M][N] varName;
 var varName : ElementType[M][N];
+ElementType[M][N] varName;
+ElementType varName[N][M]; // note the order of N, M
 
 // (3) 1-dimensional array of unknown length
-ElementType varName[];
-ElementType[] varName;
 var varName : ElementType[];
+ElementType[] varName;
+ElementType varName[];
 
 // (4) Unknown-length array of M-element arrays
-ElementType varName[][M];
-ElementType[M][] varName;
 var varName : ElementType[M][];
+ElementType[M][] varName;
+ElementType varName[][M];
 
 // (5) Type alias for N-element array of M-element arrays
 typealias ArrayType = ElementType[3][2];
@@ -37,7 +36,7 @@ where:
 - `ElementType` is the type of the array element. The element type may not have an unknown length.
   - This implies that only the outermost dimension may have an unknown length.
 - Array length expressions `N` and `M` are specialization-time constant integers.
-  - When specified, array length must be at least 0.
+  - When specified, array length must be non-negative.
 - `varName` is the variable identifier
 
 The declarations within each group are equivalent.
@@ -55,8 +54,12 @@ Restrictions for unknown-length arrays:
   compile-time in which case it becomes a known-length array.
 - A function parameter with an unknown-length array cannot be `out` or `inout`.
 
+> Remark 1: Declaring an array as part of the type is recommended. For example:
+> ```hlsl
+> var arr : int[3][4];
+> ```
 
-> Remark 1: When using the C-style variable declaration syntax, array declarations binding to the variable
+> Remark 2: When using the C-style variable declaration syntax, array declarations binding to the variable
 > identifier are applied from right to left. However, when binding to the type, the declarations are
 > applied from left to right. Consider:
 > ```hlsl
@@ -67,15 +70,15 @@ Restrictions for unknown-length arrays:
 > int[2][3][4][5] arr;
 > ```
 
-> Remark 2: Equivalent to `ElementType[N][M]` array type declaration would be
+> Remark 3: Equivalent to `ElementType[N][M]` array type declaration would be
 > `std::array<std::array<ElementType, N>, M>` in C++.
 
-> Remark 3: Unlike in C and C++, array types in Slang do not decay to pointer types. The implication is that
+> Remark 4: Unlike in C and C++, array types in Slang do not decay to pointer types. The implication is that
 > array objects are always passed as values in assignment and function calls, similar to `std::array`. To
 > avoid memory copies when possible, the compiler attempts to optimize these as pass by constant references or
 > pointers when the target supports it.
 
-> Remark 4: 0-length arrays can be used to disable data members in `struct` types. See [Generics (TODO)](TODO)
+> Remark 5: 0-length arrays can be used to disable data members in `struct` types. See [Generics (TODO)](TODO)
 > for further information.
 
 
