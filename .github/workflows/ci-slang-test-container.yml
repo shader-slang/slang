@@ -251,65 +251,63 @@ jobs:
 
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
-          echo "$bin_dir" >> $GITHUB_PATH
 
       - name: Run slangpy tests
         run: |
-          # 1. Setup paths
-          SITE_PACKAGES=$(python3 -m site --user-site)
-          SLANGPY_DIR="$SITE_PACKAGES/slangpy"
+          python3 --version
+          echo "Cleaning up existing installations and installing slangpy..."
 
-          # Fallback to system site-packages if user-site doesn't exist
-          if [ ! -d "$SLANGPY_DIR" ]; then
-              SITE_PACKAGES=$(python3 -c "import site; print(site.getsitepackages()[0])")
-              SLANGPY_DIR="$SITE_PACKAGES/slangpy"
-          fi
+          # Try to uninstall existing slangpy
+          python3 -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
 
-          echo "Targeting slangpy at: $SLANGPY_DIR"
+          # Install slangpy
+          python3 -m pip install --verbose slangpy --user
 
-          # 2. Install slangpy
-          python3 -m pip uninstall -y slangpy || true
-          python3 -m pip install slangpy --user --verbose
+          # Get site packages directory
+          SITE_PACKAGES=$(python3 -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
 
-          # 3. Handle the slangc path hack (Issue 696)
+          #
+          # THIS IS A HUGE HACK, the latest slangpy release hardcoded this
+          # directory when looking for slangc. We should remove the offending
+          # code from slangpy and just put slangc into PATH here. The offending
+          # code is find_slangc() in
+          # slangpy/tests/device/test_precompiled_modules.py
+          #
+          # See https://github.com/shader-slang/slangpy/issues/696
+          #
           SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
           mkdir -p "$SLANGC_TARGET_DIR"
-          cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/slangc"
-          chmod +x "$SLANGC_TARGET_DIR/slangc"
-
-          # 4. Copy new libraries and slangc into the slangpy package
-          echo "Updating slangpy package binaries..."
-          cp -v "$lib_dir"/libslang*.* "$SLANGPY_DIR/"
-          cp -v "$bin_dir/slangc" "$SLANGPY_DIR/"
-
-          # 5. Fix versioned library dependencies via symlinks
-          EXT_MOD=$(find "$SLANGPY_DIR" -name "slangpy_ext*.so" | head -n 1)
-          echo "Inspecting extension: $EXT_MOD"
-
-          if [ -f "$EXT_MOD" ]; then
-              for LIB_BASE in "libslang-compiler" "libslang-rt" "libslang"; do
-                  # Use -m1 to ensure only the first match is returned
-                  WANTED=$(readelf -d "$EXT_MOD" | grep -Po "$LIB_BASE\.so\.[0-9.]+" | head -n 1)
-                  if [ -n "$WANTED" ]; then
-                      echo "Creating symlink: $SLANGPY_DIR/$WANTED -> $LIB_BASE.so"
-                      # Ensure we are inside the directory when linking to avoid path issues
-                      (cd "$SLANGPY_DIR" && ln -sf "$LIB_BASE.so" "$WANTED")
-                  else
-                      echo "No versioned dependency found for $LIB_BASE"
-                  fi
-              done
+          # Copy slangc binary to the expected location
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
           else
-              echo "Error: Extension module not found!"
-              exit 1
+              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+              chmod +x "$SLANGC_TARGET_DIR/slangc"
           fi
 
-          # 6. Install test dependencies
-          echo "Installing test dependencies..."
+          # Remove old slang libraries and copy new ones
+          echo "Removing old slang libraries..."
+          rm -f "$SITE_PACKAGES/slangpy"/libslang*
+
+          echo "Copying new slang libraries..."
+          cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+          # Create symlink for the old library version that slangpy extension was linked against
+          echo "Creating symlink for slangpy compatibility..."
+          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          echo "Installing python packages..."
           curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
           python3 -m pip install -r requirements-dev.txt --user
-          python3 -m pip install pytest-github-actions-annotate-failures pytest-xdist --user
+          python3 -m pip install pytest-github-actions-annotate-failures --user
+          python3 -m pip install pytest-xdist --user
 
-          # 7. Run tests
-          echo "Running pytest..."
+          echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python3 -m pytest "$SLANGPY_DIR/tests" -ra -n auto --maxprocesses=3
+          python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
