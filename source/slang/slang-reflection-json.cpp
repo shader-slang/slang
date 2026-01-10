@@ -724,10 +724,6 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
         writer.maybeComma();
         writer << "\"kind\": \"DynamicResource\"";
         break;
-    case slang::TypeReflection::Kind::OutputStream:
-        writer.maybeComma();
-        writer << "\"kind\": \"OutputStream\"";
-        break;
     case slang::TypeReflection::Kind::MeshOutput:
         writer.maybeComma();
         writer << "\"kind\": \"MeshOutput\"";
@@ -917,6 +913,10 @@ static void emitReflectionTypeLayoutInfoJSON(
 
     case slang::TypeReflection::Kind::ConstantBuffer:
         emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "constantBuffer");
+        break;
+
+    case slang::TypeReflection::Kind::OutputStream:
+        emitReflectionParameterGroupTypeLayoutInfoJSON(writer, typeLayout, "outputStream");
         break;
 
     case slang::TypeReflection::Kind::ParameterBlock:

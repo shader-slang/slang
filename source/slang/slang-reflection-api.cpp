@@ -638,6 +638,10 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     {
         return convert(matrixType->getElementType());
     }
+    else if (auto streamType = as<HLSLStreamOutputType>(type))
+    {
+        return convert(streamType->getElementType());
+    }
 
     return nullptr;
 }
@@ -1525,6 +1529,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
         return convert(ptrTypeLayout->valueTypeLayout.Ptr());
+    }
+    else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
+    {
+        return convert(streamOutputTypeLayout->elementTypeLayout.Ptr());
     }
     return nullptr;
 }
