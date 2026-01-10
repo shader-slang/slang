@@ -150,7 +150,8 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                 continue;
 
             // For constraint interfaces like __BuiltinFloatingPointType and __BuiltinIntegerType,
-            // avoid cross-family conversions (int->float, float->int) to prevent ambiguous overloads
+            // avoid cross-family conversions (int->float, float->int) to prevent ambiguous
+            // overloads
             if (auto interfaceDeclRefType = as<DeclRefType>(interfaceType))
             {
                 if (auto interfaceDecl = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>())
@@ -158,8 +159,10 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                     auto interfaceName = interfaceDecl.getName();
                     if (interfaceName)
                     {
-                        bool isFloatInterface = interfaceName->text == UnownedStringSlice("__BuiltinFloatingPointType");
-                        bool isIntInterface = interfaceName->text == UnownedStringSlice("__BuiltinIntegerType");
+                        bool isFloatInterface =
+                            interfaceName->text == UnownedStringSlice("__BuiltinFloatingPointType");
+                        bool isIntInterface =
+                            interfaceName->text == UnownedStringSlice("__BuiltinIntegerType");
 
                         if (isFloatInterface || isIntInterface)
                         {
@@ -173,25 +176,42 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
                             if (auto candidateBasicType = as<BasicExpressionType>(candidateType))
                             {
                                 auto candidateBaseType = candidateBasicType->getBaseType();
-                                candidateIsFloat = (candidateBaseType == BaseType::Float || candidateBaseType == BaseType::Half || candidateBaseType == BaseType::Double);
-                                candidateIsInt = (candidateBaseType == BaseType::Int || candidateBaseType == BaseType::UInt ||
-                                                candidateBaseType == BaseType::Int8 || candidateBaseType == BaseType::UInt8 ||
-                                                candidateBaseType == BaseType::Int16 || candidateBaseType == BaseType::UInt16 ||
-                                                candidateBaseType == BaseType::Int64 || candidateBaseType == BaseType::UInt64);
+                                candidateIsFloat =
+                                    (candidateBaseType == BaseType::Float ||
+                                     candidateBaseType == BaseType::Half ||
+                                     candidateBaseType == BaseType::Double);
+                                candidateIsInt =
+                                    (candidateBaseType == BaseType::Int ||
+                                     candidateBaseType == BaseType::UInt ||
+                                     candidateBaseType == BaseType::Int8 ||
+                                     candidateBaseType == BaseType::UInt8 ||
+                                     candidateBaseType == BaseType::Int16 ||
+                                     candidateBaseType == BaseType::UInt16 ||
+                                     candidateBaseType == BaseType::Int64 ||
+                                     candidateBaseType == BaseType::UInt64);
                             }
 
                             // Check the source type (what we're trying to convert FROM)
                             if (auto sourceBasicType = as<BasicExpressionType>(type))
                             {
                                 auto sourceBaseType = sourceBasicType->getBaseType();
-                                sourceIsFloat = (sourceBaseType == BaseType::Float || sourceBaseType == BaseType::Half || sourceBaseType == BaseType::Double);
-                                sourceIsInt = (sourceBaseType == BaseType::Int || sourceBaseType == BaseType::UInt ||
-                                             sourceBaseType == BaseType::Int8 || sourceBaseType == BaseType::UInt8 ||
-                                             sourceBaseType == BaseType::Int16 || sourceBaseType == BaseType::UInt16 ||
-                                             sourceBaseType == BaseType::Int64 || sourceBaseType == BaseType::UInt64);
+                                sourceIsFloat =
+                                    (sourceBaseType == BaseType::Float ||
+                                     sourceBaseType == BaseType::Half ||
+                                     sourceBaseType == BaseType::Double);
+                                sourceIsInt =
+                                    (sourceBaseType == BaseType::Int ||
+                                     sourceBaseType == BaseType::UInt ||
+                                     sourceBaseType == BaseType::Int8 ||
+                                     sourceBaseType == BaseType::UInt8 ||
+                                     sourceBaseType == BaseType::Int16 ||
+                                     sourceBaseType == BaseType::UInt16 ||
+                                     sourceBaseType == BaseType::Int64 ||
+                                     sourceBaseType == BaseType::UInt64);
                             }
 
-                            // Disallow cross-family conversions: int->float for FloatInterface, float->int for IntInterface
+                            // Disallow cross-family conversions: int->float for FloatInterface,
+                            // float->int for IntInterface
                             if ((isFloatInterface && candidateIsFloat && sourceIsInt) ||
                                 (isIntInterface && candidateIsInt && sourceIsFloat))
                             {
