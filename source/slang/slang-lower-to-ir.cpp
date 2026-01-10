@@ -13081,7 +13081,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
     bool minimumOptimizations =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
@@ -13150,8 +13150,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |=
-                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= applySparseConditionalConstantPropagation(
+                        func,
+                        nullptr,
+                        compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
@@ -13184,7 +13186,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
-        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, compileRequest->getSink());
 
         if (translationUnit->getModuleDecl()->languageVersion >=
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
