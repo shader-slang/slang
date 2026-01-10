@@ -203,6 +203,15 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         size.append(calcSize(optionalType->getValueType()));
         return size;
     }
+    else if (as<DescriptorHandleType>(type))
+    {
+        // DescriptorHandle<T> is represented as either:
+        // - uint64_t (8 bytes, 8-byte aligned) with spvBindlessTextureNV extension
+        // - uint2 (8 bytes, 4-byte aligned) on other targets
+        // Since we don't have target information at AST level, we use 8-byte alignment
+        // which is the more conservative choice that works correctly for both cases.
+        return NaturalSize::make(8, 8);
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
