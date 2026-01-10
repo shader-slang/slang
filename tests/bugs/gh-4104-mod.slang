@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target hlsl
 //TEST:SIMPLE(filecheck=SOURCE): -stage compute -entry computeMain -target glsl
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=BUF): -dx12 -compute -entry computeMain -profile cs_6_6 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-slang -dx12 -compute -entry computeMain -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-via-glsl
 //TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF): -vk -compute -entry computeMain -output-using-type -emit-spirv-directly
 
@@ -23,12 +23,12 @@ bool Test_CompileTimeMod()
         && ((uint32_t(1) % u32Const) == uint32_t(1))
         && ((int32_t(1) % u32Const) == uint32_t(1))
         && ((i32Const % u32Const) == i32Const)
-        && ((uint32_t(1) % u64Const) == uint64_t(1))
-        && ((int32_t(1) % u64Const) == uint64_t(1))
-        && ((i32Const % u64Const) == i64Const)
-        && ((uint64_t(1) % u64Const) == uint64_t(1))
-        && ((int64_t(1) % u64Const) == uint64_t(1))
-        && ((i32Const % u64Const) == i64Const)
+        && ((uint32_t(1) % u64Const) == uint64_t(0))
+        && ((int32_t(1) % u64Const) == uint64_t(0))
+        && ((i32Const % u64Const) == int64_t(0))
+        && ((uint64_t(1) % u64Const) == uint64_t(0))
+        && ((int64_t(1) % u64Const) == uint64_t(0))
+        && ((i32Const % u64Const) == int64_t(0))
         ;
 }
 
@@ -39,5 +39,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // SOURCE-LABEL: Test_CompileTimeMod
     outputBuffer[0] = int(true
         && uint(-1) == u32Const
+        && uint64_t(-1) == u64Const
         && Test_CompileTimeMod());
 }
