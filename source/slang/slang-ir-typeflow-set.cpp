@@ -26,6 +26,23 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     if (!argInfo || !destInfo)
         return arg;
 
+    // If we are upcasting a default-constructed value and the destination type differs,
+    // we should materialize a default value of the destination type instead of trying to
+    // reinterpret/cast the old default value.
+    //
+    // This is important when earlier specialization/lowering changes the effective type of
+    // a phi/block-parameter, but a predecessor edge still passes a `defaultConstruct` of the
+    // pre-specialization type.
+    if (argInfo != destInfo)
+    {
+        if (as<IRDefaultConstruct>(arg))
+        {
+            if (auto newDefault =
+                    builder->emitDefaultConstruct((IRType*)destInfo, /*fallback*/ true))
+                return newDefault;
+        }
+    }
+
     if (as<IRTaggedUnionType>(argInfo) && as<IRTaggedUnionType>(destInfo))
     {
         // A tagged union is essentially a tuple(TagType(tableSet),
