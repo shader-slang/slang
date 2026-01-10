@@ -553,9 +553,11 @@ SlangResult DXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case DebugInfoType::None:
         break;
 
+    // DXC only supports -Zi (full debug info) or -Zs (small PDB without debug metadata).
+    // Testing shows -Zs generates NO debug metadata at all (!DIFile, !DICompileUnit, etc.)
+    // For all debug levels, we use -Zi to generate full debug info
     default:
         args.add(L"-Zi");
-        break;
     }
 
     // Slang strives to produce correct code, and by default
