@@ -789,13 +789,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV1 = SlangResult (*)(
+        using BuilderFuncV2 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV1)library->findFuncByName("createLLVMBuilder_V1");
+        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
         if (!builderFunc)
             return SLANG_FAIL;
 
@@ -827,6 +827,12 @@ struct LLVMEmitter
         builderOpt.fp32DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp32();
         builderOpt.fp64DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp64();
         builderOpt.fpMode = (SlangFloatingPointMode)getOptions().getFloatingPointMode();
+
+        List<TerminatedCharSlice> llvmArguments;
+        List<String> downstreamArgs = getOptions().getDownstreamArgs("llvm");
+        for (const auto& arg : downstreamArgs)
+            llvmArguments.add(TerminatedCharSlice(arg.getBuffer()));
+        builderOpt.llvmArguments = Slice(llvmArguments.begin(), llvmArguments.getCount());
 
         ComPtr<IArtifact> errorArtifact;
         SLANG_RETURN_ON_FAIL(builderFunc(
