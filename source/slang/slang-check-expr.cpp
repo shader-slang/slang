@@ -465,10 +465,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
 
             // It's not valid to reference a non-static member with a static
             // func using 'this'.
-            if (getSink() && m_parentFunc &&
-                m_parentFunc->hasModifier<HLSLStaticModifier>() &&
-                !isDeclUsableAsStaticMember(declRef.getDecl()) &&
-                as<ThisExpr>(baseExpr))
+            if (getSink() && m_parentFunc && m_parentFunc->hasModifier<HLSLStaticModifier>() &&
+                !isDeclUsableAsStaticMember(declRef.getDecl()) && as<ThisExpr>(baseExpr))
             {
                 getSink()->diagnose(loc, Diagnostics::staticRefToThis, declRef.getName());
                 expr->type = m_astBuilder->getErrorType();
