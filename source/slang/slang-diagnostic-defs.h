@@ -874,6 +874,11 @@ DIAGNOSTIC(
     Error,
     cannotDereferenceType,
     "cannot dereference type '$0', do you mean to use '.'?")
+DIAGNOSTIC(
+    30102,
+    Error,
+    staticRefToThis,
+    "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
