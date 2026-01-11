@@ -463,6 +463,17 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // only to avoid modifying the child
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
+            // It's not valid to reference a non-static member with a static
+            // func using 'this'.
+            if (getSink() && m_parentFunc &&
+                m_parentFunc->hasModifier<HLSLStaticModifier>() &&
+                !isDeclUsableAsStaticMember(declRef.getDecl()) &&
+                as<ThisExpr>(baseExpr))
+            {
+                getSink()->diagnose(loc, Diagnostics::staticRefToThis, declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
+            }
+
             // When referring to a member through an expression,
             // the result is only an l-value if both the base
             // expression and the member agree that it should be.
