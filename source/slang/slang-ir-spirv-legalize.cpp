@@ -2167,6 +2167,36 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Recursively looks for member structs that have the Block / BufferBlock
+    // decoration.
+    void findEmbeddedBlockStructs(
+        IRInst* inst,
+        bool global,
+        HashSet<IRStructType*>& embeddedBlockStructs)
+    {
+        if (!global)
+        {
+            if (auto innerStruct = as<IRStructType>(inst))
+            {
+                if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                    innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+                {
+                    embeddedBlockStructs.add(innerStruct);
+                }
+            }
+        }
+
+        if (auto outerStruct = as<IRStructType>(inst))
+        {
+            for (auto field : outerStruct->getFields())
+                findEmbeddedBlockStructs(field->getFieldType(), false, embeddedBlockStructs);
+        }
+        else if (auto outerArray = as<IRArrayType>(inst))
+        {
+            findEmbeddedBlockStructs(outerArray->getElementType(), false, embeddedBlockStructs);
+        }
+    }
+
     void legalizeStructBlocks()
     {
         // SPIRV does not allow using a struct with a block declaration as a field
@@ -2177,23 +2207,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         HashSet<IRStructType*> embeddedBlockStructs;
         List<IRGlobalParam*> structGlobalParams;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
-            if (auto outerStruct = as<IRStructType>(globalInst))
-            {
-                for (auto field : outerStruct->getFields())
-                {
-                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
-                    {
-                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
-                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
-                        {
-                            embeddedBlockStructs.add(innerStruct);
-                        }
-                    }
-                }
-            }
-            else if (auto globalParam = as<IRGlobalParam>(globalInst))
+            // This search needs to be done recursively in order to find
+            // structs nested deeper than one layer.
+            findEmbeddedBlockStructs(globalInst, true, embeddedBlockStructs);
+
+            if (auto globalParam = as<IRGlobalParam>(globalInst))
             {
                 if (auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType()))
                 {
