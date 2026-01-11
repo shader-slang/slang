@@ -14,7 +14,7 @@ jobs:
         run: docker --version
 
       - name: Test CUDA container with GPU
-        run: docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+        run: docker run --rm --gpus all nvidia/cuda:12.5.1-base-ubuntu22.04 nvidia-smi
 
       - name: Check Vulkan ICD configuration
         run: |

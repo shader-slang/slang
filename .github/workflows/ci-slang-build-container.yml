@@ -11,13 +11,12 @@ on:
         type: string
 
 jobs:
-  # Uses nvidia/cuda container for CUDA support. CUDA 12.4 is used because the test runner
-  # host driver (550.54.15) doesn't support newer PTX versions from CUDA 12.9+.
+  # Uses nvidia/cuda container for CUDA support.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
       options: --user root
 
     defaults:

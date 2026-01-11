@@ -1,7 +1,7 @@
 # Linux GPU CI Container Image
 #
-# Base image with CUDA 12.4.1 for GPU testing on self-hosted runners
-# with driver 550.54.15 (doesn't support newer PTX versions from CUDA 12.9+)
+# Base image with CUDA 12.5.1 for GPU testing on self-hosted runners
+# Requires driver 555.42.02 or newer
 #
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
@@ -9,10 +9,10 @@
 # - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
 
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
 
 # Install essential tools required for GitHub Actions and Copilot
 # - curl: for downloading Copilot runtime and dependencies
@@ -44,10 +44,16 @@ RUN apt-get update && apt-get install -y \
     libxi-dev \
     libgl1-mesa-dev \
     libvulkan-dev \
-    vulkan-validationlayers \
     spirv-tools \
     glslang-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install newer Vulkan validation layers from LunarG
+RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - && \
+    wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list && \
+    apt-get update && \
+    apt-get install -y vulkan-validationlayers && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
@@ -77,5 +83,5 @@ RUN echo "=== Installed Tools ===" && \
 
 # Set labels for identification
 LABEL org.opencontainers.image.source=https://github.com/shader-slang/slang
-LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 12.4.1"
+LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 12.5.1"
 LABEL org.opencontainers.image.licenses=MIT
