@@ -1642,6 +1642,11 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    // Entry-point layouts are generated before link-time associated type resolution, so
+    // after specialization we may need to rebuild result layouts to match the resolved
+    // return types (e.g. concrete structs for associated types).
+    refreshEntryPointResultLayouts(irModule, irEntryPoints);
+
     // For GLSL only, we will need to perform "legalization" of
     // the entry point and any entry-point parameters.
     //
