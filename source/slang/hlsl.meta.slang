@@ -12157,6 +12157,34 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+// Internal helper for max - contains the intrinsic implementations.
+// Caller must ensure T is a builtin scalar type (float, int, etc.).
+//@ hidden:
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+T __max_impl(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
+    case wgsl: __intrinsic_asm "max";
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    case cpp: __intrinsic_asm "$P_max($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 FMax $x $y };
+        else if (__isSignedInt<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 SMax $x $y };
+        else
+            return spirv_asm { result:$$T = OpExtInst glsl450 UMax $x $y };
+    }
+}
+
+//@public:
 /// Maximum.
 /// @param x The first value.
 /// @param y The second value.
@@ -12167,42 +12195,30 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
-    // Note: a core module implementation of `max` (or `min`) will require splitting
-    // floating-point and integer cases apart, because the floating-point
-    // version needs to correctly handle the case where one of the inputs
-    // is not-a-number.
+    return __max_impl(x, y);
+}
 
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    case cpp: __intrinsic_asm "$P_max($0, $1)";
-    case spirv:
-    {
-        if (__isSignedInt<T>())
-        {
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 SMax $x $y
-            };
-        }
-        else
-        {
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 UMax $x $y
-            };
-        }
-    }
-    case wgsl: __intrinsic_asm "max";
-    case llvm:
-    {
-        if (__isSignedInt<T>())
-            __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
-        else
-            __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
-    }
-    }
+/// Maximum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The maximum of `x` and `y`.
+/// @remarks This overload allows using `max` in generic code constrained by `IArithmetic`.
+/// For concrete integer and floating-point types, the more specific overloads are preferred.
+/// @category math
+__generic<T : IArithmetic>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+T max(T x, T y)
+{
+    // For builtin scalar types, use optimized intrinsics
+    if (__isFloat<T>() || __isInt<T>())
+        return __max_impl(x, y);
+
+    // For user-defined IArithmetic types, use IComparable.lessThan
+    if (x.lessThan(y))
+        return y;
+    return x;
 }
 
 /// @category math
@@ -12263,25 +12279,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    case cpp: __intrinsic_asm "$P_max($0, $1)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 FMax $x $y
-    };
-    case wgsl: __intrinsic_asm "max";
-    case llvm:
-        // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate
-        // invalid code on x86.
-        //__intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
-        if (isnan(x)) return y;
-        if (isnan(y)) return x;
-        return x > y ? x : y;
-    }
+    return __max_impl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -12416,6 +12414,34 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+// Internal helper for min - contains the intrinsic implementations.
+// Caller must ensure T is a builtin scalar type (float, int, etc.).
+//@ hidden:
+__generic<T : IArithmetic>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+T __min_impl(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case metal: __intrinsic_asm "min";
+    case wgsl: __intrinsic_asm "min";
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    case cpp: __intrinsic_asm "$P_min($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 FMin $x $y };
+        else if (__isSignedInt<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 SMin $x $y };
+        else
+            return spirv_asm { result:$$T = OpExtInst glsl450 UMin $x $y };
+    }
+}
+
+//@public:
 /// Minimum.
 /// @param x The first value to compare.
 /// @param y The second value to compare.
@@ -12428,35 +12454,7 @@ __generic<T : __BuiltinIntegerType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
-    __target_switch
-    {
-    case hlsl:
-    case glsl:
-    case metal:
-        __intrinsic_asm "min";
-    case cuda:
-    case cpp:
-        __intrinsic_asm "$P_min($0, $1)";
-    case spirv:
-    {
-        if (__isSignedInt<T>())
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 SMin $x $y
-            };
-        else
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 UMin $x $y
-            };
-    }
-    case wgsl: __intrinsic_asm "min";
-    case llvm:
-    {
-        if (__isSignedInt<T>())
-            __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
-        else
-            __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
-    }
-    }
+    return __min_impl(x, y);
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
@@ -12511,25 +12509,7 @@ __generic<T : __BuiltinFloatingPointType>
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "min";
-    case metal: __intrinsic_asm "min";
-    case glsl: __intrinsic_asm "min";
-    case cuda: __intrinsic_asm "$P_min($0, $1)";
-    case cpp: __intrinsic_asm "$P_min($0, $1)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 FMin $x $y
-    };
-    case wgsl: __intrinsic_asm "min";
-    case llvm:
-        // Unfortunately, as of LLVM 21.1.1, minimumnum seems to generate
-        // invalid code on x86.
-        // __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
-        if (isnan(x)) return y;
-        if (isnan(y)) return x;
-        return x < y ? x : y;
-    }
+    return __min_impl(x, y);
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
@@ -12563,6 +12543,29 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
     default:
         MATRIX_MAP_BINARY(T, N, M, min, x, y);
     }
+}
+
+/// Minimum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The minimum of `x` and `y`.
+/// @remarks This overload allows using `min` in generic code constrained by `IArithmetic`.
+/// For concrete integer and floating-point types, the more specific overloads are preferred.
+/// @category math
+__generic<T : IArithmetic>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+T min(T x, T y)
+{
+    // For builtin scalar types, use optimized intrinsics
+    if (__isFloat<T>() || __isInt<T>())
+        return __min_impl(x, y);
+
+    // For user-defined IArithmetic types, use IComparable.lessThan
+    if (x.lessThan(y))
+        return x;
+    return y;
 }
 
 /// Minimum of 3 inputs.
