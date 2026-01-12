@@ -1668,6 +1668,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     }
 
     IRInst* m_defaultDebugSource = nullptr;
+    IRInst* m_entryPointDebugSource = nullptr;
+
+    void setEntryPointDebugSource(IRInst* source) { m_entryPointDebugSource = source; }
 
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
@@ -2379,11 +2382,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
 
                 auto moduleInst = inst->getModule()->getModuleInst();
-                if (!m_defaultDebugSource)
-                    m_defaultDebugSource = debugSource;
                 // Only create DebugCompilationUnit for non-included files
-                auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
+                auto isIncludedFileLit = as<IRBoolLit>(debugSource->getIsIncludedFile());
+                bool isIncludedFile = isIncludedFileLit ? isIncludedFileLit->getValue() : false;
+                // Prefer the entry point's debug source as the default.
+                // Otherwise, only set default debug source to non-included files.
+                if (!m_defaultDebugSource)
+                {
+                    if (m_entryPointDebugSource && debugSource == m_entryPointDebugSource)
+                        m_defaultDebugSource = debugSource;
+                    else if (!m_entryPointDebugSource && !isIncludedFile)
+                        m_defaultDebugSource = debugSource;
+                }
+                // Create DebugCompilationUnit only for the entry point's source file.
+                // If we have an entry point debug source, only create compilation unit for it.
+                // Otherwise, fall back to using any non-included file.
+                bool shouldCreateCompilationUnit =
+                    !m_mapIRInstToSpvDebugInst.containsKey(moduleInst);
+                if (shouldCreateCompilationUnit)
+                {
+                    if (m_entryPointDebugSource)
+                        shouldCreateCompilationUnit = (debugSource == m_entryPointDebugSource);
+                    else
+                        shouldCreateCompilationUnit = !isIncludedFile;
+                }
+                if (shouldCreateCompilationUnit)
                 {
                     IRBuilder builder(inst);
                     builder.setInsertBefore(inst);
@@ -9834,6 +9857,24 @@ SlangResult emitSPIRVFromIR(
         CompilerOptionName::PreserveParameters);
     auto generateWholeProgram = codeGenContext->getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::GenerateWholeProgram);
+
+    // Pre-identify the entry point's debug source to use as the default debug source.
+    // This ensures that global variables without explicit debug locations use the
+    // correct source file (the main shader file where the entry point is defined,
+    // not imported module files).
+    for (auto entryPoint : irEntryPoints)
+    {
+        if (auto debugLoc = entryPoint->findDecoration<IRDebugLocationDecoration>())
+        {
+            auto entryPointDebugSource = as<IRDebugSource>(debugLoc->getSource());
+            if (entryPointDebugSource)
+            {
+                context.setEntryPointDebugSource(entryPointDebugSource);
+                break;
+            }
+        }
+    }
+
     for (auto inst : irModule->getGlobalInsts())
     {
         if (as<IRDebugSource>(inst))

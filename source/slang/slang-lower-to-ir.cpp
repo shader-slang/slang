@@ -8042,7 +8042,7 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
+    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, true);
     context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
     return debugSrcInst;
 }
