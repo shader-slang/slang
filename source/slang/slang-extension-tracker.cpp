@@ -86,12 +86,11 @@ void ShaderExtensionTracker::requireBaseTypeExtension(BaseType baseType)
     case BaseType::IntPtr:
     case BaseType::UIntPtr:
         {
-#if SLANG_PTR_IS_64
+            // Pointers are assumed to be 64-bit with GLSL and SPIR-V targets.
             requireExtension(
                 UnownedStringSlice::fromLiteral("GL_EXT_shader_explicit_arithmetic_types_int64"));
             m_hasBaseTypeFlags |= _getFlag(BaseType::UInt64) | _getFlag(BaseType::Int64) |
                                   _getFlag(BaseType::IntPtr) | _getFlag(BaseType::UIntPtr);
-#endif
             break;
         }
     }

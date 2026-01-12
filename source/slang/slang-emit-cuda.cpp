@@ -73,17 +73,18 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
         return UnownedStringSlice("uint");
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
-#if SLANG_PTR_IS_64
+
     case kIROp_IntPtrType:
-        return UnownedStringSlice("int64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("int64_t");
+        else
+            return UnownedStringSlice("int");
+
     case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint64_t");
-#else
-    case kIROp_IntPtrType:
-        return UnownedStringSlice("int");
-    case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint");
-#endif
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("uint64_t");
+        else
+            return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
@@ -123,17 +124,17 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
 
-#if SLANG_PTR_IS_64
     case kIROp_IntPtrType:
-        return UnownedStringSlice("longlong");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("longlong");
+        else
+            return UnownedStringSlice("int");
+
     case kIROp_UIntPtrType:
-        return UnownedStringSlice("ulonglong");
-#else
-    case kIROp_IntPtrType:
-        return UnownedStringSlice("int");
-    case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint");
-#endif
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("ulonglong");
+        else
+            return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
