@@ -890,6 +890,11 @@ Embed downstream IR into emitted slang IR
 Enable experimental features (loading builtin neural module) 
 
 
+<a id="enable-experimental-rich-diagnostics"></a>
+### -enable-experimental-rich-diagnostics
+Enable experimental rich diagnostics with enhanced formatting and details 
+
+
 
 <a id="Internal"></a>
 ## Internal
