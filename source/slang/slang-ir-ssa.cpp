@@ -394,7 +394,8 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
 
             // Find where this case falls through to (if anywhere)
             HashSet<IRBlock*> visitedForFallThrough;
-            auto fallThroughTarget = findFallThroughTarget(caseLabel, breakLabel, allCaseLabels, visitedForFallThrough);
+            auto fallThroughTarget =
+                findFallThroughTarget(caseLabel, breakLabel, allCaseLabels, visitedForFallThrough);
 
             if (!fallThroughTarget)
                 continue; // This case doesn't fall through
@@ -402,7 +403,12 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
             // This case falls through! Collect stored vars in this case
             HashSet<IRVar*> storedVars;
             HashSet<IRBlock*> visitedForStore;
-            collectStoredVarsInCase(caseLabel, breakLabel, fallThroughTarget, storedVars, visitedForStore);
+            collectStoredVarsInCase(
+                caseLabel,
+                breakLabel,
+                fallThroughTarget,
+                storedVars,
+                visitedForStore);
 
             if (storedVars.getCount() == 0)
                 continue; // No stores, nothing to protect
@@ -428,7 +434,11 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
 
                 // Check if this target also falls through
                 HashSet<IRBlock*> visitedForTargetFallThrough;
-                auto nextTarget = findFallThroughTarget(targetLabel, breakLabel, allCaseLabels, visitedForTargetFallThrough);
+                auto nextTarget = findFallThroughTarget(
+                    targetLabel,
+                    breakLabel,
+                    allCaseLabels,
+                    visitedForTargetFallThrough);
                 if (nextTarget && !processedTargets.contains(nextTarget))
                 {
                     targetsToProcess.add(nextTarget);
