@@ -136,8 +136,8 @@ struct TestClass : ITest
 }
 ```
 
-> Remark: The test for an inheriting member function compatibility is equivalent to whether a wrapper function
-> with the interface member function signature may invoke the inheriting member function, passing the
+> Remark 1: The test for an inheriting member function compatibility is equivalent to whether a wrapper
+> function with the interface member function signature may invoke the inheriting member function, passing the
 > parameters and the return value as is.
 >
 > For example:
@@ -169,6 +169,35 @@ struct TestClass : ITest
 >     return obj.someFunc(a, b);
 > }
 > ```
+
+> Remark 2: An interface can also be parameterized using generics.
+>
+> For example:
+>
+> ```hlsl
+> interface ITypedReq<T>
+> {
+>     T someFunc(T param);
+> }
+>
+> struct TestClass : ITypedReq<uint>
+> {
+>     uint someFunc(uint param)
+>     {
+>         return 123 + param;
+>     }
+> }
+>
+> [shader("compute")]
+> void main(uint3 id : SV_DispatchThreadID)
+> {
+>     TestClass obj = {  };
+>
+>     obj.someFunc(id.x);
+> }
+> ```
+>
+> See [Generics (TODO)](TODO) for further information on generics.
 
 
 ## Interface-Conforming Variants

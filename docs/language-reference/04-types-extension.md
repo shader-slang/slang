@@ -13,7 +13,7 @@ members in the `struct` definition.
 
 A struct with a non-`static` unknown-length array member may not be extended with non-`static` data members.
 
-### Example
+Example:
 
 ```hlsl
 struct ExampleStruct
@@ -36,17 +36,45 @@ extension ExampleStruct
 }
 ```
 
+An extension can also be used to provide interface requirements to a struct.
+
+Example:
+
+```hlsl
+interface IReq
+{
+    int requiredFunc();
+}
+
+struct TestClass : IReq
+{
+}
+
+extension TestClass
+{
+    int requiredFunc()
+    {
+        return 42;
+    }
+}
+
+[shader("compute")]
+void main(uint3 id : SV_DispatchThreadID)
+{
+    TestClass obj = {  };
+
+    obj.requiredFunc();
+}
+```
+
 
 ## Generic Struct Extension
 
 All structs conforming to an interface may be extended using a generic extension declaration. The generic
-extension declaration adds new members to all types conforming to the specified interface. In case there are
-multiple declarations with the same signature, the one in the concrete type takes precedence.
+extension declaration adds new members to all conforming types. In case there are multiple declarations with
+the same signature, the one in the concrete type takes precedence.
 
-See [Generics (TODO)](TODO) for further information on generics.
-
-
-### Example
+Example
 
 ```hlsl
 interface IBase
@@ -77,7 +105,7 @@ struct ConcreteInt32 : IBase
 extension<T : IBase> T
 {
     // added to all types conforming to
-    // interface IBase>
+    // interface IBase
     int getASquared()
     {
         return getA() * getA();
@@ -85,3 +113,4 @@ extension<T : IBase> T
 }
 ```
 
+See [Generics (TODO)](TODO) for further information on generics.
