@@ -18,6 +18,14 @@ A data member and a member function can be declared with the `static` keyword.
   - Access both the static and the non-static data members.
   - Invoke both the static and the non-static member functions.
 
+Data members may be assigned with a default initializer. The following rules apply:
+- When an object is initialized using an initializer list, the default initializer of a non-static data member
+  specifies the initial value when the initializer list does not provide one.
+- When an object is initialized using a constructor, the default initializer of a non-static data member
+  specifies the initial value of the data member. A constructor may override this, unless the member is
+  `const`.
+- `static const` data members must have a default initializer.
+
 The non-static data members are allocated sequentially within the `struct` when a variable of this type is
 allocated.
 
@@ -26,6 +34,11 @@ A nested type is a regular type enclosed within the scope of the outer `struct`.
 A structure may conform to one or more [interface](04-types-interface.md) types.
 
 A structure may be extended with a [type extension](04-types-extension.md).
+
+`struct` members may be declared with access control specifiers `public`, `internal`, or `private`. The default
+member visibility is `internal`. Nested `struct` members have access to `private` members of the enclosing
+`struct`. See [access control (TODO)](TODO) for further information.
+
 
 > Remark: Structure inheriting from another structure is deprecated. It may not work as expected.
 
@@ -51,7 +64,6 @@ instantiation.
 
 `const` data members cannot be initialized by the constructor.
 
-
 Example:
 ```hlsl
 struct TestClass
@@ -63,7 +75,6 @@ struct TestClass
         a = 1;
         b = 2;
     }
-
 
     __init(int _a)
     {

@@ -23,6 +23,7 @@ An interface consists of:
   - Defining a type alias for the name with `typealias` or `typedef`.
 - Any number of `static` `const` data members without initializers. A concrete inheriting type must provide
   compatible static data members with the same names and types.
+  - The type of a `static` `const` member must be either `int` or `bool`.
 
 The interface member functions may be static or non-static.
 
@@ -36,6 +37,13 @@ A member function implementation is compatible with an interface member function
 
 A member property (or variable) is compatible with an interface member property when the implementation
 property (or variable) is convertible to the interface property and vice versa.
+
+`interface` members may be declared with access control specifiers `public` or `internal`. The default member
+visibility is the visibility of the `interface`. See [access control (TODO)](TODO) for further information.
+
+When a struct implements an interface member requirement, the visibility of the member may not be higher than
+the requirement. However, it can be lower.
+
 
 Example:
 ```hlsl
