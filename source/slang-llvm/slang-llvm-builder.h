@@ -70,6 +70,7 @@ struct LLVMBuilderOptions
     SlangFpDenormalMode fp32DenormalMode;
     SlangFpDenormalMode fp64DenormalMode;
     SlangFloatingPointMode fpMode;
+    Slice<TerminatedCharSlice> llvmArguments;
 };
 
 enum LLVMAttribute : uint32_t
