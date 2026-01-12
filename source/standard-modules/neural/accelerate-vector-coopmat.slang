@@ -797,7 +797,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(sharedMemoryB + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC, StrideInVectorTileC);
                 }
             }
-            GroupMemoryBarrierWithWaveSync();
 
             // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
             // In forward pass, the tile in the shared memory is in shape M x T_ROW_A, which is one column of cooperative matrices.
@@ -961,9 +960,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 matC[index].Store<ColumnMajor, uint4>(ptrPerWarp + j * CMShape.CoopMatCSizeInVector,
                                 TileInfo.HeightInVectorTileC);
             }
-
-            // Make sure the data in shared memory is visible to all threads in the warp.
-            GroupMemoryBarrierWithWaveSync();
 
             if (Bias)
             {
