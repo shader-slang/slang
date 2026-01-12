@@ -221,7 +221,7 @@ static void reportCheckpointIntermediates(
     IRModule* irModule)
 {
     // Report checkpointing information
-    CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+    TargetRequest* targetReq = codeGenContext->getTargetReq();
     SourceManager* sourceManager = sink->getSourceManager();
 
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
@@ -245,7 +245,7 @@ static void reportCheckpointIntermediates(
             continue;
 
         IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
 
         // Reporting happens before empty structs are optimized out
         // and we still want to keep the checkpointing decorations,
@@ -265,7 +265,7 @@ static void reportCheckpointIntermediates(
         {
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
             if (fieldSize.size == 0)
                 continue;
 
@@ -977,7 +977,10 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            SLANG_PASS(applySparseConditionalConstantPropagation, codeGenContext->getSink());
+            SLANG_PASS(
+                applySparseConditionalConstantPropagation,
+                targetProgram,
+                codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -1048,7 +1051,7 @@ Result linkAndOptimizeIR(
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
-        SLANG_PASS(lowerResultType, sink);
+        SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
@@ -1182,7 +1185,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerTuples, sink);
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1235,6 +1238,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
 
             applySparseConditionalConstantPropagation,
+            targetProgram,
             sink);
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
@@ -1653,7 +1657,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {
-            SLANG_PASS(legalizeIRForMetal, sink);
+            SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
     case CodeGenTarget::CSource:
@@ -1678,7 +1682,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            SLANG_PASS(legalizeIRForWGSL, sink);
+            SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
 
@@ -1693,7 +1697,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(legalizeLogicalAndOr);
+        SLANG_PASS(legalizeLogicalAndOr, targetProgram);
 
     // Legalize non struct parameters that are expected to be structs for HLSL.
     if (isD3DTarget(targetRequest))
