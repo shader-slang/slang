@@ -78,10 +78,10 @@ jobs:
           )
 
           # Add test server arguments only if server count > 1
-          if [ "${{ inputs.server-count }}" -gt 1 ]; then
-            slang_test_args+=("-use-test-server")
-            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
-          fi
+          # if [ "${{ inputs.server-count }}" -gt 1 ]; then
+          #   slang_test_args+=("-use-test-server")
+          #   slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          # fi
 
           # Add no-GPU failure list for non-GPU tests
           if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then

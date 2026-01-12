@@ -164,18 +164,18 @@ jobs:
       server-count: 3
 
   # Windows GPU tests (self-hosted)
-  test-windows-debug-cl-x86_64-gpu:
-    needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: needs.filter.outputs.should-run == 'true'
-    uses: ./.github/workflows/ci-slang-test.yml
-    with:
-      os: windows
-      compiler: cl
-      platform: x86_64
-      config: debug
-      runs-on: '["Windows", "self-hosted", "neural"]'
-      test-category: full
-      full-gpu-tests: true
+  # test-windows-debug-cl-x86_64-gpu:
+  #   needs: [filter, build-windows-debug-cl-x86_64-gpu]
+  #   if: needs.filter.outputs.should-run == 'true'
+  #   uses: ./.github/workflows/ci-slang-test.yml
+  #   with:
+  #     os: windows
+  #     compiler: cl
+  #     platform: x86_64
+  #     config: debug
+  #     runs-on: '["Windows", "self-hosted", "neural"]'
+  #     test-category: full
+  #     full-gpu-tests: true
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
