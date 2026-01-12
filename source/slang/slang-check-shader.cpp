@@ -645,8 +645,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 String baseName = String(lowerName.subString(3, lowerName.getLength() - 3));
 
                 // Strip trailing digits to handle numbered semantics like SV_Target0, SV_Target1
-                while (baseName.getLength() > 0 &&
-                       baseName[baseName.getLength() - 1] >= '0' &&
+                while (baseName.getLength() > 0 && baseName[baseName.getLength() - 1] >= '0' &&
                        baseName[baseName.getLength() - 1] <= '9')
                 {
                     baseName = baseName.subString(0, baseName.getLength() - 1);

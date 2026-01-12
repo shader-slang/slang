@@ -2529,9 +2529,17 @@ DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value
 
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
 
-DIAGNOSTIC(40014, Error, systemSemanticNotValidForDirection, "system-value semantic '$0' cannot be used as $1")
+DIAGNOSTIC(
+    40014,
+    Error,
+    systemSemanticNotValidForDirection,
+    "system-value semantic '$0' cannot be used as $1")
 
-DIAGNOSTIC(40015, Error, systemSemanticNotValidForStage, "system-value semantic '$0' is not valid in $1 shader stage")
+DIAGNOSTIC(
+    40015,
+    Error,
+    systemSemanticNotValidForStage,
+    "system-value semantic '$0' is not valid in $1 shader stage")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
