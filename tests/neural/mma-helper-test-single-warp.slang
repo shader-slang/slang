@@ -178,7 +178,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 #if !TEST_BIAS
         DType expected = DType(tid + 1);
 #else
-        DType expected = DType(tid + i + 1);
+        DType expected = DType(tid + 1) + DType(i);
 #endif
         if (!equals(outputVector[i], expected))
         {
