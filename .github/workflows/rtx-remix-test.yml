@@ -165,80 +165,117 @@ jobs:
           echo "Verified: dxvk-remix will use the locally built Slang"
 
       - name: Build shaders using build_shaders_only.ps1
+        shell: pwsh
         env:
           SLANG_RUN_SPIRV_VALIDATION: 1
           SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: 1
         run: |
-          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
-          cd "$WORK_DIR/dxvk-remix"
+          $ErrorActionPreference = 'Stop'
+          $WORK_DIR = "$env:RUNNER_TEMP/rtx-remix-test"
+          Set-Location "$WORK_DIR/dxvk-remix"
 
-          echo "Building RTX Remix shaders..."
-          echo "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
-          echo "Start time: $(date +%H:%M:%S)"
+          Write-Host "Building RTX Remix shaders..."
+          Write-Host "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
+          Write-Host "Start time: $(Get-Date -Format 'HH:mm:ss')"
 
-          startTime=$(date +%s)
+          $startTime = Get-Date
 
-          powershell.exe -ExecutionPolicy Bypass -File ./build_shaders_only.ps1
+          # Remove Git's usr\bin from PATH to avoid GNU link.exe conflict with MSVC link.exe
+          # Keep Git\bin and Git\mingw64\bin for git and bash commands
+          $env:PATH = ($env:PATH -split ';' | Where-Object {
+            $_ -notmatch '\\Git\\usr\\bin$'
+          }) -join ';'
 
-          if [ $? -ne 0 ]; then
-            echo "ERROR: Shader build failed with exit code $?"
-            exit 1
-          fi
+          Write-Host "Running build_shaders_only.ps1..."
+          .\build_shaders_only.ps1
 
-          endTime=$(date +%s)
-          duration=$(( (endTime - startTime) / 60 ))
+          if ($LASTEXITCODE -ne 0) {
+            throw "Shader build failed with exit code $LASTEXITCODE"
+          }
 
-          echo "End time: $(date +%H:%M:%S)"
-          echo "Build duration: $duration minutes"
+          $duration = (Get-Date) - $startTime
+          Write-Host "End time: $(Get-Date -Format 'HH:mm:ss')"
+          Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
 
       - name: Verify shader compilation
+        shell: pwsh
         run: |
-          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
-          cd "$WORK_DIR/dxvk-remix"
+          $ErrorActionPreference = 'Stop'
+          $WORK_DIR = "$env:RUNNER_TEMP/rtx-remix-test"
+          Set-Location "$WORK_DIR/dxvk-remix"
 
-          echo "Verifying shader compilation output..."
+          Write-Host "Verifying shader compilation output..."
 
           # Find the build output directory
-          if [ -d "_BuildShadersOnly/src/dxvk/rtx_shaders" ]; then
-            shaderDir="_BuildShadersOnly/src/dxvk/rtx_shaders"
-          elif [ -d "_BuildRelease/src/dxvk/rtx_shaders" ]; then
-            shaderDir="_BuildRelease/src/dxvk/rtx_shaders"
-          else
-            echo "ERROR: Cannot find shader output directory"
-            find . -name "rtx_shaders" -type d || true
-            exit 1
-          fi
+          $possibleDirs = @(
+            "_BuildShadersOnly/src/dxvk/rtx_shaders",
+            "_BuildRelease/src/dxvk/rtx_shaders"
+          )
 
-          cd "$shaderDir"
+          $shaderDir = $null
+          foreach ($dir in $possibleDirs) {
+            if (Test-Path $dir) {
+              $shaderDir = $dir
+              break
+            }
+          }
+
+          if (-not $shaderDir) {
+            Write-Host "ERROR: Cannot find shader output directory"
+            Write-Host "Expected one of:"
+            foreach ($dir in $possibleDirs) {
+              Write-Host "  - $dir"
+            }
+            Write-Host ""
+            Write-Host "Searching for rtx_shaders directories:"
+            Get-ChildItem -Path . -Filter "rtx_shaders" -Directory -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "  Found: $($_.FullName)"
+            }
+
+            # Check if build directory exists at all
+            if (-not (Test-Path "_BuildShadersOnly")) {
+              Write-Host ""
+              Write-Host "ERROR: Build directory _BuildShadersOnly does not exist"
+              Write-Host "This indicates the Meson configuration or build step failed"
+              Write-Host "Check the build logs above for Meson errors (e.g., PATH issues, missing dependencies)"
+            }
+
+            exit 1
+          }
+
+          Write-Host "Found shader directory: $shaderDir"
+          Set-Location $shaderDir
 
           # Count generated files
-          headers=$(find . -maxdepth 1 -name "*.h" -type f | wc -l | xargs)
-          spvFiles=$(find . -maxdepth 1 -name "*.spv" -type f | wc -l | xargs)
-          totalSize=$(du -sm . 2>/dev/null | cut -f1 || echo "unknown")
+          $headers = (Get-ChildItem -Filter "*.h" -File | Measure-Object).Count
+          $spvFiles = (Get-ChildItem -Filter "*.spv" -File | Measure-Object).Count
+          $totalSizeMB = [math]::Round((Get-ChildItem -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
 
-          echo "Compiled shader headers (.h): $headers"
-          echo "SPIR-V binary files (.spv): $spvFiles"
-          echo "Total output size: $totalSize MB"
+          Write-Host "Compiled shader headers (.h): $headers"
+          Write-Host "SPIR-V binary files (.spv): $spvFiles"
+          Write-Host "Total output size: $totalSizeMB MB"
 
           # Validate that shaders were actually generated
-          if [ "${headers:-0}" -eq 0 ] || [ "${spvFiles:-0}" -eq 0 ]; then
-            echo "ERROR: No shader files generated"
-            echo "This indicates shader compilation failed completely"
+          if ($headers -eq 0 -or $spvFiles -eq 0) {
+            Write-Host ""
+            Write-Host "ERROR: No shader files generated"
+            Write-Host "This indicates shader compilation failed completely"
             exit 1
-          fi
+          }
 
           # Sanity check: RTX Remix should have at least 100 shaders
-          if [ "${headers:-0}" -lt 100 ] || [ "${spvFiles:-0}" -lt 100 ]; then
-            echo "ERROR: Unexpectedly low shader count: $headers headers, $spvFiles .spv files"
-            echo "Expected at least 100 shaders - this may indicate a partial build failure"
+          if ($headers -lt 100 -or $spvFiles -lt 100) {
+            Write-Host ""
+            Write-Host "ERROR: Unexpectedly low shader count: $headers headers, $spvFiles .spv files"
+            Write-Host "Expected at least 100 shaders - this may indicate a partial build failure"
             exit 1
-          fi
+          }
 
-          echo ""
-          echo "===================================================================="
-          echo "RTX Remix shader compilation successful!"
-          echo "All $headers shader variants compiled correctly"
-          echo "===================================================================="
+          Write-Host ""
+          Write-Host "===================================================================="
+          Write-Host "RTX Remix shader compilation successful!"
+          Write-Host "All $headers shader variants compiled correctly"
+          Write-Host "===================================================================="
 
       - name: Upload build logs on failure
         if: failure()
