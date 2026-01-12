@@ -1487,14 +1487,6 @@ local insts = {
 				nameHint = { struct_name = "NameHintDecoration", operands = { { "nameOperand", "IRStringLit" } } },
 			},
 			{
-				noSSAPromotion = {
-					-- Mark a variable (IRVar) as not promotable to SSA form.
-					-- Used for variables that need to remain as memory due to fall-through
-					-- in switch statements, so the fall-through structure is preserved.
-					struct_name = "NoSSAPromotionDecoration",
-				},
-			},
-			{
 				PhysicalType = {
 					struct_name = "PhysicalTypeDecoration",
 					min_operands = 1,

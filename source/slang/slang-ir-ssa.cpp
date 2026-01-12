@@ -457,10 +457,6 @@ bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>
     if (context->switchFallThroughVars.contains(var))
         return false;
 
-    // Also check for explicit decoration (for backwards compatibility or other uses).
-    if (var->findDecoration<IRNoSSAPromotionDecoration>())
-        return false;
-
     // We want to identify variables such that we can always
     // determine what they will contain at a point in the
     // program by directly inspecting their uses.
