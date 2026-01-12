@@ -1270,6 +1270,7 @@ $}
 
 //@hidden:
 __magic_type(NullPtrType)
+__intrinsic_type($(kIROp_RawPointerType))
 struct NullPtr
 {
 };
