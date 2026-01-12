@@ -187,241 +187,12 @@ bool isRuntimeType(IRType* type)
     return false;
 }
 
-IRInst* getExistentialBaseWitnessTable(IRBuilder* builder, IRType* type)
-{
-    if (auto lookupWitnessMethod = as<IRLookupWitnessMethod>(type))
-    {
-        return lookupWitnessMethod->getWitnessTable();
-    }
-    else if (auto extractExistentialType = as<IRExtractExistentialType>(type))
-    {
-        return builder->emitExtractExistentialWitnessTable(extractExistentialType->getOperand(0));
-    }
-    else
-    {
-        SLANG_UNEXPECTED("Unexpected existential type");
-    }
-}
-
-IRInst* getCacheKey(IRBuilder* builder, IRInst* primalType)
-{
-    if (auto lookupWitness = as<IRLookupWitnessMethod>(primalType))
-        return lookupWitness->getRequirementKey();
-    else if (auto extractExistentialType = as<IRExtractExistentialType>(primalType))
-    {
-        auto interfaceType = extractExistentialType->getOperand(0)->getDataType();
-
-        // We will cache on the interface's this-type, since the interface type itself can be
-        // deallocated during the lowering process.
-        //
-        return builder->getThisType(interfaceType);
-    }
-
-    return primalType;
-}
-
-
-IRInterfaceType* findDifferentiableRefInterface(IRModuleInst* moduleInst)
-{
-    for (auto inst : moduleInst->getGlobalInsts())
-    {
-        if (auto interfaceType = as<IRInterfaceType>(inst))
-        {
-            if (auto decor = interfaceType->findDecoration<IRNameHintDecoration>())
-            {
-                if (decor->getName() == "IDifferentiablePtrType")
-                {
-                    return interfaceType;
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst)
-{
-    differentiableInterfaceType = as<IRInterfaceType>(findDifferentiableInterface());
-    if (differentiableInterfaceType)
-    {
-        differentialAssocTypeStructKey = findDifferentialTypeStructKey();
-        differentialAssocTypeWitnessStructKey = findDifferentialTypeWitnessStructKey();
-        differentialAssocTypeWitnessTableType = findDifferentialTypeWitnessTableType();
-
-        zeroMethodStructKey = findZeroMethodStructKey();
-        zeroMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 2)->getRequirementVal());
-        addMethodStructKey = findAddMethodStructKey();
-        // 3 and 4 would be dzero : IForwardDifferentiable and dzero : IBackwardDifferentiable
-        addMethodType = cast<IRFuncType>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 5)->getRequirementVal());
-
-        nullDifferentialStructType = findNullDifferentialStructType();
-        nullDifferentialWitness = findNullDifferentialWitness();
-
-        forwardDifferentiableInterfaceType = cast<IRGeneric>(findForwardDifferentiableInterface());
-        backwardDifferentiableInterfaceType =
-            cast<IRGeneric>(findBackwardDifferentiableInterface());
-        backwardCallableInterfaceType = cast<IRGeneric>(findBackwardCallableInterface());
-
-        IRBuilder builder(moduleInst);
-        builder.addKeepAliveDecoration(forwardDifferentiableInterfaceType);
-        builder.addKeepAliveDecoration(backwardDifferentiableInterfaceType);
-        builder.addKeepAliveDecoration(backwardCallableInterfaceType);
-
-        isInterfaceAvailable = true;
-    }
-
-    differentiablePtrInterfaceType =
-        as<IRInterfaceType>(findDifferentiableRefInterface(inModuleInst));
-
-    if (differentiablePtrInterfaceType)
-    {
-        differentialAssocRefTypeStructKey = findDifferentialPtrTypeStructKey();
-        differentialAssocRefTypeWitnessStructKey = findDifferentialPtrTypeWitnessStructKey();
-        differentialAssocRefTypeWitnessTableType = findDifferentialPtrTypeWitnessTableType();
-
-        isPtrInterfaceAvailable = true;
-    }
-}
-
-IRInst* AutoDiffSharedContext::findDifferentiableInterface()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto intf = as<IRInterfaceType>(globalInst))
-            {
-                if (auto decor = intf->findDecoration<IRKnownBuiltinDecoration>())
-                {
-                    if (decor->getName() == KnownBuiltinDeclName::IDifferentiable)
-                    {
-                        return globalInst;
-                    }
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-
-IRInst* AutoDiffSharedContext::findForwardDifferentiableInterface()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto generic = as<IRGeneric>(globalInst))
-            {
-                auto inner = getGenericReturnVal(generic);
-                if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
-                {
-                    if (decor->getName() == KnownBuiltinDeclName::IForwardDifferentiable)
-                    {
-                        return globalInst;
-                    }
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-
-IRInst* AutoDiffSharedContext::findBackwardDifferentiableInterface()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto generic = as<IRGeneric>(globalInst))
-            {
-                auto inner = getGenericReturnVal(generic);
-                if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
-                {
-                    if (decor->getName() == KnownBuiltinDeclName::IBackwardDifferentiable)
-                    {
-                        return globalInst;
-                    }
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-
-IRInst* AutoDiffSharedContext::findBackwardCallableInterface()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto generic = as<IRGeneric>(globalInst))
-            {
-                auto inner = getGenericReturnVal(generic);
-                if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
-                {
-                    if (decor->getName() == KnownBuiltinDeclName::IBwdCallable)
-                    {
-                        return globalInst;
-                    }
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-IRStructType* AutoDiffSharedContext::findNullDifferentialStructType()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            // TODO: Also a particularly dangerous way to look for a struct...
-            if (auto structType = as<IRStructType>(globalInst))
-            {
-                if (auto decor = structType->findDecoration<IRNameHintDecoration>())
-                {
-                    if (decor->getName() == toSlice("NullDifferential"))
-                    {
-                        return structType;
-                    }
-                }
-            }
-        }
-    }
-    return nullptr;
-}
-
-IRInst* AutoDiffSharedContext::findNullDifferentialWitness()
-{
-    if (auto module = as<IRModuleInst>(moduleInst))
-    {
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (auto witnessTable = as<IRWitnessTable>(globalInst))
-            {
-                if (witnessTable->getConformanceType() == differentiableInterfaceType &&
-                    witnessTable->getConcreteType() == nullDifferentialStructType)
-                    return witnessTable;
-            }
-        }
-    }
-
-    return nullptr;
-}
-
-
-IRInterfaceRequirementEntry* AutoDiffSharedContext::getInterfaceEntryAtIndex(
+IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(
+    IRModule* moduleInst,
     IRInterfaceType* interface,
     UInt index)
 {
-    if (as<IRModuleInst>(moduleInst) && interface)
+    if (interface)
     {
         // Assume for now that IDifferentiable has exactly five fields.
         // SLANG_ASSERT(interface->getOperandCount() == 5);
@@ -435,6 +206,111 @@ IRInterfaceRequirementEntry* AutoDiffSharedContext::getInterfaceEntryAtIndex(
 
     return nullptr;
 }
+AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
+    : moduleInst(inModuleInst)
+{
+    auto module = moduleInst->getModule();
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (auto generic = as<IRGeneric>(globalInst))
+        {
+            auto inner = getGenericReturnVal(generic);
+            if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
+            {
+                switch (decor->getName())
+                {
+                case KnownBuiltinDeclName::IForwardDifferentiable:
+                    forwardDifferentiableInterfaceType = as<IRGeneric>(globalInst);
+                    break;
+                case KnownBuiltinDeclName::IBackwardDifferentiable:
+                    backwardDifferentiableInterfaceType = as<IRGeneric>(globalInst);
+                    break;
+                case KnownBuiltinDeclName::IBwdCallable:
+                    backwardCallableInterfaceType = as<IRGeneric>(globalInst);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+        else
+        {
+            if (auto decor = globalInst->findDecoration<IRKnownBuiltinDecoration>())
+            {
+                switch (decor->getName())
+                {
+                case KnownBuiltinDeclName::IDifferentiable:
+                    differentiableInterfaceType = cast<IRInterfaceType>(globalInst);
+                    break;
+                case KnownBuiltinDeclName::IDifferentiablePtr:
+                    differentiablePtrInterfaceType = cast<IRInterfaceType>(globalInst);
+                    break;
+                case KnownBuiltinDeclName::NullDifferential:
+                    nullDifferentialStructType = cast<IRStructType>(globalInst);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    if (differentiableInterfaceType)
+    {
+        differentialAssocTypeStructKey = cast<IRStructKey>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 0)->getRequirementKey());
+        differentialAssocTypeWitnessStructKey = cast<IRStructKey>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementKey());
+        differentialAssocTypeWitnessTableType = cast<IRWitnessTableType>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 1)->getRequirementVal());
+
+        zeroMethodStructKey = cast<IRStructKey>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementKey());
+        zeroMethodType = cast<IRFuncType>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 2)->getRequirementVal());
+        addMethodStructKey = cast<IRStructKey>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementKey());
+        addMethodType = cast<IRFuncType>(
+            getInterfaceEntryAtIndex(module, differentiableInterfaceType, 5)->getRequirementVal());
+
+        if (nullDifferentialStructType)
+        {
+            traverseUsers<IRWitnessTable>(
+                nullDifferentialStructType,
+                [&](IRWitnessTable* witnessTable)
+                {
+                    if (witnessTable->getConformanceType() == differentiableInterfaceType &&
+                        witnessTable->getConcreteType() == nullDifferentialStructType)
+                    {
+                        nullDifferentialWitness = witnessTable;
+                    }
+                });
+        }
+
+        IRBuilder builder(moduleInst);
+        builder.addKeepAliveDecoration(forwardDifferentiableInterfaceType);
+        builder.addKeepAliveDecoration(backwardDifferentiableInterfaceType);
+        builder.addKeepAliveDecoration(backwardCallableInterfaceType);
+
+        isInterfaceAvailable = true;
+    }
+
+    if (differentiablePtrInterfaceType)
+    {
+        differentialAssocRefTypeStructKey =
+            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 0)
+                                  ->getRequirementKey());
+        differentialAssocRefTypeWitnessStructKey =
+            cast<IRStructKey>(getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
+                                  ->getRequirementKey());
+        differentialAssocRefTypeWitnessTableType = cast<IRWitnessTableType>(
+            getInterfaceEntryAtIndex(module, differentiablePtrInterfaceType, 1)
+                ->getRequirementVal());
+
+        isPtrInterfaceAvailable = true;
+    }
+}
 
 IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     IRInst* target,
@@ -442,32 +318,6 @@ IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
 {
     IRBuilder builder(sharedContext->moduleInst);
     return builder.tryLookupAnnotation(target, kind);
-
-    /*
-    if (!target)
-        return nullptr;
-
-    ValAssociationCacheKey key = {target, kind};
-    if (IRInst* cachedResult; associationCache.tryGetValue(key, cachedResult))
-        return cachedResult;
-
-    IRInst* result = nullptr;
-    for (auto use = target->firstUse; use; use = use->nextUse)
-    {
-        if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
-        {
-            if (annotation->getConformanceID() == (IRIntegerValue)kind &&
-                annotation->getTarget() == target)
-            {
-                result = annotation->getInst();
-                break;
-            }
-        }
-    }
-
-    associationCache.add(key, result);
-    return result;
-    */
 }
 
 

@@ -36,9 +36,6 @@ struct DiffInstPair
 
 typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
-
-struct AutoDiffTranscriberBase;
-
 enum class DiffConformanceKind
 {
     Any = 0,  // Perform actions for any conformance (infer from context)
@@ -125,67 +122,6 @@ struct AutoDiffSharedContext
     bool isPtrInterfaceAvailable = false;
 
     AutoDiffSharedContext(IRModuleInst* inModuleInst);
-
-private:
-    IRInst* findDifferentiableInterface();
-    IRInst* findForwardDifferentiableInterface();
-    IRInst* findBackwardDifferentiableInterface();
-    IRInst* findBackwardCallableInterface();
-
-    IRStructType* findNullDifferentialStructType();
-
-    IRInst* findNullDifferentialWitness();
-
-    IRStructKey* findDifferentialTypeStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 0)->getRequirementKey());
-    }
-
-    IRStructKey* findDifferentialTypeWitnessStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementKey());
-    }
-
-    IRWitnessTableType* findDifferentialTypeWitnessTableType()
-    {
-        return cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementVal());
-    }
-
-    IRStructKey* findZeroMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 2)->getRequirementKey());
-    }
-
-    IRStructKey* findAddMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 5)->getRequirementKey());
-    }
-
-    IRStructKey* findDifferentialPtrTypeStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 0)->getRequirementKey());
-    }
-
-    IRStructKey* findDifferentialPtrTypeWitnessStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementKey());
-    }
-
-    IRWitnessTableType* findDifferentialPtrTypeWitnessTableType()
-    {
-        return cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementVal());
-    }
-
-    // IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
-    IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
 };
 
 struct DifferentiableTypeConformanceContext
@@ -194,39 +130,11 @@ struct DifferentiableTypeConformanceContext
 
     IRGlobalValueWithCode* parentFunc = nullptr;
 
-    /*
-    struct ValAssociationCacheKey
-    {
-        IRInst* inst;
-        ValAssociationKind associationKind;
-        bool operator==(const ValAssociationCacheKey& other) const
-        {
-            return inst == other.inst && associationKind == other.associationKind;
-        }
-
-        HashCode getHashCode() const
-        {
-            Hasher hasher;
-            hasher.hashValue(inst);
-            hasher.hashValue(static_cast<int>(associationKind));
-            return hasher.getResult();
-        }
-    };
-
-    // (inst, association-kind) -> associated-inst
-    Dictionary<ValAssociationCacheKey, IRInst*> associationCache;*/
-
     IRFunc* existentialDAddFunc = nullptr;
 
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
         : sharedContext(shared)
     {
-    }
-
-    IRType* lookupContextType(IRBuilder* builder, IRInst* fnInst)
-    {
-        return (
-            IRType*)tryGetAssociationOfKind(fnInst, ValAssociationKind::BackwardDerivativeContext);
     }
 
     IRType* resolveType(IRBuilder* builder, IRInst* typeInst)
@@ -398,7 +306,6 @@ struct DifferentiableTypeConformanceContext
             }
         case kIROp_ApplyForBwdFuncType:
             {
-                // auto bwdContextType = lookupContextType(builder, typeInst->getOperand(0));
                 auto bwdContextType = typeInst->getOperand(1);
 
                 // Copy the func's parameter types as-is and replace the result type with
@@ -615,11 +522,6 @@ IRInst* _lookupWitness(
     IRInst* requirementKey,
     IRType* resultType = nullptr);
 
-struct IRAutodiffPassOptions
-{
-    // Nothing for now...
-};
-
 void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
 
 bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module);
@@ -659,8 +561,6 @@ inline bool isRelevantDifferentialPair(IRType* type)
 }
 
 bool isRuntimeType(IRType* type);
-
-IRInst* getExistentialBaseWitnessTable(IRBuilder* builder, IRType* type);
 
 UIndex addPhiOutputArg(
     IRBuilder* builder,

@@ -112,26 +112,12 @@ static IRInst* maybeHoistAndSpecialize(IRBuilder& builder, IRInst* inst)
 
 struct BackwardDiffTranslationContext
 {
-    // References to other passes that for reverse-mode transcription.
-    DiffTransposePass* diffTransposePass;
-    DiffUnzipPass* diffUnzipPass;
-
-    // Allocate space for the passes.
-    DiffTransposePass diffTransposePassStorage;
-    DiffUnzipPass diffUnzipPassStorage;
-
     AutoDiffSharedContext* autoDiffSharedContext;
     DiagnosticSink* sink;
     DifferentiableTypeConformanceContext diffTypeContext;
 
     BackwardDiffTranslationContext(AutoDiffSharedContext* shared, DiagnosticSink* inSink)
-        : autoDiffSharedContext(shared)
-        , sink(inSink)
-        , diffTransposePassStorage(shared)
-        , diffUnzipPassStorage(shared)
-        , diffTransposePass(&diffTransposePassStorage)
-        , diffUnzipPass(&diffUnzipPassStorage)
-        , diffTypeContext(shared)
+        : autoDiffSharedContext(shared), sink(inSink), diffTypeContext(shared)
     {
     }
 
@@ -218,7 +204,7 @@ struct BackwardDiffTranslationContext
         // Split first block into a paramter block.
         makeParameterBlock(&tempBuilder, as<IRFunc>(fwdDiffFunc));
 
-        diffUnzipPass->unzipDiffInsts(fwdDiffFunc);
+        unzipDiffInsts(autoDiffSharedContext, fwdDiffFunc);
         IRFunc* unzippedFwdDiffFunc = fwdDiffFunc;
 
         // Move blocks from `unzippedFwdDiffFunc` to the `diffPropagateFunc` shell.
@@ -237,7 +223,7 @@ struct BackwardDiffTranslationContext
 
         // Transpose differential blocks from unzippedFwdDiffFunc into diffFunc (with dOutParameter)
         // representing the derivative of the return value.
-        diffTransposePass->transposeDiffBlocksInFunc(propagateFunc, {});
+        transposeDiffBlocksInFunc(autoDiffSharedContext, propagateFunc);
 
         // Apply checkpointing policy to legalize cross-scope uses of primal values
         // using either recompute or store strategies.
@@ -245,9 +231,11 @@ struct BackwardDiffTranslationContext
 
         // Extracts the primal computations into its own func, turn all accesses to stored primal
         // insts into explicit intermediate data structure reads and writes.
+        //
         IRInst* intermediateType = nullptr;
         IRFunc* getValFunc = nullptr;
-        auto applyFunc = diffUnzipPass->extractPrimalFunc(
+        auto applyFunc = splitApplyAndPropFuncs(
+            autoDiffSharedContext,
             propagateFunc,
             targetFunc,
             primalsInfo,
@@ -350,11 +338,18 @@ struct BackwardDiffTranslationContext
         // It's important to hoist the context type out *first* because the other funcs may depend
         // on it.
         //
+        /*
         contextTypeInst = maybeHoist(subBuilder, intermediateType);
 
         propagateFuncInst = maybeHoist(subBuilder, propagateFunc);
         applyFuncInst = maybeHoist(subBuilder, applyFunc);
         contextGetValFuncInst = maybeHoist(subBuilder, getValFunc);
+        */
+
+        contextTypeInst = intermediateType;
+        propagateFuncInst = propagateFunc;
+        applyFuncInst = applyFunc;
+        contextGetValFuncInst = getValFunc;
     }
 };
 

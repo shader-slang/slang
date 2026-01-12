@@ -176,6 +176,7 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 // for internal use.
 //
 [__AutoDiffBuiltin]
+[KnownBuiltin($((int)KnownBuiltinDeclName::NullDifferential))]
 struct NullDifferential : IDifferentiable
 { 
     // for now, we'll use at least one field to make sure the type is non-empty
