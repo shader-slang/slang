@@ -15,21 +15,6 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// This test verifies that the tiled MMA load operations work correctly.
-//
-// ============================================================================
-// MATRIX A - Loaded from Global Memory
-// ============================================================================
-// We construct a 32x32 matrix in row-major order:
-//
-//   Column:  0    1    2    3   ...  15   16   17   ...   31
-//   Row 0:   0    1    2    3   ...  15   16   17   ...   31
-//   Row 1:  32   33   34   35   ...  47   48   49   ...   63
-//   ...
-//   Row 30: 960  961  962  963  ...  975  976  977  ...  991
-//   Row 31: 992  993  994  995  ... 1007 1008 1009  ... 1023
-//
-
 
 // Make the weight matrix a 64x64 matrix in row major order
 // TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
@@ -109,7 +94,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, tru
 
     for (int i = 0; i < OutputSize; i++)
     {
-        inputVector[i] = DType(tid + 1);
+        inputVector[i] = DType(tid + 1) * DType(0.125f);
     }
 
     SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
@@ -177,7 +162,8 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;
     for (int i = 0; i < COL; i++)
     {
-        DType expected = DType(scaleFactor * (i + 1.0f) * (tid + 1.0f));
+        int intVal = (i + 1) * (tid + 1);
+        DType expected = DType(scaleFactor) * DType(intVal) * DType(0.125f);
         if (!equals(outputVector[i], expected))
         {
             res = false;
@@ -193,7 +179,6 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
         outputBuffer[resIndex] = finalResult ? 1 : 0;
     }
 }
-
 
 [numthreads(BatchSize, 1, 1)]
 [shader("compute")]
