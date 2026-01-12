@@ -306,23 +306,25 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         slang::TypeLayoutReflection* typeLayout)
     {
         addDescriptorRanges(descriptorSetLayoutBuilder, typeLayout);
-        addSubObjectRanges(pipelineLayoutBuilder, typeLayout);
+        addSubObjectRanges(pipelineLayoutBuilder, descriptorSetLayoutBuilder, typeLayout);
     }
 
     void addSubObjectRanges(
         PipelineLayoutBuilder& pipelineLayoutBuilder,
+        DescriptorSetLayoutBuilder& descriptorSetLayoutBuilder,
         slang::TypeLayoutReflection* typeLayout)
     {
         int subObjectRangeCount = typeLayout->getSubObjectRangeCount();
         for (int subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount;
              ++subObjectRangeIndex)
         {
-            addSubObjectRange(pipelineLayoutBuilder, typeLayout, subObjectRangeIndex);
+            addSubObjectRange(pipelineLayoutBuilder, descriptorSetLayoutBuilder, typeLayout, subObjectRangeIndex);
         }
     }
 
     void addSubObjectRange(
         PipelineLayoutBuilder& pipelineLayoutBuilder,
+        DescriptorSetLayoutBuilder& descriptorSetLayoutBuilder,
         slang::TypeLayoutReflection* typeLayout,
         int subObjectRangeIndex)
     {
@@ -355,6 +357,24 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
                 addPushConstantRangeForConstantBuffer(
                     pipelineLayoutBuilder,
                     constantBufferTypeLayout);
+                addRanges(
+                    pipelineLayoutBuilder,
+                    descriptorSetLayoutBuilder,
+                    constantBufferTypeLayout->getElementTypeLayout());
+            }
+            break;
+
+            // Nested Constant Buffers
+            // -----------------------
+
+        case slang::BindingType::ConstantBuffer:
+            {
+                auto constantBufferTypeLayout =
+                    typeLayout->getBindingRangeLeafTypeLayout(bindingRangeIndex);
+                addRangesForParameterBlockElement(
+                    pipelineLayoutBuilder,
+                    descriptorSetLayoutBuilder,
+                    constantBufferTypeLayout->getElementTypeLayout());
             }
             break;
         }
