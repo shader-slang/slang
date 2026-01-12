@@ -166,143 +166,184 @@ bool allUsesLeadToLoads(IRInst* inst)
 /// Collect all IRVar instructions that are stored to within a case region.
 /// The case region is defined as blocks reachable from caseLabel without
 /// going through breakLabel or nextCaseLabel.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
 static void collectStoredVarsInCase(
-    IRBlock* caseLabel,
+    IRBlock* startBlock,
     IRBlock* breakLabel,
     IRBlock* nextCaseLabel,
     HashSet<IRVar*>& storedVars,
     HashSet<IRBlock*>& visited)
 {
-    if (!caseLabel)
+    if (!startBlock)
         return;
 
-    if (caseLabel == breakLabel || caseLabel == nextCaseLabel)
-        return;
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
 
-    if (visited.contains(caseLabel))
-        return;
-    visited.add(caseLabel);
-
-    // Scan instructions for stores to IRVar
-    for (auto inst = caseLabel->getFirstInst(); inst; inst = inst->getNextInst())
+    while (worklist.getCount() > 0)
     {
-        if (auto store = as<IRStore>(inst))
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel || block == nextCaseLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Scan instructions for stores to IRVar
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
         {
-            if (auto var = as<IRVar>(store->getPtr()))
+            if (auto store = as<IRStore>(inst))
             {
-                storedVars.add(var);
+                if (auto var = as<IRVar>(store->getPtr()))
+                {
+                    storedVars.add(var);
+                }
             }
         }
-    }
 
-    // Follow control flow
-    auto terminator = caseLabel->getTerminator();
-    if (!terminator)
-        return;
+        // Add successors to worklist
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
 
-    for (auto succ : caseLabel->getSuccessors())
-    {
-        collectStoredVarsInCase(succ, breakLabel, nextCaseLabel, storedVars, visited);
+        for (auto succ : block->getSuccessors())
+        {
+            worklist.add(succ);
+        }
     }
 }
 
 /// Collect all IRVar instructions that are loaded from within a case region.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
 static void collectLoadedVarsInCase(
-    IRBlock* caseLabel,
+    IRBlock* startBlock,
     IRBlock* breakLabel,
     HashSet<IRVar*>& loadedVars,
     HashSet<IRBlock*>& visited)
 {
-    if (!caseLabel)
+    if (!startBlock)
         return;
 
-    if (caseLabel == breakLabel)
-        return;
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
 
-    if (visited.contains(caseLabel))
-        return;
-    visited.add(caseLabel);
-
-    // Scan instructions for loads from IRVar
-    for (auto inst = caseLabel->getFirstInst(); inst; inst = inst->getNextInst())
+    while (worklist.getCount() > 0)
     {
-        if (auto load = as<IRLoad>(inst))
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Scan instructions for loads from IRVar
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
         {
-            if (auto var = as<IRVar>(load->getPtr()))
+            if (auto load = as<IRLoad>(inst))
             {
-                loadedVars.add(var);
+                if (auto var = as<IRVar>(load->getPtr()))
+                {
+                    loadedVars.add(var);
+                }
             }
         }
-    }
 
-    // Follow control flow
-    auto terminator = caseLabel->getTerminator();
-    if (!terminator)
-        return;
+        // Add successors to worklist
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
 
-    for (auto succ : caseLabel->getSuccessors())
-    {
-        collectLoadedVarsInCase(succ, breakLabel, loadedVars, visited);
+        for (auto succ : block->getSuccessors())
+        {
+            worklist.add(succ);
+        }
     }
 }
 
 /// Find the fall-through target for a case block, if any.
 /// Returns nullptr if the case doesn't fall through to another case.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
 static IRBlock* findFallThroughTarget(
-    IRBlock* caseBlock,
     IRBlock* startBlock,
     IRBlock* breakLabel,
     const HashSet<IRBlock*>& allCaseLabels,
     HashSet<IRBlock*>& visited)
 {
-    if (!caseBlock)
+    if (!startBlock)
         return nullptr;
 
-    if (caseBlock == breakLabel)
-        return nullptr;
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
 
-    if (visited.contains(caseBlock))
-        return nullptr;
-    visited.add(caseBlock);
-
-    // If we reached another case label (not the starting block), that's the fall-through target
-    if (caseBlock != startBlock && allCaseLabels.contains(caseBlock))
-        return caseBlock;
-
-    auto terminator = caseBlock->getTerminator();
-    if (!terminator)
-        return nullptr;
-
-    switch (terminator->getOp())
+    while (worklist.getCount() > 0)
     {
-    case kIROp_UnconditionalBranch:
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // If we reached another case label (not the starting block), that's the fall-through target
+        if (block != startBlock && allCaseLabels.contains(block))
+            return block;
+
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        switch (terminator->getOp())
         {
-            auto branch = as<IRUnconditionalBranch>(terminator);
-            auto target = branch->getTargetBlock();
-            // Check if target is a case label
-            if (allCaseLabels.contains(target))
-                return target;
-            // Otherwise follow the branch
-            return findFallThroughTarget(target, startBlock, breakLabel, allCaseLabels, visited);
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = as<IRUnconditionalBranch>(terminator);
+                auto target = branch->getTargetBlock();
+                // Check if target is a case label - return immediately
+                if (allCaseLabels.contains(target))
+                    return target;
+                // Otherwise add to worklist
+                worklist.add(target);
+            }
+            break;
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+            {
+                // For conditional branches, add both paths to worklist.
+                // The shared visited set is safe here because:
+                // 1. Both branches are added upfront, so both get explored
+                // 2. If a path leads to break, we continue (don't abort)
+                // 3. IR blocks have fixed terminators, so shared blocks
+                //    lead to the same destination regardless of entry path
+                auto branch = as<IRConditionalBranch>(terminator);
+                worklist.add(branch->getFalseBlock());
+                worklist.add(branch->getTrueBlock());
+            }
+            break;
+        default:
+            // Return, loop, nested switch, etc. - don't follow
+            break;
         }
-    case kIROp_IfElse:
-        {
-            // For conditional branches, we need to check if BOTH paths
-            // lead to the same case label (unlikely for real fall-through)
-            // or if one path leads to a case label
-            auto ifElse = as<IRIfElse>(terminator);
-            auto trueTarget = findFallThroughTarget(ifElse->getTrueBlock(), startBlock, breakLabel, allCaseLabels, visited);
-            // Note: visited is shared, so we might miss some paths, but that's okay
-            // for a conservative analysis
-            if (trueTarget)
-                return trueTarget;
-            auto falseTarget = findFallThroughTarget(ifElse->getFalseBlock(), startBlock, breakLabel, allCaseLabels, visited);
-            return falseTarget;
-        }
-    default:
-        // Return, loop, nested switch, etc. - don't follow
-        return nullptr;
     }
+
+    return nullptr;
 }
 
 /// Detect variables that cross switch fall-through boundaries.
@@ -353,7 +394,7 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
 
             // Find where this case falls through to (if anywhere)
             HashSet<IRBlock*> visitedForFallThrough;
-            auto fallThroughTarget = findFallThroughTarget(caseLabel, caseLabel, breakLabel, allCaseLabels, visitedForFallThrough);
+            auto fallThroughTarget = findFallThroughTarget(caseLabel, breakLabel, allCaseLabels, visitedForFallThrough);
 
             if (!fallThroughTarget)
                 continue; // This case doesn't fall through
@@ -387,7 +428,7 @@ static void detectSwitchFallThroughVars(ConstructSSAContext* context)
 
                 // Check if this target also falls through
                 HashSet<IRBlock*> visitedForTargetFallThrough;
-                auto nextTarget = findFallThroughTarget(targetLabel, targetLabel, breakLabel, allCaseLabels, visitedForTargetFallThrough);
+                auto nextTarget = findFallThroughTarget(targetLabel, breakLabel, allCaseLabels, visitedForTargetFallThrough);
                 if (nextTarget && !processedTargets.contains(nextTarget))
                 {
                     targetsToProcess.add(nextTarget);
