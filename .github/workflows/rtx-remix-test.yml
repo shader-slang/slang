@@ -1,0 +1,251 @@
+name: RTX Remix Integration Tests
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  rtx-remix-integration:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 30 # RTX Remix shaders ~15-20 min + buffer
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Download Slang Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          path: github_artifact
+
+      - name: Setup Slang Path
+        run: |
+          # Set up bin_dir for slangc (Windows only)
+          bin_dir="$(pwd)/github_artifact/Release/bin"
+          SLANGC="${bin_dir}/slangc.exe"
+
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+          echo "SLANGC=$SLANGC" >> $GITHUB_ENV
+
+          # Verify slangc exists and is executable
+          if [ ! -f "$SLANGC" ]; then
+            echo "ERROR: slangc not found at: $SLANGC"
+            echo "Artifact directory contents:"
+            ls -laR github_artifact/ || true
+            exit 1
+          fi
+
+          echo "Found slangc at: $SLANGC"
+          "$SLANGC" --version || echo "Could not get slangc version"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Meson
+        run: pip install meson==1.9.1
+
+      - name: Verify Ninja
+        run: ninja --version
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Clone dxvk-remix repository
+        run: |
+          echo "===================================================================="
+          echo "RTX Remix → Slang Integration Test"
+          echo "Platform: ${{ inputs.os }} | Config: ${{ inputs.config }}"
+          echo "===================================================================="
+
+          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
+          mkdir -p "$WORK_DIR"
+          cd "$WORK_DIR"
+
+          echo "Cloning dxvk-remix repository..."
+          git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+          cd dxvk-remix
+          commit=$(git rev-parse HEAD)
+          echo "Using dxvk-remix commit: $commit"
+
+      - name: Cache Packman packages
+        uses: actions/cache@v4
+        with:
+          path: C:\packman-repo
+          key: packman-${{ hashFiles(format('{0}/rtx-remix-test/dxvk-remix/packman-external.xml', runner.temp)) }}
+          restore-keys: |
+            packman-
+          enableCrossOsArchive: false
+
+      - name: Download external dependencies (packman)
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
+          cd "$WORK_DIR/dxvk-remix"
+
+          echo "Downloading packman dependencies..."
+          ./scripts-common/packman/packman.cmd pull packman-external.xml
+
+      - name: Replace packman Slang binaries with built version
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
+          cd "$WORK_DIR/dxvk-remix"
+
+          echo "Replacing packman Slang binaries with locally built version..."
+
+          remixSlangDir="external/slang"
+
+          if [ ! -d "$remixSlangDir" ]; then
+            echo "ERROR: Packman Slang directory not found at: $remixSlangDir"
+            exit 1
+          fi
+
+          echo "Found packman Slang at: $remixSlangDir"
+
+          # Show original version
+          originalSlangc="$remixSlangDir/slangc.exe"
+          if [ -f "$originalSlangc" ]; then
+            echo ""
+            echo "Original packman slangc version:"
+            "$originalSlangc" -version || echo "Could not get version"
+          fi
+
+          # Copy our built Slang binaries
+          echo ""
+          echo "Copying Slang binaries from artifact..."
+          cp -rf "$bin_dir"/* "$remixSlangDir/"
+
+          # Verify replacement succeeded
+          echo ""
+          echo "Verifying replacement..."
+
+          requiredFiles=("slangc.exe" "slang-compiler.dll" "slang-glslang.dll")
+
+          for file in "${requiredFiles[@]}"; do
+            filePath="$remixSlangDir/$file"
+            if [ ! -f "$filePath" ]; then
+              echo "ERROR: Required file not found after copy: $file"
+              exit 1
+            fi
+          done
+
+          # List all copied Slang files for verification
+          echo ""
+          echo "Copied Slang files:"
+          ls -la "$remixSlangDir"/slang* || true
+
+          # Verify version changed
+          newSlangc="$remixSlangDir/slangc.exe"
+          newVersion=$("$newSlangc" -version 2>&1 || echo "version-check-failed")
+          echo "New slangc version:"
+          echo "$newVersion"
+
+          echo ""
+          echo "Verified: dxvk-remix will use the locally built Slang"
+
+      - name: Build shaders using build_shaders_only.ps1
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: 1
+          SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN: 1
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
+          cd "$WORK_DIR/dxvk-remix"
+
+          echo "Building RTX Remix shaders..."
+          echo "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
+          echo "Start time: $(date +%H:%M:%S)"
+
+          startTime=$(date +%s)
+
+          powershell.exe -ExecutionPolicy Bypass -File ./build_shaders_only.ps1
+
+          if [ $? -ne 0 ]; then
+            echo "ERROR: Shader build failed with exit code $?"
+            exit 1
+          fi
+
+          endTime=$(date +%s)
+          duration=$(( (endTime - startTime) / 60 ))
+
+          echo "End time: $(date +%H:%M:%S)"
+          echo "Build duration: $duration minutes"
+
+      - name: Verify shader compilation
+        run: |
+          WORK_DIR="${RUNNER_TEMP}/rtx-remix-test"
+          cd "$WORK_DIR/dxvk-remix"
+
+          echo "Verifying shader compilation output..."
+
+          # Find the build output directory
+          if [ -d "_BuildShadersOnly/src/dxvk/rtx_shaders" ]; then
+            shaderDir="_BuildShadersOnly/src/dxvk/rtx_shaders"
+          elif [ -d "_BuildRelease/src/dxvk/rtx_shaders" ]; then
+            shaderDir="_BuildRelease/src/dxvk/rtx_shaders"
+          else
+            echo "ERROR: Cannot find shader output directory"
+            find . -name "rtx_shaders" -type d || true
+            exit 1
+          fi
+
+          cd "$shaderDir"
+
+          # Count generated files
+          headers=$(find . -maxdepth 1 -name "*.h" -type f | wc -l | xargs)
+          spvFiles=$(find . -maxdepth 1 -name "*.spv" -type f | wc -l | xargs)
+          totalSize=$(du -sm . 2>/dev/null | cut -f1 || echo "unknown")
+
+          echo "Compiled shader headers (.h): $headers"
+          echo "SPIR-V binary files (.spv): $spvFiles"
+          echo "Total output size: $totalSize MB"
+
+          # Validate that shaders were actually generated
+          if [ "${headers:-0}" -eq 0 ] || [ "${spvFiles:-0}" -eq 0 ]; then
+            echo "ERROR: No shader files generated"
+            echo "This indicates shader compilation failed completely"
+            exit 1
+          fi
+
+          # Sanity check: RTX Remix should have at least 100 shaders
+          if [ "${headers:-0}" -lt 100 ] || [ "${spvFiles:-0}" -lt 100 ]; then
+            echo "ERROR: Unexpectedly low shader count: $headers headers, $spvFiles .spv files"
+            echo "Expected at least 100 shaders - this may indicate a partial build failure"
+            exit 1
+          fi
+
+          echo ""
+          echo "===================================================================="
+          echo "RTX Remix shader compilation successful!"
+          echo "All $headers shader variants compiled correctly"
+          echo "===================================================================="
+
+      - name: Upload build logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtx-remix-build-logs-${{ inputs.os }}-${{ inputs.config }}
+          path: |
+            ${{ runner.temp }}/rtx-remix-test/dxvk-remix/_BuildShadersOnly/meson-logs/
+            ${{ runner.temp }}/rtx-remix-test/dxvk-remix/_BuildRelease/meson-logs/
+          retention-days: 2

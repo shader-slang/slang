@@ -190,6 +190,18 @@ jobs:
       test-category: full
       full-gpu-tests: true
 
+  # RTX Remix Integration Tests (release builds only, Windows only)
+  test-rtx-remix-windows-release:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/rtx-remix-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-2022"]'
+
   check-ci:
     needs:
       [
@@ -199,6 +211,7 @@ jobs:
         test-macos-debug-clang-aarch64,
         test-linux-release-gcc-x86_64,
         test-linux-debug-gcc-x86_64,
+        test-rtx-remix-windows-release,
       ]
     runs-on: ubuntu-latest
     if: always() # Always run, even if dependencies fail
@@ -212,6 +225,7 @@ jobs:
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+          echo "RTX Remix Windows: ${{ needs.test-rtx-remix-windows-release.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
@@ -220,12 +234,14 @@ jobs:
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-rtx-remix-windows-release.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-rtx-remix-windows-release.result }}" == "cancelled" ]]; then
             echo "One or more CI jobs failed or were cancelled"
             exit 1
           fi
