@@ -306,9 +306,244 @@ The comment explicitly mentions "switch with continue" - our exact scenario.
 
 3. **Nested switches**: Each switch transformation is independent. The do-while wrapper is local to each switch.
 
+## IR Transformation Pseudocode
+
+The key insight is that we **cannot simply branch to the original case body blocks**. The original blocks have terminators (branch to next case for fallthrough, or branch to breakLabel for break) that violate SPIRV structured control flow when placed inside if-else constructs.
+
+**Solution**: Clone/inline the case body instructions into new structured blocks.
+
+### Input IR Structure
+
+```python
+# Original IR (example: case 0 falls through to default, default breaks)
+switch_inst:
+    condition: %selector
+    break_label: breakBlock
+    default_label: defaultBlock
+    cases: [(0, case0Block)]
+
+case0Block:
+    %1 = wave_op(1)
+    store(%sum, %1)
+    branch(defaultBlock)      # <-- fallthrough terminator
+
+defaultBlock:
+    %2 = wave_op(10)
+    store(%sum, %2)
+    branch(breakBlock)        # <-- break terminator
+
+breakBlock:
+    ... rest of function ...
+```
+
+### Output IR Structure (after transformation)
+
+```python
+# Transformed IR
+parentBlock:
+    loop(loopBodyBlock, breakBlock, loopBodyBlock)
+
+loopBodyBlock:
+    # Predicates computed inside loop body (at the top)
+    %pred0 = icmp_eq(%selector, 0)
+    %predDefault = or(%pred0, %isDefault)  # reaches default via fallthrough OR direct
+    
+    # First case check
+    ifElse(%pred0, thenBlock0, mergeBlock0, mergeBlock0)
+
+thenBlock0:
+    # CLONED instructions from case0Block (excluding terminator)
+    %1 = wave_op(1)
+    store(%sum, %1)
+    # case0 falls through, so we just continue to merge (no break)
+    branch(mergeBlock0)
+
+mergeBlock0:
+    # Check if we reach default (via fallthrough OR direct match)
+    ifElse(%predDefault, thenBlockDefault, mergeBlockDefault, mergeBlockDefault)
+
+thenBlockDefault:
+    # CLONED instructions from defaultBlock (excluding terminator)
+    %2 = wave_op(10)
+    store(%sum, %2)
+    # default breaks, so we exit the loop
+    branch(breakBlock)
+
+mergeBlockDefault:
+    # All checks done, fall off the end
+    branch(breakBlock)
+
+breakBlock:
+    ... rest of function (unchanged) ...
+```
+
+### Transformation Algorithm
+
+```python
+def transform_switch(switch_inst):
+    parent_block = switch_inst.parent
+    break_label = switch_inst.break_label
+    selector = switch_inst.condition
+    
+    # Step 1: Collect cases in source order (analyze fallthrough)
+    cases = collect_cases_in_source_order(switch_inst)
+    
+    # Step 2: Create the loop wrapper
+    loop_body = create_block()
+    emit_loop(target=loop_body, break_block=break_label, continue_block=loop_body)
+    
+    # Step 3: Build predicates inside loop body (at the top)
+    set_insert_point(loop_body)
+    
+    for i, case in enumerate(cases):
+        # Direct predicate: selector matches this case's values
+        case.direct_pred = emit_case_predicate(selector, case.values)
+        
+        # Reach predicate: direct match OR reached via fallthrough from earlier case
+        case.reach_pred = case.direct_pred
+        for j in range(i):
+            if cases[j].falls_through:
+                case.reach_pred = emit_or(case.reach_pred, cases[j].direct_pred)
+    
+    # Step 4: Build the if-chain
+    for i, case in enumerate(cases):
+        then_block = create_block()
+        merge_block = create_block()
+        
+        # Emit: if (reach_pred) { cloned_body } else { skip }
+        emit_if_else(case.reach_pred, then_block, merge_block, merge_block)
+        
+        # Clone case body into then_block
+        set_insert_point(then_block)
+        clone_block_contents(case.body_block, exclude_terminator=True)
+        
+        # Determine how to exit then_block
+        if case_always_breaks(case.body_block, break_label):
+            # Case breaks: branch to break_label (exits loop)
+            emit_branch(break_label)
+        else:
+            # Case falls through: branch to merge (continue to next check)
+            emit_branch(merge_block)
+        
+        # Continue building in merge_block
+        set_insert_point(merge_block)
+    
+    # Step 5: After all cases, branch to break (unreachable if all paths covered)
+    emit_branch(break_label)
+    
+    # Step 6: Remove original switch and case blocks
+    switch_inst.remove()
+    for case in cases:
+        if case.body_block.has_no_uses():
+            case.body_block.remove()
+
+
+def collect_cases_in_source_order(switch_inst):
+    """
+    Walk the function's blocks in order, identify which are case labels.
+    Return list of CaseInfo in the order they appear.
+    """
+    cases = []
+    seen_labels = set()
+    
+    # Collect all case labels and default
+    for i in range(switch_inst.case_count):
+        seen_labels.add(switch_inst.get_case_label(i))
+    seen_labels.add(switch_inst.default_label)
+    
+    # Walk blocks in function order
+    for block in switch_inst.parent.parent.blocks:
+        if block in seen_labels:
+            # Find which case values point here
+            values = []
+            for i in range(switch_inst.case_count):
+                if switch_inst.get_case_label(i) == block:
+                    values.append(switch_inst.get_case_value(i))
+            
+            is_default = (block == switch_inst.default_label)
+            
+            cases.append(CaseInfo(
+                block=block,
+                values=values,
+                is_default=is_default,
+                falls_through=detect_fallthrough(block, cases, switch_inst.break_label)
+            ))
+    
+    return cases
+
+
+def emit_case_predicate(selector, values):
+    """
+    Emit predicate: (selector == val1) | (selector == val2) | ...
+    For default: inverse of all cases AFTER this one.
+    """
+    if not values:  # default case with no explicit values
+        # Computed later after we know which cases come after
+        return None
+    
+    pred = emit_icmp_eq(selector, values[0])
+    for val in values[1:]:
+        cmp = emit_icmp_eq(selector, val)
+        pred = emit_or(pred, cmp)
+    return pred
+
+
+def detect_fallthrough(block, earlier_cases, break_label):
+    """
+    Check if this block falls through to the next case (vs breaking).
+    """
+    terminator = block.terminator
+    if is_branch(terminator):
+        target = terminator.target
+        # Falls through if target is not the break label and not a case we've seen
+        return target != break_label
+    elif is_conditional_branch(terminator):
+        # Complex: could conditionally fall through
+        # For safety, assume fallthrough if ANY path doesn't go to break
+        return not all_paths_reach(block, break_label)
+    return False
+
+
+def clone_block_contents(source_block, exclude_terminator):
+    """
+    Clone all instructions from source_block to current insert point,
+    excluding the terminator (branch/break).
+    """
+    for inst in source_block.instructions:
+        if exclude_terminator and is_terminator(inst):
+            continue
+        clone_inst(inst)
+```
+
+### Why This Works for SPIRV
+
+1. **Each if-else has its own merge block**: No sharing of merge blocks between constructs.
+
+2. **All paths from within an if-else go to its merge**: 
+   - True branch either breaks (→ breakLabel) or continues (→ merge)
+   - False branch always goes to merge
+
+3. **The loop provides the break target**: `branch breakLabel` inside the loop exits correctly.
+
+4. **Wave reconvergence**: All threads see the same sequence of if-else constructs. Wave operations execute at the same program point regardless of which path each thread took.
+
+### Key Insight: Clone, Don't Branch
+
+The critical difference from the failed approach:
+- **Failed**: Branch TO original case blocks, which have unstructured terminators
+- **Correct**: Clone case body instructions INTO new structured blocks with correct terminators
+
+This ensures:
+- Each if-else is self-contained with proper merge semantics
+- Original case blocks can be deleted (no dangling references)
+- SPIRV structured control flow is maintained
+
 ## Open Questions
 
-1. For SPIRV structured control flow: does the synthetic `IRLoop` emit correctly, or do we need additional transformations?
+1. ~~For SPIRV structured control flow: does the synthetic `IRLoop` emit correctly?~~ 
+   **Resolved**: Yes, but we must clone case body contents rather than branching to original blocks.
+
+2. For cases with complex internal control flow (if-else, loops inside case), we need to clone entire subgraphs, not just individual instructions. May need `cloneRegion()` or similar.
 
 ## Files to Investigate
 

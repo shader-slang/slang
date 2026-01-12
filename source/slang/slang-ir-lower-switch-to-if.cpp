@@ -8,6 +8,7 @@
 
 #include "slang-ir-lower-switch-to-if.h"
 
+#include "slang-ir-eliminate-phis.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
@@ -344,13 +345,16 @@ struct SwitchLoweringContext
         buildPredicates();
 
         // Emit loop instruction: do { ... } while(false)
-        // continueBlock == loopHeaderBlock gives us do-while behavior
+        // The loop's break block is the original switch's break label.
+        // The continue block is the header (so continue restarts, but condition is false so we exit).
         builder->emitLoop(loopHeaderBlock, breakLabel, loopHeaderBlock);
 
         // Now build the if-chain inside the loop header
         builder->setInsertInto(loopHeaderBlock);
 
-        // Emit if-statements for each case in source order
+        // Emit if-statements for each case in source order.
+        // Each if-else must have its own unique afterBlock (merge point) to avoid
+        // SPIRV validation errors ("already a merge block for another header").
         for (Index i = 0; i < cases.getCount(); i++)
         {
             auto& caseInfo = cases[i];
@@ -358,18 +362,19 @@ struct SwitchLoweringContext
             if (!caseInfo.reachPredicate)
                 continue;
 
-            // Emit: if (reachPredicate) { <branch to case body> }
-            // The case body itself remains in its original block
+            // Create the next check block - this is where we go if the predicate is false
+            auto nextCheckBlock = builder->createBlock();
+            nextCheckBlock->insertAfter(builder->getBlock());
 
-            auto afterBlock = builder->createBlock();
-            afterBlock->insertAfter(builder->getBlock());
+            // Emit: if (reachPredicate) { goto caseBody } else { goto nextCheck }
+            // The afterBlock (merge point) is nextCheckBlock, NOT breakLabel.
+            // This ensures each if-else has a unique merge block.
+            builder->emitIfElse(caseInfo.reachPredicate, caseInfo.label, nextCheckBlock, nextCheckBlock);
 
-            builder->emitIf(caseInfo.reachPredicate, caseInfo.label, afterBlock);
-
-            builder->setInsertInto(afterBlock);
+            builder->setInsertInto(nextCheckBlock);
         }
 
-        // After all cases, branch to break label (for cases that fall off the end)
+        // After all checks fail, branch to break label (unreachable if all cases covered)
         builder->emitBranch(breakLabel);
 
         // Remove the original switch instruction
@@ -383,15 +388,22 @@ static bool shouldLowerSwitchToIf(IRSwitch* switchInst, TargetProgram* targetPro
     SLANG_UNUSED(switchInst);
     SLANG_UNUSED(targetProgram);
 
-    // TODO: Refine this predicate. Currently returns true unconditionally.
-    // Future refinements may include:
-    // - Only lower switches with non-trivial fallthrough
-    // - Only lower for SPIRV target: if (!isKhronosTarget(targetProgram)) return false;
+    // For now, always lower. This is primarily intended for SPIRV targets
+    // to address undefined reconvergence behavior with fallthrough.
+    // Other targets like Metal already handle fallthrough correctly with
+    // proper wave convergence in their native switch implementation.
+    //
+    // TODO: Consider restricting to SPIRV targets only if other targets
+    // show regressions. The pass should still be semantically correct
+    // for all targets, even if not strictly necessary.
     return true;
 }
 
 /// Lower all switch statements in a function.
-static void lowerSwitchToIfInFunc(IRGlobalValueWithCode* func, TargetProgram* targetProgram)
+static void lowerSwitchToIfInFunc(
+    IRModule* irModule,
+    IRGlobalValueWithCode* func,
+    TargetProgram* targetProgram)
 {
     // Collect all switch instructions first (since we'll be modifying the IR)
     List<IRSwitch*> switches;
@@ -407,8 +419,20 @@ static void lowerSwitchToIfInFunc(IRGlobalValueWithCode* func, TargetProgram* ta
         }
     }
 
+    if (switches.getCount() == 0)
+        return;
+
+    // To make things easy, eliminate Phis before performing transformations.
+    // This follows the pattern established by eliminateMultiLevelBreak.
+    // SSA form will be reconstructed later by simplifyIR.
+    eliminatePhisInFunc(
+        LivenessMode::Disabled,
+        irModule,
+        func,
+        PhiEliminationOptions::getFast());
+
     // Process each switch
-    IRBuilder builder(func->getModule());
+    IRBuilder builder(irModule);
 
     for (auto switchInst : switches)
     {
@@ -430,7 +454,7 @@ void lowerSwitchToIf(IRModule* module, TargetProgram* targetProgram)
     {
         if (auto func = as<IRGlobalValueWithCode>(globalInst))
         {
-            lowerSwitchToIfInFunc(func, targetProgram);
+            lowerSwitchToIfInFunc(module, func, targetProgram);
         }
     }
 }
