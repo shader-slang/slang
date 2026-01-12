@@ -47,9 +47,4 @@ String renderDiagnostic(
     DiagnosticRenderOptions opts,
     const GenericDiagnostic& diag);
 
-#define SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS 0
-#ifdef SLANG_ENABLE_DIAGNOSTIC_RENDER_UNIT_TESTS
-int slangRichDiagnosticsUnitTest(int argc, char* argv[]);
-#endif
-
 } // namespace Slang

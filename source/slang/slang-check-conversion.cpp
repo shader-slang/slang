@@ -1111,7 +1111,7 @@ static bool isSigned(Type* t)
     }
 }
 
-int getTypeBitSize(Type* t)
+int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
     if (!basicType)
@@ -1133,11 +1133,7 @@ int getTypeBitSize(Type* t)
         return 64;
     case BaseType::IntPtr:
     case BaseType::UIntPtr:
-#if SLANG_PTR_IS_32
-        return 32;
-#else
         return 64;
-#endif
     default:
         return 0;
     }
@@ -1173,7 +1169,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
         auto knownVal = as<IntegerLiteralExpr>(arg);
         if (!knownVal)
             return candidateCost;
-        if (getIntValueBitSize(knownVal->value) <= getTypeBitSize(toType))
+        if (getIntValueBitSize(knownVal->value) <= getMaximumTypeBitSize(toType))
         {
             bool toTypeIsSigned = isSigned(toType);
             bool fromTypeIsSigned = isSigned(knownVal->type);
