@@ -381,7 +381,7 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getOptionSet(), elementType, &sizeAlignment);
+    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -692,7 +692,7 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -717,7 +717,7 @@ struct LoweredElementTypeContext
             {
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -900,7 +900,7 @@ struct LoweredElementTypeContext
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
-            target->getOptionSet(),
+            target->getTargetReq(),
             config.getLayoutRule(),
             info.loweredType,
             &sizeAlignment);
@@ -1000,13 +1000,13 @@ struct LoweredElementTypeContext
 
             IRSizeAndAlignment arrayElementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 loweredInnerType.loweredType,
                 &arrayElementSizeAlignment);
             IRSizeAndAlignment baseSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
                 &baseSizeAlignment);
@@ -1660,7 +1660,7 @@ struct LoweredElementTypeContext
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     elementType,
                     &sizeAlignment);
@@ -2524,7 +2524,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
                 &elementSizeAlignment);
@@ -2631,7 +2631,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
                         // Find an integer type of the correct size for the current layout rule.
                         IRSizeAndAlignment boolSizeAndAlignment;
                         if (getSizeAndAlignment(
-                                target->getOptionSet(),
+                                target->getTargetReq(),
                                 config.getLayoutRule(),
                                 scalarType,
                                 &boolSizeAndAlignment) == SLANG_OK)
