@@ -84,59 +84,84 @@ struct ControlFlowRestructuringContext
 /// Check if a block or any of its reachable blocks (within a case)
 /// branches unconditionally to the target block.
 /// This is used to detect if a switch case falls through to the next case.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
 static bool caseBlocksFallThroughTo(
-    IRBlock* caseLabel,
+    IRBlock* startBlock,
     IRBlock* targetBlock,
     IRBlock* breakLabel,
     HashSet<IRBlock*>& visited)
 {
-    if (!caseLabel || !targetBlock)
+    if (!startBlock || !targetBlock)
         return false;
 
-    if (visited.contains(caseLabel))
-        return false;
-    visited.add(caseLabel);
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
 
-    // Don't follow branches to the break label
-    if (caseLabel == breakLabel)
-        return false;
-
-    // If we reached the target, there's fall-through
-    if (caseLabel == targetBlock)
-        return true;
-
-    auto terminator = caseLabel->getTerminator();
-    if (!terminator)
-        return false;
-
-    switch (terminator->getOp())
+    while (worklist.getCount() > 0)
     {
-    case kIROp_UnconditionalBranch:
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Don't follow branches to the break label
+        if (block == breakLabel)
+            continue;
+
+        // If we reached the target, there's fall-through
+        if (block == targetBlock)
+            return true;
+
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        switch (terminator->getOp())
         {
-            auto branch = as<IRUnconditionalBranch>(terminator);
-            auto target = branch->getTargetBlock();
-            if (target == targetBlock)
-                return true;
-            if (target == breakLabel)
-                return false;
-            return caseBlocksFallThroughTo(target, targetBlock, breakLabel, visited);
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = as<IRUnconditionalBranch>(terminator);
+                auto target = branch->getTargetBlock();
+                if (target == targetBlock)
+                    return true;
+                if (target != breakLabel)
+                    worklist.add(target);
+            }
+            break;
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+            {
+                auto branch = as<IRConditionalBranch>(terminator);
+                worklist.add(branch->getTrueBlock());
+                worklist.add(branch->getFalseBlock());
+            }
+            break;
+        case kIROp_Loop:
+            {
+                // For loops, follow the break block (where control goes after the loop)
+                auto loop = as<IRLoop>(terminator);
+                worklist.add(loop->getBreakBlock());
+            }
+            break;
+        case kIROp_Switch:
+            {
+                // For nested switches, follow the break label (where control goes after)
+                auto nestedSwitch = as<IRSwitch>(terminator);
+                worklist.add(nestedSwitch->getBreakLabel());
+            }
+            break;
+        default:
+            // Return, throw, etc. - don't follow
+            break;
         }
-    case kIROp_ConditionalBranch:
-        {
-            auto branch = as<IRConditionalBranch>(terminator);
-            if (caseBlocksFallThroughTo(branch->getTrueBlock(), targetBlock, breakLabel, visited))
-                return true;
-            if (caseBlocksFallThroughTo(branch->getFalseBlock(), targetBlock, breakLabel, visited))
-                return true;
-            return false;
-        }
-    case kIROp_Switch:
-        // A nested switch - would need to analyze its cases, but for now just return false
-        return false;
-    default:
-        // Return, loop, etc. - don't follow
-        return false;
     }
+
+    return false;
 }
 
 /// Convert a range of blocks in the IR CFG into a region.
