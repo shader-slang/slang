@@ -55,7 +55,11 @@ function(download_and_extract archive_name url)
             endif()
         endif()
 
-        file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir} TOUCH)
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+            file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir} TOUCH)
+        else()
+            file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir})
+        endif()
         message(STATUS "${archive_name} extracted to ${extract_dir}")
     endif()
 
