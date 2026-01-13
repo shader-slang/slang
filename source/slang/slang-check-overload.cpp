@@ -1030,16 +1030,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
         SubtypeWitness* subTypeWitness = nullptr;
-        if (getAllowUnknownWitnesses())
-        {
-            auto moduleDecl = this->getShared()->getModule()->getModuleDecl();
-            subTypeWitness = m_astBuilder->getOrCreate<UnknownSubtypeWitness>(sub, sup);
-            moduleDecl->m_valsRequiringResolution.add(subTypeWitness);
-        }
-        else
-        {
-            subTypeWitness = tryGetSubtypeWitness(sub, sup);
-        }
+        subTypeWitness = tryGetSubtypeWitness(sub, sup);
 
         bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
         bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();

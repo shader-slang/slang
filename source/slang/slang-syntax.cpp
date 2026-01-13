@@ -141,18 +141,6 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::FuncDecl:
         sb << "function";
         break;
-    case ASTNodeType::DerivativeRequirementDecl:
-        sb << "DerivativeRequirementDecl";
-        break;
-    case ASTNodeType::ForwardDerivativeRequirementDecl:
-        sb << "ForwardDerivativeRequirementDecl";
-        break;
-    case ASTNodeType::BackwardDerivativeRequirementDecl:
-        sb << "BackwardDerivativeRequirementDecl";
-        break;
-    case ASTNodeType::DerivativeRequirementReferenceDecl:
-        sb << "DerivativeRequirementReferenceDecl";
-        break;
     case ASTNodeType::SubscriptDecl:
         sb << "__subscript";
         break;
@@ -909,6 +897,36 @@ NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> c
         createDefaultSubstitutionsIfNeeded(astBuilder, nullptr, declRef).as<TypeDefDecl>();
 
     return astBuilder->getOrCreate<NamedExpressionType>(specializedDeclRef);
+}
+
+std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithDirection)
+{
+    if (as<OutParamType>(paramTypeWithDirection))
+    {
+        auto outParamType = as<OutParamType>(paramTypeWithDirection);
+        return {outParamType->getValueType(), ParamPassingMode::Out};
+    }
+    else if (as<BorrowInOutParamType>(paramTypeWithDirection))
+    {
+        auto inoutParamType = as<BorrowInOutParamType>(paramTypeWithDirection);
+        return {inoutParamType->getValueType(), ParamPassingMode::BorrowInOut};
+    }
+    else if (as<RefParamType>(paramTypeWithDirection))
+    {
+        auto refParamType = as<RefParamType>(paramTypeWithDirection);
+        return {refParamType->getValueType(), ParamPassingMode::Ref};
+    }
+    else if (as<BorrowInParamType>(paramTypeWithDirection))
+    {
+        auto constRefParamType = as<BorrowInParamType>(paramTypeWithDirection);
+        return {constRefParamType->getValueType(), ParamPassingMode::BorrowIn};
+    }
+    else
+    {
+        return {paramTypeWithDirection, ParamPassingMode::In};
+    }
 }
 
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)

@@ -1161,7 +1161,20 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         bool hasForceInline = false;
-        bool hasUserDefinedDerivative = false;
+
+        // TODO: Need to come up with a better way to track functions that can be inlined
+        // pre-translation. Preferably this would be lowered as an associated attribute of the
+        // function (just like the differentiability of functions).
+        //
+        bool allowPreTranslationInlining = true;
+        traverseUsers<IRAssociatedInstAnnotation>(
+            info.callee,
+            [&](IRAssociatedInstAnnotation* annotation)
+            {
+                if (annotation->getTarget() == info.callee)
+                    allowPreTranslationInlining = false;
+            });
+
         for (auto decor : info.callee->getDecorations())
         {
             switch (decor->getOp())
@@ -1172,16 +1185,15 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             case kIROp_ForceInlineDecoration:
                 hasForceInline = true;
                 break;
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_ForwardDerivativeDecoration:
-                hasUserDefinedDerivative = true;
                 break;
             }
         }
-        if (!hasForceInline || hasUserDefinedDerivative)
+
+        if (!hasForceInline || !allowPreTranslationInlining)
         {
             return false;
         }
+
         if (auto result = m_funcCanInline.tryGetValue(info.callee))
             return *result;
         bool canInline = true;

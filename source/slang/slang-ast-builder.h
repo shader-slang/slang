@@ -679,11 +679,6 @@ public:
         Type* superType,
         ArrayView<SubtypeWitness*> witnesses);
 
-    UnknownSubtypeWitness* getUnknownSubtypeWitness(
-        Type* subType,
-        Type* superType,
-        ModuleDecl* module);
-
     SubtypeWitness* getExpandSubtypeWitness(
         Type* subType,
         Type* superType,

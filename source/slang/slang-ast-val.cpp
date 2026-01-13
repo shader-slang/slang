@@ -307,63 +307,6 @@ void TypeEqualityWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("TypeEqualityWitness(") << getSub() << toSlice(")");
 }
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! UnknownSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-Val* UnknownSubtypeWitness::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    int diff = 0;
-    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
-    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
-    if (!diff)
-        return this;
-    (*ioDiff)++;
-
-    auto newSubtypeWitness =
-        getCurrentASTBuilder()->getUnknownSubtypeWitness(newSub, newSup, getModule());
-
-    if (newSubtypeWitness == this)
-    {
-        // No need to update the cache if we are not changing the witness.
-        return this;
-    }
-
-    if (this->getModule()->m_resolvedVals.containsKey(this) &&
-        !this->getModule()->m_resolvedVals.containsKey(newSubtypeWitness))
-    {
-        // Add the new subtype witness to the cache.
-        this->getModule()->m_resolvedVals.add(
-            newSubtypeWitness,
-            this->getModule()->m_resolvedVals[this]->substitute(astBuilder, subst));
-    }
-
-    if (this->getModule()->m_valsRequiringResolution.contains(this) &&
-        !this->getModule()->m_valsRequiringResolution.contains(newSubtypeWitness))
-    {
-        // Add the new subtype witness to the cache.
-        this->getModule()->m_valsRequiringResolution.add(newSubtypeWitness);
-    }
-
-    return newSubtypeWitness;
-}
-
-void UnknownSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("UnknownSubtypeWitness(") << getSub() << toSlice(")");
-}
-
-Val* UnknownSubtypeWitness::_resolveImplOverride()
-{
-    if (getModule()->m_resolvedVals.containsKey(this))
-    {
-        // Return the resolved value from the cache.
-        return getModule()->m_resolvedVals[this];
-    }
-
-    return this;
-}
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TypePackSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 

@@ -788,7 +788,6 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativePrimalDecoration:
             case kIROp_BackwardDerivativePrimalContextDecoration:
             case kIROp_BackwardDerivativePrimalReturnDecoration:
-            case kIROp_PrimalSubstituteDecoration:
             case kIROp_AutoDiffOriginalValueDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:

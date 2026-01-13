@@ -697,7 +697,7 @@ interface IDifferentiablePtrType
 
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
-interface IForwardDifferentiable<FType>
+interface IForwardDifferentiable<FType> 
 {
 
     // BuiltinRequirementKind::ForwardDerivativeFunc

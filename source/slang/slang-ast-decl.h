@@ -1037,42 +1037,6 @@ class AttributeDecl : public ContainerDecl
     FIDDLE() SyntaxClass<NodeBase> syntaxClass;
 };
 
-// A synthesized decl used as a placeholder for a differentiable function requirement. This decl
-// will be a child of interface decl. This allows us to form an interface requirement key for the
-// derivative of an interface function. The synthesized `DerivativeRequirementDecl` will be a child
-// of the original function requirement decl after an interface type is checked.
-FIDDLE()
-class DerivativeRequirementDecl : public FunctionDeclBase
-{
-    FIDDLE(...)
-    // The original requirement decl.
-    FIDDLE() Decl* originalRequirementDecl = nullptr;
-
-    // Type to use for 'ThisType'
-    FIDDLE() Type* diffThisType;
-};
-
-// A reference to a synthesized decl representing a differentiable function requirement, this decl
-// will be a child in the orignal function.
-FIDDLE()
-class DerivativeRequirementReferenceDecl : public Decl
-{
-    FIDDLE(...)
-    FIDDLE() DerivativeRequirementDecl* referencedDecl;
-};
-
-FIDDLE()
-class ForwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
-};
-
 bool isInterfaceRequirement(Decl* decl);
 InterfaceDecl* findParentInterfaceDecl(Decl* decl);
 

@@ -1813,17 +1813,17 @@ FIDDLE() namespace Slang
                                    // Requirement keys for new auto-diff system
         ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
                                    ///< functions
-        /*FwdCallableContextType,      ///< The "FwdCallable" built-in associatedtype on functions
-        FwdApplyFunc,                ///< The "applyFwd" built-in associated function on functions
-        EvalAndFwdPropFunc,          ///< The "FwdCallable::operator()" built-in function
-        LegacyForwardDerivativeFunc, ///< The "fwdDiff" built-in associated function on functions*/
         ForwardDerivativeFunc,
+        ForwardDerivativeAllowInline, ///< "IForwardDifferentiable::allowInline" built-in associated
+                                      ///< boolean constant.
 
-        BwdCallableContextType,       ///< The "BwdCallable" built-in associatedtype on functions
-        BwdApplyFunc,                 ///< The "apply" built-in associated function on functions
-        BwdCallablePropFunc,          ///< The "BwdCallable::operator()" built-in function
-        BwdCallableGetValFunc,        ///< The "BwdCallable::getVal()" built-in function
-        LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function on functions
+        BwdCallableContextType,        ///< The "BwdCallable" built-in associatedtype on functions
+        BwdApplyFunc,                  ///< The "apply" built-in associated function on functions
+        BwdCallablePropFunc,           ///< The "BwdCallable::operator()" built-in function
+        BwdCallableGetValFunc,         ///< The "BwdCallable::getVal()" built-in function
+        LegacyBackwardDerivativeFunc,  ///< The "bwdDiff" built-in associated function on functions
+        BackwardDerivativeAllowInline, ///< "IBackwardDifferentiable::allowInline" built-in
+                                       ///< associated boolean constant.
     };
 
     // How do we swap out applyFwd for applyBwd?

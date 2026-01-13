@@ -593,7 +593,6 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
             {
             case kIROp_ForwardDerivativeDecoration:
             case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_PrimalSubstituteDecoration:
                 shouldKeptAliveIfImported = true;
                 break;
             }

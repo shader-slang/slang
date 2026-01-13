@@ -988,13 +988,6 @@ public:
         return result;
     }
 
-    SemanticsContext allowUnknownWitnesses()
-    {
-        SemanticsContext result(*this);
-        result.m_allowUnknownWitnesses = true;
-        return result;
-    }
-
     FunctionDeclBase* getParentFuncOfVisitor() { return m_parentFunc; }
     void setParentFuncOfVisitor(FunctionDeclBase* funcDecl) { m_parentFunc = funcDecl; }
 
@@ -1173,8 +1166,6 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
-    bool getAllowUnknownWitnesses() { return m_allowUnknownWitnesses; }
-
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
@@ -1192,8 +1183,6 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
-
-    bool m_allowUnknownWitnesses = false;
 
 protected:
     // TODO: consider making more of this state `private`...

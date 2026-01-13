@@ -980,7 +980,8 @@ LoweredValInfo emitCallToDeclRef(
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
-    return emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
+    auto callInst = emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
+    return callInst;
 }
 
 LoweredValInfo emitCallToDeclRef(
@@ -3460,7 +3461,7 @@ void makeVaryingInputParamConstRef(IRLoweringParameterInfo& paramInfo)
 {
     if (paramInfo.direction != ParamPassingMode::In)
         return;
-    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
+    if (paramInfo.decl && paramInfo.decl->findModifier<HLSLUniformModifier>())
         return;
     if (as<HLSLPatchType>(paramInfo.type))
         return;
@@ -3562,13 +3563,58 @@ void collectParameterLists(
         // we are in a `static` context.
         if (mode == kParameterListCollectMode_Default)
         {
-            for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
+            // TODO: dedupliate this logic with _lowerInfoFromFuncType
+            if (hasDirectFuncType(callableDeclRef))
             {
-                auto paramInfo = getParameterInfo(context, paramDeclRef);
-                if (lowerVaryingInputAsConstRef)
-                    makeVaryingInputParamConstRef(paramInfo);
-                ioParameterLists->params.add(paramInfo);
+                // Add by inspecting the func-type.
+                auto resolvedFuncType =
+                    callableDeclRef.getDecl()
+                        ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
+                        ->resolve();
+
+                FuncType* effectiveFuncType = nullptr;
+                if (!as<FuncType>(resolvedFuncType))
+                {
+                    if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
+                    {
+                        effectiveFuncType = as<FuncType>(
+                            context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
+                        SLANG_ASSERT(effectiveFuncType);
+                    }
+                }
+                else
+                {
+                    effectiveFuncType = as<FuncType>(resolvedFuncType);
+                }
+
+                for (auto paramTypeWithDirection : effectiveFuncType->getParamTypes())
+                {
+                    auto [paramType, paramDirection] =
+                        splitParameterTypeAndDirection(context->astBuilder, paramTypeWithDirection);
+                    IRLoweringParameterInfo paramInfo;
+                    paramInfo.type = paramType;
+                    paramInfo.decl = nullptr;
+                    paramInfo.direction = paramDirection;
+                    paramInfo.declaredDirection = paramInfo.direction;
+
+                    if (lowerVaryingInputAsConstRef)
+                        makeVaryingInputParamConstRef(paramInfo);
+
+                    ioParameterLists->params.add(paramInfo);
+                }
             }
+            else
+            {
+                // Add by inspecting parameter decls.
+                for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
+                {
+                    auto paramInfo = getParameterInfo(context, paramDeclRef);
+                    if (lowerVaryingInputAsConstRef)
+                        makeVaryingInputParamConstRef(paramInfo);
+                    ioParameterLists->params.add(paramInfo);
+                }
+            }
+
             maybeAddReturnDestinationParam(
                 ioParameterLists,
                 getResultType(context->astBuilder, callableDeclRef));
@@ -3614,139 +3660,141 @@ struct FuncDeclBaseTypeInfo
     bool returnViaLastRefParam = false;
 };
 
-void _lowerFuncDeclBaseTypeInfo(
+void _lowerInfoFromFuncType(
+    IRGenContext* context,
+    DeclRef<FunctionDeclBase> declRef,
+    FuncDeclBaseTypeInfo& outInfo)
+{
+    auto resolvedFuncType =
+        declRef.getDecl()
+            ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
+            ->resolve();
+
+    FuncType* effectiveFuncType = nullptr;
+
+    if (!as<FuncType>(resolvedFuncType))
+    {
+        if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
+        {
+            effectiveFuncType =
+                as<FuncType>(context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
+            SLANG_ASSERT(effectiveFuncType);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("expected a function type");
+        }
+    }
+    else
+    {
+        effectiveFuncType = as<FuncType>(resolvedFuncType);
+    }
+
+    //
+    // TODO: Unify this logic with the this-param lowering
+    // logic in 'collectParameterLists', so its not a special case..
+    //
+
+    ParameterListCollectMode innerMode =
+        getModeForCollectingParentParameters(declRef.getDecl(), declRef.getParent().getDecl());
+
+    ParamPassingMode innerThisParamDirection =
+        getThisParamDirection(declRef.getDecl(), ParamPassingMode::In);
+
+    if (innerMode != kParameterListCollectMode_Static)
+    {
+        auto thisType = getThisParamTypeForContainer(context, declRef.getParent());
+        if (thisType)
+        {
+            thisType =
+                as<Type>(thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
+        }
+
+        // If we're looking something up on a callable, the this-type determination will
+        // continue up the chain until we find a non-callable.
+        // For now, we assume only one level of indirection is needed.
+        //
+        if (isDeclRefTypeOf<CallableDecl>(thisType))
+        {
+            auto baseCallableDeclRef = as<DeclRefType>(thisType)->getDeclRef();
+            ParameterListCollectMode innerCallableCollectMode =
+                getModeForCollectingParentParameters(
+                    baseCallableDeclRef.getDecl(),
+                    baseCallableDeclRef.getParent().getDecl());
+
+            if (innerCallableCollectMode != kParameterListCollectMode_Static)
+            {
+                thisType = getThisParamTypeForCallable(context, baseCallableDeclRef);
+            }
+            else
+            {
+                thisType = nullptr;
+            }
+        }
+
+        if (thisType)
+        {
+            // Need to check for no-diff-this attribute on the target decl-ref for
+            // functions that are members of other functions.
+            //
+            if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
+            {
+                auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
+                thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
+            }
+
+            switch (innerThisParamDirection)
+            {
+            case ParamPassingMode::In:
+                // The `this` parameter is passed by value, so we
+                // don't need to do anything special here.
+                break;
+            case ParamPassingMode::Ref:
+                // The `this` parameter is passed by reference, so we
+                thisType = context->astBuilder->getRefParamType(thisType);
+                break;
+            case ParamPassingMode::BorrowIn:
+                // The `this` parameter is passed by const reference, so we
+                thisType = context->astBuilder->getConstRefParamType(thisType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                // The `this` parameter is passed by in-out reference, so we
+                thisType = context->astBuilder->getBorrowInOutParamType(thisType);
+                break;
+            default:
+                SLANG_UNEXPECTED("unknown this parameter direction");
+                break;
+            }
+
+            // Construct new effectiveFuncType to include the `this` parameter
+            //
+            List<Type*> paramTypes;
+            paramTypes.add(thisType);
+            for (auto paramType : effectiveFuncType->getParamTypes())
+            {
+                paramTypes.add(paramType);
+            }
+            effectiveFuncType = context->astBuilder->getFuncType(
+                paramTypes.getArrayView(),
+                effectiveFuncType->getResultType(),
+                effectiveFuncType->getErrorType());
+        }
+    }
+
+    // Lower type.
+    auto irFuncType = cast<IRFuncType>(lowerType(context, effectiveFuncType));
+    outInfo.type = irFuncType;
+    outInfo.resultType = irFuncType->getResultType();
+
+    return;
+}
+
+void _lowerInfoFromFuncParameters(
     IRGenContext* context,
     DeclRef<FunctionDeclBase> declRef,
     FuncDeclBaseTypeInfo& outInfo)
 {
     auto builder = context->irBuilder;
-
-    // If the function is described by a funcType,
-    //
-    if (declRef.getDecl()->funcType.type)
-    {
-        auto resolvedFuncType =
-            declRef.getDecl()
-                ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
-                ->resolve();
-
-        FuncType* effectiveFuncType = nullptr;
-
-        if (!as<FuncType>(resolvedFuncType))
-        {
-            if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
-            {
-                effectiveFuncType =
-                    as<FuncType>(context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
-                SLANG_ASSERT(effectiveFuncType);
-            }
-            else
-            {
-                SLANG_UNEXPECTED("expected a function type");
-            }
-        }
-        else
-        {
-            effectiveFuncType = as<FuncType>(resolvedFuncType);
-        }
-
-        // TODO: We need to unify this logic with the this-param lowering
-        // logic in 'collectParameterLists', so its not a special case..
-        //
-
-        ParameterListCollectMode innerMode =
-            getModeForCollectingParentParameters(declRef.getDecl(), declRef.getParent().getDecl());
-
-        ParamPassingMode innerThisParamDirection =
-            getThisParamDirection(declRef.getDecl(), ParamPassingMode::In);
-
-        if (innerMode != kParameterListCollectMode_Static)
-        {
-            auto thisType = getThisParamTypeForContainer(context, declRef.getParent());
-            if (thisType)
-            {
-                thisType = as<Type>(
-                    thisType->substitute(getCurrentASTBuilder(), SubstitutionSet(declRef)));
-            }
-
-            // If we're looking something up on a callable, the this-type determination will
-            // continue up the chain until we find a non-callable.
-            // For now, we assume only one level of indirection is needed.
-            //
-            if (isDeclRefTypeOf<CallableDecl>(thisType))
-            {
-                auto baseCallableDeclRef = as<DeclRefType>(thisType)->getDeclRef();
-                ParameterListCollectMode innerCallableCollectMode =
-                    getModeForCollectingParentParameters(
-                        baseCallableDeclRef.getDecl(),
-                        baseCallableDeclRef.getParent().getDecl());
-
-                if (innerCallableCollectMode != kParameterListCollectMode_Static)
-                {
-                    thisType = getThisParamTypeForCallable(context, baseCallableDeclRef);
-                }
-                else
-                {
-                    thisType = nullptr;
-                }
-            }
-
-            if (thisType)
-            {
-                // Need to check for no-diff-this attribute on the target decl-ref for
-                // functions that are members of other functions.
-                //
-                if (declRef.getDecl()->findModifier<NoDiffThisAttribute>())
-                {
-                    auto noDiffAttr = context->astBuilder->getNoDiffModifierVal();
-                    thisType = context->astBuilder->getModifiedType(thisType, 1, &noDiffAttr);
-                }
-
-                switch (innerThisParamDirection)
-                {
-                case ParamPassingMode::In:
-                    // The `this` parameter is passed by value, so we
-                    // don't need to do anything special here.
-                    break;
-                case ParamPassingMode::Ref:
-                    // The `this` parameter is passed by reference, so we
-                    thisType = context->astBuilder->getRefParamType(thisType);
-                    break;
-                case ParamPassingMode::BorrowIn:
-                    // The `this` parameter is passed by const reference, so we
-                    thisType = context->astBuilder->getConstRefParamType(thisType);
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    // The `this` parameter is passed by in-out reference, so we
-                    thisType = context->astBuilder->getBorrowInOutParamType(thisType);
-                    break;
-                default:
-                    SLANG_UNEXPECTED("unknown this parameter direction");
-                    break;
-                }
-
-                // Construct new effectiveFuncType to include the `this` parameter
-                //
-                List<Type*> paramTypes;
-                paramTypes.add(thisType);
-                for (auto paramType : effectiveFuncType->getParamTypes())
-                {
-                    paramTypes.add(paramType);
-                }
-                effectiveFuncType = context->astBuilder->getFuncType(
-                    paramTypes.getArrayView(),
-                    effectiveFuncType->getResultType(),
-                    effectiveFuncType->getErrorType());
-            }
-        }
-
-        // Lower type.
-        auto irFuncType = cast<IRFuncType>(lowerType(context, effectiveFuncType));
-        outInfo.type = irFuncType;
-        outInfo.resultType = irFuncType->getResultType();
-
-        return;
-    }
 
     // Collect the parameter lists we will use for our new function.
     auto& parameterLists = outInfo.parameterLists;
@@ -3823,7 +3871,6 @@ void _lowerFuncDeclBaseTypeInfo(
     {
         irResultType = lowerType(context, getResultType(context->astBuilder, declRef));
 
-
         if (auto setterDeclRef = declRef.as<SetterDecl>())
         {
             // A `set` accessor always returns `void`
@@ -3859,6 +3906,26 @@ void _lowerFuncDeclBaseTypeInfo(
     {
         outInfo.type =
             builder->getFuncType(paramTypes.getCount(), paramTypes.getBuffer(), irResultType);
+    }
+}
+
+void _lowerFuncDeclBaseTypeInfo(
+    IRGenContext* context,
+    DeclRef<FunctionDeclBase> declRef,
+    FuncDeclBaseTypeInfo& outInfo)
+{
+    auto builder = context->irBuilder;
+
+    // If the function is described by a funcType, we'll default
+    // to using that to lower the type information.
+    //
+    if (hasDirectFuncType(declRef))
+    {
+        _lowerInfoFromFuncType(context, declRef, outInfo);
+    }
+    else
+    {
+        _lowerInfoFromFuncParameters(context, declRef, outInfo);
     }
 }
 
@@ -9187,40 +9254,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType =
                             lowerType(subContext, astReqWitnessTable->baseType);
-                        /* This doesn't really work with transitive inheritance decls.. (atleast it
-                        gets complicated)
-                        if (auto declRefBaseType =
-                        as<DeclRefType>(astReqWitnessTable->baseType))
-                        {
-                            if (auto inheritanceDecl = as<InheritanceDecl>(entry.key))
-                            {
-                                // Slight hack to hijack the thisTypeWitness
-                                // to force this-type lookups to resolve to the abstract
-                                // versions.
-                                //
-                                if (!subContext->thisTypeWitness)
-                                {
-                                    // Set to ThisTypeWitness(null)
-                                    subContext->thisType = subContext->irBuilder->getThisType(
-                                        subContext->irBuilder->getVoidType());
-                                    subContext->thisTypeWitness =
-                                        subContext->irBuilder->createThisTypeWitness(
-                                            subContext->irBuilder->getVoidType());
-
-                                    // Lower the effective type for the witness table
-                                    irWitnessTableBaseType = lowerType(
-                                        subContext,
-                                        substituteType(
-                                            SubstitutionSet(declRefBaseType->getDeclRef()),
-                                            subContext->astBuilder,
-                                            inheritanceDecl->getSup().type));
-
-                                    // Reset
-                                    subContext->thisType = (IRInst*)nullptr;
-                                    subContext->thisTypeWitness = (IRInst*)nullptr;
-                                }
-                            }
-                        }*/
 
                         auto concreteType = irWitnessTable->getConcreteType();
 
@@ -9269,55 +9302,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
         }
     }
-
-    /*RefPtr<WitnessTable> resolveWitnessTable(RefPtr<WitnessTable> table)
-    {
-        ShortList<Decl*> keys;
-        for (auto entry : table->getRequirementDictionary())
-        {
-            keys.add(entry.key);
-        }
-
-        for (auto key : keys)
-        {
-            RequirementWitness witness = table->getRequirementDictionary()[key];
-            switch (witness.getFlavor())
-            {
-            case RequirementWitness::Flavor::declRef:
-                {
-                    table->m_requirementDictionary[key] =
-                        RequirementWitness(witness.getDeclRef().declRefBase->resolve());
-                    break;
-                }
-            case RequirementWitness::Flavor::val:
-                {
-                    auto val = witness.getVal()->resolve();
-                    table->m_requirementDictionary[key] = RequirementWitness(val);
-                    if (auto subtypeWitness = as<DeclaredSubtypeWitness>(val))
-                    {
-                        if (auto inheritanceDecl =
-                                subtypeWitness->getDeclRef().as<InheritanceDecl>())
-                        {
-                            // Special case...
-                            if (isDeclRefTypeOf<CallableDecl>(subtypeWitness->getSub()))
-                            {
-                                // Remove any generic-app-decl-refs.
-                                subtypeWitness->getDeclRef();
-                            }
-                        }
-                    }
-                    break;
-                }
-            case RequirementWitness::Flavor::witnessTable:
-                {
-                    // copy as is
-                    auto astReqWitnessTable = witness.getWitnessTable();
-                    table->m_requirementDictionary[key] =
-                        RequirementWitness(resolveWitnessTable(astReqWitnessTable));
-                }
-            }
-        }
-    }*/
 
     LoweredValInfo visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
@@ -10182,27 +10166,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo::simple(assocType);
     }
 
-    void insertRequirementKeyAssociation(
-        Decl* requirementDecl,
-        IRInst* originalKey,
-        IRInst* associatedKey)
-    {
-        IROp op = kIROp_Nop;
-        if (as<BackwardDerivativeRequirementDecl>(requirementDecl))
-        {
-            op = kIROp_BackwardDerivativeDecoration;
-        }
-        else if (as<ForwardDerivativeRequirementDecl>(requirementDecl))
-        {
-            op = kIROp_ForwardDerivativeDecoration;
-        }
-        else
-        {
-            return;
-        }
-        context->irBuilder->addDecoration(originalKey, op, associatedKey);
-    }
-
     // Given `value` defined as an independent generic of `outerGeneric`, emit IR that specializes
     // it using the generic params defined in `outerGeneric`. For example:
     // ```
@@ -10415,17 +10378,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
                 if (callableDecl)
                 {
-                    // Differentiable functions has additional requirements for the derivatives.
-                    for (auto diffDecl :
-                         callableDecl->getMembersOfType<DerivativeRequirementReferenceDecl>())
-                    {
-                        auto diffKey = getInterfaceRequirementKey(diffDecl->referencedDecl);
-                        insertRequirementKeyAssociation(
-                            diffDecl->referencedDecl,
-                            requirementKey,
-                            diffKey);
-                    }
-
                     for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
                              subContext->astBuilder,
                              createDefaultSpecializedDeclRef(subContext, nullptr, callableDecl)))
@@ -11856,6 +11808,62 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return type->getOp() == kIROp_ClassType;
     }
 
+    void lowerAutoPyBindCudaFunctionDecorations(
+        IRGenContext* subContext,
+        IRInst* irFunc,
+        FunctionDeclBase* decl)
+    {
+        if (auto autoPyBindModifier = decl->findModifier<AutoPyBindCudaAttribute>())
+        {
+            IRInst* irFwdDiffFunc = nullptr;
+            if (autoPyBindModifier->fwdDiffFuncDeclRef)
+            {
+                FuncDeclBaseTypeInfo innerInfoFwd;
+                _lowerFuncDeclBaseTypeInfo(
+                    context,
+                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoFwd);
+
+                auto loweredFwdDiffFunc = emitDeclRef(
+                    context,
+                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoFwd.type);
+
+                SLANG_ASSERT(loweredFwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+                irFwdDiffFunc = getSimpleVal(context, loweredFwdDiffFunc);
+            }
+
+            IRInst* irBwdDiffFunc = nullptr;
+            if (autoPyBindModifier->bwdDiffFuncDeclRef)
+            {
+                FuncDeclBaseTypeInfo innerInfoBwd;
+                _lowerFuncDeclBaseTypeInfo(
+                    context,
+                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoBwd);
+
+                auto loweredBwdDiffFunc = emitDeclRef(
+                    context,
+                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
+                    innerInfoBwd.type);
+
+                SLANG_ASSERT(loweredBwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
+                irBwdDiffFunc = getSimpleVal(context, loweredBwdDiffFunc);
+            }
+
+            subContext->irBuilder->addAutoPyBindCudaDecoration(
+                irFunc,
+                decl->getName()->text.getUnownedSlice(),
+                irFwdDiffFunc,
+                irBwdDiffFunc);
+            subContext->irBuilder->addAutoPyBindExportInfoDecoration(irFunc);
+
+            // Temp decorations to get this function through the linker.
+            subContext->irBuilder->addKeepAliveDecoration(irFunc);
+            subContext->irBuilder->addHLSLExportDecoration(irFunc);
+        }
+    }
+
     LoweredValInfo lowerFuncDeclInContext(
         IRGenContext* subContext,
         IRBuilder* subBuilder,
@@ -11889,17 +11897,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         IRGeneric* outerGeneric = nullptr;
         subContext->funcDecl = decl;
 
-        if (auto derivativeRequirement = as<DerivativeRequirementDecl>(decl))
-            outerGeneric = emitOuterGenerics(
-                subContext,
-                derivativeRequirement->originalRequirementDecl,
-                derivativeRequirement->originalRequirementDecl);
-        else
-            outerGeneric = emitOuterGenerics(subContext, decl, decl);
-
-        // TODO: REMOVE ASAP (should be in the context)
-        HashSet<DeclRefBase*> workingSet;
-        HashSet<Type*> workingTypeSet;
+        outerGeneric = emitOuterGenerics(subContext, decl, decl);
 
         if (decl->findModifier<DifferentiableAttribute>() && !isInterfaceRequirement(decl))
         {
@@ -11928,8 +11926,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 info);
         }
 
-        // need to create an IR function here
-        // IRInst* irFunc = nullptr;
         if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
         {
             List<IRInst*> irOperands;
@@ -11986,6 +11982,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
             irFunc->replaceUsesWith(synthOp);
             irFunc->removeAndDeallocate();
+
+            // Overwrite the mapping
             context->setGlobalValue(decl, LoweredValInfo::simple(synthOp));
 
             irFunc = synthOp;
@@ -11995,55 +11993,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         addLinkageDecoration(subContext, irFunc, decl);
         maybeAddDebugLocationDecoration(subContext, irFunc);
 
-        if (auto autoPyBindModifier = decl->findModifier<AutoPyBindCudaAttribute>())
-        {
-            IRInst* irFwdDiffFunc = nullptr;
-            if (autoPyBindModifier->fwdDiffFuncDeclRef)
-            {
-                FuncDeclBaseTypeInfo innerInfoFwd;
-                _lowerFuncDeclBaseTypeInfo(
-                    context,
-                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                    innerInfoFwd);
-
-                auto loweredFwdDiffFunc = emitDeclRef(
-                    context,
-                    autoPyBindModifier->fwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                    innerInfoFwd.type);
-
-                SLANG_ASSERT(loweredFwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
-                irFwdDiffFunc = getSimpleVal(context, loweredFwdDiffFunc);
-            }
-
-            IRInst* irBwdDiffFunc = nullptr;
-            if (autoPyBindModifier->bwdDiffFuncDeclRef)
-            {
-                FuncDeclBaseTypeInfo innerInfoBwd;
-                _lowerFuncDeclBaseTypeInfo(
-                    context,
-                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                    innerInfoBwd);
-
-                auto loweredBwdDiffFunc = emitDeclRef(
-                    context,
-                    autoPyBindModifier->bwdDiffFuncDeclRef->declRef.as<FunctionDeclBase>(),
-                    innerInfoBwd.type);
-
-                SLANG_ASSERT(loweredBwdDiffFunc.flavor == LoweredValInfo::Flavor::Simple);
-                irBwdDiffFunc = getSimpleVal(context, loweredBwdDiffFunc);
-            }
-
-            subContext->irBuilder->addAutoPyBindCudaDecoration(
-                irFunc,
-                decl->getName()->text.getUnownedSlice(),
-                irFwdDiffFunc,
-                irBwdDiffFunc);
-            subContext->irBuilder->addAutoPyBindExportInfoDecoration(irFunc);
-
-            // Temp decorations to get this function through the linker.
-            subContext->irBuilder->addKeepAliveDecoration(irFunc);
-            subContext->irBuilder->addHLSLExportDecoration(irFunc);
-        }
+        if (decl->findModifier<AutoPyBindCudaAttribute>())
+            lowerAutoPyBindCudaFunctionDecorations(subContext, irFunc, decl);
 
         // Always force inline diff setter accessor to prevent downstream compiler from complaining
         // fields are not fully initialized for the first `inout` parameter.
@@ -12514,43 +12465,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
                 isInline = true;
             }
-            else if (
-                as<UserDefinedDerivativeAttribute>(modifier) ||
-                as<PrimalSubstituteAttribute>(modifier))
-            {
-                // We need to lower the decl ref to the custom derivative function to IR.
-                // The IR insts correspond to the decl ref is not part of the function we
-                // are processing. If we emit it directly to within the function, it could
-                // mess up the assumption on the form of the IR (e.g. having non decoration insts
-                // appearing in the middle of decoration insts). so we emit the decl ref to the
-                // function's parent for now.
-
-                subContext->irBuilder->setInsertInto(irFunc->getParent());
-                Expr* funcExpr = nullptr;
-                if (auto udAttr = as<UserDefinedDerivativeAttribute>(modifier))
-                    funcExpr = udAttr->funcExpr;
-                else if (auto primalAttr = as<PrimalSubstituteAttribute>(modifier))
-                    funcExpr = primalAttr->funcExpr;
-                DeclRefExpr* declRefExpr = as<DeclRefExpr>(funcExpr);
-                auto funcType = lowerType(subContext, funcExpr->type);
-                auto loweredVal = emitDeclRef(subContext, declRefExpr->declRef, funcType);
-
-                SLANG_RELEASE_ASSERT(loweredVal.flavor == LoweredValInfo::Flavor::Simple);
-
-                IRInst* derivativeFunc = loweredVal.val;
-
-                if (as<ForwardDerivativeAttribute>(modifier))
-                    getBuilder()->addForwardDerivativeDecoration(irFunc, derivativeFunc);
-                else if (as<BackwardDerivativeAttribute>(modifier))
-                    getBuilder()->addUserDefinedBackwardDerivativeDecoration(
-                        irFunc,
-                        derivativeFunc);
-                else
-                    getBuilder()->addPrimalSubstituteDecoration(irFunc, derivativeFunc);
-
-                // Reset cursor.
-                subContext->irBuilder->setInsertInto(irFunc);
-            }
             else if (as<ForwardDifferentiableAttribute>(modifier))
             {
                 getBuilder()->addForwardDifferentiableDecoration(irFunc);
@@ -12652,73 +12566,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // If this function is defined inside an interface, add a reference to the IRFunc from
         // the interface's type definition.
         auto finalVal = finishOuterGenerics(subBuilder, irFunc, outerGeneric);
-
-        /*for (auto modifier : decl->modifiers)
-        {
-            if (as<DerivativeOfAttribute>(modifier) || as<PrimalSubstituteOfAttribute>(modifier))
-            {
-                Expr* funcExpr = nullptr;
-                Expr* backDeclRef = nullptr;
-                if (auto attr = as<DerivativeOfAttribute>(modifier))
-                {
-                    funcExpr = attr->funcExpr;
-                    backDeclRef = attr->backDeclRef;
-                }
-                else if (auto primalAttr = as<PrimalSubstituteOfAttribute>(modifier))
-                {
-                    funcExpr = primalAttr->funcExpr;
-                    backDeclRef = primalAttr->backDeclRef;
-                }
-
-                if (auto originalDeclRefExpr = as<DeclRefExpr>(funcExpr))
-                {
-                    NestedContext originalContextFunc(this);
-                    auto originalSubBuilder = originalContextFunc.getBuilder();
-                    auto originalSubContext = originalContextFunc.getContext();
-                    if (auto outterGeneric = getOuterGeneric(irFunc))
-                        originalSubBuilder->setInsertBefore(outterGeneric);
-                    else
-                        originalSubBuilder->setInsertBefore(irFunc);
-                    auto originalFuncDecl =
-                        as<FunctionDeclBase>(originalDeclRefExpr->declRef.getDecl());
-                    SLANG_RELEASE_ASSERT(originalFuncDecl);
-
-                    auto originalFuncVal = lowerFuncDeclInContext(
-                                               originalSubContext,
-                                               originalSubBuilder,
-                                               originalFuncDecl,
-                                               false)
-                                               .val;
-                    if (auto originalFuncGeneric = as<IRGeneric>(originalFuncVal))
-                    {
-                        originalFuncVal = findGenericReturnVal(originalFuncGeneric);
-                    }
-                    originalSubBuilder->setInsertBefore(originalFuncVal);
-                    auto derivativeFuncVal = lowerRValueExpr(originalSubContext, backDeclRef);
-                    if (as<ForwardDerivativeOfAttribute>(modifier))
-                    {
-                        originalSubBuilder->addForwardDerivativeDecoration(
-                            originalFuncVal,
-                            derivativeFuncVal.val);
-                        getBuilder()->addForwardDifferentiableDecoration(irFunc);
-                    }
-                    else if (as<BackwardDerivativeOfAttribute>(modifier))
-                    {
-                        originalSubBuilder->addUserDefinedBackwardDerivativeDecoration(
-                            originalFuncVal,
-                            derivativeFuncVal.val);
-                    }
-                    else
-                    {
-                        originalSubBuilder->addPrimalSubstituteDecoration(
-                            originalFuncVal,
-                            derivativeFuncVal.val);
-                    }
-                }
-                subContext->irBuilder->setInsertInto(irFunc);
-                finalVal->moveToEnd();
-            }
-        }*/
         return LoweredValInfo::simple(finalVal);
     }
 
@@ -12740,24 +12587,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     LoweredValInfo visitFunctionDeclBase(FunctionDeclBase* decl)
     {
-        // Handle synthesized functions.
-        /*if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
-        {
-            FuncDeclBaseTypeInfo info;
-            _lowerFuncDeclBaseTypeInfo(context, synFuncDecl->targetFuncDeclRef, info);
-
-            auto targetDeclRefInfo =
-                emitDeclRef(context, synFuncDecl->targetFuncDeclRef, info.type);
-            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-            auto _targetIRFunc = getSimpleVal(context, targetDeclRefInfo);
-            auto synthOp = getBuilder()->emitIntrinsicInst(
-                _targetIRFunc->getFullType(),
-                (IROp)synFuncDecl->irOp,
-                1,
-                &_targetIRFunc);
-            return LoweredValInfo::simple(synthOp);
-        }*/
-
         // A function declaration may have multiple, target-specific
         // overloads, and we need to emit an IR version of each of these.
 

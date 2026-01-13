@@ -968,14 +968,6 @@ TypePackSubtypeWitness* ASTBuilder::getSubtypeWitnessPack(
     return getOrCreate<TypePackSubtypeWitness>(subType, superType, witnesses);
 }
 
-UnknownSubtypeWitness* ASTBuilder::getUnknownSubtypeWitness(
-    Type* subType,
-    Type* superType,
-    ModuleDecl* module)
-{
-    return getOrCreate<UnknownSubtypeWitness>(subType, superType, module->getDefaultDeclRef());
-}
-
 SubtypeWitness* ASTBuilder::getExpandSubtypeWitness(
     Type* subType,
     Type* superType,

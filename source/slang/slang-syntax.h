@@ -102,6 +102,11 @@ inline FilteredMemberRefList<T> getMembersOfType(
         filterStyle);
 }
 
+inline bool hasDirectFuncType(DeclRef<CallableDecl> declRef)
+{
+    return declRef.getDecl()->funcType.type != nullptr;
+}
+
 void _foreachDirectOrExtensionMemberOfType(
     SemanticsVisitor* semantics,
     DeclRef<ContainerDecl> const& declRef,
@@ -262,7 +267,16 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> declRef)
 
 inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
 {
+    /*if (hasDirectFuncType(declRef))
+    {
+        return as<FuncType>(
+                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
+            ->getResultType();
+    }
+    else
+    {*/
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
+    //}
 }
 
 inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
@@ -283,6 +297,10 @@ inline FilteredMemberRefList<ParamDecl> getParameters(
 {
     return getMembersOfType<ParamDecl>(astBuilder, declRef);
 }
+
+std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithDirection);
 
 inline Decl* getInner(DeclRef<GenericDecl> declRef)
 {

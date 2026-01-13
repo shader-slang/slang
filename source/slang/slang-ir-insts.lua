@@ -1797,6 +1797,15 @@ local insts = {
 				},
 			},
 			{
+				AllowPreTranslationInlining = {
+					-- This decoration indicates the callee should be inlined after translation passes,
+					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 
+					-- for translation.
+					--
+					struct_name = "AllowPreTranslationInliningDecoration",
+				},
+			},
+			{
 				ForceUnroll = {
 					-- A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
 					struct_name = "ForceUnrollDecoration",

@@ -538,12 +538,6 @@ struct IRForwardDerivativeDecoration : IRDecoration
 };
 
 FIDDLE()
-struct IRPrimalSubstituteDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
@@ -4730,6 +4724,11 @@ $(type_info.return_type) $(type_info.method_name)(
             getStringValue(prelude));
     }
 
+    void addAllowPreTranslationInliningDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AllowPreTranslationInliningDecoration);
+    }
+
     void addReturnValueContextFieldDecoration(IRInst* value)
     {
         addDecoration(value, kIROp_ReturnValueContextFieldDecoration);
@@ -4876,11 +4875,6 @@ $(type_info.return_type) $(type_info.method_name)(
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
-    }
-
-    void addPrimalSubstituteDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_PrimalSubstituteDecoration, jvpFn);
     }
 
     void addLoopCounterDecoration(IRInst* value)

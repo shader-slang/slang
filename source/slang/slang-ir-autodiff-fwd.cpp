@@ -759,37 +759,6 @@ struct ForwardDiffTranslationContext
         return nullptr;
     }
 
-    IRInst* tryFindPrimalSubstitute(IRBuilder* builder, IRInst* callee)
-    {
-        if (auto func = as<IRFunc>(callee))
-        {
-            if (auto decor = func->findDecoration<IRPrimalSubstituteDecoration>())
-                return decor->getPrimalSubstituteFunc();
-        }
-        else if (auto specialize = as<IRSpecialize>(callee))
-        {
-            auto innerGen = as<IRGeneric>(specialize->getBase());
-            if (!innerGen)
-                return callee;
-            auto innerFunc = findGenericReturnVal(innerGen);
-            if (auto decor = innerFunc->findDecoration<IRPrimalSubstituteDecoration>())
-            {
-                auto substSpecialize = as<IRSpecialize>(decor->getPrimalSubstituteFunc());
-                SLANG_RELEASE_ASSERT(substSpecialize);
-                SLANG_RELEASE_ASSERT(substSpecialize->getArgCount() == specialize->getArgCount());
-                List<IRInst*> args;
-                for (UInt i = 0; i < specialize->getArgCount(); i++)
-                    args.add(specialize->getArg(i));
-                return builder->emitSpecializeInst(
-                    callee->getFullType(),
-                    substSpecialize->getBase(),
-                    (UInt)args.getCount(),
-                    args.getBuffer());
-            }
-        }
-        return callee;
-    }
-
     static void emitCalleeAnnotationsForHigherOrderDiff(
         IRBuilder* builder,
         DifferentiableTypeConformanceContext* context,
@@ -3073,31 +3042,7 @@ struct ForwardDiffTranslationContext
         }
     }
 
-    IRInst* getActualInstToTranslate(IRInst* inst)
-    {
-        if (auto gen = as<IRGeneric>(inst))
-        {
-            auto retVal = findGenericReturnVal(gen);
-            if (retVal->getOp() != kIROp_Func)
-                return inst;
-            if (auto primalSubst = retVal->findDecoration<IRPrimalSubstituteDecoration>())
-            {
-                auto spec = as<IRSpecialize>(primalSubst->getPrimalSubstituteFunc());
-                SLANG_RELEASE_ASSERT(spec);
-                return spec->getBase();
-            }
-        }
-        else if (auto func = as<IRFunc>(inst))
-        {
-            if (auto primalSubst = func->findDecoration<IRPrimalSubstituteDecoration>())
-            {
-                auto actualFunc = as<IRFunc>(primalSubst->getPrimalSubstituteFunc());
-                SLANG_RELEASE_ASSERT(actualFunc);
-                return actualFunc;
-            }
-        }
-        return inst;
-    }
+    IRInst* getActualInstToTranslate(IRInst* inst) { return inst; }
 
     IRInst* translate(IRBuilder* builder, IRInst* origInst)
     {

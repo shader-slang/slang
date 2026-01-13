@@ -209,7 +209,6 @@ bool isAutoDiffDecoration(IRInst* decor)
     case kIROp_BackwardDerivativePropagateDecoration:
     case kIROp_BackwardDerivativePrimalContextDecoration:
     case kIROp_BackwardDerivativePrimalReturnDecoration:
-    case kIROp_PrimalSubstituteDecoration:
     case kIROp_BackwardDerivativeDecoration:
     case kIROp_UserDefinedBackwardDerivativeDecoration:
     case kIROp_DifferentiableTypeDictionaryDecoration:
@@ -485,7 +484,6 @@ static void cloneExtraDecorationsFromInst(
             break;
         case kIROp_ForwardDerivativeDecoration:
         case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
             if (!context->getShared()->useAutodiff)
                 break;
             [[fallthrough]];

@@ -605,24 +605,6 @@ class SubtypeWitness : public Witness
 };
 
 FIDDLE()
-class UnknownSubtypeWitness : public SubtypeWitness
-{
-    FIDDLE(...)
-    UnknownSubtypeWitness(Type* sub, Type* sup, ModuleDecl* module)
-    {
-        setOperands(sub, sup, module->getDefaultDeclRef());
-    }
-
-    Type* getSub() { return as<Type>(getOperand(0)); }
-    Type* getSup() { return as<Type>(getOperand(1)); }
-    ModuleDecl* getModule() { return as<ModuleDecl>(as<DeclRefBase>(getOperand(2))->getDecl()); }
-
-    void _toTextOverride(StringBuilder& out);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride();
-};
-
-FIDDLE()
 class TypePackSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
