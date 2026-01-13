@@ -1,0 +1,61 @@
+{
+    "parameters": [
+
+    ],
+    "entryPoints": [
+        {
+            "name": "main",
+            "stage": "geometry",
+            "parameters": [
+                {
+                    "name": "outputStream",
+                    "stage": "geometry",
+                    "binding": {"kind": "varyingOutput", "index": 0},
+                    "type": {
+                        "kind": "outputStream",
+                        "elementType": {
+                            "kind": "struct",
+                            "name": "GeometryOutput",
+                            "fields": [
+                                {
+                                    "name": "position",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "semanticName": "SV_POSITION"
+                                },
+                                {
+                                    "name": "color",
+                                    "type": {
+                                        "kind": "vector",
+                                        "elementCount": 4,
+                                        "elementType": {
+                                            "kind": "scalar",
+                                            "scalarType": "float32"
+                                        }
+                                    },
+                                    "stage": "geometry",
+                                    "binding": {"kind": "varyingOutput", "index": 0},
+                                    "semanticName": "COLOR"
+                                }
+                            ]
+                        },
+                        "containerVarLayout": {
+
+                        },
+                        "elementVarLayout": {
+                            "type": {
+                                "kind": "None"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}
