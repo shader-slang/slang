@@ -4220,6 +4220,16 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
         }
+
+        // DescriptorHandle size is target-dependent, so sizeof/alignof cannot be
+        // evaluated at compile-time. Users should use reflection API instead.
+        if (as<DescriptorHandleType>(type))
+        {
+            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfDescriptorHandleNotAllowed);
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
+        }
     }
 
     sizeOfLikeExpr->sizedType = type;

@@ -1032,6 +1032,12 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 DIAGNOSTIC(
+    30100,
+    Error,
+    sizeOfDescriptorHandleNotAllowed,
+    "sizeof/alignof of 'DescriptorHandle' is not allowed because its size is target-dependent; "
+    "use reflection API to query size at runtime")
+DIAGNOSTIC(
     30083,
     Error,
     countOfArgumentIsInvalid,
