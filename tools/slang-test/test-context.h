@@ -172,7 +172,7 @@ public:
     /// specific for that. To do this we could have a 'compileCoreModule' RPC method.
     ///
     /// Current default is 60 seconds.
-    Slang::Int connectionTimeOutInMs = 60 * 1000 * 5;
+    Slang::Int connectionTimeOutInMs = 60 * 1000;
 
     void setThreadIndex(int index);
     void setMaxTestRunnerThreadCount(int count);
