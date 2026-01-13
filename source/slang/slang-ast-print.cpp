@@ -689,7 +689,7 @@ void ASTPrinter::addExpr(Expr* expr)
         if (typeType)
             sb << typeType->getType();
         else
-            sb << as<TypeType>(expr->type);
+            sb << expr->type;
     }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
