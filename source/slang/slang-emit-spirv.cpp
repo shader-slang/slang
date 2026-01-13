@@ -1098,13 +1098,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_PtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 if (auto val = as<IRIntLit>(inst))
                     return SpvLiteralBits::from64(uint64_t(val->getValue()));
+                break;
+            }
+        case kIROp_PtrType:
+        case kIROp_UIntPtrType:
+            {
+                if (auto val = as<IRIntLit>(inst))
+                {
+                    if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
+                        return SpvLiteralBits::from64(uint64_t(val->getValue()));
+                    else
+                        return SpvLiteralBits::from32(uint32_t(val->getValue()));
+                }
                 break;
             }
         default:
@@ -1132,12 +1140,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_PtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
+                break;
+            }
+        case kIROp_PtrType:
+        case kIROp_UIntPtrType:
+            {
+                if (getPointerSize(m_targetRequest) == sizeof(uint64_t))
+                    result = emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(val)));
+                else
+                    result = emitOpConstant(inst, type, SpvLiteralBits::from32(uint32_t(val)));
                 break;
             }
         default:
@@ -1656,6 +1669,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     IRInst* m_defaultDebugSource = nullptr;
 
+    // Explicitly set the default debug source (used by entry point to set the main file)
+    void setDefaultDebugSource(IRDebugSource* source)
+    {
+        if (source)
+            m_defaultDebugSource = source;
+    }
+
+    // Create DebugCompilationUnit for the module using the default (main) debug source.
+    // This should be called after all debug sources are processed so we use the correct source.
+    void ensureDebugCompilationUnit(IRModule* irModule)
+    {
+        if (!m_defaultDebugSource)
+            return;
+
+        auto moduleInst = irModule->getModuleInst();
+        if (m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+            return; // Already created
+
+        // Get the SpvInst for the default debug source
+        SpvInst* sourceSpvInst = nullptr;
+        if (!m_mapIRInstToSpvInst.tryGetValue(m_defaultDebugSource, sourceSpvInst))
+            return;
+
+        IRBuilder builder(m_defaultDebugSource);
+        builder.setInsertBefore(m_defaultDebugSource);
+        auto translationUnit = emitOpDebugCompilationUnit(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            moduleInst,
+            m_defaultDebugSource->getFullType(),
+            getNonSemanticDebugInfoExtInst(),
+            emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
+            emitIntConstant(5, builder.getUIntType()),   // DWARF version.
+            sourceSpvInst,
+            emitIntConstant(
+                SpvSourceLanguageSlang,
+                builder.getUIntType())); // Language.
+        registerDebugInst(moduleInst, translationUnit);
+    }
+
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
     {
@@ -1804,7 +1856,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IntType:
         case kIROp_Int64Type:
             {
-                const IntInfo i = getIntTypeInfo(as<IRType>(inst));
+                const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)
                     requireSPIRVCapability(SpvCapabilityInt16);
                 else if (i.width == 64)
@@ -1912,7 +1964,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
                             getSizeAndAlignment(
-                                m_targetProgram->getOptionSet(),
+                                m_targetRequest,
                                 rule,
                                 valueType,
                                 &sizeAndAlignment);
@@ -1920,7 +1972,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         else
                         {
                             getNaturalSizeAndAlignment(
-                                m_targetProgram->getOptionSet(),
+                                m_targetRequest,
                                 valueType,
                                 &sizeAndAlignment);
                         }
@@ -2157,10 +2209,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(
-                            m_targetProgram->getOptionSet(),
-                            elementType,
-                            &sizeAndAlignment);
+                        getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
@@ -2368,28 +2417,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         sliceSpvStr);
                 }
 
-                auto moduleInst = inst->getModule()->getModuleInst();
-                if (!m_defaultDebugSource)
-                    m_defaultDebugSource = debugSource;
                 // Only create DebugCompilationUnit for non-included files
                 auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
-                {
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    auto translationUnit = emitOpDebugCompilationUnit(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        moduleInst,
-                        inst->getFullType(),
-                        getNonSemanticDebugInfoExtInst(),
-                        emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
-                        emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-                        result,
-                        emitIntConstant(
-                            SpvSourceLanguageSlang,
-                            builder.getUIntType())); // Language.
-                    registerDebugInst(moduleInst, translationUnit);
-                }
+                // Prefer setting default debug source to the main file (non-included file)
+                // Fall back to an included file only if no main file has been found yet
+                if (!isIncludedFile || !m_defaultDebugSource)
+                    m_defaultDebugSource = debugSource;
+                // Note: DebugCompilationUnit is created later via ensureDebugCompilationUnit()
+                // after all debug sources are processed, so we use the correct main source file.
                 return result;
             }
         case kIROp_DebugBuildIdentifier:
@@ -3782,7 +3817,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto scalarType = getVectorElementType(atomicInst->getDataType());
             if (isIntegralType(scalarType))
             {
-                auto intInfo = getIntTypeInfo(scalarType);
+                auto intInfo = getIntTypeInfo(m_targetRequest, scalarType);
                 if (intInfo.isSigned)
                     return sop;
                 return uop;
@@ -3986,7 +4021,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;
-        getNaturalSizeAndAlignment(this->m_targetRequest->getOptionSet(), varType, &sizeAlignment);
+        getNaturalSizeAndAlignment(this->m_targetRequest, varType, &sizeAlignment);
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
             requireVariableBufferCapabilityIfNeeded(varType);
@@ -5922,11 +5957,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             else
             {
-                getOffset(
-                    m_targetProgram->getOptionSet(),
-                    IRTypeLayoutRules::get(layoutRuleName),
-                    field,
-                    &offset);
+                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -5952,7 +5983,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_targetRequest,
                     rule,
                     matrixType->getElementType(),
                     &elementSizeAlignment);
@@ -7306,7 +7337,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
                 else
                     getNaturalSizeAndAlignment(
-                        m_targetProgram->getOptionSet(),
+                        m_targetRequest,
                         ptrType->getValueType(),
                         &sizeAndAlignment);
 
@@ -7669,8 +7700,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return inner;
         }
 
-        const auto fromInfo = getIntTypeInfo(fromType);
-        const auto toInfo = getIntTypeInfo(toType);
+        const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
+        const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
         if (fromInfo == toInfo)
         {
@@ -7816,7 +7847,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         if (isIntegralType(fromType))
         {
-            const auto fromInfo = getIntTypeInfo(fromType);
+            const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
 
             return fromInfo.isSigned
                        ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
@@ -7892,7 +7923,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         SLANG_ASSERT(isIntegralType(toType));
 
-        const auto toInfo = getIntTypeInfo(toType);
+        const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
         return toInfo.isSigned ? emitOpConvertFToS(parent, inst, toTypeV, inst->getOperand(0))
                                : emitOpConvertFToU(parent, inst, toTypeV, inst->getOperand(0));
@@ -7965,7 +7996,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_targetRequest, elementType);
 
         // NM: technically, using bitfield intrinsics for anything non-32-bit goes against
         // VK specification: VUID-StandaloneSpirv-Base-04781. However, it works on at least
@@ -7990,7 +8021,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_targetRequest, elementType);
 
         if (i.width == 64)
             requireSPIRVCapability(SpvCapabilityInt64);
@@ -8849,20 +8880,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &structSizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
 
             List<SpvInst*> members;
             for (auto field : structType->getFields())
             {
                 IRIntegerValue offset = 0;
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalOffset(m_targetProgram->getOptionSet(), field, &offset);
+                getNaturalOffset(m_targetRequest, field, &offset);
 
                 auto fieldType = field->getFieldType();
-                getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
-                    fieldType,
-                    &sizeAlignment);
+                getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment);
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;
@@ -9016,7 +9044,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         else if (auto basicType = as<IRBasicType>(type))
         {
             IRSizeAndAlignment sizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), basicType, &sizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, basicType, &sizeAlignment);
             int spvEncoding = 0;
             StringBuilder sbName;
             getTypeNameHint(sbName, basicType);
@@ -9151,7 +9179,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_forward_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &structSizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_relaxed_extended_instruction"));
             return emitOpDebugForwardRefsComposite(
@@ -9841,6 +9869,25 @@ SlangResult emitSPIRVFromIR(
         {
             context.ensureInst(inst);
         }
+    }
+    // Explicitly use entry point's source file for DebugCompilationUnit.
+    // This ensures we use the main file (containing the entry point) rather than
+    // an imported module's source, regardless of processing order.
+    for (auto irEntryPoint : irEntryPoints)
+    {
+        if (auto loc = irEntryPoint->findDecoration<IRDebugLocationDecoration>())
+        {
+            context.setDefaultDebugSource(as<IRDebugSource>(loc->getSource()));
+            context.ensureInst(loc->getSource());
+            break; // Use first entry point's source as the main file
+        }
+    }
+    // Create DebugCompilationUnit after all debug sources are processed,
+    // using the entry point's source file as the compilation unit source.
+    context.ensureDebugCompilationUnit(irModule);
+
+    for (auto inst : irModule->getGlobalInsts())
+    {
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
         {
             context.ensureInst(inst);

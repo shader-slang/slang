@@ -8312,14 +8312,12 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
     case BaseType::UInt16:
         return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
     case BaseType::UInt:
-#if SLANG_PTR_IS_32
-    case BaseType::UIntPtr:
-#endif
         return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
     case BaseType::UInt64:
-#if SLANG_PTR_IS_64
+        // IntPtr & UIntPtr are assumed to be 64-bit, because we don't want
+        // spurious warnings from assuming a smaller size than what's possible
+        // at this point during compilation.
     case BaseType::UIntPtr:
-#endif
         return true;
     case BaseType::Int8:
         return value >= std::numeric_limits<int8_t>::min() &&
@@ -8328,15 +8326,10 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
         return value >= std::numeric_limits<int16_t>::min() &&
                value <= std::numeric_limits<int16_t>::max();
     case BaseType::Int:
-#if SLANG_PTR_IS_32
-    case BaseType::IntPtr:
-#endif
         return value >= std::numeric_limits<int32_t>::min() &&
                value <= std::numeric_limits<int32_t>::max();
     case BaseType::Int64:
-#if SLANG_PTR_IS_64
     case BaseType::IntPtr:
-#endif
         return value >= std::numeric_limits<int64_t>::min() &&
                value <= std::numeric_limits<int64_t>::max();
 
@@ -13877,7 +13870,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 
         // The bit width of this member, and the member type width
         const auto thisFieldWidth = bfm->width;
-        const auto thisFieldTypeWidth = getTypeBitSize(b);
+        const auto thisFieldTypeWidth = getMaximumTypeBitSize(b);
         SLANG_ASSERT(thisFieldTypeWidth != 0);
         if (thisFieldWidth > thisFieldTypeWidth)
         {
