@@ -190,9 +190,10 @@ jobs:
 
           Write-Host "Running build_shaders_only.ps1..."
 
-          # Capture output to check for build failures
+          # Capture output to file for failure detection
           # build_shaders_only.ps1 doesn't always return proper exit codes
-          $buildOutput = & .\build_shaders_only.ps1 2>&1 | Tee-Object -Variable output
+          $buildLog = "$env:TEMP/build_output.log"
+          .\build_shaders_only.ps1 2>&1 | Tee-Object -FilePath $buildLog
           $buildExitCode = $LASTEXITCODE
 
           $duration = (Get-Date) - $startTime
@@ -200,7 +201,14 @@ jobs:
           Write-Host "Build duration: $($duration.TotalMinutes.ToString('0.00')) minutes"
 
           # Check for build failures in output (build_shaders_only.ps1 may not return error codes properly)
-          $outputString = $output -join "`n"
+          Write-Host ""
+          Write-Host "Checking build log for errors..."
+          $outputString = Get-Content -Path $buildLog -Raw -ErrorAction SilentlyContinue
+
+          if (-not $outputString) {
+            Write-Host "WARNING: Could not read build log file"
+          }
+
           $hasFailed = $outputString -match "FAILED:|ninja: build stopped|meson.build.*ERROR:"
           $hasError = $outputString -match "error \d+:"
 
@@ -215,6 +223,10 @@ jobs:
             Write-Host "ERROR: Build output contains failure indicators"
             Write-Host "Detected: ninja/meson build failures"
             Write-Host ""
+            # Show last 50 lines of build log for context
+            Write-Host "Last 50 lines of build log:"
+            Get-Content -Path $buildLog -Tail 50 | Write-Host
+            Write-Host ""
             Write-Host "Build failed even though script returned success exit code"
             exit 1
           }
@@ -224,12 +236,19 @@ jobs:
             Write-Host "ERROR: Build output contains compilation errors"
             Write-Host "Shader compilation errors detected in build log"
             Write-Host ""
+            # Show last 50 lines of build log for context
+            Write-Host "Last 50 lines of build log:"
+            Get-Content -Path $buildLog -Tail 50 | Write-Host
+            Write-Host ""
             Write-Host "Review the slangc output above for details"
             exit 1
           }
 
           Write-Host ""
           Write-Host "Build completed successfully"
+
+          # Clean up build log
+          Remove-Item -Path $buildLog -ErrorAction SilentlyContinue
 
       - name: Verify shader compilation
         shell: pwsh
