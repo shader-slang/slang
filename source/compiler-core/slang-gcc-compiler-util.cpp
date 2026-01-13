@@ -561,8 +561,8 @@ static SlangResult _parseGCCFamilyLine(
     switch (options.debugInfoType)
     {
     case DebugInfoType::None:
-        //gcc accepts -g0, but it is effectively the same as not passing -g at all.
-        // No debug info is generated.
+        // gcc accepts -g0, but it is effectively the same as not passing -g at all.
+        //  No debug info is generated.
         cmdLine.addArg("-g0");
         break;
 
