@@ -227,7 +227,7 @@ void inferAnyValueSizeWhereNecessary(
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 (IRType*)implType,
                 &sizeAndAlignment);
 

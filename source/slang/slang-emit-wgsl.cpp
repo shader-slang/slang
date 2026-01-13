@@ -1026,28 +1026,34 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::IntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("i64(");
-                        m_writer->emitInt64(int64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit("i32(");
-                        m_writer->emit(int(litInst->value.intVal));
-                        m_writer->emit(")");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("i64(");
+                            m_writer->emitInt64(int64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit("i32(");
+                            m_writer->emit(int(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
                         break;
                     }
                 case BaseType::UIntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("u64(");
-                        m_writer->emitUInt64(uint64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit("u32(");
-                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
-                        m_writer->emit(")");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("u64(");
+                            m_writer->emitUInt64(uint64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit("u32(");
+                            m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
+                            m_writer->emit(")");
+                        }
                         break;
                     }
                 }

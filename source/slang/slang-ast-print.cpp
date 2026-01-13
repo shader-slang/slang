@@ -683,6 +683,14 @@ void ASTPrinter::addExpr(Expr* expr)
     {
         sb << "__return_val";
     }
+    else if (as<SharedTypeExpr>(expr))
+    {
+        auto typeType = as<TypeType>(expr->type);
+        if (typeType)
+            sb << typeType->getType();
+        else
+            sb << expr->type;
+    }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
         sb << "let ";
