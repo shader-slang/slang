@@ -12971,9 +12971,8 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             // For Standard and Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                (context->debugInfoLevel >= DebugInfoLevel::Standard)
-                    ? source->getContent()
-                    : UnownedStringSlice(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
+                                                                      : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }

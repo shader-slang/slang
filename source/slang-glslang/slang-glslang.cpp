@@ -780,7 +780,7 @@ static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)
     // - Minimal: Line numbers only (basic debug info for stack traces)
     // - Standard: Full debug info including variables and types
     // - Maximal: Everything including source code embedding and no optimization
-    
+
     if (debugLevel >= SLANG_DEBUG_INFO_LEVEL_MINIMAL)
     {
         // Enable basic debug info for all levels (Minimal and above)
