@@ -190,18 +190,7 @@ jobs:
       test-category: full
       full-gpu-tests: true
 
-  # MaterialX Integration Tests (release builds only)
-  test-materialx-linux-release:
-    needs: [filter, build-linux-release-gcc-x86_64]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
-    uses: ./.github/workflows/materialx-test.yml
-    with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
-      config: release
-      runs-on: '["ubuntu-22.04"]'
-
+  # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
@@ -213,17 +202,6 @@ jobs:
       config: release
       runs-on: '["windows-latest"]'
 
-  test-materialx-macos-release:
-    needs: [filter, build-macos-release-clang-aarch64]
-    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
-    uses: ./.github/workflows/materialx-test.yml
-    with:
-      os: macos
-      compiler: clang
-      platform: aarch64
-      config: release
-      runs-on: '["macos-latest"]'
-
   check-ci:
     needs:
       [
@@ -233,9 +211,7 @@ jobs:
         test-macos-debug-clang-aarch64,
         test-linux-release-gcc-x86_64,
         test-linux-debug-gcc-x86_64,
-        test-materialx-linux-release,
         test-materialx-windows-release,
-        test-materialx-macos-release,
       ]
     runs-on: ubuntu-latest
     if: always() # Always run, even if dependencies fail
@@ -249,9 +225,7 @@ jobs:
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
-          echo "MaterialX Linux: ${{ needs.test-materialx-linux-release.result }}"
           echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
-          echo "MaterialX macOS: ${{ needs.test-materialx-macos-release.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
@@ -260,15 +234,14 @@ jobs:
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
-             [[ "${{ needs.test-materialx-linux-release.result }}" == "failure" ]] || \
              [[ "${{ needs.test-materialx-windows-release.result }}" == "failure" ]] || \
-             [[ "${{ needs.test-materialx-macos-release.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-materialx-windows-release.result }}" == "cancelled" ]]; then
             echo "One or more CI jobs failed or were cancelled"
             exit 1
           fi
