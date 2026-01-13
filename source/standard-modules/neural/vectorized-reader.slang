@@ -1,6 +1,6 @@
 implementing neural;
 
-#ifndef UNIT_TEST
+#ifdef UNIT_TEST
 #define VISIBILITY_LEVEL public
 #else
 #define VISIBILITY_LEVEL internal
