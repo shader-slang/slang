@@ -12220,7 +12220,6 @@ T max(T x, T y)
 /// @category math
 __generic<T : IArithmetic>
 [__readNone]
-[OverloadRank(-10)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
@@ -12604,7 +12603,6 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @category math
 __generic<T : IArithmetic>
 [__readNone]
-[OverloadRank(-10)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
