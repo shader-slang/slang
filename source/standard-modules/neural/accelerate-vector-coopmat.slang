@@ -2,7 +2,7 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
-#ifndef UNIT_TEST
+#ifdef UNIT_TEST
 #define VISIBILITY_LEVEL public
 #else
 #define VISIBILITY_LEVEL internal
