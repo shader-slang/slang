@@ -1669,6 +1669,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     IRInst* m_defaultDebugSource = nullptr;
 
+    // Explicitly set the default debug source (used by entry point to set the main file)
+    void setDefaultDebugSource(IRDebugSource* source)
+    {
+        if (source)
+            m_defaultDebugSource = source;
+    }
+
+    // Create DebugCompilationUnit for the module using the default (main) debug source.
+    // This should be called after all debug sources are processed so we use the correct source.
+    void ensureDebugCompilationUnit(IRModule* irModule)
+    {
+        if (!m_defaultDebugSource)
+            return;
+
+        auto moduleInst = irModule->getModuleInst();
+        if (m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
+            return; // Already created
+
+        // Get the SpvInst for the default debug source
+        SpvInst* sourceSpvInst = nullptr;
+        if (!m_mapIRInstToSpvInst.tryGetValue(m_defaultDebugSource, sourceSpvInst))
+            return;
+
+        IRBuilder builder(m_defaultDebugSource);
+        builder.setInsertBefore(m_defaultDebugSource);
+        auto translationUnit = emitOpDebugCompilationUnit(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            moduleInst,
+            m_defaultDebugSource->getFullType(),
+            getNonSemanticDebugInfoExtInst(),
+            emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
+            emitIntConstant(5, builder.getUIntType()),   // DWARF version.
+            sourceSpvInst,
+            emitIntConstant(
+                SpvSourceLanguageSlang,
+                builder.getUIntType())); // Language.
+        registerDebugInst(moduleInst, translationUnit);
+    }
+
     Dictionary<UnownedStringSlice, SpvInst*> m_extensionInsts;
     SpvInst* ensureExtensionDeclaration(UnownedStringSlice name)
     {
@@ -2378,28 +2417,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         sliceSpvStr);
                 }
 
-                auto moduleInst = inst->getModule()->getModuleInst();
-                if (!m_defaultDebugSource)
-                    m_defaultDebugSource = debugSource;
                 // Only create DebugCompilationUnit for non-included files
                 auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
-                {
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    auto translationUnit = emitOpDebugCompilationUnit(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        moduleInst,
-                        inst->getFullType(),
-                        getNonSemanticDebugInfoExtInst(),
-                        emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
-                        emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-                        result,
-                        emitIntConstant(
-                            SpvSourceLanguageSlang,
-                            builder.getUIntType())); // Language.
-                    registerDebugInst(moduleInst, translationUnit);
-                }
+                // Prefer setting default debug source to the main file (non-included file)
+                // Fall back to an included file only if no main file has been found yet
+                if (!isIncludedFile || !m_defaultDebugSource)
+                    m_defaultDebugSource = debugSource;
+                // Note: DebugCompilationUnit is created later via ensureDebugCompilationUnit()
+                // after all debug sources are processed, so we use the correct main source file.
                 return result;
             }
         case kIROp_DebugBuildIdentifier:
@@ -2785,7 +2810,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(
             sampled == ImageOpConstants::sampledImage ||
             sampled == ImageOpConstants::readWriteImage);
-        if (ms == ImageOpConstants::isMultisampled)
+        if (ms == ImageOpConstants::isMultisampled && sampled == ImageOpConstants::readWriteImage)
             requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch (dim)
         {
@@ -5080,6 +5105,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         for (auto globalInst : referencedBuiltinIRVars)
         {
             auto thisMode = getDepthOutputExecutionMode(globalInst);
+            // If this instruction doesn't affect depth output execution modes,
+            // just skip it.
+            if (thisMode == SpvExecutionModeMax)
+                continue;
+
             if (mode == SpvExecutionModeMax)
                 mode = thisMode;
             else if (mode != thisMode)
@@ -9844,6 +9874,25 @@ SlangResult emitSPIRVFromIR(
         {
             context.ensureInst(inst);
         }
+    }
+    // Explicitly use entry point's source file for DebugCompilationUnit.
+    // This ensures we use the main file (containing the entry point) rather than
+    // an imported module's source, regardless of processing order.
+    for (auto irEntryPoint : irEntryPoints)
+    {
+        if (auto loc = irEntryPoint->findDecoration<IRDebugLocationDecoration>())
+        {
+            context.setDefaultDebugSource(as<IRDebugSource>(loc->getSource()));
+            context.ensureInst(loc->getSource());
+            break; // Use first entry point's source as the main file
+        }
+    }
+    // Create DebugCompilationUnit after all debug sources are processed,
+    // using the entry point's source file as the compilation unit source.
+    context.ensureDebugCompilationUnit(irModule);
+
+    for (auto inst : irModule->getGlobalInsts())
+    {
         if (shouldPreserveParams && as<IRGlobalParam>(inst))
         {
             context.ensureInst(inst);
