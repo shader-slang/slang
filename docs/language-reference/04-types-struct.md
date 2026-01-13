@@ -237,12 +237,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
 ## Accessing Members and Nested Types
 
-The static `struct` members and nested types are accessed using either \``.`\` or \``::`\`. Their semantics in
-this context is identical.
+The static and non-static `struct` members and nested types are accessed using \``.`\`.
 
-Non-static object members are accessed using the member of object operator \``.`\`.
-
-> Remark: The recommended operator for all member access is \``.`\`.
+> Remark: The C++-style scope resolution operator \``::`\` is deprecated.
 
 
 **Example:**
