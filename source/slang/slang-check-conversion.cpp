@@ -1111,7 +1111,7 @@ static bool isSigned(Type* t)
     }
 }
 
-int getTypeBitSize(Type* t)
+int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
     if (!basicType)
@@ -1133,11 +1133,7 @@ int getTypeBitSize(Type* t)
         return 64;
     case BaseType::IntPtr:
     case BaseType::UIntPtr:
-#if SLANG_PTR_IS_32
-        return 32;
-#else
         return 64;
-#endif
     default:
         return 0;
     }
@@ -1173,7 +1169,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
         auto knownVal = as<IntegerLiteralExpr>(arg);
         if (!knownVal)
             return candidateCost;
-        if (getIntValueBitSize(knownVal->value) <= getTypeBitSize(toType))
+        if (getIntValueBitSize(knownVal->value) <= getMaximumTypeBitSize(toType))
         {
             bool toTypeIsSigned = isSigned(toType);
             bool fromTypeIsSigned = isSigned(knownVal->type);
@@ -1265,6 +1261,60 @@ bool SemanticsVisitor::_coerce(
         if (outCost)
             *outCost = kConversionCost_None;
         return true;
+    }
+
+    // Fallback: Check if types are structurally identical but differ only in
+    // their subtype witness arguments. This can happen when generic specialization
+    // creates types through different inheritance paths
+    // (e.g., int -> __BuiltinIntegerType -> __BuiltinArithmeticType vs
+    // int -> __BuiltinSignedArithmeticType -> __BuiltinArithmeticType).
+    //
+    // We only apply this fallback for DeclRefType with GenericAppDeclRef where:
+    // 1. The base declarations are the same
+    // 2. All non-witness type arguments are equal
+    //
+    if (auto toDeclRefType = as<DeclRefType>(toType))
+    {
+        if (auto fromDeclRefType = as<DeclRefType>(fromType))
+        {
+            auto toGenApp = as<GenericAppDeclRef>(toDeclRefType->getDeclRefBase());
+            auto fromGenApp = as<GenericAppDeclRef>(fromDeclRefType->getDeclRefBase());
+            if (toGenApp && fromGenApp)
+            {
+                // Check if base declarations are the same
+                if (toGenApp->getBase() == fromGenApp->getBase())
+                {
+                    auto toArgs = toGenApp->getArgs();
+                    auto fromArgs = fromGenApp->getArgs();
+                    if (toArgs.getCount() == fromArgs.getCount())
+                    {
+                        bool allNonWitnessArgsEqual = true;
+                        for (Index i = 0; i < toArgs.getCount(); i++)
+                        {
+                            auto toArg = toArgs[i];
+                            auto fromArg = fromArgs[i];
+                            // Skip witness arguments (SubtypeWitness)
+                            if (as<SubtypeWitness>(toArg) && as<SubtypeWitness>(fromArg))
+                                continue;
+                            // Non-witness arguments must be equal
+                            if (!toArg->equals(fromArg))
+                            {
+                                allNonWitnessArgsEqual = false;
+                                break;
+                            }
+                        }
+                        if (allNonWitnessArgsEqual)
+                        {
+                            if (outToExpr)
+                                *outToExpr = fromExpr;
+                            if (outCost)
+                                *outCost = kConversionCost_None;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Assume string literals are convertible to any string type.

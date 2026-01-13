@@ -72,7 +72,10 @@ inline int getIntValueBitSize(IntegerLiteralValue val)
     return result;
 }
 
-int getTypeBitSize(Type* t);
+// This returns the number of bits that the type could be. The only exceptional
+// cases are IntPtr and UIntPtr, whose sizes are not known during checking, and
+// the maximum supported value of 64 is returned instead.
+int getMaximumTypeBitSize(Type* t);
 
 // A flat representation of basic types (scalars, vectors and matrices)
 // that can be used as lookup key in caches
@@ -2426,6 +2429,11 @@ public:
         // Additional subtype witnesses available to the currentt constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
+
+        // Accumulated conversion cost from type promotions during constraint solving.
+        // This tracks costs when a type parameter is promoted to satisfy an interface
+        // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+        ConversionCost typePromotionCost = kConversionCost_None;
     };
 
     Type* TryJoinVectorAndScalarType(
