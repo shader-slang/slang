@@ -344,8 +344,16 @@ static IRBlock* findFallThroughTarget(
                 worklist.add(loop->getBreakBlock());
             }
             break;
+        case kIROp_Switch:
+            {
+                // For nested switches, follow the break label (where control goes after)
+                // This handles fall-through after a nested switch completes
+                auto nestedSwitch = as<IRSwitch>(terminator);
+                worklist.add(nestedSwitch->getBreakLabel());
+            }
+            break;
         default:
-            // Return, nested switch, etc. - don't follow
+            // Return, throw, target switch, etc. - don't follow
             break;
         }
     }
