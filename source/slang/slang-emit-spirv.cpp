@@ -1680,6 +1680,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // This should be called after all debug sources are processed so we use the correct source.
     void ensureDebugCompilationUnit(IRModule* irModule)
     {
+        auto debugLevel = m_targetProgram->getOptionSet().getDebugInfoLevel();
+        if (debugLevel <= DebugInfoLevel::Minimal)
+            return;
+
         if (!m_defaultDebugSource)
             return;
 
@@ -1913,29 +1917,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         sliceSpvStr);
                 }
 
-                auto moduleInst = inst->getModule()->getModuleInst();
-                if (!m_defaultDebugSource)
-                    m_defaultDebugSource = debugSource;
-
                 // Only create DebugCompilationUnit for non-included files
                 auto isIncludedFile = as<IRBoolLit>(debugSource->getIsIncludedFile())->getValue();
-                if (!m_mapIRInstToSpvDebugInst.containsKey(moduleInst) && !isIncludedFile)
-                {
-                    IRBuilder builder(inst);
-                    builder.setInsertBefore(inst);
-                    auto translationUnit = emitOpDebugCompilationUnit(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        moduleInst,
-                        inst->getFullType(),
-                        getNonSemanticDebugInfoExtInst(),
-                        emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
-                        emitIntConstant(5, builder.getUIntType()),   // DWARF version.
-                        result,
-                        emitIntConstant(
-                            SpvSourceLanguageSlang,
-                            builder.getUIntType())); // Language.
-                    registerDebugInst(moduleInst, translationUnit);
-                }
+                // Prefer setting default debug source to the main file (non-included file)
+                // Fall back to an included file only if no main file has been found yet
+                if (!isIncludedFile || !m_defaultDebugSource)
+                    m_defaultDebugSource = debugSource;
+                // Note: DebugCompilationUnit is created later via ensureDebugCompilationUnit()
+                // after all debug sources are processed, so we use the correct main source file.
+
                 *emittedSpvInst = result;
                 return true;
             }
@@ -10057,11 +10047,10 @@ SlangResult emitSPIRVFromIR(
     // - Minimal (g1): IRDebugSource (without content) and IRDebugLine for line numbers only
     //                 Emits standard SPIR-V debug instructions (OpString, OpLine, OpSource)
     // - Standard (g2): Full NonSemantic debug info including IRDebugVar for local variables
-    // - Maximal (g3): Same as Standard, but with source content embedded in IRDebugSource
+    // - Maximal (g3): Same as Standard
     //
     // In SPIR-V emit, Standard and Maximal are treated identically - both use NonSemantic
-    // debug info extensions. The only difference is whether source content was embedded
-    // during IR generation, which is transparent to the SPIR-V emitter.
+    // debug info extensions.
 
     for (auto inst : irModule->getGlobalInsts())
     {
