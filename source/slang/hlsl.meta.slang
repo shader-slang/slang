@@ -12182,8 +12182,15 @@ T __max_impl(T x, T y)
             else
                 return spirv_asm { result:$$T = OpExtInst glsl450 UMax $x $y };
     case llvm:
-        // the float case is handled in the max() with T: __BuiltinFloatingPointType
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // We can only handle NaN for __BuiltinFloatingPointType,
+            // but not types conforming to IFloat for now
+            // if (isnan(x)) return y;
+            // if (isnan(y)) return x;
+            return x > y ? x : y;
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
@@ -12457,8 +12464,15 @@ T __min_impl(T x, T y)
         else
             return spirv_asm { result:$$T = OpExtInst glsl450 UMin $x $y };
     case llvm:
-        // the float case is handled in the min() with T: __BuiltinFloatingPointType
-        if (__isSignedInt<T>())
+        if (__isFloat<T>())
+        {
+            // We can only handle NaN for __BuiltinFloatingPointType,
+            // but not types conforming to IFloat for now
+            // if (isnan(x)) return y;
+            // if (isnan(y)) return x;
+            return x < y ? x : y;
+        }
+        else if (__isSignedInt<T>())
             __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
         else
             __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
