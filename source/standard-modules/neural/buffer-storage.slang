@@ -50,11 +50,14 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     @param[in] address The address relative to base address.
     @return The value at the specified address.
     */
+
+    [ForceInline]
     public T read(Address address)
     {
         return m_buffer[address + m_baseAddress];
     }
 
+    [ForceInline]
     internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
         where DstType : __BuiltinFloatingPointType
         where DstType.Differential == DstType
@@ -64,6 +67,7 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         return value;
     }
 
+    [ForceInline]
     internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
         where SrcType : __BuiltinFloatingPointType
         where SrcType.Differential == SrcType

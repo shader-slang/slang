@@ -359,6 +359,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static void loadShA<U, Storage>(
         SPtr<uint4> sharedMemory,
@@ -372,6 +373,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         matALoadStore<U, Storage, false>(sharedMemory, tileIndex, weightStorage, weightAddress);
     }
 
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static void storeShA<U, Storage>(
         SPtr<uint4> sharedMemory,
@@ -489,6 +491,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // Load the input vector into shared memory. Each input vector is a column of the matrix B.
     // Since the input vector is loaded from thread local memory, one thread can only load one
     // column of the matrix B.
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static void loadVectorToShB<U, InputArray>(
         SPtr<uint4> sharedMemoryB,
@@ -522,6 +525,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // tile will not contain the all the vectors in a warp. Instead, only partial warp will load the complete vector
     // into the shared memory. Compared to the LoadSharedMemoryFromLocalVector, where it loads partial vectors by every thread
     // in a warp.
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static void loadVectorForOuterProduct<int BatchSize, int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
         SPtr<uint4> sharedMemory,
@@ -711,6 +715,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     [require(spvAtomicFloat16AddEXT)]
     VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
@@ -816,6 +821,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
+    [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
@@ -1059,8 +1065,11 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
 
     public __subscript(int index) -> T
     {
-        get { return data[index]; }
-        set { data[index] = newValue; }
+        [ForceInline]
+        get { return this.data[index]; }
+
+        [ForceInline]
+        set { this.data[index] = newValue; }
     }
 
     private OutputVector linearTransformOnTarget<Storage, OutputVector, TargetEnum Target, bool Bias>(

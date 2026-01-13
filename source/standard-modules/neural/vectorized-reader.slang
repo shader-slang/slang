@@ -17,6 +17,7 @@ interface IArrayAccessor<T> : IRWArray<T>
 
 internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
 {
+    [ForceInline]
     override internal void atomicAdd(int index, T value)
     {
         __atomic_add(this[index], value);
@@ -88,7 +89,7 @@ internal static void writeOneElement<T, U, BufferType, int NBytes, int BitsShift
         buffer[bufferIdx] = convertedValue;
         break;
     case AccessOp.ACCUMULATE:
-        buffer[bufferIdx] = buffer[bufferIdx] +convertedValue;
+        buffer[bufferIdx] = buffer[bufferIdx] + convertedValue;
         break;
     case AccessOp.ATOMIC_ADD:
         buffer.atomicAdd(bufferIdx, convertedValue);
@@ -133,6 +134,7 @@ internal static void accessUint4Aligned<AccessOp Op, T, U, BufferType>(inout Buf
     }
 }
 
+[ForceInline]
 internal void accessUint4<AccessOp Op, T, U, BufferType, bool IsAligned, int Stride>(BufferType buffer, int baseIndex, int startIndex, inout uint4 value)
     COMMON_TYPE_CONSTRAINTS
 {
