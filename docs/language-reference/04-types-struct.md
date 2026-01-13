@@ -3,11 +3,14 @@
 A `struct` is a type consisting of an ordered sequence of members.
 
 A struct member is declared in the struct body and is one of the following:
-- Data member (*aka.* field); declared as a variable
+- Non-static data member (*aka.* field); declared as a variable
+- Static data member; declared as a variable with the `static` keyword
 - A constructor
 - Member function; declared as a function
 - Nested type; declared as type or type alias
-- A property declaration.
+- A `property` declaration
+- A `__subscript` declaration
+- A function call operator declaration
 
 A data member and a member function can be declared with the `static` keyword.
 
@@ -64,7 +67,7 @@ instantiation.
 
 `const` data members cannot be initialized by the constructor.
 
-Example:
+**Example:**
 ```hlsl
 struct TestClass
 {
@@ -157,13 +160,19 @@ Non-static member functions cannot be accessed without an object.
 ## Properties
 
 A property is a non-static member that provides a data member access interface. Properties of objects are
-accessed similarly to data members: reading a property is directed to the `get()` method of the property and
-writes are directed to the `set()` method, respectively.
+accessed similarly to data members: reading a property is directed to the `get` method of the property and
+writes are directed to the `set` method, respectively.
 
-A property that only provides the `get()` method is a read-only property. A property that only provides the
-`set()` method is a write-only property. A property that provides both is a read/write property.
+A property that only provides the `get` method is a read-only property. A property that only provides the
+`set` method is a write-only property. A property that provides both is a read/write property.
 
-Example:
+The parentheses in the `get` method declaration are optional.
+
+The parentheses and the parameter in the `set` method declaration are optional. In case the parameter is not
+specified in the declaration, a parameter `newValue` with the same type as the property is provided to the
+`set` body.
+
+**Example:**
 ```hlsl
 struct TestClass
 {
@@ -174,13 +183,15 @@ struct TestClass
 
     property someProp : float
     {
-        get() {
+        get
+        {
             return m_val;
         }
 
-        set(float newVal) {
-            m_val = newVal;
-            m_valIsPositive = (newVal > 0.0f);
+        set
+        {
+            m_val = newValue;
+            m_valIsPositive = (newValue > 0.0f);
         }
     }
 }
@@ -195,13 +206,34 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-
 > Remark 1: A property can be used to replace a non-`static` data member when additional logic is desired to
 > be added systematically to data member access. This can avoid refactoring call sites.
 
 > Remark 2: A non-static data member can be used to implement an interface property requirement. See
 > [interfaces](04-types-interface.md) for details.
 
+> Remark 3: In the example above, the property could have also been declared as:
+>
+> ```hlsl
+> struct TestClass
+> {
+>     // ...
+>
+>     property someProp : float
+>     {
+>         get()
+>         {
+>             return m_val;
+>         }
+>
+>         set(float newVal)
+>         {
+>             m_val = newVal;
+>             m_valIsPositive = (newVal > 0.0f);
+>         }
+>     }
+> }
+> ```
 
 ## Accessing Members and Nested Types
 
@@ -213,7 +245,7 @@ Non-static object members are accessed using the member of object operator \``.`
 > Remark: The recommended operator for all member access is \``.`\`.
 
 
-### Example:
+**Example:**
 
 ```hlsl
 // struct type declaration
@@ -295,6 +327,112 @@ int tmp3 = TestStruct.getB();
 // but '.' is recommended.
 int tmp4 = TestStruct::incrementAndReturnB();
 ```
+
+## Subscript operator
+
+A subscript `[]` operator can be added in a struct using a `__subscript` declaration. It is conceptually
+similar to a `property` with the main differences being that it operates on the instance of a `struct`
+(instead of a member) and it accepts parameters.
+
+A subscript declaration may have any number of parameters, including no parameters at all.
+
+The `get` method of a `__subscript` declaration is invoked when the subscript operator is applied to an object
+to return a value. The parentheses in the `get` method declaration are optional.
+
+The `set` method of a `__subscript` declaration is invoked when the subscript operator is applied to an object
+to assign a value. The parentheses and the parameter in the `set` method declaration are optional. In case the
+parameter is not specified in the declaration, a parameter `newValue` with the same type as specified for the
+subscript operator is provided to the `set` body.
+
+Multiple `__subscript` declarations are allowed as long as the declarations have different
+signatures. Overload resolution is the same as overload resolution with function invocations.
+
+**Example:**
+
+```hlsl
+RWStructuredBuffer<float> outputBuffer;
+
+struct TestStruct
+{
+    var arr : float[10][10];
+
+    // declare a 0-parameter subscript operator
+    __subscript () -> float
+    {
+        get { return arr[0][0]; }
+        set { arr[0][0] = newValue; }
+    }
+
+    // declare a 1-parameter subscript operator
+    __subscript (int i) -> float
+    {
+        get { return arr[0][i]; }
+        set { arr[0][i] = newValue; }
+    }
+
+    // declare a 2-paramater subscript operator
+    __subscript (int i0, int i1) -> float
+    {
+        get { return arr[i1][i0]; }
+        set { arr[i1][i0] = newValue; }
+    }
+}
+
+void main(uint3 id : SV_DispatchThreadID)
+{
+    TestStruct x = { };
+
+    x[] = id.z;
+    x[id.y] = id.z;
+    x[id.x, id.y] = id.z;
+
+    outputBuffer[id.x] = x[];
+    outputBuffer[id.y] = x[id.x];
+    outputBuffer[id.z] = x[id.x, id.y];
+}
+```
+
+## Function call operator
+
+A function call `()` operator can be added using an `operator ()` declaration. This allows applying parameters
+to an object as if the object was a function.
+
+Multiple declarations are allowed as long as the declarations have different signatures. Overload resolution
+is the same as overload resolution with function invocations.
+
+**Example:**
+
+```hlsl
+struct TestStruct : IFunc
+{
+    float base;
+
+    float operator () ()
+    {
+        return base;
+    }
+
+    float operator () (uint x)
+    {
+        return base * float(x);
+    }
+
+    float operator () (uint x, uint y)
+    {
+        return base * float(x) * float(y);
+    }
+}
+
+void main(uint3 id : SV_DispatchThreadID)
+{
+    TestStruct obj = { 42.0f };
+
+    outputBuffer[0] += obj();
+    outputBuffer[0] += obj(id.y);
+    outputBuffer[0] += obj(id.z, id.z * 2);
+}
+```
+
 
 # Memory Layout
 

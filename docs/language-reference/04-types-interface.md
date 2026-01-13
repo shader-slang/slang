@@ -6,17 +6,19 @@ methods defined by the interface.
 
 An interface consists of:
 
-- Any number of member function prototypes, including constructors. A concrete type inheriting from the
-  interface must provide compatible member function implementations with the same names.
+- Any number of member function prototypes, constructors, or function call operator declarations. A concrete
+  type inheriting from the interface must provide compatible member function implementations with the same
+  names.
 - Any number of member functions with the implementation body, which are added to the inheriting type (either
   a concrete `struct` or another `interface`). Constructors are not allowed.
   - Inheriting types may override member functions by using the `override` keyword with a compatible member
     function declaration.
-- Any number of property declarations. Interface may declare either `get()` or `set()` or both methods without
-  the implementation body. A concrete type inheriting from the interface must provide implementations for
-  the properties. A property may be implemented by:
-  - Implementing compatible `get()` and `set()` methods as required by the interface.; OR
-  - Providing a compatible variable with a matching name.
+- Any number of property or `__subscript` declarations. Interface may declare either `get` or `set` or
+  both methods without the implementation body. A concrete type inheriting from the interface must provide
+  implementations for the properties and `__subscript` declarations.
+  - A property or a `__subscript` declaration may be implemented with compatible `get` and `set` methods
+    as required by the interface.
+  - Alternatively, a property may be implemented by declaring a compatible variable with a matching name.
 - Any number of associated named types, which a concrete inheriting type must provide. An associated named
   type may be provided by:
   - Declaring a nested `struct` with the same name. OR
@@ -44,8 +46,8 @@ visibility is the visibility of the `interface`. See [access control (TODO)](TOD
 When a struct implements an interface member requirement, the visibility of the member may not be higher than
 the requirement. However, it can be lower.
 
+**Example:**
 
-Example:
 ```hlsl
 interface IReq
 {
@@ -62,8 +64,8 @@ interface ITest
     // Property requirement
     property testProp : float
     {
-        get(); // must be readable
-        set(); // must be writable
+        get; // must be readable
+        set; // must be writable
     }
 
     // Constructor requirement
@@ -78,6 +80,12 @@ interface ITest
     {
         return testProp + float(a);
     }
+
+    // Function call operator requirement
+    float operator () (uint x, uint y);
+
+    // Subscript operator requirement
+    __subscript (uint i0) -> float { get; set; }
 
     // Associated type requirement
     associatedtype AssocType;
@@ -99,6 +107,7 @@ struct TestClass : ITest
     }
 
     float propUnderlyingValue;
+    float arr[10] = { };
 
     // Required constructor
     __init(float f)
@@ -112,7 +121,7 @@ struct TestClass : ITest
     // "float testProp;" could have also be provided.
     property testProp : float
     {
-        get()
+        get
         {
             return propUnderlyingValue - 1.0f;
         }
@@ -131,6 +140,26 @@ struct TestClass : ITest
     float someMethod(int64_t a)
     {
         return float(a) * propUnderlyingValue;
+    }
+
+    // Required function call operator
+    float operator () (uint x, uint y)
+    {
+        return float(x * y);
+    }
+
+    // Required subscript operator
+    __subscript (uint i0) -> float
+    {
+        get
+        {
+            return arr[i0];
+        }
+
+        set
+        {
+            arr[i0] = newValue;
+        }
     }
 
     // Required associated type provided by using a

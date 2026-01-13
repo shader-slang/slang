@@ -1,7 +1,9 @@
 # Type Extension
 
 An existing `struct` type or a set of `struct` types can be extended with one or more `extension`
-declarations. An `extension` is used to append data members and member functions to an existing type.
+declarations. An `extension` may be used to add static data members, member functions, constructors,
+properties, subscript operators, and function call operators to an existing type. An `extension` may not
+change the data layout of a `struct`, that is, it cannot be used to append non-static data members.
 
 > Remark. An interface type itself cannot be extended. This would add new requirements to all conforming types
 > in which case all the conforming types would require matching extensions.
