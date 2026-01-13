@@ -2810,7 +2810,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(
             sampled == ImageOpConstants::sampledImage ||
             sampled == ImageOpConstants::readWriteImage);
-        if (ms == ImageOpConstants::isMultisampled)
+        if (ms == ImageOpConstants::isMultisampled && sampled == ImageOpConstants::readWriteImage)
             requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch (dim)
         {
