@@ -46,6 +46,18 @@ vec<T,A> _slang_vectorReshape(vec<T,N> v)
 }
 )";
 
+static const char* kMetalBuiltinPreludeMatrixFmod = R"(
+template<typename T, int A, int B>
+matrix<T,A,B> _slang_matrixFmod(matrix<T,A,B> m1, matrix<T,A,B> m2)
+{
+    matrix<T,A,B> result;
+    for (int i = 0; i < A; i++)
+        result[i] = fmod(m1[i], m2[i]);
+    return result;
+}
+)";
+
+
 void MetalSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
     IRFunc* entryPoint,
@@ -769,7 +781,16 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
         }
     case kIROp_FRem:
         {
-            m_writer->emit("fmod(");
+            if (as<IRMatrixType>(inst->getOperand(0)->getDataType()) &&
+                as<IRMatrixType>(inst->getOperand(1)->getDataType()))
+            {
+                ensurePrelude(kMetalBuiltinPreludeMatrixFmod);
+                m_writer->emit("_slang_matrixFmod(");
+            }
+            else
+            {
+                m_writer->emit("fmod(");
+            }
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(1), getInfo(EmitOp::General));

@@ -16,6 +16,7 @@ namespace Slang
 struct SharedSCCPContext
 {
     IRModule* module;
+    TargetProgram* targetProgram;
     DiagnosticSink* sink;
 };
 //
@@ -702,8 +703,8 @@ struct SCCPContext
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
@@ -719,8 +720,8 @@ struct SCCPContext
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
@@ -808,19 +809,24 @@ struct SCCPContext
         {
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             resultVal = getBuilder()->getIntValue(type, sourceValueBits);
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
-#if SLANG_PTR_IS_32
+            resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            break;
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-#endif
-            resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            // If running without targetProgram, we can't propagate
+            // pointer-sized types because we don't know what the pointer size
+            // is.
+            if (shared->targetProgram)
+            {
+                if (getPointerSize(shared->targetProgram->getTargetReq()) == sizeof(uint64_t))
+                    resultVal = getBuilder()->getIntValue(type, sourceValueBits);
+                else
+                    resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            }
             break;
         case kIROp_FloatType:
             {
@@ -1800,13 +1806,17 @@ static bool applySparseConditionalConstantPropagationRec(
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRModule* module, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
 
     // First we fold constants at global scope.
@@ -1821,13 +1831,17 @@ bool applySparseConditionalConstantPropagation(IRModule* module, DiagnosticSink*
     return changed;
 }
 
-bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagationForGlobalScope(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
     SCCPContext globalContext;
     globalContext.shared = &shared;
@@ -1836,13 +1850,17 @@ bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, D
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRInst* func,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = func->getModule();
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
 
     SCCPContext globalContext;
@@ -1853,10 +1871,11 @@ bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sin
     return applySparseConditionalConstantPropagationRec(globalContext, func);
 }
 
-IRInst* tryConstantFoldInst(IRModule* module, IRInst* inst)
+IRInst* tryConstantFoldInst(IRModule* module, TargetProgram* targetProgram, IRInst* inst)
 {
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     SCCPContext instContext;
     instContext.shared = &shared;
     instContext.code = nullptr;

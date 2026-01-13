@@ -5564,10 +5564,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // If the initializer list was empty, then the user was
         // asking for default initialization, which should apply
-        // to (almost) any type.
+        // to almost any type...
         //
         if (argCount == 0)
         {
+            // ... However, that "almost" does not count interface
+            // types. Interfaces should not be default-initialized to avoid
+            // unspecified behavior, so we'll warn about it here.
+            if (auto declRefType = as<DeclRefType>(type))
+            {
+                if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                {
+                    context->getSink()->diagnose(expr, Diagnostics::interfaceDefaultInitializer);
+                }
+            }
+
             return getDefaultVal(type.type);
         }
 
@@ -13070,7 +13081,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
     bool minimumOptimizations =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
@@ -13139,8 +13150,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |=
-                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= applySparseConditionalConstantPropagation(
+                        func,
+                        nullptr,
+                        compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
@@ -13173,7 +13186,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
-        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, compileRequest->getSink());
 
         if (translationUnit->getModuleDecl()->languageVersion >=
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)

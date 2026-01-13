@@ -18,12 +18,19 @@ on:
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
   # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
-  # CUDA 12.4 is used because the host driver (550.54.15) doesn't support newer PTX versions.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -39,16 +46,8 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1 \
-            python3
-          git config --global --add safe.directory '*'
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
@@ -128,8 +127,16 @@ jobs:
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -145,15 +152,8 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          git config --global --add safe.directory '*'
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
@@ -198,8 +198,16 @@ jobs:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
     if: always() && inputs.config == 'release'
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -215,20 +223,8 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git, Python and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            python3 \
-            python3-pip \
-            curl \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          git config --global --add safe.directory '*'
-          # Create python -> python3 symlink for slangpy-samples tests
-          ln -sf /usr/bin/python3 /usr/bin/python
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
 
@@ -272,6 +268,25 @@ jobs:
           echo "bin_dir location: $bin_dir"
           echo "lib_dir location: $lib_dir"
 
+          #
+          # THIS IS A HUGE HACK, the latest slangpy release hardcoded this
+          # directory when looking for slangc. We should remove the offending
+          # code from slangpy and just put slangc into PATH here. The offending
+          # code is find_slangc() in
+          # slangpy/tests/device/test_precompiled_modules.py
+          #
+          # See https://github.com/shader-slang/slangpy/issues/696
+          #
+          SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
+          mkdir -p "$SLANGC_TARGET_DIR"
+          # Copy slangc binary to the expected location
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
+          else
+              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+              chmod +x "$SLANGC_TARGET_DIR/slangc"
+          fi
+
           # Remove old slang libraries and copy new ones
           echo "Removing old slang libraries..."
           rm -f "$SITE_PACKAGES/slangpy"/libslang*
@@ -281,7 +296,7 @@ jobs:
 
           # Create symlink for the old library version that slangpy extension was linked against
           echo "Creating symlink for slangpy compatibility..."
-          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.21.2"
+          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
