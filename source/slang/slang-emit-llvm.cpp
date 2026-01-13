@@ -160,7 +160,7 @@ class LLVMTypeTranslator
 {
 private:
     ILLVMBuilder* builder;
-    CompilerOptionSet* compilerOptions;
+    TargetRequest* targetReq;
     const Dictionary<IRInst*, LLVMDebugNode*>* instToDebugLLVM;
 
     Dictionary<IRType*, LLVMType*> valueTypeMap;
@@ -170,9 +170,9 @@ private:
 public:
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
-        CompilerOptionSet& compilerOptions,
+        TargetRequest* targetReq,
         const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM)
-        : builder(builder), compilerOptions(&compilerOptions), instToDebugLLVM(&instToDebugLLVM)
+        : builder(builder), targetReq(targetReq), instToDebugLLVM(&instToDebugLLVM)
     {
     }
 
@@ -613,7 +613,7 @@ public:
                 }
             }
         }
-        Slang::getOffset(*compilerOptions, rules, legalField, &offset);
+        Slang::getOffset(targetReq, rules, legalField, &offset);
         return offset;
     }
 
@@ -623,11 +623,7 @@ public:
     {
         IRSizeAndAlignment sizeAlignment;
 
-        Slang::getSizeAndAlignment(
-            *compilerOptions,
-            rules,
-            legalizeResourceTypes(type),
-            &sizeAlignment);
+        Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment);
 
         return sizeAlignment;
     }
@@ -650,11 +646,7 @@ public:
     {
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
-        Slang::getSizeAndAlignment(
-            *compilerOptions,
-            rules,
-            vecType->getElementType(),
-            &elementAlignment);
+        Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment);
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 
@@ -797,13 +789,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV1 = SlangResult (*)(
+        using BuilderFuncV2 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV1)library->findFuncByName("createLLVMBuilder_V1");
+        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
         if (!builderFunc)
             return SLANG_FAIL;
 
@@ -820,10 +812,6 @@ struct LLVMEmitter
         getOptions().writeCommandLineArgs(codeGenContext->getSession(), sb);
         auto params = sb.toString();
 
-        // TODO: Should probably complain here if the target machine's pointer
-        // size doesn't match SLANG_PTR_IS_32 & SLANG_PTR_IS_64. Although, I'd
-        // rather just fix the whole pointer size mechanism in Slang.
-
         LLVMBuilderOptions builderOpt;
         builderOpt.target = asExternal(codeGenContext->getTargetFormat());
         builderOpt.targetTriple = CharSlice();
@@ -839,6 +827,12 @@ struct LLVMEmitter
         builderOpt.fp32DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp32();
         builderOpt.fp64DenormalMode = (SlangFpDenormalMode)getOptions().getDenormalModeFp64();
         builderOpt.fpMode = (SlangFloatingPointMode)getOptions().getFloatingPointMode();
+
+        List<TerminatedCharSlice> llvmArguments;
+        List<String> downstreamArgs = getOptions().getDownstreamArgs("llvm");
+        for (const auto& arg : downstreamArgs)
+            llvmArguments.add(TerminatedCharSlice(arg.getBuffer()));
+        builderOpt.llvmArguments = Slice(llvmArguments.begin(), llvmArguments.getCount());
 
         ComPtr<IArtifact> errorArtifact;
         SLANG_RETURN_ON_FAIL(builderFunc(
@@ -869,7 +863,8 @@ struct LLVMEmitter
         else
             defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
-        types.reset(new LLVMTypeTranslator(builder, getOptions(), instToDebugLLVM));
+        types.reset(
+            new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);
