@@ -337,8 +337,15 @@ static IRBlock* findFallThroughTarget(
                 worklist.add(branch->getTrueBlock());
             }
             break;
+        case kIROp_Loop:
+            {
+                // For loops, follow the break block (where control goes after the loop)
+                auto loop = as<IRLoop>(terminator);
+                worklist.add(loop->getBreakBlock());
+            }
+            break;
         default:
-            // Return, loop, nested switch, etc. - don't follow
+            // Return, nested switch, etc. - don't follow
             break;
         }
     }
