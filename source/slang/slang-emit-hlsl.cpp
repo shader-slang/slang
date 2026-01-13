@@ -1356,21 +1356,21 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
-#if SLANG_PTR_IS_64
+
     case kIROp_IntPtrType:
-        m_writer->emit("int64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("int64_t");
+        else
+            m_writer->emit("int");
         return;
+
     case kIROp_UIntPtrType:
-        m_writer->emit("uint64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("uint64_t");
+        else
+            m_writer->emit("uint");
         return;
-#else
-    case kIROp_IntPtrType:
-        m_writer->emit("int");
-        return;
-    case kIROp_UIntPtrType:
-        m_writer->emit("uint");
-        return;
-#endif
+
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -1612,12 +1612,47 @@ void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
     }
 }
 
+// Helper function to determine if an HLSL semantic accepts an index suffix
+static bool doesHLSLSemanticAcceptIndex(UnownedStringSlice semanticName)
+{
+    // Table of system semantics that accept indices
+    static const UnownedStringSlice kIndexedSystemSemantics[] = {
+        toSlice("SV_Target"),
+        toSlice("SV_ClipDistance"),
+        toSlice("SV_CullDistance"),
+    };
+
+    // User semantics (non-SV_*) always accept indices
+    if (!semanticName.startsWithCaseInsensitive(toSlice("SV_")))
+    {
+        return true;
+    }
+
+    // Check if this system semantic is in the indexed list
+    for (const auto& indexedSemantic : kIndexedSystemSemantics)
+    {
+        if (semanticName.caseInsensitiveEquals(indexedSemantic))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
         m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
+        auto semanticName = semanticDecoration->getSemanticName();
+        m_writer->emit(semanticName);
+
+        // Only emit semantic index for semantics that accept them
+        if (doesHLSLSemanticAcceptIndex(semanticName))
+        {
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+        }
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
