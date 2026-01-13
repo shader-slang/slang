@@ -2810,7 +2810,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(
             sampled == ImageOpConstants::sampledImage ||
             sampled == ImageOpConstants::readWriteImage);
-        if (ms == ImageOpConstants::isMultisampled)
+        if (ms == ImageOpConstants::isMultisampled && sampled == ImageOpConstants::readWriteImage)
             requireSPIRVCapability(SpvCapabilityStorageImageMultisample);
         switch (dim)
         {
@@ -5105,6 +5105,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         for (auto globalInst : referencedBuiltinIRVars)
         {
             auto thisMode = getDepthOutputExecutionMode(globalInst);
+            // If this instruction doesn't affect depth output execution modes,
+            // just skip it.
+            if (thisMode == SpvExecutionModeMax)
+                continue;
+
             if (mode == SpvExecutionModeMax)
                 mode = thisMode;
             else if (mode != thisMode)
