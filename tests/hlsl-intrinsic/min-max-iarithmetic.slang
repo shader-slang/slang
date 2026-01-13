@@ -3,6 +3,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-mtl -compute -shaderobj
 
 // Test that min/max can be used with IArithmetic constraint (issue #9395)
 // This verifies that generic code can use min/max for both integer and float types.
