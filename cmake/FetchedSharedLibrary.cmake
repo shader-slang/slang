@@ -55,7 +55,7 @@ function(download_and_extract archive_name url)
             endif()
         endif()
 
-        file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir})
+        file(ARCHIVE_EXTRACT INPUT ${archive_path} DESTINATION ${extract_dir} TOUCH)
         message(STATUS "${archive_name} extracted to ${extract_dir}")
     endif()
 
