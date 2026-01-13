@@ -279,13 +279,9 @@ jobs:
           #
           SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
           mkdir -p "$SLANGC_TARGET_DIR"
-          # Copy slangc binary to the expected location
-          if [[ "${{ inputs.os }}" == "windows" ]]; then
-              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
-          else
-              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
-              chmod +x "$SLANGC_TARGET_DIR/slangc"
-          fi
+          # Copy slangc binary to the expected location (Linux only in container)
+          cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+          chmod +x "$SLANGC_TARGET_DIR/slangc"
 
           # Remove old slang libraries and copy new ones
           echo "Removing old slang libraries..."
@@ -294,9 +290,16 @@ jobs:
           echo "Copying new slang libraries..."
           cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
-          # Create symlink for the old library version that slangpy extension was linked against
+          # Create symlink for the library version that slangpy extension was linked against
           echo "Creating symlink for slangpy compatibility..."
-          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
+          # Find what version slangpy's _slangpy.so is linked against
+          LINKED_LIB=$(ldd "$SITE_PACKAGES/slangpy/_slangpy"*.so 2>/dev/null | grep libslang-compiler | awk '{print $1}' || echo "")
+          if [ -n "$LINKED_LIB" ] && [ "$LINKED_LIB" != "libslang-compiler.so" ]; then
+            echo "Creating symlink: libslang-compiler.so -> $LINKED_LIB"
+            ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/$LINKED_LIB"
+          else
+            echo "No version-specific symlink needed"
+          fi
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
@@ -337,6 +340,15 @@ jobs:
             echo "Warning: Could not detect slangpy version, cloning main branch"
             git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
           fi
+
+          # THIS IS A HUGE HACK, adding a workaround for NumPy compatibility.
+          # Real fix is to allow pickle loading for NumPy compatibility in slangpy-samples.
+          #
+          # Patch test_examples.py to allow pickle loading for NumPy compatibility
+          # and reference .npz files contain pickled data
+          echo "Patching test_examples.py for NumPy pickle compatibility..."
+          sed -i 's/numpy\.load(expected_data_path)/numpy.load(expected_data_path, allow_pickle=True)/g' \
+            slangpy-samples/tests/examples/test_examples.py
 
       - name: Install slangpy-samples dependencies
         run: |
