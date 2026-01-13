@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main
 
-// CHECK: error 38028
+// CHECK: error 40015
 
 [shader("vertex")]
 void main(
