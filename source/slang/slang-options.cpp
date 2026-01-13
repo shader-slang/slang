@@ -528,6 +528,10 @@ void initCommandOptions(CommandOptions& options)
          nullptr,
          "Reports information about checkpoint contexts used for reverse-mode automatic "
          "differentiation."},
+        {OptionKind::ReportDynamicDispatchSites,
+         "-report-dynamic-dispatch-sites",
+         nullptr,
+         "Reports information about dynamic dispatch sites for interface calls."},
         {OptionKind::SkipSPIRVValidation,
          "-skip-spirv-validation",
          nullptr,
@@ -983,6 +987,10 @@ void initCommandOptions(CommandOptions& options)
          "-experimental-feature",
          nullptr,
          "Enable experimental features (loading builtin neural module)"},
+        {OptionKind::EnableRichDiagnostics,
+         "-enable-experimental-rich-diagnostics",
+         nullptr,
+         "Enable experimental rich diagnostics with enhanced formatting and details"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2302,6 +2310,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ReportDownstreamTime:
         case OptionKind::ReportPerfBenchmark:
         case OptionKind::ReportCheckpointIntermediates:
+        case OptionKind::ReportDynamicDispatchSites:
         case OptionKind::SkipSPIRVValidation:
         case OptionKind::DisableSpecialization:
         case OptionKind::DisableDynamicDispatch:
@@ -2334,6 +2343,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
+        case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
             break;
         case OptionKind::ReportDetailedPerfBenchmark:
@@ -3016,7 +3026,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::Version:
             {
-                m_sink->diagnoseRaw(Severity::Note, m_session->getBuildTagString());
+                StringBuilder versionStr;
+                versionStr << m_session->getBuildTagString() << "\n";
+                m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
                 break;
             }
         case OptionKind::HelpStyle:

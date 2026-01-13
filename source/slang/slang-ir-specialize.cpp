@@ -299,7 +299,7 @@ struct SpecializationContext
             {
                 IRUse* argUse = specializeInst->getArgOperand(ii);
                 auto originalArg = argUse->get();
-                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                IRInst* foldedArg = tryConstantFoldInst(module, targetProgram, originalArg);
                 if (foldedArg == originalArg)
                     continue;
 
@@ -1237,7 +1237,10 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                applySparseConditionalConstantPropagationForGlobalScope(
+                    this->module,
+                    targetProgram,
+                    this->sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1256,7 +1259,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink);
+                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
                 }
             }
 

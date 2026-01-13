@@ -874,6 +874,11 @@ DIAGNOSTIC(
     Error,
     cannotDereferenceType,
     "cannot dereference type '$0', do you mean to use '.'?")
+DIAGNOSTIC(
+    30102,
+    Error,
+    staticRefToThis,
+    "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -1340,7 +1345,11 @@ DIAGNOSTIC(
 
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
-
+DIAGNOSTIC(
+    31125,
+    Error,
+    attributeUsageAttributeMustBeOnNonGenericStruct,
+    "[__AttributeUsage] can only be applied to non-generic struct definitions")
 DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 
 DIAGNOSTIC(
@@ -1771,6 +1780,12 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    interfaceDefaultInitializer,
+    "initializing an interface variable with defaults is deprecated and may cause unexpected "
+    "behavior. Please provide a compatible initializer or leave the variable uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(
@@ -2908,6 +2923,17 @@ DIAGNOSTIC(
     Error,
     dynamicDispatchOnPotentiallyUninitializedExistential,
     "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
+DIAGNOSTIC(
+    50102,
+    Note,
+    dynamicDispatchCodeGeneratedHere,
+    "generated dynamic dispatch code for this site. $0 possible types: '$1'")
+DIAGNOSTIC(
+    50103,
+    Note,
+    specializedDynamicDispatchCodeGeneratedHere,
+    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. "
+    "specialization arguments: '$2'.")
 
 DIAGNOSTIC(
     52000,
