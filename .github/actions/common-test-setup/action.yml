@@ -60,10 +60,11 @@ runs:
           # On Windows, DLLs should be in the same directory as executables or in PATH
           # Use $GITHUB_PATH instead of $PATH for preservation across steps and
           # avoid unix-like/windows-like path issues
-          # echo "$bin_dir" >> $GITHUB_PATH
-          # echo "$lib_dir" >> $GITHUB_PATH
-          echo "skipping setting PATH in Windows"
+          :
         fi
+
+        # Make slangc available
+        echo "$bin_dir" >> $GITHUB_PATH
 
         # List directory contents
         echo "Contents of bin_dir ($bin_dir):"

@@ -5,8 +5,9 @@
 namespace Slang
 {
 class DiagnosticSink;
+class TargetProgram;
 
-void legalizeIRForMetal(IRModule* module, DiagnosticSink* sink);
+void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 void specializeAddressSpaceForMetal(IRModule* module);
 
 } // namespace Slang
