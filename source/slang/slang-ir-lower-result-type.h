@@ -6,9 +6,10 @@
 namespace Slang
 {
 struct IRModule;
+class TargetProgram;
 class DiagnosticSink;
 
 /// Lower `IRResultType<T,E>` types to ordinary `struct`s.
-void lowerResultType(IRModule* module, DiagnosticSink* sink);
+void lowerResultType(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang
