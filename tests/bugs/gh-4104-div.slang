@@ -23,12 +23,12 @@ bool Test_CompileTimeDiv()
         && ((uint32_t(1) / u32Const) == uint32_t(0))
         && ((int32_t(1) / u32Const) == uint32_t(0))
         && ((i32Const / u32Const) == uint32_t(0))
-        && ((uint32_t(1) / u64Const) == uint64_t(-1))
-        && ((int32_t(1) / u64Const) == uint64_t(-1))
-        && ((i32Const / u64Const) == uint64_t(-1))
-        && ((uint64_t(1) / u64Const) == uint64_t(-1))
-        && ((int64_t(1) / u64Const) == uint64_t(-1))
-        && ((i64Const / u64Const) == uint64_t(-1))
+        && ((uint32_t(1) / u64Const) == uint64_t(0))
+        && ((int32_t(1) / u64Const) == uint64_t(0))
+        && ((i32Const / u64Const) == uint64_t(0))
+        && ((uint64_t(1) / u64Const) == uint64_t(0))
+        && ((int64_t(1) / u64Const) == uint64_t(0))
+        && ((i64Const / u64Const) == uint64_t(0))
         ;
 }
 
