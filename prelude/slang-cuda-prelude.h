@@ -2315,7 +2315,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbitlow(uint64_t v)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbithigh(uint64_t v)
 {
     if (v == 0)
-        return ~0u;
+        return ~0ull;
     return 63 - __clzll(v);
 }
 
