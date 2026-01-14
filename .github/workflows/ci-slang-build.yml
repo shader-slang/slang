@@ -224,6 +224,13 @@ jobs:
             exit 1
           fi
 
+      - name: Save ccache (macOS)
+        if: ${{ inputs.os == 'macos' && always() && steps.cache-ccache-macos.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: ${{ steps.cache-ccache-macos.outputs.cache-primary-key }}
+
       - uses: actions/upload-artifact@v4
         with:
           name: slang-build-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}

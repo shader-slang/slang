@@ -172,3 +172,49 @@ runs:
         # Get the full path to ccache executable
         ccache_path=$(which ccache)
         echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
+
+      # Setup ccache for macOS using GitHub Actions cache
+    - name: Install ccache (macOS)
+      if: ${{ inputs.os == 'macos' }}
+      shell: bash
+      run: |
+        if ! command -v ccache &> /dev/null; then
+          echo "Installing ccache via Homebrew..."
+          brew install ccache
+        fi
+        echo "✅ ccache installed: $(ccache --version | head -n1)"
+
+    - name: Restore ccache (macOS)
+      if: ${{ inputs.os == 'macos' }}
+      uses: actions/cache/restore@v4
+      id: cache-ccache-macos
+      with:
+        path: ~/.ccache
+        key: ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+        restore-keys: |
+          ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+          ccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
+
+    - name: Configure ccache (macOS)
+      if: ${{ inputs.os == 'macos' }}
+      shell: bash
+      run: |
+        # Set ccache directory
+        export CCACHE_DIR="$HOME/.ccache"
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+
+        # Configure ccache settings
+        ccache --set-config=max_size=5G
+        ccache --set-config=compression=true
+        ccache --set-config=compression_level=6
+        ccache --set-config=sloppiness=pch_defines,time_macros
+        ccache --set-config=cache_dir="$CCACHE_DIR"
+
+        # Get ccache path for CMake launcher
+        ccache_path=$(which ccache)
+        echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
+
+        echo "🔧 ccache configuration:"
+        ccache --show-config | head -20 || true
+        echo "📊 ccache statistics (pre-build):"
+        ccache --show-stats || true
