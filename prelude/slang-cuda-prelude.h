@@ -5956,7 +5956,7 @@ struct WmmaFragment
             int bitOffset = elementOffset * 16;
             uint32_t mask = 0xFFFF;
             uint16_t value16;
-            memcpy(value16, &value, 2);
+            memcpy(&value16, &value, 2);
 
             // Clear the bits at the target position
             regs[regIndex] &= ~(mask << bitOffset);
