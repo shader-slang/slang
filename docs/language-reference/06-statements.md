@@ -109,8 +109,24 @@ A _default label_ consists of the keyword `default` followed by a colon (`:`).
 It is an error for a case label or default label to appear anywhere other than the body of a `switch` statement.
 It is an error for a statement to appear inside the body of a `switch` statement that is no part of a switch case clause.
 
-Each switch case clause must exit the `switch` statement via a `break` or other control transfer statement.
-"Fall-through" from one switch case clause to another is not allowed.
+Switch case clauses may either exit via a `break` or other control transfer statement, or "fall through" to the next case clause by omitting the `break`:
+
+```hlsl
+switch(value)
+{
+case 0:
+    x = 10;
+    // Fall through to case 1
+case 1:
+    result = x + value;
+    break;
+default:
+    result = -1;
+    break;
+}
+```
+
+> **Note:** Some targets (FXC/D3D11 and WGSL) do not support fall-through natively. For these targets, the compiler restructures the code by duplicating the fall-through destination into each source case. This may affect wave/subgroup convergence if the duplicated code contains wave operations. Warning 41026 is emitted when this restructuring occurs.
 
 Loop Statements
 ---------------
