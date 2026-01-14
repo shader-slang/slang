@@ -13722,7 +13722,22 @@ T reversebits<T : __BuiltinIntegerType>(T value)
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$T result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$T result $value};
+        else if (T is int8_t || T is uint8_t || T is int16_t || T is uint16_t)
+        {
+            uint val = __intCast<uint>(value);
+            uint reversed = spirv_asm {OpBitReverse $$uint result $val};
+            return T(reversed >> (32 - sizeof(T) * 8));
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            uint2 halves = __asuint2(val);
+            halves.x = spirv_asm {OpBitReverse $$uint result $halves.x};
+            halves.y = spirv_asm {OpBitReverse $$uint result $halves.y};
+            return T(__asuint64(halves.yx));
+        }
     case wgsl: __intrinsic_asm "reverseBits";
     case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
@@ -13741,7 +13756,9 @@ vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> val
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$vector<T, N> result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$vector<T, N> result $value};
+        else VECTOR_MAP_UNARY(T, N, reversebits, value);
     case wgsl: __intrinsic_asm "reverseBits";
     case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
