@@ -24,7 +24,17 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
     }
 }
 
-internal extension<T, int N> Array<T, N> : IArrayAccessor<T> {}
+internal extension<T, int N> Array<T, N> : IArrayAccessor<T>
+{
+    internal __subscript(int index) -> T
+    {
+        [ForceInline]
+        get { return this[index]; }
+
+        [ForceInline]
+        set { this[index] = newValue; }
+    }
+}
 
 VISIBILITY_LEVEL enum AccessOp : uint32_t
 {
