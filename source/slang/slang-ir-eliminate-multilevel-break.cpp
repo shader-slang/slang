@@ -180,6 +180,10 @@ struct EliminateMultiLevelBreakContext
             // Pop the exit blocks.
             for (auto exitBlock : info.exitBlocks)
                 exitBlocks.remove(exitBlock);
+            
+            // Also pop the continueBlock if it was added
+            if (info.continueBlock)
+                exitBlocks.remove(info.continueBlock);
         }
 
         void gatherInfo(IRGlobalValueWithCode* func)
