@@ -10317,7 +10317,10 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
     {
     case cpp: __intrinsic_asm "$P_firstbithigh($0)";
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
-    case glsl: __intrinsic_asm "findMSB";
+    case glsl:
+        if (T is int64_t || T is uint64_t)
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+        __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
     case metal:
         {
@@ -10427,7 +10430,10 @@ uint firstbitlow<T : __BuiltinIntegerType>(T value)
     {
     case cpp: __intrinsic_asm "$P_firstbitlow($0)";
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
-    case glsl: __intrinsic_asm "findLSB";
+    case glsl:
+        if (T is int64_t || T is uint64_t)
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+        __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
     case metal: return (value == T(0)) ? uint(-1) : __intCast<uint>(__metal_ctz(value));
     case spirv:
