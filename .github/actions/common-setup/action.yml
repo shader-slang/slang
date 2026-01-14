@@ -204,7 +204,7 @@ runs:
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
 
         # Configure ccache settings
-        ccache --set-config=max_size=5G
+        ccache --set-config=max_size=2G
         ccache --set-config=compression=true
         ccache --set-config=compression_level=6
         ccache --set-config=sloppiness=pch_defines,time_macros
