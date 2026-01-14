@@ -166,7 +166,7 @@ jobs:
             ERROR_LOG=$(mktemp)
             if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>"$ERROR_LOG"; then
               # Check if shader was created
-              if find "$CATEGORY_DIR" -name "*.slang" -newer "$GENERATESHADER" 2>/dev/null | grep -q .; then
+              if find "$CATEGORY_DIR" -name "*.slang" -maxdepth 1 -type f 2>/dev/null | grep -q .; then
                 SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
                 echo "  -> OK"
               else
