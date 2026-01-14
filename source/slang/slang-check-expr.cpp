@@ -5594,14 +5594,6 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     baseExpr = derefExpr;
 
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
-    //
-    baseExpr = maybeOpenExistential(baseExpr);
-
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.
     //
@@ -5638,6 +5630,15 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
             overloadedExpr);
         // TODO: handle other cases of OverloadedExpr that need filtering.
     }
+
+    // If the base of the member lookup has an interface type
+    // *without* a suitable this-type substitution, then we are
+    // trying to perform lookup on a value of existential type,
+    // and we should "open" the existential here so that we
+    // can expose its structure.
+    //
+    baseExpr = maybeOpenExistential(baseExpr);
+
 
     return baseExpr;
 }
