@@ -323,7 +323,94 @@ struct SwitchLoweringContext
         }
     }
 
+    /// Collect all blocks reachable from entryBlock that are part of this case's body.
+    /// Stops at nextCaseBlock, breakLabel, or already-visited blocks.
+    static void collectCaseBodyBlocks(
+        IRBlock* entryBlock,
+        IRBlock* nextCaseBlock,
+        IRBlock* breakLabel,
+        HashSet<IRBlock*>& outBlocks)
+    {
+        List<IRBlock*> workList;
+        workList.add(entryBlock);
+
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+
+            if (!block)
+                continue;
+            if (outBlocks.contains(block))
+                continue;
+            if (block == nextCaseBlock)
+                continue;
+            if (block == breakLabel)
+                continue;
+
+            outBlocks.add(block);
+
+            // Add successors
+            auto terminator = block->getTerminator();
+            if (terminator)
+            {
+                for (auto succ : block->getSuccessors())
+                {
+                    workList.add(succ);
+                }
+            }
+        }
+    }
+
+    /// Rewrite a terminator to replace oldTarget with newTarget.
+    static void rewriteBranchTarget(IRInst* terminator, IRBlock* oldTarget, IRBlock* newTarget)
+    {
+        // Modify operands that reference the old target
+        for (UInt i = 0; i < terminator->getOperandCount(); i++)
+        {
+            if (terminator->getOperand(i) == oldTarget)
+            {
+                terminator->setOperand(i, newTarget);
+            }
+        }
+    }
+
+    /// Rewrite branches from the case body that go to nextCaseBlock to instead go to mergeBlock.
+    static void rewriteFallthroughBranches(
+        IRBlock* caseEntryBlock,
+        IRBlock* nextCaseBlock,
+        IRBlock* mergeBlock,
+        IRBlock* breakLabel)
+    {
+        // Collect all blocks in this case's body
+        HashSet<IRBlock*> caseBodyBlocks;
+        collectCaseBodyBlocks(caseEntryBlock, nextCaseBlock, breakLabel, caseBodyBlocks);
+
+        // Rewrite any branches to nextCaseBlock
+        for (auto block : caseBodyBlocks)
+        {
+            auto terminator = block->getTerminator();
+            if (terminator)
+                rewriteBranchTarget(terminator, nextCaseBlock, mergeBlock);
+        }
+    }
+
     /// Perform the transformation.
+    ///
+    /// The key insight for reconvergence: we need ALL threads to pass through ALL
+    /// if-else merge points, regardless of which case they match. This ensures that
+    /// with maximal reconvergence (SPV_KHR_maximal_reconvergence), threads reconverge
+    /// at each merge point before proceeding to the next case check.
+    ///
+    /// Structure after transformation:
+    ///   loopHeader: branch(check0)
+    ///   check0: if(pred0) → case0 else → merge0
+    ///   case0: body; branch(merge0)  // fallthrough rewritten
+    ///   merge0: branch(check1)
+    ///   check1: if(pred1) → case1 else → merge1
+    ///   case1: body; branch(merge1 or breakLabel)
+    ///   merge1: branch(breakLabel)
+    ///
     void transform()
     {
         collectCases();
@@ -349,12 +436,17 @@ struct SwitchLoweringContext
         // The continue block is the header (so continue restarts, but condition is false so we exit).
         builder->emitLoop(loopHeaderBlock, breakLabel, loopHeaderBlock);
 
-        // Now build the if-chain inside the loop header
-        builder->setInsertInto(loopHeaderBlock);
+        // Build the if-chain with merge blocks for proper reconvergence.
+        // Each case gets:
+        //   - A check block with an if-else
+        //   - A merge block that all paths through the case must reach
+        //   - The merge block then chains to the next case's check block
 
-        // Emit if-statements for each case in source order.
-        // Each if-else must have its own unique afterBlock (merge point) to avoid
-        // SPIRV validation errors ("already a merge block for another header").
+        IRBlock* currentCheckBlock = loopHeaderBlock;
+
+        // Track the last block we've inserted so we can insert new blocks after it
+        IRBlock* lastInsertedBlock = loopHeaderBlock;
+
         for (Index i = 0; i < cases.getCount(); i++)
         {
             auto& caseInfo = cases[i];
@@ -362,20 +454,40 @@ struct SwitchLoweringContext
             if (!caseInfo.reachPredicate)
                 continue;
 
-            // Create the next check block - this is where we go if the predicate is false
-            auto nextCheckBlock = builder->createBlock();
-            nextCheckBlock->insertAfter(builder->getBlock());
+            // Create the merge block for this case
+            // This is where all threads reconverge after the if-else
+            auto mergeBlock = builder->createBlock();
+            mergeBlock->insertAfter(lastInsertedBlock);
+            lastInsertedBlock = mergeBlock;
 
-            // Emit: if (reachPredicate) { goto caseBody } else { goto nextCheck }
-            // The afterBlock (merge point) is nextCheckBlock, NOT breakLabel.
-            // This ensures each if-else has a unique merge block.
-            builder->emitIfElse(caseInfo.reachPredicate, caseInfo.label, nextCheckBlock, nextCheckBlock);
+            // Emit if-else in current check block
+            // true branch → case body, false branch → merge, after → merge
+            builder->setInsertInto(currentCheckBlock);
+            builder->emitIfElse(caseInfo.reachPredicate, caseInfo.label, mergeBlock, mergeBlock);
 
-            builder->setInsertInto(nextCheckBlock);
+            // Rewrite fallthrough branches in case body to go to merge instead of next case
+            if (i + 1 < cases.getCount())
+            {
+                rewriteFallthroughBranches(caseInfo.label, cases[i + 1].label, mergeBlock, breakLabel);
+            }
+
+            // Build merge block content: chain to next check or exit
+            builder->setInsertInto(mergeBlock);
+            if (i + 1 < cases.getCount())
+            {
+                // Create next check block and chain to it
+                auto nextCheckBlock = builder->createBlock();
+                nextCheckBlock->insertAfter(lastInsertedBlock);
+                lastInsertedBlock = nextCheckBlock;
+                builder->emitBranch(nextCheckBlock);
+                currentCheckBlock = nextCheckBlock;
+            }
+            else
+            {
+                // Last case: merge goes to break label
+                builder->emitBranch(breakLabel);
+            }
         }
-
-        // After all checks fail, branch to break label (unreachable if all cases covered)
-        builder->emitBranch(breakLabel);
 
         // Remove the original switch instruction
         switchInst->removeAndDeallocate();
