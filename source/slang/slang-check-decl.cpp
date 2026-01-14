@@ -2808,8 +2808,6 @@ static void addAutoDiffModifiersToFunc(
         addModifier(func, m_astBuilder->create<BackwardDifferentiableAttribute>());
         addModifier(func, m_astBuilder->create<ForwardDifferentiableAttribute>());
     }
-    // else
-    //     addModifier(func, m_astBuilder->create<TreatAsDifferentiableAttribute>());
 }
 
 ConstructorDecl* SemanticsDeclVisitorBase::createCtor(
@@ -8180,6 +8178,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
 
     // First we need to make sure the associated `Differential` type requirement is satisfied.
     bool hasDifferentialAssocType = false;
+    bool typeIsSelfDifferential = false;
     for (auto& existingEntry : witnessTable->getRequirementDictionary())
     {
         if (auto builtinReqAttr = existingEntry.key->findModifier<BuiltinRequirementModifier>())
@@ -8187,6 +8186,10 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
             if (builtinReqAttr->kind == BuiltinRequirementKind::DifferentialType &&
                 existingEntry.value.getFlavor() != RequirementWitness::Flavor::none)
             {
+                if (existingEntry.value.getFlavor() == RequirementWitness::Flavor::val)
+                    if (existingEntry.value.m_val == context->conformingType)
+                        typeIsSelfDifferential = true;
+
                 hasDifferentialAssocType = true;
             }
         }
@@ -8236,7 +8239,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     for (auto varMember : context->parentDecl->getDirectMemberDeclsOfType<VarDeclBase>())
     {
         auto derivativeAttr = varMember->findModifier<DerivativeMemberAttribute>();
-        if (!derivativeAttr)
+        if (!derivativeAttr && !typeIsSelfDifferential)
             continue;
 
         ensureDecl(varMember, DeclCheckState::ReadyForReference);
@@ -8249,16 +8252,34 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
         // DerivativeMemberAttribute might not have been checked yet. So we need to make sure
         // they are checked before we use them. `checkDerivativeMemberAttributeReferences`
         // already handles the case that the attribute has already been checked.
-        checkDerivativeMemberAttributeReferences(varMember, derivativeAttr);
+        Name* derivMemberName = nullptr;
+        if (derivativeAttr)
+        {
+            checkDerivativeMemberAttributeReferences(varMember, derivativeAttr);
 
-        // If there is anything wrong in the checking, `checkDerivativeMemberAttributeReferences`
-        // will diagnose an error, and `derivativeAttr->memberDeclRef` will be null. We will skip
-        // the remaining synthesis to avoid crash.
-        if (!derivativeAttr->memberDeclRef)
+            // If there is anything wrong in the checking,
+            // `checkDerivativeMemberAttributeReferences` will diagnose an error, and
+            // `derivativeAttr->memberDeclRef` will be null. We will skip the remaining synthesis to
+            // avoid crash.
+            if (derivativeAttr->memberDeclRef)
+            {
+                // Pull up the derivative member name from the attribute
+                derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
+            }
+        }
+        else if (typeIsSelfDifferential)
+        {
+            derivMemberName = varMember->getName();
+        }
+
+        // Couldn't find a corresponding derivative member, so we'll skip.
+        // If our checking is correct, then this member is not differentiable.
+        //
+        // If the member is differentiable, but we couldn't locate the corresponding
+        // differential member name, then something went wrong in checking.
+        //
+        if (!derivMemberName)
             continue;
-
-        // Pull up the derivative member name from the attribute
-        auto derivMemberName = derivativeAttr->memberDeclRef->declRef.getName();
 
         // Construct reference exprs to the member's corresponding fields in each parameter.
         List<Expr*> paramFields;

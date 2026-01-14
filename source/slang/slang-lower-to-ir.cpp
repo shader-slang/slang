@@ -3573,6 +3573,13 @@ void collectParameterLists(
                         ->resolve();
 
                 FuncType* effectiveFuncType = nullptr;
+
+                // TODO: Pre-compute the translated func-types and put them on the function.
+                //
+                // TODO (alternative): create a new witness type that holds on to the
+                // IDifferentiable conformances for each parameter, the this-type and the return
+                // type.
+                //
                 if (!as<FuncType>(resolvedFuncType))
                 {
                     if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
@@ -10552,10 +10559,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             subBuilder->addBuiltinDecoration(irInterface);
         }
-        if (decl->hasModifier<TreatAsDifferentiableAttribute>())
-        {
-            subBuilder->addDecoration(irInterface, kIROp_TreatAsDifferentiableDecoration);
-        }
 
         subBuilder->setInsertInto(irInterface);
 
@@ -12455,27 +12458,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
                 isInline = true;
             }
-            else if (as<TreatAsDifferentiableAttribute>(modifier))
-            {
-                getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
-            }
             else if (auto intrinsicOp = as<IntrinsicOpModifier>(modifier))
             {
                 auto op = getBuilder()->getIntValue(getBuilder()->getIntType(), intrinsicOp->op);
                 getBuilder()->addDecoration(irFunc, kIROp_IntrinsicOpDecoration, op);
                 isInline = true;
-            }
-            else if (as<ForwardDifferentiableAttribute>(modifier))
-            {
-                getBuilder()->addForwardDifferentiableDecoration(irFunc);
-            }
-            else if (as<BackwardDifferentiableAttribute>(modifier))
-            {
-                getBuilder()->addBackwardDifferentiableDecoration(irFunc);
-            }
-            else if (as<TreatAsDifferentiableAttribute>(modifier))
-            {
-                getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);
             }
             else if (as<PreferCheckpointAttribute>(modifier))
             {

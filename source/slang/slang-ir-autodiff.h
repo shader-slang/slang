@@ -540,8 +540,6 @@ void cloneCheckpointHint(
 
 void stripDerivativeDecorations(IRInst* inst);
 
-bool isBackwardDifferentiableFunc(IRInst* func);
-
 bool canTypeBeStored(IRInst* type);
 
 inline bool isRelevantDifferentialPair(IRType* type)

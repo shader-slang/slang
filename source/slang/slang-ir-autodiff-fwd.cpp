@@ -727,24 +727,6 @@ struct ForwardDiffTranslationContext
         }
     }
 
-    static bool _isDifferentiableFunc(IRInst* func)
-    {
-        func = getResolvedInstForDecorations(func);
-        for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
-        {
-            switch (decor->getOp())
-            {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_ForwardDifferentiableDecoration:
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-                return true;
-            }
-        }
-        return false;
-    }
-
     static IRFuncType* _getCalleeActualFuncType(
         DifferentiableTypeConformanceContext* context,
         IRInst* callee)
@@ -1956,11 +1938,6 @@ struct ForwardDiffTranslationContext
             builder.addNameHintDecoration(diffFunc, newNameSb.getUnownedSlice());
         }
 
-        // Mark the generated derivative function itself as differentiable.
-        builder.addForwardDifferentiableDecoration(diffFunc);
-        if (isBackwardDifferentiableFunc(origFunc))
-            builder.addBackwardDifferentiableDecoration(diffFunc);
-
         // Transfer checkpoint hint decorations
         copyCheckpointHints(&builder, origFunc, diffFunc);
         return diffFunc;
@@ -2134,13 +2111,6 @@ struct ForwardDiffTranslationContext
     // Translate a function definition.
     InstPair translateFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
     {
-        if (primalFunc->findDecoration<IRTreatAsDifferentiableDecoration>())
-        {
-            // Generate a trivial implementation for [TreatAsDifferentiable] functions.
-            generateTrivialFwdDiffFunc(primalFunc, diffFunc);
-            return InstPair(primalFunc, diffFunc);
-        }
-
         IRBuilder builder = *inBuilder;
         builder.setInsertBefore(primalFunc);
 

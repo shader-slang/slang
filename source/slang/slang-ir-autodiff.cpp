@@ -13,19 +13,6 @@
 namespace Slang
 {
 
-bool isBackwardDifferentiableFunc(IRInst* func)
-{
-    for (auto decorations : func->getDecorations())
-    {
-        switch (decorations->getOp())
-        {
-        case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-            return true;
-        }
-    }
-    return false;
-}
 
 IRInst* _lookupWitness(
     IRBuilder* builder,
@@ -449,7 +436,6 @@ IRFunc* DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
         unreachableBlock);
 
     builder.addNameHintDecoration(existentialDAddFunc, UnownedStringSlice("__existential_dadd"));
-    builder.addBackwardDifferentiableDecoration(existentialDAddFunc);
 
     return existentialDAddFunc;
 }
@@ -745,13 +731,7 @@ void stripDerivativeDecorations(IRInst* inst)
         auto next = decor->getNextDecoration();
         switch (decor->getOp())
         {
-        case kIROp_ForwardDerivativeDecoration:
         case kIROp_DerivativeMemberDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_BackwardDerivativeIntermediateTypeDecoration:
-        case kIROp_BackwardDerivativePropagateDecoration:
-        case kIROp_BackwardDerivativePrimalDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
         case kIROp_AutoDiffOriginalValueDecoration:
             decor->removeAndDeallocate();
             break;
@@ -773,7 +753,6 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             auto next = decor->getNextDecoration();
             switch (decor->getOp())
             {
-            case kIROp_ForwardDerivativeDecoration:
             case kIROp_DerivativeMemberDecoration:
             case kIROp_DifferentiableTypeDictionaryDecoration:
             case kIROp_PrimalInstDecoration:
@@ -782,14 +761,9 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_RecomputeBlockDecoration:
             case kIROp_LoopCounterDecoration:
             case kIROp_LoopCounterUpdateDecoration:
-            case kIROp_BackwardDerivativeDecoration:
-            case kIROp_BackwardDerivativeIntermediateTypeDecoration:
-            case kIROp_BackwardDerivativePropagateDecoration:
-            case kIROp_BackwardDerivativePrimalDecoration:
             case kIROp_BackwardDerivativePrimalContextDecoration:
             case kIROp_BackwardDerivativePrimalReturnDecoration:
             case kIROp_AutoDiffOriginalValueDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
             case kIROp_CheckpointIntermediateDecoration:
                 decor->removeAndDeallocate();

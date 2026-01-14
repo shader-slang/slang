@@ -241,6 +241,13 @@ struct DeadCodeEliminationContext
             //
             if (inst->hasUses())
             {
+                traverseUsers<IRAssociatedInstAnnotation>(
+                    inst,
+                    [&](IRAssociatedInstAnnotation* annotation)
+                    {
+                        if (annotation->getTarget() == inst)
+                            annotation->removeAndDeallocate();
+                    });
                 inst->replaceUsesWith(getUnitPoisonVal());
             }
 
@@ -584,16 +591,6 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                 return true;
             case kIROp_ImportDecoration:
                 isImported = true;
-                break;
-            }
-        }
-        for (auto decor : innerInst->getDecorations())
-        {
-            switch (decor->getOp())
-            {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-                shouldKeptAliveIfImported = true;
                 break;
             }
         }

@@ -68,8 +68,6 @@ bool isSimpleDecoration(IROp op)
     case kIROp_HLSLExportDecoration:
     case kIROp_ReadNoneDecoration:
     case kIROp_NoSideEffectDecoration:
-    case kIROp_ForwardDifferentiableDecoration:
-    case kIROp_BackwardDifferentiableDecoration:
     case kIROp_RequiresNVAPIDecoration:
     case kIROp_TriangleAdjInputPrimitiveTypeDecoration:
     case kIROp_TriangleInputPrimitiveTypeDecoration:
@@ -8760,6 +8758,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
 
     case kIROp_FRem:
         return false;
+
+    case kIROp_AssociatedInstAnnotation:
+        if (getOperand(0)->getOp() == kIROp_Poison)
+            return false;
     }
     return true;
 }

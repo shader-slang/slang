@@ -12,33 +12,76 @@ public:
     DiagnosticSink* sink;
     AutoDiffSharedContext sharedContext;
 
-    enum DifferentiableLevel
+    enum DiffCheckingLevel
     {
-        Forward,
-        Backward
+        None = 0,
+        Forward = 1,
+        Backward = 2
     };
-    Dictionary<IRInst*, DifferentiableLevel> differentiableFunctions;
+
+    Dictionary<IRInst*, DiffCheckingLevel> differentiableFunctions;
 
     CheckDifferentiabilityPassContext(IRModule* inModule, DiagnosticSink* inSink)
         : InstPassBase(inModule), sink(inSink), sharedContext(inModule->getModuleInst())
     {
     }
 
-    bool _isFuncMarkedForAutoDiff(IRInst* func)
+    DiffCheckingLevel getCheckingLevelRequirementForFunc(IRGlobalValueWithCode* code)
     {
-        func = getResolvedInstForDecorations(func);
-        if (!func)
-            return false;
-        for (auto decorations : func->getDecorations())
+        DiffCheckingLevel level = DiffCheckingLevel::None;
+
+        auto addToLevel = [&](IRTranslateBase* inst)
         {
-            switch (decorations->getOp())
+            switch (inst->getOp())
             {
-            case kIROp_ForwardDifferentiableDecoration:
-            case kIROp_BackwardDifferentiableDecoration:
-                return true;
+            case kIROp_ForwardDifferentiate:
+                level = std::max(level, DiffCheckingLevel::Forward);
+                break;
+            case kIROp_BackwardDifferentiate:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
+            case kIROp_BackwardDifferentiatePrimal:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
+            case kIROp_BackwardDifferentiatePropagate:
+                level = std::max(level, DiffCheckingLevel::Backward);
+                break;
+            default:
+                break;
+            }
+        };
+
+        if (as<IRModuleInst>(code->getParent()))
+        {
+            traverseUsers(
+                code,
+                [&](IRInst* user)
+                {
+                    if (auto translateInst = as<IRTranslateBase>(user))
+                        addToLevel(translateInst);
+                });
+        }
+        else if (auto block = as<IRBlock>(code->getParent()))
+        {
+            auto generic = as<IRGeneric>(block->getParent());
+            if (generic)
+            {
+                traverseUsers<IRSpecialize>(
+                    generic,
+                    [&](IRSpecialize* specialize)
+                    {
+                        traverseUsers(
+                            specialize,
+                            [&](IRInst* user)
+                            {
+                                if (auto translateInst = as<IRTranslateBase>(user))
+                                    addToLevel(translateInst);
+                            });
+                    });
             }
         }
-        return false;
+
+        return level;
     }
 
     bool shouldTreatCallAsDifferentiable(IRInst* callInst)
@@ -74,7 +117,8 @@ public:
         UInt paramIndex = 0;
         for (auto paramType : calleeFuncType->getParamTypes())
         {
-            if (diffTypeContext.isDifferentiableType(paramType))
+            auto [paramDirectionInfo, paramBaseType] = splitParameterDirectionAndType(paramType);
+            if (diffTypeContext.isDifferentiableType(paramBaseType))
             {
                 auto arg = callInst->getArg(paramIndex);
                 if (!as<IRConstant>(arg))
@@ -96,11 +140,11 @@ public:
     bool isDifferentiableFunc(
         DifferentiableTypeConformanceContext& ctx,
         IRInst* func,
-        DifferentiableLevel level)
+        DiffCheckingLevel level)
     {
         if (ctx.tryGetAssociationOfKind(func, ValAssociationKind::ForwardDerivative))
         {
-            if (level == DifferentiableLevel::Forward)
+            if (level == DiffCheckingLevel::Forward)
                 return true;
         }
 
@@ -179,7 +223,7 @@ public:
                 return isDifferentiableFunc(
                     diffTypeContext,
                     call->getCallee(),
-                    CheckDifferentiabilityPassContext::DifferentiableLevel::Forward);
+                    CheckDifferentiabilityPassContext::DiffCheckingLevel::Forward);
             }
         default:
             return diffTypeContext.isDifferentiableType(inst->getDataType());
@@ -245,8 +289,10 @@ public:
     {
         checkForInvalidHostTypeUsage(funcInst);
 
-        if (!_isFuncMarkedForAutoDiff(funcInst))
+        auto requiredDiffLevel = getCheckingLevelRequirementForFunc(funcInst);
+        if (requiredDiffLevel == DiffCheckingLevel::None)
             return;
+
         if (!funcInst->getFirstBlock())
             return;
 
@@ -268,7 +314,8 @@ public:
         bool isDifferentiableReturnType = false;
         for (auto param : funcInst->getFirstBlock()->getParams())
         {
-            if (diffTypeContext.isDifferentiableType(param->getFullType()))
+            auto [_, paramBaseType] = splitParameterDirectionAndType(param->getDataType());
+            if (diffTypeContext.isDifferentiableType(paramBaseType))
             {
                 produceDiffSet.add(param);
                 carryNonTrivialDiffSet.add(param);
@@ -281,10 +328,6 @@ public:
                 isDifferentiableReturnType = true;
             }
         }
-
-        DifferentiableLevel requiredDiffLevel = DifferentiableLevel::Forward;
-        if (isBackwardDifferentiableFunc(funcInst))
-            requiredDiffLevel = DifferentiableLevel::Backward;
 
         auto isInstProducingDiff = [&](IRInst* inst) -> bool
         {
@@ -474,8 +517,8 @@ public:
                                 inst,
                                 Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction,
                                 getResolvedInstForDecorations(call->getCallee()),
-                                requiredDiffLevel == DifferentiableLevel::Forward ? "forward"
-                                                                                  : "backward");
+                                requiredDiffLevel == DiffCheckingLevel::Forward ? "forward"
+                                                                                : "backward");
                         }
                     }
                 }
@@ -522,7 +565,8 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!diffTypeContext.isDifferentiableType(paramType))
+                        auto [_, paramBaseType] = splitParameterDirectionAndType(paramType);
+                        if (!diffTypeContext.isDifferentiableType(paramBaseType))
                             continue;
                         addToExpectDiffWorkList(arg);
                     }
@@ -592,7 +636,7 @@ public:
                     if (!isDifferentiableFunc(
                             diffTypeContext,
                             callInst->getCallee(),
-                            DifferentiableLevel::Forward))
+                            DiffCheckingLevel::Forward))
                         continue;
                     auto calleeFuncType = as<IRFuncType>(callInst->getCallee()->getFullType());
                     if (!calleeFuncType)
@@ -603,9 +647,15 @@ public:
                     {
                         auto arg = callInst->getArg(a);
                         auto paramType = calleeFuncType->getParamType(a);
-                        if (!diffTypeContext.isDifferentiableType(paramType))
+
+                        auto [paramDirectionInfo, paramBaseType] =
+                            splitParameterDirectionAndType(paramType);
+                        if (!diffTypeContext.isDifferentiableType(paramBaseType))
                             continue;
-                        if (as<IROutParamTypeBase>(paramType))
+
+                        if (paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Out ||
+                            paramDirectionInfo.kind == ParameterDirectionInfo::Kind::BorrowInOut ||
+                            paramDirectionInfo.kind == ParameterDirectionInfo::Kind::Ref)
                         {
                             if (!canAddressHoldDerivative(diffTypeContext, arg))
                             {
@@ -629,17 +679,17 @@ public:
 
         for (auto inst : module->getGlobalInsts())
         {
-            if (isDifferentiableFunc(ctx, inst, DifferentiableLevel::Backward))
+            if (isDifferentiableFunc(ctx, inst, DiffCheckingLevel::Backward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
                     bwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
-                differentiableFunctions.add(inst, DifferentiableLevel::Backward);
+                differentiableFunctions.add(inst, DiffCheckingLevel::Backward);
             }
-            else if (isDifferentiableFunc(ctx, inst, DifferentiableLevel::Forward))
+            else if (isDifferentiableFunc(ctx, inst, DiffCheckingLevel::Forward))
             {
                 if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
                     fwdDifferentiableSymbolNames.add(linkageDecor->getMangledName());
-                differentiableFunctions.add(inst, DifferentiableLevel::Forward);
+                differentiableFunctions.add(inst, DiffCheckingLevel::Forward);
             }
         }
         for (auto inst : module->getGlobalInsts())
@@ -647,9 +697,9 @@ public:
             if (auto linkageDecor = inst->findDecoration<IRLinkageDecoration>())
             {
                 if (bwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
-                    differentiableFunctions[inst] = DifferentiableLevel::Backward;
+                    differentiableFunctions[inst] = DiffCheckingLevel::Backward;
                 else if (fwdDifferentiableSymbolNames.contains(linkageDecor->getMangledName()))
-                    differentiableFunctions.addIfNotExists(inst, DifferentiableLevel::Forward);
+                    differentiableFunctions.addIfNotExists(inst, DiffCheckingLevel::Forward);
             }
         }
 

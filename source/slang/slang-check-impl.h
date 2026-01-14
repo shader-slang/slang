@@ -740,8 +740,6 @@ public:
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
-    // bool isDifferentiableFunc(FunctionDeclBase* func);
-    // bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
     FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(
         FunctionDeclBase* func,
         int recurseLimit);

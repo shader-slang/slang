@@ -4827,49 +4827,14 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_AutoDiffOriginalValueDecoration, originalVal);
     }
 
-    void addForwardDifferentiableDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_ForwardDifferentiableDecoration);
-    }
-
-    void addBackwardDifferentiableDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_BackwardDifferentiableDecoration);
-    }
-
-    void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
-    {
-        addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
-    }
-
-    void addUserDefinedBackwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
-    {
-        addDecoration(value, kIROp_UserDefinedBackwardDerivativeDecoration, fwdFunc);
-    }
-
-    void addBackwardDerivativePrimalDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativePrimalDecoration, jvpFn);
-    }
-
     void addBackwardDerivativePrimalReturnDecoration(IRInst* value, IRInst* retVal)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalReturnDecoration, retVal);
     }
 
-    void addBackwardDerivativePropagateDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativePropagateDecoration, jvpFn);
-    }
-
     void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
     {
         addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
-    }
-
-    void addBackwardDerivativeIntermediateTypeDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativeIntermediateTypeDecoration, jvpFn);
     }
 
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)

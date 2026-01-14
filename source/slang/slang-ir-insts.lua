@@ -2125,7 +2125,7 @@ local insts = {
 				},
 			},
 			{
-				primalSubstFunc = {
+				primalSubstFunc = { -- TODO: remove
 					-- Used by the auto-diff pass to hold a reference to the
 					-- primal substitute function.
 					struct_name = "PrimalSubstituteDecoration",
@@ -2133,20 +2133,20 @@ local insts = {
 				},
 			},
 			{
-				backwardDiffPrimalReference = {
+				backwardDiffPrimalReference = { -- TODO: remove
 					-- Decorations to associate an original function with compiler generated backward derivative functions.
 					struct_name = "BackwardDerivativePrimalDecoration",
 					operands = { { "backwardDerivativePrimalFunc" } },
 				},
 			},
 			{
-				backwardDiffPropagateReference = {
+				backwardDiffPropagateReference = { -- TODO: remove
 					struct_name = "BackwardDerivativePropagateDecoration",
 					operands = { { "backwardDerivativePropagateFunc" } },
 				},
 			},
 			{
-				backwardDiffIntermediateTypeReference = {
+				backwardDiffIntermediateTypeReference = { -- TODO: remove
 					struct_name = "BackwardDerivativeIntermediateTypeDecoration",
 					operands = { { "backwardDerivativeIntermediateType" } },
 				},

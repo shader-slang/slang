@@ -87,7 +87,7 @@ Tuple<float, This.BwdCallable> __synthesized_bwd_calc(float x)
 void computeMain(uint tig : SV_GroupIndex)
 {
     IFoo foo = FooImpl();
-    var resultTuple = foo.zap.apply_for_fwd(1.f);
+    foo.zap.BwdCallable resultTuple = foo.zap.apply_for_fwd(1.f);
     outputBuffer[tig] = resultTuple._0;
     outputBuffer[tig + 1] = resultTuple._1(2.0); // Expect: 4.0
     outputBuffer[tig + 2] = resultTuple._1(1.5); // Expect: 3.0
