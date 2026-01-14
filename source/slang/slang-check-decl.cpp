@@ -9408,7 +9408,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                     if (!hasConflict)
                     {
                         diagnostic = Diagnostics::FunctionRedefinition{
-                            .name = newDecl->getName(),
+                            .name = newDecl->getName()->text,
                             .function_location = newDecl->getNameLoc()};
                     }
                     auto prevDecl = *found;
