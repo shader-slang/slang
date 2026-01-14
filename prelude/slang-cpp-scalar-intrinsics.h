@@ -1073,8 +1073,6 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
 {
-    if ((int32_t)v < 0)
-        v = ~v;
     if (v == 0)
         return ~0u;
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
@@ -1139,6 +1137,8 @@ SLANG_FORCE_INLINE uint32_t I32_firstbitlow(int32_t v)
 
 SLANG_FORCE_INLINE uint32_t I32_firstbithigh(int32_t v)
 {
+    if (v < 0)
+        v = ~v;
     return U32_firstbithigh(uint32_t(v));
 }
 
@@ -1175,6 +1175,49 @@ SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint64_t U64_firstbitlow(uint64_t v)
+{
+    if (v == 0)
+        return ~uint64_t(0);
+
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_ctz returns number of trailing zeros, which is the 0-based index of first set bit
+    return __builtin_ctz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanForward returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanForward64(&index, v) ? index : ~uint64_t(0);
+#else
+    // Generic implementation - find first set bit
+    uint64_t result = 0;
+    while (result < 64 && !(v & (uint64_t(1) << result)))
+        result++;
+    return result;
+#endif
+}
+
+SLANG_FORCE_INLINE uint64_t U64_firstbithigh(uint64_t v)
+{
+    if (v == 0)
+        return ~uint64_t(0);
+
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_clz returns number of leading zeros
+    // firstbithigh should return 0-based bit position of MSB
+    return 63 - __builtin_clz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanReverse returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanReverse64(&index, v) ? index : ~uint64_t(0);
+#else
+    // Generic implementation - find highest set bit
+    int result = 63;
+    while (result >= 0 && !(v & (uint64_t(1) << result)))
+        result--;
+    return result;
+#endif
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE int64_t I64_abs(int64_t f)
@@ -1194,6 +1237,18 @@ SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE uint64_t I64_firstbitlow(int64_t v)
+{
+    return U64_firstbitlow(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE uint64_t I64_firstbithigh(int64_t v)
+{
+    if (v < 0)
+        v = ~v;
+    return U64_firstbithigh(uint64_t(v));
 }
 
 // ----------------------------- UPTR -----------------------------------------
