@@ -10283,6 +10283,22 @@ internal T __llvm_cttz<T : __BuiltinIntegerType>(T value)
     }
 }
 
+internal T __wgsl_firstLeadingBit<T>(T value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "firstLeadingBit";
+    }
+}
+
+internal T __wgsl_firstTrailingBit<T>(T value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "firstTrailingBit";
+    }
+}
+
 /// Find first set bit starting at high bit and working down.
 /// @param value The value to find set bits in.
 /// @return The bit index number of the most significant bit,
@@ -10357,7 +10373,7 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
                 count += 32;
             return count;
         }
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+    case wgsl: return __intCast<uint>(__wgsl_firstLeadingBit(value));
     case llvm:
         {
             if (__isSignedInt<T>() && value < T(0))
@@ -10391,7 +10407,7 @@ vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N>
             };
         }
         else VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+    case wgsl: return vector<uint, N>(__wgsl_firstLeadingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     }
@@ -10445,7 +10461,7 @@ uint firstbitlow<T : __BuiltinIntegerType>(T value)
 
             return count;
         }
-    case wgsl: __intrinsic_asm "firstTrailingBit";
+    case wgsl: return __intCast<uint>(__wgsl_firstTrailingBit(value));
     case llvm: return value == T(0) ? uint(-1) : __intCast<uint>(__llvm_cttz(value));
     }
 }
@@ -10466,7 +10482,7 @@ vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> va
             };
         }
         else VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
-    case wgsl: __intrinsic_asm "firstTrailingBit";
+    case wgsl: return vector<uint, N>(__wgsl_firstTrailingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     }
