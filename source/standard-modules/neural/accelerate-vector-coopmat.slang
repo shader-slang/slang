@@ -613,6 +613,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     }
 
     // Sum reduce of the dOut
+    [ForceInline]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
     VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(

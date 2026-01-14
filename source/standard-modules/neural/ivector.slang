@@ -83,7 +83,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T>;
+            where OutputVector : IVector<T>;
 
     /**
     Evaluates a linear transformation: output = W * this + bias.

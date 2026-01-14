@@ -80,6 +80,7 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     @param[in] address The address relative to base address.
     @param[in] value The value to add.
     */
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(Address address, T value)
     {
@@ -120,6 +121,7 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     @param[in] address The address relative to base address.
     @param[in] value The value to write.
     */
+    [ForceInline]
     public void write(Address address, T value)
     {
         m_buffer[address + m_baseAddress] = value;
