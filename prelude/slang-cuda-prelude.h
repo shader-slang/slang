@@ -2224,6 +2224,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
     return 31 - __clz(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_reversebits(uint32_t v)
+{
+    return __brev(v);
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 // Unary
@@ -2274,6 +2279,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
     return U32_firstbithigh(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_reversebits(int32_t v)
+{
+    return int32_t(U32_reversebits(uint32_t(v)));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2295,6 +2305,25 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbitlow(uint64_t v)
+{
+    // __ffs returns 1-based bit position or 0 if no bits set
+    // firstbitlow should return 0-based bit position or ~0u if no bits set
+    return v == 0 ? ~0ull : (__ffsll(v) - 1ull);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbithigh(uint64_t v)
+{
+    if (v == 0)
+        return ~0u;
+    return 63 - __clzll(v);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_reversebits(uint64_t v)
+{
+    return __brevll(v);
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
@@ -2314,6 +2343,23 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t I64_firstbitlow(int64_t v)
+{
+    return U64_firstbitlow(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t I64_firstbithigh(int64_t v)
+{
+    if (v < 0)
+        v = ~v;
+    return U64_firstbithigh(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_reversebits(int64_t v)
+{
+    return int64_t(U64_reversebits(uint64_t(v)));
 }
 
 // ----------------------------- IPTR -----------------------------------------
