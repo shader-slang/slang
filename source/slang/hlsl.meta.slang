@@ -10295,7 +10295,7 @@ internal T __llvm_cttz<T : __BuiltinIntegerType>(T value)
 /// @category bitops Bit operation functions
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-T firstbithigh<T : __BuiltinIntegerType>(T value)
+uint firstbithigh<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -10308,35 +10308,35 @@ T firstbithigh<T : __BuiltinIntegerType>(T value)
             if (__isSignedInt<T>() && value < T(0))
                 value = ~value;
             if (value == T(0))
-                return T(-1);
-            return T(sizeof(T)*8-1) - __metal_clz(value);
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__metal_clz(value));
         }
     case spirv:
         if (T is int)
         {
             return spirv_asm {
-                OpExtInst $$T result glsl450 FindSMsb $value
+                OpExtInst $$uint result glsl450 FindSMsb $value
             };
         }
         else if (T is uint)
         {
             return spirv_asm {
-                OpExtInst $$T result glsl450 FindUMsb $value
+                OpExtInst $$uint result glsl450 FindUMsb $value
             };
         }
         else if (T is int8_t || T is int16_t)
         {
             int value32 = __intCast<int>(value);
-            return T(spirv_asm {
-                OpExtInst $$int result glsl450 FindSMsb $value32
-            });
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindSMsb $value32
+            };
         }
         else if (T is uint8_t || T is uint16_t)
         {
             uint value32 = __intCast<uint>(value);
-            return T(spirv_asm {
+            return spirv_asm {
                 OpExtInst $$uint result glsl450 FindUMsb $value32
-            });
+            };
         }
         else
         {
@@ -10351,11 +10351,11 @@ T firstbithigh<T : __BuiltinIntegerType>(T value)
             };
 
             if (count == ~0u)
-                return T(-1);
+                return uint(-1);
 
             if (halves.y != 0)
                 count += 32;
-            return T(count);
+            return count;
         }
     case wgsl: __intrinsic_asm "firstLeadingBit";
     case llvm:
@@ -10363,15 +10363,15 @@ T firstbithigh<T : __BuiltinIntegerType>(T value)
             if (__isSignedInt<T>() && value < T(0))
                 value = ~value;
             if (value == T(0))
-                return T(-1);
-            return T(sizeof(T)*8-1) - __llvm_ctlz(value);
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__llvm_ctlz(value));
         }
     }
 }
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<T, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
+vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
     __target_switch
     {
@@ -10381,19 +10381,19 @@ vector<T, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> va
         if (T is int)
         {
             return spirv_asm {
-                OpExtInst $$vector<T, N> result glsl450 FindSMsb $value
+                OpExtInst $$vector<uint, N> result glsl450 FindSMsb $value
             };
         }
         else if (T is uint)
         {
             return spirv_asm {
-                OpExtInst $$vector<T, N> result glsl450 FindUMsb $value
+                OpExtInst $$vector<uint, N> result glsl450 FindUMsb $value
             };
         }
-        else VECTOR_MAP_UNARY(T, N, firstbithigh, value);
+        else VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     case wgsl: __intrinsic_asm "firstLeadingBit";
     default:
-        VECTOR_MAP_UNARY(T, N, firstbithigh, value);
+        VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     }
 }
 
@@ -10405,7 +10405,7 @@ vector<T, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> va
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-T firstbitlow<T : __BuiltinIntegerType>(T value)
+uint firstbitlow<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -10413,20 +10413,20 @@ T firstbitlow<T : __BuiltinIntegerType>(T value)
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: return (value == T(0)) ? T(-1) : __metal_ctz(value);
+    case metal: return (value == T(0)) ? uint(-1) : __intCast<uint>(__metal_ctz(value));
     case spirv:
         if (T is int || T is uint)
         {
             return spirv_asm {
-                OpExtInst $$T result glsl450 FindILsb $value
+                OpExtInst $$uint result glsl450 FindILsb $value
             };
         }
         else if (T is int8_t || T is int16_t || T is uint8_t || T is uint16_t)
         {
             uint value32 = __intCast<uint>(value);
-            return T(spirv_asm {
+            return spirv_asm {
                 OpExtInst $$uint result glsl450 FindILsb $value
-            });
+            };
         }
         else
         {
@@ -10438,21 +10438,21 @@ T firstbitlow<T : __BuiltinIntegerType>(T value)
             };
 
             if (count == ~0u)
-                return T(-1);
+                return uint(-1);
 
             if (halves.x == 0)
                 count += 32;
 
-            return T(count);
+            return count;
         }
     case wgsl: __intrinsic_asm "firstTrailingBit";
-    case llvm: return value == T(0) ? T(-1) : __llvm_cttz(value);
+    case llvm: return value == T(0) ? uint(-1) : __intCast<uint>(__llvm_cttz(value));
     }
 }
 
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<T,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value)
+vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value)
 {
     __target_switch
     {
@@ -10462,13 +10462,13 @@ vector<T,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value
         if (T is int || T is uint)
         {
             return spirv_asm {
-                OpExtInst $$vector<T,N> result glsl450 FindILsb $value
+                OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
             };
         }
-        else VECTOR_MAP_UNARY(T, N, firstbitlow, value);
+        else VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     case wgsl: __intrinsic_asm "firstTrailingBit";
     default:
-        VECTOR_MAP_UNARY(T, N, firstbitlow, value);
+        VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     }
 }
 

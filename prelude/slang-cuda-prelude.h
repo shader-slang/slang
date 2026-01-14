@@ -2305,17 +2305,17 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbitlow(uint64_t v)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbitlow(uint64_t v)
 {
     // __ffs returns 1-based bit position or 0 if no bits set
     // firstbitlow should return 0-based bit position or ~0u if no bits set
-    return v == 0 ? ~0ull : (__ffsll(v) - 1ull);
+    return v == 0 ? ~uint32_t(0) : (__ffsll(v) - 1u);
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_firstbithigh(uint64_t v)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbithigh(uint64_t v)
 {
     if (v == 0)
-        return ~0ull;
+        return ~uint32_t(0);
     return 63 - __clzll(v);
 }
 
@@ -2345,12 +2345,12 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
     return U64_countbits(uint64_t(v));
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t I64_firstbitlow(int64_t v)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbitlow(int64_t v)
 {
     return U64_firstbitlow(uint64_t(v));
 }
 
-SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t I64_firstbithigh(int64_t v)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbithigh(int64_t v)
 {
     if (v < 0)
         v = ~v;
