@@ -36,7 +36,8 @@ jobs:
       - name: Download Slang Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          # Linux uses containerized builds with a different artifact naming pattern
+          name: ${{ inputs.os == 'linux' && format('slang-tests-linux-x86_64-gcc-{0}', inputs.config) || format('slang-tests-{0}-{1}-{2}-{3}', inputs.os, inputs.platform, inputs.compiler, inputs.config) }}
           path: github_artifact
 
       - name: Setup Slang Path
@@ -103,7 +104,7 @@ jobs:
 
           cmake \
             -DMATERIALX_BUILD_PYTHON=ON \
-            -DMATERIALX_INSTALL_PYTHON=OFF \
+            -DMATERIALX_INSTALL_PYTHON=ON \
             -DMATERIALX_BUILD_VIEWER=OFF \
             -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
             -DMATERIALX_BUILD_TESTS=OFF \
