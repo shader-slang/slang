@@ -12160,7 +12160,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 // Internal helper for max - contains the intrinsic implementations.
 // Caller must ensure T is a builtin scalar type (float, int, etc.).
 //@ hidden:
-__generic<T : IArithmetic>
+__generic<T : IComparable>
 [__unsafeForceInlineEarly]
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -12205,6 +12205,7 @@ T __max_impl(T x, T y)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
@@ -12215,11 +12216,12 @@ T max(T x, T y)
 /// @param x The first value.
 /// @param y The second value.
 /// @return The maximum of `x` and `y`.
-/// @remarks This overload allows using `max` in generic code constrained by `IArithmetic`.
+/// @remarks This overload allows using `max` in generic code constrained by `IComparable`.
 /// For concrete integer and floating-point types, the more specific overloads are preferred.
 /// @category math
-__generic<T : IArithmetic>
+__generic<T : IComparable>
 [__readNone]
+[OverloadRank(-10)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
@@ -12227,7 +12229,7 @@ T max(T x, T y)
     if (__isFloat<T>() || __isInt<T>())
         return __max_impl(x, y);
 
-    // For user-defined IArithmetic types, use IComparable.lessThan
+    // For user-defined types, use IComparable.lessThan
     if (x.lessThan(y))
         return y;
     return x;
@@ -12288,6 +12290,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
@@ -12441,7 +12444,7 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 // Internal helper for min - contains the intrinsic implementations.
 // Caller must ensure T is a builtin scalar type (float, int, etc.).
 //@ hidden:
-__generic<T : IArithmetic>
+__generic<T : IComparable>
 [__unsafeForceInlineEarly]
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -12488,6 +12491,7 @@ T __min_impl(T x, T y)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
@@ -12543,6 +12547,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
+[ForceInline]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
@@ -12598,11 +12603,12 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @param x The first value.
 /// @param y The second value.
 /// @return The minimum of `x` and `y`.
-/// @remarks This overload allows using `min` in generic code constrained by `IArithmetic`.
+/// @remarks This overload allows using `min` in generic code constrained by `IComparable`.
 /// For concrete integer and floating-point types, the more specific overloads are preferred.
 /// @category math
-__generic<T : IArithmetic>
+__generic<T : IComparable>
 [__readNone]
+[OverloadRank(-10)]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
@@ -12610,7 +12616,7 @@ T min(T x, T y)
     if (__isFloat<T>() || __isInt<T>())
         return __min_impl(x, y);
 
-    // For user-defined IArithmetic types, use IComparable.lessThan
+    // For user-defined IComparable types, use IComparable.lessThan
     if (x.lessThan(y))
         return x;
     return y;
