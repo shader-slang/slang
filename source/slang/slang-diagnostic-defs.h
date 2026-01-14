@@ -2659,6 +2659,13 @@ DIAGNOSTIC(
     "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
+    41026,
+    Warning,
+    switchFallthroughRestructured,
+    "switch fall-through is not supported by this target and will be restructured; "
+    "this may affect wave/subgroup convergence if the duplicated code contains wave operations")
+
+DIAGNOSTIC(
     41024,
     Error,
     cannotDefaultInitializeResource,
