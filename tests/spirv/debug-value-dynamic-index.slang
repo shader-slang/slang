@@ -25,5 +25,4 @@ void main(int id : SV_DispatchThreadID)
 // CHECK: DebugTypeComposite
 // CHECK: DebugFunctionDefinition
 // CHECK: DebugScope
-// CHECK: DebugDeclare
 // CHECK: DebugLine

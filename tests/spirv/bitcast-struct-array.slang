@@ -30,6 +30,12 @@ RWStructuredBuffer<uint> inputBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=floatBuffer
+RWStructuredBuffer<float> floatBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=intBuffer
+RWStructuredBuffer<int> intBuffer;
+
 // OUT: 42
 // OUT: 84
 // OUT: 305419896
@@ -41,14 +47,18 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     // Struct types - ineligible for optimization
     IntPair ip = { asint(inputBuffer[0]), asint(inputBuffer[1]) };
+    intBuffer[0] = ip.x;  // Force preservation of int
+    intBuffer[1] = ip.y;
     FloatPair fp = bit_cast<FloatPair>(ip);
+    floatBuffer[0] = fp.a;  // Force preservation of float bitcast
+    floatBuffer[1] = fp.b;
 
     // Array types - ineligible for optimization
     uint uintArray[2] = { inputBuffer[2], inputBuffer[3] };
     uint64_t u64 = bit_cast<uint64_t>(uintArray);
 
     // Store results to prevent optimization
-    outputBuffer[0] = asuint(fp.a);
-    outputBuffer[1] = asuint(fp.b);
+    outputBuffer[0] = asuint(floatBuffer[0]);
+    outputBuffer[1] = asuint(floatBuffer[1]);
     outputBuffer[2] = uint(u64 & 0xFFFFFFFF);
 }

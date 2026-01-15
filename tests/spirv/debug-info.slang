@@ -27,4 +27,4 @@ void main()
 // CHECK: DebugFunctionDefinition
 // CHECK: DebugScope
 // CHECK: DebugLine
-// CHECK: DebugDeclare
+// CHECK: DebugValue

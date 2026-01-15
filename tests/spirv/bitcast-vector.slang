@@ -43,6 +43,15 @@ RWStructuredBuffer<uint> inputBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=doubleBuffer
+RWStructuredBuffer<double> doubleBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=float2Buffer
+RWStructuredBuffer<float2> float2Buffer;
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=16):out,name=float4Buffer
+RWStructuredBuffer<float4> float4Buffer;
+
 // OUT: 1082130434
 // OUT: 1072693248
 // OUT: 1072693248
@@ -65,14 +74,16 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // Test 1: uint2 (64-bit) <-> double (64-bit scalar)
     uint2 u2 = uint2(inputBuffer[0], inputBuffer[1]);
     double d1 = bit_cast<double>(u2);
+    doubleBuffer[0] = d1;  // Force preservation
 
     // Test 2: double (64-bit scalar) -> uint2 (64-bit)
-    double d2 = d1;
+    double d2 = doubleBuffer[0];
     uint2 u2_result = bit_cast<uint2>(d2);
 
     // Test 3: uint64_t (64-bit scalar) -> float2 (64-bit)
     uint64_t u64 = uint64_t(inputBuffer[0]) | (uint64_t(inputBuffer[1]) << 32);
     float2 f2 = bit_cast<float2>(u64);
+    float2Buffer[0] = f2;  // Force preservation
 
     // Test 4: float4 (128-bit) <-> double2 (128-bit)
     float4 f4 = float4(
@@ -82,10 +93,12 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         asfloat(inputBuffer[5])
     );
     double2 d2v = bit_cast<double2>(f4);
+    doubleBuffer[1] = d2v.x;  // Force preservation
 
     // Test 5: double2 (128-bit) -> float4 (128-bit)
-    double2 d2v_input = d2v;
+    double2 d2v_input = double2(doubleBuffer[1], 0);
     float4 f4_result = bit_cast<float4>(d2v_input);
+    float4Buffer[0] = f4_result;  // Force preservation
 
     // Test 6: uint (32-bit) <-> vector<uint16_t, 2> (32-bit)
     uint u32 = inputBuffer[6];
