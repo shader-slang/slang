@@ -65,7 +65,7 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<Address, OutputVector>(address);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(address);
     return outputVec;
 }
 
@@ -77,7 +77,7 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<Address, OutputVector>(weightAddress, biasAddress);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 

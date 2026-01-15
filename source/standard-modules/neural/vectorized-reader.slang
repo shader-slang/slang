@@ -7,7 +7,7 @@ implementing neural;
 #endif
 
 
-interface IArrayAccessor<T> : IRWArray<T>
+internal interface IArrayAccessor<T> : IRWArray<T>
 {
     internal void atomicAdd(int index, T value)
     {

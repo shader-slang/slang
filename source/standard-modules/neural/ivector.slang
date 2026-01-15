@@ -77,12 +77,13 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     - `OutputVector` must conform to `IVector<T>`
     */
     [Differentiable]
-    public OutputVector linearTransform<Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
+            where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 
     /**
@@ -109,7 +110,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -117,6 +118,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
+            where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 
     /**
@@ -137,9 +139,10 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<Address, OutputVector>(Address weightAddress)
+    public OutputVector linearTransform<Address, Layout, OutputVector>(Address weightAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 
     /**
@@ -165,9 +168,10 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<Address, OutputVector>(
+    public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 }
