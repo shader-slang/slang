@@ -88,6 +88,10 @@ protected:
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) SLANG_OVERRIDE;
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) SLANG_OVERRIDE;
 
+    // FXC (DX11/DXBC) doesn't support fall-through in switch statements.
+    // DXC (DX12/DXIL) does support fall-through.
+    virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE;
+
     virtual void handleRequiredCapabilitiesImpl(IRInst* inst) SLANG_OVERRIDE;
 
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;

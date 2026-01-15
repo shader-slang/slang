@@ -1248,6 +1248,22 @@ void HLSLSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
     }
 }
 
+bool HLSLSourceEmitter::supportsSwitchFallThrough()
+{
+    // FXC (SM 5.x and earlier) doesn't support fall-through in switch statements.
+    // DXC (SM 6.0 and later) does support fall-through.
+    //
+    // We use m_effectiveProfile which includes the fallback logic that sets
+    // SM for DXBC targets when no profile is explicitly specified.
+    if (m_effectiveProfile.getFamily() == ProfileFamily::DX)
+    {
+        // SM 6.0+ supports fall-through, SM 5.x and earlier do not
+        return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_0;
+    }
+    // For non-DX profiles targeting HLSL, assume modern compiler (supports fall-through)
+    return true;
+}
+
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
 {
     switch (decoration->getOp())
@@ -1612,12 +1628,47 @@ void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
     }
 }
 
+// Helper function to determine if an HLSL semantic accepts an index suffix
+static bool doesHLSLSemanticAcceptIndex(UnownedStringSlice semanticName)
+{
+    // Table of system semantics that accept indices
+    static const UnownedStringSlice kIndexedSystemSemantics[] = {
+        toSlice("SV_Target"),
+        toSlice("SV_ClipDistance"),
+        toSlice("SV_CullDistance"),
+    };
+
+    // User semantics (non-SV_*) always accept indices
+    if (!semanticName.startsWithCaseInsensitive(toSlice("SV_")))
+    {
+        return true;
+    }
+
+    // Check if this system semantic is in the indexed list
+    for (const auto& indexedSemantic : kIndexedSystemSemantics)
+    {
+        if (semanticName.caseInsensitiveEquals(indexedSemantic))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
         m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
+        auto semanticName = semanticDecoration->getSemanticName();
+        m_writer->emit(semanticName);
+
+        // Only emit semantic index for semantics that accept them
+        if (doesHLSLSemanticAcceptIndex(semanticName))
+        {
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+        }
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
