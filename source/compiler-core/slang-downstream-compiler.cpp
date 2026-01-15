@@ -87,6 +87,12 @@ SlangResult CommandLineDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
     ArtifactUtil::addAssociated(resultArtifact, diagnostics);
 
+    // If Slang was built using Clang or GCC and with sanitizers, the same `-fsanitize=...` flag
+    // must be used when linking an executable, or it will fail to link. We can't instrument
+    // Slang-generated C++ with sanitizers as they might report errors that can't be fixed, so we
+    // separate compilation and linking into two commands to enable sanitizers only during linking.
+    bool shouldSeparateCompileAndLink = options.targetType == SLANG_HOST_EXECUTABLE;
+
     auto helper = DefaultArtifactHelper::getSingleton();
 
     List<ComPtr<IArtifact>> artifactList;
@@ -122,11 +128,12 @@ SlangResult CommandLineDownstreamCompiler::compile(
         options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
     }
 
-    // Compile stage: compile source to object code
+    // Compile stage if executable target: compile source to object code
 
     List<ComPtr<IArtifact>> compileArtifacts;
     ComPtr<IArtifact> objectArtifact;
 
+    if (shouldSeparateCompileAndLink)
     {
         CompileOptions compileOptions = options;
         compileOptions.targetType = SLANG_OBJECT_CODE;
@@ -168,10 +175,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
         }
     }
 
-    // Link stage: link executable or library
+    // Link stage if executable target, or single-stage compile for all other targets
 
-    // Pass compiled object to linker
-    options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
+    if (shouldSeparateCompileAndLink)
+    {
+        // Pass compiled object to linker
+        options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
+    }
 
     CommandLine cmdLine(m_cmdLine);
 
