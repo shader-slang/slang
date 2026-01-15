@@ -7625,6 +7625,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         if (ptrElementCount && ptrElementCount->getValue() == 1)
                         {
                             // Both the value and pointer IR types are single-element arrays.
+                            // Ensure the pointer is emitted first, so that if it was unwrapped
+                            // to a scalar type, it will be in the tracking set.
+                            ensureInst(ptr);
                             // Check if the SPIR-V pointer was emitted with an unwrapped scalar type.
                             if (m_unwrappedSingleElementArrayPtrs.contains(ptr))
                             {

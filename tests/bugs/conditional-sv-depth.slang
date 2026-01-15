@@ -6,12 +6,20 @@
 // the SPIR-V emitter should correctly unwrap the single-element array
 // for FragDepth which must be a scalar float in Vulkan.
 //
-// This test verifies that the SPIR-V compilation succeeds and produces
-// valid output that would pass spirv-val with --target-env vulkan1.2
+// This test verifies that:
+// 1. gl_FragDepth is declared as a scalar float pointer, not an array
+// 2. The generated SPIR-V passes spirv-val validation
 
-//TEST:COMPILE: tests/bugs/conditional-sv-depth.slang -target spirv -emit-spirv-directly -o tests/bugs/conditional-sv-depth.spv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry ps_main -emit-spirv-directly
+
+// CHECK: %_ptr_Output_float = OpTypePointer Output %float
+// CHECK: %gl_FragDepth = OpVariable %_ptr_Output_float Output
+// CHECK-NOT: %_ptr_Output__arr_float
+// CHECK: OpStore %gl_FragDepth %
+
+uniform float depthValue;
 
 [shader("fragment")]
 Conditional<float, true> ps_main(): SV_Depth {
-    return 0.0;
+    return depthValue;
 }
