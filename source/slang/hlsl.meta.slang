@@ -10318,8 +10318,6 @@ uint firstbithigh<T : __BuiltinIntegerType>(T value)
     case cpp: __intrinsic_asm "$P_firstbithigh($0)";
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
     case glsl:
-        if (T is int64_t || T is uint64_t)
-            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
         __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
     case metal:

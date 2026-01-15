@@ -1386,6 +1386,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case BaseType::IntPtr:
                 case BaseType::Int64:
                     {
+                        _requireBaseType(BaseType::Int64);
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("L");
                         return;
@@ -1395,6 +1396,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     {
                         SLANG_COMPILE_TIME_ASSERT(
                             sizeof(litInst->value.intVal) >= sizeof(uint64_t));
+                        _requireBaseType(BaseType::UInt64);
                         m_writer->emitUInt64(uint64_t(litInst->value.intVal));
                         m_writer->emit("UL");
                         return;
