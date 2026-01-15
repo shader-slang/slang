@@ -874,6 +874,11 @@ DIAGNOSTIC(
     Error,
     cannotDereferenceType,
     "cannot dereference type '$0', do you mean to use '.'?")
+DIAGNOSTIC(
+    30102,
+    Error,
+    staticRefToThis,
+    "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -1026,6 +1031,12 @@ DIAGNOSTIC(
     "non-static function reference '$0' is not allowed here.")
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
+DIAGNOSTIC(
+    30100,
+    Error,
+    sizeOfDescriptorHandleNotAllowed,
+    "sizeof/alignof of 'DescriptorHandle' is not allowed because its size is target-dependent; "
+    "use reflection API to query size at runtime")
 DIAGNOSTIC(
     30083,
     Error,
@@ -2634,6 +2645,13 @@ DIAGNOSTIC(
     Warning,
     commaOperatorUsedInExpression,
     "comma operator used in expression (may be unintended)")
+
+DIAGNOSTIC(
+    41026,
+    Warning,
+    switchFallthroughRestructured,
+    "switch fall-through is not supported by this target and will be restructured; "
+    "this may affect wave/subgroup convergence if the duplicated code contains wave operations")
 
 DIAGNOSTIC(
     41024,

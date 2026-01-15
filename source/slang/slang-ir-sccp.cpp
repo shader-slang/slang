@@ -401,12 +401,13 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
-    template<typename TIntFunc, typename TFloatFunc>
+    template<typename TIntFunc, typename TUintFunc, typename TFloatFunc>
     LatticeVal evalBinaryImpl(
         IRType* type,
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
+        const TUintFunc& uintFunc,
         const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -416,17 +417,20 @@ struct SCCPContext
         IRInst* resultVal = nullptr;
         switch (type->getOp())
         {
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
-        case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
+            resultVal =
+                getBuilder()->getIntValue(type, uintFunc(c0->value.uintVal, c1->value.uintVal));
+            break;
         case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_IntPtrType:
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
             break;
@@ -561,6 +565,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 + c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 + c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
     LatticeVal evalSub(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -570,6 +575,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 - c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 - c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
     LatticeVal evalMul(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -579,6 +585,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 * c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -588,6 +595,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
     LatticeVal evalRem(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -597,6 +605,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
     LatticeVal evalEql(IRType* type, LatticeVal v0, LatticeVal v1)

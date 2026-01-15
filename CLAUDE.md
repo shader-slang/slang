@@ -257,6 +257,36 @@ By default, slang uses `-emit-spirv-directly` and slang emits from slang shader 
 When `-emit-spirv-via-glsl` is used, slang will translate the input slang shader to glsl and let glslang to generate spirv code.
 This can be useful when we want to generate a reference spirv code for a comparison.
 
+#### extras/repro-remix.sh - RTX Remix Shader Compatibility Testing
+
+The repository includes a script to reproduce RTX Remix shader compilation issues locally:
+
+```bash
+# Prerequisites: Build Slang in Debug first
+cmake.exe --preset default
+cmake.exe --build --preset debug
+
+# Run RTX Remix shader compilation test
+./extras/repro-remix.sh
+
+# Clean existing dxvk-remix clone and start fresh
+./extras/repro-remix.sh --clean
+```
+
+**What it does:**
+- Clones NVIDIA RTX Remix repository to `external/dxvk-remix/`
+- Comments out Slang in packman config to prevent overwriting
+- Replaces with your Debug build
+- Compiles all RTX Remix shaders with SPIRV validation enabled
+- Verifies shader compilation output
+
+**When to use:**
+- When RTX Remix nightly CI workflow fails
+- To test Slang changes against a large real-world shader codebase
+- To reproduce shader compilation issues before fixing them
+
+See `extras/repro-remix.md` for detailed documentation.
+
 ### IR System
 
 - Slang uses a custom SSA-based IR (not LLVM)
