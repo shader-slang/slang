@@ -127,7 +127,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
+            m_sharedContext->m_targetRequest,
             layoutRules,
             elementType,
             &elementSize);
@@ -141,11 +141,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
-            layoutRules,
-            structType,
-            &structSize);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, structType, &structSize);
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -233,11 +229,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetProgram->getOptionSet(),
-            rules,
-            structType,
-            &sizeAlignment);
+        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
         traverseUses(
             cbParamInst,
             [&](IRUse* use)
@@ -1381,21 +1373,36 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // SPIRV does not allow using merge block directly as true/false block,
         // so we need to create an intermediate block if this is the case.
         IRBuilder builder(inst);
-        if (inst->getTrueBlock() == inst->getAfterBlock())
+
+        auto addIntermediateBlock = [&](auto& replaceBlock)
         {
             builder.setInsertBefore(inst->getAfterBlock());
             auto newBlock = builder.emitBlock();
+
+            // Add an IRDebugLine to the block we're creating. Find the first
+            // IRDebugLine in the 'after' block, and copy that.
+            for (auto afterInst : inst->getAfterBlock()->getChildren())
+            {
+                if (auto debugLine = as<IRDebugLine>(afterInst))
+                {
+                    IRCloneEnv cloneEnv;
+                    cloneInst(&cloneEnv, &builder, debugLine);
+                    break;
+                }
+            }
+
             builder.emitBranch(inst->getAfterBlock());
-            inst->trueBlock.set(newBlock);
+            replaceBlock.set(newBlock);
             addToWorkList(newBlock);
+        };
+
+        if (inst->getTrueBlock() == inst->getAfterBlock())
+        {
+            addIntermediateBlock(inst->trueBlock);
         }
         if (inst->getFalseBlock() == inst->getAfterBlock())
         {
-            builder.setInsertBefore(inst->getAfterBlock());
-            auto newBlock = builder.emitBlock();
-            builder.emitBranch(inst->getAfterBlock());
-            inst->falseBlock.set(newBlock);
-            addToWorkList(newBlock);
+            addIntermediateBlock(inst->falseBlock);
         }
     }
 
@@ -1538,7 +1545,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         if (vectorType)
             elementType = vectorType->getElementType();
 
-        const IntInfo i = getIntTypeInfo(elementType);
+        const IntInfo i = getIntTypeInfo(m_codeGenContext->getTargetReq(), elementType);
 
         // SPIRV doesn't support non-32bit integer types, so we need to convert
         if (i.width < 32)
@@ -2098,7 +2105,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     break;
                                 IRIntegerValue offset = 0;
                                 if (getOffset(
-                                        m_sharedContext->m_targetProgram->getOptionSet(),
+                                        m_sharedContext->m_targetRequest,
                                         IRTypeLayoutRules::get(layoutRuleName),
                                         field,
                                         &offset) != SLANG_OK)
@@ -2160,6 +2167,26 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Recursively looks for member structs that have the Block / BufferBlock
+    // decoration.
+    void findEmbeddedBlockStructs(IRType* type, HashSet<IRStructType*>& embeddedBlockStructs)
+    {
+        if (auto structType = as<IRStructType>(type))
+        {
+            if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                embeddedBlockStructs.add(structType);
+            }
+            for (auto field : structType->getFields())
+                findEmbeddedBlockStructs(field->getFieldType(), embeddedBlockStructs);
+        }
+        else if (auto arrayType = as<IRArrayType>(type))
+        {
+            findEmbeddedBlockStructs(arrayType->getElementType(), embeddedBlockStructs);
+        }
+    }
+
     void legalizeStructBlocks()
     {
         // SPIRV does not allow using a struct with a block declaration as a field
@@ -2170,21 +2197,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         HashSet<IRStructType*> embeddedBlockStructs;
         List<IRGlobalParam*> structGlobalParams;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto outerStruct = as<IRStructType>(globalInst))
             {
+                // This search needs to be done recursively in order to find
+                // structs nested deeper than one layer.
                 for (auto field : outerStruct->getFields())
-                {
-                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
-                    {
-                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
-                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
-                        {
-                            embeddedBlockStructs.add(innerStruct);
-                        }
-                    }
-                }
+                    findEmbeddedBlockStructs(field->getFieldType(), embeddedBlockStructs);
             }
             else if (auto globalParam = as<IRGlobalParam>(globalInst))
             {
@@ -2475,7 +2496,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
 
         changed = false;
 
-        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
 
         for (auto inst : module->getGlobalInsts())
@@ -2488,7 +2509,7 @@ void simplifyIRForSpirvLegalization(TargetProgram* target, DiagnosticSink* sink,
             while (funcChanged && funcIterationCount < kMaxFuncIterations)
             {
                 funcChanged = false;
-                funcChanged |= applySparseConditionalConstantPropagation(func, sink);
+                funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 funcChanged |= removeRedundancyInFunc(func, false);
                 CFGSimplificationOptions options;

@@ -168,10 +168,12 @@ private:
 RefPtr<IRDominatorTree> computeDominatorTree(IRGlobalValueWithCode* code);
 
 void computePostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
+void computeMirroredPostorder(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
 void computePostorder(
     IRGlobalValueWithCode* code,
     List<IRBlock*>& outOrder,
-    HashSet<IRBlock*>& outReachableSet);
+    HashSet<IRBlock*>& outReachableSet,
+    bool mirrored = false);
 void computePostorderOnReverseCFG(IRGlobalValueWithCode* code, List<IRBlock*>& outOrder);
 
 inline List<IRBlock*> getPostorder(IRGlobalValueWithCode* code)
@@ -192,6 +194,14 @@ inline List<IRBlock*> getReversePostorder(IRGlobalValueWithCode* code)
 {
     List<IRBlock*> result;
     computePostorder(code, result);
+    result.reverse();
+    return result;
+}
+
+inline List<IRBlock*> getReverseMirroredPostorder(IRGlobalValueWithCode* code)
+{
+    List<IRBlock*> result;
+    computeMirroredPostorder(code, result);
     result.reverse();
     return result;
 }

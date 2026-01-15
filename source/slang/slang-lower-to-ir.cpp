@@ -610,7 +610,7 @@ struct IRGenContext
     // that contains the Inst.
     FunctionDeclBase* funcDecl;
 
-    bool includeDebugInfo = false;
+    DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -5564,10 +5564,21 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // If the initializer list was empty, then the user was
         // asking for default initialization, which should apply
-        // to (almost) any type.
+        // to almost any type...
         //
         if (argCount == 0)
         {
+            // ... However, that "almost" does not count interface
+            // types. Interfaces should not be default-initialized to avoid
+            // unspecified behavior, so we'll warn about it here.
+            if (auto declRefType = as<DeclRefType>(type))
+            {
+                if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                {
+                    context->getSink()->diagnose(expr, Diagnostics::interfaceDefaultInitializer);
+                }
+            }
+
             return getDefaultVal(type.type);
         }
 
@@ -5849,6 +5860,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                            ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
                            : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
@@ -5859,6 +5871,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                             ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
                             : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
@@ -5868,6 +5881,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // after-block: return input parameter
         builder->insertBlock(afterBlock);
         builder->setInsertInto(afterBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto paramType = lowerType(context, expr->type.type);
         auto result = builder->emitParam(paramType);
 
@@ -6861,7 +6875,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
-
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
@@ -6883,6 +6896,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(afterBlock);
         }
+
+        maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
         if (stmt->findModifier<FlattenAttribute>())
         {
@@ -7956,6 +7971,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+
         lowerSwitchCases(stmt->body, &info);
 
         // TODO: once we've discovered the cases, we should
@@ -8016,15 +8032,22 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         return *result;
 
     ComPtr<ISlangBlob> outBlob;
-    if (path.hasFileFoundPath())
-    {
-        context->getLinkage()->getFileSystemExt()->loadFile(
-            path.foundPath.getBuffer(),
-            outBlob.writeRef());
-    }
     UnownedStringSlice content;
-    if (outBlob)
-        content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+
+    // Only embed source content for Standard and Maximal debug level
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+    {
+        if (path.hasFileFoundPath())
+        {
+            context->getLinkage()->getFileSystemExt()->loadFile(
+                path.foundPath.getBuffer(),
+                outBlob.writeRef());
+        }
+        if (outBlob)
+            content =
+                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+    }
+
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
     auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
@@ -8039,7 +8062,8 @@ void maybeEmitDebugLine(
     SourceLoc loc,
     bool allowNullStmt)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug line info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
     if (!allowNullStmt)
@@ -8087,7 +8111,8 @@ void maybeEmitDebugLine(
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug location info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
     auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
     if (!sourceView)
@@ -9784,7 +9809,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
-                if (context->includeDebugInfo && decl->loc.isValid() &&
+                // Requires Standard level or higher for variable debug info
+                if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
                     context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
@@ -12927,8 +12953,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo =
-        compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
+    context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
@@ -12938,14 +12963,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // in the translation unit.
     //
     // If debug info is enabled, we emit the DebugSource insts for each source file into IR.
-    if (context->includeDebugInfo)
+    // This is needed for Minimal level and above (for line number correlation)
+    if (context->debugInfoLevel != DebugInfoLevel::None)
     {
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
+            // For Standard and Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                source->getContent(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
+                                                                      : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
@@ -13055,8 +13083,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     lowerExpandType(module);
 
     // Generate DebugValue insts to store values into debug variables,
-    // if debug symbols are enabled.
-    if (context->includeDebugInfo)
+    // if debug symbols are enabled at Standard level or higher.
+    // This allows debugging of local variable values.
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
         insertDebugValueStore(context->shared->debugValueContext, module);
     }
@@ -13066,7 +13095,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
     bool minimumOptimizations =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
@@ -13135,8 +13164,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |=
-                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= applySparseConditionalConstantPropagation(
+                        func,
+                        nullptr,
+                        compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
@@ -13169,15 +13200,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
-        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, compileRequest->getSink());
 
         if (translationUnit->getModuleDecl()->languageVersion >=
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
         {
             // We do not allow specializing a generic function with an existential type.
-            checkForIllegalGenericSpecializationWithExistentialType(
-                module,
-                compileRequest->getSink());
+            addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
 

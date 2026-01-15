@@ -14,6 +14,8 @@ struct ManglingContext
     }
     ASTBuilder* astBuilder;
     StringBuilder sb;
+    Decl* targetDecl = nullptr; // The decl we are mangling name for.
+    bool isEmittingTarget = false;
 };
 
 void emitRaw(ManglingContext* context, char const* text)
@@ -407,6 +409,30 @@ void emitVal(ManglingContext* context, Val* val)
 
 void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool includeModuleName)
 {
+    if (declRef.getDecl() == context->targetDecl)
+    {
+        if (!context->isEmittingTarget)
+        {
+            context->isEmittingTarget = true;
+        }
+        else
+        {
+            // We are already in the middle of mangling the target decl,
+            // so we must have run into a cycle.
+            //
+            // For example, this can happen when mangling a struct defined
+            // inline at a parameter-type locataion inside a function.
+            // During mangling that struct, we will mangle the parent function,
+            // but the mangled name of that parent function will contain
+            // parameter types, which means we will attempt to mangle the struct
+            // again.
+            //
+            // In this case we will just skip emitting for the current declRef
+            // to break the cycle.
+            return;
+        }
+    }
+
     bool ignoreName = false;
     if (!includeModuleName)
     {
@@ -727,6 +753,7 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
     // TODO: catch cases where the declaration should
     // forward to something else? E.g., what if we
     // are asked to mangle the name of a `typedef`?
+    context->targetDecl = declRef.getDecl();
 
     auto decl = declRef.getDecl();
     if (!decl)
@@ -787,6 +814,10 @@ void mangleName(ManglingContext* context, DeclRef<Decl> declRef)
         emitRaw(context, "BwdReq_");
         emitQualifiedName(context, bwdReq->originalRequirementDecl, true);
         return;
+    }
+    else if (as<AttributeDecl>(decl))
+    {
+        emitRaw(context, "A");
     }
     else
     {

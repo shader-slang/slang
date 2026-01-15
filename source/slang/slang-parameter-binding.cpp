@@ -1914,7 +1914,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
-    if (!state.optSemanticName)
+    if (decl && !state.optSemanticName)
     {
         if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
         {
@@ -1962,8 +1962,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // `location`s in declaration order coincidentally matches
     // the `SV_Target` order.
     //
-    if (isKhronosTarget(context->getTargetRequest()) ||
-        isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+    if (decl &&
+        (isKhronosTarget(context->getTargetRequest()) ||
+         isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest())))
     {
         if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {
@@ -2209,6 +2210,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout,
                 (int)rowCount);
+        }
+        else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+        {
+            return processSimpleEntryPointParameter(
+                context,
+                descriptorHandleType,
+                state,
+                varLayout);
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {

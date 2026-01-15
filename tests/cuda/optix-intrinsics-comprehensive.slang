@@ -23,6 +23,10 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK-DAG: optixGetObjectRayOrigin()
 //CHECK-DAG: optixGetObjectRayDirection()
 
+// PTX checks for HitObject methods in raygen
+//CHECK_PTX-DAG: _optix_get_object_ray_origin_x
+//CHECK_PTX-DAG: _optix_get_object_ray_direction_x
+
 // Control flow intrinsics
 //CHECK-DAG: optixTerminateRay
 //CHECK-DAG: optixTraverse
@@ -126,7 +130,7 @@ struct AnyHitPayload
 [shader("closesthit")]
 void closestHitShader(
     uniform TraditionalSbtData sbtData,  // This triggers traditional optixGetSbtDataPointer
-    inout RayPayload payload,
+    inout RayPayload payload, 
     in CustomAttributes attr)
 {
     // Test basic ray query intrinsics using correct HLSL names
@@ -134,9 +138,8 @@ void closestHitShader(
     payload.data.instanceIndex = InstanceIndex();
     payload.data.instanceID = InstanceID();
     payload.data.primitiveIndex = PrimitiveIndex();
-    // Note: ObjectRayDirection/ObjectRayOrigin are NOT available in closesthit on CUDA/OptiX
-    // They are only available in anyhit and intersection shaders per OptiX documentation.
-    // See issue #9258 for details.
+    payload.data.objectRayDirection = ObjectRayDirection();
+    payload.data.objectRayOrigin = ObjectRayOrigin();
     payload.data.worldRayDirection = WorldRayDirection();
     payload.data.worldRayOrigin = WorldRayOrigin();
     payload.data.rayTmin = RayTMin();
@@ -183,21 +186,17 @@ void anyHitShader(inout AnyHitPayload payload, in CustomAttributes attr)
     uint hitKind = HitKind();
     uint instanceID = InstanceID();
     float rayT = RayTCurrent();
-
-    // Test ObjectRayOrigin/ObjectRayDirection - only available in anyhit and intersection on CUDA/OptiX
-    float3 objOrigin = ObjectRayOrigin();
-    float3 objDir = ObjectRayDirection();
-
+    
     // Count hits for testing
     payload.hitCount++;
-
+    
     // Test termination based on some criteria
-    if (payload.terminateRequested || payload.hitCount > 3 || objOrigin.x > 100.0f)
+    if (payload.terminateRequested || payload.hitCount > 3)
     {
         // Test optixTerminateRay - only available in anyhit shaders
         AcceptHitAndEndSearch();  // This maps to optixTerminateRay for CUDA
     }
-    else if (objDir.z < 0)
+    else
     {
         // Test ignoring hit to continue traversal
         IgnoreHit();

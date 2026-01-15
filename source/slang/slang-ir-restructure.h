@@ -262,5 +262,13 @@ public:
 /// enough to handle something in the input CFG, diagnostic messages
 /// will be output to the given `sink`.
 ///
-RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, DiagnosticSink* sink);
+/// If `preserveFallThrough` is true, fall-through between switch cases will be
+/// preserved in the region structure. If false, the pass will use the legacy
+/// behavior that doesn't preserve fall-through (required for HLSL/WGSL targets
+/// that don't support fall-through).
+///
+RefPtr<RegionTree> generateRegionTreeForFunc(
+    IRGlobalValueWithCode* code,
+    DiagnosticSink* sink,
+    bool preserveFallThrough = true);
 } // namespace Slang

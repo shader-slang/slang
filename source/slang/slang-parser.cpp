@@ -6396,6 +6396,7 @@ Stmt* Parser::parseIfLetStatement()
     auto tempVarDecl = astBuilder->create<LetDecl>();
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
+    tempVarDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(currentScope->containerDecl, tempVarDecl);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
@@ -6412,10 +6413,25 @@ Stmt* Parser::parseIfLetStatement()
 
     ReadToken(TokenType::RParent);
 
-    // Create a new scope surrounding the positive statement, will be used for
-    // the variable declared in the if_let syntax
+    // Create scope for the positive statement containing the unwrapped variable.
+    // The variable must be added to scope BEFORE parsing the body, because during
+    // deferred parsing tryParseGenericApp may call CheckTerm which needs to find
+    // the variable.
     ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
     pushScopeAndSetParent(positiveScopeDecl);
+
+    // Create 'let <user_var> = $OptVar.value'
+    MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
+    memberExpr->baseExpression = tempVarExpr;
+    memberExpr->name = getName(this, "value");
+
+    auto varDecl = astBuilder->create<LetDecl>();
+    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->initExpr = memberExpr;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
+    AddMember(positiveScopeDecl, varDecl);
+
+    // Now parse the body with the variable in scope
     ifStatement->positiveStatement = ParseStatement(ifStatement);
     PopScope();
 
@@ -6433,20 +6449,8 @@ Stmt* Parser::parseIfLetStatement()
             seqPositiveStmt = astBuilder->create<SeqStmt>();
         }
 
-        MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
-        memberExpr->baseExpression = tempVarExpr;
-        memberExpr->name = getName(this, "value");
-
-        auto varDecl = astBuilder->create<LetDecl>();
-        varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
-        varDecl->initExpr = memberExpr;
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
         varDeclrStatement->decl = varDecl;
-
-        // Add scope to the variable declared in the if_let syntax such
-        // that this variable cannot be used outside the positive statement
-        AddMember(positiveScopeDecl, varDecl);
 
         seqPositiveStmt->stmts.add(varDeclrStatement);
         seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
@@ -6473,6 +6477,8 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
     }
+    ifStatement->afterLoc = tokenReader.peekLoc();
+
     return ifStatement;
 }
 
@@ -8255,7 +8261,7 @@ static Expr* parsePostfixExpr(Parser* parser)
     }
 }
 
-static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+static IntegerLiteralValue _foldIntegerPrefixOp(TokenType tokenType, IntegerLiteralValue value)
 {
     switch (tokenType)
     {
@@ -8264,7 +8270,15 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        return -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8758,7 +8772,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                 // Need to get the basic type, so we can fit to underlying type
                 if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))

@@ -1,0 +1,42 @@
+name: Test ARC Runner
+on:
+  workflow_dispatch:
+
+jobs:
+  test-arc:
+    runs-on: [self-hosted, Linux, GPU, arc]
+
+    steps:
+      - name: Check GPU with nvidia-smi
+        run: nvidia-smi
+
+      - name: Check Docker
+        run: docker --version
+
+      - name: Test CUDA container with GPU
+        run: docker run --rm --gpus all nvidia/cuda:12.5.1-base-ubuntu22.04 nvidia-smi
+
+      - name: Check Vulkan ICD configuration
+        run: |
+          echo "Checking Vulkan ICD configuration..."
+          if [ -f /etc/vulkan/icd.d/nvidia_icd.json ]; then
+            echo "✓ Vulkan ICD found"
+            cat /etc/vulkan/icd.d/nvidia_icd.json
+          else
+            echo "✗ Vulkan ICD not found"
+            exit 1
+          fi
+
+      - name: Check system resources
+        run: |
+          echo "=== CPU Info ==="
+          lscpu | grep -E "Model name|CPU\(s\)|Thread"
+          echo ""
+          echo "=== Memory Info ==="
+          free -h
+          echo ""
+          echo "=== Disk Info ==="
+          df -h /
+          echo ""
+          echo "=== GPU Info ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv

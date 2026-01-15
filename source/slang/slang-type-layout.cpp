@@ -97,12 +97,99 @@ void _typeLayout_keepFunctions()
     SLANG_UNUSED(b);
 }
 
+// Given a Type returns the equivalent ShaderParameterKind
+static ShaderParameterKind _getShaderParameterKindForResourceType(Type* type)
+{
+    if (auto textureType = as<TextureType>(type))
+    {
+        if (textureType->isCombined())
+        {
+            switch (textureType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                return ShaderParameterKind::TextureSampler;
+            default:
+                return ShaderParameterKind::MutableTextureSampler;
+            }
+        }
+        else
+        {
+            switch (textureType->getAccess())
+            {
+            case SLANG_RESOURCE_ACCESS_READ:
+                return ShaderParameterKind::Texture;
+            default:
+                return ShaderParameterKind::MutableTexture;
+            }
+        }
+    }
+    else if (auto imageType = as<GLSLImageType>(type))
+    {
+        switch (imageType->getAccess())
+        {
+        case SLANG_RESOURCE_ACCESS_READ:
+            return ShaderParameterKind::Image;
+        default:
+            return ShaderParameterKind::MutableImage;
+        }
+    }
+    else if (as<SamplerStateType>(type))
+    {
+        return ShaderParameterKind::SamplerState;
+    }
+    else if (as<GLSLAtomicUintType>(type))
+    {
+        return ShaderParameterKind::AtomicUint;
+    }
+    else if (as<HLSLByteAddressBufferType>(type))
+    {
+        return ShaderParameterKind::RawBuffer;
+    }
+    else if (
+        as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type))
+    {
+        return ShaderParameterKind::MutableRawBuffer;
+    }
+    else if (as<GLSLInputAttachmentType>(type))
+    {
+        return ShaderParameterKind::InputRenderTarget;
+    }
+    else if (as<RaytracingAccelerationStructureType>(type))
+    {
+        return ShaderParameterKind::AccelerationStructure;
+    }
+    else if (as<UntypedBufferResourceType>(type))
+    {
+        return ShaderParameterKind::RawBuffer;
+    }
+    else if (as<GLSLShaderStorageBufferType>(type))
+    {
+        return ShaderParameterKind::MutableRawBuffer;
+    }
+    else if (as<HLSLStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::StructuredBuffer;
+    }
+    else if (
+        as<HLSLRWStructuredBufferType>(type) || as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::MutableStructuredBuffer;
+    }
+    else if (as<HLSLAppendStructuredBufferType>(type) || as<HLSLConsumeStructuredBufferType>(type))
+    {
+        return ShaderParameterKind::AppendConsumeStructuredBuffer;
+    }
+    SLANG_UNEXPECTED("unhandled shader parameter kind");
+    UNREACHABLE_RETURN(ShaderParameterKind::Texture);
+}
+
 //
 
 struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -129,10 +216,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::Int64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::IntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout(context);
 
         case BaseType::UInt8:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
@@ -143,10 +227,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         case BaseType::UInt64:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
         case BaseType::UIntPtr:
-            return SimpleLayoutInfo(
-                LayoutResourceKind::Uniform,
-                sizeof(intptr_t),
-                sizeof(intptr_t));
+            return GetPointerLayout(context);
 
         case BaseType::Half:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
@@ -161,10 +242,10 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
         }
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) override
     {
-        // We'll assume 64 pointers by default, with 8 byte alignment
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, 8, 8);
+        auto pointerSize = getPointerSize(context.targetReq);
+        return SimpleLayoutInfo(LayoutResourceKind::Uniform, pointerSize, pointerSize);
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -305,6 +386,20 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
     }
 
     bool DoStructuredBuffersNeedSeparateCounterBuffer() override { return true; }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+        SLANG_UNUSED(context);
+
+        // For non-bindless targets, DescriptorHandle<T> has the layout of uint2
+        auto uintInfo = GetScalarLayout(BaseType::UInt, context);
+        auto uint2Info = GetVectorLayout(BaseType::UInt, uintInfo, 2);
+        return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint2Info.size, uint2Info.alignment));
+    }
 };
 
 /// Common behavior for GLSL-family layout.
@@ -336,7 +431,7 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         return vectorInfo;
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // TODO(JS):
         // We'll assume 64 bit "pointer". If we are using these extensions...
@@ -360,6 +455,26 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         // The size of a `struct` must be rounded up to be a multiple of its alignment.
         //
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(elementType);
+
+        // Check if SPIRV with spvBindlessTextureNV extension is enabled
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            // For spvBindlessTextureNV, DescriptorHandle<T> is represented as uint64_t
+            auto uint64Info = GetScalarLayout(BaseType::UInt64, context);
+            return ObjectLayoutInfo(SimpleLayoutInfo(kind, uint64Info.size, uint64Info.alignment));
+        }
+
+        // For non-bindless GLSL/SPIRV targets, fall back to default layout
+        return Super::GetDescriptorHandleLayout(kind, elementType, context);
     }
 };
 
@@ -426,7 +541,7 @@ struct HLSLConstantBufferLayoutRulesImpl : DefaultLayoutRulesImpl
         return Super::GetArrayLayout(elementInfo, elementCount);
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // Not supported on HLSL currently...
         return SimpleLayoutInfo();
@@ -484,7 +599,7 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -498,18 +613,8 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
 
         // This always returns a layout where the size is the same as the alignment.
         default:
-            return Super::GetScalarLayout(baseType);
+            return Super::GetScalarLayout(baseType, context);
         }
-    }
-
-    SimpleLayoutInfo GetPointerLayout() override
-    {
-        // TODO(JS):
-        // NOTE! We are assuming that the layout is the same for the *target* that it is for
-        // the compilation.
-        // If we are emitting C++, then there is no way in general to know how that C++ will be
-        // compiled it could be 32 or 64 (or other) sizes. For now we just assume they are the same.
-        return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(void*), alignof(void*));
     }
 
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
@@ -537,6 +642,72 @@ struct CPULayoutRulesImpl : DefaultLayoutRulesImpl
     void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
     {
         // Conform to C/C++ size is adjusted to the largest alignment
+        ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(kind);
+
+        // For CPU targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
+
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
+    }
+};
+
+// The LLVM layout is similar to the CPU layout, except vectors are aligned to the
+// next power of two.
+//
+// TODO: The current implementation should be reasonably performant and reliable
+// on common targets. However, the layout rules should follow LLVM's DataLayout
+// for the given target triple. To know this triple, it either needs to be
+// passed as a parameter to all member functions or the struct needs to have a
+// constructor and be constructed dynamically.
+//
+// All of that implies a larger refactor touching lots of code around the
+// codebase.
+struct LLVMLayoutRulesImpl : DefaultLayoutRulesImpl
+{
+    typedef DefaultLayoutRulesImpl Super;
+
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
+    {
+        switch (baseType)
+        {
+        case BaseType::Bool:
+            return SimpleLayoutInfo(LayoutResourceKind::Uniform, 1, 1);
+
+        // This always returns a layout where the size is the same as the alignment.
+        default:
+            return Super::GetScalarLayout(baseType, context);
+        }
+    }
+
+    SimpleLayoutInfo GetVectorLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t elementCount) override
+    {
+        SLANG_UNUSED(elementType);
+        SimpleLayoutInfo vectorInfo;
+        vectorInfo.kind = elementInfo.kind;
+        vectorInfo.size = elementInfo.size * elementCount;
+        // Align vector to next power of two.
+        vectorInfo.alignment = Slang::_roundUpToPowerOfTwo(vectorInfo.size.getFiniteValue());
+        return vectorInfo;
+    }
+
+    UniformLayoutInfo BeginStructLayout() override { return Super::BeginStructLayout(); }
+
+    void EndStructLayout(UniformLayoutInfo* ioStructInfo) override
+    {
+        // Insert tailing padding.
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
 };
@@ -574,7 +745,7 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
 {
     typedef DefaultLayoutRulesImpl Super;
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context) override
     {
         switch (baseType)
         {
@@ -589,11 +760,11 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
             }
 
         default:
-            return Super::GetScalarLayout(baseType);
+            return Super::GetScalarLayout(baseType, context);
         }
     }
 
-    SimpleLayoutInfo GetPointerLayout() override
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // CUDA/NVTRC only support 64 bit pointers
         return SimpleLayoutInfo(LayoutResourceKind::Uniform, sizeof(int64_t), sizeof(int64_t));
@@ -703,6 +874,21 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
     }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) override
+    {
+        SLANG_UNUSED(kind);
+
+        // For CUDA targets, DescriptorHandle<T> has the layout of T
+        // Determine ShaderParameterKind from the element type
+        ShaderParameterKind paramKind = _getShaderParameterKindForResourceType(elementType);
+
+        // Get the object layout for the kind
+        return context.rules->GetObjectLayout(paramKind, context.objectLayoutOptions);
+    }
 };
 
 struct CUDAEntryPointParameterLayoutRulesImpl : CUDALayoutRulesImpl
@@ -790,12 +976,13 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
     // hook to allow differentiating for input/output
     virtual LayoutResourceKind getKind() { return kind; }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType, const TypeLayoutContext&) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(getKind(), 1);
     }
-    SimpleLayoutInfo GetPointerLayout() override
+
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // For pointers assume same logic as for scalars
         return SimpleLayoutInfo(getKind(), 1);
@@ -842,12 +1029,13 @@ struct GLSLSpecializationConstantLayoutRulesImpl : DefaultLayoutRulesImpl
 {
     LayoutResourceKind getKind() { return LayoutResourceKind::SpecializationConstant; }
 
-    SimpleLayoutInfo GetScalarLayout(BaseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType, const TypeLayoutContext&) override
     {
         // Assume that all scalars take up one "slot"
         return SimpleLayoutInfo(getKind(), 1);
     }
-    SimpleLayoutInfo GetPointerLayout() override
+
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext&) override
     {
         // In a sense pointer are just like ScalarLayout, so we'll use the same logic...
         return SimpleLayoutInfo(getKind(), 1);
@@ -1195,6 +1383,30 @@ struct CPULayoutRulesFamilyImpl : LayoutRulesFamilyImpl
     LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
 };
 
+struct LLVMLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
+{
+    virtual LayoutRulesImpl* getAnyValueRules() override;
+    virtual LayoutRulesImpl* getConstantBufferRules(
+        CompilerOptionSet& compilerOptions,
+        Type* containerType) override;
+    virtual LayoutRulesImpl* getPushConstantBufferRules() override;
+    virtual LayoutRulesImpl* getTextureBufferRules(CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getVaryingInputRules() override;
+    virtual LayoutRulesImpl* getVaryingOutputRules() override;
+    virtual LayoutRulesImpl* getSpecializationConstantRules() override;
+    virtual LayoutRulesImpl* getShaderStorageBufferRules(
+        CompilerOptionSet& compilerOptions) override;
+    virtual LayoutRulesImpl* getParameterBlockRules(CompilerOptionSet& compilerOptions) override;
+
+    LayoutRulesImpl* getRayPayloadParameterRules() override;
+    LayoutRulesImpl* getCallablePayloadParameterRules() override;
+    LayoutRulesImpl* getHitAttributesParameterRules() override;
+
+    LayoutRulesImpl* getShaderRecordConstantBufferRules() override;
+    LayoutRulesImpl* getEntryPointParameterRules() override;
+    LayoutRulesImpl* getStructuredBufferRules(CompilerOptionSet& compilerOptions) override;
+};
+
 struct CLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 {
     virtual LayoutRulesImpl* getAnyValueRules() override;
@@ -1302,6 +1514,7 @@ struct WGSLLayoutRulesFamilyImpl : LayoutRulesFamilyImpl
 GLSLLayoutRulesFamilyImpl kGLSLLayoutRulesFamilyImpl;
 HLSLLayoutRulesFamilyImpl kHLSLLayoutRulesFamilyImpl;
 CPULayoutRulesFamilyImpl kCPULayoutRulesFamilyImpl;
+LLVMLayoutRulesFamilyImpl kLLVMLayoutRulesFamilyImpl;
 CLayoutRulesFamilyImpl kCLayoutRulesFamilyImpl;
 CUDALayoutRulesFamilyImpl kCUDALayoutRulesFamilyImpl;
 MetalLayoutRulesFamilyImpl kMetalLayoutRulesFamilyImpl;
@@ -1724,6 +1937,46 @@ LayoutRulesImpl kHLSLHitAttributesParameterLayoutRulesImpl_ = {
     &kHLSLObjectLayoutRulesImpl,
 };
 
+// LLVM cases
+
+static LLVMLayoutRulesImpl kLLVMLayoutRulesImpl;
+
+LayoutRulesImpl kLLVMLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kLLVMLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMAnyValueLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd140LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd140LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMStd430LayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kStd430LayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMScalarLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kDefaultLayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
+LayoutRulesImpl kLLVMCLayoutRulesImpl_ = {
+    &kLLVMLayoutRulesFamilyImpl,
+    &kCPULayoutRulesImpl,
+    &kCPUObjectLayoutRulesImpl,
+};
+
 // GLSL Family
 
 LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getAnyValueRules()
@@ -2009,6 +2262,133 @@ LayoutRulesImpl* CPULayoutRulesFamilyImpl::getStructuredBufferRules(CompilerOpti
     return &kCPULayoutRulesImpl_;
 }
 
+// LLVM Family
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getAnyValueRules()
+{
+    return &kLLVMAnyValueLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(
+    CompilerOptionSet& compilerOptions,
+    Type* containerType)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        switch (cbufferType->getLayoutType()->astNodeType)
+        {
+        default:
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::Std140DataLayoutType:
+            return &kLLVMStd140LayoutRulesImpl_;
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+        case ASTNodeType::Std430DataLayoutType:
+            return &kLLVMStd430LayoutRulesImpl_;
+        case ASTNodeType::ScalarDataLayoutType:
+            return &kLLVMScalarLayoutRulesImpl_;
+        case ASTNodeType::CDataLayoutType:
+            return &kLLVMCLayoutRulesImpl_;
+        }
+    }
+    else if (containerType == nullptr)
+        return &kLLVMStd140LayoutRulesImpl_;
+
+    // If we're here, containerType is probably a uniform parameter.
+
+    // It'd be nice if this could be Std140 to match GLSL. However, that can't
+    // be: the LLVM target needs to collect its uniforms into one top-level
+    // ConstantBuffer, which in turn enforces that all uniforms must use the
+    // same layout :/
+    //
+    // The top-level ConstantBuffer uses the C layout for compatibility with the
+    // C++ target, so uniforms within it cannot be Std140.
+    return &kLLVMCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getPushConstantBufferRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getTextureBufferRules(CompilerOptionSet&)
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingInputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getVaryingOutputRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getSpecializationConstantRules()
+{
+    return &kLLVMLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderStorageBufferRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getParameterBlockRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd140LayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getRayPayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getCallablePayloadParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getHitAttributesParameterRules()
+{
+    return nullptr;
+}
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getShaderRecordConstantBufferRules()
+{
+    return nullptr;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getEntryPointParameterRules()
+{
+    return &kLLVMCLayoutRulesImpl_;
+}
+
+LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getStructuredBufferRules(
+    CompilerOptionSet& compilerOptions)
+{
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+
+    return &kLLVMStd430LayoutRulesImpl_;
+}
+
 // C compatible layout family
 
 LayoutRulesImpl* CLayoutRulesFamilyImpl::getAnyValueRules()
@@ -2197,7 +2577,7 @@ struct MetalObjectLayoutRulesImpl : ObjectLayoutRulesImpl
 
 struct MetalArgumentBufferElementLayoutRulesImpl : ObjectLayoutRulesImpl, DefaultLayoutRulesImpl
 {
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType) override
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext&) override
     {
         SLANG_UNUSED(baseType);
         // Everything in a metal argument buffer, including basic scalar values, occupy one `[[id]]`
@@ -2544,6 +2924,15 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CSource:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+        if (isCPUTargetViaLLVM(targetReq))
+        {
+            return &kLLVMLayoutRulesFamilyImpl;
+        }
+        else
         {
             // For now lets use some fairly simple CPU binding rules
 
@@ -2555,6 +2944,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
 
             return &kCPULayoutRulesFamilyImpl;
         }
+
     case CodeGenTarget::Metal:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
@@ -2838,13 +3228,45 @@ bool isSPIRV(CodeGenTarget codeGenTarget)
 
 bool isCPUTarget(TargetRequest* targetReq)
 {
+    return isCPUTarget(targetReq->getTarget());
+}
+
+bool isCPUTarget(CodeGenTarget codeGenTarget)
+{
     return ArtifactDescUtil::isCpuLikeTarget(
-        ArtifactDescUtil::makeDescForCompileTarget(asExternal(targetReq->getTarget())));
+        ArtifactDescUtil::makeDescForCompileTarget(asExternal(codeGenTarget)));
+}
+
+bool isCPUTargetViaLLVM(TargetRequest* targetReq)
+{
+    SlangEmitCPUMethod emitCPUMethod = targetReq->getOptionSet().getEnumOption<SlangEmitCPUMethod>(
+        CompilerOptionName::EmitCPUMethod);
+    bool emitViaLLVM = emitCPUMethod == SlangEmitCPUMethod::SLANG_EMIT_CPU_VIA_LLVM;
+    switch (targetReq->getTarget())
+    {
+    default:
+        return false;
+
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+        return true;
+
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+        return emitViaLLVM;
+    }
 }
 
 bool isCUDATarget(TargetRequest* targetReq)
 {
-    switch (targetReq->getTarget())
+    return isCUDATarget(targetReq->getTarget());
+}
+
+bool isCUDATarget(CodeGenTarget codeGenTarget)
+{
+    switch (codeGenTarget)
     {
     default:
         return false;
@@ -2881,10 +3303,85 @@ bool isKernelTarget(CodeGenTarget codeGenTarget)
            ArtifactStyle::Kernel;
 }
 
+static bool getLLVMBuiltinTypeLayoutInfo(TargetRequest* targetReq, TargetBuiltinTypeLayoutInfo* out)
+{
+    CompilerOptionSet& compileOptions = targetReq->getOptionSet();
+
+    // On LLVM targets, we need to query the sizes from LLVM itself, based
+    // on the target triple.
+    Session* session = targetReq->getSession();
+    ISlangSharedLibrary* llvmLib = session->getOrLoadSlangLLVM();
+    if (!llvmLib)
+        return false;
+
+    auto targetTripleOption =
+        compileOptions.getStringOption(CompilerOptionName::LLVMTargetTriple).getUnownedSlice();
+    CharSlice targetTriple = CharSlice(targetTripleOption.begin(), targetTripleOption.getLength());
+
+    using InfoFuncV1 =
+        SlangResult (*)(Slang::CharSlice targetTriple, Slang::TargetBuiltinTypeLayoutInfo* info);
+
+    auto infoFunc = (InfoFuncV1)llvmLib->findFuncByName("getLLVMTargetBuiltinTypeLayoutInfo_V1");
+
+    if (!infoFunc)
+        return false;
+
+    SlangResult result = infoFunc(targetTriple, out);
+    return result == SLANG_OK;
+}
+
+TargetBuiltinTypeLayoutInfo getBuiltinTypeLayoutInfo(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info;
+    info.genericPointerSize = 8; // Assume 64-bit pointers by default.
+
+    // If we don't know the target, we just have to assume the defaults. This
+    // type of usage occurs in IR checking passes prior to target-specific
+    // emission, e.g. checkForOperatorShiftOverflow. Because we don't yet know
+    // the size of pointers when that pass runs, we just assume it's 64 bits
+    // because that's the case most of the time.
+    if (!targetReq)
+        return info;
+
+    // If we're using an LLVM target, we should ask from LLVM.
+    if (isCPUTargetViaLLVM(targetReq) && getLLVMBuiltinTypeLayoutInfo(targetReq, &info))
+        return info;
+
+    // Otherwise, we can make educated guesses based on the targets.
+    switch (targetReq->getTarget())
+    {
+    case CodeGenTarget::CSource:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
+    case CodeGenTarget::HostCPPSource:
+    case CodeGenTarget::CUDAObjectCode:
+    case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
+        // Assume we're targeting the compiler's host, so we can just get the
+        // pointer size from the host here.
+        info.genericPointerSize = sizeof(void*);
+        break;
+    }
+    return info;
+}
+
+size_t getPointerSize(TargetRequest* targetReq)
+{
+    TargetBuiltinTypeLayoutInfo info = getBuiltinTypeLayoutInfo(targetReq);
+    return info.genericPointerSize;
+}
+
 SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgram)
 {
     // If we are emitting directly, there is no intermediate source language
-    if (targetProgram->shouldEmitSPIRVDirectly())
+    if (targetProgram->shouldEmitSPIRVDirectly() ||
+        isCPUTargetViaLLVM(targetProgram->getTargetReq()))
     {
         return SourceLanguage::Unknown;
     }
@@ -2923,7 +3420,7 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
         }
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostSharedLibrary:
-    case CodeGenTarget::ObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::HostExecutable:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::ShaderHostCallable:
@@ -4739,14 +5236,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         return TypeLayoutResult(typeLayout, info);
     }
-    else if (const auto samplerStateType = as<SamplerStateType>(type))
-    {
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(ShaderParameterKind::SamplerState, context.objectLayoutOptions)
-                .getSimple(),
-            type,
-            rules);
-    }
     else if (as<SubpassInputType>(type))
     {
         // SubpassInputType fills 2 slots, 'shader resource' and 'input_attachment_index'
@@ -4757,131 +5246,96 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         objLayout1.layoutInfos.add(objLayout2.layoutInfos.getFirst());
         return createSimpleTypeLayout(objLayout1, type, rules);
     }
-    else if (auto textureType = as<TextureType>(type))
+    else if (auto structuredBufferType = as<HLSLStructuredBufferType>(type))
     {
-        // TODO: the logic here should really be defined by the rules,
-        // and not at this top level...
-        ShaderParameterKind kind;
-        if (textureType->isCombined())
-        {
-            switch (textureType->getAccess())
-            {
-            default:
-                kind = ShaderParameterKind::MutableTextureSampler;
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                kind = ShaderParameterKind::TextureSampler;
-                break;
-            }
-        }
-        else
-        {
-            switch (textureType->getAccess())
-            {
-            default:
-                kind = ShaderParameterKind::MutableTexture;
-                break;
-
-            case SLANG_RESOURCE_ACCESS_READ:
-                kind = ShaderParameterKind::Texture;
-                break;
-            }
-        }
-        auto objLayout = rules->GetObjectLayout(kind, context.objectLayoutOptions);
-        return createSimpleTypeLayout(objLayout, type, rules);
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::StructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::StructuredBuffer,
+            structuredBufferType,
+            structuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
     }
-    else if (auto imageType = as<GLSLImageType>(type))
+    else if (auto rwStructuredBufferType = as<HLSLRWStructuredBufferType>(type))
     {
-        // TODO: the logic here should really be defined by the rules,
-        // and not at this top level...
-        ShaderParameterKind kind;
-        switch (imageType->getAccess())
-        {
-        default:
-            kind = ShaderParameterKind::MutableImage;
-            break;
-
-        case SLANG_RESOURCE_ACCESS_READ:
-            kind = ShaderParameterKind::Image;
-            break;
-        }
-
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::MutableStructuredBuffer,
+            rwStructuredBufferType,
+            rwStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (
+        auto rasterizerOrderedStructuredBufferType =
+            as<HLSLRasterizerOrderedStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::MutableStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::MutableStructuredBuffer,
+            rasterizerOrderedStructuredBufferType,
+            rasterizerOrderedStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (auto appendStructuredBufferType = as<HLSLAppendStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            appendStructuredBufferType,
+            appendStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (auto consumeStructuredBufferType = as<HLSLConsumeStructuredBufferType>(type))
+    {
+        auto info = rules
+                        ->GetObjectLayout(
+                            ShaderParameterKind::AppendConsumeStructuredBuffer,
+                            context.objectLayoutOptions)
+                        .getSimple();
+        auto typeLayout = createStructuredBufferTypeLayout(
+            context,
+            ShaderParameterKind::AppendConsumeStructuredBuffer,
+            consumeStructuredBufferType,
+            consumeStructuredBufferType->getElementType());
+        return TypeLayoutResult(typeLayout, info);
+    }
+    else if (
+        as<TextureType>(type) || as<SamplerStateType>(type) ||
+        as<HLSLByteAddressBufferType>(type) || as<HLSLRWByteAddressBufferType>(type) ||
+        as<HLSLRasterizerOrderedByteAddressBufferType>(type) || as<GLSLImageType>(type) ||
+        as<GLSLShaderStorageBufferType>(type) || as<GLSLAtomicUintType>(type) ||
+        as<GLSLInputAttachmentType>(type) || as<UntypedBufferResourceType>(type) ||
+        as<RaytracingAccelerationStructureType>(type))
+    {
+        ShaderParameterKind kind = _getShaderParameterKindForResourceType(type);
         return createSimpleTypeLayout(
             rules->GetObjectLayout(kind, context.objectLayoutOptions),
             type,
             rules);
     }
-    else if (as<SubpassInputType>(type))
-    {
-        ShaderParameterKind kind = ShaderParameterKind::SubpassInput;
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
-    }
-    else if (as<GLSLAtomicUintType>(type))
-    {
-        ShaderParameterKind kind = ShaderParameterKind::AtomicUint;
-        return createSimpleTypeLayout(
-            rules->GetObjectLayout(kind, context.objectLayoutOptions),
-            type,
-            rules);
-    }
-
-    // TODO: need a better way to handle this stuff...
-#define CASE(TYPE, KIND)                                                                           \
-    else if (auto type_##TYPE = as<TYPE>(type)) do                                                 \
-    {                                                                                              \
-        auto info = rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions) \
-                        .getSimple();                                                              \
-        auto typeLayout = createStructuredBufferTypeLayout(                                        \
-            context,                                                                               \
-            ShaderParameterKind::KIND,                                                             \
-            type_##TYPE,                                                                           \
-            type_##TYPE->getElementType());                                                        \
-        return TypeLayoutResult(typeLayout, info);                                                 \
-    }                                                                                              \
-    while (0)
-
-    CASE(HLSLStructuredBufferType, StructuredBuffer);
-    CASE(HLSLRWStructuredBufferType, MutableStructuredBuffer);
-    CASE(HLSLRasterizerOrderedStructuredBufferType, MutableStructuredBuffer);
-    CASE(HLSLAppendStructuredBufferType, AppendConsumeStructuredBuffer);
-    CASE(HLSLConsumeStructuredBufferType, AppendConsumeStructuredBuffer);
-
-#undef CASE
-
-
-    // TODO: need a better way to handle this stuff...
-#define CASE(TYPE, KIND)                                                                    \
-    else if (as<TYPE>(type)) do                                                             \
-    {                                                                                       \
-        return createSimpleTypeLayout(                                                      \
-            rules->GetObjectLayout(ShaderParameterKind::KIND, context.objectLayoutOptions), \
-            type,                                                                           \
-            rules);                                                                         \
-    }                                                                                       \
-    while (0)
-
-    CASE(HLSLByteAddressBufferType, RawBuffer);
-    CASE(HLSLRWByteAddressBufferType, MutableRawBuffer);
-    CASE(HLSLRasterizerOrderedByteAddressBufferType, MutableRawBuffer);
-
-    CASE(GLSLInputAttachmentType, InputRenderTarget);
-
-    // This case is mostly to allow users to add new resource types...
-    CASE(RaytracingAccelerationStructureType, AccelerationStructure);
-    CASE(UntypedBufferResourceType, RawBuffer);
-
-    CASE(GLSLShaderStorageBufferType, MutableRawBuffer);
-
-#undef CASE
-
     else if (auto basicType = as<BasicExpressionType>(type))
     {
         return createSimpleTypeLayout(
-            rules->GetScalarLayout(basicType->getBaseType()),
+            rules->GetScalarLayout(basicType->getBaseType(), context),
             type,
             rules);
     }
@@ -5013,7 +5467,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         RefPtr<PointerTypeLayout> ptrLayout = new PointerTypeLayout();
 
-        const auto info = rules->GetPointerLayout();
+        const auto info = rules->GetPointerLayout(context);
 
         const TypeLayoutResult result(ptrLayout, info);
         _addLayout(context, type, result);
@@ -5049,8 +5503,19 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
+        if (context.targetReq &&
+            context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
+        {
+            auto uint64Type = context.astBuilder->getUInt64Type();
+            return _createTypeLayout(context, uint64Type);
+        }
+
+        // On bindless targets, DescriptorHandle<T> has the layout of T
         if (areResourceTypesBindlessOnTarget(context.targetReq))
             return _createTypeLayout(context, resPtrType->getElementType());
+
+        // On non-bindless targets, DescriptorHandle<T> has the layout of uint2
         auto uint2Type = context.astBuilder->getVectorType(
             context.astBuilder->getUIntType(),
             context.astBuilder->getIntVal(context.astBuilder->getIntType(), 2));
@@ -5561,7 +6026,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
-            auto info = varyingRules[rr]->GetScalarLayout(baseType);
+            auto info = varyingRules[rr]->GetScalarLayout(baseType, context);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -5575,7 +6040,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
-            auto info = varyingRules[rr]->GetPointerLayout();
+            auto info = varyingRules[rr]->GetPointerLayout(context);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
 
@@ -5609,7 +6074,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto varyingRuleSet = varyingRules[rr];
-            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
             auto info = varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, elementCount);
             typeLayout->addResourceUsage(info.kind, info.size);
         }
@@ -5663,7 +6128,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
         for (int rr = 0; rr < varyingRulesCount; ++rr)
         {
             auto varyingRuleSet = varyingRules[rr];
-            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType);
+            auto elementInfo = varyingRuleSet->GetScalarLayout(elementBaseType, context);
 
             auto info = varyingRuleSet->GetMatrixLayout(
                 elementBaseType,
@@ -5679,6 +6144,34 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
                 auto rowInfo =
                     varyingRuleSet->GetVectorLayout(elementBaseType, elementInfo, colCount);
                 rowTypeLayout->addResourceUsage(rowInfo.kind, rowInfo.size);
+            }
+        }
+
+        return typeLayout;
+    }
+    else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+    {
+        RefPtr<TypeLayout> typeLayout = new TypeLayout();
+        typeLayout->type = type; // Preserve the original DescriptorHandle type
+        typeLayout->rules = rules;
+
+        for (int rr = 0; rr < varyingRulesCount; ++rr)
+        {
+            // Determine the layout resource kind based on the direction mask
+            LayoutResourceKind varyingKind = LayoutResourceKind::VaryingInput;
+            if (directionMask & kEntryPointParameterDirection_Output)
+                varyingKind = LayoutResourceKind::VaryingOutput;
+
+            auto objLayoutInfo = varyingRules[rr]->simpleRules->GetDescriptorHandleLayout(
+                varyingKind,
+                descriptorHandleType->getElementType(),
+                context);
+
+            // For combined texture samplers, objLayoutInfo may contain multiple layoutInfos
+            // (e.g., one for texture and one for sampler)
+            for (const auto& layoutInfo : objLayoutInfo.layoutInfos)
+            {
+                typeLayout->addResourceUsage(layoutInfo.kind, layoutInfo.size);
             }
         }
 

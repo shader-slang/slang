@@ -35,9 +35,13 @@ if(SLANG_GENERATORS_PATH)
     endif()
     set(SLANG_COMPILER "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}")
     set(SLANG_COMPILER_DEPENDENCY)
-else()
+elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY slangc)
+else()
+    # As a fallback, use the system-installed `slangc` compiler
+    set(SLANG_COMPILER slangc)
+    set(SLANG_COMPILER_DEPENDENCY)
 endif()
 
 # Build neural.slang-module and output to the output directory

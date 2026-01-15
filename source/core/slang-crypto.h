@@ -67,29 +67,6 @@ public:
     uint32_t getHashCode() const { return data[0]; }
 };
 
-/// MD5 hash generator implementing https://www.ietf.org/rfc/rfc1321.txt
-class MD5
-{
-public:
-    using Digest = HashDigest<16>;
-
-    MD5();
-
-    void init();
-    void update(const void* data, SlangSizeT size);
-    Digest finalize();
-
-    static Digest compute(const void* data, SlangInt size);
-
-private:
-    const void* processBlock(const void* data, SlangInt size);
-
-    uint32_t m_lo, m_hi;
-    uint32_t m_a, m_b, m_c, m_d;
-    uint32_t m_block[16];
-    uint8_t m_buffer[64];
-};
-
 /// SHA1 hash generator implementing https://www.ietf.org/rfc/rfc3174.txt
 class SHA1
 {
