@@ -3,6 +3,7 @@
 
 #include "slang-ast-base.h"
 #include "slang-ast-expr.h"
+#include "slang-ast-print.h"
 #include "slang-ast-type.h"
 #include "slang-check-impl.h"
 
@@ -113,5 +114,19 @@ void printDiagnosticArg(StringBuilder& sb, ParamPassingMode direction)
         break;
     }
 }
+
+String SpecializationArg::toString()
+{
+    if (val)
+        return val->toString();
+    else if (expr)
+    {
+        ASTPrinter printer(getCurrentASTBuilder());
+        printer.addExpr(expr);
+        return printer.getString();
+    }
+    return String();
+}
+
 
 } // namespace Slang
