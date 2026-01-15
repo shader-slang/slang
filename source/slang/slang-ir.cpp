@@ -8079,8 +8079,8 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
-            if (as<IRSetBase>(uu->getUser()) != nullptr)
-                setsToUpdate.add(as<IRSetBase>(user));
+            if (auto setBase = as<IRSetBase>(uu->getUser()))
+                setsToUpdate.add(setBase);
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
