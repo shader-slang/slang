@@ -16,9 +16,12 @@ public:
     // to create the inner compiler and wrap it here.
     //
     ComPtr<IDownstreamCompiler> cppCompiler;
+    String executablePath;
 
-    MetalDownstreamCompiler(ComPtr<IDownstreamCompiler>& innerCompiler)
-        : DownstreamCompilerBase(innerCompiler->getDesc()), cppCompiler(innerCompiler)
+    MetalDownstreamCompiler(ComPtr<IDownstreamCompiler>& innerCompiler, String path)
+        : DownstreamCompilerBase(innerCompiler->getDesc())
+        , cppCompiler(innerCompiler)
+        , executablePath(path)
     {
     }
 
@@ -44,10 +47,16 @@ public:
     {
         // Use metal-objdump to disassemble the Metal IR.
 
-        ExecutableLocation exeLocation("xcrun");
         CommandLine cmdLine;
+#if SLANG_APPLE_FAMILY
+        ExecutableLocation exeLocation("xcrun");
         cmdLine.setExecutableLocation(exeLocation);
         cmdLine.addArg("metal-objdump");
+#else
+        // Metal Developer Tools for Windows
+        ExecutableLocation exeLocation(executablePath, "metal-objdump");
+        cmdLine.setExecutableLocation(exeLocation);
+#endif
         cmdLine.addArg("--disassemble");
         ComPtr<IOSFileArtifactRepresentation> srcFile;
         SLANG_RETURN_ON_FAIL(from->requireFile(IArtifact::Keep::No, srcFile.writeRef()));
@@ -62,19 +71,37 @@ public:
     }
 };
 
-static SlangResult locateMetalCompiler(DownstreamCompilerSet* set)
+static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet* set)
 {
     ComPtr<IDownstreamCompiler> innerCppCompiler;
 
+#if SLANG_APPLE_FAMILY
+    // Use xcrun command to find the metal compiler.
     CommandLine xcrunCmdLine;
     ExecutableLocation xcrunLocation("xcrun");
     xcrunCmdLine.setExecutableLocation(xcrunLocation);
+    xcrunCmdLine.addArg("--sdk");
+    xcrunCmdLine.addArg("macosx");
+    xcrunCmdLine.addArg("--find");
     xcrunCmdLine.addArg("metal");
+    ExecuteResult exeRes;
+    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(xcrunCmdLine, exeRes));
+    if (exeRes.resultCode != 0)
+    {
+        return SLANG_FAIL;
+    }
 
     SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::createCompiler(xcrunCmdLine, innerCppCompiler));
+#else
+    // Metal Developer Tools for Windows
+    ExecutableLocation metalcLocation = ExecutableLocation(path, "metal");
+
+    SLANG_RETURN_ON_FAIL(
+        GCCDownstreamCompilerUtil::createCompiler(metalcLocation, innerCppCompiler));
+#endif
 
     ComPtr<IDownstreamCompiler> compiler =
-        ComPtr<IDownstreamCompiler>(new MetalDownstreamCompiler(innerCppCompiler));
+        ComPtr<IDownstreamCompiler>(new MetalDownstreamCompiler(innerCppCompiler, path));
     set->addCompiler(compiler);
     return SLANG_OK;
 }
@@ -84,9 +111,8 @@ SlangResult MetalDownstreamCompilerUtil::locateCompilers(
     ISlangSharedLibraryLoader* loader,
     DownstreamCompilerSet* set)
 {
-    SLANG_UNUSED(path);
     SLANG_UNUSED(loader);
-    return locateMetalCompiler(set);
+    return locateMetalCompiler(path, set);
 }
 
 } // namespace Slang
