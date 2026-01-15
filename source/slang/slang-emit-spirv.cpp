@@ -6288,6 +6288,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
+    // Helper function to unwrap single-element array types from pointer types.
+    // This is needed for system values like SV_Depth that require scalar types
+    // in SPIR-V, but may be wrapped in Conditional<T, true> which expands to T[1].
+    IRType* maybeUnwrapSingleElementArrayFromPtrType(IRType* type)
+    {
+        auto ptrType = as<IRPtrTypeBase>(type);
+        if (!ptrType)
+            return type;
+
+        auto valueType = ptrType->getValueType();
+        auto arrayType = as<IRArrayType>(valueType);
+        if (!arrayType)
+            return type;
+
+        // Check if this is a single-element array (like float[1] from Conditional<float, true>)
+        auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+        if (!elementCount || elementCount->getValue() != 1)
+            return type;
+
+        // Create a new pointer type pointing to the element type instead of the array
+        IRBuilder builder(ptrType);
+        return builder.getPtrType(ptrType->getOp(), arrayType->getElementType(), ptrType->getAddressSpace());
+    }
+
     SpvInst* getBuiltinGlobalVar(IRType* type, SpvBuiltIn builtinVal, IRInst* irInst)
     {
         SpvInst* result = nullptr;
@@ -6403,15 +6427,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "sv_depth")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
+                    return getBuiltinGlobalVar(
+                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
+                        SpvBuiltInFragDepth,
+                        inst);
                 }
                 else if (semanticName == "sv_depthgreaterequal")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
+                    return getBuiltinGlobalVar(
+                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
+                        SpvBuiltInFragDepth,
+                        inst);
                 }
                 else if (semanticName == "sv_depthlessequal")
                 {
-                    return getBuiltinGlobalVar(inst->getFullType(), SpvBuiltInFragDepth, inst);
+                    return getBuiltinGlobalVar(
+                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
+                        SpvBuiltInFragDepth,
+                        inst);
                 }
                 else if (semanticName == "sv_dispatchthreadid")
                 {
@@ -7560,6 +7593,46 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             memoryAccessMask,
             alignment,
             memoryScope);
+
+        // Handle the case where the value is a single-element array but the pointer
+        // type was unwrapped to a scalar (e.g., when using Conditional<float, true> with SV_Depth).
+        // We need to extract the element from the array before storing.
+        SpvInst* valueToStore = nullptr;
+        auto valType = val->getDataType();
+        if (auto valArrayType = as<IRArrayType>(valType))
+        {
+            auto elementCount = as<IRIntLit>(valArrayType->getElementCount());
+            if (elementCount && elementCount->getValue() == 1)
+            {
+                // Check if the pointer's target type in IR is also a single-element array
+                // (which would have been unwrapped for SPIR-V system values)
+                auto ptrType = as<IRPtrTypeBase>(ptr->getDataType());
+                if (ptrType)
+                {
+                    auto ptrValueType = ptrType->getValueType();
+                    if (auto ptrArrayType = as<IRArrayType>(ptrValueType))
+                    {
+                        auto ptrElementCount = as<IRIntLit>(ptrArrayType->getElementCount());
+                        if (ptrElementCount && ptrElementCount->getValue() == 1)
+                        {
+                            // The pointer type was likely unwrapped by maybeUnwrapSingleElementArrayFromPtrType.
+                            // Extract element 0 from the single-element array value.
+                            valueToStore = emitOpCompositeExtract(
+                                parent,
+                                nullptr,
+                                valArrayType->getElementType(),
+                                val,
+                                makeArray(SpvLiteralInteger::from32(0)));
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we didn't extract an element, use the original value
+        if (!valueToStore)
+            valueToStore = ensureInst(val);
+
         return emitInstCustomOperandFunc(
             parent,
             inst,
@@ -7567,7 +7640,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             [&]()
             {
                 emitOperand(ptr);
-                emitOperand(val);
+                emitOperand(getID(valueToStore));
                 if (memoryAccessMask)
                 {
                     emitOperand(SpvLiteralInteger::from32(memoryAccessMask));

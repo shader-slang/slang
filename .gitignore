@@ -132,3 +132,5 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+cmake-3.30.0-linux-x86_64.tar.gz
+tests/bugs/conditional-sv-depth.spv
