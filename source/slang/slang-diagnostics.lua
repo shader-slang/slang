@@ -4,6 +4,19 @@
 --
 -- Lua-based diagnostic definitions for the Slang compiler
 --
+-- Code Generation Flow:
+--   1. This file defines diagnostics using err()/warning() helper functions
+--   2. slang-diagnostics-helpers.lua processes them, extracting:
+--      - Parameters from ~interpolations (auto-deduplicated)
+--      - Locations from span() and note() calls
+--   3. slang-rich-diagnostics.h.lua loads processed diagnostics
+--   4. FIDDLE templates in slang-rich-diagnostics.h generate C++ structs:
+--      - Parameters become typed member variables (String, Type*, Name*, int)
+--      - Locations become SourceLoc member variables
+--   5. FIDDLE templates in slang-rich-diagnostics.cpp generate toGenericDiagnostic():
+--      - Builds message string by interpolating parameters
+--      - Sets primary span, secondary spans, and notes with their messages
+--
 -- Example usage:
 --
 -- err(
