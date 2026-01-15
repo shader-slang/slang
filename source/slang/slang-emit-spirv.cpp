@@ -7653,7 +7653,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             [&]()
             {
                 emitOperand(ptr);
-                emitOperand(getID(valueToStore));
+                emitOperand(valueToStore);
                 if (memoryAccessMask)
                 {
                     emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
