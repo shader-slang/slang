@@ -13735,7 +13735,10 @@ T reversebits<T : __BuiltinIntegerType>(T value)
     case hlsl:
         __intrinsic_asm "reversebits";
     case glsl:
-        __intrinsic_asm "bitfieldReverse";
+        if (T is int64_t || T is uint64_t)
+            __intrinsic_asm "pack64(bitfieldReverse(unpack32($0)).yx)";
+        else
+            __intrinsic_asm "bitfieldReverse";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_reversebits($0)";
