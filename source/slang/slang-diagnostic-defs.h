@@ -2307,6 +2307,18 @@ DIAGNOSTIC(
     intValFromNonIntSpecConstEncountered,
     "cannot cast non-integer specialization constant to compile-time integer")
 
+DIAGNOSTIC(
+    38042,
+    Error,
+    ImplicitTypeCoerceConstraintWithNonImplicitConversion,
+    "'$0' is not implicitly convertable to '$1', not satisfying the type coerce constraint "
+    "'$1($0)'")
+
+DIAGNOSTIC(
+    38043,
+    Error,
+    TypeCoerceConstraintMissingConversion,
+    "'$0' is not convertable to '$1', not satisfying the type coerce constraint '$1($0)'")
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(

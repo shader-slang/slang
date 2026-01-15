@@ -1030,42 +1030,128 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     for (auto arg : substArgs)
         newArgs.add(arg);
 
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+    for (auto constraintDecl : genericDeclRef.getDecl()->getMembers())
     {
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView(), constraintDecl)
-                .as<GenericTypeConstraintDecl>();
-
-        auto sub = getSub(m_astBuilder, constraintDeclRef);
-        auto sup = getSup(m_astBuilder, constraintDeclRef);
-
-        auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
-
-        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
-        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
-
-        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
         {
-            newArgs.add(subTypeWitness);
-        }
-        else if (!subTypeWitness && constraintIsOptional)
-        {
-            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
-        }
-        else
-        {
-            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        newArgs.getArrayView(),
+                        genericTypeConstraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+            auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+
+            bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+            bool constraintIsOptional =
+                genericTypeConstraintDecl->hasModifier<OptionalConstraintModifier>();
+
+            if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
             {
-                subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
-                getSink()->diagnose(
-                    context.loc,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    sub,
-                    sup);
+                newArgs.add(subTypeWitness);
             }
-            return false;
+            else if (!subTypeWitness && constraintIsOptional)
+            {
+                newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
+            }
+            else
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
+                    getSink()->diagnose(
+                        context.loc,
+                        Diagnostics::typeArgumentDoesNotConformToInterface,
+                        sub,
+                        sup);
+                }
+                return false;
+            }
+        }
+        else if (as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            // This logic closely mirrors logic from `trySolveConstraintSystem`
+            DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView(), constraintDecl)
+                    .as<TypeCoercionConstraintDecl>();
+            auto fromType = getFromType(m_astBuilder, constraintDeclRef);
+            auto toType = getToType(m_astBuilder, constraintDeclRef);
+            auto conversionCost = getConversionCost(toType, fromType);
+
+            if (constraintDecl->findModifier<ImplicitConversionModifier>())
+            {
+                // The type arguments are not implicitly convertible, return failure.
+                if (conversionCost > kConversionCost_GeneralConversion)
+                {
+                    DeclRef<Decl> declRefUsedToConvert{};
+                    _coerce(
+                        CoercionSite::General,
+                        toType,
+                        nullptr,
+                        fromType,
+                        nullptr,
+                        getSink(),
+                        nullptr,
+                        &declRefUsedToConvert);
+
+                    if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                    {
+                        getSink()->diagnose(
+                            context.loc,
+                            Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
+                            fromType,
+                            toType);
+                        getSink()->diagnose(
+                            declRefUsedToConvert,
+                            Diagnostics::seeDefinitionOf,
+                            "the non implicit conversion function");
+                        getSink()->diagnose(
+                            constraintDecl,
+                            Diagnostics::seeDefinitionOf,
+                            "the unsatisfied constraint");
+                    }
+
+                    return false;
+                }
+            }
+            else
+            {
+                // The type arguments are not convertible, return failure.
+                if (conversionCost == kConversionCost_Impossible)
+                {
+                    if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                    {
+                        getSink()->diagnose(
+                            context.loc,
+                            Diagnostics::TypeCoerceConstraintMissingConversion,
+                            fromType,
+                            toType);
+                        getSink()->diagnose(
+                            constraintDecl,
+                            Diagnostics::seeDefinitionOf,
+                            genericDeclRef.getDecl()->inner);
+                    }
+                    return false;
+                }
+            }
+            DeclRef<Decl> declRefUsedToConvert{};
+            _coerce(
+                CoercionSite::General,
+                toType,
+                nullptr,
+                fromType,
+                nullptr,
+                getSink(),
+                nullptr,
+                &declRefUsedToConvert);
+            newArgs.add(
+                m_astBuilder->getTypeCoercionWitness(fromType, toType, declRefUsedToConvert));
         }
     }
 
@@ -2891,7 +2977,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
                                             &collectedErrorsSink,
-                                            &conversionCost);
+                                            &conversionCost,
+                                            nullptr);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;

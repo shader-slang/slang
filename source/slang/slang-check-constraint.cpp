@@ -764,8 +764,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     args.getArrayView().arrayView,
                     constraintDecl)
                 .as<TypeCoercionConstraintDecl>();
-        auto fromType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->fromType.Ptr());
-        auto toType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->toType.Ptr());
+        auto fromType = getFromType(m_astBuilder, constraintDeclRef);
+        auto toType = getToType(m_astBuilder, constraintDeclRef);
         auto conversionCost = getConversionCost(toType, fromType);
         if (constraintDecl->findModifier<ImplicitConversionModifier>())
         {
@@ -791,11 +791,17 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             constrainedGenericParams.add(toDecl.getDecl());
         }
-        // If we are to expand the support of type coercion constraint beyond simple builtin core
-        // module functions, then the witness should be a reference to the conversion function. For
-        // now, this isn't required, and it is not easy to get it from the coercion logic, so we
-        // leave it empty.
-        args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
+        DeclRef<Decl> declRefUsedToConvert{};
+        _coerce(
+            CoercionSite::General,
+            toType,
+            nullptr,
+            fromType,
+            nullptr,
+            getSink(),
+            nullptr,
+            &declRefUsedToConvert);
+        args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, declRefUsedToConvert));
     }
 
     // Add a flat cost to all unconstrained generic params.
