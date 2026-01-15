@@ -65,7 +65,8 @@ void UIntSet::resize(UInt size)
 
 void UIntSet::unsetAll()
 {
-    ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
+    if (m_buffer.getCount() > 0)
+        ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
 }
 
 bool UIntSet::isEmpty() const
@@ -99,6 +100,9 @@ bool UIntSet::operator==(const UIntSet& set) const
 
     const Index bCount = set.m_buffer.getCount();
     const auto bElems = set.m_buffer.getBuffer();
+
+    if (aCount == 0 || bCount == 0)
+        return aCount == bCount;
 
     const Index minCount = Math::Min(aCount, bCount);
 

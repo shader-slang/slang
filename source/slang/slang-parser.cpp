@@ -6473,6 +6473,8 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
     }
+    ifStatement->afterLoc = tokenReader.peekLoc();
+
     return ifStatement;
 }
 
@@ -8255,7 +8257,7 @@ static Expr* parsePostfixExpr(Parser* parser)
     }
 }
 
-static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+static IntegerLiteralValue _foldIntegerPrefixOp(TokenType tokenType, IntegerLiteralValue value)
 {
     switch (tokenType)
     {
@@ -8264,7 +8266,15 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        return -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8758,7 +8768,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                 // Need to get the basic type, so we can fit to underlying type
                 if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
