@@ -8145,7 +8145,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto srcVal = emitLoad(parent, slangIRLoad);
         auto convertedVal =
             emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
-        return emitOpStore(parent, nullptr, inst->getPtr(), convertedVal);
+
+        // Get memory access operands for the store (handles PhysicalStorageBuffer alignment).
+        int memoryAccessMask = 0;
+        int alignment = -1;
+        MemoryScope memoryScope{};
+        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(
+            inst,
+            inst->getPtr(),
+            memoryAccessMask,
+            alignment,
+            memoryScope);
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpStore,
+            [&]()
+            {
+                emitOperand(inst->getPtr());
+                emitOperand(convertedVal);
+                if (memoryAccessMask)
+                {
+                    emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                    if (memoryAccessMask & SpvMemoryAccessAlignedMask)
+                        emitOperand(SpvLiteralInteger::from32((uint32_t)alignment));
+                    if (memoryAccessMask & SpvMemoryAccessMakePointerAvailableMask)
+                        emitOperand(
+                            emitIntConstant((IRIntegerValue)memoryScope, builder.getIntType()));
+                }
+            });
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
