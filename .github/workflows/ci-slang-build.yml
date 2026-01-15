@@ -225,7 +225,7 @@ jobs:
           fi
 
       - name: Save ccache (macOS)
-        if: ${{ inputs.os == 'macos' && always() && steps.cache-ccache-macos.outputs.cache-hit != 'true' }}
+        if: ${{ inputs.os == 'macos' && always() && steps.cache-ccache-macos.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' }}
         uses: actions/cache/save@v4
         with:
           path: ~/.ccache
