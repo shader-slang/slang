@@ -1,5 +1,20 @@
 implementing neural;
 
+public enum LayoutType : uint32_t
+{
+    Linear = 0,
+}
+
+internal interface IStorageLayout
+{
+    internal static const LayoutType Layout;
+}
+
+public struct LinearLayout : IStorageLayout
+{
+    internal static const LayoutType Layout = LayoutType.Linear;
+}
+
 /**
 Storage interface for accessing neural network parameters.
 Provides an abstraction for reading/writing parameters from various storage backends

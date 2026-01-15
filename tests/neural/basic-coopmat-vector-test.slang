@@ -52,7 +52,7 @@ OutputVector MatVecMul<InputVector, OutputVector>(
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<BufferStorage, OutputVector>(weightStorage, weightAddress);
+    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, weightAddress);
     return outputVec;
 }
 
@@ -66,7 +66,7 @@ OutputVector MatVecMulAdd<InputVector, OutputVector>(
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<BufferStorage, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
+    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
     return outputVec;
 }
 

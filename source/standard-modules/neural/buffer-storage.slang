@@ -18,7 +18,7 @@ public struct StructuredBufferStorage<T> : IStorage<T>
     /// Address type is a simple unsigned integer index.
     public typealias Address = uint;
 
-    /// The underlying buffer type.
+    /// The underlying buffer type.s
     public typealias BufferType = RWStructuredBuffer<T>;
 
     /// Differential type for automatic differentiation.
