@@ -583,6 +583,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Map a Slang IR instruction to the corresponding SPIR-V debug instruction.
     Dictionary<IRInst*, SpvInst*> m_mapIRInstToSpvDebugInst;
 
+    // Set of IR instructions whose pointer types were unwrapped from single-element arrays
+    // to scalar types for SPIR-V system values (e.g., SV_Depth).
+    HashSet<IRInst*> m_unwrappedSingleElementArrayPtrs;
+
     /// Register that `irInst` maps to `spvInst`
     void registerInst(IRInst* irInst, SpvInst* spvInst)
     {
@@ -6291,8 +6295,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Helper function to unwrap single-element array types from pointer types.
     // This is needed for system values like SV_Depth that require scalar types
     // in SPIR-V, but may be wrapped in Conditional<T, true> which expands to T[1].
-    IRType* maybeUnwrapSingleElementArrayFromPtrType(IRType* type)
+    // Returns the unwrapped type and sets wasUnwrapped to true if unwrapping occurred.
+    IRType* maybeUnwrapSingleElementArrayFromPtrType(IRType* type, bool& wasUnwrapped)
     {
+        wasUnwrapped = false;
         auto ptrType = as<IRPtrTypeBase>(type);
         if (!ptrType)
             return type;
@@ -6308,6 +6314,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return type;
 
         // Create a new pointer type pointing to the element type instead of the array
+        wasUnwrapped = true;
         IRBuilder builder(ptrType);
         return builder.getPtrType(ptrType->getOp(), arrayType->getElementType(), ptrType->getAddressSpace());
     }
@@ -6427,24 +6434,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
                 else if (semanticName == "sv_depth")
                 {
-                    return getBuiltinGlobalVar(
-                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
-                        SpvBuiltInFragDepth,
-                        inst);
+                    bool wasUnwrapped = false;
+                    auto unwrappedType = maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType(), wasUnwrapped);
+                    if (wasUnwrapped)
+                        m_unwrappedSingleElementArrayPtrs.add(inst);
+                    return getBuiltinGlobalVar(unwrappedType, SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_depthgreaterequal")
                 {
-                    return getBuiltinGlobalVar(
-                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
-                        SpvBuiltInFragDepth,
-                        inst);
+                    bool wasUnwrapped = false;
+                    auto unwrappedType = maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType(), wasUnwrapped);
+                    if (wasUnwrapped)
+                        m_unwrappedSingleElementArrayPtrs.add(inst);
+                    return getBuiltinGlobalVar(unwrappedType, SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_depthlessequal")
                 {
-                    return getBuiltinGlobalVar(
-                        maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType()),
-                        SpvBuiltInFragDepth,
-                        inst);
+                    bool wasUnwrapped = false;
+                    auto unwrappedType = maybeUnwrapSingleElementArrayFromPtrType(inst->getFullType(), wasUnwrapped);
+                    if (wasUnwrapped)
+                        m_unwrappedSingleElementArrayPtrs.add(inst);
+                    return getBuiltinGlobalVar(unwrappedType, SpvBuiltInFragDepth, inst);
                 }
                 else if (semanticName == "sv_dispatchthreadid")
                 {
@@ -7604,8 +7614,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             auto elementCount = as<IRIntLit>(valArrayType->getElementCount());
             if (elementCount && elementCount->getValue() == 1)
             {
-                // Check if the pointer's target type in IR is also a single-element array
-                // (which would have been unwrapped for SPIR-V system values)
+                // Check if the pointer's IR type is also a single-element array.
                 auto ptrType = as<IRPtrTypeBase>(ptr->getDataType());
                 if (ptrType)
                 {
@@ -7615,14 +7624,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         auto ptrElementCount = as<IRIntLit>(ptrArrayType->getElementCount());
                         if (ptrElementCount && ptrElementCount->getValue() == 1)
                         {
-                            // The pointer type was likely unwrapped by maybeUnwrapSingleElementArrayFromPtrType.
-                            // Extract element 0 from the single-element array value.
-                            valueToStore = emitOpCompositeExtract(
-                                parent,
-                                nullptr,
-                                valArrayType->getElementType(),
-                                val,
-                                makeArray(SpvLiteralInteger::from32(0)));
+                            // Both the value and pointer IR types are single-element arrays.
+                            // Check if the SPIR-V pointer was emitted with an unwrapped scalar type.
+                            if (m_unwrappedSingleElementArrayPtrs.contains(ptr))
+                            {
+                                // Extract element 0 from the single-element array value.
+                                valueToStore = emitOpCompositeExtract(
+                                    parent,
+                                    nullptr,
+                                    valArrayType->getElementType(),
+                                    val,
+                                    makeArray(SpvLiteralInteger::from32(0)));
+                            }
                         }
                     }
                 }
