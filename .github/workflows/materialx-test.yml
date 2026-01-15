@@ -139,18 +139,23 @@ jobs:
           echo "Generating Slang shaders from MaterialX test suite..."
 
           # Find all .mtlx files and generate shaders
-          MTLX_FILES=($(find "$MATERIALX_RESOURCES" -name "*.mtlx" -type f | sort))
+          # Use -printf to get paths relative to MATERIALX_RESOURCES (works cross-platform)
+          cd "$MATERIALX_RESOURCES"
+          MTLX_FILES=($(find . -name "*.mtlx" -type f | sed 's|^\./||' | sort))
           TOTAL_MTLX=${#MTLX_FILES[@]}
           echo "Found $TOTAL_MTLX MaterialX documents"
+
+          # Go back to work directory where generated-shaders will be created
+          cd "$WORK_DIR"
 
           SUCCESS_COUNT=0
           FAILED_COUNT=0
           SKIPPED_COUNT=0
           CURRENT=0
 
-          for MATERIAL_PATH in "${MTLX_FILES[@]}"; do
+          for RELATIVE_PATH in "${MTLX_FILES[@]}"; do
             CURRENT=$((CURRENT + 1))
-            RELATIVE_PATH="${MATERIAL_PATH#$MATERIALX_RESOURCES/}"
+            MATERIAL_PATH="$MATERIALX_RESOURCES/$RELATIVE_PATH"
             CATEGORY=$(dirname "$RELATIVE_PATH")
             CATEGORY_DIR="generated-shaders/$CATEGORY"
             mkdir -p "$CATEGORY_DIR"
