@@ -26,6 +26,10 @@ local cpp_type_map = {
 	type = "Type*",
 	int = "int",
 	name = "Name*",
+	decl = "Decl*",
+	expr = "Expr*",
+	stmt = "Stmt*",
+	val = "Val*",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]
@@ -43,6 +47,31 @@ function M.getCppType(lua_type)
 		)
 	end
 	return mapped
+end
+
+-- Helper function to get the location extraction expression for a typed location
+function M.getLocationExpr(location_name, location_type)
+	if not location_type then
+		-- Plain SourceLoc
+		return location_name
+	end
+
+	-- Map types to their location extraction methods
+	local location_extractors = {
+		decl = location_name .. "->getNameLoc()",
+		expr = location_name .. "->loc",
+		stmt = location_name .. "->loc",
+		type = location_name .. "->loc",
+		val = location_name .. "->loc",
+		name = location_name .. "->loc",
+	}
+
+	local extractor = location_extractors[location_type]
+	if not extractor then
+		error("Unknown location type '" .. location_type .. "' for location '" .. location_name .. "'")
+	end
+
+	return extractor
 end
 
 -- Helper function to convert severity names to C++ Severity enum values

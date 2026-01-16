@@ -71,7 +71,7 @@ local function warning(name, code, message, primary_span, ...)
 end
 
 -- Helper function to parse interpolated message strings
--- Converts "text ~param more text" into structured format
+-- Converts "text ~param more text" or "text ~param:Type more text" into structured format
 -- Parameters are automatically deduplicated
 local function parse_message(message)
 	local parts = {}
@@ -97,13 +97,13 @@ local function parse_message(message)
 			})
 		end
 
-		-- Extract parameter name (alphanumeric and underscores)
+		-- Extract parameter name and optional type: ~name or ~name:Type
 		local param_start = tilde_pos + 1
 		local param_end = param_start - 1
 
 		while param_end + 1 <= #message do
 			local char = message:sub(param_end + 1, param_end + 1)
-			if char:match("[%w_]") then
+			if char:match("[%w_:]") then
 				param_end = param_end + 1
 			else
 				break
@@ -114,18 +114,48 @@ local function parse_message(message)
 			error("Empty parameter name after ~ at position " .. tilde_pos)
 		end
 
-		local param_name = message:sub(param_start, param_end)
+		local param_spec = message:sub(param_start, param_end)
+		local param_name, param_type = param_spec:match("^([%w_]+):?([%w_]*)$")
+
+		if not param_name then
+			error("Invalid parameter syntax: ~" .. param_spec)
+		end
+
+		-- Default to string if no type specified
+		if param_type == "" then
+			param_type = "string"
+		else
+			param_type = param_type:lower()
+		end
 
 		table.insert(parts, {
 			type = "interpolation",
 			param_name = param_name,
-			param_type = "string", -- Placeholder type until type system is added back
+			param_type = param_type,
 		})
 
 		pos = param_end + 1
 	end
 
 	return parts
+end
+
+-- Helper function to parse location specification with optional type
+-- Supports "location_name" or "location_name:Type"
+local function parse_location_spec(location_spec)
+	local name, loc_type = location_spec:match("^([%w_]+):?([%w_]*)$")
+	if not name then
+		error("Invalid location syntax: " .. location_spec)
+	end
+
+	-- Default to SourceLoc if no type specified
+	if loc_type == "" then
+		loc_type = nil  -- Will be treated as plain SourceLoc
+	else
+		loc_type = loc_type:lower()
+	end
+
+	return name, loc_type
 end
 
 -- Helper function to validate a span-like structure (location and message)
@@ -247,9 +277,9 @@ local function process_diagnostics(diagnostics_table)
 			local seen_params = {}
 			local seen_locations = {}
 
-			local function add_location(loc_name)
+			local function add_location(loc_name, loc_type)
 				if loc_name and not seen_locations[loc_name] then
-					table.insert(locations, { name = loc_name })
+					table.insert(locations, { name = loc_name, type = loc_type })
 					seen_locations[loc_name] = true
 				end
 			end
@@ -272,7 +302,11 @@ local function process_diagnostics(diagnostics_table)
 
 				-- Add location if it exists (for spans/notes)
 				if container.location then
-					add_location(container.location)
+					local loc_name, loc_type = parse_location_spec(container.location)
+					add_location(loc_name, loc_type)
+					-- Store parsed location info back to container for code generation
+					container.location_name = loc_name
+					container.location_type = loc_type
 				end
 
 				-- Attach the parsed parts back to the object for C++ generation

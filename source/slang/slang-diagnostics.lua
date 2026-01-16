@@ -20,24 +20,29 @@
 -- Example usage:
 --
 -- err(
---     "function return type mismatch",      -- Diagnostic name
---     30007,                                 -- Diagnostic code
---     "expression type ~expression_type does not match function's return type ~return_type",
---     span("expression_location", "expression type"),        -- Primary span (required)
---     span("function_location", "function return type")      -- Secondary span (optional)
+--     "function return type mismatch",
+--     30007,
+--     "expression type ~expr_type:Type does not match function's return type ~return_type:Type",
+--     span("expression:Expr", "expression type"),        -- Primary span (uses Expr*, extracts .loc)
+--     span("function:Decl", "function return type")      -- Secondary span (uses Decl*, extracts .getNameLoc())
 -- )
 --
 -- err(
 --     "function redefinition",
 --     30201,
---     "function ~name already has a body",
---     span("function_location", "redeclared here"),
---     note("original_location", "see previous definition of ~name")  -- Note: ~name is auto-deduplicated
+--     "function ~name already has a body",               -- ~name defaults to String type
+--     span("function_location", "redeclared here"),      -- Plain SourceLoc (no type suffix)
+--     note("original_location", "see previous definition of ~name")
 -- )
 --
 -- Interpolation syntax:
---   ~param - Interpolates a parameter. If used multiple times, refers to the same parameter.
---            Parameters are automatically deduplicated across the entire diagnostic.
+--   ~param        - String parameter (default)
+--   ~param:Type   - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
+--                   Parameters are automatically deduplicated across the entire diagnostic.
+--
+-- Location syntax:
+--   "location"         - Plain SourceLoc variable
+--   "location:Type"    - Typed location (Decl->getNameLoc(), Expr->loc, Type->loc, etc.)
 --
 -- Available functions:
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
@@ -56,17 +61,17 @@ local warning = helpers.warning
 err(
 	"function return type mismatch",
 	30007,
-	"expression type ~expression_type does not match function's return type ~return_type",
-	span("expression_location", "expression type"),
-	span("function_location", "function return type")
+	"expression type ~expression_type:Type does not match function's return type ~return_type:Type",
+	span("expression:Expr", "expression type"),
+	span("function:Decl", "function return type")
 )
 
 err(
 	"function redefinition",
 	30201,
-	"function ~name already has a body",
-	span("function_location", "redeclared here"),
-	note("original_location", "see previous definition of ~name")
+	"function ~func_name:Name already has a body",
+	span("function:Decl", "redeclared here"),
+	note("original:Decl", "see previous definition of ~func_name")
 )
 
 -- Process and validate all diagnostics

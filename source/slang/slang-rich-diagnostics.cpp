@@ -77,15 +77,29 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     result.code = $(diagnostic.code);
     result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
 
+%   local getParamType = function(param_name)
+%     for _, param in ipairs(diagnostic.params) do
+%       if param.name == param_name then
+%         return param.type
+%       end
+%     end
+%     return "string"
+%   end
+%
 %   local buildMessage = function(parts)
 %     local emitPart = function(part)
 %       if part.type == "text" then
           "$(part.content:gsub('"', '\\"'))"
 %       elseif part.type == "interpolation" then
-%         if part.param_type == "name" then
+%         local ptype = getParamType(part.param_name)
+%         if ptype == "name" then
           nameToPrintableString($(part.param_name))
-%         elseif part.param_type == "type" then
+%         elseif ptype == "type" then
           typeToPrintableString($(part.param_name))
+%         elseif ptype == "decl" then
+          nameToPrintableString($(part.param_name)->getName())
+%         elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
+          $(part.param_name)
 %         else
           $(part.param_name)
 %         end
@@ -103,9 +117,9 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %     end
 %   end    
     result.message = $(buildMessage(diagnostic.message_parts));
-    
+
     // Set primary span
-    result.primarySpan.range = SourceRange{$(diagnostic.primary_span.location)};
+    result.primarySpan.range = SourceRange{$(lua_module.getLocationExpr(diagnostic.primary_span.location_name, diagnostic.primary_span.location_type))};
     result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
     
 %     if diagnostic.secondary_spans then
@@ -113,7 +127,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         for _, span in ipairs(diagnostic.secondary_spans) do
     {
         DiagnosticSpan span;
-        span.range = SourceRange{$(span.location)};
+        span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
         span.message = $(buildMessage(span.message_parts));
         result.secondarySpans.add(span);
     }
@@ -125,7 +139,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         for _, note in ipairs(diagnostic.notes) do
     {
         DiagnosticNote note;
-        note.span.range = SourceRange{$(note.location)};
+        note.span.range = SourceRange{$(lua_module.getLocationExpr(note.location_name, note.location_type))};
         note.message = $(buildMessage(note.message_parts));
         result.notes.add(note);
     }
