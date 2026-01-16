@@ -7,6 +7,7 @@
 #include <windows.h>
 #include <winioctl.h>
 #endif
+#include <limits>
 
 using namespace Slang;
 
@@ -21,7 +22,7 @@ static SlangResult _checkGenerateTemporary()
         String path;
         SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slang-check"), path));
 
-        // The path should exist exist
+        // The path should exist
         SLANG_CHECK(File::exists(path));
 
         if (paths.contains(path))
@@ -120,26 +121,33 @@ static SlangResult _checkLargeFileExists()
     const Int64 kTwoGB = Int64(2) * 1024 * 1024 * 1024;
     const Int64 kOneKB = 1024;
     const Int64 kLargeFileSize = kTwoGB + kOneKB;
+    SlangResult result = SLANG_OK;
     if (SLANG_FAILED(_setSparseFileSize(path, kLargeFileSize)))
     {
-        File::remove(path);
-        return SLANG_FAIL;
+        result = SLANG_FAIL;
+        goto cleanup;
     }
 
     SLANG_CHECK(File::exists(path));
 
-    const SlangPathType kInvalidPathType = static_cast<SlangPathType>(-1);
+    const SlangPathType kInvalidPathType =
+        static_cast<SlangPathType>(std::numeric_limits<SlangPathTypeIntegral>::max());
     SlangPathType pathType = kInvalidPathType;
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
     if (SLANG_FAILED(pathTypeResult))
     {
-        File::remove(path);
-        return pathTypeResult;
+        result = pathTypeResult;
+        goto cleanup;
     }
     SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
 
-    SLANG_RETURN_ON_FAIL(File::remove(path));
-    return SLANG_OK;
+cleanup:
+    SlangResult removeResult = File::remove(path);
+    if (SLANG_FAILED(removeResult))
+    {
+        return removeResult;
+    }
+    return result;
 }
 #endif
 
