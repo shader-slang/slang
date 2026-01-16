@@ -70,7 +70,7 @@ static SlangResult _setSparseFileSize(const String& path, Int64 size)
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,
-        OPEN_EXISTING,
+        OPEN_ALWAYS,
         FILE_ATTRIBUTE_NORMAL,
         nullptr);
     if (handle == INVALID_HANDLE_VALUE)
@@ -124,7 +124,7 @@ static SlangResult _checkLargeFileExists()
 
     SLANG_CHECK(File::exists(path));
 
-    SlangPathType pathType = SLANG_PATH_TYPE_FILE;
+    SlangPathType pathType = SLANG_PATH_TYPE_DIRECTORY;
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
     SLANG_CHECK(SLANG_SUCCEEDED(pathTypeResult));
     SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
