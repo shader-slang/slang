@@ -1,7 +1,10 @@
-//TEST:SIMPLE(filecheck=CHECK_NONE): -target spirv -g0 -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_MINIMAL): -target spirv -g1 -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_STANDARD): -target spirv -g2 -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_MAXIMAL): -target spirv -g3 -emit-spirv-directly
+// TEST:SIMPLE(filecheck=CHECK_NONE): -target spirv -g0 -emit-spirv-directly
+// TEST:SIMPLE(filecheck=CHECK_MINIMAL): -target spirv -g1 -emit-spirv-directly
+//  DISABLED: SPIRV-Tools v2025.5 crashes during optimization when processing DebugValue
+//  instructions that reference pointer values. Assertion in def_use_manager.cpp:56.
+//  This appears to be a SPIRV-Tools regression - works with -O0. Tracking issue #9634
+// DISABLE_TEST:SIMPLE(filecheck=CHECK_STANDARD): -target spirv -g2 -emit-spirv-directly
+// DISABLE_TEST:SIMPLE(filecheck=CHECK_MAXIMAL): -target spirv -g3 -emit-spirv-directly
 
 // Test that verifies different debug information levels generate appropriate debug info:
 // - g0/none: No debug info at all
