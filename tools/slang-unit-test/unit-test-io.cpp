@@ -124,10 +124,8 @@ static SlangResult _checkLargeFileExists()
 
     SLANG_CHECK(File::exists(path));
 
-    const SlangPathType kInvalidPathType = SlangPathType(~SlangPathTypeIntegral(0));
-    SlangPathType pathType = kInvalidPathType;
+    SlangPathType pathType = static_cast<SlangPathType>(-1);
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
-    SLANG_CHECK(SLANG_SUCCEEDED(pathTypeResult));
     if (SLANG_FAILED(pathTypeResult))
     {
         File::remove(path);
