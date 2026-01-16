@@ -602,13 +602,14 @@ static void _lookUpMembersInSuperTypeDeclImpl(
     {
         selfType = selfType->getCanonicalType();
         inheritanceInfo = semantics->getShared()->getInheritanceInfo(selfType);
-        if (semantics->disableCachingInheritanceInfo())
+    }
+
+    if (semantics->disableCachingInheritanceInfo())
+    {
+        if (auto declRefType = as<DeclRefType>(selfType))
         {
-            if (auto declRefType = as<DeclRefType>(selfType))
-            {
-                auto decl = declRefType->getDeclRef();
-                semantics->getShared()->removeInheritanceInfoFromCache(decl);
-            }
+            auto decl = declRefType->getDeclRef();
+            semantics->getShared()->removeInheritanceInfoFromCache(decl);
         }
     }
 
