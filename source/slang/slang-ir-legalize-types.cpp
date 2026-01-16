@@ -2220,6 +2220,23 @@ static LegalVal legalizeCoopMatMapElementIFunc(
     // it will be removed as a part of the legalization process,
     // because it is a zero-sized struct.
     // We need to explicitly remove it from its user.
+    auto coopMat = inst->getOperand(0);
+    auto legalCoopMat = legalizeOperand(context, coopMat);
+    auto ifuncCall = inst->getOperand(1);
+    auto legalIFuncCall = legalizeOperand(context, ifuncCall);
+    if (legalCoopMat.flavor != LegalVal::Flavor::simple ||
+        legalIFuncCall.flavor != LegalVal::Flavor::simple)
+    {
+        return LegalVal();
+    }
+
+    ShortList<IRInst*> newArgs;
+    newArgs.setCount(inst->getOperandCount());
+    newArgs[0] = legalCoopMat.getSimple();
+    newArgs[1] = legalIFuncCall.getSimple();
+    bool recreate = newArgs[0] != coopMat || newArgs[1] != ifuncCall;
+    bool dropIFuncThis = false;
+
     if (inst->hasIFuncThis())
     {
         // Check if `this` is valid.
@@ -2230,19 +2247,53 @@ static LegalVal legalizeCoopMatMapElementIFunc(
             legalThisType.flavor == LegalType::Flavor::none)
         {
             // If `this` is not valid, remove it from IR.
-            IRBuilder builder{inst};
-            builder.setInsertBefore(inst);
-            auto newInst = builder.emitCoopMatMapElementFunc(
-                inst->getFullType(),
-                inst->getOperand(0),
-                inst->getOperand(1));
+            dropIFuncThis = true;
+        }
+        else
+        {
+            if (legalArg.flavor != LegalVal::Flavor::simple)
+                return LegalVal();
 
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-            return LegalVal::simple(newInst);
+            newArgs[2] = legalArg.getSimple();
+            recreate = recreate || newArgs[2] != ifuncThis;
         }
     }
-    return LegalVal::simple(inst);
+
+    auto legalType = legalizeType(context, inst->getFullType());
+    auto newType = inst->getFullType();
+    if (legalType.flavor == LegalType::Flavor::simple)
+    {
+        newType = legalType.getSimple();
+        recreate = recreate || newType != inst->getFullType();
+    }
+
+    if (!dropIFuncThis && !recreate)
+        return LegalVal::simple(inst);
+
+    IRBuilder builder(inst->getModule());
+    builder.setInsertBefore(inst);
+    IRInst* newInst = nullptr;
+    if (dropIFuncThis)
+    {
+        newInst = builder.emitCoopMatMapElementFunc(newType, newArgs[0], newArgs[1]);
+    }
+    else
+    {
+        newInst = builder.emitIntrinsicInst(
+            newType,
+            inst->getOp(),
+            inst->getOperandCount(),
+            newArgs.getArrayView().getBuffer());
+    }
+
+    inst->replaceUsesWith(newInst);
+    inst->removeFromParent();
+    context->replacedInstructions.add(inst);
+    for (auto child : inst->getDecorationsAndChildren())
+    {
+        child->insertAtEnd(newInst);
+    }
+    return LegalVal::simple(newInst);
 }
 
 static LegalVal legalizeInst(IRTypeLegalizationContext* context, IRInst* inst)

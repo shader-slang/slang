@@ -1,5 +1,5 @@
 // coopmat-map-element-crash.slang
-//TEST:SIMPLE:-target spirv -profile glsl_450 -stage compute -entry coopmat_map_element_repro -emit-spirv-directly -render-feature cooperative-matrix-per-element-operations
+//TEST:SIMPLE:-target spirv -profile glsl_450 -stage compute -entry coopmat_map_element_repro -emit-spirv-directly
 
 struct ReproParams
 {
