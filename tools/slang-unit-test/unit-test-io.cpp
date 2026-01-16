@@ -127,10 +127,15 @@ static SlangResult _checkLargeFileExists()
     SlangPathType pathType = SLANG_PATH_TYPE_DIRECTORY;
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
     SLANG_CHECK(SLANG_SUCCEEDED(pathTypeResult));
+    if (SLANG_FAILED(pathTypeResult))
+    {
+        File::remove(path);
+        return pathTypeResult;
+    }
     SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
 
     SLANG_RETURN_ON_FAIL(File::remove(path));
-    return pathTypeResult;
+    return SLANG_OK;
 }
 #endif
 
