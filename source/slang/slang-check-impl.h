@@ -836,6 +836,7 @@ public:
             m_mapDeclRefToInheritanceInfo.remove(key);
         }
     }
+
 private:
     /// Mapping from type declarations to the known extensiosn that apply to them
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -1194,6 +1195,7 @@ public:
     }
 
     bool disableCachingInheritanceInfo() { return m_disableCachingInheritanceInfo; }
+
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
@@ -1206,6 +1208,7 @@ private:
     bool m_excludeTransparentMembersFromLookup = false;
 
     bool m_disableCachingInheritanceInfo = false;
+
 protected:
     // TODO: consider making more of this state `private`...
 
