@@ -512,10 +512,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 // because if the inheritance info is not completed for some type due to the above
                 // reason, we will still have chance to check later on when everything is ready.
                 //
-                // This solution might be too aggressive to abandon the cache. The more smart solution
-                // is that we can check if sub has any dependency constraintDeclRef that is being checked,
-                // then we will know that it's expected to fail here, so we can disable the cache only in
-                // that case.
+                // This solution might be too aggressive to abandon the cache. The more smart
+                // solution is that we can check if sub has any dependency constraintDeclRef that is
+                // being checked, then we will know that it's expected to fail here, so we can
+                // disable the cache only in that case.
                 auto typeRepr = subVisitor.TranslateTypeNodeImpl(sub.exp);
 
                 if (tmpSink.getErrorCount() != 0)

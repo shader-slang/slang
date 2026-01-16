@@ -606,8 +606,8 @@ static void _lookUpMembersInSuperTypeDeclImpl(
         {
             if (auto declRefType = as<DeclRefType>(selfType))
             {
-                auto declRef = declRefType->getDeclRef();
-                semantics->getShared()->removeInheritanceInfoFromCache(declRef);
+                auto decl = declRefType->getDeclRef();
+                semantics->getShared()->removeInheritanceInfoFromCache(decl);
             }
         }
     }
