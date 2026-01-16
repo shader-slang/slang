@@ -78,6 +78,7 @@ static SlangResult _setSparseFileSize(const String& path, Int64 size)
         return SLANG_FAIL;
     }
 
+    SlangResult result = SLANG_OK;
     DWORD bytesReturned = 0;
     if (!::DeviceIoControl(
             handle,
@@ -89,25 +90,26 @@ static SlangResult _setSparseFileSize(const String& path, Int64 size)
             &bytesReturned,
             nullptr))
     {
-        ::CloseHandle(handle);
-        return SLANG_FAIL;
+        result = SLANG_FAIL;
+        goto cleanup;
     }
 
     LARGE_INTEGER offset;
     offset.QuadPart = size;
     if (!::SetFilePointerEx(handle, offset, nullptr, FILE_BEGIN))
     {
-        ::CloseHandle(handle);
-        return SLANG_FAIL;
+        result = SLANG_FAIL;
+        goto cleanup;
     }
     if (!::SetEndOfFile(handle))
     {
-        ::CloseHandle(handle);
-        return SLANG_FAIL;
+        result = SLANG_FAIL;
+        goto cleanup;
     }
 
+cleanup:
     ::CloseHandle(handle);
-    return SLANG_OK;
+    return result;
 }
 
 static SlangResult _checkLargeFileExists()
@@ -115,7 +117,9 @@ static SlangResult _checkLargeFileExists()
     String path;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slang-large"), path));
 
-    const Int64 kLargeFileSize = (Int64(2) * 1024 * 1024 * 1024) + 1024;
+    const Int64 kTwoGB = Int64(2) * 1024 * 1024 * 1024;
+    const Int64 kOneKB = 1024;
+    const Int64 kLargeFileSize = kTwoGB + kOneKB;
     if (SLANG_FAILED(_setSparseFileSize(path, kLargeFileSize)))
     {
         File::remove(path);
@@ -124,7 +128,8 @@ static SlangResult _checkLargeFileExists()
 
     SLANG_CHECK(File::exists(path));
 
-    SlangPathType pathType = static_cast<SlangPathType>(-1);
+    const SlangPathType kInvalidPathType = static_cast<SlangPathType>(-1);
+    SlangPathType pathType = kInvalidPathType;
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
     if (SLANG_FAILED(pathTypeResult))
     {
