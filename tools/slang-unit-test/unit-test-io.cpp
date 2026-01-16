@@ -3,6 +3,11 @@
 #include "../../source/core/slang-io.h"
 #include "unit-test/slang-unit-test.h"
 
+#if SLANG_WINDOWS_FAMILY
+#include <windows.h>
+#include <winioctl.h>
+#endif
+
 using namespace Slang;
 
 static SlangResult _checkGenerateTemporary()
@@ -57,7 +62,88 @@ static SlangResult _checkGenerateTemporary()
     return SLANG_OK;
 }
 
+#if SLANG_WINDOWS_FAMILY
+static SlangResult _setSparseFileSize(const String& path, Int64 size)
+{
+    HANDLE handle = ::CreateFileW(
+        path.toWString(),
+        GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        nullptr,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        nullptr);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        return SLANG_FAIL;
+    }
+
+    DWORD bytesReturned = 0;
+    if (!::DeviceIoControl(
+            handle,
+            FSCTL_SET_SPARSE,
+            nullptr,
+            0,
+            nullptr,
+            0,
+            &bytesReturned,
+            nullptr))
+    {
+        ::CloseHandle(handle);
+        return SLANG_FAIL;
+    }
+
+    LARGE_INTEGER offset;
+    offset.QuadPart = size;
+    if (!::SetFilePointerEx(handle, offset, nullptr, FILE_BEGIN))
+    {
+        ::CloseHandle(handle);
+        return SLANG_FAIL;
+    }
+    if (!::SetEndOfFile(handle))
+    {
+        ::CloseHandle(handle);
+        return SLANG_FAIL;
+    }
+
+    ::CloseHandle(handle);
+    return SLANG_OK;
+}
+
+static SlangResult _checkLargeFileExists()
+{
+    String path;
+    SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slang-large"), path));
+
+    const Int64 largeSize = (Int64(2) * 1024 * 1024 * 1024) + 1024;
+    if (SLANG_FAILED(_setSparseFileSize(path, largeSize)))
+    {
+        File::remove(path);
+        return SLANG_FAIL;
+    }
+
+    SLANG_CHECK(File::exists(path));
+
+    SlangPathType pathType = SLANG_PATH_TYPE_FILE;
+    SlangResult pathTypeResult = Path::getPathType(path, &pathType);
+    SLANG_CHECK(SLANG_SUCCEEDED(pathTypeResult));
+    SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+    SLANG_RETURN_ON_FAIL(File::remove(path));
+    return pathTypeResult;
+}
+#endif
+
 SLANG_UNIT_TEST(io)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(_checkGenerateTemporary()));
+}
+
+SLANG_UNIT_TEST(ioLargeFileExists)
+{
+#if SLANG_WINDOWS_FAMILY
+    SLANG_CHECK(SLANG_SUCCEEDED(_checkLargeFileExists()));
+#else
+    SLANG_IGNORE_TEST
+#endif
 }
