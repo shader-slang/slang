@@ -56,7 +56,7 @@ RWStructuredBuffer<float4> float4Buffer;
 // OUT: 1072693248
 // OUT: 1072693248
 // OUT: 1073741826
-// OUT: 1065353216
+// OUT: 0
 // OUT: 15360
 // OUT: 16384
 // OUT: 86

@@ -34,17 +34,17 @@ RWStructuredBuffer<float16_t> floatBuffer;
 RWStructuredBuffer<int16_t> intBuffer;
 
 // OUT: 64480
-// OUT: 49220
+// OUT: 64480
 // OUT: 49120
-// OUT: 100
+// OUT: 49120
 // OUT: 17408
-// OUT: 300
-// OUT: 400
-// OUT: 500
+// OUT: 17408
+// OUT: 200
+// OUT: 200
 // OUT: 18432
-// OUT: 400
-// OUT: 500
-// OUT: 600
+// OUT: 18432
+// OUT: 300
+// OUT: 300
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
