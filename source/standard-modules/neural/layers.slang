@@ -14,10 +14,6 @@ Layer parameters packed as a contiguous block:
 `FFLayer` is generic over `Storage : IStorage<T>`. Address arithmetic is performed
 through `Storage.getOffset()` so different storage backends can define their own
 addressing scheme.
-
-Note: Storage cannot be stored as a member field because `linearTransform` requires
-method-level generic constraints that can only be verified at call-site. The storage
-must be passed as a parameter of type `S` to satisfy these constraints.
 */
 public struct FFLayer<
     T,
@@ -29,28 +25,33 @@ public struct FFLayer<
 >
     : ILayer<T, InputVector, OutputVector, Storage, Activation>
     where T : __BuiltinFloatingPointType
-    where T.Differential == T
+    where T == T.Differential
+    where Storage : IStorage<T>
+    where Storage.Differential : IStorage<T.Differential>
+    where Storage.Address == Storage.Differential.Address
     where InputVector : IVector<T>
     where OutputVector : IVector<T>
-    where Storage : IStorage<T>
     where Activation : IActivation<T>
 {
     public static const int ParameterCount =
         OutputVector.Size * InputVector.Size + (HasBias ? OutputVector.Size : 0);
 
+    internal Storage storage;
     internal Storage.Address weightAddress;
     internal Storage.Address biasAddress;
 
     /// Constructor for layers without bias.
-    public __init(Storage.Address weightAddr)
+    public __init(Storage s, Storage.Address weightAddr)
     {
+        storage = s;
         weightAddress = weightAddr;
     }
 
     /// Constructor for layers with bias (separate addresses).
     /// Weight and bias can be in different storage locations.
-    public __init(Storage.Address weightAddr, Storage.Address biasAddr)
+    public __init(Storage s, Storage.Address weightAddr, Storage.Address biasAddr)
     {
+        storage = s;
         weightAddress = weightAddr;
         biasAddress = biasAddr;
     }
@@ -61,27 +62,21 @@ public struct FFLayer<
     }
 
     /// Evaluate layer: y = Activation(W*x + b).
-    /// Method-level generic `S` is required for `linearTransform` constraints.
-    /// @param storage Weight/bias storage (passed as `S` to satisfy constraints).
     /// @param activationParam Activation-specific parameters (e.g., alpha for LeakyReLU).
     /// @param input Input vector.
     [NoDiffThis, Differentiable]
-    public OutputVector eval<S>(S storage, Activation.ParamType activationParam, InputVector input)
-        where S : IStorage<T>
-        where S.Differential : IStorage<T.Differential>
-        where S.Address == S.Differential.Address
-        where S.Address == Storage.Address
+    public OutputVector eval(Activation.ParamType activationParam, InputVector input)
     {
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<S, OutputVector>(
-                storage, storage, S.Address(weightAddress), S.Address(biasAddress));
+            y = input.linearTransform<Storage, OutputVector>(
+                storage, storage, weightAddress, biasAddress);
         }
         else
         {
-            y = input.linearTransform<S, OutputVector>(
-                storage, S.Address(weightAddress));
+            y = input.linearTransform<Storage, OutputVector>(
+                storage, weightAddress);
         }
         return Activation.eval<OutputVector>(activationParam, y);
     }

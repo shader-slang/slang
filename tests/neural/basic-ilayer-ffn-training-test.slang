@@ -44,12 +44,12 @@ bool forwardCheck()
     let x = V2(xArr);
 
     // Layer1: weights at 0 (4 floats: 2x2), bias at 4 (2 floats)
-    let layer1 = Layer1(0, 4);
+    let layer1 = Layer1(storage, 0, 4);
     // Layer2: weights at 6 (2 floats: 1x2), bias at 8 (1 float)
-    let layer2 = Layer2(6, 8);
+    let layer2 = Layer2(storage, 6, 8);
 
-    let h = layer1.eval<Storage>(storage, NoParam(), x);
-    let y = layer2.eval<Storage>(storage, NoParam(), h);
+    let h = layer1.eval(NoParam(), x);
+    let y = layer2.eval(NoParam(), h);
 
     // Expected:
     // h = W1*x + b1

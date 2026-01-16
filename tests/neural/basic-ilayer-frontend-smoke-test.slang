@@ -27,12 +27,11 @@ typealias Layer = FFLayer<float, XVec, YVec, Storage, Act, true>;
 // Test: evaluate layer through ILayer constraint
 InlineVector<float, 2> evalAsLayer<L>(
     L layer,
-    Storage storage,
     Act.ParamType activationParam,
     InlineVector<float, 4> input)
     where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Storage, Act>
 {
-    return layer.eval<Storage>(storage, activationParam, input);
+    return layer.eval(activationParam, input);
 }
 
 bool forwardTest()
@@ -42,14 +41,14 @@ bool forwardTest()
 
     let storage = Storage(params);
     // Weights at offset 0 (8 floats: 2x4), bias at offset 8 (2 floats)
-    let layer = Layer(0, 8);
+    let layer = Layer(storage, 0, 8);
 
     // Input x = [1,2,3,4]
     float[4] xArr = {1.0, 2.0, 3.0, 4.0};
     let x = InlineVector<float, 4>(xArr);
 
     // Layer: y = ReLU(W*x + b)
-    let y = evalAsLayer<Layer>(layer, storage, NoParam(), x);
+    let y = evalAsLayer<Layer>(layer, NoParam(), x);
 
     // Expected: W*x + b = [1*1+2*2+3*3+4*4 + 9, 5*1+6*2+7*3+8*4 + 10] = [39, 80]
     // ReLU([39, 80]) = [39, 80]
