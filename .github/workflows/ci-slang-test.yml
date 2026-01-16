@@ -314,7 +314,8 @@ jobs:
 
       - name: Run slangpy-samples tests
         # Skip on macOS debug due to intermittent failures in test_toy_restir
+        # Skip test_check_urls because URL checking is not required for slang CI
         if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Running slangpy-samples tests..."
-          python -m pytest -n 4 slangpy-samples/tests
+          python -m pytest -n 4 slangpy-samples/tests -k "not test_check_urls"
