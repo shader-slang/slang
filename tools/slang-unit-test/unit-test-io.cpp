@@ -115,8 +115,8 @@ static SlangResult _checkLargeFileExists()
     String path;
     SLANG_RETURN_ON_FAIL(File::generateTemporary(toSlice("slang-large"), path));
 
-    const Int64 largeSize = (Int64(2) * 1024 * 1024 * 1024) + 1024;
-    if (SLANG_FAILED(_setSparseFileSize(path, largeSize)))
+    const Int64 kLargeFileSize = (Int64(2) * 1024 * 1024 * 1024) + 1024;
+    if (SLANG_FAILED(_setSparseFileSize(path, kLargeFileSize)))
     {
         File::remove(path);
         return SLANG_FAIL;
@@ -124,7 +124,8 @@ static SlangResult _checkLargeFileExists()
 
     SLANG_CHECK(File::exists(path));
 
-    SlangPathType pathType = SLANG_PATH_TYPE_DIRECTORY;
+    const SlangPathType kInvalidPathType = SlangPathType(~SlangPathTypeIntegral(0));
+    SlangPathType pathType = kInvalidPathType;
     SlangResult pathTypeResult = Path::getPathType(path, &pathType);
     SLANG_CHECK(SLANG_SUCCEEDED(pathTypeResult));
     if (SLANG_FAILED(pathTypeResult))
