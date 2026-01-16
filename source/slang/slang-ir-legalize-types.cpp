@@ -2223,8 +2223,11 @@ static LegalVal legalizeCoopMatMapElementIFunc(
     if (inst->hasIFuncThis())
     {
         // Check if `this` is valid.
-        auto legalArg = legalizeOperand(context, inst->getIFuncThis());
-        if (legalArg.flavor == LegalVal::Flavor::none)
+        auto ifuncThis = inst->getIFuncThis();
+        auto legalArg = legalizeOperand(context, ifuncThis);
+        auto legalThisType = legalizeType(context, ifuncThis->getDataType());
+        if (legalArg.flavor == LegalVal::Flavor::none ||
+            legalThisType.flavor == LegalType::Flavor::none)
         {
             // If `this` is not valid, remove it from IR.
             IRBuilder builder{inst};
