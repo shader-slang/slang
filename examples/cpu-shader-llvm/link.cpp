@@ -60,13 +60,15 @@ int main(int argc, char** argv)
     entryPointParams.maxIters = 256;
 
     // We could safely multithread the workgroup calls, e.g. with OpenMP:
-    //#pragma omp parallel for collapse(2)
+    // #pragma omp parallel for collapse(2)
     // The thread group size is 8x8 here.
-    for (uint32_t x = 0; x < imageWidth/8; ++x)
-    for (uint32_t y = 0; y < imageHeight/8; ++y)
+    for (uint32_t x = 0; x < imageWidth / 8; ++x)
     {
-        uint32_t groupID[3] = {x, y, 0};
-        renderMandelbrotFractal_Group(groupID, &entryPointParams, &globals);
+        for (uint32_t y = 0; y < imageHeight / 8; ++y)
+        {
+            uint32_t groupID[3] = {x, y, 0};
+            renderMandelbrotFractal_Group(groupID, &entryPointParams, &globals);
+        }
     }
 
     const char* filename = "cpu-shader-llvm.png";

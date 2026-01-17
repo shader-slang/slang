@@ -1,7 +1,7 @@
 // This sample demonstrates how to compile a Slang shader during runtime and
 // run it on the CPU via JIT compilation.
-#include "slang.h"
 #include "examples/example-base/example-base.h"
+#include "slang.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -56,8 +56,7 @@ int exampleMain(int argc, char** argv)
     // This option is currently needed to use LLVM directly instead of emitting
     // C++ and invoking Clang.
     slang::CompilerOptionEntry options[] = {
-        {slang::CompilerOptionName::EmitCPUMethod, {{}, SLANG_EMIT_CPU_VIA_LLVM}}
-    };
+        {slang::CompilerOptionName::EmitCPUMethod, {{}, SLANG_EMIT_CPU_VIA_LLVM}}};
 
     slang::TargetDesc target = {};
     // For JIT execution, the target must be SLANG_SHADER_HOST_CALLABLE or
@@ -91,9 +90,13 @@ int exampleMain(int argc, char** argv)
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findEntryPointByName("renderMandelbrotFractal", entryPoint.writeRef());
 
-    slang::IComponentType* components[] = { module, entryPoint };
+    slang::IComponentType* components[] = {module, entryPoint};
     Slang::ComPtr<slang::IComponentType> program;
-    if (session->createCompositeComponentType(components, std::size(components), program.writeRef(), diagnosticBlob.writeRef()) != SLANG_OK)
+    if (session->createCompositeComponentType(
+            components,
+            std::size(components),
+            program.writeRef(),
+            diagnosticBlob.writeRef()) != SLANG_OK)
     {
         diagnoseIfNeeded(diagnosticBlob);
         return -1;
@@ -102,7 +105,11 @@ int exampleMain(int argc, char** argv)
     // Now, we can finally fetch a handle that allows us to access the compiled
     // program's functions.
     ComPtr<ISlangSharedLibrary> sharedLibrary;
-    if (program->getEntryPointHostCallable(0, 0, sharedLibrary.writeRef(), diagnosticBlob.writeRef()) != SLANG_OK)
+    if (program->getEntryPointHostCallable(
+            0,
+            0,
+            sharedLibrary.writeRef(),
+            diagnosticBlob.writeRef()) != SLANG_OK)
     {
         diagnoseIfNeeded(diagnosticBlob);
         return -1;
@@ -110,7 +117,8 @@ int exampleMain(int argc, char** argv)
 
     // Grab the work group / "thread group" function. This runs a whole group at
     // once.
-    auto renderMandelbrotFractal_Group = (ComputeShaderFunc)sharedLibrary->findFuncByName("renderMandelbrotFractal_Group");
+    auto renderMandelbrotFractal_Group =
+        (ComputeShaderFunc)sharedLibrary->findFuncByName("renderMandelbrotFractal_Group");
     if (!renderMandelbrotFractal_Group)
     {
         reportError("Failed to find entry point!\n");
@@ -136,13 +144,15 @@ int exampleMain(int argc, char** argv)
     entryPointParams.maxIters = 256;
 
     // We could safely multithread the workgroup calls, e.g. with OpenMP:
-    //#pragma omp parallel for collapse(2)
+    // #pragma omp parallel for collapse(2)
     // The thread group size is 8x8 here.
-    for (uint32_t x = 0; x < imageWidth/8; ++x)
-    for (uint32_t y = 0; y < imageHeight/8; ++y)
+    for (uint32_t x = 0; x < imageWidth / 8; ++x)
     {
-        uint32_t groupID[3] = {x, y, 0};
-        renderMandelbrotFractal_Group(groupID, &entryPointParams, &globals);
+        for (uint32_t y = 0; y < imageHeight / 8; ++y)
+        {
+            uint32_t groupID[3] = {x, y, 0};
+            renderMandelbrotFractal_Group(groupID, &entryPointParams, &globals);
+        }
     }
 
     const char* filename = "cpu-shader-llvm.png";
