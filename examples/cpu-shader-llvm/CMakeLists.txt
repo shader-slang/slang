@@ -1,3 +1,5 @@
+example(cpu-shader-llvm TARGET_NAME cpu-shader-llvm-jit EXPLICIT_SOURCE jit.cpp LINK_WITH_PRIVATE stb)
+
 if(SLANG_ENABLE_SLANGC)
     # This example does not set a CMake toolchain for Slang, hence just running
     # it as a custom command.
@@ -15,7 +17,7 @@ if(SLANG_ENABLE_SLANGC)
 
     # Normally, you would use the below three lines:
     #add_executable(cpu-shader-llvm-link link.cpp ${CMAKE_CURRENT_BINARY_DIR}/shader.o)
-    # add_dependencies(cpu-shader-llvm-link cpu-shader-llvm-link-shader)
+    #add_dependencies(cpu-shader-llvm-link cpu-shader-llvm-link-shader)
     #target_link_libraries(cpu-shader-llvm-link PRIVATE stb)
 
     # However, the Slang project has its own target system which we use to have

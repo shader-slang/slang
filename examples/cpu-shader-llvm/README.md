@@ -2,9 +2,9 @@ Running Slang compute shaders on CPU via LLVM
 =============================================
 
 This example demonstrates two different ways of running Slang compute shaders
-on CPUs using the direct-to-LLVM emitter. The process is a bit different than
-with GPUs, because there is no graphics API involved. You are directly
-responsible for calling into the shader code.
+on CPUs by using the direct-to-LLVM emitter. The process is a bit different than
+running shaders on GPUs because there is no graphics API involved. You are
+directly responsible for calling into the shader code.
 
 The samples demonstrate two suggested workflows for running shaders on CPUs:
 
@@ -27,37 +27,31 @@ running the shader using the Slang C++ API.
 approach may be more straightforward to use.
 
 **Faster iteration:** JIT compilation enables hot reloading the Slang shader as
-you can simply reload and compile new shaders in your program without
-re-linking the host program itself.
+you can reload and compile new shaders in your program without re-linking the
+host program itself.
 
 **Exact optimization for host CPU:** JIT compilation allows LLVM to optimize the
-shader for exactly and only the host CPU architecture (akin to `-march=native`
-in C compilers). This means that extensions like AVX512 can be utilized when
-they happen to be available instead of imposing a hard requirement on them being
-available.
+shader for the host's CPU architecture (akin to `-march=native` in C compilers).
+This means that extensions like AVX512 can be utilized when they happen to be
+available instead of imposing a hard requirement on them being available.
 
-**Compilation delay:** as compiling occurs during runtime, loading a shader 
-causes a delay. JIT compilation occurs only after LLVM IR has been generated -
-all Slang frontend compiler passes need to run up-front.
+**Compilation delay:** As compiling occurs during runtime, loading a shader 
+causes a delay. 
 
-**Need to ship Slang libraries:** for JIT compilation, your host program must
-ship with the Slang libraries, including `slang-llvm.dll/so`, which is fairly big
-due to including LLVM (around 100 MB).
+**Need to ship Slang libraries:** For JIT compilation, your host program must
+ship with the Slang libraries, including `slang-llvm.dll/so`, which is fairly
+big due to including LLVM (around 100 MB).
 
 ## `link.cpp`: ahead-of-time shader compilation
 
 This program uses `slangc` during build time to produce object code from the
 shader source. This object code is then linked with the host program.
 
-`slangc` is currently used twice in this approach - once to produce the object
-code, and another time to produce a C++ header that exposes the shader entry
-point and its parameters to the host program.
-
 ### Why or why not compile ahead of time
 
 **No need to ship Slang libraries:** The Slang compiler is only being used
-during build time. This can reduce the memory footprint and loading times
-compared to the JIT approach that has to ship LLVM.
+during build time. This approach can reduce the memory footprint and loading
+times compared to the JIT method that has to ship with Slang libraries.
 
 **No loading times:** No compiling work occurs during runtime.
 
@@ -79,18 +73,18 @@ to re-compile it into object code and re-link your whole program again.
 With either approach, the shader is compiled into native CPU machine code. The
 host program is then able to call the shader in the following ways:
 
-* **Recommended:** per workgroup
+* **Recommended:** Per workgroup
     - One function call runs a single workgroup invocation
-* **Not recommended:** compute dispatch
+* **Not recommended:** Compute dispatch
     - Runs the specified number of workgroups in a single-threaded loop
-* **DO NOT USE:** per work item
+* **DO NOT USE:** Per work item
     - Runs a single work item without considering others.
 
 The per workgroup approach is recommended and demonstrated in this sample,
 because it's both very flexible and performant. It allows LLVM to vectorize work
 items onto SIMD lanes, yet it allows the user to implement multithreaded
-execution in their preferred manner, as they can simply dispatch workgroups from
-any thread.
+execution in their preferred manner, as they can dispatch workgroups from any
+thread.
 
 The per work item approach should not be used, because it cannot work with
 barriers and shared memory once they become supported on the CPU targets. It
@@ -111,9 +105,10 @@ You can pass parameters directly to LLVM using the `-Xllvm` flag, e.g.
 
 ### Cross compilation
 
-`slangc` can be used to cross-compile for CPUs other than the host as well. You
+`slangc` can be used to cross-compile shaders for CPUs other than the host. You
 can set the [target triple](https://clang.llvm.org/docs/CrossCompilation.html#target-triple)
-with `-llvm-target-triple <target-triple>`. To set a [specific CPU](https://clang.llvm.org/docs/CrossCompilation.html#cpu-fpu-abi)
+with `-llvm-target-triple <target-triple>`. To set a
+[specific CPU type](https://clang.llvm.org/docs/CrossCompilation.html#cpu-fpu-abi)
 and enable all the extensions it has, use `-llvm-cpu <cpuname>`. To enable
 individual extensions, use `-llvm-features <comma,separated,list>`. The list of
 features that may exist on an architecture can be viewed with
@@ -136,7 +131,7 @@ support for that architecture and build Slang with
 ### Inspecting LLVM IR
 
 If you wish to run your own custom passes on the LLVM IR produced by `slangc`,
-debug the LLVM emitter, or inspect the IR for any other reason, you can use
-`llvm-shader-ir` and `llvm-host-ir` targets. The correspond to
+debug the LLVM emitter, or inspect the IR for any other reason, you can use the
+`llvm-shader-ir` and `llvm-host-ir` targets. They correspond to
 `shader-object-code` and `host-object-code`, but output the IR before running
 codegen but after optimization.

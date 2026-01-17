@@ -52,14 +52,16 @@ int main(int argc, char** argv)
 
     GlobalParams globals;
     globals.outputColorsData = imageData.data();
+    // divide by 4 because the shader side used uint8_t4.
     globals.outputColorsCount = imageData.size() / 4;
     globals.constants = &constants;
 
     EntryPointParams entryPointParams;
     entryPointParams.maxIters = 256;
 
-    // We can safely multithread the workgroup calls!
-    #pragma omp parallel for collapse(2)
+    // We could safely multithread the workgroup calls, e.g. with OpenMP:
+    //#pragma omp parallel for collapse(2)
+    // The thread group size is 8x8 here.
     for (uint32_t x = 0; x < imageWidth/8; ++x)
     for (uint32_t y = 0; y < imageHeight/8; ++y)
     {
