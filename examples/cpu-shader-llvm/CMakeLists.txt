@@ -12,8 +12,8 @@ if(SLANG_ENABLE_SLANGC)
     )
     add_custom_target(cpu-shader-llvm-link-shader DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/shader.o)
     # This dependency is added so that the custom command above is able to use
-    # slangc.
-    add_dependencies(cpu-shader-llvm-link-shader slangc)
+    # slangc and slang-llvm.
+    add_dependencies(cpu-shader-llvm-link-shader slangc slang-llvm)
 
     # Normally, you would use the below three lines:
     #add_executable(cpu-shader-llvm-link link.cpp ${CMAKE_CURRENT_BINARY_DIR}/shader.o)

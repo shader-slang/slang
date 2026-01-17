@@ -49,7 +49,7 @@ int exampleMain(int argc, char** argv)
     SlangGlobalSessionDesc desc = {};
     if (slang::createGlobalSession(&desc, globalSession.writeRef()) != SLANG_OK)
     {
-        reportError("Failed to open global session!\n");
+        log("Failed to open global session!\n");
         return -1;
     }
 
@@ -74,7 +74,7 @@ int exampleMain(int argc, char** argv)
     Slang::ComPtr<slang::ISession> session;
     if (globalSession->createSession(sessionDesc, session.writeRef()))
     {
-        reportError("Failed to open JIT session!\n");
+        log("Failed to open JIT session!\n");
         return -1;
     }
 
@@ -121,7 +121,7 @@ int exampleMain(int argc, char** argv)
         (ComputeShaderFunc)sharedLibrary->findFuncByName("renderMandelbrotFractal_Group");
     if (!renderMandelbrotFractal_Group)
     {
-        reportError("Failed to find entry point!\n");
+        log("Failed to find entry point!\n");
         return -1;
     }
 
@@ -158,7 +158,7 @@ int exampleMain(int argc, char** argv)
     const char* filename = "cpu-shader-llvm.png";
     if (!stbi_write_png(filename, imageWidth, imageHeight, 4, imageData.data(), 4 * imageWidth))
     {
-        fprintf(stderr, "Failed to write %s!", filename);
+        log("Failed to write %s!\n", filename);
         return 1;
     }
 
