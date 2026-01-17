@@ -96,6 +96,15 @@ almost any modern CPU and shader.
 This section lists advice for very specific needs and is not necessary to read
 for basic use.
 
+### Debugging
+
+You should be able to use a debugger with the resulting code and step through
+the Slang code, as long as you ran `slangc` with debug symbols enabled
+(`-g1`, `-g2` or `-g3`). You should also disable optimizations with `-O0` to
+make the debugging experience more straightforward; workgroup-level
+vectorization can make the program difficult-to-impossible to follow in a
+debugger, and `-O0` prevents that from happening.
+
 ### Passing parameters to LLVM
 
 You can pass parameters directly to LLVM using the `-Xllvm` flag, e.g.
