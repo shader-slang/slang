@@ -318,7 +318,11 @@ struct PipelineLayoutReflectionContext_Vulkan : PipelineLayoutReflectionContext
         for (int subObjectRangeIndex = 0; subObjectRangeIndex < subObjectRangeCount;
              ++subObjectRangeIndex)
         {
-            addSubObjectRange(pipelineLayoutBuilder, descriptorSetLayoutBuilder, typeLayout, subObjectRangeIndex);
+            addSubObjectRange(
+                pipelineLayoutBuilder,
+                descriptorSetLayoutBuilder,
+                typeLayout,
+                subObjectRangeIndex);
         }
     }
 
