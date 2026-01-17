@@ -49,7 +49,7 @@ int exampleMain(int argc, char** argv)
     SlangGlobalSessionDesc desc = {};
     if (slang::createGlobalSession(&desc, globalSession.writeRef()) != SLANG_OK)
     {
-        log("Failed to open global session!\n");
+        fprintf(stderr, "Failed to open global session!\n");
         return -1;
     }
 
@@ -74,7 +74,7 @@ int exampleMain(int argc, char** argv)
     Slang::ComPtr<slang::ISession> session;
     if (globalSession->createSession(sessionDesc, session.writeRef()))
     {
-        log("Failed to open JIT session!\n");
+        fprintf(stderr, "Failed to open JIT session!\n");
         return -1;
     }
 
@@ -121,7 +121,7 @@ int exampleMain(int argc, char** argv)
         (ComputeShaderFunc)sharedLibrary->findFuncByName("renderMandelbrotFractal_Group");
     if (!renderMandelbrotFractal_Group)
     {
-        log("Failed to find entry point!\n");
+        fprintf(stderr, "Failed to find entry point!\n");
         return -1;
     }
 
