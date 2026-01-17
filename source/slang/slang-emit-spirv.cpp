@@ -7604,9 +7604,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
         int alignment = -1;
-        if (destPtrType &&
-            addressSpaceToStorageClass(destPtrType->getAddressSpace()) ==
-                SpvStorageClassPhysicalStorageBuffer)
+        if (destPtrType && addressSpaceToStorageClass(destPtrType->getAddressSpace()) ==
+                               SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment);
