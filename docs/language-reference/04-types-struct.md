@@ -63,9 +63,9 @@ forms:
   declarations.
 - The *with-members* declaration defines the structure type with a layout and an [extensible](04-types-extension)
   list of non-layout members.
-- The *link-time extern type* declarations declares the existence of a structure type that is defined in
+- The *link-time extern type* declaration specifies the existence of a structure type that is defined in
   another module. See [Modules (TODO)](TODO).
-- The *link-time export type* declarations declares that a structure type is exported with a type alias. See
+- The *link-time export type* declaration specifies that a structure type is exported with a type alias. See
   [Modules (TODO)](TODO).
 
 When the *`identifier`* is specified, it is the name of the structure. Otherwise, the structure is anonymous,
@@ -82,10 +82,10 @@ A structure member is declared in the structure body and is one of the following
   keyword.
 - A [non-static member function](#nonstatic-member-function); declared as a function without the `static`
   modifier keyword.
-- A nested type; declared as type or type alias.
+- A nested type; declared as a type or a type alias.
 - A [`property` declaration](#property).
 - A [`__subscript` declaration](#subscript-op).
-- A [function call operator declarations](#function-call-op).
+- A [function call operator declaration](#function-call-op).
 
 A data member and a member function can be declared with the `static` keyword.
 
@@ -103,6 +103,8 @@ Data members may be assigned with a default initializer. The following rules app
   specifies the initial value of the data member. A constructor may override this, unless the member is
   `const`.
 - `static const` data members must have a default initializer.
+
+For further information, see [Initialization (TODO)](TODO).
 
 The non-static data members are allocated sequentially within the `struct` when a variable of this type is
 allocated. See [Variables (TODO)](TODO).
@@ -144,7 +146,7 @@ Declaration with body:
 When a user-provided constructor is defined for a `struct`, a constructor is executed on object
 instantiation. A constructor can have any number of parameters. A constructor does not have a return
 type. More than one constructors may be defined in which case overload resolution is performed to select the
-most appropriate constructor given the parameters.
+most appropriate constructor given the initialization parameters.
 
 The constructor parameters are provided in the optional initializer list. When an initializer is not provided,
 the no-parameter constructor is invoked.
@@ -236,7 +238,7 @@ state.
 A static member function is a regular function enclosed within the `struct` name space. Static member
 functions may access only static structure members.
 
-Static member function invocation does not require an object.
+Invocation of a static member function does not require an object.
 
 
 ## Non-static Member Functions {#nonstatic-member-function}
@@ -275,11 +277,11 @@ Traditional syntax, explicit accessor declarations:
 
 Accessor declaration syntax, no body: (interfaces only)
 > *`accessor-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`** \| **`'ref'`**) [**`'('`** *`param-list`* **`')'`**] **`';'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**] **`';'`**
 
 Accessor declaration syntax, with body:
 > *`accessor-decl`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`** \| **`'ref'`**) [**`'('`** *`param-list`* **`')'`**]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
 
 ### Description
@@ -288,13 +290,10 @@ A property is a non-static member that provides a data member access interface. 
 accessed similarly to data members: reading a property is directed to the `get` accessor of the property and
 writes are directed to the `set` accessor, respectively.
 
-When accessor `ref` is declared, it returns a read-write reference to a structure data member. This language
-feature is currently experimental.
-
 A property that only provides the `get` accessor is a read-only property. A property that only provides the
 `set` accessor is a write-only property. A property that provides both is a read/write property.
 
-The parentheses in the `get` and `ref` accessor declarations are optional. These accessors accept no parameters.
+The parentheses in the `get` accessor declaration are optional. The `get` accessor accepts no parameters.
 
 The parentheses and the parameter in the `set` accessor declaration are optional. In case the parameter is not
 specified in the declaration, parameter `newValue` with the same type as the property is provided to the `set`
@@ -303,7 +302,7 @@ body.
 The property declaration forms without accessor or accessor body declarations are useful only in
 [interface](04-interface) declarations.
 
-> ⚠️ **Warning:** Property reference accessor `ref` is an experimental language feature. It is subject to
+> ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
 > change and may not work as expected.
 
 
@@ -374,7 +373,7 @@ void main(uint3 id : SV_DispatchThreadID)
 
 The static and non-static structure members and nested types are accessed using \``.`\`.
 
-> Remark: The C++-style scope resolution operator \``::`\` is deprecated.
+> ⚠️ **Warning:** The C++-style scope resolution operator \``::`\` is deprecated. It should not be used.
 
 
 **Example:**
@@ -492,9 +491,8 @@ for the subscript operator is provided to the `set` body.
 Multiple `__subscript` declarations are allowed as long as the declarations have different
 signatures. Overload resolution is the same as overload resolution with function invocations.
 
-> ⚠️ **Warning:** Subscript operator reference accessor `ref` is an experimental language feature, similar to
-> [property reference accessor](#property). Documentation is omitted here. It is subject to change and may not
-> work as expected.
+> ⚠️ **Warning:** Subscript operator reference accessor `ref` is a Slang internal language feature. It is
+> subject to change and may not work as expected.
 
 **Example:**
 
@@ -543,6 +541,17 @@ void main(uint3 id : SV_DispatchThreadID)
 
 ## Function call operator {#function-call-op}
 
+### Syntax
+
+Declaration without body: (interfaces only)
+> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`** **`';'`**
+
+Declaration with body:
+> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`**<br>
+> **`'{'`** *`body-stmt`*\* **`'}'`**
+
+### Description
+
 A function call `()` operator can be added using an `operator ()` declaration. This allows applying parameters
 to an object as if the object was a function.
 
@@ -552,7 +561,9 @@ is the same as overload resolution with function invocations.
 **Example:**
 
 ```hlsl
-struct TestStruct : IFunc
+RWStructuredBuffer<float> outputBuffer;
+
+struct TestStruct
 {
     float base;
 
