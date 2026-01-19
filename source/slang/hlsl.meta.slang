@@ -22032,7 +22032,7 @@ struct HitObject
     [ForceInline]
     [require(cuda, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22216,9 +22216,8 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
-    [require(hlsl, ser_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22482,7 +22481,7 @@ struct HitObject
         /// miss.
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
@@ -22512,7 +22511,7 @@ struct HitObject
     }
 
     [__requiresNVAPI]
-    [require(hlsl_nvapi, ser_nvapi)]
+    [require(nvapi, ser_nvapi)]
     __generic<payload_t>
     static void __InvokeHLSL_NVAPI(
         RaytracingAccelerationStructure AccelerationStructure,
@@ -22541,7 +22540,7 @@ struct HitObject
         /// shader is invoked. (NVAPI/SPIRV/CUDA variant with AccelerationStructure parameter)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -22717,7 +22716,7 @@ struct HitObject
         /// Note: This is an NVAPI/SPIRV/CUDA extension. DXR 1.3 uses individual accessors (GetRayTMin, GetRayTCurrent, etc.)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
@@ -22967,7 +22966,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     int GetClusterID()
     {
         __target_switch
@@ -23090,7 +23089,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
@@ -23122,7 +23121,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
@@ -23550,7 +23549,7 @@ struct HitObject
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t)
     {
@@ -23564,7 +23563,7 @@ struct HitObject
         }
     }
 
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
@@ -23585,7 +23584,7 @@ struct HitObject
     }
 
     [__requiresNVAPI]
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
@@ -23621,7 +23620,7 @@ struct HitObject
         }
     }
 
-    [require(hlsl_nvapi, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
