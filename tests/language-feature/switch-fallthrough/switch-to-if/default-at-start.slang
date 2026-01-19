@@ -1,25 +1,14 @@
 // default-at-start.slang
 //
 // Test a switch where default is the first case and falls through
-// to subsequent cases. This tests the predicate logic when default
-// precedes all explicit cases.
+// to subsequent cases, with wave operations to trigger lowering.
 
-// Note: Metal has broken fallthrough handling when default is first.
-// The switch-to-if lowering pass will fix this. For now, only test on CPU.
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+// GPU backends only - wave ops not supported on CPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
-// Expected values:
-// val=0: case 0 -> 100
-// val=1: case 1 -> 200
-// val=99: default -> case 0 -> case 1
-//         1 + 100 + 200 = 301
-
-// Actually, let me trace through more carefully:
 // switch structure:
 //   default: result += 1; fallthrough
 //   case 0:  result += 100; fallthrough
@@ -49,15 +38,16 @@ int test(int val)
     switch(val)
     {
     default:
-        result += 1;
+        // Wave op to trigger lowering
+        result += 1 + int(WaveGetLaneIndex()) * 0;
         // Fall through to case 0
 
     case 0:
-        result += 100;
+        result += 100 + int(WaveGetLaneIndex()) * 0;
         // Fall through to case 1
 
     case 1:
-        result += 200;
+        result += 200 + int(WaveGetLaneIndex()) * 0;
         break;
     }
 

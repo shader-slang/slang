@@ -11,6 +11,22 @@ that fall through to subsequent cases).
 
 See GitHub issue #6441 for details: https://github.com/shader-slang/slang/issues/6441
 
+## How Tests Trigger Lowering
+
+The lowering pass uses an allowlist-based check to determine if transformation is needed.
+It only transforms switches where the fallthrough path contains operations NOT on the 
+allowlist (e.g., wave operations, function calls).
+
+These tests use `WaveGetLaneIndex()` multiplied by 0 in the fallthrough paths:
+```hlsl
+result += 1 + int(WaveGetLaneIndex()) * 0;  // Triggers lowering without affecting value
+```
+
+This pattern:
+1. Includes a wave operation (triggers the lowering)
+2. Multiplies by 0 (doesn't affect the actual computed value)
+3. Keeps expected outputs simple and predictable
+
 ## Transformation Approach
 
 The pass splits switches with fallthrough into two switches:
@@ -46,9 +62,15 @@ cases, and switches nested inside loops.
 
 ## Test Approach
 
-Each test runs on multiple backends to verify the lowering produces correct results:
-- `-cpu` (always available, used as baseline)
-- `-dx12` (when available)
-- `-vk` (when available)
-- `-mtl` (when available on macOS)
-- `-wgpu` (WebGPU)
+Each test runs on GPU backends that support wave operations:
+- `-dx11` (DirectX 11)
+- `-dx12` (DirectX 12)
+- `-vk` (Vulkan)
+- `-mtl` (Metal, when available on macOS)
+
+CPU testing is not included because wave operations are not supported on CPU.
+
+## Known Issues
+
+The Metal wave tests (`wave-break-if-version.slang`, `wave-break-done-flag-if-version.slang`)
+fail on Metal. This is a pre-existing Metal issue unrelated to the switch lowering pass.

@@ -1,26 +1,29 @@
 // all-cases-fallthrough.slang
 //
 // Test a switch where all cases fall through except the last.
-// This tests cumulative predicate generation when every case
-// flows into the next.
+// This tests the switch-to-reconverged-switches lowering with
+// wave operations in the fallthrough path.
 
+// GPU backends only - wave ops not supported on CPU
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
-// Expected values:
-// val=0: case 0 -> case 1 -> case 2 -> case 3 (default)
+// Each thread takes a different case path.
+// The wave ops inside the switch should still work correctly.
+// WaveGetLaneIndex returns the lane's index, which we use as a contribution.
+//
+// val=0: case 0 -> case 1 -> case 2 -> default
+//        contribution = WaveGetLaneIndex (0 for lane 0)
 //        1 + 10 + 100 + 1000 = 1111
-// val=1: case 1 -> case 2 -> case 3 (default)
+// val=1: case 1 -> case 2 -> default  
 //        10 + 100 + 1000 = 1110
-// val=2: case 2 -> case 3 (default)
+// val=2: case 2 -> default
 //        100 + 1000 = 1100
-// val=3: case 3 (default) only
+// val=3: default only
 //        1000
-// val=99: default only (matches case 3)
+// val=99: default only
 //        1000
 
 // Hex:
@@ -45,15 +48,16 @@ int test(int val)
     switch(val)
     {
     case 0:
-        result += 1;
+        // WaveGetLaneIndex to trigger lowering (it's a wave op)
+        result += 1 + int(WaveGetLaneIndex()) * 0;  // Just add 1
         // Fall through
 
     case 1:
-        result += 10;
+        result += 10 + int(WaveGetLaneIndex()) * 0;  // Just add 10
         // Fall through
 
     case 2:
-        result += 100;
+        result += 100 + int(WaveGetLaneIndex()) * 0;  // Just add 100
         // Fall through
 
     default:

@@ -1,15 +1,14 @@
 // nested-switch-both-fallthrough.slang
 //
 // Test nested switches where both outer and inner switches have
-// fallthrough behavior. This verifies that the switch-to-if lowering
-// correctly handles independent nested control flow.
+// fallthrough behavior with wave operations. This triggers the
+// switch-to-reconverged-switches lowering for both switches.
 
+// GPU backends only - wave ops not supported on CPU
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // Outer switch:
 // case 0: set multiplier=10, fallthrough
@@ -61,18 +60,21 @@ int test(int outer, int inner)
     {
     case 0:
         multiplier = 10;
+        // Wave op to trigger lowering (multiply by 0)
+        multiplier += int(WaveGetLaneIndex()) * 0;
         // Fall through to case 1
 
     case 1:
-        // Inner switch with fallthrough
+        // Inner switch with fallthrough and wave ops
         switch(inner)
         {
         case 0:
-            result += 1;
+            // Wave op triggers lowering for inner switch
+            result += 1 + int(WaveGetLaneIndex()) * 0;
             // Fall through to case 1
 
         case 1:
-            result += 2;
+            result += 2 + int(WaveGetLaneIndex()) * 0;
             break;
 
         default:

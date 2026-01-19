@@ -1,17 +1,14 @@
 // loop-inside-switch.slang
 //
-// Test a switch where case bodies contain loops.
-// This verifies that the lowering correctly handles loops nested
-// inside the transformed switch.
+// Test a switch where case bodies contain loops, with wave operations
+// in the fallthrough path. This triggers the switch-to-reconverged-switches
+// lowering and verifies loops are handled correctly.
 
-// Note: Metal has broken fallthrough handling with loops in cases.
-// The switch-to-if lowering pass will fix this. For now, only test on CPU.
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
+// GPU backends only - wave ops not supported on CPU
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
 // Expected values:
 // val=0: case 0 loop sums 1+2+3 = 6, falls through to case 1, adds 100 -> 106
@@ -40,15 +37,17 @@ int test(int val)
     switch(val)
     {
     case 0:
-        // Loop inside case, then fallthrough
+        // Loop inside case, then fallthrough with wave op
         for (int i = 1; i <= 3; i++)
         {
             result += i;
         }
+        // Wave op to trigger lowering (multiply by 0)
+        result += int(WaveGetLaneIndex()) * 0;
         // Fall through to case 1
 
     case 1:
-        result += 100;
+        result += 100 + int(WaveGetLaneIndex()) * 0;
         break;
 
     case 2:
@@ -57,6 +56,7 @@ int test(int val)
         {
             result += i;
         }
+        result += int(WaveGetLaneIndex()) * 0;
         break;
 
     default:

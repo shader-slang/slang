@@ -1,15 +1,14 @@
 // conditional-break-fallthrough.slang
 //
 // Test a case that conditionally breaks or falls through based on
-// a runtime value. This matches the "case 4" example in the switch-to-if
-// lowering plan.
+// a runtime value, with wave operations in the fallthrough path.
+// This triggers the switch-to-reconverged-switches lowering.
 
+// GPU backends only - wave ops not supported on CPU
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
 // Expected values (hex):
 // tid=0: val=0 -> case 0 -> 100 = 0x64
@@ -18,6 +17,7 @@
 // tid=3: val=2 -> case 2 -> 200 = 0xC8
 // tid=4: val=99 -> default directly -> 200 = 0xC8
 // tid=5: val=100 -> default directly -> 200 = 0xC8
+
 // CHECK:      64
 // CHECK-NEXT: 1F4
 // CHECK-NEXT: C8
@@ -35,12 +35,13 @@ int test(int val, bool shouldBreak)
     switch(val)
     {
     case 0:
-        result = 100;
+        // Wave op to trigger lowering (multiply by 0 to not affect value)
+        result = 100 + int(WaveGetLaneIndex()) * 0;
         break;
 
     case 1:
         // Conditional break: if shouldBreak is true, break out
-        // Otherwise fall through to default
+        // Otherwise fall through to default with wave op
         if (shouldBreak)
         {
             result = 500;
@@ -49,14 +50,12 @@ int test(int val, bool shouldBreak)
         // Fall through to default
 
     default:
-        // Reached by:
-        // - case 1 when shouldBreak is false (fallthrough)
-        // - Any unmatched value (direct entry)
-        result = 200;
+        // Wave op in fallthrough path
+        result = 200 + int(WaveGetLaneIndex()) * 0;
         break;
 
     case 2:
-        result = 200;
+        result = 200 + int(WaveGetLaneIndex()) * 0;
         break;
     }
 
