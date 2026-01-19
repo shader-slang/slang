@@ -138,6 +138,75 @@ static const IRIntegerValue kBreakStageSentinel = INT32_MAX;
 // Forward declarations
 static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram);
 static bool isInstructionSafeForFallthrough(IRInst* inst);
+/// Check if caseLabel1 can reach caseLabel2 (i.e., falls through to it).
+///
+/// Performs a reachability analysis from caseLabel1's successors, stopping at:
+/// - The break label (end of switch)
+/// - The source block itself (cycle detection)
+/// - The switch's parent block (prevents loop back-edge traversal)
+/// - All other case labels except the target (prevents cross-case traversal)
+/// 
+/// Returns true if caseLabel2 is reachable from caseLabel1 without going through
+/// any stop blocks (meaning control can fall through from case1 to case2).
+static bool caseFallsThroughTo(
+    IRSwitch* switchInst,
+    IRBlock* caseLabel1,
+    IRBlock* caseLabel2,
+    IRBlock* breakLabel)
+{
+    if (!caseLabel1 || !caseLabel2)
+        return false;
+
+    // Build stop blocks: break label, switch block, all case labels except target
+    HashSet<IRBlock*> stopBlocks;
+    stopBlocks.add(breakLabel);
+    stopBlocks.add(caseLabel1);
+
+    auto switchBlock = as<IRBlock>(switchInst->getParent());
+    if (switchBlock)
+        stopBlocks.add(switchBlock);
+
+    UInt caseCount = switchInst->getCaseCount();
+    for (UInt i = 0; i < caseCount; i++)
+    {
+        auto caseLabel = switchInst->getCaseLabel(i);
+        if (caseLabel != caseLabel2)
+            stopBlocks.add(caseLabel);
+    }
+    auto defaultLabel = switchInst->getDefaultLabel();
+    if (defaultLabel && defaultLabel != caseLabel2)
+        stopBlocks.add(defaultLabel);
+
+    // Check if case1 can reach case2's label
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> workList;
+
+    for (auto succ : caseLabel1->getSuccessors())
+        workList.add(succ);
+
+    while (workList.getCount() > 0)
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+
+        if (!block)
+            continue;
+        if (visited.contains(block))
+            continue;
+        if (stopBlocks.contains(block))
+            continue;
+
+        if (block == caseLabel2)
+            return true;
+
+        visited.add(block);
+
+        for (auto succ : block->getSuccessors())
+            workList.add(succ);
+    }
+
+    return false;
+}
 
 /// Information about a case in the switch.
 struct CaseInfo
@@ -355,67 +424,7 @@ struct SwitchLoweringContext
         IRBlock* caseLabel2,
         IRBlock* breakLabel)
     {
-        if (!caseLabel1 || !caseLabel2)
-            return false;
-
-        // Build a set of "stop blocks" - blocks we shouldn't traverse into
-        HashSet<IRBlock*> stopBlocks;
-        stopBlocks.add(breakLabel);
-        stopBlocks.add(caseLabel1);
-
-        // Add the block containing the switch instruction as a stop block.
-        // This prevents following control flow that exits the switch (like continue
-        // to an outer loop) and then re-enters via the loop back-edge.
-        auto switchBlock = as<IRBlock>(switchInst->getParent());
-        if (switchBlock)
-            stopBlocks.add(switchBlock);
-
-        // Add all other case labels as stop blocks (except caseLabel2, our target)
-        UInt caseCount = switchInst->getCaseCount();
-        for (UInt i = 0; i < caseCount; i++)
-        {
-            auto caseLabel = switchInst->getCaseLabel(i);
-            if (caseLabel != caseLabel2)
-                stopBlocks.add(caseLabel);
-        }
-        auto defaultLabel = switchInst->getDefaultLabel();
-        if (defaultLabel && defaultLabel != caseLabel2)
-            stopBlocks.add(defaultLabel);
-
-        // Check if case1 can reach case2's label
-        HashSet<IRBlock*> visited;
-        List<IRBlock*> workList;
-
-        for (auto succ : caseLabel1->getSuccessors())
-        {
-            workList.add(succ);
-        }
-
-        while (workList.getCount() > 0)
-        {
-            auto block = workList.getLast();
-            workList.removeLast();
-
-            if (!block)
-                continue;
-            if (visited.contains(block))
-                continue;
-            if (stopBlocks.contains(block))
-                continue;
-
-            // Found case2's label - this is fallthrough
-            if (block == caseLabel2)
-                return true;
-
-            visited.add(block);
-
-            for (auto succ : block->getSuccessors())
-            {
-                workList.add(succ);
-            }
-        }
-
-        return false;
+        return caseFallsThroughTo(switchInst, caseLabel1, caseLabel2, breakLabel);
     }
 
     /// Build fallthrough groups from the collected cases.
@@ -1202,68 +1211,6 @@ struct SwitchLoweringContext
         switchInst->removeAndDeallocate();
     }
 };
-
-/// Check if caseLabel1 can reach caseLabel2 (i.e., falls through to it).
-/// This is a standalone version of the fallthrough detection logic.
-static bool caseFallsThroughTo(
-    IRSwitch* switchInst,
-    IRBlock* caseLabel1,
-    IRBlock* caseLabel2,
-    IRBlock* breakLabel)
-{
-    if (!caseLabel1 || !caseLabel2)
-        return false;
-
-    // Build stop blocks: break label, switch block, all case labels except target
-    HashSet<IRBlock*> stopBlocks;
-    stopBlocks.add(breakLabel);
-    stopBlocks.add(caseLabel1);
-
-    auto switchBlock = as<IRBlock>(switchInst->getParent());
-    if (switchBlock)
-        stopBlocks.add(switchBlock);
-
-    UInt caseCount = switchInst->getCaseCount();
-    for (UInt i = 0; i < caseCount; i++)
-    {
-        auto caseLabel = switchInst->getCaseLabel(i);
-        if (caseLabel != caseLabel2)
-            stopBlocks.add(caseLabel);
-    }
-    auto defaultLabel = switchInst->getDefaultLabel();
-    if (defaultLabel && defaultLabel != caseLabel2)
-        stopBlocks.add(defaultLabel);
-
-    // Check if case1 can reach case2's label
-    HashSet<IRBlock*> visited;
-    List<IRBlock*> workList;
-
-    for (auto succ : caseLabel1->getSuccessors())
-        workList.add(succ);
-
-    while (workList.getCount() > 0)
-    {
-        auto block = workList.getLast();
-        workList.removeLast();
-
-        if (!block)
-            continue;
-        if (visited.contains(block))
-            continue;
-        if (stopBlocks.contains(block))
-            continue;
-
-        if (block == caseLabel2)
-            return true;
-
-        visited.add(block);
-
-        for (auto succ : block->getSuccessors())
-            workList.add(succ);
-    }
-
-    return false;
-}
 
 /// Check if an instruction is "safe" and doesn't require thread reconvergence.
 /// Uses an ALLOWLIST approach: only return true if the instruction is explicitly
