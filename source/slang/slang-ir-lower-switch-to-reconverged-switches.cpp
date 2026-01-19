@@ -248,7 +248,7 @@ struct SwitchLoweringContext
         {
             if (i + 1 < cases.getCount())
             {
-                cases[i].fallsThrough = casesShareBlocks(
+                cases[i].fallsThrough = caseFallsThrough(
                     cases[i].label, cases[i + 1].label, breakLabel);
             }
             else
@@ -326,14 +326,18 @@ struct SwitchLoweringContext
 
     /// Check if case i "falls through" to case i+1.
     /// 
-    /// We detect fallthrough by checking if case i can reach case i+1's label,
-    /// or if they share blocks that both will execute. We stop at:
+    /// After simplifyCFG runs, empty intermediate blocks are fused into
+    /// the switch operands, so fallthrough is detected simply by checking
+    /// if case i can reach case i+1's label.
+    /// 
+    /// We stop traversal at:
     /// - The break label (switch exit)
     /// - ALL case labels from this switch (to avoid following control flow
     ///   that exits the switch, like 'continue' to an outer loop, which would
     ///   re-enter the switch via loop back-edge)
+    /// - The switch block itself (for loop back-edge avoidance)
     /// - Blocks already visited (cycle detection)
-    bool casesShareBlocks(
+    bool caseFallsThrough(
         IRBlock* caseLabel1,
         IRBlock* caseLabel2,
         IRBlock* breakLabel)
@@ -342,10 +346,6 @@ struct SwitchLoweringContext
             return false;
 
         // Build a set of "stop blocks" - blocks we shouldn't traverse into
-        // This includes:
-        // - The break label (switch exit)
-        // - ALL case labels from this switch (except caseLabel2)
-        // - The switch block itself (to avoid following loop back-edges)
         HashSet<IRBlock*> stopBlocks;
         stopBlocks.add(breakLabel);
         stopBlocks.add(caseLabel1);
@@ -357,7 +357,7 @@ struct SwitchLoweringContext
         if (switchBlock)
             stopBlocks.add(switchBlock);
 
-        // Add all other case labels as stop blocks (except caseLabel2)
+        // Add all other case labels as stop blocks (except caseLabel2, our target)
         UInt caseCount = switchInst->getCaseCount();
         for (UInt i = 0; i < caseCount; i++)
         {
@@ -365,81 +365,41 @@ struct SwitchLoweringContext
             if (caseLabel != caseLabel2)
                 stopBlocks.add(caseLabel);
         }
-        // Also add default label if different from caseLabel2
         auto defaultLabel = switchInst->getDefaultLabel();
         if (defaultLabel && defaultLabel != caseLabel2)
             stopBlocks.add(defaultLabel);
 
-        // Collect blocks reachable from case 1, stopping at stopBlocks
-        HashSet<IRBlock*> visited1;
-        HashSet<IRBlock*> blocks1;
-        
-        auto collectWithStopBlocks = [&](
-            IRBlock* startBlock,
-            const HashSet<IRBlock*>& stops,
-            HashSet<IRBlock*>& visited,
-            HashSet<IRBlock*>& outBlocks)
+        // Check if case1 can reach case2's label
+        HashSet<IRBlock*> visited;
+        List<IRBlock*> workList;
+
+        for (auto succ : caseLabel1->getSuccessors())
         {
-            List<IRBlock*> workList;
-            workList.add(startBlock);
-
-            while (workList.getCount() > 0)
-            {
-                auto block = workList.getLast();
-                workList.removeLast();
-
-                if (!block)
-                    continue;
-                if (visited.contains(block))
-                    continue;
-                if (stops.contains(block))
-                    continue;
-
-                visited.add(block);
-                outBlocks.add(block);
-
-                for (auto succ : block->getSuccessors())
-                {
-                    workList.add(succ);
-                }
-            }
-        };
-
-        auto terminator1 = caseLabel1->getTerminator();
-        if (terminator1)
-        {
-            for (auto succ : caseLabel1->getSuccessors())
-            {
-                collectWithStopBlocks(succ, stopBlocks, visited1, blocks1);
-            }
+            workList.add(succ);
         }
 
-        // If case 1 can reach case 2's label directly, that's fallthrough
-        if (blocks1.contains(caseLabel2))
-            return true;
-
-        // Now check for shared blocks between case 1 and case 2
-        // For case 2, add caseLabel2 to stop blocks
-        HashSet<IRBlock*> stopBlocks2 = stopBlocks;
-        stopBlocks2.add(caseLabel2);
-
-        HashSet<IRBlock*> visited2;
-        HashSet<IRBlock*> blocks2;
-
-        auto terminator2 = caseLabel2->getTerminator();
-        if (terminator2)
+        while (workList.getCount() > 0)
         {
-            for (auto succ : caseLabel2->getSuccessors())
-            {
-                collectWithStopBlocks(succ, stopBlocks2, visited2, blocks2);
-            }
-        }
+            auto block = workList.getLast();
+            workList.removeLast();
 
-        // Check for intersection
-        for (auto block : blocks1)
-        {
-            if (blocks2.contains(block))
+            if (!block)
+                continue;
+            if (visited.contains(block))
+                continue;
+            if (stopBlocks.contains(block))
+                continue;
+
+            // Found case2's label - this is fallthrough
+            if (block == caseLabel2)
                 return true;
+
+            visited.add(block);
+
+            for (auto succ : block->getSuccessors())
+            {
+                workList.add(succ);
+            }
         }
 
         return false;
