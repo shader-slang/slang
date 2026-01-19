@@ -1060,6 +1060,7 @@ struct IRConstant : IRInst
     union ValueUnion
     {
         IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRUnsignedIntegerValue uintVal;
         IRFloatingPointValue floatVal;
         void* ptrVal;
 
