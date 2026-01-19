@@ -83,6 +83,11 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         return param.type
 %       end
 %     end
+%     for _, loc in ipairs(diagnostic.locations) do
+%       if loc.name == param_name and loc.type then
+%         return loc.type
+%       end
+%     end
 %     return "string"
 %   end
 %
@@ -91,17 +96,31 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %       if part.type == "text" then
           "$(part.content:gsub('"', '\\"'))"
 %       elseif part.type == "interpolation" then
-%         local ptype = getParamType(part.param_name)
-%         if ptype == "name" then
-          nameToPrintableString($(part.param_name))
-%         elseif ptype == "type" then
-          typeToPrintableString($(part.param_name))
-%         elseif ptype == "decl" then
-          nameToPrintableString($(part.param_name)->getName())
-%         elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
-          $(part.param_name)
+%         if part.member_name then
+%           -- Member access: ~param.member or ~param:Type.member
+%           local ptype = getParamType(part.param_name)
+%           local cpp_expr, result_type = lua_module.resolveMemberAccess(ptype, part.member_name, part.param_name)
+%           if result_type == "name" then
+          nameToPrintableString($(cpp_expr))
+%           elseif result_type == "type" then
+          typeToPrintableString($(cpp_expr))
+%           else
+          $(cpp_expr)
+%           end
 %         else
+%           -- Direct parameter reference
+%           local ptype = getParamType(part.param_name)
+%           if ptype == "name" then
+          nameToPrintableString($(part.param_name))
+%           elseif ptype == "type" then
+          typeToPrintableString($(part.param_name))
+%           elseif ptype == "decl" then
+          nameToPrintableString($(part.param_name)->getName())
+%           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(part.param_name)
+%           else
+          $(part.param_name)
+%           end
 %         end
 %       end
 %     end

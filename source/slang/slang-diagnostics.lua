@@ -7,13 +7,15 @@
 -- Code Generation Flow:
 --   1. This file defines diagnostics using err()/warning() helper functions
 --   2. slang-diagnostics-helpers.lua processes them, extracting:
+--      - Locations from span() and note() calls (processed first)
 --      - Parameters from ~interpolations (auto-deduplicated)
---      - Locations from span() and note() calls
+--      - Member accesses like ~expr.type are resolved using location types
 --   3. slang-rich-diagnostics.h.lua loads processed diagnostics
 --   4. FIDDLE templates in slang-rich-diagnostics.h generate C++ structs:
---      - Parameters become typed member variables (String, Type*, Name*, int)
---      - Locations become SourceLoc member variables
+--      - Only direct parameters become member variables (not derived via member access)
+--      - Locations become typed pointers (Expr*, Decl*) or SourceLoc
 --   5. FIDDLE templates in slang-rich-diagnostics.cpp generate toGenericDiagnostic():
+--      - Member accesses generate appropriate C++ (expr->type, decl->getName())
 --      - Builds message string by interpolating parameters
 --      - Sets primary span, secondary spans, and notes with their messages
 --
@@ -22,27 +24,42 @@
 -- err(
 --     "function return type mismatch",
 --     30007,
---     "expression type ~expr_type:Type does not match function's return type ~return_type:Type",
---     span("expression:Expr", "expression type"),        -- Primary span (uses Expr*, extracts .loc)
---     span("function:Decl", "function return type")      -- Secondary span (uses Decl*, extracts .getNameLoc())
+--     "expression type ~expression.type does not match function's return type ~return_type:Type",
+--     span("expression:Expr", "expression type"),        -- Declares expression:Expr
+--     span("function:Decl", "function return type")
 -- )
+-- ~expression.type automatically extracts expression->type (Type*)
+-- ~return_type:Type is a direct parameter
 --
 -- err(
 --     "function redefinition",
 --     30201,
---     "function ~name already has a body",               -- ~name defaults to String type
---     span("function_location", "redeclared here"),      -- Plain SourceLoc (no type suffix)
---     note("original_location", "see previous definition of ~name")
+--     "function ~function already has a body",           -- Decl auto-uses .name
+--     span("function:Decl", "redeclared here"),
+--     note("original:Decl", "see previous definition of ~function")
 -- )
+-- ~function (a Decl) automatically becomes function->getName() when interpolated
+--
+-- err(
+--     "type mismatch",
+--     30008,
+--     "cannot convert ~from:Type to ~to:Type",  -- Inline type declaration
+--     span("expr:Expr", "expression here")
+-- )
+-- ~from:Type declares 'from' as Type* inline (no need to declare separately)
 --
 -- Interpolation syntax:
---   ~param        - String parameter (default)
---   ~param:Type   - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
---                   Parameters are automatically deduplicated across the entire diagnostic.
+--   ~param           - String parameter (default)
+--   ~param:Type      - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
+--   ~param.member    - Member access (e.g., ~expr.type, ~decl.name)
+--   ~param:Type.member - Inline type with member (e.g., ~foo:Expr.type)
+--                     Parameters are automatically deduplicated.
+--                     Decl types automatically use .name when interpolated directly.
 --
 -- Location syntax:
 --   "location"         - Plain SourceLoc variable
---   "location:Type"    - Typed location (Decl->getNameLoc(), Expr->loc, Type->loc, etc.)
+--   "location:Type"    - Typed location (Decl->getNameLoc(), Expr->loc, etc.)
+--                        Typed locations can be used as parameters in interpolations
 --
 -- Available functions:
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
@@ -51,7 +68,7 @@
 --   note(location, message) - Create a note (appears after the main diagnostic)
 
 -- Load helper functions
-local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)")  .. "slang-diagnostics-helpers.lua")
+local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
 local span = helpers.span
 local note = helpers.note
 local err = helpers.err
@@ -61,7 +78,7 @@ local warning = helpers.warning
 err(
 	"function return type mismatch",
 	30007,
-	"expression type ~expression_type:Type does not match function's return type ~return_type:Type",
+	"expression type ~expression.type does not match function's return type ~return_type:Type",
 	span("expression:Expr", "expression type"),
 	span("function:Decl", "function return type")
 )
@@ -69,9 +86,9 @@ err(
 err(
 	"function redefinition",
 	30201,
-	"function ~func_name:Name already has a body",
+	"function ~function already has a body",
 	span("function:Decl", "redeclared here"),
-	note("original:Decl", "see previous definition of ~func_name")
+	note("original:Decl", "see previous definition of ~function")
 )
 
 -- Process and validate all diagnostics
