@@ -18,10 +18,10 @@ import neural;
 //
 // Total params: (2*2 + 2) + (1*2 + 1) = 9
 
-//TEST_INPUT: ubuffer(data=[2 -1 0.5 3  1 -2  -2 4  0.5], stride=4):name=parametersFloat
+//TEST_INPUT: ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4):name=parametersFloat
 RWStructuredBuffer<float> parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):name=params
+//TEST_INPUT: ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=params
 RWStructuredBuffer<float> params;
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=resultBuffer

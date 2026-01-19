@@ -70,12 +70,12 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<Storage, OutputVector>(
+            y = input.linearTransform<Storage, LinearLayout, OutputVector>(
                 storage, storage, weightAddress, biasAddress);
         }
         else
         {
-            y = input.linearTransform<Storage, OutputVector>(
+            y = input.linearTransform<Storage, LinearLayout, OutputVector>(
                 storage, weightAddress);
         }
         return Activation.eval<OutputVector>(activationParam, y);
@@ -95,11 +95,11 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<A, OutputVector>(weightAddr, biasAddr);
+            y = input.linearTransform<A, LinearLayout, OutputVector>(weightAddr, biasAddr);
         }
         else
         {
-            y = input.linearTransform<A, OutputVector>(weightAddr);
+            y = input.linearTransform<A, LinearLayout, OutputVector>(weightAddr);
         }
         return Activation.eval<OutputVector>(activationParam, y);
     }

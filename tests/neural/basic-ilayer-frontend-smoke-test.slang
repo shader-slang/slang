@@ -9,10 +9,10 @@ import neural;
 
 // Parameters: FFLayer<float, 4, 2, ..., HasBias=true>
 // weights = 2x4 matrix, bias = 2
-//TEST_INPUT: ubuffer(data=[1 2 3 4  5 6 7 8  9 10], stride=4):name=parametersFloat
+//TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0  5.0 6.0 7.0 8.0  9.0 10.0], stride=4):name=parametersFloat
 RWStructuredBuffer<float> parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):name=params
+//TEST_INPUT: ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=params
 RWStructuredBuffer<float> params;
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
