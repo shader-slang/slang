@@ -1001,35 +1001,23 @@ struct SwitchLoweringContext
                 }
                 else
                 {
-                    // For non-first cases in the group, find the cloned entry for their
-                    // original label and point to it
-                    // This is complex - for now, just point to the first case's block
-                    // and let the case body handle the fallthrough internally
-                    Index firstCaseIdx = group.caseIndices[0];
-                    IRBlock* firstCaseBlock = nullptr;
-                    if (caseIndexToFirstSwitchBlock.tryGetValue(firstCaseIdx, firstCaseBlock))
-                    {
-                        // We need to find the cloned version of this case's label
-                        // For simplicity, reuse direct branching to the original label
-                        // with break redirected
-                        IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
-                        
-                        auto clonedEntry = cloneNonFallthroughCaseBody(
-                            caseInfo.label,
-                            nextCaseBlock,
-                            breakLabel,
-                            betweenSwitchesBlock,
-                            betweenSwitchesBlock);
+                    // Non-first case in a safe fallthrough group.
+                    // Clone this case's body separately - when the selector matches
+                    // this case value, execution enters here and gets the remaining
+                    // fallthrough sequence (from this point to the group's end).
+                    IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
+                    
+                    auto clonedEntry = cloneNonFallthroughCaseBody(
+                        caseInfo.label,
+                        nextCaseBlock,
+                        breakLabel,
+                        betweenSwitchesBlock,
+                        betweenSwitchesBlock);
 
-                        if (clonedEntry)
-                        {
-                            builder->setInsertInto(caseBlock);
-                            builder->emitBranch(clonedEntry);
-                        }
-                        else
-                        {
-                            builder->emitBranch(betweenSwitchesBlock);
-                        }
+                    if (clonedEntry)
+                    {
+                        builder->setInsertInto(caseBlock);
+                        builder->emitBranch(clonedEntry);
                     }
                     else
                     {
