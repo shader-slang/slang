@@ -86,6 +86,7 @@ prelude/*.h.cpp
 /external/slang-llvm/
 /external/slang-glslang/
 /external/mimalloc/
+/external/slangpy/
 /external/dxvk-remix/
 
 build/**/*.tlog
