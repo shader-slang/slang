@@ -74,6 +74,7 @@
 #include "slang-ir-link.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-simplify-cfg.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-bit-cast.h"
@@ -1929,8 +1930,10 @@ Result linkAndOptimizeIR(
     // See GitHub issue #6441.
     //
     // We eliminate phis first so the switch lowering pass sees a cleaner IR
-    // without block parameters.
+    // without block parameters. Then simplifyCFG fuses empty switch case blocks
+    // that just branch to shared blocks.
     SLANG_PASS(eliminatePhis, LivenessMode::Disabled, PhiEliminationOptions::getFast());
+    SLANG_PASS(simplifyCFG, CFGSimplificationOptions::getFast());
     SLANG_PASS(lowerSwitchToReconvergedSwitches, targetProgram);
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);

@@ -1,15 +1,128 @@
 // slang-ir-lower-switch-to-reconverged-switches.cpp
 //
 // Lowers switch statements with fallthrough to use reconverged control flow.
-// This splits switches into two: the first sets selector/stage variables,
-// the second executes fallthrough sequences with if-guards.
-//
 // See GitHub issue #6441 and local-tests/6441/selector-example2.slang
+//
+// ## Problem
+//
+// SPIR-V's OpSwitch has undefined reconvergence behavior for fallthrough cases.
+// When threads in a wave/subgroup enter different cases that share code via
+// fallthrough, they may not properly reconverge at the shared code, causing
+// incorrect results for wave operations (WaveActiveSum, etc.).
+//
+// The SPV_KHR_maximal_reconvergence extension guarantees reconvergence at
+// structured control flow merge points (like if-else merges), but OpSwitch
+// fallthrough is NOT structured - threads can enter the same code from
+// different case labels.
+//
+// ## Solution: Two-Switch Transformation
+//
+// We split a switch with fallthrough into two switches:
+//
+// ### First Switch (Dispatch Switch)
+// - Each case sets two variables: `fallthroughSelector` and `fallthroughStage`
+// - ALL cases break (no fallthrough in the IR structure)
+// - Cases in the same fallthrough group get the same selector value
+// - The stage indicates where in the fallthrough sequence to start
+//
+// ### Second Switch (Execution Switch)  
+// - Dispatches on `fallthroughSelector`
+// - One case per fallthrough group
+// - Each case contains if-guarded stages: `if (fallthroughStage <= N) { ... }`
+// - This ensures all threads in a fallthrough group reconverge at each if-merge
+//
+// ### Non-Fallthrough Cases
+// - Get selector = MIN_INT (a sentinel value)
+// - Their code executes directly after the first switch dispatch
+// - They do NOT go through the second switch's case structure
+// - Their break targets must be redirected to the final break label
+//
+// ## Example
+//
+// Original (with conditional break in case0):
+//   switch(val, breakLabel, defaultLabel, 0:case0, 1:case1, 2:case2)
+//   case0: a(); if(cond) branch(breakLabel) else branch(case0_continue)
+//   case0_continue: a2(); branch(case1)     // fallthrough
+//   case1: b(); branch(breakLabel)          // break
+//   case2: c(); branch(breakLabel)          // break
+//   defaultLabel: d(); branch(breakLabel)
+//   breakLabel: ...
+//
+// Transformed:
+//   switch(val, secondSwitchEntry, newDefault, 0:dispatch0, 1:dispatch1, 2:dispatch2)
+//   dispatch0: selector=0; stage=0; branch(secondSwitchEntry)
+//   dispatch1: selector=0; stage=1; branch(secondSwitchEntry)
+//   dispatch2: selector=MIN_INT; branch(case2Body)
+//   newDefault: selector=MIN_INT; branch(defaultBody)
+//   
+//   case2Body: c(); branch(secondSwitchEntry)
+//   defaultBody: d(); branch(secondSwitchEntry)
+//   
+//   secondSwitchEntry:
+//   switch(selector, finalBreak, finalBreak, 0:fallthroughGroup0)
+//   fallthroughGroup0:
+//     ifElse(stage <= 0, stage0Body, stage0Merge, stage0Merge)
+//     stage0Body:
+//       a();
+//       ifElse(cond, condBreak, condContinue, stage0Merge)
+//       condBreak: stage=MAX_INT; branch(stage0Merge)  // skip remaining stages
+//       condContinue: a2(); branch(stage0Merge)
+//     stage0Merge:
+//     ifElse(stage <= 1, stage1Body, stage1Merge, stage1Merge)
+//     stage1Body: b(); branch(stage1Merge)
+//     stage1Merge:
+//     branch(finalBreak)
+//   finalBreak: ...
+//
+// The key insight for conditional breaks: setting stage=MAX_INT causes all
+// subsequent "if (stage <= N)" checks to fail, effectively skipping the
+// remaining stages while maintaining structured control flow.
+//
+// ## Loops Inside Fallthrough Cases
+//
+// Loops inside case bodies are preserved as-is (they have their own structured
+// control flow). However, any branch from inside the loop that targets the
+// original switch's break label must be transformed:
+//
+// Original:
+//   case0:
+//     loop(header, loopBreak, continue)
+//       header: if(done) branch(loopBreak) else branch(body)
+//       body: ...; if(earlyExit) branch(switchBreak); branch(continue)
+//       continue: branch(header)
+//     loopBreak: branch(case1)  // fallthrough
+//
+// Transformed (inside stage0Body):
+//   loop(header, loopBreak, continue)
+//     header: if(done) branch(loopBreak) else branch(body)
+//     body: ...;
+//       ifElse(earlyExit, earlyExitBlock, noEarlyExit, loopMerge)
+//       earlyExitBlock: stage=MAX_INT; branch(loopMerge)
+//       noEarlyExit: branch(loopMerge)
+//     loopMerge: branch(continue)
+//     continue: branch(header)
+//   loopBreak: branch(stage0Merge)  // continues to next stage check
+//
+// The loop's own break (loopBreak) is NOT a switch break - it just exits
+// the loop and continues the case body. Only branches that originally
+// targeted the switch's break label need transformation.
+//
+// ## Key Invariants
+//
+// 1. First switch's break label becomes the second switch entry
+// 2. Fallthrough cases: dispatch blocks set selector/stage, branch to second switch
+// 3. Non-fallthrough cases: dispatch blocks set selector=MIN_INT, branch to body
+// 4. Non-fallthrough case bodies branch to second switch entry when done
+// 5. Second switch routes selector values to fallthrough groups
+// 6. Second switch's default = break = finalBreak (MIN_INT goes straight to break)
+// 7. All control flow converges at finalBreak
 
 #include "slang-ir-lower-switch-to-reconverged-switches.h"
 
+#include "slang-ir-clone.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 
@@ -212,10 +325,15 @@ struct SwitchLoweringContext
     }
 
     /// Check if case i "falls through" to case i+1.
-    /// We detect this by checking if they share any blocks (other than the break label).
-    /// If case i reaches some block X, and case i+1 also reaches X, they share that block,
-    /// meaning threads entering via case i and case i+1 could converge at X.
-    static bool casesShareBlocks(
+    /// 
+    /// We detect fallthrough by checking if case i can reach case i+1's label,
+    /// or if they share blocks that both will execute. We stop at:
+    /// - The break label (switch exit)
+    /// - ALL case labels from this switch (to avoid following control flow
+    ///   that exits the switch, like 'continue' to an outer loop, which would
+    ///   re-enter the switch via loop back-edge)
+    /// - Blocks already visited (cycle detection)
+    bool casesShareBlocks(
         IRBlock* caseLabel1,
         IRBlock* caseLabel2,
         IRBlock* breakLabel)
@@ -223,29 +341,97 @@ struct SwitchLoweringContext
         if (!caseLabel1 || !caseLabel2)
             return false;
 
-        // Collect blocks reachable from case 1 (excluding case 1's own label)
+        // Build a set of "stop blocks" - blocks we shouldn't traverse into
+        // This includes:
+        // - The break label (switch exit)
+        // - ALL case labels from this switch (except caseLabel2)
+        // - The switch block itself (to avoid following loop back-edges)
+        HashSet<IRBlock*> stopBlocks;
+        stopBlocks.add(breakLabel);
+        stopBlocks.add(caseLabel1);
+
+        // Add the block containing the switch instruction as a stop block.
+        // This prevents following control flow that exits the switch (like continue
+        // to an outer loop) and then re-enters via the loop back-edge.
+        auto switchBlock = as<IRBlock>(switchInst->getParent());
+        if (switchBlock)
+            stopBlocks.add(switchBlock);
+
+        // Add all other case labels as stop blocks (except caseLabel2)
+        UInt caseCount = switchInst->getCaseCount();
+        for (UInt i = 0; i < caseCount; i++)
+        {
+            auto caseLabel = switchInst->getCaseLabel(i);
+            if (caseLabel != caseLabel2)
+                stopBlocks.add(caseLabel);
+        }
+        // Also add default label if different from caseLabel2
+        auto defaultLabel = switchInst->getDefaultLabel();
+        if (defaultLabel && defaultLabel != caseLabel2)
+            stopBlocks.add(defaultLabel);
+
+        // Collect blocks reachable from case 1, stopping at stopBlocks
         HashSet<IRBlock*> visited1;
         HashSet<IRBlock*> blocks1;
-        visited1.add(caseLabel1); // Don't include the entry block itself
+        
+        auto collectWithStopBlocks = [&](
+            IRBlock* startBlock,
+            const HashSet<IRBlock*>& stops,
+            HashSet<IRBlock*>& visited,
+            HashSet<IRBlock*>& outBlocks)
+        {
+            List<IRBlock*> workList;
+            workList.add(startBlock);
+
+            while (workList.getCount() > 0)
+            {
+                auto block = workList.getLast();
+                workList.removeLast();
+
+                if (!block)
+                    continue;
+                if (visited.contains(block))
+                    continue;
+                if (stops.contains(block))
+                    continue;
+
+                visited.add(block);
+                outBlocks.add(block);
+
+                for (auto succ : block->getSuccessors())
+                {
+                    workList.add(succ);
+                }
+            }
+        };
+
         auto terminator1 = caseLabel1->getTerminator();
         if (terminator1)
         {
             for (auto succ : caseLabel1->getSuccessors())
             {
-                collectReachableBlocks(succ, breakLabel, visited1, blocks1);
+                collectWithStopBlocks(succ, stopBlocks, visited1, blocks1);
             }
         }
 
-        // Collect blocks reachable from case 2 (excluding case 2's own label)
+        // If case 1 can reach case 2's label directly, that's fallthrough
+        if (blocks1.contains(caseLabel2))
+            return true;
+
+        // Now check for shared blocks between case 1 and case 2
+        // For case 2, add caseLabel2 to stop blocks
+        HashSet<IRBlock*> stopBlocks2 = stopBlocks;
+        stopBlocks2.add(caseLabel2);
+
         HashSet<IRBlock*> visited2;
         HashSet<IRBlock*> blocks2;
-        visited2.add(caseLabel2);
+
         auto terminator2 = caseLabel2->getTerminator();
         if (terminator2)
         {
             for (auto succ : caseLabel2->getSuccessors())
             {
-                collectReachableBlocks(succ, breakLabel, visited2, blocks2);
+                collectWithStopBlocks(succ, stopBlocks2, visited2, blocks2);
             }
         }
 
@@ -420,6 +606,81 @@ struct SwitchLoweringContext
         }
     }
 
+    /// Rewrite all branches in bodyBlocks that target oldTarget to target newTarget.
+    /// Handles unconditional branches, conditional branches, and loop instructions.
+    void rewriteBreakTargets(
+        const HashSet<IRBlock*>& bodyBlocks,
+        IRBlock* oldTarget,
+        IRBlock* newTarget)
+    {
+        for (auto block : bodyBlocks)
+        {
+            auto terminator = block->getTerminator();
+            if (!terminator)
+                continue;
+
+            switch (terminator->getOp())
+            {
+            case kIROp_UnconditionalBranch:
+                {
+                    auto branch = as<IRUnconditionalBranch>(terminator);
+                    if (branch->getTargetBlock() == oldTarget)
+                    {
+                        builder->setInsertBefore(terminator);
+                        builder->emitBranch(newTarget);
+                        terminator->removeAndDeallocate();
+                    }
+                }
+                break;
+
+            case kIROp_ConditionalBranch:
+                {
+                    auto condBranch = as<IRConditionalBranch>(terminator);
+                    auto trueTarget = condBranch->getTrueBlock();
+                    auto falseTarget = condBranch->getFalseBlock();
+
+                    bool needsRewrite = (trueTarget == oldTarget) || (falseTarget == oldTarget);
+                    if (needsRewrite)
+                    {
+                        auto condition = condBranch->getCondition();
+                        auto newTrueTarget = (trueTarget == oldTarget) ? newTarget : trueTarget;
+                        auto newFalseTarget = (falseTarget == oldTarget) ? newTarget : falseTarget;
+
+                        builder->setInsertBefore(terminator);
+                        builder->emitBranch(condition, newTrueTarget, newFalseTarget);
+                        terminator->removeAndDeallocate();
+                    }
+                }
+                break;
+
+            case kIROp_Loop:
+                {
+                    // Loop instruction has break target as operand
+                    // loop(targetBlock, breakBlock, continueBlock)
+                    auto loop = as<IRLoop>(terminator);
+                    if (loop->getBreakBlock() == oldTarget)
+                    {
+                        // Need to rewrite the loop's break target
+                        // The loop instruction operands are: targetBlock, breakBlock, continueBlock
+                        loop->breakBlock.set(newTarget);
+                    }
+                }
+                break;
+
+            case kIROp_Switch:
+                {
+                    // Nested switch - rewrite its break label if it targets oldTarget
+                    auto nestedSwitch = as<IRSwitch>(terminator);
+                    if (nestedSwitch->getBreakLabel() == oldTarget)
+                    {
+                        nestedSwitch->breakLabel.set(newTarget);
+                    }
+                }
+                break;
+            }
+        }
+    }
+
     /// Rewrite branches in caseBodyBlocks: replace branches to breakLabel with
     /// fallthroughStage = MAX_INT; branch to mergeBlock.
     /// Replace branches to nextCaseBlock with branch to mergeBlock.
@@ -524,6 +785,147 @@ struct SwitchLoweringContext
         }
     }
 
+    /// Clone case body blocks into new blocks.
+    /// 
+    /// This creates new blocks for each block in bodyBlocks, sets up the IRCloneEnv
+    /// to redirect branches appropriately, and clones all instructions.
+    /// 
+    /// The cloning approach is essential because simply branching to existing blocks
+    /// and rewriting their terminators doesn't work - SSA optimization passes 
+    /// (simplifyIR, eliminatePhis, simplifyNonSSAIR) will merge our dispatch blocks
+    /// with the case bodies and coalesce our selector/stage variables with unrelated
+    /// variables like loop counters and results.
+    /// 
+    /// By cloning, we create completely new IR that the optimizer treats as distinct
+    /// from the original blocks. The original blocks become dead code and are removed
+    /// by dead code elimination.
+    /// 
+    /// @param bodyBlocks Set of blocks to clone
+    /// @param entryBlock The entry block of the case body (first block to execute)
+    /// @param redirections Map of old blocks to redirect to new blocks (e.g., breakLabel -> newTarget)
+    /// @param insertBeforeBlock Block to insert new blocks before
+    /// @returns The cloned entry block
+    IRBlock* cloneCaseBodyBlocks(
+        const HashSet<IRBlock*>& bodyBlocks,
+        IRBlock* entryBlock,
+        const Dictionary<IRBlock*, IRBlock*>& redirections,
+        IRBlock* insertBeforeBlock)
+    {
+        if (bodyBlocks.getCount() == 0)
+            return nullptr;
+
+        IRCloneEnv cloneEnv;
+
+        // IMPORTANT: Add redirections FIRST, before creating block mappings.
+        // This ensures that blocks like breakLabel and nextCaseBlock are properly
+        // redirected when encountered during cloning, rather than being cloned.
+        for (const auto& [oldBlock, newBlock] : redirections)
+        {
+            cloneEnv.mapOldValToNew[oldBlock] = newBlock;
+        }
+
+        // Create new empty blocks and register mappings for body blocks
+        // Skip any blocks that are already in redirections (they shouldn't be cloned)
+        Dictionary<IRBlock*, IRBlock*> oldToNew;
+        for (auto block : bodyBlocks)
+        {
+            // Don't create a clone for blocks that should be redirected
+            if (redirections.containsKey(block))
+                continue;
+
+            auto clonedBlock = builder->createBlock();
+            clonedBlock->insertBefore(insertBeforeBlock);
+            cloneEnv.mapOldValToNew[block] = clonedBlock;
+            oldToNew[block] = clonedBlock;
+        }
+
+        // Second pass: clone instructions from old blocks to new blocks
+        for (auto block : bodyBlocks)
+        {
+            // Skip blocks that are redirected (not cloned)
+            if (redirections.containsKey(block))
+                continue;
+
+            auto clonedBlock = oldToNew[block];
+            builder->setInsertInto(clonedBlock);
+
+            for (auto inst : block->getChildren())
+            {
+                cloneInst(&cloneEnv, builder, inst);
+            }
+        }
+
+        // Return the cloned entry block
+        // First check if it was redirected, then check if it was cloned
+        IRBlock* clonedEntry = nullptr;
+        if (!oldToNew.tryGetValue(entryBlock, clonedEntry))
+        {
+            // Entry block might have been redirected (unusual but possible)
+            redirections.tryGetValue(entryBlock, clonedEntry);
+        }
+        return clonedEntry;
+    }
+
+    /// Clone case body for non-fallthrough cases.
+    /// Redirects breakLabel -> targetBlock.
+    IRBlock* cloneNonFallthroughCaseBody(
+        IRBlock* entryBlock,
+        IRBlock* nextCaseBlock,
+        IRBlock* breakLabel,
+        IRBlock* targetBlock,
+        IRBlock* insertBeforeBlock)
+    {
+        HashSet<IRBlock*> bodyBlocks;
+        collectCaseBodyBlocks(entryBlock, nextCaseBlock, breakLabel, bodyBlocks);
+
+        if (bodyBlocks.getCount() == 0)
+            return nullptr;
+
+        Dictionary<IRBlock*, IRBlock*> redirections;
+        redirections[breakLabel] = targetBlock;
+
+        return cloneCaseBodyBlocks(bodyBlocks, entryBlock, redirections, insertBeforeBlock);
+    }
+
+    /// Clone case body for fallthrough cases in the second switch.
+    /// Creates break handling (sets stage to MAX_INT) and redirects appropriately.
+    IRBlock* cloneFallthroughCaseBody(
+        IRBlock* entryBlock,
+        IRBlock* nextCaseBlock,
+        IRBlock* breakLabel,
+        IRBlock* stageMergeBlock,
+        IRInst* fallthroughStageVar,
+        IRInst* maxStageValue,
+        IRBlock* insertBeforeBlock)
+    {
+        HashSet<IRBlock*> bodyBlocks;
+        collectCaseBodyBlocks(entryBlock, nextCaseBlock, breakLabel, bodyBlocks);
+
+        if (bodyBlocks.getCount() == 0)
+            return nullptr;
+
+        // For fallthrough cases, we need special handling:
+        // - breakLabel branches need to set stage=MAX_INT, then branch to stageMergeBlock
+        // - nextCaseBlock branches (fallthrough) need to branch to stageMergeBlock
+        //
+        // We handle breakLabel by creating a break handler block.
+
+        auto breakHandlerBlock = builder->createBlock();
+        breakHandlerBlock->insertBefore(insertBeforeBlock);
+        builder->setInsertInto(breakHandlerBlock);
+        builder->emitStore(fallthroughStageVar, maxStageValue);
+        builder->emitBranch(stageMergeBlock);
+
+        Dictionary<IRBlock*, IRBlock*> redirections;
+        redirections[breakLabel] = breakHandlerBlock;
+        if (nextCaseBlock)
+        {
+            redirections[nextCaseBlock] = stageMergeBlock;
+        }
+
+        return cloneCaseBodyBlocks(bodyBlocks, entryBlock, redirections, insertBeforeBlock);
+    }
+
     /// Perform the transformation.
     void transform()
     {
@@ -545,12 +947,16 @@ struct SwitchLoweringContext
         auto intType = originalSelector->getDataType();
 
         // Create variables for fallthroughSelector and fallthroughStage
+        // We add name hints to prevent register allocation from coalescing these
+        // with other variables (which could cause incorrect code generation).
         builder->setInsertBefore(switchInst);
 
         auto fallthroughSelectorVar = builder->emitVar(intType);
+        builder->addNameHintDecoration(fallthroughSelectorVar, UnownedStringSlice("_ft_selector"));
         builder->emitStore(fallthroughSelectorVar, originalSelector);
 
         auto fallthroughStageVar = builder->emitVar(intType);
+        builder->addNameHintDecoration(fallthroughStageVar, UnownedStringSlice("_ft_stage"));
         auto zeroValue = builder->getIntValue(intType, 0);
         builder->emitStore(fallthroughStageVar, zeroValue);
 
@@ -605,31 +1011,38 @@ struct SwitchLoweringContext
             }
             else
             {
-                // Non-fallthrough case: execute body directly, then skip second switch
-                // Set fallthroughSelector to skip value so second switch doesn't match
+                // Non-fallthrough case: execute body directly, then skip second switch.
+                // 
+                // IMPORTANT: We CLONE the case body blocks rather than branching to them.
+                // Simply branching to existing blocks and rewriting terminators doesn't work
+                // because SSA optimization passes (simplifyIR, eliminatePhis, simplifyNonSSAIR)
+                // will merge our dispatch blocks with the case bodies and coalesce our
+                // selector/stage variables with unrelated variables like loop counters.
+                //
+                // By cloning, we create completely new IR that the optimizer treats as
+                // distinct from the original blocks.
+
                 builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
 
-                // Branch to original case body
-                builder->emitBranch(caseInfo.label);
-
-                // Retarget original case body's break to betweenSwitchesBlock
-                // (so it continues to second switch, which will skip due to selector)
-                HashSet<IRBlock*> bodyBlocks;
                 IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
-                collectCaseBodyBlocks(caseInfo.label, nextCaseBlock, breakLabel, bodyBlocks);
 
-                for (auto block : bodyBlocks)
+                // Clone the case body with breakLabel redirected to betweenSwitchesBlock
+                auto clonedEntry = cloneNonFallthroughCaseBody(
+                    caseInfo.label,
+                    nextCaseBlock,
+                    breakLabel,
+                    betweenSwitchesBlock,
+                    betweenSwitchesBlock);
+
+                if (clonedEntry)
                 {
-                    auto terminator = block->getTerminator();
-                    if (auto branch = as<IRUnconditionalBranch>(terminator))
-                    {
-                        if (branch->getTargetBlock() == breakLabel)
-                        {
-                            builder->setInsertBefore(terminator);
-                            builder->emitBranch(betweenSwitchesBlock);
-                            terminator->removeAndDeallocate();
-                        }
-                    }
+                    builder->setInsertInto(caseBlock);
+                    builder->emitBranch(clonedEntry);
+                }
+                else
+                {
+                    // Empty body - just branch to between switches
+                    builder->emitBranch(betweenSwitchesBlock);
                 }
             }
 
@@ -693,6 +1106,10 @@ struct SwitchLoweringContext
             secondSwitchCaseArgs.add(groupCaseBlock);
 
             // Build the if-chain for stages within this group
+            // 
+            // IMPORTANT: We CLONE the case body blocks rather than branching to them.
+            // This is essential because simply branching and rewriting terminators
+            // doesn't work - SSA passes will merge/coalesce our structures.
             IRBlock* currentBlock = groupCaseBlock;
 
             for (Index stageIdx = 0; stageIdx < group.caseIndices.getCount(); stageIdx++)
@@ -711,23 +1128,32 @@ struct SwitchLoweringContext
                 // fallthroughStage <= stageIdx is equivalent to stageIdx >= fallthroughStage
                 auto condition = builder->emitGeq(stageValue, fallthroughStageLoad);
 
-                // Emit if-else: if (condition) goto caseBody else goto merge
-                builder->emitIfElse(condition, caseInfo.label, stageMergeBlock, stageMergeBlock);
-
-                // Rewrite the case body's branches
-                HashSet<IRBlock*> bodyBlocks;
+                // Clone the case body for this stage
                 IRBlock* nextCaseBlock = (caseIdx + 1 < cases.getCount())
                     ? cases[caseIdx + 1].label
                     : nullptr;
-                collectCaseBodyBlocks(caseInfo.label, nextCaseBlock, breakLabel, bodyBlocks);
 
-                rewriteCaseBodyBranches(
-                    bodyBlocks,
+                auto clonedEntry = cloneFallthroughCaseBody(
+                    caseInfo.label,
                     nextCaseBlock,
                     breakLabel,
                     stageMergeBlock,
                     fallthroughStageVar,
-                    maxStageValue);
+                    maxStageValue,
+                    stageMergeBlock);
+
+                if (clonedEntry)
+                {
+                    // Emit if-else: if (condition) goto clonedEntry else goto merge
+                    builder->setInsertInto(currentBlock);
+                    builder->emitIfElse(condition, clonedEntry, stageMergeBlock, stageMergeBlock);
+                }
+                else
+                {
+                    // Empty body - just branch to merge
+                    builder->setInsertInto(currentBlock);
+                    builder->emitBranch(stageMergeBlock);
+                }
 
                 // Set up for next stage
                 currentBlock = stageMergeBlock;
@@ -738,18 +1164,13 @@ struct SwitchLoweringContext
             builder->emitBranch(afterSecondSwitchBlock);
         }
 
-        // Default for second switch: just branch to break (no fallthrough group matched)
-        auto secondSwitchDefaultBlock = builder->createBlock();
-        secondSwitchDefaultBlock->insertBefore(afterSecondSwitchBlock);
-        builder->setInsertInto(secondSwitchDefaultBlock);
-        builder->emitBranch(afterSecondSwitchBlock);
-
         // Emit second switch
+        // Default = break = afterSecondSwitchBlock (MIN_INT selector goes straight to break)
         builder->setInsertInto(betweenSwitchesBlock);
         builder->emitSwitch(
             fallthroughSelectorLoad2,
             afterSecondSwitchBlock,
-            secondSwitchDefaultBlock,
+            afterSecondSwitchBlock,  // default = break (no intermediate block needed)
             (UInt)secondSwitchCaseArgs.getCount(),
             secondSwitchCaseArgs.getBuffer());
 
@@ -780,6 +1201,13 @@ static void lowerSwitchInFunc(
     IRGlobalValueWithCode* func,
     TargetProgram* targetProgram)
 {
+    // First, eliminate continue blocks in this function.
+    // This transforms `continue` statements (which might target outer loops from 
+    // inside switches) into breaks to inner regions. This simplifies the control 
+    // flow analysis for fallthrough detection, preventing us from incorrectly 
+    // detecting fallthrough when a case uses `continue` to exit to an outer loop.
+    eliminateContinueBlocksInFunc(irModule, func);
+
     // Collect all switch instructions first (since we'll be modifying the IR)
     List<IRSwitch*> switches;
 
