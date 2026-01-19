@@ -848,21 +848,20 @@ struct SwitchLoweringContext
         // with other variables (which could cause incorrect code generation).
         builder->setInsertBefore(switchInst);
 
+        // Skip value for selector: -1 means "don't go through second switch"
+        auto skipSelectorValue = builder->getIntValue(intType, -1);
+        // Default stage is 0 (start of fallthrough sequence)
+        auto zeroValue = builder->getIntValue(intType, 0);
+        // MAX_INT for early exit (stage will never be <= MAX_INT after break)
+        auto maxStageValue = builder->getIntValue(intType, INT32_MAX);
+
         auto fallthroughSelectorVar = builder->emitVar(intType);
         builder->addNameHintDecoration(fallthroughSelectorVar, UnownedStringSlice("_ft_selector"));
-        builder->emitStore(fallthroughSelectorVar, originalSelector);
+        builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
 
         auto fallthroughStageVar = builder->emitVar(intType);
         builder->addNameHintDecoration(fallthroughStageVar, UnownedStringSlice("_ft_stage"));
-        auto zeroValue = builder->getIntValue(intType, 0);
         builder->emitStore(fallthroughStageVar, zeroValue);
-
-        // MAX_INT for early exit (stage will never be <= MAX_INT)
-        auto maxStageValue = builder->getIntValue(intType, INT32_MAX);
-
-        // A special "skip" value for fallthroughSelector when non-fallthrough case ran.
-        // We use -1 since group indices start at 0.
-        auto skipSelectorValue = builder->getIntValue(intType, -1);
 
         // --- Build the first switch ---
         // All cases in the first switch set fallthroughSelector and fallthroughStage, then break.
@@ -933,7 +932,7 @@ struct SwitchLoweringContext
                 caseIndexToFirstSwitchBlock[i] = caseBlock;
 
                 builder->setInsertInto(caseBlock);
-                builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
+                // fallthroughSelector already defaults to -1 (skip), no need to store
 
                 // Find the last case in this group to determine where to stop cloning
                 auto& group = fallthroughGroups[caseInfo.fallthroughGroupIndex];
@@ -1034,7 +1033,7 @@ struct SwitchLoweringContext
                 caseIndexToFirstSwitchBlock[i] = caseBlock;
 
                 builder->setInsertInto(caseBlock);
-                builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
+                // fallthroughSelector already defaults to -1 (skip), no need to store
 
                 IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
 
@@ -1075,10 +1074,10 @@ struct SwitchLoweringContext
         else
         {
             // No default: create a block that just branches to between-switches
+            // fallthroughSelector already defaults to -1 (skip), no need to store
             firstSwitchDefaultBlock = builder->createBlock();
             firstSwitchDefaultBlock->insertBefore(betweenSwitchesBlock);
             builder->setInsertInto(firstSwitchDefaultBlock);
-            builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
             builder->emitBranch(betweenSwitchesBlock);
         }
 
