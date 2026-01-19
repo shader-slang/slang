@@ -14,6 +14,9 @@ Types in Slang do not generally have identical memory layouts in different targe
 are discussed with each type. Any details of layout not specified may depend on the target language, target
 device, compiler options, and the context in which a type is used.
 
+## Type declarations {#declarations}
+
+TODO
 
 ## Known and Unknown Size
 
