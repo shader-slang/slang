@@ -960,20 +960,342 @@ struct SwitchLoweringContext
     }
 };
 
-/// Determine if a switch should be considered for lowering.
-/// We always return true here - the actual decision about whether to transform
-/// happens inside SwitchLoweringContext::transform() based on needsTransformation().
+/// Check if caseLabel1 can reach caseLabel2 (i.e., falls through to it).
+/// This is a standalone version of the fallthrough detection logic.
+static bool caseFallsThroughTo(
+    IRSwitch* switchInst,
+    IRBlock* caseLabel1,
+    IRBlock* caseLabel2,
+    IRBlock* breakLabel)
+{
+    if (!caseLabel1 || !caseLabel2)
+        return false;
+
+    // Build stop blocks: break label, switch block, all case labels except target
+    HashSet<IRBlock*> stopBlocks;
+    stopBlocks.add(breakLabel);
+    stopBlocks.add(caseLabel1);
+
+    auto switchBlock = as<IRBlock>(switchInst->getParent());
+    if (switchBlock)
+        stopBlocks.add(switchBlock);
+
+    UInt caseCount = switchInst->getCaseCount();
+    for (UInt i = 0; i < caseCount; i++)
+    {
+        auto caseLabel = switchInst->getCaseLabel(i);
+        if (caseLabel != caseLabel2)
+            stopBlocks.add(caseLabel);
+    }
+    auto defaultLabel = switchInst->getDefaultLabel();
+    if (defaultLabel && defaultLabel != caseLabel2)
+        stopBlocks.add(defaultLabel);
+
+    // Check if case1 can reach case2's label
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> workList;
+
+    for (auto succ : caseLabel1->getSuccessors())
+        workList.add(succ);
+
+    while (workList.getCount() > 0)
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+
+        if (!block)
+            continue;
+        if (visited.contains(block))
+            continue;
+        if (stopBlocks.contains(block))
+            continue;
+
+        if (block == caseLabel2)
+            return true;
+
+        visited.add(block);
+
+        for (auto succ : block->getSuccessors())
+            workList.add(succ);
+    }
+
+    return false;
+}
+
+/// Check if an instruction is "safe" and doesn't require thread reconvergence.
+/// Uses an ALLOWLIST approach: only return true if the instruction is explicitly
+/// known to be safe. Unknown instructions are considered unsafe.
 /// 
-/// TODO: In the future, we may want to restrict this to SPIR-V targets only,
+/// Safe operations include: basic math, loads, stores, control flow, comparisons,
+/// type conversions, and other simple operations that don't have subgroup semantics.
+static bool isInstructionSafeForFallthrough(IRInst* inst)
+{
+    // Block parameters and decorations are always safe
+    if (as<IRParam>(inst) || as<IRDecoration>(inst))
+        return true;
+
+    auto op = inst->getOp();
+
+    // Allowlist of safe operations
+    switch (op)
+    {
+    // Control flow (terminators)
+    case kIROp_UnconditionalBranch:
+    case kIROp_ConditionalBranch:
+    case kIROp_Switch:
+    case kIROp_IfElse:
+    case kIROp_Loop:
+    case kIROp_Return:
+    case kIROp_Unreachable:
+    case kIROp_Discard:
+    case kIROp_MissingReturn:
+
+    // Memory operations
+    case kIROp_Load:
+    case kIROp_Store:
+    case kIROp_Var:
+    case kIROp_Alloca:
+
+    // Pointer/address operations
+    case kIROp_GetElementPtr:
+    case kIROp_FieldAddress:
+    case kIROp_FieldExtract:
+    case kIROp_GetElement:
+    case kIROp_GetAddress:
+    case kIROp_ImageSubscript:
+    case kIROp_RWStructuredBufferGetElementPtr:
+
+    // Arithmetic operations
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_IRem:
+    case kIROp_FRem:
+    case kIROp_Neg:
+
+    // Bitwise operations
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+
+    // Logical operations
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_Not:
+
+    // Comparison operations
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Less:
+    case kIROp_Greater:
+    case kIROp_Leq:
+    case kIROp_Geq:
+
+    // Type conversions
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_CastIntToPtr:
+    case kIROp_CastPtrToInt:
+    case kIROp_CastPtrToBool:
+    case kIROp_BitCast:
+    case kIROp_Reinterpret:
+
+    // Constructors
+    case kIROp_MakeVector:
+    case kIROp_MakeMatrix:
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeTuple:
+    case kIROp_MakeOptionalValue:
+    case kIROp_MakeOptionalNone:
+
+    // Vector/matrix access
+    case kIROp_VectorReshape:
+    case kIROp_MatrixReshape:
+    case kIROp_Swizzle:
+    case kIROp_SwizzleSet:
+    case kIROp_SwizzledStore:
+
+    // Misc safe operations
+    case kIROp_Select:
+    case kIROp_UpdateElement:
+    case kIROp_GetTupleElement:
+    case kIROp_GetOptionalValue:
+    case kIROp_OptionalHasValue:
+    case kIROp_LoadFromUninitializedMemory:
+    case kIROp_Poison:
+    case kIROp_DefaultConstruct:
+
+    // Constants and literals
+    case kIROp_IntLit:
+    case kIROp_FloatLit:
+    case kIROp_BoolLit:
+    case kIROp_StringLit:
+    case kIROp_VoidLit:
+
+    // Debug info (always safe)
+    case kIROp_DebugLine:
+    case kIROp_DebugVar:
+    case kIROp_DebugValue:
+    case kIROp_DebugLocationDecoration:
+    case kIROp_DebugSource:
+        return true;
+
+    default:
+        // Unknown instruction - not on allowlist, considered unsafe
+        return false;
+    }
+}
+
+/// Collect blocks reachable between two case labels (the fallthrough path).
+static void collectFallthroughBlocks(
+    IRSwitch* switchInst,
+    IRBlock* caseLabel1,
+    IRBlock* caseLabel2,
+    IRBlock* breakLabel,
+    HashSet<IRBlock*>& outBlocks)
+{
+    // Build stop blocks (same logic as caseFallsThroughTo)
+    HashSet<IRBlock*> stopBlocks;
+    stopBlocks.add(breakLabel);
+    stopBlocks.add(caseLabel1);
+
+    auto switchBlock = as<IRBlock>(switchInst->getParent());
+    if (switchBlock)
+        stopBlocks.add(switchBlock);
+
+    UInt caseCount = switchInst->getCaseCount();
+    for (UInt i = 0; i < caseCount; i++)
+    {
+        auto caseLabel = switchInst->getCaseLabel(i);
+        if (caseLabel != caseLabel2)
+            stopBlocks.add(caseLabel);
+    }
+    auto defaultLabel = switchInst->getDefaultLabel();
+    if (defaultLabel && defaultLabel != caseLabel2)
+        stopBlocks.add(defaultLabel);
+
+    // Collect reachable blocks
+    HashSet<IRBlock*> visited;
+    List<IRBlock*> workList;
+
+    // Start from case1's entry (include it)
+    workList.add(caseLabel1);
+
+    while (workList.getCount() > 0)
+    {
+        auto block = workList.getLast();
+        workList.removeLast();
+
+        if (!block)
+            continue;
+        if (visited.contains(block))
+            continue;
+        // Don't cross into other case labels (except caseLabel2)
+        if (stopBlocks.contains(block) && block != caseLabel1)
+            continue;
+
+        visited.add(block);
+        outBlocks.add(block);
+
+        // Stop at caseLabel2 - don't traverse further
+        if (block == caseLabel2)
+            continue;
+
+        for (auto succ : block->getSuccessors())
+            workList.add(succ);
+    }
+}
+
+/// Check if a fallthrough path contains any operations that require reconvergence.
+/// Returns true if there are unsafe operations (needs lowering).
+static bool fallthroughNeedsLowering(
+    IRSwitch* switchInst,
+    IRBlock* caseLabel1,
+    IRBlock* caseLabel2,
+    IRBlock* breakLabel)
+{
+    HashSet<IRBlock*> fallthroughBlocks;
+    collectFallthroughBlocks(switchInst, caseLabel1, caseLabel2, breakLabel, fallthroughBlocks);
+
+    for (auto block : fallthroughBlocks)
+    {
+        for (auto inst : block->getChildren())
+        {
+            if (!isInstructionSafeForFallthrough(inst))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+/// Check if a switch needs lowering due to fallthrough with unsafe operations.
+/// Returns true if any fallthrough case contains operations requiring reconvergence.
+static bool switchNeedsLowering(IRSwitch* switchInst)
+{
+    auto breakLabel = switchInst->getBreakLabel();
+
+    // Collect unique case labels in block order
+    HashSet<IRBlock*> seenLabels;
+    List<IRBlock*> orderedLabels;
+
+    auto func = as<IRGlobalValueWithCode>(switchInst->getParent()->getParent());
+    if (!func)
+        return false;
+
+    // Add default label to seen set
+    auto defaultLabel = switchInst->getDefaultLabel();
+    if (defaultLabel)
+        seenLabels.add(defaultLabel);
+
+    // Add all case labels to seen set
+    UInt caseCount = switchInst->getCaseCount();
+    for (UInt i = 0; i < caseCount; i++)
+        seenLabels.add(switchInst->getCaseLabel(i));
+
+    // Walk blocks to get labels in order
+    for (auto block : func->getBlocks())
+    {
+        if (seenLabels.contains(block))
+            orderedLabels.add(block);
+    }
+
+    // Check each consecutive pair for fallthrough with unsafe operations
+    for (Index i = 0; i + 1 < orderedLabels.getCount(); i++)
+    {
+        auto case1 = orderedLabels[i];
+        auto case2 = orderedLabels[i + 1];
+
+        if (caseFallsThroughTo(switchInst, case1, case2, breakLabel))
+        {
+            // Found fallthrough - check if it contains unsafe operations
+            if (fallthroughNeedsLowering(switchInst, case1, case2, breakLabel))
+                return true;
+        }
+    }
+
+    return false;
+}
+
+/// Determine if a switch should be lowered.
+/// Only lower switches that have fallthrough cases with operations that require
+/// reconvergence (e.g., wave operations). Simple fallthrough with only safe
+/// operations (math, loads, stores) doesn't need lowering.
+/// 
+/// TODO: In the future, we may want to also restrict this to SPIR-V targets only,
 /// since other targets may handle reconvergence correctly in hardware.
 static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram)
 {
-    SLANG_UNUSED(switchInst);
     SLANG_UNUSED(targetProgram);
 
-    // Always consider switches for potential lowering.
-    // The transform() method will check needsTransformation() and early-exit if not needed.
-    return true;
+    return switchNeedsLowering(switchInst);
 }
 
 /// Lower all switch statements in a function.
