@@ -161,8 +161,9 @@ struct FallthroughGroup
     /// Indices into cases array for cases in this group (in execution order)
     List<Index> caseIndices;
 
-    /// The canonical selector value for this group (first explicit case value)
-    IRInst* canonicalValue = nullptr;
+    /// The group's index (0-based), used as the selector value in the second switch.
+    /// This avoids potential collisions with actual case values.
+    Index groupIndex = -1;
 
     /// True if this group contains operations that require reconvergence lowering.
     /// Groups with only safe operations (math, load, store, etc.) can keep
@@ -481,28 +482,14 @@ struct SwitchLoweringContext
             }
         }
 
-        // Determine canonical selector value for each group
-        for (auto& group : fallthroughGroups)
-        {
-            // Find the first explicit case value (skip default)
-            for (Index caseIdx : group.caseIndices)
-            {
-                auto& caseInfo = cases[caseIdx];
-                if (!caseInfo.isDefault && caseInfo.values.getCount() > 0)
-                {
-                    group.canonicalValue = caseInfo.values[0];
-                    break;
-                }
-            }
-
-            // If no explicit case value found (all defaults?), this group is odd
-            // In practice this shouldn't happen with well-formed switches
-        }
     }
 
     /// Check each fallthrough group to determine if it needs reconvergence lowering.
     /// Groups containing only safe operations (math, load, store, etc.) can keep
     /// their original fallthrough behavior.
+    /// 
+    /// Also assigns contiguous 0-based group indices only to groups that need lowering.
+    /// This ensures the second switch has cases 0, 1, 2, ... with -1 as the skip value.
     void checkGroupsForLowering()
     {
         auto breakLabel = switchInst->getBreakLabel();
@@ -528,6 +515,17 @@ struct SwitchLoweringContext
                     break;
                 }
             }
+        }
+
+        // Assign contiguous 0-based indices only to groups that need lowering
+        Index nextGroupIndex = 0;
+        for (auto& group : fallthroughGroups)
+        {
+            if (group.needsLowering)
+            {
+                group.groupIndex = nextGroupIndex++;
+            }
+            // Groups that don't need lowering keep groupIndex = -1
         }
     }
 
@@ -862,9 +860,9 @@ struct SwitchLoweringContext
         // MAX_INT for early exit (stage will never be <= MAX_INT)
         auto maxStageValue = builder->getIntValue(intType, INT32_MAX);
 
-        // A special "skip" value for fallthroughSelector when non-fallthrough case ran
-        // We use a value that won't match any case in the second switch
-        auto skipSelectorValue = builder->getIntValue(intType, INT32_MIN);
+        // A special "skip" value for fallthroughSelector when non-fallthrough case ran.
+        // We use -1 since group indices start at 0.
+        auto skipSelectorValue = builder->getIntValue(intType, -1);
 
         // --- Build the first switch ---
         // All cases in the first switch set fallthroughSelector and fallthroughStage, then break.
@@ -903,11 +901,9 @@ struct SwitchLoweringContext
 
                 builder->setInsertInto(caseBlock);
 
-                // Set fallthroughSelector to the group's canonical value
-                if (group.canonicalValue)
-                {
-                    builder->emitStore(fallthroughSelectorVar, group.canonicalValue);
-                }
+                // Set fallthroughSelector to the group's index
+                auto groupIndexValue = builder->getIntValue(intType, group.groupIndex);
+                builder->emitStore(fallthroughSelectorVar, groupIndexValue);
 
                 // Set fallthroughStage to this case's stage index
                 auto stageValue = builder->getIntValue(intType, caseInfo.stageIndex);
@@ -1115,14 +1111,13 @@ struct SwitchLoweringContext
             if (!group.needsLowering)
                 continue;
 
-            if (!group.canonicalValue)
-                continue;
-
             // Create the case block for this group
             auto groupCaseBlock = builder->createBlock();
             groupCaseBlock->insertBefore(afterSecondSwitchBlock);
 
-            secondSwitchCaseArgs.add(group.canonicalValue);
+            // Use the group index as the case value (0-based)
+            auto groupIndexValue = builder->getIntValue(intType, group.groupIndex);
+            secondSwitchCaseArgs.add(groupIndexValue);
             secondSwitchCaseArgs.add(groupCaseBlock);
 
             // Build the if-chain for stages within this group
