@@ -1,15 +1,29 @@
-# Switch-to-If Lowering Tests
+# Switch Reconverged Lowering Tests
 
-These tests verify the switch-to-if lowering pass, which transforms `switch` statements 
-to equivalent `if` chains wrapped in a `do { } while(false)` loop.
+These tests verify the switch lowering pass that transforms `switch` statements with 
+fallthrough to use reconverged control flow via a two-switch approach.
 
 ## Purpose
 
-The switch-to-if lowering is needed for SPIR-V targets because `OpSwitch` has undefined 
+The switch lowering is needed for SPIR-V targets because `OpSwitch` has undefined 
 reconvergence behavior with non-trivial fallthrough (cases with wave/subgroup operations 
 that fall through to subsequent cases).
 
 See GitHub issue #6441 for details: https://github.com/shader-slang/slang/issues/6441
+
+## Transformation Approach
+
+The pass splits switches with fallthrough into two switches:
+
+1. **First Switch (Dispatch)**: Sets `fallthroughSelector` and `fallthroughStage` variables,
+   then branches to the second switch. All cases break (no fallthrough in IR structure).
+
+2. **Second Switch (Execution)**: Dispatches on `fallthroughSelector`. Each case contains
+   if-guarded stages using `if (fallthroughStage <= N)`. This ensures all threads in a
+   fallthrough group reconverge at each if-merge point.
+
+Non-fallthrough cases execute their code directly after the first switch dispatch and 
+don't go through the second switch.
 
 ## Key Test: wave-fallthrough-gh6441.slang
 
@@ -26,13 +40,9 @@ to another case. These are the primary motivating cases for this lowering.
 Tests where a case body contains conditional logic that may break or fall through 
 depending on runtime values.
 
-### Cumulative Predicate Logic
-Tests that verify the cumulative predicate computation handles complex case orderings,
-including default not at end, multiple fallthrough chains, and mixed break/fallthrough.
-
 ### Control Flow Interactions
-Tests for switch inside loops with break/continue, nested switches, and switches 
-nested inside loops.
+Tests for switch inside loops with break/continue, nested switches, loops inside switch
+cases, and switches nested inside loops.
 
 ## Test Approach
 
