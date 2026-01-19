@@ -129,6 +129,12 @@
 namespace Slang
 {
 
+// Sentinel value for _ft_stage when a break is executed.
+// Setting _ft_stage to this value ensures all subsequent stage guards
+// (stageIdx >= _ft_stage) will fail, skipping remaining stages.
+// This requires that no fallthrough group has this many or more cases.
+static const IRIntegerValue kBreakStageSentinel = INT32_MAX;
+
 // Forward declarations
 static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram);
 static bool isInstructionSafeForFallthrough(IRInst* inst);
@@ -852,8 +858,8 @@ struct SwitchLoweringContext
         auto skipSelectorValue = builder->getIntValue(intType, -1);
         // Default stage is 0 (start of fallthrough sequence)
         auto zeroValue = builder->getIntValue(intType, 0);
-        // MAX_INT for early exit (stage will never be <= MAX_INT after break)
-        auto maxStageValue = builder->getIntValue(intType, INT32_MAX);
+        // Sentinel value for early exit (break). See kBreakStageSentinel definition.
+        auto maxStageValue = builder->getIntValue(intType, kBreakStageSentinel);
 
         auto fallthroughSelectorVar = builder->emitVar(intType);
         builder->addNameHintDecoration(fallthroughSelectorVar, UnownedStringSlice("_ft_selector"));
@@ -1125,6 +1131,10 @@ struct SwitchLoweringContext
             // This is essential because simply branching and rewriting terminators
             // doesn't work - SSA passes will merge/coalesce our structures.
             IRBlock* currentBlock = groupCaseBlock;
+
+            // Validate that stage indices won't collide with our break sentinel.
+            // This would only happen with an absurdly large switch (billions of cases).
+            SLANG_ASSERT(group.caseIndices.getCount() < kBreakStageSentinel);
 
             for (Index stageIdx = 0; stageIdx < group.caseIndices.getCount(); stageIdx++)
             {
