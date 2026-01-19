@@ -131,6 +131,7 @@ namespace Slang
 
 // Forward declarations
 static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram);
+static bool isInstructionSafeForFallthrough(IRInst* inst);
 
 /// Information about a case in the switch.
 struct CaseInfo
@@ -162,6 +163,11 @@ struct FallthroughGroup
 
     /// The canonical selector value for this group (first explicit case value)
     IRInst* canonicalValue = nullptr;
+
+    /// True if this group contains operations that require reconvergence lowering.
+    /// Groups with only safe operations (math, load, store, etc.) can keep
+    /// their original fallthrough behavior without going through the second switch.
+    bool needsLowering = false;
 };
 
 /// Context for lowering a single switch statement.
@@ -494,6 +500,105 @@ struct SwitchLoweringContext
         }
     }
 
+    /// Check each fallthrough group to determine if it needs reconvergence lowering.
+    /// Groups containing only safe operations (math, load, store, etc.) can keep
+    /// their original fallthrough behavior.
+    void checkGroupsForLowering()
+    {
+        auto breakLabel = switchInst->getBreakLabel();
+
+        for (auto& group : fallthroughGroups)
+        {
+            group.needsLowering = false;
+
+            // Check each case in the group (except the last, which doesn't fall through)
+            for (Index i = 0; i + 1 < group.caseIndices.getCount(); i++)
+            {
+                Index caseIdx = group.caseIndices[i];
+                Index nextCaseIdx = group.caseIndices[i + 1];
+
+                auto& caseInfo = cases[caseIdx];
+                auto& nextCaseInfo = cases[nextCaseIdx];
+
+                // Check if the fallthrough path from this case to the next contains
+                // unsafe operations
+                if (fallthroughPathNeedsLowering(caseInfo.label, nextCaseInfo.label, breakLabel))
+                {
+                    group.needsLowering = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Check if a fallthrough path contains any operations that require reconvergence.
+    bool fallthroughPathNeedsLowering(
+        IRBlock* caseLabel1,
+        IRBlock* caseLabel2,
+        IRBlock* breakLabel)
+    {
+        // Build stop blocks (same logic as caseFallsThrough)
+        HashSet<IRBlock*> stopBlocks;
+        stopBlocks.add(breakLabel);
+        stopBlocks.add(caseLabel1);
+
+        auto switchBlock = as<IRBlock>(switchInst->getParent());
+        if (switchBlock)
+            stopBlocks.add(switchBlock);
+
+        UInt caseCount = switchInst->getCaseCount();
+        for (UInt i = 0; i < caseCount; i++)
+        {
+            auto caseLabel = switchInst->getCaseLabel(i);
+            if (caseLabel != caseLabel2)
+                stopBlocks.add(caseLabel);
+        }
+        auto defaultLabel = switchInst->getDefaultLabel();
+        if (defaultLabel && defaultLabel != caseLabel2)
+            stopBlocks.add(defaultLabel);
+
+        // Collect blocks in the fallthrough path
+        HashSet<IRBlock*> fallthroughBlocks;
+        HashSet<IRBlock*> visited;
+        List<IRBlock*> workList;
+
+        workList.add(caseLabel1);
+
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+
+            if (!block)
+                continue;
+            if (visited.contains(block))
+                continue;
+            if (stopBlocks.contains(block) && block != caseLabel1)
+                continue;
+
+            visited.add(block);
+            fallthroughBlocks.add(block);
+
+            if (block == caseLabel2)
+                continue;
+
+            for (auto succ : block->getSuccessors())
+                workList.add(succ);
+        }
+
+        // Check all instructions in the fallthrough path
+        for (auto block : fallthroughBlocks)
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (!isInstructionSafeForFallthrough(inst))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     /// Check if the switch has any fallthrough that needs handling.
     bool hasFallthrough() const
     {
@@ -505,8 +610,20 @@ struct SwitchLoweringContext
         return false;
     }
 
+    /// Check if any fallthrough group requires reconvergence lowering.
+    bool hasGroupNeedingLowering() const
+    {
+        for (const auto& group : fallthroughGroups)
+        {
+            if (group.needsLowering)
+                return true;
+        }
+        return false;
+    }
+
     /// Check if this switch needs transformation for proper reconvergence.
-    /// Currently we only transform if any case has fallthrough (shared blocks).
+    /// We only transform if at least one fallthrough group contains unsafe
+    /// operations (wave ops, function calls, etc.) that require reconvergence.
     /// 
     /// Note: We intentionally do not consider the presence of a default case
     /// as a trigger for transformation. While default cases can theoretically
@@ -526,7 +643,7 @@ struct SwitchLoweringContext
     /// this logic may need to be revisited.
     bool needsTransformation() const
     {
-        return hasFallthrough();
+        return hasGroupNeedingLowering();
     }
 
     /// Collect all blocks reachable from entryBlock that are part of this case's body.
@@ -715,8 +832,9 @@ struct SwitchLoweringContext
         if (cases.getCount() == 0)
             return;
 
-        // Build fallthrough groups
+        // Build fallthrough groups and check which need reconvergence lowering
         buildFallthroughGroups();
+        checkGroupsForLowering();
 
         // Only transform switches that need it for proper reconvergence
         if (!needsTransformation())
@@ -766,16 +884,24 @@ struct SwitchLoweringContext
         {
             auto& caseInfo = cases[i];
 
-            auto caseBlock = builder->createBlock();
-            caseBlock->insertBefore(betweenSwitchesBlock);
-            caseIndexToFirstSwitchBlock[i] = caseBlock;
-
-            builder->setInsertInto(caseBlock);
-
+            // Determine if this case needs to go through the two-switch lowering
+            bool needsDispatch = false;
             if (caseInfo.fallthroughGroupIndex >= 0)
             {
-                // This case is part of a fallthrough group
                 auto& group = fallthroughGroups[caseInfo.fallthroughGroupIndex];
+                needsDispatch = group.needsLowering;
+            }
+
+            if (needsDispatch)
+            {
+                // This case is part of a fallthrough group that needs lowering
+                auto& group = fallthroughGroups[caseInfo.fallthroughGroupIndex];
+
+                auto caseBlock = builder->createBlock();
+                caseBlock->insertBefore(betweenSwitchesBlock);
+                caseIndexToFirstSwitchBlock[i] = caseBlock;
+
+                builder->setInsertInto(caseBlock);
 
                 // Set fallthroughSelector to the group's canonical value
                 if (group.canonicalValue)
@@ -789,6 +915,110 @@ struct SwitchLoweringContext
 
                 // Break to between-switches block
                 builder->emitBranch(betweenSwitchesBlock);
+
+                // Add case values to first switch (interleaved: value, label)
+                for (auto value : caseInfo.values)
+                {
+                    firstSwitchCaseArgs.add(value);
+                    firstSwitchCaseArgs.add(caseBlock);
+                }
+            }
+            else if (caseInfo.fallthroughGroupIndex >= 0)
+            {
+                // This case is part of a fallthrough group that does NOT need lowering.
+                // Keep original fallthrough behavior by pointing directly to original label.
+                // The original label's break will still target the original breakLabel,
+                // but we need to rewrite those to go to betweenSwitchesBlock.
+
+                // For simplicity, we clone the case body like non-fallthrough cases,
+                // but preserve fallthrough by not stopping at the next case block.
+                auto caseBlock = builder->createBlock();
+                caseBlock->insertBefore(betweenSwitchesBlock);
+                caseIndexToFirstSwitchBlock[i] = caseBlock;
+
+                builder->setInsertInto(caseBlock);
+                builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
+
+                // Find the last case in this group to determine where to stop cloning
+                auto& group = fallthroughGroups[caseInfo.fallthroughGroupIndex];
+                Index lastCaseInGroup = group.caseIndices[group.caseIndices.getCount() - 1];
+                IRBlock* stopBlock = (lastCaseInGroup + 1 < cases.getCount()) 
+                    ? cases[lastCaseInGroup + 1].label 
+                    : nullptr;
+
+                // Only clone from the first case in the group - subsequent cases will
+                // share the cloned body via fallthrough
+                if (caseInfo.stageIndex == 0)
+                {
+                    // Clone the entire group's body (including fallthrough)
+                    auto clonedEntry = cloneNonFallthroughCaseBody(
+                        caseInfo.label,
+                        stopBlock,
+                        breakLabel,
+                        betweenSwitchesBlock,
+                        betweenSwitchesBlock);
+
+                    if (clonedEntry)
+                    {
+                        builder->setInsertInto(caseBlock);
+                        builder->emitBranch(clonedEntry);
+                    }
+                    else
+                    {
+                        builder->emitBranch(betweenSwitchesBlock);
+                    }
+
+                    // Add case values to first switch
+                    for (auto value : caseInfo.values)
+                    {
+                        firstSwitchCaseArgs.add(value);
+                        firstSwitchCaseArgs.add(caseBlock);
+                    }
+                }
+                else
+                {
+                    // For non-first cases in the group, find the cloned entry for their
+                    // original label and point to it
+                    // This is complex - for now, just point to the first case's block
+                    // and let the case body handle the fallthrough internally
+                    Index firstCaseIdx = group.caseIndices[0];
+                    IRBlock* firstCaseBlock = nullptr;
+                    if (caseIndexToFirstSwitchBlock.tryGetValue(firstCaseIdx, firstCaseBlock))
+                    {
+                        // We need to find the cloned version of this case's label
+                        // For simplicity, reuse direct branching to the original label
+                        // with break redirected
+                        IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
+                        
+                        auto clonedEntry = cloneNonFallthroughCaseBody(
+                            caseInfo.label,
+                            nextCaseBlock,
+                            breakLabel,
+                            betweenSwitchesBlock,
+                            betweenSwitchesBlock);
+
+                        if (clonedEntry)
+                        {
+                            builder->setInsertInto(caseBlock);
+                            builder->emitBranch(clonedEntry);
+                        }
+                        else
+                        {
+                            builder->emitBranch(betweenSwitchesBlock);
+                        }
+                    }
+                    else
+                    {
+                        builder->emitBranch(betweenSwitchesBlock);
+                    }
+
+                    // Add case values to first switch
+                    for (auto value : caseInfo.values)
+                    {
+                        firstSwitchCaseArgs.add(value);
+                        firstSwitchCaseArgs.add(caseBlock);
+                    }
+                }
             }
             else
             {
@@ -803,6 +1033,11 @@ struct SwitchLoweringContext
                 // By cloning, we create completely new IR that the optimizer treats as
                 // distinct from the original blocks.
 
+                auto caseBlock = builder->createBlock();
+                caseBlock->insertBefore(betweenSwitchesBlock);
+                caseIndexToFirstSwitchBlock[i] = caseBlock;
+
+                builder->setInsertInto(caseBlock);
                 builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
 
                 IRBlock* nextCaseBlock = (i + 1 < cases.getCount()) ? cases[i + 1].label : nullptr;
@@ -825,13 +1060,13 @@ struct SwitchLoweringContext
                     // Empty body - just branch to between switches
                     builder->emitBranch(betweenSwitchesBlock);
                 }
-            }
 
-            // Add case values to first switch (interleaved: value, label)
-            for (auto value : caseInfo.values)
-            {
-                firstSwitchCaseArgs.add(value);
-                firstSwitchCaseArgs.add(caseBlock);
+                // Add case values to first switch (interleaved: value, label)
+                for (auto value : caseInfo.values)
+                {
+                    firstSwitchCaseArgs.add(value);
+                    firstSwitchCaseArgs.add(caseBlock);
+                }
             }
         }
 
@@ -875,6 +1110,10 @@ struct SwitchLoweringContext
         for (Index groupIdx = 0; groupIdx < fallthroughGroups.getCount(); groupIdx++)
         {
             auto& group = fallthroughGroups[groupIdx];
+
+            // Skip groups that don't need reconvergence lowering
+            if (!group.needsLowering)
+                continue;
 
             if (!group.canonicalValue)
                 continue;
