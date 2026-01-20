@@ -24606,6 +24606,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     /// Constructor for uint64_t handles
     [ForceInline]
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __intrinsic_op($(kIROp_CastUInt64ToDescriptorHandle))
     __init(uint64_t handleValue);
 
@@ -24615,6 +24616,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this == (uint64_t)other;
         default:
             return all(__vectorEql((uint2)this, (uint2)other));
@@ -24627,6 +24629,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -24641,6 +24644,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -24663,6 +24667,7 @@ extension uint64_t
 {
     __intrinsic_op($(kIROp_CastDescriptorHandleToUInt64))
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
 }
 
