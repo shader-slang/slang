@@ -425,7 +425,12 @@ endif()
 # calls above
 #
 
-find_package(Threads REQUIRED)
+if(NOT EMSCRIPTEN)
+    find_package(Threads REQUIRED)
+else()
+    # Create a dummy Threads::Threads target for Emscripten builds
+    add_library(Threads::Threads INTERFACE IMPORTED)
+endif()
 
 if(${SLANG_USE_SYSTEM_UNORDERED_DENSE})
     find_package(unordered_dense CONFIG QUIET)
