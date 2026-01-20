@@ -368,9 +368,17 @@ local function process_diagnostics(diagnostics_table)
               table.insert(params, { name = part.param_name, type = part.param_type })
               seen_params[part.param_name] = part.param_type
             elseif seen_params[part.param_name] ~= part.param_type then
-              table.insert(all_errors, context_path .. ": parameter '" .. part.param_name ..
-                "' is used with conflicting types: '" .. seen_params[part.param_name] ..
-                "' and '" .. part.param_type .. "'")
+              table.insert(
+                all_errors,
+                context_path
+                  .. ": parameter '"
+                  .. part.param_name
+                  .. "' is used with conflicting types: '"
+                  .. seen_params[part.param_name]
+                  .. "' and '"
+                  .. part.param_type
+                  .. "'"
+              )
             end
           elseif part.type == "interpolation" and part.member_name then
             -- Member access: register the base parameter if not already known
@@ -378,9 +386,17 @@ local function process_diagnostics(diagnostics_table)
               table.insert(params, { name = part.param_name, type = part.param_type })
               seen_params[part.param_name] = part.param_type
             elseif seen_params[part.param_name] ~= part.param_type then
-              table.insert(all_errors, context_path .. ": parameter '" .. part.param_name ..
-                "' is used with conflicting types: '" .. seen_params[part.param_name] ..
-                "' and '" .. part.param_type .. "'")
+              table.insert(
+                all_errors,
+                context_path
+                  .. ": parameter '"
+                  .. part.param_name
+                  .. "' is used with conflicting types: '"
+                  .. seen_params[part.param_name]
+                  .. "' and '"
+                  .. part.param_type
+                  .. "'"
+              )
             end
           end
         end
