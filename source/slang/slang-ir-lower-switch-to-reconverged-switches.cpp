@@ -146,7 +146,6 @@ namespace Slang
 static const IRIntegerValue kBreakStageSentinel = INT32_MAX;
 
 // Forward declarations
-static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram);
 static bool isInstructionSafeForFallthrough(IRInst* inst);
 /// Build the set of "stop blocks" for switch case traversal.
 ///
@@ -712,6 +711,8 @@ struct SwitchLoweringContext
     }
 
     /// Check if any fallthrough group requires reconvergence lowering.
+    /// Note: We don't consider default cases as triggers because parser-generated
+    /// implicit defaults are hard to distinguish from user-written ones.
     bool hasGroupNeedingLowering() const
     {
         for (const auto& group : fallthroughGroups)
@@ -720,31 +721,6 @@ struct SwitchLoweringContext
                 return true;
         }
         return false;
-    }
-
-    /// Check if this switch needs transformation for proper reconvergence.
-    /// We only transform if at least one fallthrough group contains unsafe
-    /// operations (wave ops, function calls, etc.) that require reconvergence.
-    /// 
-    /// Note: We intentionally do not consider the presence of a default case
-    /// as a trigger for transformation. While default cases can theoretically
-    /// cause reconvergence issues (since multiple unmatched selector values
-    /// can enter via default), there are practical reasons to skip them:
-    /// 
-    /// 1. The parser-to-IR lowering often generates implicit default cases
-    ///    for variable initialization (e.g., `int result = 0; switch(val) {...}`
-    ///    becomes a default case that stores the initial value). These are
-    ///    difficult to distinguish from explicit user-written defaults.
-    /// 
-    /// 2. We assume that reasonable GPU drivers will properly reconverge
-    ///    threads entering via the default case, since this is a common
-    ///    and well-understood control flow pattern.
-    /// 
-    /// If reconvergence issues are observed with default cases in practice,
-    /// this logic may need to be revisited.
-    bool needsTransformation() const
-    {
-        return hasGroupNeedingLowering();
     }
 
     /// Collect all blocks reachable from entryBlock that are part of this case's body.
@@ -1231,7 +1207,7 @@ struct SwitchLoweringContext
         checkGroupsForLowering();
 
         // Only transform switches that need it for proper reconvergence
-        if (!needsTransformation())
+        if (!hasGroupNeedingLowering())
             return;
 
         // For SPIR-V targets, emit the RequireMaximallyReconverges instruction.
@@ -1779,19 +1755,6 @@ static bool switchNeedsLowering(IRSwitch* switchInst)
     return false;
 }
 
-/// Determine if a switch should be lowered.
-/// Only lower switches that have fallthrough cases with operations that require
-/// reconvergence (e.g., wave operations). Simple fallthrough with only safe
-/// operations (math, loads, stores) doesn't need lowering.
-/// 
-/// Note: Target filtering (SPIR-V and Metal only) is done in slang-emit.cpp
-/// where this pass is called.
-static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram)
-{
-    SLANG_UNUSED(targetProgram);
-
-    return switchNeedsLowering(switchInst);
-}
 
 /// Lower all switch statements in a function.
 /// 
@@ -1829,7 +1792,7 @@ static void lowerSwitchInFunc(
         {
             if (auto switchInst = as<IRSwitch>(block->getTerminator()))
             {
-                if (shouldLowerSwitch(switchInst, targetProgram))
+                if (switchNeedsLowering(switchInst))
                 {
                     switches.add(switchInst);
                 }
