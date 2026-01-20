@@ -884,24 +884,20 @@ struct SwitchLoweringContext
     /// 2. NOT redirecting directly to stageMergeBlock (which would violate structured exits)
     /// 3. Instead, letting the break flow to a common merge point with fallthrough
     /// 4. The stage guards will skip remaining stages when stage==MAX_INT
-    IRBlock* cloneFallthroughCaseBody(
-        IRBlock* entryBlock,
-        IRBlock* nextCaseBlock,
-        IRBlock* breakLabel,
-        IRBlock* stageMergeBlock,
-        IRInst* fallthroughStageVar,
-        IRInst* maxStageValue,
-        IRBlock* insertBeforeBlock)
+    /// Information about a conditional break detected during cloning.
+    struct ConditionalBreakInfo
     {
-        HashSet<IRBlock*> bodyBlocks;
-        collectCaseBodyBlocks(entryBlock, nextCaseBlock, breakLabel, bodyBlocks);
+        IRBlock* clonedBreakBlock;
+        IRBlock* continuationStart;
+        IRBlock* condBranchBlock;
+    };
 
-        if (bodyBlocks.getCount() == 0)
-            return nullptr;
-
-        // Identify which original blocks have breaks (branch to breakLabel)
-        // We need this BEFORE cloning so we can inject stores in the cloned versions.
-        HashSet<IRBlock*> blocksWithBreak;
+    /// Find blocks that branch to breakLabel (have a break statement).
+    void findBlocksWithBreak(
+        const HashSet<IRBlock*>& bodyBlocks,
+        IRBlock* breakLabel,
+        HashSet<IRBlock*>& outBlocksWithBreak)
+    {
         for (auto block : bodyBlocks)
         {
             auto terminator = block->getTerminator();
@@ -912,38 +908,22 @@ struct SwitchLoweringContext
             {
                 if (terminator->getOperand(i) == breakLabel)
                 {
-                    blocksWithBreak.add(block);
+                    outBlocksWithBreak.add(block);
                     break;
                 }
             }
         }
+    }
 
-        // Create a merge block that both break and fallthrough paths will join at.
-        // This ensures SPIR-V structured control flow is maintained.
-        // From this merge block, we branch to stageMergeBlock.
-        auto caseMergeBlock = builder->createBlock();
-        caseMergeBlock->insertBefore(insertBeforeBlock);
-        builder->setInsertInto(caseMergeBlock);
-        builder->emitBranch(stageMergeBlock);
-
-        // Set up redirections for nextCaseBlock only.
-        // IMPORTANT: We do NOT redirect breakLabel here because that breaks SPIR-V
-        // structured control flow for conditional breaks (if-else where one path breaks).
-        // Instead, we handle breakLabel manually after cloning.
-        Dictionary<IRBlock*, IRBlock*> redirections;
-        if (nextCaseBlock)
-        {
-            redirections[nextCaseBlock] = caseMergeBlock;
-        }
-
-        // Clone with block mapping so we can find cloned versions
-        IRCloneEnv cloneEnv;
-        for (const auto& [oldBlock, newBlock] : redirections)
-        {
-            cloneEnv.mapOldValToNew[oldBlock] = newBlock;
-        }
-
-        Dictionary<IRBlock*, IRBlock*> oldToNew;
+    /// Clone case body blocks, setting up redirections and block mappings.
+    void cloneBodyBlocks(
+        const HashSet<IRBlock*>& bodyBlocks,
+        const Dictionary<IRBlock*, IRBlock*>& redirections,
+        IRBlock* caseMergeBlock,
+        IRCloneEnv& cloneEnv,
+        Dictionary<IRBlock*, IRBlock*>& oldToNew)
+    {
+        // Create cloned blocks
         for (auto block : bodyBlocks)
         {
             if (redirections.containsKey(block))
@@ -955,7 +935,7 @@ struct SwitchLoweringContext
             oldToNew[block] = clonedBlock;
         }
 
-        // Clone instructions
+        // Clone instructions into each block
         for (auto block : bodyBlocks)
         {
             if (redirections.containsKey(block))
@@ -969,27 +949,18 @@ struct SwitchLoweringContext
                 cloneInst(&cloneEnv, builder, inst);
             }
         }
+    }
 
-        // Now handle blocks that had breaks. For conditional breaks (where the break
-        // is inside an if-else), we need to ensure the continuation code only executes
-        // on the non-break path.
-        //
-        // We use an approach that inserts a guard check after the conditional:
-        //   if (breakCond) { _ft_stage = MAX_INT; }
-        //   if (_ft_stage != MAX_INT) { continuation code... }
-        //
-        // This is valid SPIR-V structured control flow because both conditionals
-        // have proper merge points.
-        
-        // First pass: collect info about conditional breaks and insert stores
-        struct ConditionalBreakInfo
-        {
-            IRBlock* clonedBreakBlock;
-            IRBlock* continuationStart;
-            IRBlock* condBranchBlock;
-        };
-        List<ConditionalBreakInfo> conditionalBreaks;
-
+    /// Process break blocks: inject stage stores and detect conditional breaks.
+    void processBreakBlocks(
+        const HashSet<IRBlock*>& blocksWithBreak,
+        const Dictionary<IRBlock*, IRBlock*>& oldToNew,
+        IRBlock* breakLabel,
+        IRBlock* caseMergeBlock,
+        IRInst* fallthroughStageVar,
+        IRInst* maxStageValue,
+        List<ConditionalBreakInfo>& outConditionalBreaks)
+    {
         for (auto origBlock : blocksWithBreak)
         {
             IRBlock* clonedBlock = nullptr;
@@ -1000,13 +971,12 @@ struct SwitchLoweringContext
             if (!terminator)
                 continue;
 
-            // Insert store before the terminator
+            // Insert _ft_stage = MAX_INT store before the terminator
             builder->setInsertBefore(terminator);
             builder->emitStore(fallthroughStageVar, maxStageValue);
 
             // Check if clonedBlock is the target of a conditional branch (if-else)
             IRBlock* continuationStart = nullptr;
-            IRBlock* condBranchBlock = nullptr;
             
             if (clonedBlock->firstUse)
             {
@@ -1026,7 +996,12 @@ struct SwitchLoweringContext
                         if (continuationStart && continuationStart != breakLabel && 
                             continuationStart != caseMergeBlock)
                         {
-                            condBranchBlock = as<IRBlock>(condBranch->getParent());
+                            // Record this conditional break
+                            ConditionalBreakInfo info;
+                            info.clonedBreakBlock = clonedBlock;
+                            info.continuationStart = continuationStart;
+                            info.condBranchBlock = as<IRBlock>(condBranch->getParent());
+                            outConditionalBreaks.add(info);
                             break;
                         }
                         continuationStart = nullptr;
@@ -1034,20 +1009,9 @@ struct SwitchLoweringContext
                 }
             }
 
-            if (continuationStart)
-            {
-                // This is a conditional break - record it for second pass
-                ConditionalBreakInfo info;
-                info.clonedBreakBlock = clonedBlock;
-                info.continuationStart = continuationStart;
-                info.condBranchBlock = condBranchBlock;
-                conditionalBreaks.add(info);
-            }
-
-            // Redirect breakLabel references to the continuation (if-else merge)
-            // For conditional breaks, the break path goes to the continuation's entry
-            // which then gets wrapped with a guard check.
-            // For unconditional breaks, go to caseMergeBlock.
+            // Redirect breakLabel references.
+            // For conditional breaks: go to continuation (will be wrapped with guard)
+            // For unconditional breaks: go to caseMergeBlock
             IRBlock* breakRedirectTarget = continuationStart ? continuationStart : caseMergeBlock;
             
             for (UInt i = 0; i < terminator->getOperandCount(); i++)
@@ -1058,89 +1022,143 @@ struct SwitchLoweringContext
                 }
             }
         }
+    }
 
-        // Second pass: wrap continuation code with guard checks
-        // For each conditional break, we insert a check at the continuation start:
-        //   if (_ft_stage != MAX_INT) { original continuation } else { skip to merge }
-        // Each guard gets its own unique merge block to avoid SPIR-V validation errors.
+    /// Wrap a continuation block with a guard check for _ft_stage != MAX_INT.
+    void wrapContinuationWithGuard(
+        IRBlock* continuationStart,
+        IRBlock* caseMergeBlock,
+        IRInst* fallthroughStageVar,
+        IRInst* maxStageValue)
+    {
+        // Create a unique merge block for this guard
+        auto guardMergeBlock = builder->createBlock();
+        guardMergeBlock->insertBefore(caseMergeBlock);
+        builder->setInsertInto(guardMergeBlock);
+        builder->emitBranch(caseMergeBlock);
+        
+        // Create a guard block that checks _ft_stage
+        auto guardBlock = builder->createBlock();
+        guardBlock->insertBefore(continuationStart);
+        
+        // Create a skip block that goes to guardMergeBlock
+        auto skipBlock = builder->createBlock();
+        skipBlock->insertBefore(continuationStart);
+        builder->setInsertInto(skipBlock);
+        builder->emitBranch(guardMergeBlock);
+        
+        // Build the guard check: if (_ft_stage != MAX_INT) { continuation } else { skip }
+        builder->setInsertInto(guardBlock);
+        auto stageVal = builder->emitLoad(fallthroughStageVar);
+        auto notBroken = builder->emitNeq(stageVal, maxStageValue);
+        builder->emitIfElse(notBroken, continuationStart, skipBlock, guardMergeBlock);
+        
+        // Redirect predecessors of continuationStart to guardBlock
+        List<IRUse*> usesToRedirect;
+        for (auto use = continuationStart->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user->getParent() != guardBlock)
+            {
+                usesToRedirect.add(use);
+            }
+        }
+        for (auto use : usesToRedirect)
+        {
+            use->set(guardBlock);
+        }
+        
+        // Redirect continuation's end to guardMergeBlock instead of caseMergeBlock
+        HashSet<IRBlock*> continuationBlocks;
+        List<IRBlock*> workList;
+        workList.add(continuationStart);
+        
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+            
+            if (!block || continuationBlocks.contains(block))
+                continue;
+            if (block == caseMergeBlock || block == guardMergeBlock || block == skipBlock)
+                continue;
+            
+            continuationBlocks.add(block);
+            
+            for (auto succ : block->getSuccessors())
+                workList.add(succ);
+        }
+
+        for (auto contBlock : continuationBlocks)
+        {
+            auto contTerm = contBlock->getTerminator();
+            if (!contTerm)
+                continue;
+            
+            for (UInt i = 0; i < contTerm->getOperandCount(); i++)
+            {
+                if (contTerm->getOperand(i) == caseMergeBlock)
+                {
+                    contTerm->setOperand(i, guardMergeBlock);
+                }
+            }
+        }
+    }
+
+    /// Clone a case body for the second switch, handling breaks and conditional breaks.
+    IRBlock* cloneFallthroughCaseBody(
+        IRBlock* entryBlock,
+        IRBlock* nextCaseBlock,
+        IRBlock* breakLabel,
+        IRBlock* stageMergeBlock,
+        IRInst* fallthroughStageVar,
+        IRInst* maxStageValue,
+        IRBlock* insertBeforeBlock)
+    {
+        // Collect all blocks in the case body
+        HashSet<IRBlock*> bodyBlocks;
+        collectCaseBodyBlocks(entryBlock, nextCaseBlock, breakLabel, bodyBlocks);
+
+        if (bodyBlocks.getCount() == 0)
+            return nullptr;
+
+        // Find blocks that have breaks
+        HashSet<IRBlock*> blocksWithBreak;
+        findBlocksWithBreak(bodyBlocks, breakLabel, blocksWithBreak);
+
+        // Create the case merge block (joins break and fallthrough paths)
+        auto caseMergeBlock = builder->createBlock();
+        caseMergeBlock->insertBefore(insertBeforeBlock);
+        builder->setInsertInto(caseMergeBlock);
+        builder->emitBranch(stageMergeBlock);
+
+        // Set up redirections (only nextCaseBlock, not breakLabel)
+        Dictionary<IRBlock*, IRBlock*> redirections;
+        if (nextCaseBlock)
+        {
+            redirections[nextCaseBlock] = caseMergeBlock;
+        }
+
+        // Clone the blocks
+        IRCloneEnv cloneEnv;
+        for (const auto& [oldBlock, newBlock] : redirections)
+        {
+            cloneEnv.mapOldValToNew[oldBlock] = newBlock;
+        }
+
+        Dictionary<IRBlock*, IRBlock*> oldToNew;
+        cloneBodyBlocks(bodyBlocks, redirections, caseMergeBlock, cloneEnv, oldToNew);
+
+        // Process break blocks and detect conditional breaks
+        List<ConditionalBreakInfo> conditionalBreaks;
+        processBreakBlocks(blocksWithBreak, oldToNew, breakLabel, caseMergeBlock,
+                          fallthroughStageVar, maxStageValue, conditionalBreaks);
+
+        // Wrap continuation code with guard checks for conditional breaks
         for (auto& info : conditionalBreaks)
         {
-            auto continuationStart = info.continuationStart;
-            
-            // Create a unique merge block for this guard
-            auto guardMergeBlock = builder->createBlock();
-            guardMergeBlock->insertBefore(caseMergeBlock);
-            builder->setInsertInto(guardMergeBlock);
-            builder->emitBranch(caseMergeBlock);
-            
-            // Create a guard block that checks _ft_stage
-            auto guardBlock = builder->createBlock();
-            guardBlock->insertBefore(continuationStart);
-            
-            // Create a skip block that goes to guardMergeBlock
-            auto skipBlock = builder->createBlock();
-            skipBlock->insertBefore(continuationStart);
-            builder->setInsertInto(skipBlock);
-            builder->emitBranch(guardMergeBlock);
-            
-            // Build the guard check in guardBlock
-            builder->setInsertInto(guardBlock);
-            auto stageVal = builder->emitLoad(fallthroughStageVar);
-            auto notBroken = builder->emitNeq(stageVal, maxStageValue);
-            builder->emitIfElse(notBroken, continuationStart, skipBlock, guardMergeBlock);
-            
-            // Redirect all predecessors of continuationStart to guardBlock instead
-            // (except the guard block itself)
-            List<IRUse*> usesToRedirect;
-            for (auto use = continuationStart->firstUse; use; use = use->nextUse)
-            {
-                auto user = use->getUser();
-                if (user->getParent() != guardBlock)
-                {
-                    usesToRedirect.add(use);
-                }
-            }
-            for (auto use : usesToRedirect)
-            {
-                use->set(guardBlock);
-            }
-            
-            // Also redirect the continuation's end to guardMergeBlock instead of caseMergeBlock
-            // This ensures the continuation flows into its merge, not directly to caseMergeBlock
-            HashSet<IRBlock*> continuationBlocks;
-            List<IRBlock*> workList;
-            workList.add(continuationStart);
-            
-            while (workList.getCount() > 0)
-            {
-                auto block = workList.getLast();
-                workList.removeLast();
-                
-                if (!block || continuationBlocks.contains(block))
-                    continue;
-                if (block == caseMergeBlock || block == guardMergeBlock || block == skipBlock)
-                    continue;
-                
-                continuationBlocks.add(block);
-                
-                for (auto succ : block->getSuccessors())
-                    workList.add(succ);
-            }
-
-            for (auto contBlock : continuationBlocks)
-            {
-                auto contTerm = contBlock->getTerminator();
-                if (!contTerm)
-                    continue;
-                
-                for (UInt i = 0; i < contTerm->getOperandCount(); i++)
-                {
-                    if (contTerm->getOperand(i) == caseMergeBlock)
-                    {
-                        contTerm->setOperand(i, guardMergeBlock);
-                    }
-                }
-            }
+            wrapContinuationWithGuard(info.continuationStart, caseMergeBlock,
+                                      fallthroughStageVar, maxStageValue);
         }
 
         // Return the cloned entry block
