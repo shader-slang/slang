@@ -448,7 +448,14 @@ endif()
 
 if(${SLANG_USE_SYSTEM_LZ4})
     find_package(lz4 REQUIRED)
-    add_library(lz4_static ALIAS LZ4::lz4)
+    # Conan's lz4 package provides LZ4::lz4_static target
+    if(TARGET LZ4::lz4_static)
+        add_library(lz4_static ALIAS LZ4::lz4_static)
+    elseif(TARGET LZ4::lz4)
+        add_library(lz4_static ALIAS LZ4::lz4)
+    else()
+        message(FATAL_ERROR "Could not find LZ4 target (LZ4::lz4_static or LZ4::lz4)")
+    endif()
 endif()
 
 if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
