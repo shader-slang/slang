@@ -11,9 +11,10 @@
 // All threads in the switch should see the same result if wave operations
 // are correctly reconverged.
 
-// CPU doesn't support wave ops
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0
+// GPU backends that support reconvergence lowering (SPIR-V, Metal, DX12)
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute -shaderobj
 
 // All threads output 84 = 0x54
 // CHECK:      54

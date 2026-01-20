@@ -6,14 +6,23 @@
 // ## Problem
 //
 // SPIR-V's OpSwitch has undefined reconvergence behavior for fallthrough cases.
-// When threads in a wave/subgroup enter different cases that share code via
-// fallthrough, they may not properly reconverge at the shared code, causing
-// incorrect results for wave operations (WaveActiveSum, etc.).
+// Metal also exhibits similar reconvergence issues with switch fallthrough.
+// When threads in a wave/subgroup/simdgroup enter different cases that share
+// code via fallthrough, they may not properly reconverge at the shared code,
+// causing incorrect results for wave operations (WaveActiveSum, etc.).
 //
 // The SPV_KHR_maximal_reconvergence extension guarantees reconvergence at
 // structured control flow merge points (like if-else merges), but OpSwitch
 // fallthrough is NOT structured - threads can enter the same code from
 // different case labels.
+//
+// ## Target Scope
+//
+// This pass runs for SPIR-V and Metal targets only.
+// - HLSL: Handles reconvergence correctly without this transformation.
+// - CUDA: Has reconvergence issues but this transformation doesn't work for it.
+// - CPU: Doesn't support wave operations, not applicable.
+// - DX11, WGSL: Don't support switch fallthrough.
 //
 // ## Solution: Two-Switch Transformation
 //
@@ -1775,8 +1784,8 @@ static bool switchNeedsLowering(IRSwitch* switchInst)
 /// reconvergence (e.g., wave operations). Simple fallthrough with only safe
 /// operations (math, loads, stores) doesn't need lowering.
 /// 
-/// TODO: In the future, we may want to also restrict this to SPIR-V targets only,
-/// since other targets may handle reconvergence correctly in hardware.
+/// Note: Target filtering (SPIR-V and Metal only) is done in slang-emit.cpp
+/// where this pass is called.
 static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram)
 {
     SLANG_UNUSED(targetProgram);

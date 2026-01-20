@@ -7,9 +7,9 @@
 // The pass should only transform Group 1 to the second switch, while Group 2
 // can remain as regular fallthrough in the first switch.
 
-// GPU backends that support wave ops
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0
+// GPU backends that support reconvergence lowering (SPIR-V, Metal, DX12)
+// CUDA has reconvergence issues but the lowering doesn't work for it yet.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute -shaderobj
 

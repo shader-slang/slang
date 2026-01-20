@@ -1925,16 +1925,19 @@ Result linkAndOptimizeIR(
     }
 
     // Lower switch statements with fallthrough to use reconverged control flow.
-    // This must run before eliminateMultiLevelBreak so that any continue
-    // statements that now cross our synthetic loop boundary are handled.
-    // See GitHub issue #6441.
+    // This is needed for SPIR-V and Metal targets which have reconvergence issues
+    // with switch fallthrough containing wave operations.
+    // Must run before eliminateMultiLevelBreak. See GitHub issue #6441.
     //
     // We eliminate phis first so the switch lowering pass sees a cleaner IR
     // without block parameters. Then simplifyCFG fuses empty switch case blocks
     // that just branch to shared blocks.
-    SLANG_PASS(eliminatePhis, LivenessMode::Disabled, PhiEliminationOptions::getFast());
-    SLANG_PASS(simplifyCFG, CFGSimplificationOptions::getFast());
-    SLANG_PASS(lowerSwitchToReconvergedSwitches, targetProgram);
+    if (isSPIRV(target) || isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(eliminatePhis, LivenessMode::Disabled, PhiEliminationOptions::getFast());
+        SLANG_PASS(simplifyCFG, CFGSimplificationOptions::getFast());
+        SLANG_PASS(lowerSwitchToReconvergedSwitches, targetProgram);
+    }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 

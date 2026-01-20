@@ -6,9 +6,9 @@
 // This tests wave operations with non-trivial fallthrough, which is
 // the primary motivating case for switch reconvergence lowering.
 
-// CPU doesn't support wave ops; need GPU backend
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0
+// GPU backends that support reconvergence lowering (SPIR-V, Metal, DX12)
+// CUDA has reconvergence issues but the lowering doesn't work for it yet.
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -compute -profile cs_6_0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-mtl -compute -shaderobj
 

@@ -13,7 +13,11 @@ class TargetProgram;
 /// 2. Second switch: Executes fallthrough sequences using if-guards for stages
 ///
 /// This provides deterministic reconvergence behavior for switches with
-/// non-trivial fallthrough, addressing undefined behavior in SPIR-V's OpSwitch.
+/// non-trivial fallthrough, addressing undefined behavior in SPIR-V's OpSwitch
+/// and similar issues in Metal.
+///
+/// Only runs for SPIR-V and Metal targets. HLSL handles reconvergence correctly.
+/// CUDA has reconvergence issues but this transformation doesn't work for it.
 ///
 /// Non-fallthrough cases remain in the first switch and execute directly.
 ///
