@@ -586,21 +586,36 @@ struct SwitchLoweringContext
         {
             group.needsLowering = false;
 
-            // Check each case in the group (except the last, which doesn't fall through)
-            for (Index i = 0; i + 1 < group.caseIndices.getCount(); i++)
+            // Check fallthrough paths between consecutive cases (skip first case - nothing 
+            // falls into it). We start at i=1 to check the path INTO each case, since threads
+            // from earlier cases will reconverge there.
+            for (Index i = 1; i < group.caseIndices.getCount(); i++)
             {
+                Index prevCaseIdx = group.caseIndices[i - 1];
                 Index caseIdx = group.caseIndices[i];
-                Index nextCaseIdx = group.caseIndices[i + 1];
 
+                auto& prevCaseInfo = cases[prevCaseIdx];
                 auto& caseInfo = cases[caseIdx];
-                auto& nextCaseInfo = cases[nextCaseIdx];
 
-                // Check if the fallthrough path from this case to the next contains
+                // Check if the fallthrough path from previous case to this case contains
                 // unsafe operations
-                if (checkFallthroughPathNeedsLowering(caseInfo.label, nextCaseInfo.label, breakLabel))
+                if (checkFallthroughPathNeedsLowering(prevCaseInfo.label, caseInfo.label, breakLabel))
                 {
                     group.needsLowering = true;
                     break;
+                }
+            }
+
+            // Also check the last case's body (from its label to break).
+            // This is critical because threads from all earlier cases reconverge here,
+            // so any wave ops in the last case's body require reconvergence.
+            if (!group.needsLowering && group.caseIndices.getCount() > 0)
+            {
+                Index lastCaseIdx = group.caseIndices.getLast();
+                auto& lastCaseInfo = cases[lastCaseIdx];
+                if (checkCaseBodyNeedsLowering(lastCaseInfo.label, breakLabel))
+                {
+                    group.needsLowering = true;
                 }
             }
         }
@@ -624,6 +639,55 @@ struct SwitchLoweringContext
         IRBlock* breakLabel)
     {
         return fallthroughPathNeedsLowering(switchInst, caseLabel1, caseLabel2, breakLabel);
+    }
+
+    /// Check if a case body (from label to break) contains any unsafe operations.
+    /// This checks the FULL body of the case, not just the path to the next case.
+    bool checkCaseBodyNeedsLowering(IRBlock* caseLabel, IRBlock* breakLabel)
+    {
+        HashSet<IRBlock*> stopBlocks;
+        // Stop at break label and all other case labels
+        stopBlocks.add(breakLabel);
+        for (UInt i = 0; i < switchInst->getCaseCount(); i++)
+        {
+            auto otherLabel = switchInst->getCaseLabel(i);
+            if (otherLabel != caseLabel)
+                stopBlocks.add(otherLabel);
+        }
+        auto defaultLabel = switchInst->getDefaultLabel();
+        if (defaultLabel && defaultLabel != caseLabel)
+            stopBlocks.add(defaultLabel);
+
+        // Collect all blocks reachable from caseLabel (the case body)
+        HashSet<IRBlock*> visited;
+        List<IRBlock*> workList;
+        workList.add(caseLabel);
+
+        while (workList.getCount() > 0)
+        {
+            auto block = workList.getLast();
+            workList.removeLast();
+
+            if (!block || visited.contains(block))
+                continue;
+            // Don't cross into stop blocks (except the source block)
+            if (stopBlocks.contains(block) && block != caseLabel)
+                continue;
+
+            visited.add(block);
+
+            // Check this block for unsafe operations
+            for (auto inst : block->getChildren())
+            {
+                if (!isInstructionSafeForFallthrough(inst))
+                    return true;
+            }
+
+            for (auto succ : block->getSuccessors())
+                workList.add(succ);
+        }
+
+        return false;
     }
 
     /// Check if the switch has any fallthrough that needs handling.
@@ -862,11 +926,11 @@ struct SwitchLoweringContext
         builder->setInsertInto(caseMergeBlock);
         builder->emitBranch(stageMergeBlock);
 
-        // Set up redirections:
-        // - breakLabel -> caseMergeBlock (NOT directly to stageMergeBlock)
-        // - nextCaseBlock -> caseMergeBlock (fallthrough also goes to merge)
+        // Set up redirections for nextCaseBlock only.
+        // IMPORTANT: We do NOT redirect breakLabel here because that breaks SPIR-V
+        // structured control flow for conditional breaks (if-else where one path breaks).
+        // Instead, we handle breakLabel manually after cloning.
         Dictionary<IRBlock*, IRBlock*> redirections;
-        redirections[breakLabel] = caseMergeBlock;
         if (nextCaseBlock)
         {
             redirections[nextCaseBlock] = caseMergeBlock;
@@ -906,8 +970,15 @@ struct SwitchLoweringContext
             }
         }
 
-        // Now inject stage=MAX_INT stores into cloned blocks that had breaks.
-        // The store must be inserted BEFORE the terminal branch instruction.
+        // Now handle blocks that had breaks. For each such block:
+        // 1. Inject _ft_stage = MAX_INT store before the terminator
+        // 2. Redirect branches to breakLabel appropriately
+        //
+        // For SPIR-V structured control flow, we need to be careful with conditional breaks.
+        // If a block branches to breakLabel and is the target of a conditional branch,
+        // we should redirect to the if-else merge (the other target of the conditional),
+        // not directly to caseMergeBlock. This preserves the selection structure.
+        // The stage check will handle skipping subsequent code after the break.
         for (auto origBlock : blocksWithBreak)
         {
             IRBlock* clonedBlock = nullptr;
@@ -921,6 +992,52 @@ struct SwitchLoweringContext
             // Insert store before the terminator
             builder->setInsertBefore(terminator);
             builder->emitStore(fallthroughStageVar, maxStageValue);
+
+            // Determine where to redirect the break.
+            // If this block is the target of a conditional branch (if-else),
+            // redirect to the other target (the merge point) to preserve structure.
+            // Otherwise, redirect to caseMergeBlock.
+            IRBlock* breakRedirectTarget = caseMergeBlock;
+
+            // Check if clonedBlock has a single predecessor that's a conditional branch
+            if (clonedBlock->firstUse)
+            {
+                // Find predecessor blocks that branch to us
+                for (auto use = clonedBlock->firstUse; use; use = use->nextUse)
+                {
+                    auto user = use->getUser();
+                    if (auto condBranch = as<IRConditionalBranch>(user))
+                    {
+                        // This is a conditional branch that targets our block
+                        // Find the other target (the if-else merge)
+                        auto trueBlock = condBranch->getTrueBlock();
+                        auto falseBlock = condBranch->getFalseBlock();
+                        
+                        IRBlock* otherTarget = nullptr;
+                        if (trueBlock == clonedBlock)
+                            otherTarget = falseBlock;
+                        else if (falseBlock == clonedBlock)
+                            otherTarget = trueBlock;
+                        
+                        if (otherTarget && otherTarget != breakLabel && otherTarget != caseMergeBlock)
+                        {
+                            // The other target is likely the if-else merge
+                            // Redirect our break to there to preserve structure
+                            breakRedirectTarget = otherTarget;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Redirect breakLabel references
+            for (UInt i = 0; i < terminator->getOperandCount(); i++)
+            {
+                if (terminator->getOperand(i) == breakLabel)
+                {
+                    terminator->setOperand(i, breakRedirectTarget);
+                }
+            }
         }
 
         // Return the cloned entry block
