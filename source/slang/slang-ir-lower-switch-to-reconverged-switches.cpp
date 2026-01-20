@@ -970,15 +970,26 @@ struct SwitchLoweringContext
             }
         }
 
-        // Now handle blocks that had breaks. For each such block:
-        // 1. Inject _ft_stage = MAX_INT store before the terminator
-        // 2. Redirect branches to breakLabel appropriately
+        // Now handle blocks that had breaks. For conditional breaks (where the break
+        // is inside an if-else), we need to ensure the continuation code only executes
+        // on the non-break path.
         //
-        // For SPIR-V structured control flow, we need to be careful with conditional breaks.
-        // If a block branches to breakLabel and is the target of a conditional branch,
-        // we should redirect to the if-else merge (the other target of the conditional),
-        // not directly to caseMergeBlock. This preserves the selection structure.
-        // The stage check will handle skipping subsequent code after the break.
+        // We use an approach that inserts a guard check after the conditional:
+        //   if (breakCond) { _ft_stage = MAX_INT; }
+        //   if (_ft_stage != MAX_INT) { continuation code... }
+        //
+        // This is valid SPIR-V structured control flow because both conditionals
+        // have proper merge points.
+        
+        // First pass: collect info about conditional breaks and insert stores
+        struct ConditionalBreakInfo
+        {
+            IRBlock* clonedBreakBlock;
+            IRBlock* continuationStart;
+            IRBlock* condBranchBlock;
+        };
+        List<ConditionalBreakInfo> conditionalBreaks;
+
         for (auto origBlock : blocksWithBreak)
         {
             IRBlock* clonedBlock = nullptr;
@@ -993,49 +1004,141 @@ struct SwitchLoweringContext
             builder->setInsertBefore(terminator);
             builder->emitStore(fallthroughStageVar, maxStageValue);
 
-            // Determine where to redirect the break.
-            // If this block is the target of a conditional branch (if-else),
-            // redirect to the other target (the merge point) to preserve structure.
-            // Otherwise, redirect to caseMergeBlock.
-            IRBlock* breakRedirectTarget = caseMergeBlock;
-
-            // Check if clonedBlock has a single predecessor that's a conditional branch
+            // Check if clonedBlock is the target of a conditional branch (if-else)
+            IRBlock* continuationStart = nullptr;
+            IRBlock* condBranchBlock = nullptr;
+            
             if (clonedBlock->firstUse)
             {
-                // Find predecessor blocks that branch to us
                 for (auto use = clonedBlock->firstUse; use; use = use->nextUse)
                 {
                     auto user = use->getUser();
                     if (auto condBranch = as<IRConditionalBranch>(user))
                     {
-                        // This is a conditional branch that targets our block
-                        // Find the other target (the if-else merge)
                         auto trueBlock = condBranch->getTrueBlock();
                         auto falseBlock = condBranch->getFalseBlock();
                         
-                        IRBlock* otherTarget = nullptr;
                         if (trueBlock == clonedBlock)
-                            otherTarget = falseBlock;
+                            continuationStart = falseBlock;
                         else if (falseBlock == clonedBlock)
-                            otherTarget = trueBlock;
+                            continuationStart = trueBlock;
                         
-                        if (otherTarget && otherTarget != breakLabel && otherTarget != caseMergeBlock)
+                        if (continuationStart && continuationStart != breakLabel && 
+                            continuationStart != caseMergeBlock)
                         {
-                            // The other target is likely the if-else merge
-                            // Redirect our break to there to preserve structure
-                            breakRedirectTarget = otherTarget;
+                            condBranchBlock = as<IRBlock>(condBranch->getParent());
                             break;
                         }
+                        continuationStart = nullptr;
                     }
                 }
             }
 
-            // Redirect breakLabel references
+            if (continuationStart)
+            {
+                // This is a conditional break - record it for second pass
+                ConditionalBreakInfo info;
+                info.clonedBreakBlock = clonedBlock;
+                info.continuationStart = continuationStart;
+                info.condBranchBlock = condBranchBlock;
+                conditionalBreaks.add(info);
+            }
+
+            // Redirect breakLabel references to the continuation (if-else merge)
+            // For conditional breaks, the break path goes to the continuation's entry
+            // which then gets wrapped with a guard check.
+            // For unconditional breaks, go to caseMergeBlock.
+            IRBlock* breakRedirectTarget = continuationStart ? continuationStart : caseMergeBlock;
+            
             for (UInt i = 0; i < terminator->getOperandCount(); i++)
             {
                 if (terminator->getOperand(i) == breakLabel)
                 {
                     terminator->setOperand(i, breakRedirectTarget);
+                }
+            }
+        }
+
+        // Second pass: wrap continuation code with guard checks
+        // For each conditional break, we insert a check at the continuation start:
+        //   if (_ft_stage != MAX_INT) { original continuation } else { skip to merge }
+        // Each guard gets its own unique merge block to avoid SPIR-V validation errors.
+        for (auto& info : conditionalBreaks)
+        {
+            auto continuationStart = info.continuationStart;
+            
+            // Create a unique merge block for this guard
+            auto guardMergeBlock = builder->createBlock();
+            guardMergeBlock->insertBefore(caseMergeBlock);
+            builder->setInsertInto(guardMergeBlock);
+            builder->emitBranch(caseMergeBlock);
+            
+            // Create a guard block that checks _ft_stage
+            auto guardBlock = builder->createBlock();
+            guardBlock->insertBefore(continuationStart);
+            
+            // Create a skip block that goes to guardMergeBlock
+            auto skipBlock = builder->createBlock();
+            skipBlock->insertBefore(continuationStart);
+            builder->setInsertInto(skipBlock);
+            builder->emitBranch(guardMergeBlock);
+            
+            // Build the guard check in guardBlock
+            builder->setInsertInto(guardBlock);
+            auto stageVal = builder->emitLoad(fallthroughStageVar);
+            auto notBroken = builder->emitNeq(stageVal, maxStageValue);
+            builder->emitIfElse(notBroken, continuationStart, skipBlock, guardMergeBlock);
+            
+            // Redirect all predecessors of continuationStart to guardBlock instead
+            // (except the guard block itself)
+            List<IRUse*> usesToRedirect;
+            for (auto use = continuationStart->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (user->getParent() != guardBlock)
+                {
+                    usesToRedirect.add(use);
+                }
+            }
+            for (auto use : usesToRedirect)
+            {
+                use->set(guardBlock);
+            }
+            
+            // Also redirect the continuation's end to guardMergeBlock instead of caseMergeBlock
+            // This ensures the continuation flows into its merge, not directly to caseMergeBlock
+            HashSet<IRBlock*> continuationBlocks;
+            List<IRBlock*> workList;
+            workList.add(continuationStart);
+            
+            while (workList.getCount() > 0)
+            {
+                auto block = workList.getLast();
+                workList.removeLast();
+                
+                if (!block || continuationBlocks.contains(block))
+                    continue;
+                if (block == caseMergeBlock || block == guardMergeBlock || block == skipBlock)
+                    continue;
+                
+                continuationBlocks.add(block);
+                
+                for (auto succ : block->getSuccessors())
+                    workList.add(succ);
+            }
+
+            for (auto contBlock : continuationBlocks)
+            {
+                auto contTerm = contBlock->getTerminator();
+                if (!contTerm)
+                    continue;
+                
+                for (UInt i = 0; i < contTerm->getOperandCount(); i++)
+                {
+                    if (contTerm->getOperand(i) == caseMergeBlock)
+                    {
+                        contTerm->setOperand(i, guardMergeBlock);
+                    }
                 }
             }
         }
