@@ -3,20 +3,22 @@
 local diagnostics = {}
 
 -- Helper function to create a span
-local function span(location, message)
+local function span(location, message, variadic)
   return {
     location = location,
     message = message,
     is_note = false,
+    variadic = variadic or false,
   }
 end
 
 -- Helper function to create a note
-local function note(location, message)
+local function note(location, message, variadic)
   return {
     location = location,
     message = message,
     is_note = true,
+    variadic = variadic or false,
   }
 end
 
@@ -40,11 +42,13 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
         table.insert(notes, {
           location = s.location,
           message = s.message,
+          variadic = s.variadic,
         })
       else
         table.insert(secondary_spans, {
           location = s.location,
           message = s.message,
+          variadic = s.variadic,
         })
       end
     end
@@ -314,9 +318,9 @@ local function process_diagnostics(diagnostics_table)
       local seen_params = {}
       local seen_locations = {}
 
-      local function add_location(loc_name, loc_type)
+      local function add_location(loc_name, loc_type, is_variadic)
         if loc_name and not seen_locations[loc_name] then
-          table.insert(locations, { name = loc_name, type = loc_type })
+          table.insert(locations, { name = loc_name, type = loc_type, variadic = is_variadic or false })
           seen_locations[loc_name] = true
         end
       end
@@ -325,7 +329,7 @@ local function process_diagnostics(diagnostics_table)
       local function collect_location(container)
         if container.location then
           local loc_name, loc_type = parse_location_spec(container.location)
-          add_location(loc_name, loc_type)
+          add_location(loc_name, loc_type, container.variadic)
           -- Store parsed location info back to container for code generation
           container.location_name = loc_name
           container.location_type = loc_type

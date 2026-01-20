@@ -91,7 +91,8 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %     return "string"
 %   end
 %
-%   local buildMessage = function(parts)
+%   local buildMessage = function(parts, var_mapping)
+%     var_mapping = var_mapping or {}
 %     local emitPart = function(part)
 %       if part.type == "text" then
           "$(part.content:gsub('"', '\\"'))"
@@ -99,7 +100,8 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         if part.member_name then
 %           -- Member access: ~param.member or ~param:Type.member
 %           local ptype = getParamType(part.param_name)
-%           local cpp_expr, result_type = lua_module.resolveMemberAccess(ptype, part.member_name, part.param_name)
+%           local base_expr = var_mapping[part.param_name] or part.param_name
+%           local cpp_expr, result_type = lua_module.resolveMemberAccess(ptype, part.member_name, base_expr)
 %           if result_type == "name" then
           nameToPrintableString($(cpp_expr))
 %           elseif result_type == "type" then
@@ -110,16 +112,17 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         else
 %           -- Direct parameter reference
 %           local ptype = getParamType(part.param_name)
+%           local base_expr = var_mapping[part.param_name] or part.param_name
 %           if ptype == "name" then
-          nameToPrintableString($(part.param_name))
+          nameToPrintableString($(base_expr))
 %           elseif ptype == "type" then
-          typeToPrintableString($(part.param_name))
+          typeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
-          nameToPrintableString($(part.param_name)->getName())
+          nameToPrintableString($(base_expr)->getName())
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
-          $(part.param_name)
+          $(base_expr)
 %           else
-          $(part.param_name)
+          $(base_expr)
 %           end
 %         end
 %       end
@@ -144,24 +147,46 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %     if diagnostic.secondary_spans then
     // Set secondary spans
 %         for _, span in ipairs(diagnostic.secondary_spans) do
+%             if span.variadic then
+%                 local item_var = span.location_name .. "_item"
+%                 local var_map = {[span.location_name] = item_var}
+    for (auto $(item_var) : $(span.location_name)) {
+        DiagnosticSpan span;
+        span.range = SourceRange{$(lua_module.getLocationExpr(item_var, span.location_type))};
+        span.message = $(buildMessage(span.message_parts, var_map));
+        result.secondarySpans.add(span);
+    }
+%             else
     {
         DiagnosticSpan span;
         span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
         span.message = $(buildMessage(span.message_parts));
         result.secondarySpans.add(span);
     }
+%             end
 %         end
 %     end
 
 %     if diagnostic.notes then
     // Set notes
 %         for _, note in ipairs(diagnostic.notes) do
+%             if note.variadic then
+%                 local item_var = note.location_name .. "_item"
+%                 local var_map = {[note.location_name] = item_var}
+    for (auto $(item_var) : $(note.location_name)) {
+        DiagnosticNote note;
+        note.span.range = SourceRange{$(lua_module.getLocationExpr(item_var, note.location_type))};
+        note.message = $(buildMessage(note.message_parts, var_map));
+        result.notes.add(note);
+    }
+%             else
     {
         DiagnosticNote note;
         note.span.range = SourceRange{$(lua_module.getLocationExpr(note.location_name, note.location_type))};
         note.message = $(buildMessage(note.message_parts));
         result.notes.add(note);
     }
+%             end
 %         end
 %     end
     

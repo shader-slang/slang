@@ -48,6 +48,15 @@
 -- )
 -- ~from:Type declares 'from' as Type* inline (no need to declare separately)
 --
+-- err(
+--     "multiple type errors",
+--     30009,
+--     "expression has multiple type errors",
+--     span("expression:Expr", "expression here"),
+--     span("error_expr:Expr", "type error: ~error_expr.type", true)  -- variadic=true
+-- )
+-- Variadic span: error_expr becomes List<Expr*>, generates one span per item in the list
+--
 -- Interpolation syntax:
 --   ~param           - String parameter (default)
 --   ~param:Type      - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
@@ -64,8 +73,10 @@
 -- Available functions:
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
 --   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
---   span(location, message) - Create a secondary span
---   note(location, message) - Create a note (appears after the main diagnostic)
+--   span(location, message, variadic) - Create a secondary span
+--     variadic (optional): if true, location becomes List<Type*> and renders multiple spans
+--   note(location, message, variadic) - Create a note (appears after the main diagnostic)
+--     variadic (optional): if true, location becomes List<Type*> and renders multiple notes
 
 -- Load helper functions
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
@@ -89,6 +100,14 @@ err(
 	"function ~function already has a body",
 	span("function:Decl", "redeclared here"),
 	note("original:Decl", "see previous definition of ~function")
+)
+
+err(
+	"multiple type errors",
+	30202,
+	"expression has multiple type errors",
+	span("expression:Expr", "expression here"),
+	span("error_expr:Expr", "type error: ~error_expr.type", true)
 )
 
 -- Process and validate all diagnostics

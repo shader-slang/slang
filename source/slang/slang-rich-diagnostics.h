@@ -38,10 +38,18 @@ struct $(class_name)
 %     for _, loc in ipairs(diagnostic.locations) do
 %         if loc.type then
 %             local loc_cpp_type = lua_module.getCppType(loc.type)
-%             local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+%             if loc.variadic then
+    List<$(loc_cpp_type)> $(loc.name) = {};
+%             else
+%                 local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
     $(loc_cpp_type) $(loc.name) = $(loc_initializer);
+%             end
 %         else
+%             if loc.variadic then
+    List<SourceLoc> $(loc.name) = {};
+%             else
     SourceLoc $(loc.name) = SourceLoc{};
+%             end
 %         end
 %     end
 
