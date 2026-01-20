@@ -110,6 +110,14 @@ err(
   span("error_expr:Expr", "type error: ~error_expr.type", true)
 )
 
+err(
+  "ambiguous overload for name with args",
+  39999,
+  "ambiguous call to '~name' with arguments of type ~args",
+  span("expr:Expr", "in call expression"),
+  note("candidates:Decl", "candidate: ~candidates", true)
+)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 
