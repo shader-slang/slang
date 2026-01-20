@@ -125,6 +125,7 @@
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -794,6 +795,11 @@ struct SwitchLoweringContext
     /// @param redirections Map of old blocks to redirect to new blocks (e.g., breakLabel -> newTarget)
     /// @param insertBeforeBlock Block to insert new blocks before
     /// @returns The cloned entry block
+    /// 
+    /// IMPORTANT: We must clone blocks in their original function order to preserve
+    /// the logical structure for nested switches. If blocks are cloned in random order
+    /// (e.g., hash set iteration order), the fallthrough detection for nested switches
+    /// will fail because it relies on block order in the function.
     IRBlock* cloneCaseBodyBlocks(
         const HashSet<IRBlock*>& bodyBlocks,
         IRBlock* entryBlock,
@@ -813,10 +819,21 @@ struct SwitchLoweringContext
             cloneEnv.mapOldValToNew[oldBlock] = newBlock;
         }
 
+        // Get blocks in function order (not hash set order) to preserve logical structure
+        List<IRBlock*> orderedBlocks;
+        if (auto func = as<IRGlobalValueWithCode>(entryBlock->getParent()))
+        {
+            for (auto block : func->getBlocks())
+            {
+                if (bodyBlocks.contains(block))
+                    orderedBlocks.add(block);
+            }
+        }
+
         // Create new empty blocks and register mappings for body blocks
         // Skip any blocks that are already in redirections (they shouldn't be cloned)
         Dictionary<IRBlock*, IRBlock*> oldToNew;
-        for (auto block : bodyBlocks)
+        for (auto block : orderedBlocks)
         {
             // Don't create a clone for blocks that should be redirected
             if (redirections.containsKey(block))
@@ -829,7 +846,7 @@ struct SwitchLoweringContext
         }
 
         // Second pass: clone instructions from old blocks to new blocks
-        for (auto block : bodyBlocks)
+        for (auto block : orderedBlocks)
         {
             // Skip blocks that are redirected (not cloned)
             if (redirections.containsKey(block))
@@ -916,6 +933,11 @@ struct SwitchLoweringContext
     }
 
     /// Clone case body blocks, setting up redirections and block mappings.
+    /// 
+    /// IMPORTANT: We must clone blocks in their original function order to preserve
+    /// the logical structure for nested switches. If blocks are cloned in random order
+    /// (e.g., hash set iteration order), the fallthrough detection for nested switches
+    /// will fail because it relies on block order in the function.
     void cloneBodyBlocks(
         const HashSet<IRBlock*>& bodyBlocks,
         const Dictionary<IRBlock*, IRBlock*>& redirections,
@@ -923,8 +945,25 @@ struct SwitchLoweringContext
         IRCloneEnv& cloneEnv,
         Dictionary<IRBlock*, IRBlock*>& oldToNew)
     {
-        // Create cloned blocks
-        for (auto block : bodyBlocks)
+        // Get blocks in function order (not hash set order) to preserve logical structure
+        List<IRBlock*> orderedBlocks;
+        if (bodyBlocks.getCount() > 0)
+        {
+            // Find the function containing these blocks
+            IRBlock* anyBlock = nullptr;
+            for (auto b : bodyBlocks) { anyBlock = b; break; }
+            if (auto func = as<IRGlobalValueWithCode>(anyBlock->getParent()))
+            {
+                for (auto block : func->getBlocks())
+                {
+                    if (bodyBlocks.contains(block))
+                        orderedBlocks.add(block);
+                }
+            }
+        }
+
+        // Create cloned blocks in order
+        for (auto block : orderedBlocks)
         {
             if (redirections.containsKey(block))
                 continue;
@@ -935,8 +974,8 @@ struct SwitchLoweringContext
             oldToNew[block] = clonedBlock;
         }
 
-        // Clone instructions into each block
-        for (auto block : bodyBlocks)
+        // Clone instructions into each block (in order)
+        for (auto block : orderedBlocks)
         {
             if (redirections.containsKey(block))
                 continue;
@@ -1185,6 +1224,25 @@ struct SwitchLoweringContext
         // Only transform switches that need it for proper reconvergence
         if (!needsTransformation())
             return;
+
+        // For SPIR-V targets, emit the RequireMaximallyReconverges instruction.
+        // This tells the SPIR-V emitter to add the SPV_KHR_maximal_reconvergence
+        // extension and MaximallyReconvergesKHR execution mode, which guarantees
+        // that threads reconverge at structured control flow merge points.
+        // Without this extension, our if-chain transformation doesn't provide
+        // the reconvergence guarantees we need for wave operations.
+        //
+        // Other targets (DX12, Metal) have built-in reconvergence semantics and
+        // don't need this extension.
+        if (targetProgram && isSPIRV(targetProgram->getTargetReq()->getTarget()))
+        {
+            builder->setInsertBefore(switchInst);
+            builder->emitIntrinsicInst(
+                builder->getVoidType(),
+                kIROp_RequireMaximallyReconverges,
+                0,
+                nullptr);
+        }
 
         auto parentBlock = as<IRBlock>(switchInst->getParent());
         auto breakLabel = switchInst->getBreakLabel();
@@ -1727,6 +1785,10 @@ static bool shouldLowerSwitch(IRSwitch* switchInst, TargetProgram* targetProgram
 }
 
 /// Lower all switch statements in a function.
+/// 
+/// This function runs iteratively because transforming a switch may clone
+/// case bodies that contain nested switches. Those nested switches also need
+/// to be transformed, so we keep running until no more switches need lowering.
 static void lowerSwitchInFunc(
     IRModule* irModule,
     IRGlobalValueWithCode* func,
@@ -1739,38 +1801,50 @@ static void lowerSwitchInFunc(
     // detecting fallthrough when a case uses `continue` to exit to an outer loop.
     eliminateContinueBlocksInFunc(irModule, func);
 
-    // Collect all switch instructions first (since we'll be modifying the IR)
-    List<IRSwitch*> switches;
-
-    for (auto block : func->getBlocks())
-    {
-        if (auto switchInst = as<IRSwitch>(block->getTerminator()))
-        {
-            if (shouldLowerSwitch(switchInst, targetProgram))
-            {
-                switches.add(switchInst);
-            }
-        }
-    }
-
-    if (switches.getCount() == 0)
-        return;
-
     // Note: eliminatePhis is called before this pass in slang-emit.cpp,
     // so we expect to see IR without block parameters here.
 
-    // Process each switch
     IRBuilder builder(irModule);
 
-    for (auto switchInst : switches)
+    // Run iteratively until no more switches need lowering.
+    // This handles nested switches: when we transform an outer switch, we clone
+    // its case bodies which may contain inner switches that also need transformation.
+    // We limit iterations to prevent infinite loops in case of bugs.
+    const int kMaxIterations = 100;
+    for (int iteration = 0; iteration < kMaxIterations; iteration++)
     {
-        SwitchLoweringContext ctx;
-        ctx.switchInst = switchInst;
-        ctx.builder = &builder;
-        ctx.targetProgram = targetProgram;
+        // Collect all switch instructions that need lowering
+        List<IRSwitch*> switches;
 
-        ctx.transform();
+        for (auto block : func->getBlocks())
+        {
+            if (auto switchInst = as<IRSwitch>(block->getTerminator()))
+            {
+                if (shouldLowerSwitch(switchInst, targetProgram))
+                {
+                    switches.add(switchInst);
+                }
+            }
+        }
+
+        if (switches.getCount() == 0)
+            return;  // No more switches to process
+
+        // Process each switch found in this iteration
+        for (auto switchInst : switches)
+        {
+            SwitchLoweringContext ctx;
+            ctx.switchInst = switchInst;
+            ctx.builder = &builder;
+            ctx.targetProgram = targetProgram;
+
+            ctx.transform();
+        }
     }
+
+    // If we get here, we hit the iteration limit - this shouldn't happen
+    // in practice unless there's a bug causing infinite switch creation.
+    SLANG_ASSERT(!"Switch lowering exceeded maximum iterations");
 }
 
 void lowerSwitchToReconvergedSwitches(IRModule* module, TargetProgram* targetProgram)
