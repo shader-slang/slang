@@ -7596,6 +7596,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto destPtrType = as<IRPtrTypeBase>(inst->getDest()->getDataType());
+        SLANG_ASSERT(destPtrType);
+
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
@@ -7604,8 +7606,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
         int alignment = -1;
-        if (destPtrType && addressSpaceToStorageClass(destPtrType->getAddressSpace()) ==
-                               SpvStorageClassPhysicalStorageBuffer)
+        if (addressSpaceToStorageClass(addrSpace) == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment);
