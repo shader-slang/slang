@@ -2979,15 +2979,17 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 Index maxCandidatesToPrint = 10;
                 Index candidateIndex = 0;
 
-                context.bestCandidates.sort([](const OverloadCandidate& c1, const OverloadCandidate& c2)
-                                            { return c1.status < c2.status; });
+                context.bestCandidates.sort(
+                    [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                    { return c1.status < c2.status; });
 
                 for (auto candidate : context.bestCandidates)
                 {
                     // Only include visible candidates (skip invisible ones for now)
                     if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
                     {
-                        String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                        String declString =
+                            ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
                         Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
                         c.candidate = candidate.item.declRef.getDecl();
                         c.candidate_signature = declString;
@@ -3030,8 +3032,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     Index candidateCount = context.bestCandidates.getCount();
                     Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
                     Index candidateIndex = 0;
-                    context.bestCandidates.sort([](const OverloadCandidate& c1, const OverloadCandidate& c2)
-                                                { return c1.status < c2.status; });
+                    context.bestCandidates.sort(
+                        [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                        { return c1.status < c2.status; });
 
                     for (auto candidate : context.bestCandidates)
                     {
