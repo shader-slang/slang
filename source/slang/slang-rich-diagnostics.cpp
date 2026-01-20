@@ -70,28 +70,47 @@ UnownedStringSlice typeToPrintableString(Type* type)
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) 
-GenericDiagnostic $(class_name)::toGenericDiagnostic() const
-{
-    GenericDiagnostic result;
-    result.code = $(diagnostic.code);
-    result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
-
-%   local getParamType = function(param_name)
+%     local class_name = lua_module.toPascalCase(diagnostic.name)
+%
+%   -- Build a lookup table for variadic struct info
+%   local variadic_struct_by_name = {}
+%   if diagnostic.variadic_structs then
+%     for _, vs in ipairs(diagnostic.variadic_structs) do
+%       variadic_struct_by_name[vs.struct_name] = vs
+%     end
+%   end
+%
+%   -- getParamType: looks in direct params, direct locations, and variadic struct members
+%   local getParamType = function(param_name, variadic_struct)
+%     -- First check direct params
 %     for _, param in ipairs(diagnostic.params) do
 %       if param.name == param_name then
 %         return param.type
 %       end
 %     end
+%     -- Check direct locations
 %     for _, loc in ipairs(diagnostic.locations) do
 %       if loc.name == param_name and loc.type then
 %         return loc.type
 %       end
 %     end
+%     -- Check variadic struct members if provided
+%     if variadic_struct then
+%       for _, param in ipairs(variadic_struct.params) do
+%         if param.name == param_name then
+%           return param.type
+%         end
+%       end
+%       for _, loc in ipairs(variadic_struct.locations) do
+%         if loc.name == param_name and loc.type then
+%           return loc.type
+%         end
+%       end
+%     end
 %     return "string"
 %   end
 %
-%   local buildMessage = function(parts, var_mapping)
+%   local buildMessage = function(parts, var_mapping, variadic_struct)
 %     var_mapping = var_mapping or {}
 %     local emitPart = function(part)
 %       if part.type == "text" then
@@ -99,7 +118,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %       elseif part.type == "interpolation" then
 %         if part.member_name then
 %           -- Member access: ~param.member or ~param:Type.member
-%           local ptype = getParamType(part.param_name)
+%           local ptype = getParamType(part.param_name, variadic_struct)
 %           local base_expr = var_mapping[part.param_name] or part.param_name
 %           local cpp_expr, result_type = lua_module.resolveMemberAccess(ptype, part.member_name, base_expr)
 %           if result_type == "name" then
@@ -111,7 +130,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %           end
 %         else
 %           -- Direct parameter reference
-%           local ptype = getParamType(part.param_name)
+%           local ptype = getParamType(part.param_name, variadic_struct)
 %           local base_expr = var_mapping[part.param_name] or part.param_name
 %           if ptype == "name" then
           nameToPrintableString($(base_expr))
@@ -137,43 +156,39 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %       end
         ).produceString()
 %     end
-%   end    
+%   end
+GenericDiagnostic $(class_name)::toGenericDiagnostic() const
+{
+    GenericDiagnostic result;
+    result.code = $(diagnostic.code);
+    result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
+
     result.message = $(buildMessage(diagnostic.message_parts));
 
     // Set primary span
     result.primarySpan.range = SourceRange{$(lua_module.getLocationExpr(diagnostic.primary_span.location_name, diagnostic.primary_span.location_type))};
     result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
-    
-%     if diagnostic.secondary_spans then
+
+%     if diagnostic.secondary_spans and #diagnostic.secondary_spans > 0 then
     // Set secondary spans
 %         for _, span in ipairs(diagnostic.secondary_spans) do
-%             if span.variadic then
-%                 -- Find all variadic parameters used in this span's message
+%             if span.variadic and span.struct_name then
+%                 -- AoS iteration: loop over the struct list
+%                 local vs = variadic_struct_by_name[span.struct_name]
+%                 local item_var = "item"
+%                 -- Build variable mapping for struct members
 %                 local var_map = {}
-%                 local loop_vars = {}
-%                 -- Add the location
-%                 local loc_item_var = span.location_name .. "_item"
-%                 var_map[span.location_name] = loc_item_var
-%                 table.insert(loop_vars, {var = loc_item_var, list = span.location_name})
-%                 -- Add variadic parameters
-%                 for _, part in ipairs(span.message_parts) do
-%                     if part.type == "interpolation" and not part.member_name then
-%                         for _, param in ipairs(diagnostic.params) do
-%                             if param.name == part.param_name and param.variadic then
-%                                 local item_var = param.name .. "_item"
-%                                 var_map[param.name] = item_var
-%                                 table.insert(loop_vars, {var = item_var, list = param.name})
-%                             end
-%                         end
-%                     end
+%                 for _, loc in ipairs(vs.locations) do
+%                     var_map[loc.name] = item_var .. "." .. loc.name
 %                 end
-    for (Index i = 0; i < $(loop_vars[1].list).getCount(); i++) {
-%                 for _, lv in ipairs(loop_vars) do
-        auto $(lv.var) = $(lv.list)[i];
+%                 for _, param in ipairs(vs.params) do
+%                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
+    for (const auto& $(item_var) : $(vs.list_name))
+    {
         DiagnosticSpan span;
-        span.range = SourceRange{$(lua_module.getLocationExpr(loc_item_var, span.location_type))};
-        span.message = $(buildMessage(span.message_parts, var_map));
+        span.range = SourceRange{$(lua_module.getLocationExpr(var_map[span.location_name], span.location_type))};
+        span.message = $(buildMessage(span.message_parts, var_map, vs));
         result.secondarySpans.add(span);
     }
 %             else
@@ -187,36 +202,26 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %         end
 %     end
 
-%     if diagnostic.notes then
+%     if diagnostic.notes and #diagnostic.notes > 0 then
     // Set notes
 %         for _, note in ipairs(diagnostic.notes) do
-%             if note.variadic then
-%                 -- Find all variadic parameters used in this note's message
+%             if note.variadic and note.struct_name then
+%                 -- AoS iteration: loop over the struct list
+%                 local vs = variadic_struct_by_name[note.struct_name]
+%                 local item_var = "item"
+%                 -- Build variable mapping for struct members
 %                 local var_map = {}
-%                 local loop_vars = {}
-%                 -- Add the location
-%                 local loc_item_var = note.location_name .. "_item"
-%                 var_map[note.location_name] = loc_item_var
-%                 table.insert(loop_vars, {var = loc_item_var, list = note.location_name})
-%                 -- Add variadic parameters
-%                 for _, part in ipairs(note.message_parts) do
-%                     if part.type == "interpolation" and not part.member_name then
-%                         for _, param in ipairs(diagnostic.params) do
-%                             if param.name == part.param_name and param.variadic then
-%                                 local item_var = param.name .. "_item"
-%                                 var_map[param.name] = item_var
-%                                 table.insert(loop_vars, {var = item_var, list = param.name})
-%                             end
-%                         end
-%                     end
+%                 for _, loc in ipairs(vs.locations) do
+%                     var_map[loc.name] = item_var .. "." .. loc.name
 %                 end
-    for (Index i = 0; i < $(loop_vars[1].list).getCount(); i++) {
-%                 for _, lv in ipairs(loop_vars) do
-        auto $(lv.var) = $(lv.list)[i];
+%                 for _, param in ipairs(vs.params) do
+%                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
+    for (const auto& $(item_var) : $(vs.list_name))
+    {
         DiagnosticNote note;
-        note.span.range = SourceRange{$(lua_module.getLocationExpr(loc_item_var, note.location_type))};
-        note.message = $(buildMessage(note.message_parts, var_map));
+        note.span.range = SourceRange{$(lua_module.getLocationExpr(var_map[note.location_name], note.location_type))};
+        note.message = $(buildMessage(note.message_parts, var_map, vs));
         result.notes.add(note);
     }
 %             else
@@ -229,7 +234,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %             end
 %         end
 %     end
-    
+
     return result;
 }
 

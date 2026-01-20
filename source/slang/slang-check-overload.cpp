@@ -2988,8 +2988,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
                     {
                         String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-                        diagnostic.candidate.add(candidate.item.declRef.getDecl());
-                        diagnostic.candidate_signature.add(declString);
+                        Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
+                        c.candidate = candidate.item.declRef.getDecl();
+                        c.candidate_signature = declString;
+                        diagnostic.candidates.add(c);
                     }
 
                     candidateIndex++;

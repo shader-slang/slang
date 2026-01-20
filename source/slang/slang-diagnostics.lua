@@ -53,9 +53,9 @@
 --     30009,
 --     "expression has multiple type errors",
 --     span("expression:Expr", "expression here"),
---     span("error_expr:Expr", "type error: ~error_expr.type", true)  -- variadic=true
+--     variadic_span("Error", "error_expr:Expr", "type error: ~error_expr.type")
 -- )
--- Variadic span: error_expr becomes List<Expr*>, generates one span per item in the list
+-- Variadic span: Creates nested struct Error with error_expr member, List<Error> errors
 --
 -- Interpolation syntax:
 --   ~param           - String parameter (default)
@@ -73,15 +73,20 @@
 -- Available functions:
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
 --   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
---   span(location, message, variadic) - Create a secondary span
---     variadic (optional): if true, location becomes List<Type*> and renders multiple spans
---   note(location, message, variadic) - Create a note (appears after the main diagnostic)
---     variadic (optional): if true, location becomes List<Type*> and renders multiple notes
+--   span(location, message) - Create a secondary span
+--   note(location, message) - Create a note (appears after the main diagnostic)
+--   variadic_span(struct_name, location, message) - Create a variadic span with AoS layout
+--     struct_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
+--     Exclusive interpolants become members of the nested struct
+--   variadic_note(struct_name, location, message) - Create a variadic note with AoS layout
+--     struct_name: Name for nested struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
 
 -- Load helper functions
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
 local span = helpers.span
 local note = helpers.note
+local variadic_span = helpers.variadic_span
+local variadic_note = helpers.variadic_note
 local err = helpers.err
 local warning = helpers.warning
 
@@ -107,7 +112,7 @@ err(
   30202,
   "expression has multiple type errors",
   span("expression:Expr", "expression here"),
-  span("error_expr:Expr", "type error: ~error_expr.type", true)
+  variadic_span("Error", "error_expr:Expr", "type error: ~error_expr.type")
 )
 
 err(
@@ -115,7 +120,7 @@ err(
   39999,
   "ambiguous call to '~name' with arguments of type ~args",
   span("expr:Expr", "in call expression"),
-  note("candidate:Decl", "candidate: ~candidate_signature", true)
+  variadic_note("Candidate", "candidate:Decl", "candidate: ~candidate_signature")
 )
 
 -- Process and validate all diagnostics

@@ -26,37 +26,51 @@ namespace Diagnostics
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) 
+%     local class_name = lua_module.toPascalCase(diagnostic.name)
 struct $(class_name)
 {
+%     -- Direct parameters (non-variadic or shared)
 %     for _, param in ipairs(diagnostic.params) do
 %         local type = lua_module.getCppType(param.type)
-%         if param.variadic then
-    List<$(type)> $(param.name) = {};
-%         else
-%             local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+%         local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
     $(type) $(param.name) = $(initializer);
-%         end
 %     end
 
+%     -- Direct locations (non-variadic or shared)
 %     for _, loc in ipairs(diagnostic.locations) do
 %         if loc.type then
 %             local loc_cpp_type = lua_module.getCppType(loc.type)
-%             if loc.variadic then
-    List<$(loc_cpp_type)> $(loc.name) = {};
-%             else
-%                 local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+%             local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
     $(loc_cpp_type) $(loc.name) = $(loc_initializer);
-%             end
 %         else
-%             if loc.variadic then
-    List<SourceLoc> $(loc.name) = {};
-%             else
     SourceLoc $(loc.name) = SourceLoc{};
-%             end
 %         end
 %     end
 
+%     -- Nested structs for variadic spans/notes (AoS pattern)
+%     if diagnostic.variadic_structs then
+%         for _, vs in ipairs(diagnostic.variadic_structs) do
+    struct $(vs.struct_name)
+    {
+%             for _, loc in ipairs(vs.locations) do
+%                 if loc.type then
+%                     local loc_cpp_type = lua_module.getCppType(loc.type)
+%                     local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+        $(loc_cpp_type) $(loc.name) = $(loc_initializer);
+%                 else
+        SourceLoc $(loc.name) = SourceLoc{};
+%                 end
+%             end
+%             for _, param in ipairs(vs.params) do
+%                 local type = lua_module.getCppType(param.type)
+%                 local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+        $(type) $(param.name) = $(initializer);
+%             end
+    };
+    List<$(vs.struct_name)> $(vs.list_name) = {};
+
+%         end
+%     end
     GenericDiagnostic toGenericDiagnostic() const;
 };
 

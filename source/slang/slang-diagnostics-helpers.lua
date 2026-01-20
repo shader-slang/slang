@@ -3,22 +3,46 @@
 local diagnostics = {}
 
 -- Helper function to create a span
-local function span(location, message, variadic)
+local function span(location, message)
   return {
     location = location,
     message = message,
     is_note = false,
-    variadic = variadic or false,
+    variadic = false,
   }
 end
 
 -- Helper function to create a note
-local function note(location, message, variadic)
+local function note(location, message)
   return {
     location = location,
     message = message,
     is_note = true,
-    variadic = variadic or false,
+    variadic = false,
+  }
+end
+
+-- Helper function to create a variadic span (generates a nested struct and List<>)
+-- struct_name: Name for the struct (e.g., "Error" -> struct Error, List<Error> errors)
+local function variadic_span(struct_name, location, message)
+  return {
+    location = location,
+    message = message,
+    is_note = false,
+    variadic = true,
+    struct_name = struct_name,
+  }
+end
+
+-- Helper function to create a variadic note (generates a nested struct and List<>)
+-- struct_name: Name for the struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
+local function variadic_note(struct_name, location, message)
+  return {
+    location = location,
+    message = message,
+    is_note = true,
+    variadic = true,
+    struct_name = struct_name,
   }
 end
 
@@ -43,12 +67,14 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
           location = s.location,
           message = s.message,
           variadic = s.variadic,
+          struct_name = s.struct_name,
         })
       else
         table.insert(secondary_spans, {
           location = s.location,
           message = s.message,
           variadic = s.variadic,
+          struct_name = s.struct_name,
         })
       end
     end
@@ -279,6 +305,18 @@ local function validate_diagnostic(diag, index)
   return errors
 end
 
+-- Helper to make a plural name for list members
+local function pluralize(name)
+  -- Simple English pluralization
+  if name:sub(-1) == "s" or name:sub(-2) == "ch" or name:sub(-2) == "sh" then
+    return name .. "es"
+  elseif name:sub(-1) == "y" and not name:sub(-2, -2):match("[aeiou]") then
+    return name:sub(1, -2) .. "ies"
+  else
+    return name .. "s"
+  end
+end
+
 -- Function to process and validate all diagnostics
 local function process_diagnostics(diagnostics_table)
   local processed = {}
@@ -313,29 +351,41 @@ local function process_diagnostics(diagnostics_table)
         seen_codes[diag.code] = i
       end
 
-      local params = {}
-      local locations = {}
-      local seen_params = {}
-      local seen_locations = {}
+      -- Track which params/locations appear in which contexts
+      -- param_contexts[name] = { variadic_structs = {struct_name1, ...}, non_variadic = bool }
+      local param_contexts = {}
+      local seen_params = {} -- name -> type mapping
+      local seen_locations = {} -- name -> {type, variadic, struct_name}
 
-      local function add_location(loc_name, loc_type, is_variadic)
-        if loc_name and not seen_locations[loc_name] then
-          table.insert(locations, { name = loc_name, type = loc_type, variadic = is_variadic or false })
-          seen_locations[loc_name] = true
-        end
-      end
+      -- Variadic structs: struct_name -> { params = {}, locations = {}, container_type = "span"|"note" }
+      local variadic_structs = {}
 
       -- First pass: collect all locations to build the known_params map
       local function collect_location(container)
         if container.location then
           local loc_name, loc_type = parse_location_spec(container.location)
-          add_location(loc_name, loc_type, container.variadic)
           -- Store parsed location info back to container for code generation
           container.location_name = loc_name
           container.location_type = loc_type
-          -- Track location as a parameter too
+
+          -- Track this location
+          if not seen_locations[loc_name] then
+            seen_locations[loc_name] = { type = loc_type }
+          end
+
+          -- Track location as a parameter for type resolution
           if loc_type and not seen_params[loc_name] then
             seen_params[loc_name] = loc_type
+          end
+
+          -- Track context (variadic vs non-variadic)
+          if not param_contexts[loc_name] then
+            param_contexts[loc_name] = { variadic_structs = {}, non_variadic = false, is_location = true }
+          end
+          if container.variadic and container.struct_name then
+            param_contexts[loc_name].variadic_structs[container.struct_name] = true
+          else
+            param_contexts[loc_name].non_variadic = true
           end
         end
       end
@@ -347,6 +397,12 @@ local function process_diagnostics(diagnostics_table)
       if diag.secondary_spans then
         for _, span in ipairs(diag.secondary_spans) do
           collect_location(span)
+          -- Register variadic struct
+          if span.variadic and span.struct_name then
+            if not variadic_structs[span.struct_name] then
+              variadic_structs[span.struct_name] = { params = {}, locations = {}, container_type = "span", container = span }
+            end
+          end
         end
       end
 
@@ -354,6 +410,12 @@ local function process_diagnostics(diagnostics_table)
       if diag.notes then
         for _, note in ipairs(diag.notes) do
           collect_location(note)
+          -- Register variadic struct
+          if note.variadic and note.struct_name then
+            if not variadic_structs[note.struct_name] then
+              variadic_structs[note.struct_name] = { params = {}, locations = {}, container_type = "note", container = note }
+            end
+          end
         end
       end
 
@@ -365,43 +427,39 @@ local function process_diagnostics(diagnostics_table)
           return nil
         end
 
-        -- Extract params for the global diagnostic param list (automatically deduplicated)
-        -- If this container is variadic, mark parameters as variadic too
+        -- Extract params and track their contexts
         for _, part in ipairs(parts) do
-          if part.type == "interpolation" and not part.member_name then
-            if not seen_params[part.param_name] then
-              table.insert(params, { name = part.param_name, type = part.param_type, variadic = container.variadic or false })
-              seen_params[part.param_name] = part.param_type
-            elseif seen_params[part.param_name] ~= part.param_type then
+          if part.type == "interpolation" then
+            local param_name = part.param_name
+            local param_type = part.param_type
+
+            -- Register or validate param type
+            if not seen_params[param_name] then
+              seen_params[param_name] = param_type
+            elseif seen_params[param_name] ~= param_type then
               table.insert(
                 all_errors,
                 context_path
                   .. ": parameter '"
-                  .. part.param_name
+                  .. param_name
                   .. "' is used with conflicting types: '"
-                  .. seen_params[part.param_name]
+                  .. seen_params[param_name]
                   .. "' and '"
-                  .. part.param_type
+                  .. param_type
                   .. "'"
               )
             end
-          elseif part.type == "interpolation" and part.member_name then
-            -- Member access: register the base parameter if not already known
-            if not seen_params[part.param_name] then
-              table.insert(params, { name = part.param_name, type = part.param_type, variadic = container.variadic or false })
-              seen_params[part.param_name] = part.param_type
-            elseif seen_params[part.param_name] ~= part.param_type then
-              table.insert(
-                all_errors,
-                context_path
-                  .. ": parameter '"
-                  .. part.param_name
-                  .. "' is used with conflicting types: '"
-                  .. seen_params[part.param_name]
-                  .. "' and '"
-                  .. part.param_type
-                  .. "'"
-              )
+
+            -- Track context (variadic vs non-variadic) - skip member accesses as they derive from the base param
+            if not part.member_name then
+              if not param_contexts[param_name] then
+                param_contexts[param_name] = { variadic_structs = {}, non_variadic = false, is_location = false }
+              end
+              if container.variadic and container.struct_name then
+                param_contexts[param_name].variadic_structs[container.struct_name] = true
+              else
+                param_contexts[param_name].non_variadic = true
+              end
             end
           end
         end
@@ -432,14 +490,55 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
+      -- Now determine which params/locations go where:
+      -- - If param appears ONLY in variadic context(s), it becomes a struct member
+      -- - If param appears in non-variadic context (or multiple variadic contexts), it's a direct member
+      local direct_params = {}
+      local direct_locations = {}
+
+      for param_name, ctx in pairs(param_contexts) do
+        local variadic_count = 0
+        local single_struct = nil
+        for struct_name, _ in pairs(ctx.variadic_structs) do
+          variadic_count = variadic_count + 1
+          single_struct = struct_name
+        end
+
+        if ctx.non_variadic or variadic_count > 1 then
+          -- Direct member of diagnostic struct
+          if ctx.is_location then
+            table.insert(direct_locations, { name = param_name, type = seen_locations[param_name].type })
+          else
+            table.insert(direct_params, { name = param_name, type = seen_params[param_name] })
+          end
+        elseif variadic_count == 1 then
+          -- Member of the variadic struct
+          local vs = variadic_structs[single_struct]
+          if ctx.is_location then
+            table.insert(vs.locations, { name = param_name, type = seen_locations[param_name].type })
+          else
+            table.insert(vs.params, { name = param_name, type = seen_params[param_name] })
+          end
+        end
+      end
+
+      -- Convert variadic_structs map to list and add list_name
+      local variadic_structs_list = {}
+      for struct_name, vs in pairs(variadic_structs) do
+        vs.struct_name = struct_name
+        vs.list_name = pluralize(struct_name:sub(1,1):lower() .. struct_name:sub(2))
+        table.insert(variadic_structs_list, vs)
+      end
+
       table.insert(processed, {
         name = diag.name,
         code = diag.code,
         severity = diag.severity,
         message = diag.message,
         message_parts = main_parts,
-        params = params,
-        locations = locations,
+        params = direct_params,
+        locations = direct_locations,
+        variadic_structs = variadic_structs_list,
         primary_span = diag.primary_span,
         secondary_spans = diag.secondary_spans or {},
         notes = diag.notes or {},
@@ -454,6 +553,8 @@ return {
   diagnostics = diagnostics,
   span = span,
   note = note,
+  variadic_span = variadic_span,
+  variadic_note = variadic_note,
   err = err,
   warning = warning,
   process_diagnostics = process_diagnostics,
