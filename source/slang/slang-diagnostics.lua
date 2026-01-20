@@ -87,34 +87,34 @@ local warning = helpers.warning
 
 -- Define diagnostics
 err(
-	"function return type mismatch",
-	30007,
-	"expression type ~expression.type does not match function's return type ~return_type:Type",
-	span("expression:Expr", "expression type"),
-	span("function:Decl", "function return type")
+  "function return type mismatch",
+  30007,
+  "expression type ~expression.type does not match function's return type ~return_type:Type",
+  span("expression:Expr", "expression type"),
+  span("function:Decl", "function return type")
 )
 
 err(
-	"function redefinition",
-	30201,
-	"function ~function already has a body",
-	span("function:Decl", "redeclared here"),
-	note("original:Decl", "see previous definition of ~function")
+  "function redefinition",
+  30201,
+  "function ~function already has a body",
+  span("function:Decl", "redeclared here"),
+  note("original:Decl", "see previous definition of ~function")
 )
 
 err(
-	"multiple type errors",
-	30202,
-	"expression has multiple type errors",
-	span("expression:Expr", "expression here"),
-	span("error_expr:Expr", "type error: ~error_expr.type", true)
+  "multiple type errors",
+  30202,
+  "expression has multiple type errors",
+  span("expression:Expr", "expression here"),
+  span("error_expr:Expr", "type error: ~error_expr.type", true)
 )
 
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 
 if #validation_errors > 0 then
-	error("Diagnostic validation failed:\n" .. table.concat(validation_errors, "\n"))
+  error("Diagnostic validation failed:\n" .. table.concat(validation_errors, "\n"))
 end
 
 return processed_diagnostics
