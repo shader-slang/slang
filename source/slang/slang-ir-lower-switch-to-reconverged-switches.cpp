@@ -813,7 +813,13 @@ struct SwitchLoweringContext
     }
 
     /// Clone case body for fallthrough cases in the second switch.
-    /// Creates break handling (sets stage to MAX_INT) and redirects appropriately.
+    /// Injects stage=MAX_INT stores before breaks and redirects appropriately.
+    /// 
+    /// For SPIR-V structured control flow, we handle breaks by:
+    /// 1. Setting stage=MAX_INT in the break path
+    /// 2. NOT redirecting directly to stageMergeBlock (which would violate structured exits)
+    /// 3. Instead, letting the break flow to a common merge point with fallthrough
+    /// 4. The stage guards will skip remaining stages when stage==MAX_INT
     IRBlock* cloneFallthroughCaseBody(
         IRBlock* entryBlock,
         IRBlock* nextCaseBlock,
@@ -829,26 +835,101 @@ struct SwitchLoweringContext
         if (bodyBlocks.getCount() == 0)
             return nullptr;
 
-        // For fallthrough cases, we need special handling:
-        // - breakLabel branches need to set stage=MAX_INT, then branch to stageMergeBlock
-        // - nextCaseBlock branches (fallthrough) need to branch to stageMergeBlock
-        //
-        // We handle breakLabel by creating a break handler block.
-
-        auto breakHandlerBlock = builder->createBlock();
-        breakHandlerBlock->insertBefore(insertBeforeBlock);
-        builder->setInsertInto(breakHandlerBlock);
-        builder->emitStore(fallthroughStageVar, maxStageValue);
-        builder->emitBranch(stageMergeBlock);
-
-        Dictionary<IRBlock*, IRBlock*> redirections;
-        redirections[breakLabel] = breakHandlerBlock;
-        if (nextCaseBlock)
+        // Identify which original blocks have breaks (branch to breakLabel)
+        // We need this BEFORE cloning so we can inject stores in the cloned versions.
+        HashSet<IRBlock*> blocksWithBreak;
+        for (auto block : bodyBlocks)
         {
-            redirections[nextCaseBlock] = stageMergeBlock;
+            auto terminator = block->getTerminator();
+            if (!terminator)
+                continue;
+
+            for (UInt i = 0; i < terminator->getOperandCount(); i++)
+            {
+                if (terminator->getOperand(i) == breakLabel)
+                {
+                    blocksWithBreak.add(block);
+                    break;
+                }
+            }
         }
 
-        return cloneCaseBodyBlocks(bodyBlocks, entryBlock, redirections, insertBeforeBlock);
+        // Create a merge block that both break and fallthrough paths will join at.
+        // This ensures SPIR-V structured control flow is maintained.
+        // From this merge block, we branch to stageMergeBlock.
+        auto caseMergeBlock = builder->createBlock();
+        caseMergeBlock->insertBefore(insertBeforeBlock);
+        builder->setInsertInto(caseMergeBlock);
+        builder->emitBranch(stageMergeBlock);
+
+        // Set up redirections:
+        // - breakLabel -> caseMergeBlock (NOT directly to stageMergeBlock)
+        // - nextCaseBlock -> caseMergeBlock (fallthrough also goes to merge)
+        Dictionary<IRBlock*, IRBlock*> redirections;
+        redirections[breakLabel] = caseMergeBlock;
+        if (nextCaseBlock)
+        {
+            redirections[nextCaseBlock] = caseMergeBlock;
+        }
+
+        // Clone with block mapping so we can find cloned versions
+        IRCloneEnv cloneEnv;
+        for (const auto& [oldBlock, newBlock] : redirections)
+        {
+            cloneEnv.mapOldValToNew[oldBlock] = newBlock;
+        }
+
+        Dictionary<IRBlock*, IRBlock*> oldToNew;
+        for (auto block : bodyBlocks)
+        {
+            if (redirections.containsKey(block))
+                continue;
+
+            auto clonedBlock = builder->createBlock();
+            clonedBlock->insertBefore(caseMergeBlock);
+            cloneEnv.mapOldValToNew[block] = clonedBlock;
+            oldToNew[block] = clonedBlock;
+        }
+
+        // Clone instructions
+        for (auto block : bodyBlocks)
+        {
+            if (redirections.containsKey(block))
+                continue;
+
+            auto clonedBlock = oldToNew[block];
+            builder->setInsertInto(clonedBlock);
+
+            for (auto inst : block->getChildren())
+            {
+                cloneInst(&cloneEnv, builder, inst);
+            }
+        }
+
+        // Now inject stage=MAX_INT stores into cloned blocks that had breaks.
+        // The store must be inserted BEFORE the terminal branch instruction.
+        for (auto origBlock : blocksWithBreak)
+        {
+            IRBlock* clonedBlock = nullptr;
+            if (!oldToNew.tryGetValue(origBlock, clonedBlock))
+                continue;
+
+            auto terminator = clonedBlock->getTerminator();
+            if (!terminator)
+                continue;
+
+            // Insert store before the terminator
+            builder->setInsertBefore(terminator);
+            builder->emitStore(fallthroughStageVar, maxStageValue);
+        }
+
+        // Return the cloned entry block
+        IRBlock* clonedEntry = nullptr;
+        if (!oldToNew.tryGetValue(entryBlock, clonedEntry))
+        {
+            redirections.tryGetValue(entryBlock, clonedEntry);
+        }
+        return clonedEntry;
     }
 
     /// Perform the transformation.
