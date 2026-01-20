@@ -156,7 +156,7 @@ In `slang-emit.cpp`, the pass runs:
 
 - `source/slang/slang-ir-lower-switch-to-reconverged-switches.h` - Header
 - `source/slang/slang-ir-lower-switch-to-reconverged-switches.cpp` - Implementation
-- `tests/language-feature/switch-fallthrough/switch-to-if/` - Tests
+- `tests/language-feature/switch-fallthrough/reconvergence/` - Tests
 
 ## Historical Note
 
