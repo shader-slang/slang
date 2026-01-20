@@ -3700,6 +3700,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
                     funcDebugScope);
+
+                // For the first block only, emit a DebugLine immediately after DebugScope.
+                // This is required for debuggers like RenderDoc to be able to step into
+                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
+                // appears between DebugScope and the first DebugLine, preventing the
+                // debugger from mapping the function entry point to source code.
+                if (irBlock == irFunc->getFirstBlock())
+                {
+                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                    {
+                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
+                        {
+                            emitOpDebugLine(
+                                spvBlock,
+                                nullptr,
+                                m_voidType,
+                                getNonSemanticDebugInfoExtInst(),
+                                irDebugFunc->getFile(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getCol(),
+                                irDebugFunc->getCol());
+                        }
+                    }
+                }
             }
             // In addition to normal basic blocks,
             // all loops gets a header block.
