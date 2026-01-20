@@ -2279,9 +2279,102 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Check if a semantic name is a depth-related system value that requires scalar type in SPIR-V.
+    bool isDepthSystemValue(const String& semanticName)
+    {
+        return semanticName == "sv_depth" ||
+               semanticName == "sv_depthgreaterequal" ||
+               semanticName == "sv_depthlessequal";
+    }
+
+    // Unwrap single-element array types from depth-related system values.
+    // SPIR-V requires FragDepth to be a scalar float, but Conditional<float, true> expands to float[1].
+    // This pass transforms the IR so that the pointer type points directly to the element type,
+    // and fixes up all stores to extract the scalar from the array.
+    void legalizeDepthOutputTypes()
+    {
+        IRBuilder builder(m_module);
+
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto globalParam = as<IRGlobalParam>(globalInst);
+            if (!globalParam)
+                continue;
+
+            // Check if this is a depth-related system value
+            auto varLayout = findVarLayout(globalParam);
+            if (!varLayout)
+                continue;
+
+            auto systemValueAttr = varLayout->findAttr<IRSystemValueSemanticAttr>();
+            if (!systemValueAttr)
+                continue;
+
+            String semanticName = systemValueAttr->getName();
+            semanticName = semanticName.toLower();
+
+            if (!isDepthSystemValue(semanticName))
+                continue;
+
+            // Check if the type is a pointer to a single-element array
+            auto ptrType = as<IRPtrTypeBase>(globalParam->getDataType());
+            if (!ptrType)
+                continue;
+
+            auto arrayType = as<IRArrayType>(ptrType->getValueType());
+            if (!arrayType)
+                continue;
+
+            auto elementCount = as<IRIntLit>(arrayType->getElementCount());
+            if (!elementCount || elementCount->getValue() != 1)
+                continue;
+
+            // Found a depth output with single-element array type.
+            // Change the pointer type to point to the element type directly.
+            auto elementType = arrayType->getElementType();
+            builder.setInsertBefore(globalParam);
+            auto newPtrType = builder.getPtrType(ptrType->getOp(), elementType, ptrType->getAddressSpace());
+            globalParam->setFullType(newPtrType);
+
+            // Fix up all uses. For stores, we need to extract the scalar from the array value.
+            // (Loads are not expected for FragDepth as it's output-only, but handle for safety.)
+            traverseUses(globalParam, [&](IRUse* use)
+            {
+                auto user = use->getUser();
+
+                if (auto storeInst = as<IRStore>(user))
+                {
+                    // The value being stored is a single-element array.
+                    // Extract element 0 before storing.
+                    auto storedVal = storeInst->getVal();
+                    if (as<IRArrayType>(storedVal->getDataType()))
+                    {
+                        builder.setInsertBefore(storeInst);
+                        auto extractedVal = builder.emitElementExtract(elementType, storedVal, builder.getIntValue(builder.getIntType(), 0));
+                        storeInst->val.set(extractedVal);
+                    }
+                }
+                else if (auto loadInst = as<IRLoad>(user))
+                {
+                    // If someone loads from FragDepth (unusual), we need to wrap the scalar into an array.
+                    builder.setInsertAfter(loadInst);
+                    IRInst* loadInstAsArg = loadInst;
+                    auto wrappedVal = builder.emitMakeArray(arrayType, 1, &loadInstAsArg);
+                    loadInst->replaceUsesWith(wrappedVal);
+                    // The wrappedVal now uses loadInst, so we need to make sure loadInst itself isn't replaced
+                    wrappedVal->setOperand(0, loadInst);
+                }
+            });
+        }
+    }
+
     void processModule()
     {
         determineSpirvVersion();
+
+        // Legalize depth output types before other processing.
+        // This unwraps single-element arrays from SV_Depth system values.
+        legalizeDepthOutputTypes();
 
         // Process global params before anything else, so we don't generate inefficient
         // array marhalling code for array-typed global params.
