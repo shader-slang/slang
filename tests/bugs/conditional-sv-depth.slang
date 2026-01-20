@@ -1,6 +1,6 @@
 // conditional-sv-depth.slang
 // Test that Conditional<float, true> works correctly with SV_Depth semantic.
-// https://github.com/shader-slang/slang/issues/XXXX
+// https://github.com/shader-slang/slang/issues/9578
 // 
 // When using Conditional<T, true> which internally becomes T[1],
 // the SPIR-V emitter should correctly unwrap the single-element array
@@ -10,7 +10,7 @@
 // 1. gl_FragDepth is declared as a scalar float pointer, not an array
 // 2. The generated SPIR-V passes spirv-val validation
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -stage fragment -entry ps_main -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry ps_main -emit-spirv-directly
 
 // CHECK: %_ptr_Output_float = OpTypePointer Output %float
 // CHECK: %gl_FragDepth = OpVariable %_ptr_Output_float Output
