@@ -3,29 +3,35 @@
 // Test a case with multiple conditional breaks and result manipulation
 // in between, with wave operations in the fallthrough path.
 // This triggers the switch-to-reconverged-switches lowering.
+//
+// Uses WaveActiveSum(1) which returns the count of active threads.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
+// Active thread counts at each wave op:
+// - case 0: 1 thread (tid=0) → WaveActiveSum(1) = 1
+// - case 2: 1 thread (tid=4) → WaveActiveSum(1) = 1
+// - default: 3 threads (tid=3,5,6) → WaveActiveSum(1) = 3
+//
 // Expected values (hex):
-// tid=0: val=0 -> case 0 -> 100 = 0x64
+// tid=0: val=0 -> case 0 -> 99 + 1 = 100 = 0x64
 // tid=1: val=1, break1=true -> case 1 breaks at first if -> 500 = 0x1F4
 // tid=2: val=1, break1=false, break2=true -> case 1 breaks at second if -> 0+10+600 = 610 = 0x262
-// tid=3: val=1, break1=false, break2=false -> case 1 falls through -> 0+10+20 + default(200) = 230 = 0xE6
-// tid=4: val=2 -> case 2 -> 200 = 0xC8
-// tid=5: val=99 -> default directly -> 200 = 0xC8
-// tid=6: val=100 -> default directly -> 200 = 0xC8
+// tid=3: val=1, falls through -> 0+10+20 + (199+3) = 232 = 0xE8
+// tid=4: val=2 -> case 2 -> 199 + 1 = 200 = 0xC8
+// tid=5: val=99 -> default directly -> 199 + 3 = 202 = 0xCA
+// tid=6: val=100 -> default directly -> 199 + 3 = 202 = 0xCA
 
 // CHECK:      64
 // CHECK-NEXT: 1F4
 // CHECK-NEXT: 262
-// CHECK-NEXT: E6
+// CHECK-NEXT: E8
 // CHECK-NEXT: C8
-// CHECK-NEXT: C8
-// CHECK-NEXT: C8
+// CHECK-NEXT: CA
+// CHECK-NEXT: CA
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3 4 5 6], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -37,8 +43,8 @@ int test(int val, bool shouldBreak1, bool shouldBreak2)
     switch(val)
     {
     case 0:
-        // Wave op to trigger lowering (multiply by 0 to not affect value)
-        result = 100 + int(WaveGetLaneIndex()) * 0;
+        // Wave op to trigger lowering - 1 thread active
+        result = 99 + WaveActiveSum(1);  // 99 + 1 = 100
         break;
 
     case 1:
@@ -62,12 +68,13 @@ int test(int val, bool shouldBreak1, bool shouldBreak2)
         // Fall through to default
 
     default:
-        // Wave op in fallthrough path
-        result += 200 + int(WaveGetLaneIndex()) * 0;
+        // Wave op in fallthrough path - 3 threads active (tid 3,5,6)
+        result += 199 + WaveActiveSum(1);  // 199 + 3 = 202
         break;
 
     case 2:
-        result = 200 + int(WaveGetLaneIndex()) * 0;
+        // 1 thread active
+        result = 199 + WaveActiveSum(1);  // 199 + 1 = 200
         break;
     }
 

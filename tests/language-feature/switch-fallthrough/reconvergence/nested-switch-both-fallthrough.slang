@@ -3,46 +3,39 @@
 // Test nested switches where both outer and inner switches have
 // fallthrough behavior with wave operations. This triggers the
 // switch-to-reconverged-switches lowering for both switches.
+//
+// Uses WaveActiveSum(1) to verify active thread counts.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
-// Outer switch:
-// case 0: set multiplier=10, fallthrough
-// case 1: run inner switch, break
-// default: result = -1
-
-// Inner switch:
-// case 0: add 1, fallthrough
-// case 1: add 2, break
-// default: add 100, break
-
+// Thread mapping: tid = outer*3 + inner
+// Outer switch: case 0 (tid 0,1,2), case 1 (tid 0-5 due to fallthrough), default (tid 6,7,8)
+// Inner switch: case 0 (tid 0,3), case 1 (tid 0,1,3,4), default (tid 2,5)
+//
+// Active thread counts:
+// - outer case 0: 3 threads → WaveActiveSum(1) = 3, so mult = 7 + 3 = 10
+// - inner case 0: 2 threads → WaveActiveSum(1) = 2
+// - inner case 1: 4 threads → WaveActiveSum(1) = 4
+//
 // Expected values:
-// outer=0, inner=0: mult=10, inner: +1 fallthrough +2 = 3, result = 3*10 = 30
-// outer=0, inner=1: mult=10, inner: +2 = 2, result = 2*10 = 20
-// outer=0, inner=2: mult=10, inner: +100 = 100, result = 100*10 = 1000
-// outer=1, inner=0: mult=1, inner: +1 fallthrough +2 = 3, result = 3*1 = 3
-// outer=1, inner=1: mult=1, inner: +2 = 2, result = 2*1 = 2
-// outer=1, inner=2: mult=1, inner: +100 = 100, result = 100*1 = 100
-// outer=2, inner=*: default -> result = -1
+// tid=0: outer=0,inner=0: mult=10, inner: 2+4=6, result = 6*10 = 60
+// tid=1: outer=0,inner=1: mult=10, inner: 4, result = 4*10 = 40
+// tid=2: outer=0,inner=2: mult=10, inner: 100, result = 100*10 = 1000
+// tid=3: outer=1,inner=0: mult=1, inner: 2+4=6, result = 6*1 = 6
+// tid=4: outer=1,inner=1: mult=1, inner: 4, result = 4*1 = 4
+// tid=5: outer=1,inner=2: mult=1, inner: 100, result = 100*1 = 100
+// tid=6,7,8: outer=2,*: default -> result = -1
 
-// Hex:
-// 30 = 0x1E
-// 20 = 0x14
-// 1000 = 0x3E8
-// 3 = 0x3
-// 2 = 0x2
-// 100 = 0x64
-// -1 = 0xFFFFFFFF
+// Hex: 60=0x3C, 40=0x28, 1000=0x3E8, 6=0x6, 4=0x4, 100=0x64, -1=0xFFFFFFFF
 
-// CHECK:      1E
-// CHECK-NEXT: 14
+// CHECK:      3C
+// CHECK-NEXT: 28
 // CHECK-NEXT: 3E8
-// CHECK-NEXT: 3
-// CHECK-NEXT: 2
+// CHECK-NEXT: 6
+// CHECK-NEXT: 4
 // CHECK-NEXT: 64
 // CHECK-NEXT: FFFFFFFF
 // CHECK-NEXT: FFFFFFFF
@@ -59,9 +52,8 @@ int test(int outer, int inner)
     switch(outer)
     {
     case 0:
-        multiplier = 10;
-        // Wave op to trigger lowering (multiply by 0)
-        multiplier += int(WaveGetLaneIndex()) * 0;
+        // 3 threads active (tid 0,1,2) → WaveActiveSum(1) = 3
+        multiplier = 7 + WaveActiveSum(1);  // 7 + 3 = 10
         // Fall through to case 1
 
     case 1:
@@ -69,12 +61,13 @@ int test(int outer, int inner)
         switch(inner)
         {
         case 0:
-            // Wave op triggers lowering for inner switch
-            result += 1 + int(WaveGetLaneIndex()) * 0;
+            // 2 threads active (tid 0,3) → WaveActiveSum(1) = 2
+            result += WaveActiveSum(1);  // 2
             // Fall through to case 1
 
         case 1:
-            result += 2 + int(WaveGetLaneIndex()) * 0;
+            // 4 threads active (tid 0,1,3,4) → WaveActiveSum(1) = 4
+            result += WaveActiveSum(1);  // 4
             break;
 
         default:

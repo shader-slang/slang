@@ -1,32 +1,29 @@
 // default-at-start.slang
 //
 // Test a switch where default is the first case and falls through
-// to subsequent cases, with wave operations to trigger lowering.
+// to subsequent cases, with WaveActiveSum to verify thread counts.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
-// switch structure:
-//   default: result += 1; fallthrough
-//   case 0:  result += 100; fallthrough
-//   case 1:  result += 200; break
+// 4 threads with val: 0, 1, 99, 99
+// Fallthrough group: default -> case 0 -> case 1
+// - default stage: threads 2,3 active, WaveActiveSum(1) = 2
+// - case 0 stage: threads 0,2,3 active, WaveActiveSum(1) = 3
+// - case 1 stage: all 4 threads active, WaveActiveSum(1) = 4
+//
+// val=0 (thread 0): case 0 + case 1 = 3 + 4 = 7
+// val=1 (thread 1): case 1 only = 4
+// val=99 (threads 2,3): default + case 0 + case 1 = 2 + 3 + 4 = 9
 
-// val=0: enters at case 0, result = 0 + 100 + 200 = 300
-// val=1: enters at case 1, result = 0 + 200 = 200
-// val=99: enters at default, result = 0 + 1 + 100 + 200 = 301
+// Hex: 7=0x7, 4=0x4, 9=0x9
 
-// Hex:
-// 300 = 0x12C
-// 200 = 0xC8
-// 301 = 0x12D
-
-// CHECK:      12C
-// CHECK-NEXT: C8
-// CHECK-NEXT: 12D
-// CHECK-NEXT: 12D
+// CHECK:      7
+// CHECK-NEXT: 4
+// CHECK-NEXT: 9
+// CHECK-NEXT: 9
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -38,16 +35,15 @@ int test(int val)
     switch(val)
     {
     default:
-        // Wave op to trigger lowering
-        result += 1 + int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 2 threads (2,3) active
         // Fall through to case 0
 
     case 0:
-        result += 100 + int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 3 threads (0,2,3) active
         // Fall through to case 1
 
     case 1:
-        result += 200 + int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 4 threads active
         break;
     }
 

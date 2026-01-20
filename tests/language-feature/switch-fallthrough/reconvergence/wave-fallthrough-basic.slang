@@ -12,8 +12,14 @@
 // are correctly reconverged.
 
 // CPU doesn't support wave ops
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -capability cuda_sm_7_0
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -compute -capability cuda_sm_7_0
+
+// All threads output 84 = 0x54
+// CHECK:      54
+// CHECK-NEXT: 54
+// CHECK-NEXT: 54
+// CHECK-NEXT: 54
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -52,6 +58,3 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 }
 
 // Expected: All 4 threads output 84 (0x54)
-// But we can't use filecheck with COMPARE_COMPUTE_EX easily...
-// This test primarily validates that the code compiles and runs without
-// crashing or producing undefined behavior.

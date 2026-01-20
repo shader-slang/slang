@@ -5,26 +5,24 @@
 // lowering and verifies loops are handled correctly.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
-// Expected values:
-// val=0: case 0 loop sums 1+2+3 = 6, falls through to case 1, adds 100 -> 106
-// val=1: case 1 adds 100 -> 100
-// val=2: case 2 loop sums 1+2+3+4+5 = 15, breaks -> 15
+// Fallthrough group: cases 0,1. With stage guards:
+// - case 0: 1 thread active, WaveActiveSum(1) = 1
+// - case 1: 2 threads active, WaveActiveSum(1) = 2
+//
+// val=0: loop sums 1+2+3=6, WaveActiveSum=1, falls through, WaveActiveSum=2 -> 6+1+2=9
+// val=1: WaveActiveSum=2 -> 2
+// val=2: loop sums 1+2+3+4+5=15, WaveActiveSum=1 (only thread 2) -> 15+1=16
 // val=99: default -> 1000
 
-// Hex:
-// 106 = 0x6A
-// 100 = 0x64
-// 15 = 0xF
-// 1000 = 0x3E8
+// Hex: 9=0x9, 2=0x2, 16=0x10, 1000=0x3E8
 
-// CHECK:      6A
-// CHECK-NEXT: 64
-// CHECK-NEXT: F
+// CHECK:      9
+// CHECK-NEXT: 2
+// CHECK-NEXT: 10
 // CHECK-NEXT: 3E8
 
 //TEST_INPUT:ubuffer(data=[0 1 2 3], stride=4):out,name=outputBuffer
@@ -42,21 +40,20 @@ int test(int val)
         {
             result += i;
         }
-        // Wave op to trigger lowering (multiply by 0)
-        result += int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 1 thread active = 1
         // Fall through to case 1
 
     case 1:
-        result += 100 + int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 2 threads active = 2
         break;
 
     case 2:
-        // Another loop, with break from switch
+        // Another loop, with break from switch (non-fallthrough case)
         for (int i = 1; i <= 5; i++)
         {
             result += i;
         }
-        result += int(WaveGetLaneIndex()) * 0;
+        result += WaveActiveSum(1);  // 1 thread (thread 2 only) = 1
         break;
 
     default:

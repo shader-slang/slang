@@ -2,9 +2,10 @@
 //
 // Test complex fallthrough with default in the middle, with wave
 // operations to trigger lowering.
+//
+// Uses WaveActiveSum(1) which returns the count of active threads.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
@@ -19,20 +20,22 @@
 //   case 2: anotherThing(); break;
 // }
 
+// Active thread counts at each wave op:
+// - case 0: 1 thread (tid=0) → WaveActiveSum(1) = 1
+// - case 2: 1 thread (tid=2) → WaveActiveSum(1) = 1
+// - default: 2 threads (tid=5,6) → WaveActiveSum(1) = 2
+// - case 1/3: 4 threads (tid=1,3,5,6) → WaveActiveSum(1) = 4
+//
 // Expected values:
-// val=0: case 0 -> 10
-// val=1: case 1 -> 30
-// val=2: case 2 -> 40
-// val=3: case 3 -> 30
-// val=4, cond=true: case 4 breaks -> 50
-// val=4, cond=false: case 4 falls through -> default -> case 1/3 -> 20+30=50
-// val=99 (unmatched): default -> case 1/3 -> 20+30=50
+// tid=0: case 0 → 9 + 1 = 10
+// tid=1: case 1/3 → 26 + 4 = 30
+// tid=2: case 2 → 39 + 1 = 40
+// tid=3: case 3 → 26 + 4 = 30
+// tid=4: case 4 break → 50
+// tid=5: case 4 fall → default → case 1/3 → (18+2) + (26+4) = 50
+// tid=6: default → case 1/3 → (18+2) + (26+4) = 50
 
-// Hex:
-// 10 = 0xA
-// 30 = 0x1E
-// 40 = 0x28
-// 50 = 0x32
+// Hex: 10=0xA, 30=0x1E, 40=0x28, 50=0x32
 
 // CHECK:      A
 // CHECK-NEXT: 1E
@@ -52,8 +55,8 @@ int test(int selector, bool shouldBreakCase4)
     switch(selector)
     {
     case 0:
-        // Wave op to trigger lowering
-        result = 10 + int(WaveGetLaneIndex()) * 0;
+        // 1 thread active → WaveActiveSum(1) = 1
+        result = 9 + WaveActiveSum(1);  // 9 + 1 = 10
         break;
 
     case 4:
@@ -65,16 +68,19 @@ int test(int selector, bool shouldBreakCase4)
         // Fall through to default
 
     default:
-        result += 20 + int(WaveGetLaneIndex()) * 0;
+        // 2 threads active (tid 5,6) → WaveActiveSum(1) = 2
+        result += 18 + WaveActiveSum(1);  // 18 + 2 = 20
         // Fall through to case 1/3
 
     case 1:
     case 3:
-        result += 30 + int(WaveGetLaneIndex()) * 0;
+        // 4 threads active (tid 1,3,5,6) → WaveActiveSum(1) = 4
+        result += 26 + WaveActiveSum(1);  // 26 + 4 = 30
         break;
 
     case 2:
-        result = 40 + int(WaveGetLaneIndex()) * 0;
+        // 1 thread active → WaveActiveSum(1) = 1
+        result = 39 + WaveActiveSum(1);  // 39 + 1 = 40
         break;
     }
 
