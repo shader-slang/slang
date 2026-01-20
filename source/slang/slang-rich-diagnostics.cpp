@@ -148,11 +148,31 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     // Set secondary spans
 %         for _, span in ipairs(diagnostic.secondary_spans) do
 %             if span.variadic then
-%                 local item_var = span.location_name .. "_item"
-%                 local var_map = {[span.location_name] = item_var}
-    for (auto $(item_var) : $(span.location_name)) {
+%                 -- Find all variadic parameters used in this span's message
+%                 local var_map = {}
+%                 local loop_vars = {}
+%                 -- Add the location
+%                 local loc_item_var = span.location_name .. "_item"
+%                 var_map[span.location_name] = loc_item_var
+%                 table.insert(loop_vars, {var = loc_item_var, list = span.location_name})
+%                 -- Add variadic parameters
+%                 for _, part in ipairs(span.message_parts) do
+%                     if part.type == "interpolation" and not part.member_name then
+%                         for _, param in ipairs(diagnostic.params) do
+%                             if param.name == part.param_name and param.variadic then
+%                                 local item_var = param.name .. "_item"
+%                                 var_map[param.name] = item_var
+%                                 table.insert(loop_vars, {var = item_var, list = param.name})
+%                             end
+%                         end
+%                     end
+%                 end
+    for (Index i = 0; i < $(loop_vars[1].list).getCount(); i++) {
+%                 for _, lv in ipairs(loop_vars) do
+        auto $(lv.var) = $(lv.list)[i];
+%                 end
         DiagnosticSpan span;
-        span.range = SourceRange{$(lua_module.getLocationExpr(item_var, span.location_type))};
+        span.range = SourceRange{$(lua_module.getLocationExpr(loc_item_var, span.location_type))};
         span.message = $(buildMessage(span.message_parts, var_map));
         result.secondarySpans.add(span);
     }
@@ -171,11 +191,31 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     // Set notes
 %         for _, note in ipairs(diagnostic.notes) do
 %             if note.variadic then
-%                 local item_var = note.location_name .. "_item"
-%                 local var_map = {[note.location_name] = item_var}
-    for (auto $(item_var) : $(note.location_name)) {
+%                 -- Find all variadic parameters used in this note's message
+%                 local var_map = {}
+%                 local loop_vars = {}
+%                 -- Add the location
+%                 local loc_item_var = note.location_name .. "_item"
+%                 var_map[note.location_name] = loc_item_var
+%                 table.insert(loop_vars, {var = loc_item_var, list = note.location_name})
+%                 -- Add variadic parameters
+%                 for _, part in ipairs(note.message_parts) do
+%                     if part.type == "interpolation" and not part.member_name then
+%                         for _, param in ipairs(diagnostic.params) do
+%                             if param.name == part.param_name and param.variadic then
+%                                 local item_var = param.name .. "_item"
+%                                 var_map[param.name] = item_var
+%                                 table.insert(loop_vars, {var = item_var, list = param.name})
+%                             end
+%                         end
+%                     end
+%                 end
+    for (Index i = 0; i < $(loop_vars[1].list).getCount(); i++) {
+%                 for _, lv in ipairs(loop_vars) do
+        auto $(lv.var) = $(lv.list)[i];
+%                 end
         DiagnosticNote note;
-        note.span.range = SourceRange{$(lua_module.getLocationExpr(item_var, note.location_type))};
+        note.span.range = SourceRange{$(lua_module.getLocationExpr(loc_item_var, note.location_type))};
         note.message = $(buildMessage(note.message_parts, var_map));
         result.notes.add(note);
     }

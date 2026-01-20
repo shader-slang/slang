@@ -115,7 +115,7 @@ err(
   39999,
   "ambiguous call to '~name' with arguments of type ~args",
   span("expr:Expr", "in call expression"),
-  note("candidates:Decl", "candidate: ~candidates", true)
+  note("candidate:Decl", "candidate: ~candidate_signature", true)
 )
 
 -- Process and validate all diagnostics

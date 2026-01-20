@@ -2987,7 +2987,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     // Only include visible candidates (skip invisible ones for now)
                     if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
                     {
-                        diagnostic.candidates.add(candidate.item.declRef.getDecl());
+                        String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                        diagnostic.candidate.add(candidate.item.declRef.getDecl());
+                        diagnostic.candidate_signature.add(declString);
                     }
 
                     candidateIndex++;

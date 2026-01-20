@@ -366,10 +366,11 @@ local function process_diagnostics(diagnostics_table)
         end
 
         -- Extract params for the global diagnostic param list (automatically deduplicated)
+        -- If this container is variadic, mark parameters as variadic too
         for _, part in ipairs(parts) do
           if part.type == "interpolation" and not part.member_name then
             if not seen_params[part.param_name] then
-              table.insert(params, { name = part.param_name, type = part.param_type })
+              table.insert(params, { name = part.param_name, type = part.param_type, variadic = container.variadic or false })
               seen_params[part.param_name] = part.param_type
             elseif seen_params[part.param_name] ~= part.param_type then
               table.insert(
@@ -387,7 +388,7 @@ local function process_diagnostics(diagnostics_table)
           elseif part.type == "interpolation" and part.member_name then
             -- Member access: register the base parameter if not already known
             if not seen_params[part.param_name] then
-              table.insert(params, { name = part.param_name, type = part.param_type })
+              table.insert(params, { name = part.param_name, type = part.param_type, variadic = container.variadic or false })
               seen_params[part.param_name] = part.param_type
             elseif seen_params[part.param_name] ~= part.param_type then
               table.insert(

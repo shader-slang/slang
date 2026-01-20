@@ -31,8 +31,12 @@ struct $(class_name)
 {
 %     for _, param in ipairs(diagnostic.params) do
 %         local type = lua_module.getCppType(param.type)
-%         local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+%         if param.variadic then
+    List<$(type)> $(param.name) = {};
+%         else
+%             local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
     $(type) $(param.name) = $(initializer);
+%         end
 %     end
 
 %     for _, loc in ipairs(diagnostic.locations) do
