@@ -97,9 +97,9 @@ err(
 err(
   "function redefinition",
   30201,
-  "function ~function already has a body",
+  "function '~function' already has a body",
   span("function:Decl", "redeclared here"),
-  note("original:Decl", "see previous definition of ~function")
+  note("original:Decl", "see previous definition of '~function'")
 )
 
 err(
