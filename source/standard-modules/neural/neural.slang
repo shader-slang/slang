@@ -40,3 +40,4 @@ __include "buffer-storage";
 __include "accelerate-vector-coopmat";
 __include "vectorized-reader";
 __include "shared-memory-pool";
+__include "hash-function";
