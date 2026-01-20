@@ -1856,12 +1856,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (debugLevel == DebugInfoLevel::Minimal)
                 {
                     // For minimal (g1), just emit OpString with the filename for use with OpLine
+                    auto fileNameLit = as<IRStringLit>(debugSource->getFileName());
                     *emittedSpvInst = emitInst(
                         getSection(SpvLogicalSectionID::DebugStringsAndSource),
                         inst,
                         SpvOpString,
                         kResultID,
-                        debugSource->getFileName());
+                        SpvLiteralBits::fromUnownedStringSlice(fileNameLit->getStringSlice()));
                     return true;
                 }
 
