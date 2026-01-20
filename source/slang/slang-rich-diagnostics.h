@@ -47,7 +47,7 @@ struct $(class_name)
 %         end
 %     end
 
-%     -- Nested structs for variadic spans/notes (AoS pattern)
+%     -- Nested structs for variadic spans/notes
 %     if diagnostic.variadic_structs then
 %         for _, vs in ipairs(diagnostic.variadic_structs) do
     struct $(vs.struct_name)
