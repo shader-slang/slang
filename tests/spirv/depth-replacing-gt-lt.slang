@@ -4,13 +4,13 @@
 // CHECK: OpExecutionMode %FS_WriteDepthLt DepthLess
 
 [shader("fragment")]
-void FS_WriteDepthGt(out float depth: SV_DepthGreaterEqual)
+void FS_WriteDepthGt(float a, out float depth: SV_DepthGreaterEqual)
 {
-    depth = 0.5;
+    depth = a;
 }
 
 [shader("fragment")]
-void FS_WriteDepthLt(out float depth: SV_DepthLessEqual)
+void FS_WriteDepthLt(float a, out float depth: SV_DepthLessEqual)
 {
-    depth = 0.5;
+    depth = a;
 }

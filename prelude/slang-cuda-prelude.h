@@ -4407,6 +4407,13 @@ static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTra
 }
 #endif
 
+#if (OPTIX_VERSION >= 80000)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTime(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTime();
+}
+#endif
+
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ uint
 slangOptixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
@@ -4468,11 +4475,46 @@ slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ uint
-slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
+    OptixTraversableHandle* Obj,
+    uint sbtRecordIndex)
 {
-    optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return sbtRecordIndex;
+    optixHitObjectSetSbtRecordIndex(sbtRecordIndex);
+}
+#endif
+
+// HitObject transform matrix wrappers for SER (Shader Execution Reordering)
+// These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
+// Available in RG, CH, MS, CC, DC stages per OptiX documentation
+// Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
+// were added in OptiX 9.0 (not available in 8.0 or 8.1)
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetWorldToObject(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetWorldToObjectTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetObjectToWorld(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetObjectToWorldTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
 }
 #endif
 
@@ -5910,7 +5952,9 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            return *reinterpret_cast<const T*>(&regs[index]);
+            T v;
+            memcpy(&v, &regs[index], 4);
+            return v;
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5921,7 +5965,9 @@ struct WmmaFragment
             int bitOffset = elementOffset * 16;
             uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFFFF;
             uint16_t value16 = static_cast<uint16_t>(extracted);
-            return *reinterpret_cast<const T*>(&value16);
+            T v;
+            memcpy(&v, &value16, 2);
+            return v;
         }
         else if constexpr (sizeof(T) == 1)
         {
@@ -5942,7 +5988,7 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            regs[index] = *reinterpret_cast<const uint32_t*>(&value);
+            memcpy(&regs[index], &value, 4);
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5951,7 +5997,8 @@ struct WmmaFragment
             int elementOffset = index % 2;
             int bitOffset = elementOffset * 16;
             uint32_t mask = 0xFFFF;
-            uint16_t value16 = *reinterpret_cast<const uint16_t*>(&value);
+            uint16_t value16;
+            memcpy(&value16, &value, 2);
 
             // Clear the bits at the target position
             regs[regIndex] &= ~(mask << bitOffset);
@@ -6007,7 +6054,7 @@ struct WmmaFragment
 
     // Maximum registers needed across all fragment types and data types
     static constexpr int MAX_REGS = 8;
-    unsigned regs[MAX_REGS] = {};
+    uint32_t regs[MAX_REGS] = {};
 
     static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
                                                   : (R == MatrixUse::MatrixB) ? (K * N)

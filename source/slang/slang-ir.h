@@ -32,6 +32,7 @@ class Layout;
 class Type;
 class Session;
 class Name;
+class TargetRequest;
 struct IRBuilder;
 struct IRFunc;
 struct IRGlobalValueWithCode;
@@ -1002,7 +1003,11 @@ struct IntInfo
     bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
 };
 
-IntInfo getIntTypeInfo(const IRType* intType);
+// The size of some integer types (IntPtr & UIntPtr) depend on the target.
+Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType);
+std::optional<Int> maybeGetIntTypeWidth(IRType* intType);
+bool getIntTypeSigned(IRType* intType);
+IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType);
 
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);
@@ -1055,6 +1060,7 @@ struct IRConstant : IRInst
     union ValueUnion
     {
         IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRUnsignedIntegerValue uintVal;
         IRFloatingPointValue floatVal;
         void* ptrVal;
 

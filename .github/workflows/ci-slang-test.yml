@@ -214,10 +214,31 @@ jobs:
           echo "Site packages directory: $SITE_PACKAGES"
           echo "bin_dir location: $bin_dir"
           echo "lib_dir location: $lib_dir"
+
+          #
+          # THIS IS A HUGE HACK, the latest slangpy release hardcoded this
+          # directory when looking for slangc. We should remove the offending
+          # code from slangpy and just put slangc into PATH here. The offending
+          # code is find_slangc() in
+          # slangpy/tests/device/test_precompiled_modules.py
+          #
+          # See https://github.com/shader-slang/slangpy/issues/696
+          #
+          SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
+          mkdir -p "$SLANGC_TARGET_DIR"
+          # Copy slangc binary to the expected location
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
+          else
+              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+              chmod +x "$SLANGC_TARGET_DIR/slangc"
+          fi
+
           # Copy library files
           if [[ "${{ inputs.os }}" == "windows" ]]; then
-            cp "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+            cp -v "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
           else
+
             # This is kind of awkward because the version numbers might be
             # different between the old libslang-compiler and the new one, so
             # we need to make sure we overwrite the old one. This logic also
@@ -293,7 +314,8 @@ jobs:
 
       - name: Run slangpy-samples tests
         # Skip on macOS debug due to intermittent failures in test_toy_restir
+        # Skip test_check_urls because URL checking is not required for slang CI
         if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Running slangpy-samples tests..."
-          python -m pytest -n 4 slangpy-samples/tests
+          python -m pytest -n 4 slangpy-samples/tests -k "not test_check_urls"

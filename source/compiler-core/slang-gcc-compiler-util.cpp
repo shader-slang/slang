@@ -565,9 +565,29 @@ static SlangResult _parseGCCFamilyLine(
         break;
     }
 
-    if (options.debugInfoType != DebugInfoType::None)
+    switch (options.debugInfoType)
     {
-        cmdLine.addArg("-g");
+    case DebugInfoType::None:
+        // gcc accepts -g0, but it is effectively the same as not passing -g at all.
+        //  No debug info is generated.
+        cmdLine.addArg("-g0");
+        break;
+
+    case DebugInfoType::Minimal:
+        // Minimal: Line numbers only for stack traces
+        // Use -g1 for minimal debug info or -gline-tables-only if available
+        cmdLine.addArg("-g1");
+        break;
+
+    case DebugInfoType::Standard:
+        // Standard: Full debug information (GCC default level)
+        cmdLine.addArg("-g2");
+        break;
+
+    case DebugInfoType::Maximal:
+        // Maximal: Maximum debug information including macro definitions
+        cmdLine.addArg("-g3");
+        break;
     }
 
     if (options.flags & CompileOptions::Flag::Verbose)

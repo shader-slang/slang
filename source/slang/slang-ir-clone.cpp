@@ -128,13 +128,13 @@ static void getSpecializedLinkageName(StringBuilder& strBuilder, IRSpecialize* s
         auto arg = specInst->getArg(i);
         if (auto typeLinkage = arg->findDecoration<IRLinkageDecoration>())
         {
-            digestBuilder.append(typeLinkage->getMangledName().begin());
+            digestBuilder.append(typeLinkage->getMangledName());
         }
         else
         {
             StringBuilder typeNameHint;
             getTypeNameHint(typeNameHint, arg);
-            digestBuilder.append(typeNameHint.getUnownedSlice().begin());
+            digestBuilder.append(typeNameHint.getUnownedSlice());
         }
     }
 

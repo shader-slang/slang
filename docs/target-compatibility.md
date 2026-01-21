@@ -44,6 +44,7 @@ Items with ^ means there is some discussion about support later in the document 
 | [Shader Execution Reordering](#ser)                  | No    | Yes ^     | Yes ^   | No             | No    | No        |
 | [debugBreak](#debug-break)                           | No    | No        | Yes     | Yes            | No    | Yes       |
 | [realtime clock](#realtime-clock)                    | No    | Yes ^     | Yes     | Yes            | No    | No        |
+| [Switch Fall-Through](#switch-fallthrough)           | No ^  | Yes       | Yes     | Yes            | Yes   | Yes       |
 
 <a id="half"></a>
 
@@ -328,3 +329,32 @@ On Vulkan this is supported via [VK_KHR_shader_clock extension](https://registry
 On CUDA this is supported via [clock](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#time-function).
 
 Currently this is not supported on CPU, although this will potentially be added in the future.
+
+<a id="switch-fallthrough"></a>
+
+## Switch Fall-Through
+
+Switch fall-through allows code in one case to execute and then continue into the next case without a `break`:
+
+```hlsl
+switch(value)
+{
+case 0:
+    x = 10;
+    // Fall through to case 1
+case 1:
+    result = x + value;
+    break;
+}
+```
+
+This is natively supported on most targets. However, D3D11 (FXC/DXBC) and WGSL do not support fall-through in their switch statements.
+
+For these targets, Slang restructures the code by duplicating the fall-through destination into each source case. This produces functionally correct results, but has implications:
+
+- **Code size**: The generated code may be larger due to duplication.
+- **Wave convergence**: If the duplicated code contains wave/subgroup operations, each copy executes independently, which may affect convergence behavior compared to native fall-through.
+
+When restructuring occurs, Slang emits warning 41026 to alert developers to this behavior change.
+
+To avoid restructuring, ensure each case ends with `break`, `return`, or another control transfer statement.
