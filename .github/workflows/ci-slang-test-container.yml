@@ -184,7 +184,7 @@ jobs:
           # Verify GPU is accessible
           echo "=== GPU Info ==="
           nvidia-smi
-          
+
           # Check CUDA
           echo "=== CUDA libraries ==="
           ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
@@ -262,7 +262,7 @@ jobs:
           # Verify GPU is accessible
           echo "=== GPU Info ==="
           nvidia-smi
-          
+
           # Check CUDA
           echo "=== CUDA libraries ==="
           ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
