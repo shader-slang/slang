@@ -1856,12 +1856,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (debugLevel == DebugInfoLevel::Minimal)
                 {
                     // For minimal (g1), just emit OpString with the filename for use with OpLine
+                    auto fileNameLit = as<IRStringLit>(debugSource->getFileName());
                     *emittedSpvInst = emitInst(
                         getSection(SpvLogicalSectionID::DebugStringsAndSource),
                         inst,
                         SpvOpString,
                         kResultID,
-                        debugSource->getFileName());
+                        SpvLiteralBits::fromUnownedStringSlice(fileNameLit->getStringSlice()));
                     return true;
                 }
 
@@ -7596,10 +7597,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto destPtrType = as<IRPtrTypeBase>(inst->getDest()->getDataType());
+        SLANG_ASSERT(destPtrType);
+
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
         auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+
+        // Compute memory access operands for PhysicalStorageBuffer alignment
+        int memoryAccessMask = 0;
+        int alignment = -1;
+        if (addressSpaceToStorageClass(addrSpace) == SpvStorageClassPhysicalStorageBuffer)
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment);
+            alignment = sizeAndAlignment.alignment;
+            if (alignment != -1)
+                memoryAccessMask |= SpvMemoryAccessAlignedMask;
+        }
+
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
@@ -7615,8 +7631,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 sourceElementType,
                 inst->getSource(),
                 makeArray(SpvLiteralInteger::from32((int32_t)i)));
-            result =
-                emitOpStore(parent, (i == inst->getElementCount() - 1 ? inst : nullptr), addr, val);
+            result = emitInstCustomOperandFunc(
+                parent,
+                (i == inst->getElementCount() - 1 ? inst : nullptr),
+                SpvOpStore,
+                [&]()
+                {
+                    emitOperand(addr);
+                    emitOperand(val);
+                    if (memoryAccessMask)
+                    {
+                        emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                        if (memoryAccessMask & SpvMemoryAccessAlignedMask)
+                            emitOperand(SpvLiteralInteger::from32((uint32_t)alignment));
+                    }
+                });
         }
         return result;
     }
@@ -8145,7 +8174,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto srcVal = emitLoad(parent, slangIRLoad);
         auto convertedVal =
             emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
-        return emitOpStore(parent, nullptr, inst->getPtr(), convertedVal);
+
+        // Compute memory access operands for PhysicalStorageBuffer alignment
+        int memoryAccessMask = 0;
+        int alignment = -1;
+        MemoryScope memoryScope{};
+        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(
+            inst,
+            inst->getPtr(),
+            memoryAccessMask,
+            alignment,
+            memoryScope);
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpStore,
+            [&]()
+            {
+                emitOperand(inst->getPtr());
+                emitOperand(convertedVal);
+                if (memoryAccessMask)
+                {
+                    emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                    if (memoryAccessMask & SpvMemoryAccessAlignedMask)
+                        emitOperand(SpvLiteralInteger::from32((uint32_t)alignment));
+                    if (memoryAccessMask & SpvMemoryAccessMakePointerAvailableMask)
+                        emitOperand(
+                            emitIntConstant((IRIntegerValue)memoryScope, builder.getIntType()));
+                }
+            });
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)
