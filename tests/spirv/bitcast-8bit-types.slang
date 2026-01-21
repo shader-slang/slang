@@ -1,10 +1,11 @@
 // Test that 8-bit types use OpBitcast per SPIR-V spec
 // Per spec: scalar or vector of numerical types must use OpBitcast
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Per SPIR-V spec: 8-bit types MUST use direct OpBitcast (no lowering/splitting)
 // CHECK-DAG: OpBitcast %char %
+// CHECK-DAG: OpBitcast %uchar %
 // CHECK-DAG: OpBitcast %v2char %
 // CHECK-DAG: OpBitcast %v3uchar %
 // CHECK-DAG: OpBitcast %v4char %
@@ -16,12 +17,6 @@ RWStructuredBuffer<uint> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=int8Buffer
-RWStructuredBuffer<int8_t> int8Buffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=uint8Buffer
-RWStructuredBuffer<uint8_t> uint8Buffer;
 
 // OUT: 42
 // OUT: 200
@@ -38,11 +33,9 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // Basic 8-bit scalar types
     uint8_t u8 = uint8_t(inputBuffer[0] & 0xFF);
     int8_t i8 = bit_cast<int8_t>(u8);
-    int8Buffer[0] = i8;  // Force preservation
 
     int8_t i8_input = int8_t(inputBuffer[1] & 0xFF);
     uint8_t u8_result = bit_cast<uint8_t>(i8_input);
-    uint8Buffer[0] = u8_result;  // Force preservation
 
     // Vector types with 8-bit components
     vector<uint8_t, 2> u8v2 = vector<uint8_t, 2>(
@@ -50,7 +43,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         uint8_t(inputBuffer[3] & 0xFF)
     );
     vector<int8_t, 2> i8v2 = bit_cast<vector<int8_t, 2>>(u8v2);
-    int8Buffer[1] = i8v2.x;  // Force preservation
 
     vector<int8_t, 3> i8v3 = vector<int8_t, 3>(
         int8_t(inputBuffer[4] & 0xFF),
@@ -58,7 +50,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         int8_t(inputBuffer[6] & 0xFF)
     );
     vector<uint8_t, 3> u8v3 = bit_cast<vector<uint8_t, 3>>(i8v3);
-    uint8Buffer[1] = u8v3.x;  // Force preservation
 
     vector<uint8_t, 4> u8v4 = vector<uint8_t, 4>(
         uint8_t(inputBuffer[7] & 0xFF),
@@ -67,7 +58,6 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         uint8_t(inputBuffer[10] & 0xFF)
     );
     vector<int8_t, 4> i8v4 = bit_cast<vector<int8_t, 4>>(u8v4);
-    int8Buffer[2] = i8v4.x;  // Force preservation
 
     // Store results to prevent optimization
     outputBuffer[0] = uint(i8);

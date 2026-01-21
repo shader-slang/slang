@@ -2,8 +2,8 @@
 // Per SPIR-V spec: OpBitcast can handle pointer <-> vector<32-bit integer> bitcasts
 // but only in SPIR-V 1.5 or later
 
-//TEST:SIMPLE(filecheck=CHECK_SPIRV15): -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_SPIRV14): -target spirv -emit-spirv-directly -profile spirv_1_4
+//TEST:SIMPLE(filecheck=CHECK_SPIRV15): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK_SPIRV14): -target spirv -emit-spirv-directly -O0 -profile spirv_1_4
 
 // With SPIR-V 1.5+, pointer->vector<uint2> should use OpBitcast directly
 // A 64-bit pointer can be cast to uint2 (2×32 = 64 bits)
@@ -19,26 +19,20 @@
 //TEST_INPUT: set inputPtr = ubuffer(data=[1073741824 1077936128 1082130432], stride=4);
 uniform float* inputPtr;
 
-//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=vecBuffer
-RWStructuredBuffer<uint2> vecBuffer;
 
 // OUT: 1073741824
 // OUT: 1077936128
-// OUT: 0
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     // Test pointer -> vector<uint2> bitcast (should use OpBitcast in SPIR-V 1.5+)
     uint2 vec2 = bit_cast<uint2>(inputPtr);
-    vecBuffer[0] = vec2;  // Force preservation
     
     // Extract the pointer value back and use it
-    float* ptr_restored = bit_cast<float*>(vecBuffer[0]);
+    float* ptr_restored = bit_cast<float*>(vec2);
     outputBuffer[0] = asuint(ptr_restored[0]);
     outputBuffer[1] = asuint(ptr_restored[1]);
-    outputBuffer[2] = vec2.x;  // Use vec2 to prevent optimization
 }

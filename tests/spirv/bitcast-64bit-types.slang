@@ -1,7 +1,7 @@
 // Test that 64-bit types use OpBitcast directly in SPIR-V
 // Tests uint64 -> double and uint64 -> int64 in scalar, vec2, vec3, vec4 forms
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Scalar: uint64 -> double, uint64 -> int64
 // CHECK-DAG: %d64 = OpBitcast %double %u64
@@ -27,12 +27,6 @@ RWStructuredBuffer<uint> inputBuffer;
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=doubleBuffer
-RWStructuredBuffer<double> doubleBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0], stride=8):out,name=int64Buffer
-RWStructuredBuffer<int64_t> int64Buffer;
-
 // OUT: 100
 // OUT: 0
 // OUT: 100
@@ -56,9 +50,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // Scalar: uint64 -> double, uint64 -> int64
     uint64_t u64 = uint64_t(inputBuffer[0]) | (uint64_t(inputBuffer[1]) << 32);
     double d64 = bit_cast<double>(u64);
-    doubleBuffer[0] = d64;  // Force preservation
     int64_t i64 = bit_cast<int64_t>(u64);
-    int64Buffer[0] = i64;  // Force preservation
 
     // Vec2: uint64×2 -> double×2, uint64×2 -> int64×2
     vector<uint64_t, 2> u64v2 = vector<uint64_t, 2>(

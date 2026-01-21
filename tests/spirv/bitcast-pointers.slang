@@ -1,7 +1,7 @@
 // Test that pointer types use OpBitcast directly in SPIR-V where allowed by spec
 // Tests pointer <-> pointer, pointer <-> integer scalar, pointer <-> integer vector
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Per SPIR-V spec: pointer bitcasts MUST use direct OpBitcast when:
 // - Pointer to pointer: same storage class and size
@@ -35,12 +35,6 @@ uniform int* inputPtr;
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-//TEST_INPUT: ubuffer(data=[0 0], stride=8):out,name=uint64Buffer
-RWStructuredBuffer<uint64_t> uint64Buffer;
-
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=uint2Buffer
-RWStructuredBuffer<uint2> uint2Buffer;
-
 // OUT: 42
 // OUT: 100
 // OUT: 200
@@ -57,20 +51,18 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // Test 2: Pointer to integer scalar
     // Convert pointer to integer (64-bit pointer on modern systems)
     uint64_t ptrValue1 = bit_cast<uint64_t>(inputPtr);
-    uint64Buffer[0] = ptrValue1;  // Force preservation
     
     // Test 3: Integer scalar to pointer
     // Convert integer back to pointer
-    int* ptr3 = bit_cast<int*>(uint64Buffer[0]);
+    int* ptr3 = bit_cast<int*>(ptrValue1);
     
     // Test 4: Pointer to integer vector (SPIR-V 1.5+, only 32-bit integer vectors)
     // 64-bit pointer -> uint2 (2×32 = 64 bits)
     uint2 ptrVec = bit_cast<uint2>(inputPtr);
-    uint2Buffer[0] = ptrVec;  // Force preservation
     
     // Test 5: Integer vector to pointer (SPIR-V 1.5+, only 32-bit integer vectors)
     // uint2 -> 64-bit pointer
-    int* ptr4 = bit_cast<int*>(uint2Buffer[0]);
+    int* ptr4 = bit_cast<int*>(ptrVec);
     
     // Verify the bitcasts worked by dereferencing the pointers
     // (They should all point to the same location)

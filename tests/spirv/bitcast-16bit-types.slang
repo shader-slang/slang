@@ -1,7 +1,7 @@
 // Test that 16-bit types use OpBitcast directly in SPIR-V
 // Tests uint16 -> float16 and uint16 -> int16 in scalar, vec2, vec3, vec4 forms
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Scalar: uint16 -> float16, uint16 -> int16
 // CHECK-DAG: %f16 = OpBitcast %half %u16
@@ -24,27 +24,17 @@
 //TEST_INPUT:ubuffer(data=[15360 49120 16384 17408 18432 100 200 300 400 500], stride=4):name=inputBuffer
 RWStructuredBuffer<uint> inputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=floatBuffer
-RWStructuredBuffer<float16_t> floatBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=intBuffer
-RWStructuredBuffer<int16_t> intBuffer;
-
-// OUT: 64480
-// OUT: 64480
+// OUT: 15360
+// OUT: 15360
 // OUT: 49120
 // OUT: 49120
 // OUT: 17408
 // OUT: 17408
 // OUT: 200
 // OUT: 200
-// OUT: 18432
-// OUT: 18432
-// OUT: 300
-// OUT: 300
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
@@ -52,9 +42,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     // Scalar: uint16 -> float16, uint16 -> int16
     uint16_t u16 = uint16_t(inputBuffer[0] & 0xFFFF);
     float16_t f16 = bit_cast<float16_t>(u16);
-    floatBuffer[0] = f16;  // Force preservation
     int16_t i16 = bit_cast<int16_t>(u16);
-    intBuffer[0] = i16;  // Force preservation
 
     // Vec2: uint16×2 -> float16×2, uint16×2 -> int16×2
     vector<uint16_t, 2> u16v2 = vector<uint16_t, 2>(
@@ -62,9 +50,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         uint16_t(inputBuffer[2] & 0xFFFF)
     );
     vector<float16_t, 2> f16v2 = bit_cast<vector<float16_t, 2>>(u16v2);
-    floatBuffer[1] = f16v2.x;  // Force preservation
     vector<int16_t, 2> i16v2 = bit_cast<vector<int16_t, 2>>(u16v2);
-    intBuffer[1] = i16v2.x;  // Force preservation
 
     // Vec3: uint16×3 -> float16×3, uint16×3 -> int16×3
     vector<uint16_t, 3> u16v3 = vector<uint16_t, 3>(
@@ -73,9 +59,7 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         uint16_t(inputBuffer[5] & 0xFFFF)
     );
     vector<float16_t, 3> f16v3 = bit_cast<vector<float16_t, 3>>(u16v3);
-    floatBuffer[2] = f16v3.x;  // Force preservation
     vector<int16_t, 3> i16v3 = bit_cast<vector<int16_t, 3>>(u16v3);
-    intBuffer[2] = i16v3.x;  // Force preservation
 
     // Vec4: uint16×4 -> float16×4, uint16×4 -> int16×4
     vector<uint16_t, 4> u16v4 = vector<uint16_t, 4>(
@@ -85,21 +69,15 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
         uint16_t(inputBuffer[9] & 0xFFFF)
     );
     vector<float16_t, 4> f16v4 = bit_cast<vector<float16_t, 4>>(u16v4);
-    floatBuffer[3] = f16v4.x;  // Force preservation
     vector<int16_t, 4> i16v4 = bit_cast<vector<int16_t, 4>>(u16v4);
-    intBuffer[3] = i16v4.x;  // Force preservation
 
-    // Store results - use all bitcast results
-    outputBuffer[0] = uint(asuint16(f16)) + uint(asuint16(f16v2.x));
-    outputBuffer[1] = uint(uint16_t(i16)) + uint(uint16_t(i16v2.x));
+    // Store results
+    outputBuffer[0] = uint(asuint16(f16));
+    outputBuffer[1] = uint(uint16_t(i16));
     outputBuffer[2] = uint(asuint16(f16v2.x));
     outputBuffer[3] = uint(uint16_t(i16v2.x));
     outputBuffer[4] = uint(asuint16(f16v3.x));
     outputBuffer[5] = uint(uint16_t(i16v3.x));
     outputBuffer[6] = uint(asuint16(f16v4.x));
     outputBuffer[7] = uint(uint16_t(i16v4.x));
-    outputBuffer[8] = uint(asuint16(f16v3.y));
-    outputBuffer[9] = uint(uint16_t(i16v3.y));
-    outputBuffer[10] = uint(asuint16(f16v4.y));
-    outputBuffer[11] = uint(uint16_t(i16v4.y));
 }

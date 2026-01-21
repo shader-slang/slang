@@ -1,7 +1,7 @@
 // Test that matrix types do NOT use OpBitcast per SPIR-V spec
 // Per spec: OpBitcast only allows "scalar or vector of numerical type"
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // CHECK-NOT: OpBitcast %mat4v4float
 // CHECK-NOT: OpBitcast %mat3v3float
@@ -17,9 +17,6 @@ RWStructuredBuffer<uint> inputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=floatBuffer
-RWStructuredBuffer<float> floatBuffer;
 
 // OUT: 1065353216
 // OUT: 1065353216
@@ -55,13 +52,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
     float2x2 fmat2x2 = bit_cast<float2x2>(umat2x2);
 
-    // Store intermediate float values to force bitcast preservation
-    floatBuffer[0] = fmat4x4[0][0];
-    floatBuffer[1] = fmat3x3[0][0];
-    floatBuffer[2] = fmat2x2[0][0];
-
     // Store results to prevent optimization
-    outputBuffer[0] = asuint(floatBuffer[0]);
-    outputBuffer[1] = asuint(floatBuffer[1]);
-    outputBuffer[2] = asuint(floatBuffer[2]);
+    outputBuffer[0] = asuint(fmat4x4[0][0]);
+    outputBuffer[1] = asuint(fmat3x3[0][0]);
+    outputBuffer[2] = asuint(fmat2x2[0][0]);
 }
