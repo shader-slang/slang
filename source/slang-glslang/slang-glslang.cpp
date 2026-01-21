@@ -264,16 +264,14 @@ static int glslang_optimizeSPIRV(
         return 0;
     }
 
-    // WORKAROUND: Temporarily disable SPIRV-Tools optimization to work around
-    // ADCE regression in commit 1c26ea1c. ADCE aggressively eliminates variables
-    // causing crashes in autodiff shaders and potentially other code patterns.
-    // TODO: Implement proper fix (detect autodiff, use OpCopyObject, or fix IR)
-    // See: https://github.com/shader-slang/slang/issues/XXXXX
-    return 0;
-
     const auto debugInfoType = request.debugInfoType;
 
     spvtools::Optimizer optimizer(targetEnv);
+
+    // WORKAROUND: Disable ADCE to avoid crash in autodiff shaders (SPIRV-Tools commit 1c26ea1c)
+    // ADCE aggressively eliminates variables causing GPU crashes in autodiff shaders.
+    // See: https://github.com/shader-slang/slang/issues/9675
+    const bool enableADCE = false;
 
     auto messageConsumer = [&](spv_message_level_t level,
                                const char* source,
@@ -358,7 +356,8 @@ static int glslang_optimizeSPIRV(
 
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
 
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
@@ -372,7 +371,8 @@ static int glslang_optimizeSPIRV(
 
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass()); // 8
 
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
             optimizer.RegisterPass(spvtools::CreateVectorDCEPass()); // 9
 
@@ -427,7 +427,8 @@ static int glslang_optimizeSPIRV(
             // optimizer.RegisterPass(spvtools::CreateBlockMergePass());             // 8
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass()); // 5
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass()); // 5
             // optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());          // 1
             optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
             optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
@@ -437,7 +438,8 @@ static int glslang_optimizeSPIRV(
             // optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());        // 2
             // optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
             optimizer.RegisterPass(spvtools::CreateSimplificationPass()); // 14
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateCFGCleanupPass());
 #endif
 
@@ -459,16 +461,19 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateMergeReturnPass());
             optimizer.RegisterPass(spvtools::CreateInlineExhaustivePass());
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass());
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
 
             // We run CompactIdsPass here, because CreateLocalMultiStoreElimPass can explode
             // id usage (by a factor of 10), and compacting ids here has been shown to half
@@ -478,9 +483,11 @@ static int glslang_optimizeSPIRV(
             // Note that CreateLocalMultiStoreElimPass really just does a SSARewritePass
             optimizer.RegisterPass(spvtools::CreateLocalMultiStoreElimPass());
 
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateCCPPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateLoopUnrollPass(true));
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
             optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
@@ -490,9 +497,11 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateLocalAccessChainConvertPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleBlockLoadStoreElimPass());
             optimizer.RegisterPass(spvtools::CreateLocalSingleStoreElimPass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateSSARewritePass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateVectorDCEPass());
             optimizer.RegisterPass(spvtools::CreateDeadInsertElimPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
@@ -500,7 +509,8 @@ static int glslang_optimizeSPIRV(
             optimizer.RegisterPass(spvtools::CreateIfConversionPass());
             optimizer.RegisterPass(spvtools::CreateCopyPropagateArraysPass());
             optimizer.RegisterPass(spvtools::CreateReduceLoadSizePass());
-            optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            if (enableADCE)
+                optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
             optimizer.RegisterPass(spvtools::CreateBlockMergePass());
             optimizer.RegisterPass(spvtools::CreateRedundancyEliminationPass());
             optimizer.RegisterPass(spvtools::CreateDeadBranchElimPass());
