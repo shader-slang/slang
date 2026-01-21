@@ -311,6 +311,9 @@ if(SLANG_ENABLE_SLANG_RHI)
         )
     endif()
 
+    # Link slang-rhi to slang (propagates SLANG_STATIC when building static)
+    target_link_libraries(slang-rhi PUBLIC slang)
+
     # Output slang-rhi-tests to the bin directory so we can run it easily.
     set_target_properties(
         slang-rhi-tests
