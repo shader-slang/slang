@@ -181,6 +181,14 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
+          # Verify GPU is accessible
+          echo "=== GPU Info ==="
+          nvidia-smi
+          
+          # Check CUDA
+          echo "=== CUDA libraries ==="
+          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
+
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
@@ -250,6 +258,14 @@ jobs:
 
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # Verify GPU is accessible
+          echo "=== GPU Info ==="
+          nvidia-smi
+          
+          # Check CUDA
+          echo "=== CUDA libraries ==="
+          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
 
       - name: Run slangpy tests
         run: |
