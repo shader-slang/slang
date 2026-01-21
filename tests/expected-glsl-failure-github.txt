@@ -1,0 +1,3 @@
+tests/cooperative-vector/matrix-mul-bias-structuredbuffer-packed.slang (vk)
+tests/cooperative-vector/matrix-mul-structuredbuffer-packed.slang (vk)
+tests/cooperative-vector/outer-product-structuredbuffer.slang (vk)
