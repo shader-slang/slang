@@ -21,7 +21,7 @@ Struct *link-time extern type* declaration:
 
 Struct *link-time export type alias* declaration:
 > [*`modifier-list`*]<br>
-> **`export'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
+> **`'export'`** **`'struct'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
 
 Member list:
