@@ -553,22 +553,12 @@ struct SwitchLoweringContext
                 currentStage = 0;
             }
 
-            if (currentGroupIndex >= 0 || cases[i - 1 >= 0 ? i - 1 : 0].fallsThrough)
+            // Add this case to the current fallthrough group if we're in one
+            if (currentGroupIndex >= 0)
             {
-                // We're in a fallthrough group
-                if (i > 0 && cases[i - 1].fallsThrough && currentGroupIndex < 0)
-                {
-                    // Predecessor fell through but we didn't start a group yet
-                    // This shouldn't happen given our logic, but handle it
-                    currentGroupIndex = fallthroughGroups.getCount() - 1;
-                }
-
-                if (currentGroupIndex >= 0)
-                {
-                    caseInfo.fallthroughGroupIndex = currentGroupIndex;
-                    caseInfo.stageIndex = currentStage++;
-                    fallthroughGroups[currentGroupIndex].caseIndices.add(i);
-                }
+                caseInfo.fallthroughGroupIndex = currentGroupIndex;
+                caseInfo.stageIndex = currentStage++;
+                fallthroughGroups[currentGroupIndex].caseIndices.add(i);
             }
 
             // If this case doesn't fall through, end the current group
