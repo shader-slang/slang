@@ -3,26 +3,30 @@
 ## Syntax
 
 Struct *no-body* declaration:
-> [*`modifier-list`*]<br>
-> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *with-members* declaration:
-> [*`modifier-list`*]<br>
-> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
 > **`'{'`** *`member-list`* **`'}'`**
 
 Struct *link-time extern type* declaration:
-> [*`modifier-list`*]<br>
-> **`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *link-time export type alias* declaration:
-> [*`modifier-list`*]<br>
-> **`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
 
 Member list:
 > *`member-list`* =<br>
