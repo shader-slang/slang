@@ -248,6 +248,42 @@ extern "C"
     return succ;
 }
 
+// Helper function to detect if SPIRV module contains autodiff code
+// by searching for "DifferentialPair" in OpName instructions
+static bool containsAutodiffCode(const std::vector<unsigned int>& spirv)
+{
+    // SPIRV module header is 5 words, then instructions follow
+    if (spirv.size() < 5)
+        return false;
+
+    // Search through SPIRV instructions for OpName with "DifferentialPair"
+    for (size_t i = 5; i < spirv.size();)
+    {
+        uint32_t instruction = spirv[i];
+        uint16_t wordCount = (instruction >> 16) & 0xFFFF;
+        uint16_t opcode = instruction & 0xFFFF;
+
+        if (wordCount == 0 || i + wordCount > spirv.size())
+            break;
+
+        // OpName = 5
+        if (opcode == 5 && wordCount >= 3)
+        {
+            // OpName has: [word count + opcode] [ID] [name as null-terminated string]
+            // Check if the name contains "DifferentialPair"
+            const char* name = reinterpret_cast<const char*>(&spirv[i + 2]);
+            if (strstr(name, "DifferentialPair") != nullptr)
+            {
+                return true;
+            }
+        }
+
+        i += wordCount;
+    }
+
+    return false;
+}
+
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
 static int glslang_optimizeSPIRV(
@@ -256,11 +292,22 @@ static int glslang_optimizeSPIRV(
     std::vector<SPIRVOptimizationDiagnostic>& outDiags,
     std::vector<unsigned int>& ioSpirv)
 {
-    const auto optimizationLevel = request.optimizationLevel;
+    auto optimizationLevel = request.optimizationLevel;
 
     // If there is no optimization then we are done
     if (optimizationLevel == SLANG_OPTIMIZATION_LEVEL_NONE)
     {
+        return 0;
+    }
+
+    // WORKAROUND: Disable SPIRV-Tools optimization for autodiff shaders
+    // SPIRV-Tools ADCE (commit 1c26ea1c) is too aggressive and eliminates
+    // differential variables, causing GPU crashes. Disable optimization for
+    // autodiff code until proper fix is implemented.
+    // See: https://github.com/shader-slang/slang/issues/XXXXX
+    if (containsAutodiffCode(ioSpirv))
+    {
+        optimizationLevel = SLANG_OPTIMIZATION_LEVEL_NONE;
         return 0;
     }
 
