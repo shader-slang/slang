@@ -501,6 +501,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvAddressingModel m_addressingMode = SpvAddressingModelLogical;
 
+    // Track if we've emitted a DebugScope that needs a DebugLine to follow it.
+    // This is used to ensure that every DebugScope block has at least one DebugLine.
+    SpvInstParent* m_pendingDebugScopeParent = nullptr;
+    IRInst* m_pendingDebugScopeSourceInst = nullptr;
+
     // We will store the logical sections of the SPIR-V module
     // in a single array so that we can easily look up a
     // section by its `SpvLogicalSectionID`.
@@ -3722,6 +3727,41 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
                     funcDebugScope);
+                // Emit a DebugLine immediately after the DebugScope to ensure every
+                // DebugScope block has at least one DebugLine. Try to get location from
+                // the first ordinary instruction in the block, or use a default location.
+                IRInst* firstInst = irBlock->getFirstOrdinaryInst();
+                IRDebugLocationDecoration* locDecor =
+                    firstInst ? firstInst->findDecoration<IRDebugLocationDecoration>() : nullptr;
+                if (locDecor)
+                {
+                    emitOpDebugLine(
+                        spvBlock,
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        locDecor->getSource(),
+                        locDecor->getLine(),
+                        locDecor->getLine(),
+                        locDecor->getCol(),
+                        locDecor->getCol());
+                }
+                else if (m_defaultDebugSource)
+                {
+                    // Emit a default DebugLine at line 0 if we don't have location info
+                    IRBuilder builder(irBlock);
+                    auto zero = builder.getIntValue(builder.getUIntType(), 0);
+                    emitOpDebugLine(
+                        spvBlock,
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        m_defaultDebugSource,
+                        zero,
+                        zero,
+                        zero,
+                        zero);
+                }
             }
             // In addition to normal basic blocks,
             // all loops gets a header block.
@@ -3780,6 +3820,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitPhi(spvBlock, irParam);
                 }
             }
+
+            // Before emitting the ordinary instructions, ensure we have a DebugLine
+            // after any DebugScope that was emitted for this block.
+            // This must come after OpPhi instructions but before other instructions.
+            // However, since we now emit DebugLine immediately after block-level DebugScope,
+            // this is only needed for IRDebugScope instructions within the block.
+            if (m_pendingDebugScopeParent == spvBlock)
+            {
+                maybeEmitPendingDebugLine(spvBlock, irBlock->getFirstOrdinaryInst());
+            }
+
             for (auto irInst : irBlock->getOrdinaryInsts())
             {
                 // Any instructions local to the block will be emitted as children
@@ -3797,6 +3848,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     // after this inst in the block, because OpKill is a terminator inst.
                     break;
                 }
+            }
+
+            // If we still have a pending DebugScope (from an IRDebugScope instruction),
+            // emit a DebugLine now to ensure it's not left without a DebugLine.
+            if (m_pendingDebugScopeParent)
+            {
+                maybeEmitPendingDebugLine(m_pendingDebugScopeParent, irBlock);
             }
         }
 
@@ -4309,6 +4367,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     /// Emit an instruction that is local to the body of the given `parent`.
     SpvInst* emitLocalInst(SpvInstParent* parent, IRInst* inst)
     {
+        // Before emitting any non-debug instruction, ensure we emit a DebugLine
+        // if a DebugScope was emitted that needs one.
+        // Skip this for debug-related instructions to avoid infinite recursion.
+        switch (inst->getOp())
+        {
+        case kIROp_DebugLine:
+        case kIROp_DebugScope:
+        case kIROp_DebugNoScope:
+        case kIROp_DebugVar:
+        case kIROp_DebugValue:
+        case kIROp_DebugFunction:
+        case kIROp_DebugInlinedAt:
+        case kIROp_DebugInlinedVariable:
+            // Don't emit a pending DebugLine for debug instructions
+            break;
+        default:
+            // For all other instructions, emit a pending DebugLine if needed
+            maybeEmitPendingDebugLine(parent, inst);
+            break;
+        }
+
         SpvInst* result = nullptr;
 
         // First, try to handle debug instructions with centralized debug level checking
@@ -8770,6 +8849,60 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             operands.getView());
     }
 
+    void maybeEmitPendingDebugLine(SpvInstParent* parent, IRInst* inst)
+    {
+        // If we have a pending debug scope that needs a DebugLine, emit one now
+        if (m_pendingDebugScopeParent && m_pendingDebugScopeSourceInst)
+        {
+            auto scope = findDebugScope(m_pendingDebugScopeSourceInst);
+            if (scope)
+            {
+                // Try to get source location from the instruction or the pending scope instruction
+                IRInst* sourceInst = inst ? inst : m_pendingDebugScopeSourceInst;
+
+                // Try to get debug location decoration
+                IRDebugLocationDecoration* locDecor = nullptr;
+                if (sourceInst)
+                    locDecor = sourceInst->findDecoration<IRDebugLocationDecoration>();
+
+                // If we have location information, emit a DebugLine
+                if (locDecor)
+                {
+                    emitOpDebugLine(
+                        m_pendingDebugScopeParent,
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        locDecor->getSource(),
+                        locDecor->getLine(),
+                        locDecor->getLine(),
+                        locDecor->getCol(),
+                        locDecor->getCol());
+                }
+                else if (m_defaultDebugSource)
+                {
+                    // Emit a default DebugLine at line 0 if we don't have location info
+                    IRBuilder builder(sourceInst);
+                    auto zero = builder.getIntValue(builder.getUIntType(), 0);
+                    emitOpDebugLine(
+                        m_pendingDebugScopeParent,
+                        nullptr,
+                        m_voidType,
+                        getNonSemanticDebugInfoExtInst(),
+                        m_defaultDebugSource,
+                        zero,
+                        zero,
+                        zero,
+                        zero);
+                }
+            }
+
+            // Clear the pending debug scope
+            m_pendingDebugScopeParent = nullptr;
+            m_pendingDebugScopeSourceInst = nullptr;
+        }
+    }
+
     SpvInst* emitDebugLine(SpvInstParent* parent, IRDebugLine* debugLine)
     {
         // For Minimal (g1), emit standard SPIR-V OpLine for line number tracking only
@@ -8797,6 +8930,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto scope = findDebugScope(debugLine);
         if (!scope)
             return nullptr;
+
+        // Clear the pending debug scope since we're emitting a DebugLine
+        m_pendingDebugScopeParent = nullptr;
+        m_pendingDebugScopeSourceInst = nullptr;
+
         return emitOpDebugLine(
             parent,
             debugLine,
@@ -8832,13 +8970,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!scope)
             return nullptr;
 
-        return emitOpDebugScope(
+        auto result = emitOpDebugScope(
             parent,
             nullptr,
             m_voidType,
             getNonSemanticDebugInfoExtInst(),
             scope,
             inlinedAt);
+
+        // Mark that we need a DebugLine to follow this DebugScope
+        m_pendingDebugScopeParent = parent;
+        m_pendingDebugScopeSourceInst = debugScope;
+
+        return result;
     }
 
 
@@ -8898,6 +9042,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     SpvInst* emitDebugNoScope(SpvInstParent* parent)
     {
+        // Clear any pending debug scope when emitting DebugNoScope
+        m_pendingDebugScopeParent = nullptr;
+        m_pendingDebugScopeSourceInst = nullptr;
+
         return emitOpDebugNoScope(parent, nullptr, m_voidType, getNonSemanticDebugInfoExtInst());
     }
 
