@@ -4221,15 +4221,9 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             return sizeOfLikeExpr;
         }
 
-        // DescriptorHandle size is target-dependent, so sizeof/alignof cannot be
-        // evaluated at compile-time. Users should use reflection API instead.
-        if (as<DescriptorHandleType>(type))
-        {
-            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfDescriptorHandleNotAllowed);
-
-            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
-            return sizeOfLikeExpr;
-        }
+        // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
+        // uint2 otherwise). The size calculation is deferred to IR level where target
+        // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
     }
 
     sizeOfLikeExpr->sizedType = type;
