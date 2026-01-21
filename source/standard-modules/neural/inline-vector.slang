@@ -70,9 +70,17 @@ public struct InlineVector<T, int N> : IVector<T>
     */
     public __subscript(int index) -> T
     {
-        get() { return this.data[index]; }
-        set() { this.data[index] = newValue; }
+        get { return this.data[index]; }
+        set { this.data[index] = newValue; }
     }
+
+    /// Differentiable element getter.
+    [Differentiable]
+    public T get(int index) { return this.data[index]; }
+
+    /// Differentiable element setter (accumulates to existing value for gradient flow).
+    [Differentiable]
+    [mutating] public void set(int index, T value) { this.data[index] = value; }
 
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]

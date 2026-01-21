@@ -1006,7 +1006,7 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
     internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(DTypeMatC);
     internal static const int Uint4AlignedInputSize = ((N + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
-    // [DerivativeMember(Differential.data)]
+    [DerivativeMember(Differential.data)]
     internal T[Uint4AlignedInputSize] data;
     public int getCount() { return N; }
 
@@ -1072,6 +1072,14 @@ public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, i
         [ForceInline]
         set { this.data[index] = newValue; }
     }
+
+    /// Differentiable element getter.
+    [Differentiable]
+    public T get(int index) { return this.data[index]; }
+
+    /// Differentiable element setter.
+    [Differentiable]
+    [mutating] public void set(int index, T value) { this.data[index] = value; }
 
     private OutputVector linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum Target, bool Bias>(
         Storage weight,

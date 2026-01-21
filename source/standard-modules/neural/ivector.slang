@@ -57,6 +57,14 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
         set;
     }
 
+    /// Differentiable element getter.
+    [Differentiable]
+    public T get(int index);
+
+    /// Differentiable element setter.
+    [Differentiable]
+    [mutating] public void set(int index, T value);
+
     /**
     Evaluates a linear transformation: output = W * input.
     Performs matrix-vector multiplication.

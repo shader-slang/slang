@@ -41,7 +41,7 @@ public struct ReLU<T> : IActivation<T>
         Vector output = Vector();
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
-            output[i] = max(input[i], T(0));
+            output.set(i, max(input.get(i), T(0)));
         return output;
     }
 }
@@ -64,8 +64,8 @@ public struct LeakyReLU<T> : IActivation<T>
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
         {
-            let x = input[i];
-            output[i] = (x < T(0)) ? alpha * x : x;
+            let x = input.get(i);
+            output.set(i, (x < T(0)) ? alpha * x : x);
         }
         return output;
     }
@@ -88,8 +88,8 @@ public struct Sigmoid<T> : IActivation<T>
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
         {
-            let x = input[i];
-            output[i] = T(1) / (T(1) + exp(-x));
+            let x = input.get(i);
+            output.set(i, T(1) / (T(1) + exp(-x)));
         }
         return output;
     }
@@ -111,7 +111,7 @@ public struct TanhActivation<T> : IActivation<T>
         Vector output = Vector();
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
-            output[i] = tanh(input[i]);
+            output.set(i, tanh(input.get(i)));
         return output;
     }
 }
@@ -132,7 +132,7 @@ public struct ExpActivation<T> : IActivation<T>
         Vector output = Vector();
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
-            output[i] = exp(input[i]);
+            output.set(i, exp(input.get(i)));
         return output;
     }
 }
@@ -153,7 +153,7 @@ public struct SineActivation<T> : IActivation<T>
         Vector output = Vector();
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
-            output[i] = sin(input[i]);
+            output.set(i, sin(input.get(i)));
         return output;
     }
 }
