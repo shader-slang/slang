@@ -12,6 +12,11 @@ namespace Slang
 {
 
 class Type;
+class Decl;
+class Expr;
+class Stmt;
+class Val;
+class Name;
 
 namespace Diagnostics
 {
@@ -31,7 +36,13 @@ struct $(class_name)
 %     end
 
 %     for _, loc in ipairs(diagnostic.locations) do
+%         if loc.type then
+%             local loc_cpp_type = lua_module.getCppType(loc.type)
+%             local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+    $(loc_cpp_type) $(loc.name) = $(loc_initializer);
+%         else
     SourceLoc $(loc.name) = SourceLoc{};
+%         end
 %     end
 
     GenericDiagnostic toGenericDiagnostic() const;

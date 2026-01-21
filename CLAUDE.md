@@ -16,8 +16,6 @@ User-specific instructions for Slang:
 
 ## Build System and Common Commands
 
-**IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.
-
 ### Building the Project
 
 ```bash
@@ -35,6 +33,16 @@ cmake --build --preset release # Release binary
 # Build specific targets
 cmake --build --preset debug --target slangc
 cmake --build --preset debug --target slang-test
+```
+
+When building with `cmake --build`, redirect all of outputs to null-device.
+When the build failed, then, re-run the same command without the redirections.
+It is to avoid wasting the token usage of LLM.
+
+Example,
+```
+# Print the build logs only when the initial attempt failed.
+cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 ```
 
 ### PR Workflow
@@ -308,13 +316,92 @@ See `extras/repro-remix.md` for detailed documentation.
 
 - Don't mention Claude on the commit message
 
+### Debugging with slangpy repro steps
+
+When debugging slangpy compatibility issues or testing Slang changes against slangpy, follow these steps to build slangpy from source using your local Slang build.
+
+**Prerequisites:**
+- Python 3.10+ installed
+- Slang built in Debug or Release configuration
+- Git with submodules support
+
+#### Step 1: Build Slang
+
+```bash
+# From Slang repository root
+cmake --preset default
+cmake --build --preset debug    # or --preset release
+```
+
+#### Step 2: Clone slangpy Repository
+
+```bash
+# Clone with submodules (required for slangpy build)
+git clone --recursive https://github.com/shader-slang/slangpy.git external/slangpy
+```
+
+Read `external/slangpy/CLAUDE.md` for general information about the repo.
+
+#### Step 3: Build and Install slangpy with Local Slang
+
+On Windows:
+```bash
+cd external/slangpy
+SET CMAKE_ARGS=-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug
+python.exe -m pip install -e .
+```
+
+On Linux/macOS:
+```bash
+cd external/slangpy
+CMAKE_ARGS="-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug" python.exe -m pip install -e .
+```
+
+#### Step 4: Install Test Dependencies
+
+```bash
+# From external/slangpy directory
+python -m pip install -r requirements-dev.txt --user
+python -m pip install pytest-xdist --user
+```
+
+#### Step 5: Run Tests
+
+Write a test case under `external/slangpy/slangpy/tests` and run it with pytest.
+
+The following example is to run all of the existing slangpy tests:
+```bash
+# From external/slangpy directory
+python -m pytest slangpy/tests -ra -n auto --maxprocesses=3
+```
+
+#### Notes
+- Use `-DSGL_LOCAL_SLANG_BUILD_DIR=build/Release` for Release builds
+- The `-e` flag installs in editable mode, allowing you to modify slangpy source
+- Tests run in parallel with `-n auto` for faster execution
+- Some tests may skip if GPU hardware is not available
+
+#### Troubleshooting
+- If tests fail to find slangc, verify the `SLANG_BUILD_DIR` path is correct
+- If import fails, check that slangpy was installed: `python -c "import slangpy; print(slangpy.__file__)"`
+- For GPU-specific test failures, ensure drivers are up to date
+
 ## Cross-Platform Considerations
 
-**Supported Platforms**: Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
+**Supported Platforms**:
+Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
 
-**Platform Abstractions**: Use utilities in `source/core/` for file system, process management, platform detection
+**Platform Abstractions**:
+Use utilities in `source/core/` for file system, process management, platform detection
 
-**Graphics APIs**: Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
+**Graphics APIs**:
+Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
+
+**WSL on Windows**:
+When running under WSL environment, try to append `.exe` to the executables to avoid using Linux binaries
+- Use `cmake.exe` instead of `cmake`,
+- Use `python.exe` instead of `python`,
+- Use `gh.exe` instead of `gh` and so on.
 
 ## Additional documents
 
