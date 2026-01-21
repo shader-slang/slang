@@ -667,6 +667,8 @@ static SlangResult _parseGCCFamilyLine(
 #endif // defined(__has_feature)
         break;
 
+    case SLANG_SHADER_SHARED_LIBRARY:
+    case SLANG_SHADER_HOST_CALLABLE:
     case SLANG_OBJECT_CODE:
         if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind) &&
             !PlatformUtil::isFamily(PlatformFamily::Microsoft, platformKind))
