@@ -279,13 +279,9 @@ jobs:
           #
           SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
           mkdir -p "$SLANGC_TARGET_DIR"
-          # Copy slangc binary to the expected location
-          if [[ "${{ inputs.os }}" == "windows" ]]; then
-              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
-          else
-              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
-              chmod +x "$SLANGC_TARGET_DIR/slangc"
-          fi
+          # Copy slangc binary to the expected location (Linux only in container)
+          cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+          chmod +x "$SLANGC_TARGET_DIR/slangc"
 
           # Remove old slang libraries and copy new ones
           echo "Removing old slang libraries..."
@@ -294,9 +290,16 @@ jobs:
           echo "Copying new slang libraries..."
           cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
-          # Create symlink for the old library version that slangpy extension was linked against
+          # Create symlink for the library version that slangpy extension was linked against
           echo "Creating symlink for slangpy compatibility..."
-          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
+          # Find what version slangpy's _slangpy.so is linked against
+          LINKED_LIB=$(ldd "$SITE_PACKAGES/slangpy/_slangpy"*.so 2>/dev/null | grep libslang-compiler | awk '{print $1}' || echo "")
+          if [ -n "$LINKED_LIB" ] && [ "$LINKED_LIB" != "libslang-compiler.so" ]; then
+            echo "Creating symlink: libslang-compiler.so -> $LINKED_LIB"
+            ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/$LINKED_LIB"
+          else
+            echo "No version-specific symlink needed"
+          fi
 
           echo "Listing files in slangpy directory..."
           ls -la "$SITE_PACKAGES/slangpy/"
@@ -310,3 +313,49 @@ jobs:
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
           python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+
+          # Export SITE_PACKAGES for use in slangpy-samples step
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+      - name: Clone slangpy-samples
+        run: |
+          # Clone slangpy-samples and checkout the tag matching the installed
+          # slangpy version. This ensures compatibility between the slangpy
+          # release and the samples. Falls back to main if no matching tag exists.
+          echo "Cloning slangpy-samples repository..."
+
+          # Detect installed slangpy version
+          SLANGPY_VERSION=$(python3 -c "import slangpy; print(slangpy.__version__)" 2>/dev/null || echo "unknown")
+          echo "Installed slangpy version: $SLANGPY_VERSION"
+
+          # Try to clone specific version tag directly, fallback to main if it fails
+          if [ "$SLANGPY_VERSION" != "unknown" ]; then
+            if git clone --branch "v${SLANGPY_VERSION}" --depth 1 https://github.com/shader-slang/slangpy-samples.git 2>/dev/null; then
+              echo "Successfully cloned version tag v${SLANGPY_VERSION}"
+            else
+              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, cloning main branch"
+              git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+            fi
+          else
+            echo "Warning: Could not detect slangpy version, cloning main branch"
+            git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
+          fi
+
+          # THIS IS A HUGE HACK, adding a workaround for NumPy compatibility.
+          # Real fix is to allow pickle loading for NumPy compatibility in slangpy-samples.
+          #
+          # Patch test_examples.py to allow pickle loading for NumPy compatibility
+          # and reference .npz files contain pickled data
+          echo "Patching test_examples.py for NumPy pickle compatibility..."
+          sed -i 's/numpy\.load(expected_data_path)/numpy.load(expected_data_path, allow_pickle=True)/g' \
+            slangpy-samples/tests/examples/test_examples.py
+
+      - name: Install slangpy-samples dependencies
+        run: |
+          echo "Installing slangpy-samples dependencies..."
+          python3 -m pip install -r slangpy-samples/requirements.txt --user
+
+      - name: Run slangpy-samples tests
+        run: |
+          echo "Running slangpy-samples tests..."
+          python3 -m pytest -n 4 slangpy-samples/tests
