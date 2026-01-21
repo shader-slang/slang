@@ -76,20 +76,13 @@ static SlangResult locateMetalCompiler(const String& path, DownstreamCompilerSet
     ComPtr<IDownstreamCompiler> innerCppCompiler;
 
 #if SLANG_APPLE_FAMILY
-    // Use xcrun command to find the metal compiler.
+    // Create Metal compiler (`metal`) wrapper using `xcrun` (sets the `SDKROOT` env var).
     CommandLine xcrunCmdLine;
     ExecutableLocation xcrunLocation("xcrun");
     xcrunCmdLine.setExecutableLocation(xcrunLocation);
     xcrunCmdLine.addArg("--sdk");
     xcrunCmdLine.addArg("macosx");
-    xcrunCmdLine.addArg("--find");
     xcrunCmdLine.addArg("metal");
-    ExecuteResult exeRes;
-    SLANG_RETURN_ON_FAIL(ProcessUtil::execute(xcrunCmdLine, exeRes));
-    if (exeRes.resultCode != 0)
-    {
-        return SLANG_FAIL;
-    }
 
     SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::createCompiler(xcrunCmdLine, innerCppCompiler));
 #else
