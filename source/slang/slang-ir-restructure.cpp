@@ -621,9 +621,8 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                 }
 
                 // Sort by block position in function (source order)
-                caseInfos.sort([&](const SwitchCaseInfo& a, const SwitchCaseInfo& b) {
-                    return blockOrder[a.label] < blockOrder[b.label];
-                });
+                caseInfos.sort([&](const SwitchCaseInfo& a, const SwitchCaseInfo& b)
+                               { return blockOrder[a.label] < blockOrder[b.label]; });
 
                 // Now iterate through cases in source order
                 for (Index caseIdx = 0; caseIdx < caseInfos.getCount(); caseIdx++)
