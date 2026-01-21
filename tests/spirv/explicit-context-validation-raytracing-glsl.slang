@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage raygeneration -entry main -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK): -allow-glsl -target spirv -emit-spirv-directly -stage raygeneration -entry main -enable-experimental-passes -capability spvShaderInvocationReorderNV
 
 // Check to ensure we make global ray-tracing objects. Ensure we store into these variables directly and not through a context-pointer.
 
@@ -66,7 +66,7 @@ bool testReadWriteOfObjects(){
         && testPayloadReadWrite()
         && testAttributeReadWrite()
         && testCallableReadWrite();
-        ;
+        ;       
 }
 
 void main()
