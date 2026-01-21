@@ -1,6 +1,4 @@
-//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
-//  This test explicitly verifies SROA with ADCE behavior - requires full optimization pipeline.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-use-entrypoint-name -enable-experimental-passes
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -fvk-use-entrypoint-name -enable-experimental-passes
 
 // This test checks that spirv-opt is running SROA (scalar replacement of aggregates) to 
 // hoist out all member variables of a struct. If this sucsessfully runs, we should not see

@@ -268,6 +268,11 @@ static int glslang_optimizeSPIRV(
 
     spvtools::Optimizer optimizer(targetEnv);
 
+    // WORKAROUND: Disable ADCE when debug info is enabled to avoid SPIRV-Tools bug where
+    // eliminate-dead-code-aggressive removes IDs still referenced by DebugScope instructions.
+    // See: https://github.com/KhronosGroup/SPIRV-Tools/issues/XXXX
+    const bool enableADCE = (debugInfoType == SLANG_DEBUG_INFO_LEVEL_NONE);
+
     auto messageConsumer = [&](spv_message_level_t level,
                                const char* source,
                                const spv_position_t& position,
@@ -351,7 +356,10 @@ static int glslang_optimizeSPIRV(
 
             optimizer.RegisterPass(spvtools::CreateEliminateDeadFunctionsPass()); // 3
 
+            if (enableADCE)
+            {
             optimizer.RegisterPass(spvtools::CreateAggressiveDCEPass());
+            }
             optimizer.RegisterPass(spvtools::CreatePrivateToLocalPass());
 
             optimizer.RegisterPass(spvtools::CreateScalarReplacementPass(100));
