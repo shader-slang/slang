@@ -4,7 +4,7 @@
 // to subsequent cases, with WaveActiveSum to verify thread counts.
 
 // GPU backends only - wave ops not supported on CPU
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -shaderobj
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -dx12 -profile cs_6_0 -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
