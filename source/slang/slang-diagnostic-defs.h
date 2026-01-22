@@ -1032,12 +1032,6 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 DIAGNOSTIC(
-    30100,
-    Error,
-    sizeOfDescriptorHandleNotAllowed,
-    "sizeof/alignof of 'DescriptorHandle' is not allowed because its size is target-dependent; "
-    "use reflection API to query size at runtime")
-DIAGNOSTIC(
     30083,
     Error,
     countOfArgumentIsInvalid,
@@ -3252,4 +3246,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC
