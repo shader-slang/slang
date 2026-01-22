@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -120,8 +120,8 @@ jobs:
             -emit-spirv-via-glsl \
             -ignore-abort-msg \
             -api vk \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
-            -expected-failure-list tests/expected-glsl-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
   test-slang-rhi:
@@ -133,7 +133,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -204,7 +204,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
