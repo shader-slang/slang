@@ -27,8 +27,6 @@ if(EMSCRIPTEN)
         PUBLIC
         "--bind"
         "--emit-tsd" "interface.d.ts"
-        "-sEXPORT_ES6=1"
-        "-sMODULARIZE=1"
         "-sEXPORTED_RUNTIME_METHODS=['FS']"
     )
 endif()
