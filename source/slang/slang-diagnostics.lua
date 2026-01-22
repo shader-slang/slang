@@ -48,6 +48,15 @@
 -- )
 -- ~from:Type declares 'from' as Type* inline (no need to declare separately)
 --
+-- err(
+--     "multiple type errors",
+--     30009,
+--     "expression has multiple type errors",
+--     span("expression:Expr", "expression here"),
+--     variadic_span("Error", "error_expr:Expr", "type error: ~error_expr.type")
+-- )
+-- Variadic span: Creates nested struct Error with error_expr member, List<Error> errors
+--
 -- Interpolation syntax:
 --   ~param           - String parameter (default)
 --   ~param:Type      - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
@@ -66,11 +75,18 @@
 --   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
 --   span(location, message) - Create a secondary span
 --   note(location, message) - Create a note (appears after the main diagnostic)
+--   variadic_span(struct_name, location, message) - Create a variadic span with AoS layout
+--     struct_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
+--     Exclusive interpolants become members of the nested struct
+--   variadic_note(struct_name, location, message) - Create a variadic note with AoS layout
+--     struct_name: Name for nested struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
 
 -- Load helper functions
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
 local span = helpers.span
 local note = helpers.note
+local variadic_span = helpers.variadic_span
+local variadic_note = helpers.variadic_note
 local err = helpers.err
 local warning = helpers.warning
 
@@ -89,6 +105,22 @@ err(
   "function '~function' already has a body",
   span("function:Decl", "redeclared here"),
   note("original:Decl", "see previous definition of '~function'")
+)
+
+err(
+  "multiple type errors",
+  30202,
+  "expression has multiple type errors",
+  span("expression:Expr", "expression here"),
+  variadic_span("Error", "error_expr:Expr", "type error: ~error_expr.type")
+)
+
+err(
+  "ambiguous overload for name with args",
+  39999,
+  "ambiguous call to '~name' with arguments of type ~args",
+  span("expr:Expr", "in call expression"),
+  variadic_note("Candidate", "candidate:Decl", "candidate: ~candidate_signature")
 )
 
 -- Process and validate all diagnostics
