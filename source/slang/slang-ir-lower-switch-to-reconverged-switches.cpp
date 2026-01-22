@@ -128,6 +128,8 @@
 
 #include "slang-ir-lower-switch-to-reconverged-switches.h"
 
+#include <atomic>
+
 #include "slang-ir-clone.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-insts.h"
@@ -144,6 +146,11 @@ namespace Slang
 // (stageIdx >= _ft_stage) will fail, skipping remaining stages.
 // This requires that no fallthrough group has this many or more cases.
 static const IRIntegerValue kBreakStageSentinel = INT32_MAX;
+
+// Counter for generating unique variable names for nested switch transformations.
+// Each switch transformation gets a unique ID to prevent variable name collisions
+// when switches are nested (e.g., switch inside switch with fallthrough).
+static std::atomic<int> g_switchTransformCounter{0};
 
 // Forward declarations
 static bool isInstructionSafeForFallthrough(IRInst* inst);
@@ -1225,9 +1232,18 @@ struct SwitchLoweringContext
         auto intType = originalSelector->getDataType();
 
         // Create variables for fallthroughSelector and fallthroughStage
-        // We add name hints to prevent register allocation from coalescing these
+        // We add unique name hints to prevent register allocation from coalescing these
         // with other variables (which could cause incorrect code generation).
+        // Each switch transformation gets a unique ID to avoid name collisions
+        // when switches are nested.
         builder->setInsertBefore(switchInst);
+
+        // Generate unique variable names for this switch transformation
+        int switchId = g_switchTransformCounter.fetch_add(1);
+        StringBuilder selectorName;
+        selectorName << "_ft_selector_" << switchId;
+        StringBuilder stageName;
+        stageName << "_ft_stage_" << switchId;
 
         // Skip value for selector: -1 means "don't go through second switch"
         auto skipSelectorValue = builder->getIntValue(intType, -1);
@@ -1237,11 +1253,11 @@ struct SwitchLoweringContext
         auto maxStageValue = builder->getIntValue(intType, kBreakStageSentinel);
 
         auto fallthroughSelectorVar = builder->emitVar(intType);
-        builder->addNameHintDecoration(fallthroughSelectorVar, UnownedStringSlice("_ft_selector"));
+        builder->addNameHintDecoration(fallthroughSelectorVar, selectorName.getUnownedSlice());
         builder->emitStore(fallthroughSelectorVar, skipSelectorValue);
 
         auto fallthroughStageVar = builder->emitVar(intType);
-        builder->addNameHintDecoration(fallthroughStageVar, UnownedStringSlice("_ft_stage"));
+        builder->addNameHintDecoration(fallthroughStageVar, stageName.getUnownedSlice());
         builder->emitStore(fallthroughStageVar, zeroValue);
 
         // --- Build the first switch ---
