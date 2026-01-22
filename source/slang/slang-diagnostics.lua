@@ -57,6 +57,17 @@
 -- )
 -- Variadic span: Creates nested struct Error with error_expr member, List<Error> errors
 --
+-- err(
+--     "conflicting attributes",
+--     30010,
+--     "conflicting attributes on declaration",
+--     span("decl:Decl", "declaration here"),
+--     note("attr1:Decl", "first attribute here",
+--          span("attr1_arg:Expr", "with argument"),
+--          span("attr1_type:Type", "of type"))
+-- )
+-- Notes can have additional spans: Provide more context within a note
+--
 -- Interpolation syntax:
 --   ~param           - String parameter (default)
 --   ~param:Type      - Typed parameter (Type, Decl, Expr, Stmt, Val, Name, int)
@@ -74,12 +85,14 @@
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
 --   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
 --   span(location, message) - Create a secondary span
---   note(location, message) - Create a note (appears after the main diagnostic)
+--   note(location, message, span1, span2, ...) - Create a note (appears after the main diagnostic)
+--     Optional span arguments can be added to attach additional spans to the note
 --   variadic_span(struct_name, location, message) - Create a variadic span with AoS layout
 --     struct_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
 --     Exclusive interpolants become members of the nested struct
---   variadic_note(struct_name, location, message) - Create a variadic note with AoS layout
+--   variadic_note(struct_name, location, message, span1, span2, ...) - Create a variadic note with AoS layout
 --     struct_name: Name for nested struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
+--     Optional span arguments can be added to attach additional spans to the note
 
 -- Load helper functions
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
@@ -121,6 +134,14 @@ err(
   "ambiguous call to '~name' with arguments of type ~args",
   span("expr:Expr", "in call expression"),
   variadic_note("Candidate", "candidate:Decl", "candidate: ~candidate_signature")
+)
+
+err(
+  "note with spans test",
+  39998,
+  "this is a test diagnostic with spans in notes",
+  span("expr:Expr", "main expression"),
+  note("decl:Decl", "see declaration here", span("attr:Decl", "with attribute"), span("param:Expr", "used here"))
 )
 
 -- Process and validate all diagnostics

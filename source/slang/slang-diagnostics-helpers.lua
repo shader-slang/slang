@@ -12,13 +12,15 @@ local function span(location, message)
   }
 end
 
--- Helper function to create a note
-local function note(location, message)
+-- Helper function to create a note with optional additional spans
+local function note(location, message, ...)
+  local extra_spans = {...}
   return {
     location = location,
     message = message,
     is_note = true,
     variadic = false,
+    spans = #extra_spans > 0 and extra_spans or nil,
   }
 end
 
@@ -36,13 +38,15 @@ end
 
 -- Helper function to create a variadic note (generates a nested struct and List<>)
 -- struct_name: Name for the struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
-local function variadic_note(struct_name, location, message)
+local function variadic_note(struct_name, location, message, ...)
+  local extra_spans = {...}
   return {
     location = location,
     message = message,
     is_note = true,
     variadic = true,
     struct_name = struct_name,
+    spans = #extra_spans > 0 and extra_spans or nil,
   }
 end
 
@@ -68,6 +72,7 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
           message = s.message,
           variadic = s.variadic,
           struct_name = s.struct_name,
+          spans = s.spans,
         })
       else
         table.insert(secondary_spans, {
@@ -298,6 +303,19 @@ local function validate_diagnostic(diag, index)
         for _, err in ipairs(note_errors) do
           table.insert(errors, err)
         end
+        -- Validate spans within notes
+        if note.spans then
+          if type(note.spans) ~= "table" then
+            table.insert(errors, diagnostic_name .. ".notes[" .. i .. "].spans must be a table")
+          else
+            for j, span in ipairs(note.spans) do
+              local span_errors = validate_span(span, diagnostic_name .. ".notes[" .. i .. "].spans[" .. j .. "]")
+              for _, err in ipairs(span_errors) do
+                table.insert(errors, err)
+              end
+            end
+          end
+        end
       end
     end
   end
@@ -416,6 +434,12 @@ local function process_diagnostics(diagnostics_table)
               variadic_structs[note.struct_name] = { params = {}, locations = {}, container_type = "note", container = note }
             end
           end
+          -- Collect locations from spans within notes
+          if note.spans then
+            for _, span in ipairs(note.spans) do
+              collect_location(span)
+            end
+          end
         end
       end
 
@@ -487,6 +511,12 @@ local function process_diagnostics(diagnostics_table)
       if diag.notes then
         for j, note in ipairs(diag.notes) do
           process_message_container(note, diagnostic_name .. ".notes[" .. j .. "]")
+          -- Process spans within notes
+          if note.spans then
+            for k, span in ipairs(note.spans) do
+              process_message_container(span, diagnostic_name .. ".notes[" .. j .. "].spans[" .. k .. "]")
+            end
+          end
         end
       end
 

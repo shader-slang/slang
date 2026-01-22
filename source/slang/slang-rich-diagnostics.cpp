@@ -222,6 +222,17 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
         DiagnosticNote note;
         note.span.range = SourceRange{$(lua_module.getLocationExpr(var_map[note.location_name], note.location_type))};
         note.message = $(buildMessage(note.message_parts, var_map, vs));
+%                 if note.spans and #note.spans > 0 then
+        // Add additional spans to note
+%                     for _, span in ipairs(note.spans) do
+        {
+            DiagnosticSpan span;
+            span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
+            span.message = $(buildMessage(span.message_parts));
+            note.secondarySpans.add(span);
+        }
+%                     end
+%                 end
         result.notes.add(note);
     }
 %             else
@@ -229,6 +240,17 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
         DiagnosticNote note;
         note.span.range = SourceRange{$(lua_module.getLocationExpr(note.location_name, note.location_type))};
         note.message = $(buildMessage(note.message_parts));
+%                 if note.spans and #note.spans > 0 then
+        // Add additional spans to note
+%                     for _, span in ipairs(note.spans) do
+        {
+            DiagnosticSpan span;
+            span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
+            span.message = $(buildMessage(span.message_parts));
+            note.secondarySpans.add(span);
+        }
+%                     end
+%                 end
         result.notes.add(note);
     }
 %             end
