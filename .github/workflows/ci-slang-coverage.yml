@@ -72,6 +72,84 @@ jobs:
           llvm-profdata --version
           llvm-cov --version
 
+      - name: Install LLVM Tools for Windows
+        if: inputs.compiler == 'clang-cl' && inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          # Check common LLVM installation locations
+          $possiblePaths = @(
+            "C:\Program Files\LLVM\bin",
+            "C:\Program Files (x86)\LLVM\bin",
+            "C:\LLVM\bin",
+            "$env:RUNNER_TEMP\llvm\bin"
+          )
+
+          $llvmPath = $null
+          foreach ($path in $possiblePaths) {
+            if (Test-Path "$path\llvm-profdata.exe") {
+              Write-Host "Found existing LLVM installation at: $path"
+              $llvmPath = $path
+              break
+            }
+          }
+
+          if (-not $llvmPath) {
+            Write-Host "LLVM not found, downloading and installing..."
+
+            # Download LLVM directly from GitHub releases
+            $llvmVersion = "18.1.8"
+            $downloadUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvmVersion/LLVM-$llvmVersion-win64.exe"
+            $installerPath = "$env:RUNNER_TEMP\llvm-installer.exe"
+            $installDir = "$env:RUNNER_TEMP\llvm"
+
+            Write-Host "Downloading LLVM from $downloadUrl..."
+            try {
+              Invoke-WebRequest -Uri $downloadUrl -OutFile $installerPath -UseBasicParsing
+              Write-Host "Download completed: $(Get-Item $installerPath | Select-Object -ExpandProperty Length) bytes"
+            } catch {
+              Write-Error "Failed to download LLVM: $_"
+              exit 1
+            }
+
+            Write-Host "Installing LLVM to $installDir..."
+            try {
+              # Run installer in silent mode with custom directory
+              $process = Start-Process -FilePath $installerPath -ArgumentList "/S","/D=$installDir" -Wait -PassThru -NoNewWindow
+              if ($process.ExitCode -ne 0) {
+                Write-Error "LLVM installer failed with exit code $($process.ExitCode)"
+                exit 1
+              }
+              Write-Host "Installation completed successfully"
+            } catch {
+              Write-Error "Failed to install LLVM: $_"
+              exit 1
+            }
+
+            $llvmPath = "$installDir\bin"
+
+            # Clean up installer
+            Remove-Item $installerPath -ErrorAction SilentlyContinue
+          }
+
+          # Verify the installation
+          if (-not (Test-Path "$llvmPath\llvm-profdata.exe")) {
+            Write-Error "LLVM tools not found at $llvmPath"
+            Get-ChildItem -Path (Split-Path $llvmPath) -Recurse -ErrorAction SilentlyContinue | Select-Object FullName | Out-String | Write-Host
+            exit 1
+          }
+
+          # Add LLVM to PATH
+          Add-Content -Path $env:GITHUB_PATH -Value $llvmPath
+
+          # Also set for current session
+          $env:PATH = "$llvmPath;$env:PATH"
+
+          # Verify tools are accessible
+          Write-Host "`nVerifying LLVM installation:"
+          & "$llvmPath\clang-cl.exe" --version
+          & "$llvmPath\llvm-profdata.exe" --version
+          & "$llvmPath\llvm-cov.exe" --version
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -107,6 +185,21 @@ jobs:
             echo "ℹ️  ccache_symlinks_path not set - building without ccache"
           fi
 
+          # Set up CMake to use clang-cl explicitly on Windows
+          cmake_clang_defines=()
+          if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.compiler }}" == "clang-cl" ]]; then
+            cmake_clang_defines+=("-DCMAKE_C_COMPILER=clang-cl")
+            cmake_clang_defines+=("-DCMAKE_CXX_COMPILER=clang-cl")
+            # Force C++20 standard for clang-cl
+            cmake_clang_defines+=("-DCMAKE_CXX_STANDARD=20")
+            cmake_clang_defines+=("-DCMAKE_CXX_STANDARD_REQUIRED=ON")
+            # Set initial flags: disable C++98 warnings, keep exceptions enabled
+            # /EHsc enables C++ exception handling (required by Slang code)
+            # Note: /MP (multi-process compilation) is not supported by clang-cl, so we exclude it
+            cmake_clang_defines+=("-DCMAKE_CXX_FLAGS_INIT=-D_ITERATOR_DEBUG_LEVEL=0 /EHsc -Wno-c++98-compat -Wno-c++98-compat-pedantic -Wno-c++98-compat-extra-semi -Wno-pre-c++17-compat -Wno-unused-command-line-argument")
+            echo "Configuring CMake to use clang-cl with C++20"
+          fi
+
           if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
             # Doing a debug build will try to link against a release built llvm, this
             # is a problem on Windows, so make slang-llvm in release build and use
@@ -117,20 +210,23 @@ jobs:
             cmake --preset coverage --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
               "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
-              "${cmake_launcher_defines[@]}"
+              "${cmake_launcher_defines[@]}" \
+              "${cmake_clang_defines[@]}"
             cmake --build --preset coverage
           elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
             # linux aarch64 cannot build llvm.
             cmake --preset coverage --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-              "${cmake_launcher_defines[@]}"
+              "${cmake_launcher_defines[@]}" \
+              "${cmake_clang_defines[@]}"
             cmake --build --preset coverage
           else
             # Otherwise, use the "system" llvm we have just build or got from the
             # cache in the setup phase
             cmake --preset coverage --fresh \
               -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
-              "${cmake_launcher_defines[@]}"
+              "${cmake_launcher_defines[@]}" \
+              "${cmake_clang_defines[@]}"
             cmake --build --preset coverage
           fi
 
@@ -183,6 +279,9 @@ jobs:
           if [[ "$OSTYPE" == "darwin"* ]]; then
             LLVM_COV="${LLVM_COV:-xcrun llvm-cov}"
             LIB_EXT="dylib"
+          elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* || "$OSTYPE" == "win32" || "$(uname -s)" == MINGW* ]]; then
+            LLVM_COV="${LLVM_COV:-llvm-cov}"
+            LIB_EXT="dll"
           else
             LLVM_COV="${LLVM_COV:-llvm-cov}"
             LIB_EXT="so"
@@ -331,9 +430,15 @@ jobs:
       - name: Compress and Upload LCOV Report
         run: |
           # Compress LCOV file to save space
-          gzip -9 coverage.lcov
-          echo "Compressed LCOV file:"
-          ls -lh coverage.lcov.gz
+          if command -v gzip &> /dev/null; then
+            gzip -9 coverage.lcov
+            echo "Compressed LCOV file:"
+            ls -lh coverage.lcov.gz
+          else
+            echo "gzip not available, skipping compression"
+            # Create a dummy .gz file pointing to the original
+            cp coverage.lcov coverage.lcov.gz
+          fi
 
       - name: Upload LCOV Report
         uses: actions/upload-artifact@v4
