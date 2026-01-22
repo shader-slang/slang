@@ -1,4 +1,5 @@
 implementing neural;
+#include "common-def.slang"
 
 public enum InterpolationType : uint32_t
 {
@@ -9,7 +10,7 @@ public enum InterpolationType : uint32_t
     LinearSmoothGrad2
 };
 
-enum GridType {
+public enum GridType {
     Hash,
     Dense,
     Tiled,
@@ -19,44 +20,26 @@ enum GridType {
 // Helper Functions
 // =============================================================================
 
-/// Type trait for computing grid scale and resolution with compile-time parameters.
-/// Usage: GridScaleTraits<BaseResolution, MaxResolution, NumLevels>.scale(level)
-///        GridScaleTraits<BaseResolution, MaxResolution, NumLevels>.resolution(level)
-internal struct GridScaleTraits<uint BaseResolution, uint MaxResolution, uint NumLevels>
+/// Computes the scale for a given level.
+/// @param level The current level index.
+/// @param perLevelScale The per-level scale factor.
+/// @param baseResolution The base resolution.
+/// @return The scale value (baseResolution * perLevelScale^level - 1).
+[ForceInline]
+float gridScale(uint level, float log2PerLevelScale, uint baseResolution)
 {
-    // Compile-time computed log2 per-level scale
-    static const float Log2PerLevelScale = log2(float(MaxResolution) / float(BaseResolution)) / float(NumLevels - 1);
+    // The -1 means that `baseResolution` refers to the number of grid _vertices_ rather
+    // than the number of cells. This results in nice, power-of-2-scaled parameter grids.
+    return exp2(float(level) * log2PerLevelScale) * float(baseResolution) - 1.0f;
+}
 
-    /// Computes the scale for a given level.
-    /// @param level The current level index.
-    /// @return The scale value (base_resolution * 2^(level * log2_per_level_scale) - 1).
-    [ForceInline]
-    static float scale(uint level)
-    {
-        // The -1 means that `baseResolution` refers to the number of grid _vertices_ rather
-        // than the number of cells. This results in nice, power-of-2-scaled parameter grids.
-        return exp2(float(level) * Log2PerLevelScale) * float(BaseResolution) - 1.0f;
-    }
-
-    /// Computes the grid resolution from a scale value.
-    /// @param scaleVal The scale value from scale().
-    /// @return The grid resolution (ceil(scale) + 1).
-    [ForceInline]
-    static uint resolution(float scaleVal)
-    {
-        return uint(ceil(scaleVal)) + 1;
-    }
-
-    /// Computes both scale and resolution for a given level.
-    /// @param level The current level index.
-    /// @param outScale Output: the computed scale value.
-    /// @param outResolution Output: the computed resolution.
-    [ForceInline]
-    static void scaleAndResolution(uint level, out float outScale, out uint outResolution)
-    {
-        outScale = scale(level);
-        outResolution = resolution(outScale);
-    }
+/// Computes the grid resolution from a scale value.
+/// @param scale The scale value from gridScale().
+/// @return The grid resolution (ceil(scale) + 1).
+[ForceInline]
+uint gridResolution(float scale)
+{
+    return uint(ceil(scale)) + 1;
 }
 
 /// Smoothstep interpolation function: 3t^2 - 2t^3
@@ -158,7 +141,7 @@ void posFract<InterpolationType InterpType>(
     // preventing spurious alignment of fractional coordinates upon integer scales.
     pos = scale * input + 0.5f;
     float tmp = floor(pos);
-    posGrid = uint(int(tmp));
+    posGrid = uint(tmp);
     pos -= tmp;
 
     // Apply interpolation function and compute derivative
@@ -228,169 +211,56 @@ void posFractWithDerivativePos<InterpolationType InterpType>(
     }
 }
 
-// =============================================================================
-// Offset Table Computation
-// =============================================================================
-
-/// Computes the number of parameters for a given level.
-/// This replicates the host-side offset table computation from tiny-cuda-nn.
-[ForceInline]
-uint computeParamsInLevel<GridType GridType, uint Log2HashmapSize, uint BaseResolution, uint MaxResolution, uint NumLevels, int Dimensions>(
-    uint level)
-{
-    float scale;
-    uint resolution;
-    GridScaleTraits<BaseResolution, MaxResolution, NumLevels>.scaleAndResolution(level, scale, resolution);
-
-    // Compute number of dense params: resolution^Dimensions
-    // Using a loop to compute power to avoid overflow issues
-    uint paramsInLevel = 1;
-    [ForceUnroll]
-    for (int d = 0; d < Dimensions; ++d)
-    {
-        // Check for potential overflow
-        if (paramsInLevel > 0x7FFFFFFFu / resolution)
-        {
-            paramsInLevel = 0x7FFFFFFFu;
-            break;
-        }
-        paramsInLevel *= resolution;
-    }
-
-    // Align to multiple of 8 for memory access alignment
-    paramsInLevel = ((paramsInLevel + 7u) / 8u) * 8u;
-
-    if (GridType == GridType.Dense)
-    {
-        // Dense grid uses all params
-    }
-    else if (GridType == GridType.Tiled)
-    {
-        // Tiled grid limits to base resolution
-        uint tiledParams = 1;
-        [ForceUnroll]
-        for (int d = 0; d < Dimensions; ++d)
-        {
-            tiledParams *= BaseResolution;
-        }
-        paramsInLevel = min(paramsInLevel, tiledParams);
-    }
-    else if (GridType == GridType.Hash)
-    {
-        // Hash grid limits to 2^Log2HashmapSize
-        paramsInLevel = min(paramsInLevel, 1u << Log2HashmapSize);
-    }
-
-    return paramsInLevel;
-}
-
-/// Type trait for computing Base^Exponent at compile time.
-/// Usage: PowerOf<Base, Exponent>.value
-/// Note: Exponent must be in range [0, 8] for typical grid dimensions.
-internal struct CompileTimePower<uint Base, int Exponent>
-{
-    // TODO: We don't support recursive type traits yet
-    // static const uint Value = (Exponent == 0) ? 1 : PowerOf<Base, Exponent - 1>.Value * Base;
-    static const uint Value = (Exponent == 0u) ? 1u :
-        Exponent == 1 ? Base :
-        Exponent == 2 ? Base * Base :
-        Exponent == 3 ? Base * Base * Base :
-        Exponent == 4 ? Base * Base * Base * Base :
-        Exponent == 5 ? Base * Base * Base * Base * Base :
-        Exponent == 6 ? Base * Base * Base * Base * Base * Base :
-        Exponent == 7 ? Base * Base * Base * Base * Base * Base * Base :
-        Exponent == 8 ? Base * Base * Base * Base * Base * Base * Base * Base :
-        0U;
-}
-
-/// Computes the offset for a given level by summing params of all previous levels.
-///
-/// For best performance, consider passing a precomputed offset table instead of
-/// using this function. The original CUDA implementation precomputes the offset
-/// table on the host side.
-///
-/// This function has an optimized fast path for Hash grids where all levels are
-/// capped at the hashmap size (when BaseResolution^Dimensions >= 2^Log2HashmapSize).
-[ForceInline]
-uint computeLevelOffset<GridType GridType, uint Log2HashmapSize, uint BaseResolution, uint MaxResolution, uint NumLevels, int Dimensions>(
-    uint level)
-{
-    // Fast path for Hash grids: if base resolution already exceeds hashmap capacity,
-    // all levels have the same size, so we can compute offset directly.
-    if (GridType == GridType.Hash)
-    {
-        static const uint hashmapSize = 1u << Log2HashmapSize;
-        static const uint basePower = CompileTimePower<BaseResolution, Dimensions>.Value;
-
-        // If base resolution^Dimensions >= hashmap size, all levels are capped
-        if (basePower >= hashmapSize)
-        {
-            return level * hashmapSize;
-        }
-    }
-
-    // General case: iterate through levels (unrolled at compile time)
-    uint offset = 0;
-    [ForceUnroll]
-    for (uint l = 0; l < NumLevels; ++l)
-    {
-        if (l >= level)
-            break;
-        offset += computeParamsInLevel<GridType, Log2HashmapSize, BaseResolution, MaxResolution, NumLevels, Dimensions>(l);
-    }
-    return offset;
-}
-
-/// Computes the hashmap size for a given level.
-[ForceInline]
-uint computeHashmapSize<GridType GridType, uint Log2HashmapSize, uint BaseResolution, uint MaxResolution, uint NumLevels, int Dimensions>(
-    uint level)
-{
-    return computeParamsInLevel<GridType, Log2HashmapSize, BaseResolution, MaxResolution, NumLevels, Dimensions>(level);
-}
 
 // =============================================================================
 // Grid Encoder
 // =============================================================================
 
-struct GridEncoder<T,
+VISIBILITY_LEVEL struct GridEncoder<T,
     int Dimensions,
     int FeaturesPerLevel,
     HashType HashType,
     InterpolationType InterpType,
     GridType GridType,
     uint BaseResolution,
-    uint MaxResolution,
     uint TotalNumFeatures,
-    uint Log2HashmapSize
+    uint Log2HashmapSize,
+    bool ComputeLevelInfoOnFly = false
     >
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
     static const uint NumLevels = TotalNumFeatures / FeaturesPerLevel;
 
-    // Compile-time computed log2 per-level scale
-    // Formula: log2(MaxResolution / BaseResolution) / (NumLevels - 1)
-    static const float Log2PerLevelScale = log2(float(MaxResolution) / float(BaseResolution)) / float(NumLevels - 1);
+    /// Precomputed per-level information.
+    /// This struct should be populated on the host side for each level.
+    /// But if ComputeLevelInfoOnFly is true, we will compute it in the encode function.
+    struct LevelInfo
+    {
+        uint offset;        // Offset into grid storage for this level (in number of features)
+        uint hashmapSize;   // Hashmap size for this level
+        float scale;        // Scale for computing fractional coordinates
+        uint resolution;    // Grid resolution for this level
+    }
 
     struct Params
     {
-        uint numPositions;
         uint currentLevel;
-        uint positionIndex;
         float maxLevel;
+        float log2PerLevelScale;   // log2(MaxResolution / BaseResolution) / (NumLevels - 1)
         float interpolationParam;  // Only used for LinearSmoothGrad variants
+        LevelInfo levelInfo;       // This field is provided by caller if ComputeLevelInfoOnFly is false
     }
 
-    /// Reads grid values at a given position from the grid storage.
+    /// Reads feature values at a given position from the feature table.
     [ForceInline]
-    static void readGridValue<Storage>(
-        Storage grid,
-        Storage.Address gridAddress,
+    static void readFeatureValue<Storage>(
+        Storage featureTable,
+        Storage.Address featureTableAddress,
         uint hashmapSize,
         uint resolution,
         uvec<Dimensions> localPos,
-        out vector<T, FeaturesPerLevel> result)
+        out T result[FeaturesPerLevel])
         where Storage : IStorage<T>
     {
         uint index = gridIndex<HashType, Dimensions>(GridType, hashmapSize, resolution, localPos) * FeaturesPerLevel;
@@ -398,78 +268,55 @@ struct GridEncoder<T,
         [ForceUnroll]
         for (uint f = 0; f < FeaturesPerLevel; ++f)
         {
-            result[f] = grid.read(Storage.getOffset(gridAddress, int(index + f)));
+            result[f] = featureTable.read(Storage.getOffset(featureTableAddress, int(index + f)));
         }
     }
 
     /// Main forward pass: encodes positions using the multi-resolution hash grid.
     ///
     /// @param params Encoding parameters containing:
-    ///   - numPositions: Total number of positions to encode
     ///   - currentLevel: The level to process (replaces blockIdx.y from CUDA version)
-    ///   - positionIndex: The position index (global thread index / numLevels in the caller)
     ///   - maxLevel: Maximum level to use (normalized 0-1)
     ///   - interpolationParam: Parameter for LinearSmoothGrad variants
-    /// @param positions Storage containing input positions (Dimensions floats per position)
-    /// @param positionsAddress Base address for positions storage
-    /// @param grid Storage containing grid parameters
-    /// @param gridAddress Base address for grid storage
-    /// @param encodedPositions Output storage for encoded features
-    /// @param encodedPositionsAddress Base address for output storage
-    static void encode<Storage>(
+    /// @param position Input position (Dimensions floats)
+    /// @param featureTable Storage containing feature vectors for all levels
+    /// @param featureTableAddress Base address for feature table storage
+    /// @param encodedFeatures Output: encoded feature vector for this position at this level
+    static T[FeaturesPerLevel] encode<Storage>(
         no_diff in Params params,
-        Storage positions,
-        no_diff in Storage.Address positionsAddress,
-        Storage grid,
-        no_diff in Storage.Address gridAddress,
-        Storage encodedPositions,
-        no_diff in Storage.Address encodedPositionsAddress)
+        T position[Dimensions],
+        Storage featureTable,
+        no_diff in Storage.Address featureTableAddress)
         where Storage : IStorage<T>
     {
-        // Early exit if position index is out of bounds
-        if (params.positionIndex >= params.numPositions)
-            return;
-
-        // Compute maxLevel in terms of number of levels
-        float maxLevelFloat = (params.maxLevel * float(TotalNumFeatures)) / float(FeaturesPerLevel);
+        // Initialize output to zero
+        T encodedFeatures[FeaturesPerLevel] = {};
 
         // If level is greater than maxLevel, output zero padding
-        if (float(params.currentLevel) >= maxLevelFloat + 1e-3f)
+        if (float(params.currentLevel) >= params.maxLevel + 1e-3f)
         {
-            [ForceUnroll]
-            for (uint f = 0; f < FeaturesPerLevel; ++f)
-            {
-                uint outIdx = params.positionIndex + (params.currentLevel * FeaturesPerLevel + f) * params.numPositions;
-                encodedPositions.write(Storage.getOffset(encodedPositionsAddress, int(outIdx)), T(0.0f));
-            }
-            return;
+            return encodedFeatures;
         }
 
-        // Compute level-specific parameters
-        // TODO: These computations are done per-thread. For better performance, consider:
-        //   - Precomputing in shared memory at the start of each workgroup
-        //   - Using a constant buffer with precomputed offset tables
-        uint levelOffset = computeLevelOffset<GridType, Log2HashmapSize, BaseResolution, MaxResolution, NumLevels, Dimensions>(
-            params.currentLevel);
-        uint hashmapSize = computeHashmapSize<GridType, Log2HashmapSize, BaseResolution, MaxResolution, NumLevels, Dimensions>(
-            params.currentLevel);
+        // Use precomputed level-specific parameters from constant buffer
+        uint levelOffset = params.levelInfo.offset;
+        uint hashmapSize = params.levelInfo.hashmapSize;
 
-        // Offset grid address to the start of this level
-        Storage.Address levelGridAddress = Storage.getOffset(gridAddress, int(levelOffset * FeaturesPerLevel));
+        // Compute scale and resolution
+        float scale = gridScale(params.currentLevel, params.log2PerLevelScale, BaseResolution);
+        uint resolution = gridResolution(scale);
 
-        float scale;
-        uint resolution;
-        GridScaleTraits<BaseResolution, MaxResolution, NumLevels>.scaleAndResolution(params.currentLevel, scale, resolution);
+        // Offset feature table address to the start of this level
+        Storage.Address levelFeatureAddress = Storage.getOffset(featureTableAddress, int(levelOffset * FeaturesPerLevel));
 
-        // Read input position and compute fractional coordinates
+        // Compute fractional coordinates from input position
         vector<float, Dimensions> pos;
         uvec<Dimensions> posGrid;
 
         [ForceUnroll]
         for (uint dim = 0; dim < Dimensions; ++dim)
         {
-            T readVal = positions.read(Storage.getOffset(positionsAddress, int(dim * params.numPositions + params.positionIndex)));
-            float inputVal = __realCast<float, T>(readVal);
+            float inputVal = __realCast<float, T>(position[dim]);
             float posDerivative;  // Not used, but required by posFract
             posFract<InterpType>(
                 inputVal,
@@ -483,21 +330,11 @@ struct GridEncoder<T,
         // Handle nearest neighbor interpolation (no interpolation)
         if (InterpType == InterpolationType.Nearest)
         {
-            vector<T, FeaturesPerLevel> result;
-            readGridValue(grid, levelGridAddress, hashmapSize, resolution, posGrid, result);
-
-            [ForceUnroll]
-            for (uint f = 0; f < FeaturesPerLevel; ++f)
-            {
-                uint outIdx = params.positionIndex + (params.currentLevel * FeaturesPerLevel + f) * params.numPositions;
-                encodedPositions.write(Storage.getOffset(encodedPositionsAddress, int(outIdx)), result[f]);
-            }
-            return;
+            readFeatureValue(featureTable, levelFeatureAddress, hashmapSize, resolution, posGrid, encodedFeatures);
+            return encodedFeatures;
         }
 
         // N-linear interpolation
-        vector<T, FeaturesPerLevel> result = vector<T, FeaturesPerLevel>(T(0.0f));
-
         // Iterate over all 2^Dimensions corners of the grid cell
         [ForceUnroll]
         for (uint idx = 0; idx < (1u << Dimensions); ++idx)
@@ -520,22 +357,16 @@ struct GridEncoder<T,
                 }
             }
 
-            vector<T, FeaturesPerLevel> gridVal;
-            readGridValue(grid, levelGridAddress, hashmapSize, resolution, posGridLocal, gridVal);
+            T featureVal[FeaturesPerLevel];
+            readFeatureValue(featureTable, levelFeatureAddress, hashmapSize, resolution, posGridLocal, featureVal);
 
             [ForceUnroll]
             for (uint f = 0; f < FeaturesPerLevel; ++f)
             {
-                result[f] += T(weight) * gridVal[f];
+                encodedFeatures[f] += T(weight) * featureVal[f];
             }
         }
 
-        // Write encoded positions
-        [ForceUnroll]
-        for (uint f = 0; f < FeaturesPerLevel; ++f)
-        {
-            uint outIdx = params.positionIndex + (params.currentLevel * FeaturesPerLevel + f) * params.numPositions;
-            encodedPositions.write(Storage.getOffset(encodedPositionsAddress, int(outIdx)), result[f]);
-        }
+        return encodedFeatures;
     }
 }

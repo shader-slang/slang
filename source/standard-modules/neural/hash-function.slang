@@ -1,10 +1,6 @@
 implementing neural;
 
-#ifdef UNIT_TEST
-#define VISIBILITY_LEVEL public
-#else
-#define VISIBILITY_LEVEL internal
-#endif
+#include "common-def.slang"
 
 VISIBILITY_LEVEL typealias uvec<int Dim> = Array<uint32_t, Dim>;
 
@@ -26,7 +22,7 @@ VISIBILITY_LEVEL struct Pcg32
 	uint64_t state;
 	uint64_t inc;
 
-	__init(uint64_t initstate, uint64_t initseq = 1)
+	VISIBILITY_LEVEL __init(uint64_t initstate, uint64_t initseq = 1)
 	{
 		state = 0;
 		inc = (initseq << 1) | 1;
@@ -36,7 +32,7 @@ VISIBILITY_LEVEL struct Pcg32
 	}
 
 	[mutating]
-	uint32_t nextUint()
+	VISIBILITY_LEVEL uint32_t nextUint()
 	{
 		uint64_t oldstate = state;
 		state = oldstate * Mult + inc;
@@ -46,7 +42,7 @@ VISIBILITY_LEVEL struct Pcg32
 	}
 
 	[mutating]
-	void advance(int64_t delta)
+	VISIBILITY_LEVEL void advance(int64_t delta)
 	{
 		uint64_t curMult = Mult;
 		uint64_t curPlus = inc;
