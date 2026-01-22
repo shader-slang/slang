@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -75,13 +75,8 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-          # Verify GPU is accessible
-          echo "=== GPU Info ==="
-          nvidia-smi
-
-          # Check CUDA
-          echo "=== CUDA libraries ==="
-          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
+          # Display environment configuration
+          print-env-info
 
       - name: Test Slang
         run: |
@@ -133,7 +128,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -181,6 +176,9 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
+          # Display environment configuration
+          print-env-info
+
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
@@ -204,7 +202,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.1.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -250,6 +248,9 @@ jobs:
 
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # Display environment configuration
+          print-env-info
 
       - name: Run slangpy tests
         run: |
