@@ -2792,6 +2792,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
 
+        // Overload resolution can give us a valid expression with >0 arguments when the type has
+        // parameter pack arguments. This is primarily relevant for Tuple<>
+        List<Expr*> argExprs;
+        overloadContext.args = &argExprs;
+
         auto type = varDecl->getType();
         ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
         auto ctorMethod = getShared()->tryGetImplicitCastMethod(key);

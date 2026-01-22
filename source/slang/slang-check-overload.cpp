@@ -853,6 +853,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     }
     if (context.mode == OverloadResolveContext::Mode::ForReal)
     {
+        SLANG_ASSERT(context.args || (context.argCount == 0 && resultArgs.getCount() == 0));
         context.argCount = resultArgs.getCount();
         if (context.args)
         {
