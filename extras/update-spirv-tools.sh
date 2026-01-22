@@ -16,21 +16,21 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+  echo -e "${GREEN}[INFO]${NC} $1"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+  echo -e "${YELLOW}[WARN]${NC} $1"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+  echo -e "${RED}[ERROR]${NC} $1"
 }
 
 # Check if we're in the repository root
 if [ ! -f "CMakeLists.txt" ] || [ ! -d "external/spirv-tools" ]; then
-    log_error "This script must be run from the Slang repository root."
-    exit 1
+  log_error "This script must be run from the Slang repository root."
+  exit 1
 fi
 
 COMMIT_HASH="${1:-origin/main}"
@@ -51,8 +51,8 @@ log_info "Resolving commit hash..."
 RESOLVED_COMMIT=$(git -C external/spirv-tools rev-parse "$COMMIT_HASH" 2>/dev/null || echo "")
 
 if [ -z "$RESOLVED_COMMIT" ]; then
-    log_error "Could not resolve commit hash: $COMMIT_HASH"
-    exit 1
+  log_error "Could not resolve commit hash: $COMMIT_HASH"
+  exit 1
 fi
 
 # Extract last 6 characters of commit hash for branch suffix
@@ -65,8 +65,8 @@ log_info "Branch name: $BRANCH_NAME"
 # Step 3: Create a branch for the update
 log_info "Creating branch '$BRANCH_NAME'..."
 git checkout -b "$BRANCH_NAME" || {
-    log_warn "Branch '$BRANCH_NAME' may already exist. Switching to it..."
-    git checkout "$BRANCH_NAME"
+  log_warn "Branch '$BRANCH_NAME' may already exist. Switching to it..."
+  git checkout "$BRANCH_NAME"
 }
 
 # Step 4: Update the SPIRV-Tools submodule to the specified version
@@ -90,14 +90,14 @@ cd ../..
 
 # Step 6: Update SPIRV-Headers to what SPIRV-Tools uses
 log_info "Determining SPIRV-Headers revision from SPIRV-Tools DEPS..."
-SPIRV_HEADERS_REV=$(grep -oP "spirv_headers_revision.*'\K[a-f0-9]+" external/spirv-tools/DEPS || \
-                    grep "spirv_headers_revision" external/spirv-tools/DEPS | grep -oE "[a-f0-9]{40}")
+SPIRV_HEADERS_REV=$(grep -oP "spirv_headers_revision.*'\K[a-f0-9]+" external/spirv-tools/DEPS ||
+  grep "spirv_headers_revision" external/spirv-tools/DEPS | grep -oE "[a-f0-9]{40}")
 
 if [ -z "$SPIRV_HEADERS_REV" ]; then
-    log_error "Could not determine SPIRV-Headers revision from DEPS file."
-    log_info "Contents of spirv_headers_revision line:"
-    grep spirv_headers_revision external/spirv-tools/DEPS
-    exit 1
+  log_error "Could not determine SPIRV-Headers revision from DEPS file."
+  log_info "Contents of spirv_headers_revision line:"
+  grep spirv_headers_revision external/spirv-tools/DEPS
+  exit 1
 fi
 
 log_info "SPIRV-Headers revision: $SPIRV_HEADERS_REV"
@@ -123,8 +123,8 @@ INC_COUNT=$(find external/spirv-tools-generated -maxdepth 1 -name "*.inc" | wc -
 log_info "Copied $H_COUNT .h files and $INC_COUNT .inc files"
 
 if [ "$H_COUNT" -eq 0 ] && [ "$INC_COUNT" -eq 0 ]; then
-    log_error "No generated files were copied. Check if SPIRV-Tools build succeeded."
-    exit 1
+  log_error "No generated files were copied. Check if SPIRV-Tools build succeeded."
+  exit 1
 fi
 
 # Step 8: Stage the changes
