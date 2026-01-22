@@ -41,7 +41,7 @@
 // - This ensures all threads in a fallthrough group reconverge at each if-merge
 //
 // ### Non-Fallthrough Cases
-// - Get selector = MIN_INT (a sentinel value)
+// - Get selector = -1 (a sentinel value)
 // - Their code executes directly after the first switch dispatch
 // - They do NOT go through the second switch's case structure
 // - Their break targets must be redirected to the final break label
@@ -61,8 +61,8 @@
 //   switch(val, secondSwitchEntry, newDefault, 0:dispatch0, 1:dispatch1, 2:dispatch2)
 //   dispatch0: selector=0; stage=0; branch(secondSwitchEntry)
 //   dispatch1: selector=0; stage=1; branch(secondSwitchEntry)
-//   dispatch2: selector=MIN_INT; branch(case2Body)
-//   newDefault: selector=MIN_INT; branch(defaultBody)
+//   dispatch2: selector=-1; branch(case2Body)
+//   newDefault: selector=-1; branch(defaultBody)
 //   
 //   case2Body: c(); branch(secondSwitchEntry)
 //   defaultBody: d(); branch(secondSwitchEntry)
@@ -120,10 +120,10 @@
 //
 // 1. First switch's break label becomes the second switch entry
 // 2. Fallthrough cases: dispatch blocks set selector/stage, branch to second switch
-// 3. Non-fallthrough cases: dispatch blocks set selector=MIN_INT, branch to body
+// 3. Non-fallthrough cases: dispatch blocks set selector=-1, branch to body
 // 4. Non-fallthrough case bodies branch to second switch entry when done
 // 5. Second switch routes selector values to fallthrough groups
-// 6. Second switch's default = break = finalBreak (MIN_INT goes straight to break)
+// 6. Second switch's default = break = finalBreak (-1 goes straight to break)
 // 7. All control flow converges at finalBreak
 
 #include "slang-ir-lower-switch-to-reconverged-switches.h"
@@ -1552,7 +1552,7 @@ struct SwitchLoweringContext
         }
 
         // Emit second switch
-        // Default = break = afterSecondSwitchBlock (MIN_INT selector goes straight to break)
+        // Default = break = afterSecondSwitchBlock (-1 selector goes straight to break)
         builder->setInsertInto(betweenSwitchesBlock);
         builder->emitSwitch(
             fallthroughSelectorLoad2,
