@@ -1595,6 +1595,11 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
+
+    IRType* getDataLayout()
+    {
+        return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr;
+    }
 };
 
 

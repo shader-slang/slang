@@ -3566,7 +3566,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
                 AccessQualifier::ReadWrite,
-                AddressSpace::BuiltinInput),
+                AddressSpace::BuiltinInput,
+                builder.getDefaultBufferLayoutType()),
             kind,
             spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
@@ -7735,9 +7736,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(destPtrType);
 
         auto addrSpace = AddressSpace::Function;
+        IRType* dataLayout = builder.getDefaultBufferLayoutType();
         if (destPtrType->hasAddressSpace())
+        {
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+            dataLayout = destPtrType->getDataLayout();
+        }
+        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
 
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
@@ -7844,7 +7849,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
-            addressSpace);
+            addressSpace,
+            ptrTypeWithNoAddressSpace->getDataLayout());
     }
 
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)

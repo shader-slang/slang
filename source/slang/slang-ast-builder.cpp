@@ -473,17 +473,18 @@ Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
     return res;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace)
+PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace, Type* dataLayout)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
 }
 
 PtrType* ASTBuilder::getPtrType(
     Type* valueType,
     AccessQualifier accessQualifier,
-    AddressSpace addrSpace)
+    AddressSpace addrSpace,
+    Type* dataLayout)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, "PtrType"));
+    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -550,9 +551,34 @@ PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
     Val* accessQualifier,
     Val* addrSpace,
+    Type* dataLayoutType,
     char const* ptrTypeName)
 {
-    Val* args[] = {valueType, accessQualifier, addrSpace};
+    auto declRef = as<DeclRefType>(dataLayoutType)->getDeclRef();
+    auto containerDeclRef = declRef.as<ContainerDecl>();
+    auto dataLayoutInterface = m_sharedASTBuilder->getIBufferDataLayoutType();
+    DeclaredSubtypeWitness* subtypeWitness = nullptr;
+
+    for (auto typeConstraintDeclRef: containerDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeConstraintDecl>())
+    {
+        if (typeConstraintDeclRef->getSup().type == dataLayoutInterface)
+        {
+            subtypeWitness = getDeclaredSubtypeWitness(
+                dataLayoutType,
+                m_sharedASTBuilder->getIBufferDataLayoutType(),
+                typeConstraintDeclRef);
+        }
+    }
+
+    SLANG_RELEASE_ASSERT(subtypeWitness);
+
+    Val* args[] = {
+        valueType,
+        accessQualifier,
+        addrSpace,
+        dataLayoutType,
+        subtypeWitness
+    };
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 
@@ -560,6 +586,7 @@ PtrTypeBase* ASTBuilder::getPtrType(
     Type* valueType,
     AccessQualifier accessQualifier,
     AddressSpace addrSpace,
+    Type* dataLayoutType,
     char const* ptrTypeName)
 {
     Type* typeOfAccessQualifier = getMagicEnumType("AccessQualifier");
@@ -568,6 +595,7 @@ PtrTypeBase* ASTBuilder::getPtrType(
         valueType,
         getIntVal(typeOfAccessQualifier, (IntegerLiteralValue)accessQualifier),
         getIntVal(typeOfAddressSpace, (IntegerLiteralValue)addrSpace),
+        dataLayoutType,
         ptrTypeName));
 }
 

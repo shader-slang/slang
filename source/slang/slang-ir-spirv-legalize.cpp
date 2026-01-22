@@ -236,7 +236,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 builder.setInsertBefore(use->getUser());
                 auto addr = builder.emitFieldAddress(
-                    builder.getPtrType(innerType, AccessQualifier::Read, AddressSpace::Uniform),
+                    builder.getPtrType(innerType, AccessQualifier::Read, AddressSpace::Uniform, builder.getDefaultBufferLayoutType()),
                     cbParamInst,
                     key);
                 use->set(addr);
@@ -543,7 +543,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(innerType, access, addressSpace);
+            ptrType = builder.getPtrType(innerType, access, addressSpace, builder.getDefaultBufferLayoutType());
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -569,7 +569,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 builder.getPtrType(
                                     innerElementType,
                                     ptrType->getAccessQualifier(),
-                                    addressSpace),
+                                    addressSpace,
+                                    builder.getDefaultBufferLayoutType()),
                                 inst,
                                 getElement->getIndex());
                             user->replaceUsesWith(newAddr);
@@ -706,7 +707,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 oldPtrType->getOp(),
                 oldPtrType->getValueType(),
                 oldPtrType->getAccessQualifier(),
-                AddressSpace::Function);
+                AddressSpace::Function,
+                oldPtrType->getDataLayout());
             inst->setFullType(newPtrType);
             addUsersToWorkList(inst);
         }
@@ -761,7 +763,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     oldPtrType->getOp(),
                     oldPtrType->getValueType(),
                     oldPtrType->getAccessQualifier(),
-                    AddressSpace::UserPointer);
+                    AddressSpace::UserPointer,
+                    oldPtrType->getDataLayout());
                 inst->setFullType(newPtrType);
                 addUsersToWorkList(inst);
             }
@@ -836,7 +839,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             oldPtrType->getOp(),
             oldPtrType->getValueType(),
             oldPtrType->getAccessQualifier(),
-            addressSpace);
+            addressSpace,
+            oldPtrType->getDataLayout());
         inst->setFullType(newPtrType);
         addUsersToWorkList(inst);
         return;
@@ -1060,7 +1064,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     oldResultType->getOp(),
                     oldResultType->getValueType(),
                     ptrType->getAccessQualifier(),
-                    ptrType->getAddressSpace());
+                    ptrType->getAddressSpace(),
+                    ptrType->getDataLayout());
                 IRInst* args[2] = {base, index};
                 auto newInst = builder.emitIntrinsicInst(newPtrType, gepInst->getOp(), 2, args);
                 gepInst->replaceUsesWith(newInst);
@@ -1114,7 +1119,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 resultPtrType->getOp(),
                 resultPtrType->getValueType(),
                 ptrOperandType->getAccessQualifier(),
-                ptrOperandType->getAddressSpace());
+                ptrOperandType->getAddressSpace(),
+                ptrOperandType->getDataLayout());
             auto newInst = builder.replaceOperand(&offsetPtrInst->typeUse, newResultType);
             addUsersToWorkList(newInst);
         }
@@ -1172,7 +1178,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(subscript);
             auto newPtrType =
-                builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), AddressSpace::Image);
+                builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), AddressSpace::Image, ptrType->getDataLayout());
             subscript->setFullType(newPtrType);
 
             // HACK: assumes the image operand is a load and replace it with
@@ -1207,7 +1213,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     oldResultType->getOp(),
                     newValueType,
                     ptrType->getAccessQualifier(),
-                    ptrType->getAddressSpace());
+                    ptrType->getAddressSpace(),
+                    ptrType->getDataLayout());
                 auto newInst =
                     builder.emitFieldAddress(newPtrType, inst->getBase(), inst->getField());
                 inst->replaceUsesWith(newInst);
@@ -2327,11 +2334,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 accessQualifier = AccessQualifier::Immutable;
 
             IRBuilder builder(t);
+
             builder.setInsertBefore(t);
             t->replaceUsesWith(builder.getPtrType(
                 lowered.structType,
                 accessQualifier,
-                getStorageBufferAddressSpace()));
+                getStorageBufferAddressSpace(),
+                t->getDataLayout()));
         }
         for (auto t : textureFootprintTypes)
         {
