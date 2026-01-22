@@ -71,8 +71,18 @@ struct EliminateMultiLevelBreakContext
             // If this is a loop, store the continue block.
             // We add it to the exitBlocks stack separately in collectBreakableRegionBlocks
             // so that nested constructs treat it as an exit point.
-            if (as<IRLoop>(headerInst))
+            // We also add it to exitBlocks so that multi-level branches to the continue
+            // block can be detected (e.g., a continue from inside a nested loop/switch).
+            // However, we must NOT add the continue block if it's the same as the target
+            // block (as in do-while(false) loops), because that would prevent the loop
+            // body from being collected.
+            if (auto loop = as<IRLoop>(headerInst))
+            {
                 continueBlock = getContinueBlock();
+                if (continueBlock && continueBlock != getBreakBlock() &&
+                    continueBlock != loop->getTargetBlock())
+                    exitBlocks.add(continueBlock);
+            }
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
