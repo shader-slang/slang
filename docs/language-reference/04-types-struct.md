@@ -4,24 +4,24 @@
 
 Struct *no-body* declaration:
 > [*`modifier-list`*]<br>
-> **`'struct'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
+> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *with-members* declaration:
 > [*`modifier-list`*]<br>
-> **`'struct'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
+> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
 > **`'{'`** *`member-list`* **`'}'`**
 
 Struct *link-time extern type* declaration:
 > [*`modifier-list`*]<br>
-> **`'extern'`** **`'struct'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
+> **`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *link-time export type alias* declaration:
 > [*`modifier-list`*]<br>
-> **`'export'`** **`'struct'`** [*`bracket-attribute-list`*] [*`identifier`*] [*`generic-params-decl`*]<br>
+> **`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
 
 Member list:
@@ -37,7 +37,6 @@ Member list:
 ### Parameters
 
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
-- *`bracket-attribute-list`* is an optional list of bracketed attributes (TODO: link)
 - *`identifier`* is an optional name of the declared struct type
 - *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
 - *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface).
@@ -51,6 +50,10 @@ Member list:
   - *`property-decl`* is a [property declaration](#property).
   - *`subscript-op-decl`* is a [subscript operator declaration](#subscript-op).
   - *`function-call-op-decl`* is a [function call operator declaration](#function-call-op).
+
+> ⚠️ **Warning:** `Slangc` currently accepts bracketed attributes right after the **`'struct'`** keyword. This
+> is deprecated syntax and expected to be removed. Bracketed attributes should be added in *`modifier-list`*,
+> instead. ([Issue #9691](https://github.com/shader-slang/slang/issues/9691))
 
 
 ## Description
