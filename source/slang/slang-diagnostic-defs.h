@@ -1043,11 +1043,7 @@ DIAGNOSTIC(
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
 
-DIAGNOSTIC(
-    30084,
-    Error,
-    floatBitCastTypeMismatch,
-    "'$0' requires a $1 argument")
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
 
 DIAGNOSTIC(
     30085,

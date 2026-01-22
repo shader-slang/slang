@@ -505,7 +505,7 @@ class CountOfExpr : public SizeOfLikeExpr
 /// Expression for compile-time bit casting from floating-point to integer.
 /// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
 /// The input can be:
-///   - A floating-point literal with suffix: 1.0h (half), 1.0f (float), 1.0lf or 1.0 (double)
+///   - A floating-point literal with suffix: 1.0h (half), 1.0f or 1.0 (float), 1.0lf (double)
 ///   - An explicit cast: half(x), float(x), double(x)
 /// Returns:
 ///   - half -> int16_t
