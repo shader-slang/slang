@@ -2162,6 +2162,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     types.add(field->getFieldType());
                 }
+
+                maybeAssignAnonymousMemberNames(as<IRStructType>(inst));
+
                 auto spvStructType = emitOpTypeStruct(inst, types);
                 emitDecorations(inst, getID(spvStructType));
 
@@ -9061,6 +9064,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We can simply emit a store into the backing variable for the DebugValue operation.
         //
         return emitStore(parent, debugValue, debugVar, debugValueVal);
+    }
+
+    void maybeAssignAnonymousMemberNames(IRStructType* structType)
+    {
+        // if any of the members have names associated with them, don't generate any names
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            for (auto decor : key->getDecorations())
+            {
+                if (as<IRNameHintDecoration>(decor) || as<IRLinkageDecoration>(decor))
+                {
+                    return;
+                }
+            }
+        }
+
+        // assign names of the keys to `__memberN`; this aligns with what debuggers expect
+        IRBuilder builder(structType);
+        uint32_t index = 0;
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            StringBuilder sbName;
+            sbName << "__member" << index;
+            builder.addNameHintDecoration(key, sbName.getUnownedSlice());
+            index++;
+        }
     }
 
     IRInst* getName(IRInst* inst)
