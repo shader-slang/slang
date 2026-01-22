@@ -1824,6 +1824,11 @@ public:
         if (expr->value)
             dispatch(expr->value);
     }
+    void visitFloatBitCastExpr(FloatBitCastExpr* expr)
+    {
+        if (expr->value)
+            dispatch(expr->value);
+    }
     void visitExpr(Expr* /*expr*/) {}
 };
 
@@ -7095,6 +7100,21 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     return countOfExpr;
 }
 
+static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
+{
+    FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+
+    // Parse the argument expression
+    // The result type will be determined during semantic checking based on the input type
+    expr->value = parser->ParseExpression();
+
+    parser->ReadMatchingToken(TokenType::RParent);
+
+    return expr;
+}
+
 static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -9740,6 +9760,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
+    _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

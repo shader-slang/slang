@@ -4911,6 +4911,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
     }
 
+    LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
+    {
+        // __floatAsInt should always be constant-folded during semantic checking.
+        // If we reach here, something went wrong.
+        SLANG_UNEXPECTED("__floatAsInt should be constant-folded during type checking");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
