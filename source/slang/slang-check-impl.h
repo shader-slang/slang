@@ -829,6 +829,14 @@ public:
     //
     DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
 
+    void removeInheritanceInfoFromCache(DeclRef<Decl>& key)
+    {
+        if (m_mapDeclRefToInheritanceInfo.tryGetValue(key))
+        {
+            m_mapDeclRefToInheritanceInfo.remove(key);
+        }
+    }
+
 private:
     /// Mapping from type declarations to the known extensiosn that apply to them
     Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
@@ -1160,6 +1168,14 @@ public:
         return result;
     }
 
+    SemanticsContext withInheritanceCacheDisabled(DiagnosticSink* sink)
+    {
+        SemanticsContext result(*this);
+        result.m_sink = sink;
+        result.m_disableCachingInheritanceInfo = true;
+        return result;
+    }
+
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     SemanticsContext excludeTransparentMembersFromLookup()
@@ -1178,6 +1194,8 @@ public:
         return m_shared->getGLSLBindingOffsetTracker();
     }
 
+    bool disableCachingInheritanceInfo() { return m_disableCachingInheritanceInfo; }
+
 private:
     SharedSemanticsContext* m_shared = nullptr;
 
@@ -1188,6 +1206,8 @@ private:
     Decl* m_declToExcludeFromLookup = nullptr;
 
     bool m_excludeTransparentMembersFromLookup = false;
+
+    bool m_disableCachingInheritanceInfo = false;
 
 protected:
     // TODO: consider making more of this state `private`...
