@@ -2151,7 +2151,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // expressions nested in AST locations like: `let x = someFunc((int y)=>{...});
             // (checking of lambda exprs requires parentFunc to be available).
             auto parentFunc = getParentFunc(varDecl);
-            if (parentFunc)
+            if (parentFunc != m_parentFunc)
                 contextToUse = contextToUse.withParentFunc(parentFunc);
 
             SemanticsVisitor subVisitor(contextToUse);

@@ -921,7 +921,8 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
 
     SemanticsVisitor visitor(context);
 
-    auto checkedExpr = visitor.CheckExpr(expr);
+    auto checkedExpr = visitor.CheckTerm(expr);
+    checkedExpr = visitor.maybeResolveOverloadedExpr(checkedExpr, LookupMask::Default, nullptr);
 
     if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {
