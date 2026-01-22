@@ -1,5 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly
+//  TODO: Remove -g0 once SPIRV-Tools regression is fixed, see #9675
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=BUF):-vk -output-using-type -emit-spirv-directly -g0
 
 // CHECK: %[[C0:[0-9A-Za-z_]+]] = OpSpecConstant %int 32
 // CHECK: %[[I2:[0-9A-Za-z_]+]] = OpConstant %int 2

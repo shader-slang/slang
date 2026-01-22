@@ -1,6 +1,4 @@
-//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
-//  This test requires ADCE for mesh shader validation to pass.
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_6 -stage mesh -entry main
+// TEST:SIMPLE(filecheck=CHECK): -target spirv -profile sm_6_6 -stage mesh -entry main -O0
 
 struct MeshOutput
 {
