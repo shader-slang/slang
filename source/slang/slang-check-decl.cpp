@@ -9407,12 +9407,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                 {
                     if (!hasConflict)
                     {
-                        diagnostic = Diagnostics::FunctionRedefinition{
-                            .name = newDecl->getName(),
-                            .function_location = newDecl->getNameLoc()};
+                        diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
                     }
                     auto prevDecl = *found;
-                    diagnostic.original_location = prevDecl->getNameLoc();
+                    diagnostic.original = prevDecl;
                 }
                 else
                 {

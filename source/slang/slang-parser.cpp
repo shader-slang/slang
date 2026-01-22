@@ -6396,6 +6396,7 @@ Stmt* Parser::parseIfLetStatement()
     auto tempVarDecl = astBuilder->create<LetDecl>();
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
+    tempVarDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(currentScope->containerDecl, tempVarDecl);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
@@ -6412,10 +6413,25 @@ Stmt* Parser::parseIfLetStatement()
 
     ReadToken(TokenType::RParent);
 
-    // Create a new scope surrounding the positive statement, will be used for
-    // the variable declared in the if_let syntax
+    // Create scope for the positive statement containing the unwrapped variable.
+    // The variable must be added to scope BEFORE parsing the body, because during
+    // deferred parsing tryParseGenericApp may call CheckTerm which needs to find
+    // the variable.
     ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
     pushScopeAndSetParent(positiveScopeDecl);
+
+    // Create 'let <user_var> = $OptVar.value'
+    MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
+    memberExpr->baseExpression = tempVarExpr;
+    memberExpr->name = getName(this, "value");
+
+    auto varDecl = astBuilder->create<LetDecl>();
+    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->initExpr = memberExpr;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
+    AddMember(positiveScopeDecl, varDecl);
+
+    // Now parse the body with the variable in scope
     ifStatement->positiveStatement = ParseStatement(ifStatement);
     PopScope();
 
@@ -6433,20 +6449,8 @@ Stmt* Parser::parseIfLetStatement()
             seqPositiveStmt = astBuilder->create<SeqStmt>();
         }
 
-        MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
-        memberExpr->baseExpression = tempVarExpr;
-        memberExpr->name = getName(this, "value");
-
-        auto varDecl = astBuilder->create<LetDecl>();
-        varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
-        varDecl->initExpr = memberExpr;
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
         varDeclrStatement->decl = varDecl;
-
-        // Add scope to the variable declared in the if_let syntax such
-        // that this variable cannot be used outside the positive statement
-        AddMember(positiveScopeDecl, varDecl);
 
         seqPositiveStmt->stmts.add(varDeclrStatement);
         seqPositiveStmt->stmts.add(ifStatement->positiveStatement);

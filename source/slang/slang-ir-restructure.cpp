@@ -75,7 +75,94 @@ struct ControlFlowRestructuringContext
 
     /// The region tree we are in the process of building.
     RegionTree* regionTree = nullptr;
+
+    /// Whether to preserve fall-through structure in switch statements.
+    /// When false, fall-through is not preserved (legacy behavior for HLSL/WGSL).
+    bool preserveFallThrough = true;
 };
+
+/// Check if a block or any of its reachable blocks (within a case)
+/// branches unconditionally to the target block.
+/// This is used to detect if a switch case falls through to the next case.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
+static bool caseBlocksFallThroughTo(
+    IRBlock* startBlock,
+    IRBlock* targetBlock,
+    IRBlock* breakLabel,
+    HashSet<IRBlock*>& visited)
+{
+    if (!startBlock || !targetBlock)
+        return false;
+
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
+
+    while (worklist.getCount() > 0)
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Don't follow branches to the break label
+        if (block == breakLabel)
+            continue;
+
+        // If we reached the target, there's fall-through
+        if (block == targetBlock)
+            return true;
+
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        switch (terminator->getOp())
+        {
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = as<IRUnconditionalBranch>(terminator);
+                auto target = branch->getTargetBlock();
+                if (target == targetBlock)
+                    return true;
+                if (target != breakLabel)
+                    worklist.add(target);
+            }
+            break;
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+            {
+                auto branch = as<IRConditionalBranch>(terminator);
+                worklist.add(branch->getTrueBlock());
+                worklist.add(branch->getFalseBlock());
+            }
+            break;
+        case kIROp_Loop:
+            {
+                // For loops, follow the break block (where control goes after the loop)
+                auto loop = as<IRLoop>(terminator);
+                worklist.add(loop->getBreakBlock());
+            }
+            break;
+        case kIROp_Switch:
+            {
+                // For nested switches, follow the break label (where control goes after)
+                auto nestedSwitch = as<IRSwitch>(terminator);
+                worklist.add(nestedSwitch->getBreakLabel());
+            }
+            break;
+        default:
+            // Return, throw, etc. - don't follow
+            break;
+        }
+    }
+
+    return false;
+}
 
 /// Convert a range of blocks in the IR CFG into a region.
 ///
@@ -473,6 +560,9 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                 //
                 bool defaultLabelHandled = false;
 
+                // Track whether we've warned about fall-through being restructured
+                bool warnedAboutFallthrough = false;
+
                 // If the `default` case just branches to
                 // the join point, then we don't need to
                 // do anything with it.
@@ -556,9 +646,42 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     // If there *is* a next `case`, then we will set its
                     // label up as the "end" label when emitting
                     // the statements inside the block.
+                    //
+                    // However, if the target doesn't support fall-through (e.g., HLSL/WGSL),
+                    // we should NOT set the end label to the next case, so that each case
+                    // body will be treated as terminating independently.
+                    // Determine the potential fall-through target
+                    IRBlock* potentialFallThroughTarget = nullptr;
                     if (caseIndex < caseCount)
                     {
-                        caseEndLabel = switchInst->getCaseLabel(caseIndex);
+                        potentialFallThroughTarget = switchInst->getCaseLabel(caseIndex);
+                    }
+                    else if (!defaultLabelHandled && defaultLabel != breakLabel)
+                    {
+                        potentialFallThroughTarget = defaultLabel;
+                    }
+
+                    if (ctx->preserveFallThrough && potentialFallThroughTarget)
+                    {
+                        caseEndLabel = potentialFallThroughTarget;
+                    }
+                    else if (
+                        !ctx->preserveFallThrough && potentialFallThroughTarget &&
+                        !warnedAboutFallthrough && ctx->getSink())
+                    {
+                        // Check if this case actually falls through
+                        HashSet<IRBlock*> visited;
+                        if (caseBlocksFallThroughTo(
+                                caseLabel,
+                                potentialFallThroughTarget,
+                                breakLabel,
+                                visited))
+                        {
+                            ctx->getSink()->diagnose(
+                                switchInst,
+                                Diagnostics::switchFallthroughRestructured);
+                            warnedAboutFallthrough = true;
+                        }
                     }
 
                     // Now we can actually generate the region.
@@ -631,7 +754,10 @@ static RefPtr<Region> generateRegionsForIRBlocks(
     return resultRegion;
 }
 
-RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, DiagnosticSink* sink)
+RefPtr<RegionTree> generateRegionTreeForFunc(
+    IRGlobalValueWithCode* code,
+    DiagnosticSink* sink,
+    bool preserveFallThrough)
 {
     RefPtr<RegionTree> regionTree = new RegionTree();
     regionTree->irCode = code;
@@ -639,6 +765,7 @@ RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, Diagno
     ControlFlowRestructuringContext restructuringContext;
     restructuringContext.sink = sink;
     restructuringContext.regionTree = regionTree;
+    restructuringContext.preserveFallThrough = preserveFallThrough;
 
     regionTree->rootRegion = generateRegionsForIRBlocks(
         &restructuringContext,

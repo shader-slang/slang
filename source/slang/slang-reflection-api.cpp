@@ -638,6 +638,10 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     {
         return convert(matrixType->getElementType());
     }
+    else if (auto streamType = as<HLSLStreamOutputType>(type))
+    {
+        return convert(streamType->getElementType());
+    }
 
     return nullptr;
 }
@@ -1525,6 +1529,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
         return convert(ptrTypeLayout->valueTypeLayout.Ptr());
+    }
+    else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
+    {
+        return convert(streamOutputTypeLayout->elementTypeLayout.Ptr());
     }
     return nullptr;
 }
@@ -3264,6 +3272,55 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
         {
             *rs = constantVal->getValue();
             return 0;
+        }
+        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (int64_t)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (int64_t)floatLit->value;
+                return 0;
+            }
+        }
+    }
+
+    return SLANG_E_INVALID_ARG;
+}
+
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (auto cexpr = as<FloatingPointLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = (float)cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (float)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (float)floatLit->value;
+                return 0;
+            }
         }
     }
 

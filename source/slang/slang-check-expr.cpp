@@ -463,6 +463,15 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             // only to avoid modifying the child
             expr->type.isWriteOnly = baseExpr->type.isWriteOnly || expr->type.isWriteOnly;
 
+            // It's not valid to reference a non-static member with a static
+            // func using 'this'.
+            if (getSink() && m_parentFunc && m_parentFunc->hasModifier<HLSLStaticModifier>() &&
+                !isDeclUsableAsStaticMember(declRef.getDecl()) && as<ThisExpr>(baseExpr))
+            {
+                getSink()->diagnose(loc, Diagnostics::staticRefToThis, declRef.getName());
+                expr->type = m_astBuilder->getErrorType();
+            }
+
             // When referring to a member through an expression,
             // the result is only an l-value if both the base
             // expression and the member agree that it should be.
@@ -4211,6 +4220,10 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
         }
+
+        // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
+        // uint2 otherwise). The size calculation is deferred to IR level where target
+        // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
     }
 
     sizeOfLikeExpr->sizedType = type;
@@ -5575,14 +5588,6 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     baseExpr = derefExpr;
 
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
-    //
-    baseExpr = maybeOpenExistential(baseExpr);
-
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.
     //
@@ -5619,6 +5624,15 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
             overloadedExpr);
         // TODO: handle other cases of OverloadedExpr that need filtering.
     }
+
+    // If the base of the member lookup has an interface type
+    // *without* a suitable this-type substitution, then we are
+    // trying to perform lookup on a value of existential type,
+    // and we should "open" the existential here so that we
+    // can expose its structure.
+    //
+    baseExpr = maybeOpenExistential(baseExpr);
+
 
     return baseExpr;
 }

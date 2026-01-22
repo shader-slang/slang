@@ -3026,7 +3026,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::Version:
             {
-                m_sink->diagnoseRaw(Severity::Note, m_session->getBuildTagString());
+                StringBuilder versionStr;
+                versionStr << m_session->getBuildTagString() << "\n";
+                m_sink->diagnoseRaw(Severity::Note, versionStr.getUnownedSlice());
                 break;
             }
         case OptionKind::HelpStyle:
