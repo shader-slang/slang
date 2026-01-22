@@ -6,21 +6,47 @@ local diagnostics = {}
 local function span(location, message)
   return {
     location = location,
-    message = message,
+    message = message or "",  -- Default to empty string if not provided
     is_note = false,
     variadic = false,
   }
 end
 
--- Helper function to create a note with optional additional spans
-local function note(location, message, ...)
-  local extra_spans = {...}
+-- Helper function to create a note with message and spans
+local function note(message, ...)
+  local all_spans = {...}
+
+  if type(message) ~= "string" then
+    error("note() first argument must be a message (string)")
+  end
+
+  if #all_spans == 0 then
+    error("note() requires at least one span after the message")
+  end
+
+  -- Validate that none of the spans are notes (prevent nesting)
+  for i, s in ipairs(all_spans) do
+    if type(s) ~= "table" then
+      error("note() argument " .. (i + 1) .. " must be a span (got " .. type(s) .. ")")
+    end
+    if s.is_note then
+      error("note() cannot contain nested notes (argument " .. (i + 1) .. " is a note)")
+    end
+  end
+
+  local primary_span = all_spans[1]
+  local additional_spans = {}
+  for i = 2, #all_spans do
+    table.insert(additional_spans, all_spans[i])
+  end
+
   return {
-    location = location,
+    location = primary_span.location,
     message = message,
+    primary_span_message = primary_span.message,  -- Store primary span's message
     is_note = true,
     variadic = false,
-    spans = #extra_spans > 0 and extra_spans or nil,
+    spans = #additional_spans > 0 and additional_spans or nil,
   }
 end
 
@@ -38,15 +64,45 @@ end
 
 -- Helper function to create a variadic note (generates a nested struct and List<>)
 -- struct_name: Name for the struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
-local function variadic_note(struct_name, location, message, ...)
-  local extra_spans = {...}
+local function variadic_note(struct_name, message, ...)
+  local all_spans = {...}
+
+  if type(struct_name) ~= "string" then
+    error("variadic_note() first argument must be a struct name (string)")
+  end
+
+  if type(message) ~= "string" then
+    error("variadic_note() second argument must be a message (string)")
+  end
+
+  if #all_spans == 0 then
+    error("variadic_note() requires at least one span after the message")
+  end
+
+  -- Validate that none of the spans are notes (prevent nesting)
+  for i, s in ipairs(all_spans) do
+    if type(s) ~= "table" then
+      error("variadic_note() argument " .. (i + 2) .. " must be a span (got " .. type(s) .. ")")
+    end
+    if s.is_note then
+      error("variadic_note() cannot contain nested notes (argument " .. (i + 2) .. " is a note)")
+    end
+  end
+
+  local primary_span = all_spans[1]
+  local additional_spans = {}
+  for i = 2, #all_spans do
+    table.insert(additional_spans, all_spans[i])
+  end
+
   return {
-    location = location,
+    location = primary_span.location,
     message = message,
+    primary_span_message = primary_span.message,  -- Store primary span's message
     is_note = true,
     variadic = true,
     struct_name = struct_name,
-    spans = #extra_spans > 0 and extra_spans or nil,
+    spans = #additional_spans > 0 and additional_spans or nil,
   }
 end
 
@@ -70,6 +126,7 @@ local function add_diagnostic(name, code, severity, message, primary_span, ...)
         table.insert(notes, {
           location = s.location,
           message = s.message,
+          primary_span_message = s.primary_span_message,
           variadic = s.variadic,
           struct_name = s.struct_name,
           spans = s.spans,
@@ -511,6 +568,12 @@ local function process_diagnostics(diagnostics_table)
       if diag.notes then
         for j, note in ipairs(diag.notes) do
           process_message_container(note, diagnostic_name .. ".notes[" .. j .. "]")
+          -- Process primary span message
+          if note.primary_span_message then
+            local primary_span_container = { message = note.primary_span_message }
+            local primary_span_parts = process_message_container(primary_span_container, diagnostic_name .. ".notes[" .. j .. "].primary_span")
+            note.primary_span_message_parts = primary_span_parts
+          end
           -- Process spans within notes
           if note.spans then
             for k, span in ipairs(note.spans) do

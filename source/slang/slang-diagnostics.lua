@@ -36,9 +36,10 @@
 --     30201,
 --     "function ~function already has a body",           -- Decl auto-uses .name
 --     span("function:Decl", "redeclared here"),
---     note("original:Decl", "see previous definition of ~function")
+--     note("see previous definition of '~function'", span("original:Decl"))
 -- )
 -- ~function (a Decl) automatically becomes function->getName() when interpolated
+-- note(message, span, ...) requires a message and at least one span
 --
 -- err(
 --     "type mismatch",
@@ -62,11 +63,13 @@
 --     30010,
 --     "conflicting attributes on declaration",
 --     span("decl:Decl", "declaration here"),
---     note("attr1:Decl", "first attribute here",
+--     note("first attribute here",
+--          span("attr1:Decl"),
 --          span("attr1_arg:Expr", "with argument"),
 --          span("attr1_type:Type", "of type"))
 -- )
--- Notes can have additional spans: Provide more context within a note
+-- Notes can have additional spans: First span is primary, additional spans are secondary
+-- span() message parameter is optional and defaults to empty string
 --
 -- Interpolation syntax:
 --   ~param           - String parameter (default)
@@ -84,15 +87,19 @@
 -- Available functions:
 --   err(name, code, message, primary_span, ...) - Define an error diagnostic
 --   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
---   span(location, message) - Create a secondary span
---   note(location, message, span1, span2, ...) - Create a note (appears after the main diagnostic)
---     Optional span arguments can be added to attach additional spans to the note
---   variadic_span(struct_name, location, message) - Create a variadic span with AoS layout
+--   span(location, message?) - Create a span (message defaults to empty string)
+--   note(message, span1, span2, ...) - Create a note (appears after the main diagnostic)
+--     message: The note's message
+--     Requires at least one span. First span is primary, additional spans are secondary.
+--     Cannot nest notes inside notes.
+--   variadic_span(struct_name, location, message) - Create a variadic span
 --     struct_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
 --     Exclusive interpolants become members of the nested struct
---   variadic_note(struct_name, location, message, span1, span2, ...) - Create a variadic note with AoS layout
+--   variadic_note(struct_name, message, span1, span2, ...) - Create a variadic note
 --     struct_name: Name for nested struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
---     Optional span arguments can be added to attach additional spans to the note
+--     message: The note's message
+--     Requires at least one span. First span is primary, additional spans are secondary.
+--     Cannot nest notes inside variadic notes.
 
 -- Load helper functions
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
@@ -117,7 +124,7 @@ err(
   30201,
   "function '~function' already has a body",
   span("function:Decl", "redeclared here"),
-  note("original:Decl", "see previous definition of '~function'")
+  note("see previous definition of '~function'", span("original:Decl"))
 )
 
 err(
@@ -133,7 +140,7 @@ err(
   39999,
   "ambiguous call to '~name' with arguments of type ~args",
   span("expr:Expr", "in call expression"),
-  variadic_note("Candidate", "candidate:Decl", "candidate: ~candidate_signature")
+  variadic_note("Candidate", "candidate: ~candidate_signature", span("candidate:Decl"))
 )
 
 err(
@@ -141,7 +148,12 @@ err(
   39998,
   "this is a test diagnostic with spans in notes",
   span("expr:Expr", "main expression"),
-  note("decl:Decl", "see declaration here", span("attr:Decl", "with attribute"), span("param:Expr", "used here"))
+  note(
+    "a note",
+    span("decl:Decl", "see declaration here"),
+    span("attr:Decl", "with attribute"),
+    span("param:Expr", "used here")
+  )
 )
 
 -- Process and validate all diagnostics
