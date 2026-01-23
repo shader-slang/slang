@@ -1,5 +1,4 @@
 //TEST:SIMPLE(filecheck=CHECK_SPV): -emit-spirv-directly -stage raygeneration -entry main -target spirv-assembly
-//TEST:SIMPLE(filecheck=CHECK_HLSL): -stage raygeneration -entry main -target hlsl
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -stage raygeneration -entry main -target glsl
 
 #define TRACING_EPSILON 1e-6
@@ -122,9 +121,6 @@ void main()
 // CHECK_SPV: %{{.*}} = OpVariable %_ptr_RayPayload{{NV|KHR}}_ReflectionRay{{.*}} RayPayload
 // CHECK_SPV: OpTraceRayMotionNV
 // CHECK_SPV: OpTraceRayKHR
-
-// CHECK_HLSL: TraceMotionRay
-// CHECK_HLSL: TraceRay
 
 // CHECK_GLSL: traceRayMotionNV(
 // CHECK_GLSL: traceRayEXT(

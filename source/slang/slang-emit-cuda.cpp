@@ -858,6 +858,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            StringBuilder typeSB;
+            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            m_writer->emit(typeSB);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();

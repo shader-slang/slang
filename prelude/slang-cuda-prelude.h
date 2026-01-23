@@ -4407,6 +4407,13 @@ static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTra
 }
 #endif
 
+#if (OPTIX_VERSION >= 80000)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTime(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTime();
+}
+#endif
+
 #if (OPTIX_VERSION >= 80100)
 static __forceinline__ __device__ uint
 slangOptixHitObjectGetSbtGASIndex(OptixTraversableHandle* Obj)
@@ -4468,11 +4475,46 @@ slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ uint
-slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
+    OptixTraversableHandle* Obj,
+    uint sbtRecordIndex)
 {
-    optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return sbtRecordIndex;
+    optixHitObjectSetSbtRecordIndex(sbtRecordIndex);
+}
+#endif
+
+// HitObject transform matrix wrappers for SER (Shader Execution Reordering)
+// These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
+// Available in RG, CH, MS, CC, DC stages per OptiX documentation
+// Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
+// were added in OptiX 9.0 (not available in 8.0 or 8.1)
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetWorldToObject(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetWorldToObjectTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetObjectToWorld(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetObjectToWorldTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
 }
 #endif
 
@@ -5770,6 +5812,9 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
 struct WmmaFragment
 {
+    __device__ WmmaFragment() {}
+    __device__ WmmaFragment(T scalarValue) { fill(scalarValue); }
+
     typedef WmmaFragment<T, M, N, K, R> This;
     template<Layout layout>
     void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
