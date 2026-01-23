@@ -171,14 +171,16 @@ public struct PermutoEncoder<T,
     // =========================================================================
 
     /// Reads feature values at a given lattice position from the feature table.
-    [Differentiable]
+    [BackwardDerivative(readFeatureValueBwd)]
     static void readFeatureValue<Storage>(
         Storage featureTable,
-        Storage.Address featureTableAddress,
+        no_diff in Storage.Address featureTableAddress,
         uint hashmapSize,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
             where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
     {
         uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
@@ -188,6 +190,27 @@ public struct PermutoEncoder<T,
             result[f] = featureTable.read(Storage.getOffset(featureTableAddress, int(index + f)));
         }
     }
+
+    static void readFeatureValueBwd<Storage>(
+        DifferentialPtrPair<Storage> featureTable,
+        no_diff in Storage.Address featureTableAddress,
+        uint hashmapSize,
+        uvec<Dimensions> key,
+        T.Differential[FeatureDimensionPerEntry] result)
+            where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
+    {
+        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
+
+        [ForceUnroll]
+        for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
+        {
+            let offset = Storage.getOffset(featureTableAddress, int(index + f));
+            featureTable.d.atomicAdd(offset, result[f]);
+        }
+    }
+
 
     /// Main forward pass: encodes positions using the permutohedral lattice.
     ///
@@ -209,6 +232,8 @@ public struct PermutoEncoder<T,
         Storage featureTable,
         no_diff in Storage.Address featureTableAddress)
             where Storage : IStorage<T>
+            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Address == Storage.Differential.Address
     {
         // Initialize output to zero
         T encodedFeatures[FeatureDimensionPerEntry] = {};
