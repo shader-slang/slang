@@ -2983,7 +2983,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     [](const OverloadCandidate& c1, const OverloadCandidate& c2)
                     { return c1.status < c2.status; });
 
-                for (auto candidate : context.bestCandidates)
+                for (const auto& candidate : context.bestCandidates)
                 {
                     // Only include visible candidates (skip invisible ones for now)
                     if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
@@ -3036,7 +3036,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                         [](const OverloadCandidate& c1, const OverloadCandidate& c2)
                         { return c1.status < c2.status; });
 
-                    for (auto candidate : context.bestCandidates)
+                    for (const auto& candidate : context.bestCandidates)
                     {
                         String declString =
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
