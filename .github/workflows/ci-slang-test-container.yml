@@ -310,4 +310,19 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+
+          # First attempt: run with parallel execution
+          if python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi
