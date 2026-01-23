@@ -1,12 +1,14 @@
 // Test permuto encoder backward pass using autodiff
 // Reference: tiny-cuda-nn permuto.h encoding
-// Run the CUDA reference first: cd tiny-cuda-nn/build && ./permuto_reference b
+// Run the CUDA reference first: cd tiny-cuda-nn/build && ./permuto_jit_test b
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature
 
 import neural;
+import "permuto-reference-data";
 
-// Test configuration (must match CUDA reference permuto_reference.cu)
+// Test configuration (must match CUDA reference permuto_jit_test.cu)
 static const int N_POS_DIMS = 2;
 static const int FEATURE_DIM_PER_ENTRY = 2;
 static const uint N_LEVELS = 4;
@@ -27,6 +29,8 @@ static const float LOG2_PER_LEVEL_SCALE = 1.5f;
 // Type alias for the encoder
 typealias Encoder = PermutoEncoder<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE>;
 
+static const float EPSILON = 0.1f;  // Allow for floating-point precision differences
+
 // ============================================================================
 // Buffers
 // ============================================================================
@@ -44,9 +48,9 @@ RWStructuredBuffer<float> gDFeatureTable;
 //TEST_INPUT:ubuffer(count=512, stride=4):name=gDLdPosBuffer
 RWStructuredBuffer<float> gDLdPosBuffer;
 
-// Simple output buffer to verify the test ran
-//TEST_INPUT:ubuffer(count=1, stride=4):out,name=gResultBuffer
-RWStructuredBuffer<uint> gResultBuffer;
+// Verification result buffer: [0] = position pass count, [1] = param pass count
+//TEST_INPUT:ubuffer(count=2, stride=4):out,name=gVerifyBuffer
+RWStructuredBuffer<uint> gVerifyBuffer;
 
 /// Compute backward pass for all levels using bwd_diff
 void encodeBackwardAllLevels(
@@ -87,12 +91,41 @@ void encodeBackwardAllLevels(
         float dL_dy[FEATURE_DIM_PER_ENTRY] = {1.0f, 1.0f};
 
         // Call backward pass
-        bwd_diff(Encoder.encode)(params, dpPosition, dpFeatureStorage, 0u, dL_dy);
+        bwd_diff(Encoder.encode<StructuredBufferStorage<float>>)(params, dpPosition, dpFeatureStorage, 0u, dL_dy);
 
         // Accumulate position gradient
         dL_dpos[0] += dpPosition.d[0];
         dL_dpos[1] += dpPosition.d[1];
     }
+}
+
+/// Verify dL/dpos for a position against expected values
+bool verifyPosition(uint verifyIdx, uint posIdx)
+{
+    [ForceUnroll]
+    for (uint dim = 0; dim < N_POS_DIMS; ++dim)
+    {
+        uint outIdx = posIdx * N_POS_DIMS + dim;
+        uint expectedIdx = verifyIdx * N_POS_DIMS + dim;
+        float expected = EXPECTED_DL_DPOS[expectedIdx];
+        float actual = gDLdPosBuffer[outIdx];
+        float diff = abs(actual - expected);
+        if (diff > EPSILON)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+/// Verify dL/dparams (feature table gradients) against expected values
+bool verifyParam(uint verifyIdx)
+{
+    uint paramIdx = VERIFY_PARAM_INDICES[verifyIdx];
+    float expected = EXPECTED_DL_DPARAMS[verifyIdx];
+    float actual = gDFeatureTable[paramIdx];
+    float diff = abs(actual - expected);
+    return diff <= EPSILON;
 }
 
 [shader("compute")]
@@ -138,12 +171,39 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     gDLdPosBuffer[posIdx * N_POS_DIMS + 0] = dL_dpos[0];
     gDLdPosBuffer[posIdx * N_POS_DIMS + 1] = dL_dpos[1];
 
-    // Thread 0 writes a marker to verify test ran
-    if (posIdx == 0)
+    // Barrier to ensure all threads have finished writing results
+    AllMemoryBarrierWithGroupSync();
+
+    // Only thread 0 does the verification
+    if (posIdx != 0) return;
+
+    // Verify the 16 selected positions for dL/dpos
+    uint posPassCount = 0;
+    [ForceUnroll]
+    for (uint i = 0; i < NUM_VERIFY_POSITIONS; ++i)
     {
-        gResultBuffer[0] = 1u;
+        if (verifyPosition(i, VERIFY_POSITIONS[i]))
+        {
+            posPassCount++;
+        }
     }
+
+    // Verify the 64 selected feature table gradients
+    uint paramPassCount = 0;
+    [ForceUnroll]
+    for (uint i = 0; i < NUM_VERIFY_PARAMS; ++i)
+    {
+        if (verifyParam(i))
+        {
+            paramPassCount++;
+        }
+    }
+
+    // Output: [0] = position pass count (expect 16), [1] = param pass count (expect 64)
+    gVerifyBuffer[0] = posPassCount;
+    gVerifyBuffer[1] = paramPassCount;
 }
 
-// Verify the test ran successfully
-// BUF: 1
+// Expected output: all 16 position verifications and all 64 param verifications should pass
+// BUF: 16
+// BUF-NEXT: 64
