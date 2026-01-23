@@ -310,6 +310,7 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
 
           # First attempt: run with parallel execution
           if python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
