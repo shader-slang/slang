@@ -7,14 +7,12 @@ implementing neural;
 
 public struct PermutoEncoder<T,
     int Dimensions,
-    int FeaturesPerLevel,
-    uint TotalNumFeatures,
+    int FeatureDimensionPerEntry,
     uint Log2HashmapSize
     >
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    static const uint NumLevels = TotalNumFeatures / FeaturesPerLevel;
 
     /// Precomputed per-level information.
     VISIBILITY_LEVEL struct LevelInfo
@@ -27,8 +25,11 @@ public struct PermutoEncoder<T,
     {
         VISIBILITY_LEVEL uint currentLevel;
         VISIBILITY_LEVEL float maxLevel;
-        VISIBILITY_LEVEL float baseScale;           // Base scale for the encoding
-        VISIBILITY_LEVEL float log2PerLevelScale;   // log2(MaxResolution / BaseResolution) / (NumLevels - 1)
+        VISIBILITY_LEVEL float baseScale;               // Base scale for the encoding
+        VISIBILITY_LEVEL float log2PerLevelScale;       // log2(MaxResolution / BaseResolution) / (NumLevels - 1)
+        VISIBILITY_LEVEL float scale;                   // Scale for this level
+        VISIBILITY_LEVEL float scalesPerDim[Dimensions];
+        VISIBILITY_LEVEL float shiftsPerDim[Dimensions];
         VISIBILITY_LEVEL LevelInfo levelInfo;
     }
 
@@ -55,7 +56,7 @@ public struct PermutoEncoder<T,
     /// @param elevated Output elevated coordinates [Dimensions+1].
     [ForceInline]
     static void permutoElevate(
-        float pos[Dimensions],
+        T pos[Dimensions],
         float scalesPerDim[Dimensions],
         float shiftsPerDim[Dimensions],
         out float elevated[Dimensions + 1])
@@ -64,7 +65,7 @@ public struct PermutoEncoder<T,
         [ForceUnroll]
         for (int dim = Dimensions - 1; dim >= 0; --dim)
         {
-            float cf = (pos[dim] + shiftsPerDim[dim]) * scalesPerDim[dim];
+            float cf = (__realCast<float>(pos[dim]) + shiftsPerDim[dim]) * scalesPerDim[dim];
             elevated[dim + 1] = sum - float(dim + 1) * cf;
             sum += cf;
         }
@@ -183,13 +184,13 @@ public struct PermutoEncoder<T,
         Storage.Address featureTableAddress,
         uint hashmapSize,
         uvec<Dimensions> key,
-        out T result[FeaturesPerLevel])
+        out T result[FeatureDimensionPerEntry])
         where Storage : IStorage<T>
     {
-        uint index = permutoIndex(key, hashmapSize) * FeaturesPerLevel;
+        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
         [ForceUnroll]
-        for (uint f = 0; f < FeaturesPerLevel; ++f)
+        for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
         {
             result[f] = featureTable.read(Storage.getOffset(featureTableAddress, int(index + f)));
         }
@@ -200,25 +201,24 @@ public struct PermutoEncoder<T,
     /// @param params Encoding parameters containing:
     ///   - currentLevel: The level to process
     ///   - maxLevel: Maximum level to use
-    ///   - baseScale: Base scale for the encoding
-    ///   - log2PerLevelScale: Log2 of per-level scale factor
+    ///   - scale: Scale for this level
+    ///   - scalesPerDim: Per-dimension scaling factors
+    ///   - shiftsPerDim: Per-dimension random shifts
+    ///   - levelInfo: Level offset and hashmap size
     /// @param position Input position (Dimensions floats)
-    /// @param scalesPerDim Per-dimension scaling factors (precomputed based on level)
-    /// @param shiftsPerDim Per-dimension random shifts (precomputed based on level)
     /// @param featureTable Storage containing feature vectors for all levels
     /// @param featureTableAddress Base address for feature table storage
     /// @return Encoded feature vector for this position at this level
-    VISIBILITY_LEVEL static T[FeaturesPerLevel] encode<Storage>(
+    [ForceInline]
+    VISIBILITY_LEVEL static T[FeatureDimensionPerEntry] encode<Storage>(
         no_diff in Params params,
         T position[Dimensions],
-        float scalesPerDim[Dimensions],
-        float shiftsPerDim[Dimensions],
         Storage featureTable,
         no_diff in Storage.Address featureTableAddress)
-        where Storage : IStorage<T>
+            where Storage : IStorage<T>
     {
         // Initialize output to zero
-        T encodedFeatures[FeaturesPerLevel] = {};
+        T encodedFeatures[FeatureDimensionPerEntry] = {};
 
         // If level is greater than maxLevel, output zero padding
         if (float(params.currentLevel) >= params.maxLevel + 1e-3f)
@@ -231,19 +231,11 @@ public struct PermutoEncoder<T,
         uint hashmapSize = params.levelInfo.hashmapSize;
 
         // Offset feature table address to the start of this level
-        Storage.Address levelFeatureAddress = Storage.getOffset(featureTableAddress, int(levelOffset * FeaturesPerLevel));
-
-        // Convert position to float array
-        float pos[Dimensions];
-        [ForceUnroll]
-        for (uint dim = 0; dim < Dimensions; ++dim)
-        {
-            pos[dim] = __realCast<float, T>(position[dim]);
-        }
+        Storage.Address levelFeatureAddress = Storage.getOffset(featureTableAddress, int(levelOffset * FeatureDimensionPerEntry));
 
         // Elevate D-dimension vector to (D+1)-dimension homogeneous vector on hyperplane H_d
         float elevated[Dimensions + 1];
-        permutoElevate(pos, scalesPerDim, shiftsPerDim, elevated);
+        permutoElevate(position, params.scalesPerDim, params.shiftsPerDim, elevated);
 
         // Find the closest remainder-0 and rank
         int rem0[Dimensions + 1];
@@ -271,13 +263,13 @@ public struct PermutoEncoder<T,
             }
 
             // Read feature value at this vertex
-            T featureVal[FeaturesPerLevel];
+            T featureVal[FeatureDimensionPerEntry];
             readFeatureValue(featureTable, levelFeatureAddress, hashmapSize, key, featureVal);
 
             // Accumulate with barycentric weight
             float weight = barycentric[k];
             [ForceUnroll]
-            for (uint f = 0; f < FeaturesPerLevel; ++f)
+            for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
             {
                 encodedFeatures[f] += T(weight) * featureVal[f];
             }
@@ -286,26 +278,30 @@ public struct PermutoEncoder<T,
         return encodedFeatures;
     }
 
-    /// Convenience overload that computes scalesPerDim and shiftsPerDim internally.
-    /// Note: This requires a seed for the random shift generation.
-    VISIBILITY_LEVEL static T[FeaturesPerLevel] encode<Storage>(
-        no_diff in Params params,
-        T position[Dimensions],
-        uint randomSeed,
-        Storage featureTable,
-        no_diff in Storage.Address featureTableAddress)
-        where Storage : IStorage<T>
+    /// Helper function to compute scalesPerDim and shiftsPerDim for a given level.
+    /// Users can prepare this data themselves if they prefer.
+    ///
+    /// @param baseScale Base scale for the encoding
+    /// @param currentLevel The current level being processed
+    /// @param log2PerLevelScale Log2 of the per-level scale factor
+    /// @param seed Seed for the random shift generation
+    /// @param scalesPerDim Output: per-dimension scaling factors
+    /// @param shiftsPerDim Output: per-dimension random shifts
+    [ForceInline]
+    VISIBILITY_LEVEL static void prepareShiftAndScalePerDim(
+        in float baseScale,
+        in uint currentLevel,
+        in float log2PerLevelScale,
+        in uint seed,
+        out float scalesPerDim[Dimensions],
+        out float shiftsPerDim[Dimensions])
     {
         // Compute scale for this level
-        float scale = params.baseScale * exp2(float(params.currentLevel) * params.log2PerLevelScale);
-
-        // Compute per-dimension scales and shifts
-        float scalesPerDim[Dimensions];
-        float shiftsPerDim[Dimensions];
+        float scale = baseScale * exp2(float(currentLevel) * log2PerLevelScale);
 
         // Initialize RNG for random shifts (different levels should draw differently)
-        Pcg32 rng = Pcg32(randomSeed);
-        rng.advance(int64_t(params.currentLevel * Dimensions));
+        Pcg32 rng = Pcg32(seed);
+        rng.advance(int64_t(currentLevel * Dimensions));
 
         [ForceUnroll]
         for (uint dim = 0; dim < Dimensions; ++dim)
@@ -315,7 +311,21 @@ public struct PermutoEncoder<T,
             float randFloat = float(rng.nextUint()) * (1.0f / 4294967296.0f);
             shiftsPerDim[dim] = randFloat * 10.0f - 5.0f;
         }
+    }
 
-        return encode(params, position, scalesPerDim, shiftsPerDim, featureTable, featureTableAddress);
+    /// Helper function to compute the LevelInfo (offset and hashmapSize) for a given level.
+    /// The hashmap size is 2^Log2HashmapSize for all levels.
+    /// The offset for each level is currentLevel * hashmapSize.
+    ///
+    /// @param currentLevel The current level being processed
+    /// @param levelInfo Output: the computed level info with offset and hashmapSize
+    [ForceInline]
+    VISIBILITY_LEVEL static void prepareLevelInfo(
+        in uint currentLevel,
+        out LevelInfo levelInfo)
+    {
+        static const uint HashmapSize = 1u << Log2HashmapSize;
+        levelInfo.hashmapSize = HashmapSize;
+        levelInfo.offset = currentLevel * HashmapSize;
     }
 }
