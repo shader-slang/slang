@@ -26,6 +26,36 @@ ISlangUnknown* IComponentType2Recorder::getInterface(const Guid& guid)
         return nullptr;
 }
 
+SLANG_NO_THROW SlangResult IComponentType2Recorder::getTargetHostCallable(
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary,
+    slang::IBlob** outDiagnostics)
+{
+    slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+
+    ApiCallId callId = static_cast<ApiCallId>(
+        makeApiCallId(getClassId(), IComponentTypeMethodId::getTargetHostCallable));
+    ParameterRecorder* recorder{};
+    {
+        recorder = m_recordManager->beginMethodRecord(callId, m_componentType2Handle);
+        recorder->recordInt32(targetIndex);
+        recorder = m_recordManager->endMethodRecord();
+    }
+
+    SlangResult res = m_actualComponentType2->getTargetHostCallable(
+        targetIndex,
+        outSharedLibrary,
+        outDiagnostics);
+
+    {
+        recorder->recordAddress(*outSharedLibrary);
+        recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
+        m_recordManager->apendOutput();
+    }
+
+    return res;
+}
+
 SlangResult IComponentType2Recorder::getTargetCompileResult(
     SlangInt targetIndex,
     slang::ICompileResult** outCompileResult,

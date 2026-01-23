@@ -29,6 +29,10 @@ public:
         slang::IComponentType2* componentType,
         RecordManager* recordManager);
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = nullptr) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
         SlangInt targetIndex,
         slang::ICompileResult** outCompileResult,

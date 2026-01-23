@@ -304,36 +304,6 @@ SLANG_NO_THROW SlangResult IComponentTypeRecorder::link(
     return res;
 }
 
-SLANG_NO_THROW SlangResult IComponentTypeRecorder::getTargetHostCallable(
-    int targetIndex,
-    ISlangSharedLibrary** outSharedLibrary,
-    slang::IBlob** outDiagnostics)
-{
-    slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
-
-    ApiCallId callId = static_cast<ApiCallId>(
-        makeApiCallId(getClassId(), IComponentTypeMethodId::getTargetHostCallable));
-    ParameterRecorder* recorder{};
-    {
-        recorder = m_recordManager->beginMethodRecord(callId, m_componentHandle);
-        recorder->recordInt32(targetIndex);
-        recorder = m_recordManager->endMethodRecord();
-    }
-
-    SlangResult res = m_actualComponentType->getTargetHostCallable(
-        targetIndex,
-        outSharedLibrary,
-        outDiagnostics);
-
-    {
-        recorder->recordAddress(*outSharedLibrary);
-        recorder->recordAddress(outDiagnostics ? *outDiagnostics : nullptr);
-        m_recordManager->apendOutput();
-    }
-
-    return res;
-}
-
 SLANG_NO_THROW SlangResult IComponentTypeRecorder::getEntryPointHostCallable(
     int entryPointIndex,
     int targetIndex,

@@ -105,12 +105,15 @@ static SlangResult _innerMain(int argc, char** argv)
             return -1;
     }
 
+    ComPtr<slang::IComponentType2> componentType2;
+    slangModule->queryInterface(SLANG_IID_PPV_ARGS(componentType2.writeRef()));
+
     // Get the 'shared library' (note that this doesn't necessarily have to be implemented as a
     // shared library it's just an interface to executable code).
     ComPtr<ISlangSharedLibrary> sharedLibrary;
     {
         ComPtr<slang::IBlob> diagnosticsBlob;
-        SlangResult result = slangModule->getTargetHostCallable(
+        SlangResult result = componentType2->getTargetHostCallable(
             0,
             sharedLibrary.writeRef(),
             diagnosticsBlob.writeRef());
