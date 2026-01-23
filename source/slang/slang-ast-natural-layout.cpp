@@ -209,6 +209,13 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         size.append(calcSize(optionalType->getValueType()));
         return size;
     }
+    else if (as<DescriptorHandleType>(type))
+    {
+        // DescriptorHandleType has target-dependent size/alignment.
+        // Return invalid so that sizeof/alignof gets lowered to IR instructions
+        // which can be resolved later with target information.
+        return NaturalSize::makeInvalid();
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())
