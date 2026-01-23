@@ -48,6 +48,10 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL link(
         slang::IComponentType** outLinkedComponentType,
         ISlangBlob** outDiagnostics = nullptr) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = 0) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
         int entryPointIndex,
         int targetIndex,

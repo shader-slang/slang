@@ -55,12 +55,13 @@ enum IComponentTypeMethodId : uint16_t
     getEntryPointHash = 0x0010,
     specialize = 0x0011,
     link = 0x0012,
-    getEntryPointHostCallable = 0x0013,
-    renameEntryPoint = 0x0014,
-    linkWithOptions = 0x0015,
-    getTargetCompileResult = 0x0016,
-    getEntryPointCompileResult = 0x0017,
-    queryInterface = 0x0018,
+    getTargetHostCallable = 0x0013,
+    getEntryPointHostCallable = 0x0014,
+    renameEntryPoint = 0x0015,
+    linkWithOptions = 0x0016,
+    getTargetCompileResult = 0x0017,
+    getEntryPointCompileResult = 0x0018,
+    queryInterface = 0x0019,
 };
 
 enum ApiCallId : uint32_t
@@ -139,6 +140,8 @@ enum ApiCallId : uint32_t
         makeApiCallId(Class_IModule, IComponentTypeMethodId::getEntryPointHash),
     IModule_specialize = makeApiCallId(Class_IModule, IComponentTypeMethodId::specialize),
     IModule_link = makeApiCallId(Class_IModule, IComponentTypeMethodId::link),
+    IModule_getTargetHostCallable =
+        makeApiCallId(Class_IModule, IComponentTypeMethodId::getTargetHostCallable),
     IModule_getEntryPointHostCallable =
         makeApiCallId(Class_IModule, IComponentTypeMethodId::getEntryPointHostCallable),
     IModule_renameEntryPoint =
@@ -160,6 +163,8 @@ enum ApiCallId : uint32_t
         makeApiCallId(Class_IEntryPoint, IComponentTypeMethodId::getEntryPointHash),
     IEntryPoint_specialize = makeApiCallId(Class_IEntryPoint, IComponentTypeMethodId::specialize),
     IEntryPoint_link = makeApiCallId(Class_IEntryPoint, IComponentTypeMethodId::link),
+    IEntryPoint_getTargetHostCallable =
+        makeApiCallId(Class_IEntryPoint, IComponentTypeMethodId::getTargetHostCallable),
     IEntryPoint_getEntryPointHostCallable =
         makeApiCallId(Class_IEntryPoint, IComponentTypeMethodId::getEntryPointHostCallable),
     IEntryPoint_renameEntryPoint =
@@ -186,6 +191,9 @@ enum ApiCallId : uint32_t
         makeApiCallId(Class_ICompositeComponentType, IComponentTypeMethodId::specialize),
     ICompositeComponentType_link =
         makeApiCallId(Class_ICompositeComponentType, IComponentTypeMethodId::link),
+    ICompositeComponentType_getTargetHostCallable = makeApiCallId(
+        Class_ICompositeComponentType,
+        IComponentTypeMethodId::getTargetHostCallable),
     ICompositeComponentType_getEntryPointHostCallable = makeApiCallId(
         Class_ICompositeComponentType,
         IComponentTypeMethodId::getEntryPointHostCallable),
@@ -213,6 +221,8 @@ enum ApiCallId : uint32_t
     ITypeConformance_specialize =
         makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::specialize),
     ITypeConformance_link = makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::link),
+    ITypeConformance_getTargetHostCallable =
+        makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::getTargetHostCallable),
     ITypeConformance_getEntryPointHostCallable =
         makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::getEntryPointHostCallable),
     ITypeConformance_renameEntryPoint =

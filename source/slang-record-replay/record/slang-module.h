@@ -150,6 +150,17 @@ public:
         return Super::link(outLinkedComponentType, outDiagnostics);
     }
 
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = 0) override
+    {
+        return Super::getTargetHostCallable(
+            targetIndex,
+            outSharedLibrary,
+            outDiagnostics);
+    }
+
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
         int entryPointIndex,
         int targetIndex,

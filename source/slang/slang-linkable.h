@@ -151,6 +151,10 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL link(
         slang::IComponentType** outLinkedComponentType,
         ISlangBlob** outDiagnostics) SLANG_OVERRIDE;
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE;
     SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
         int entryPointIndex,
         int targetIndex,
