@@ -13,7 +13,6 @@ public struct PermutoEncoder<T,
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-
     /// Precomputed per-level information.
     VISIBILITY_LEVEL struct LevelInfo
     {
@@ -41,7 +40,6 @@ public struct PermutoEncoder<T,
     /// @param key The lattice coordinate.
     /// @param hashmapSize The size of the hashmap.
     /// @return The index into the parameter array.
-    [ForceInline]
     static uint permutoIndex(uvec<Dimensions> key, uint hashmapSize)
     {
         return baseConvertHash<Dimensions>(key) % hashmapSize;
@@ -54,11 +52,11 @@ public struct PermutoEncoder<T,
     /// @param scalesPerDim Per-dimension scaling factors [Dimensions].
     /// @param shiftsPerDim Per-dimension shifts [Dimensions].
     /// @param elevated Output elevated coordinates [Dimensions+1].
-    [ForceInline]
+    [Differentiable]
     static void permutoElevate(
         T pos[Dimensions],
-        float scalesPerDim[Dimensions],
-        float shiftsPerDim[Dimensions],
+        no_diff in float scalesPerDim[Dimensions],
+        no_diff in float shiftsPerDim[Dimensions],
         out float elevated[Dimensions + 1])
     {
         float sum = 0.0f;
@@ -76,7 +74,7 @@ public struct PermutoEncoder<T,
     /// @param elevated The elevated coordinates [Dimensions+1].
     /// @param rem0 Output: coordinates of remainder-0 point [Dimensions+1].
     /// @param rank Output: rank ordering [Dimensions+1].
-    [ForceInline]
+    /// Note: Not differentiable since outputs are int (no gradient needed).
     static void permutoFindRem0(
         float elevated[Dimensions + 1],
         out int rem0[Dimensions + 1],
@@ -147,27 +145,22 @@ public struct PermutoEncoder<T,
     /// @param rem0 The remainder-0 point coordinates [Dimensions+1].
     /// @param rank The rank ordering [Dimensions+1].
     /// @param barycentric Output: barycentric coordinates [Dimensions+2].
-    [ForceInline]
+    [Differentiable]
     static void permutoBarycentric(
         float elevated[Dimensions + 1],
         int rem0[Dimensions + 1],
         int rank[Dimensions + 1],
         out float barycentric[Dimensions + 2])
     {
-        // Initialize barycentric to zero
-        [ForceUnroll]
-        for (uint i = 0; i < Dimensions + 2; ++i)
-        {
-            barycentric[i] = 0.0f;
-        }
-
         // Compute the barycentric coordinates
         [ForceUnroll]
         for (uint dim = 0; dim <= Dimensions; ++dim)
         {
             float delta = (elevated[dim] - float(rem0[dim])) * (1.0f / float(Dimensions + 1));
-            barycentric[int(Dimensions) - rank[dim]] += delta;
-            barycentric[int(Dimensions + 1) - rank[dim]] -= delta;
+            int idxPlus = int(Dimensions) - rank[dim];
+            int idxMinus = int(Dimensions + 1) - rank[dim];
+            barycentric[idxPlus] += delta;
+            barycentric[idxMinus] -= delta;
         }
         // Wrap around
         barycentric[0] += 1.0f + barycentric[Dimensions + 1];
@@ -178,14 +171,14 @@ public struct PermutoEncoder<T,
     // =========================================================================
 
     /// Reads feature values at a given lattice position from the feature table.
-    [ForceInline]
+    [Differentiable]
     static void readFeatureValue<Storage>(
         Storage featureTable,
         Storage.Address featureTableAddress,
         uint hashmapSize,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
-        where Storage : IStorage<T>
+            where Storage : IStorage<T>
     {
         uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
@@ -209,7 +202,7 @@ public struct PermutoEncoder<T,
     /// @param featureTable Storage containing feature vectors for all levels
     /// @param featureTableAddress Base address for feature table storage
     /// @return Encoded feature vector for this position at this level
-    [ForceInline]
+    [Differentiable]
     VISIBILITY_LEVEL static T[FeatureDimensionPerEntry] encode<Storage>(
         no_diff in Params params,
         T position[Dimensions],
@@ -243,7 +236,7 @@ public struct PermutoEncoder<T,
         permutoFindRem0(elevated, rem0, rank);
 
         // Compute the barycentric coordinates
-        float barycentric[Dimensions + 2];
+        float barycentric[Dimensions + 2] = {};
         permutoBarycentric(elevated, rem0, rank, barycentric);
 
         // Interpolate the values using barycentric weights
@@ -287,7 +280,6 @@ public struct PermutoEncoder<T,
     /// @param seed Seed for the random shift generation
     /// @param scalesPerDim Output: per-dimension scaling factors
     /// @param shiftsPerDim Output: per-dimension random shifts
-    [ForceInline]
     VISIBILITY_LEVEL static void prepareShiftAndScalePerDim(
         in float baseScale,
         in uint currentLevel,
@@ -319,7 +311,6 @@ public struct PermutoEncoder<T,
     ///
     /// @param currentLevel The current level being processed
     /// @param levelInfo Output: the computed level info with offset and hashmapSize
-    [ForceInline]
     VISIBILITY_LEVEL static void prepareLevelInfo(
         in uint currentLevel,
         out LevelInfo levelInfo)
