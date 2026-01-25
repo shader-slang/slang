@@ -147,6 +147,29 @@ String TSLSourceEmitter::getTSLTypeName(IRType* type)
             return getTSLTypeName(ptrType->getValueType());
         }
 
+    // Storage buffer types - TSL uses storage() function to access these
+    case kIROp_HLSLRWStructuredBufferType:
+    case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        {
+            // For RWStructuredBuffer<T>, we emit a storage buffer type
+            // In TSL, these are accessed via storage(buffer, type, count)
+            auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+            auto elementType = structuredBufferType->getElementType();
+            StringBuilder sb;
+            sb << "StorageBuffer<" << getTSLTypeName(elementType) << ">";
+            return sb.produceString();
+        }
+
+    case kIROp_HLSLStructuredBufferType:
+        {
+            // For read-only StructuredBuffer<T>
+            auto structuredBufferType = as<IRHLSLStructuredBufferTypeBase>(type);
+            auto elementType = structuredBufferType->getElementType();
+            StringBuilder sb;
+            sb << "StorageBufferReadOnly<" << getTSLTypeName(elementType) << ">";
+            return sb.produceString();
+        }
+
     default:
         return "unknown";
     }
