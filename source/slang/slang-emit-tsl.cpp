@@ -170,6 +170,20 @@ String TSLSourceEmitter::getTSLTypeName(IRType* type)
             return sb.produceString();
         }
 
+    case kIROp_ConstantBufferType:
+        {
+            // For constant buffers, we just emit the element type
+            // TSL will use uniform() for each field
+            auto cbType = as<IRConstantBufferType>(type);
+            return getTSLTypeName((IRType*)cbType->getElementType());
+        }
+
+    case kIROp_ParameterBlockType:
+        {
+            auto pbType = as<IRParameterBlockType>(type);
+            return getTSLTypeName((IRType*)pbType->getElementType());
+        }
+
     default:
         return "unknown";
     }
@@ -202,7 +216,13 @@ void TSLSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
     m_writer->emit("abs, acos, asin, atan, ceil, clamp, cos, cross, degrees,\n");
     m_writer->emit("distance, dot, exp, exp2, floor, fract, inverseSqrt, length,\n");
     m_writer->emit("log, log2, max, min, mix, mod, normalize, pow, radians,\n");
-    m_writer->emit("reflect, refract, round, sign, sin, smoothstep, sqrt, step, tan, trunc\n");
+    m_writer->emit("reflect, refract, round, sign, sin, smoothstep, sqrt, step, tan, trunc,\n");
+    m_writer->emit("// Compute shader builtins\n");
+    m_writer->emit("instanceIndex, localIndex, workgroupId,\n");
+    m_writer->emit("// Uniform and storage\n");
+    m_writer->emit("uniform, storage, instancedArray,\n");
+    m_writer->emit("// Atomic operations\n");
+    m_writer->emit("atomicStore, atomicLoad, atomicAdd, atomicSub, atomicMax, atomicMin, atomicAnd, atomicOr, atomicXor\n");
 
     m_writer->dedent();
     m_writer->emit("} from 'three/tsl';\n\n");
@@ -643,7 +663,7 @@ bool TSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 
 void TSLSourceEmitter::emitFuncHeaderImpl(IRFunc* func)
 {
-    auto resultType = func->getResultType();
+    SLANG_UNUSED(func->getResultType()); // TSL functions don't use return types in header
 
     // Check if this is an entry point
     auto entryPointDecor = func->findDecoration<IREntryPointDecoration>();
@@ -725,17 +745,151 @@ void TSLSourceEmitter::emitEntryPointAttributesImpl(
     // TSL doesn't use entry point attributes in the same way as other targets
 }
 
+void TSLSourceEmitter::emitTSLDefaultValue(IRType* type)
+{
+    // Emit a default/zero value for the given type
+    if (!type)
+    {
+        m_writer->emit("0");
+        return;
+    }
+
+    switch (type->getOp())
+    {
+    case kIROp_FloatType:
+    case kIROp_HalfType:
+    case kIROp_DoubleType:
+        m_writer->emit("0.0");
+        break;
+
+    case kIROp_IntType:
+        m_writer->emit("0");
+        break;
+
+    case kIROp_UIntType:
+        m_writer->emit("0");
+        break;
+
+    case kIROp_BoolType:
+        m_writer->emit("false");
+        break;
+
+    case kIROp_VectorType:
+        {
+            auto vecType = as<IRVectorType>(type);
+            auto elemType = vecType->getElementType();
+            auto elemCount = as<IRIntLit>(vecType->getElementCount());
+            int count = elemCount ? int(elemCount->getValue()) : 4;
+
+            String typeName = getTSLTypeName(type);
+            m_writer->emit(typeName);
+            m_writer->emit("(");
+            for (int i = 0; i < count; i++)
+            {
+                if (i > 0)
+                    m_writer->emit(", ");
+                emitTSLDefaultValue(elemType);
+            }
+            m_writer->emit(")");
+        }
+        break;
+
+    case kIROp_MatrixType:
+        {
+            // For matrices, emit identity-like default
+            m_writer->emit(getTSLTypeName(type));
+            m_writer->emit("()");
+        }
+        break;
+
+    default:
+        m_writer->emit("0");
+        break;
+    }
+}
+
 void TSLSourceEmitter::emitParameterGroupImpl(
     IRGlobalParam* varDecl,
     IRUniformParameterGroupType* type)
 {
-    SLANG_UNUSED(varDecl);
-    SLANG_UNUSED(type);
-    // TSL handles uniform parameter groups differently - as JavaScript objects
-    // For now, just emit a comment noting the parameter group
-    m_writer->emit("// Parameter group: ");
+    // TSL handles uniform parameter groups using the uniform() function
+    // For constant buffers, we emit each field as a uniform
+    auto elementType = type->getElementType();
+
+    m_writer->emit("// Uniform: ");
     m_writer->emit(getName(varDecl));
     m_writer->emit("\n");
+
+    // Check if the element type is a struct
+    if (auto structType = as<IRStructType>(elementType))
+    {
+        // Emit struct fields as individual uniforms
+        m_writer->emit("const ");
+        m_writer->emit(getName(varDecl));
+        m_writer->emit(" = {\n");
+        m_writer->indent();
+
+        bool first = true;
+        for (auto field : structType->getFields())
+        {
+            if (!first)
+                m_writer->emit(",\n");
+            first = false;
+
+            m_writer->emit(getName(field->getKey()));
+            m_writer->emit(": uniform(");
+            emitTSLDefaultValue(field->getFieldType());
+            m_writer->emit(")");
+        }
+
+        m_writer->emit("\n");
+        m_writer->dedent();
+        m_writer->emit("};\n");
+    }
+    else
+    {
+        // For simple types, just emit as a single uniform
+        m_writer->emit("const ");
+        m_writer->emit(getName(varDecl));
+        m_writer->emit(" = uniform(");
+        emitTSLDefaultValue(elementType);
+        m_writer->emit(");\n");
+    }
+}
+
+void TSLSourceEmitter::emitSimpleFuncImpl(IRFunc* func)
+{
+    // Deal with decorations that need to be emitted as attributes
+    IREntryPointDecoration* entryPointDecor = func->findDecoration<IREntryPointDecoration>();
+    if (entryPointDecor)
+    {
+        emitEntryPointAttributes(func, entryPointDecor);
+    }
+
+    emitFunctionPreambleImpl(func);
+    emitFuncDecorations(func);
+    emitFuncHeader(func);
+    emitSemantics(func);
+
+    // TODO: encode declaration vs. definition
+    if (isDefinition(func))
+    {
+        // TSL uses arrow function syntax: Fn((params) => { ... })
+        // The header already emitted "export const name = /*@__PURE__*/ Fn((params) => "
+        m_writer->emit("\n{\n");
+        m_writer->indent();
+
+        // Need to emit the operations in the blocks of the function
+        emitFunctionBody(func);
+
+        m_writer->dedent();
+        // TSL function closing: }); instead of just }
+        m_writer->emit("});\n\n");
+    }
+    else
+    {
+        m_writer->emit(";\n\n");
+    }
 }
 
 } // namespace Slang

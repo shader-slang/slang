@@ -2090,6 +2090,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             // See https://github.com/gpuweb/gpuweb/issues/606.
             lineDirectiveMode = LineDirectiveMode::None;
             break;
+
+        case CodeGenTarget::TSL:
+            // TSL is JavaScript-based, doesn't support #line directives.
+            lineDirectiveMode = LineDirectiveMode::None;
+            break;
         }
     }
 

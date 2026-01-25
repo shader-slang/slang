@@ -39,6 +39,7 @@ public:
     virtual void emitParameterGroupImpl(
         IRGlobalParam* varDecl,
         IRUniformParameterGroupType* type) SLANG_OVERRIDE;
+    virtual void emitSimpleFuncImpl(IRFunc* func) SLANG_OVERRIDE;
 
     // TSL-specific helper methods
     const char* getTSLBinaryOpName(IROp op);
@@ -54,6 +55,7 @@ public:
     void emitTSLIfElse(IRIfElse* ifElse);
     void emitTSLLoop(IRLoop* loop);
     void emitTSLSwitch(IRSwitch* switchInst);
+    void emitTSLDefaultValue(IRType* type);
 
     void addTSLImport(const char* name);
 
