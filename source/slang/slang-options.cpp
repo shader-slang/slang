@@ -1458,7 +1458,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
         {".cu", SLANG_SOURCE_LANGUAGE_CUDA, SLANG_STAGE_NONE},
 
         {".wgsl", SLANG_SOURCE_LANGUAGE_WGSL, SLANG_STAGE_NONE},
-        {".tsl", SLANG_SOURCE_LANGUAGE_TSL, SLANG_STAGE_NONE},
+        // Note: TSL is an output-only format, not a parseable input source language
     };
 
     for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
