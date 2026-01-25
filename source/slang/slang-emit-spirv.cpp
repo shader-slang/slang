@@ -7916,7 +7916,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace, bufPtrType->getDataLayout()),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }

@@ -2253,7 +2253,13 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     case kIROp_PtrType:
-        return IRTypeLayoutRuleName::Natural;
+        {
+            auto ptrType = as<IRPtrType>(bufferType);
+            auto layoutTypeOp = ptrType->getDataLayout()
+                                    ? ptrType->getDataLayout()->getOp()
+                                    : kIROp_DefaultBufferLayoutType;
+            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+        }
     }
     return IRTypeLayoutRuleName::Natural;
 }
