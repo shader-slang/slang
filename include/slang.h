@@ -654,6 +654,8 @@ typedef uint32_t SlangSizeT;
         SLANG_HOST_LLVM_IR,     ///< Host LLVM IR assembly
         SLANG_SHADER_LLVM_IR,   ///< Host LLVM IR assembly (kernel/shader)
 
+        SLANG_TSL,              ///< Three.js Shading Language (TSL)
+
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -807,6 +809,7 @@ typedef uint32_t SlangSizeT;
         SLANG_SOURCE_LANGUAGE_METAL,
         SLANG_SOURCE_LANGUAGE_WGSL,
         SLANG_SOURCE_LANGUAGE_LLVM,
+        SLANG_SOURCE_LANGUAGE_TSL,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 

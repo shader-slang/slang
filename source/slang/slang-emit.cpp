@@ -22,6 +22,7 @@
 #include "slang-emit-torch.h"
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
+#include "slang-emit-tsl.h"
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-autodiff.h"
@@ -2158,6 +2159,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         case SourceLanguage::WGSL:
             {
                 sourceEmitter = new WGSLSourceEmitter(desc);
+                break;
+            }
+        case SourceLanguage::TSL:
+            {
+                sourceEmitter = new TSLSourceEmitter(desc);
                 break;
             }
         default:

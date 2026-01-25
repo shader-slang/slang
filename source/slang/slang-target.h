@@ -57,6 +57,7 @@ enum class CodeGenTarget : SlangCompileTargetIntegral
     HostObjectCode = SLANG_HOST_OBJECT_CODE,
     HostLLVMIR = SLANG_HOST_LLVM_IR,
     ShaderLLVMIR = SLANG_SHADER_LLVM_IR,
+    TSL = SLANG_TSL,
     CountOf = SLANG_TARGET_COUNT_OF,
 };
 

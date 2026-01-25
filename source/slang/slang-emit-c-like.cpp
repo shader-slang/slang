@@ -98,6 +98,10 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
         {
             return SourceLanguage::WGSL;
         }
+    case CodeGenTarget::TSL:
+        {
+            return SourceLanguage::TSL;
+        }
     }
 }
 

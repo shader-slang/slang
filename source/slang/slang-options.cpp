@@ -1458,6 +1458,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
         {".cu", SLANG_SOURCE_LANGUAGE_CUDA, SLANG_STAGE_NONE},
 
         {".wgsl", SLANG_SOURCE_LANGUAGE_WGSL, SLANG_STAGE_NONE},
+        {".tsl", SLANG_SOURCE_LANGUAGE_TSL, SLANG_STAGE_NONE},
     };
 
     for (Index i = 0; i < SLANG_COUNT_OF(entries); ++i)
@@ -3971,6 +3972,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     case CodeGenTarget::MetalLibAssembly:
                     case CodeGenTarget::Metal:
                     case CodeGenTarget::WGSL:
+                    case CodeGenTarget::TSL:
                     case CodeGenTarget::HostVM:
                     case CodeGenTarget::HostObjectCode:
                     case CodeGenTarget::ShaderObjectCode:

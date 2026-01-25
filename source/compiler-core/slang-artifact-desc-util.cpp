@@ -201,6 +201,7 @@ SLANG_HIERARCHICAL_ENUM(ArtifactKind, SLANG_ARTIFACT_KIND, SLANG_ARTIFACT_KIND_E
             x(Metal, Source) \
             x(Slang, Source) \
             x(WGSL, Source) \
+            x(TSL, Source) \
         x(KernelLike, Base) \
             x(DXIL, KernelLike) \
             x(DXBC, KernelLike) \
@@ -325,6 +326,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
         return Desc::make(Kind::Assembly, Payload::MetalAIR, Style::Kernel, 0);
     case SLANG_WGSL:
         return Desc::make(Kind::Source, Payload::WGSL, Style::Kernel, 0);
+    case SLANG_TSL:
+        return Desc::make(Kind::Source, Payload::TSL, Style::Kernel, 0);
     case SLANG_WGSL_SPIRV_ASM:
         return Desc::make(Kind::Assembly, Payload::WGSL_SPIRV, Style::Kernel, 0);
     case SLANG_WGSL_SPIRV:
@@ -402,6 +405,8 @@ SLANG_HIERARCHICAL_ENUM(ArtifactStyle, SLANG_ARTIFACT_STYLE, SLANG_ARTIFACT_STYL
                 return SLANG_METAL;
             case Payload::WGSL:
                 return SLANG_WGSL;
+            case Payload::TSL:
+                return SLANG_TSL;
             default:
                 break;
             }

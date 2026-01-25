@@ -175,6 +175,7 @@ enum class ArtifactPayload : uint8_t
     Metal, ///< Metal source
     Slang, ///< Slang source
     WGSL,  ///< WGSL source
+    TSL,   ///< TSL (Three.js Shading Language) source
 
     KernelLike, ///< GPU Kernel like
 

@@ -88,6 +88,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
     {SLANG_METAL_LIB_ASM, "metallib-asm", "metallib-asm", "Metal Library Bytecode assembly"},
     {SLANG_WGSL, "wgsl", "wgsl", "WebGPU shading language source"},
+    {SLANG_TSL, "tsl,js", "tsl", "Three.js Shading Language (TSL) source"},
     {SLANG_WGSL_SPIRV_ASM,
      "wgsl-spirv-asm",
      "wgsl-spirv-asm,wgsl-spirv-assembly",
