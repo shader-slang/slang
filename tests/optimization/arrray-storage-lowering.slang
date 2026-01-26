@@ -1,8 +1,5 @@
-//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
-//  This FileCheck test requires ADCE to eliminate OpCompositeConstruct. Runtime test (.1) still passes.
-//DISABLE_TEST:SIMPLE(filecheck=SPV): -target spirv
-
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
+//TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
 
 struct DoubleNested
 {
