@@ -25,6 +25,7 @@ static const uint FEATURE_TABLE_SIZE = TOTAL_TABLE_SIZE * FEATURE_DIM_PER_ENTRY;
 // Encoder configuration
 static const float BASE_SCALE = 4.0f;
 static const float LOG2_PER_LEVEL_SCALE = 1.5f;
+static const float MAX_LEVEL_RATIO = 1.1f;  // Matches tiny-cuda-nn default
 
 // Type alias for the encoder
 typealias Encoder = PermutoEncoder<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE>;
@@ -127,23 +128,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     [ForceUnroll]
     for (uint level = 0; level < N_LEVELS; ++level)
     {
-        // Compute per-dimension scales and shifts using helper function
-        float scalesPerDim[N_POS_DIMS];
-        float shiftsPerDim[N_POS_DIMS];
-        Encoder.prepareShiftAndScalePerDim(BASE_SCALE, level, LOG2_PER_LEVEL_SCALE, 1337u, scalesPerDim, shiftsPerDim);
-
-        // Setup params
+        // Setup params using prepareLevelInfo which computes all level-specific parameters
         Encoder.Params params;
-        params.currentLevel = level;
-        params.maxLevel = float(N_LEVELS);
-        params.scalesPerDim = scalesPerDim;
-        params.shiftsPerDim = shiftsPerDim;
-
-        // Setup level info using helper function
-        Encoder.prepareLevelInfo(level, params.levelInfo);
+        params.maxLevel = MAX_LEVEL_RATIO * float(N_LEVELS);
+        Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
         // Encode
-        float result[FEATURE_DIM_PER_ENTRY] = Encoder.encode(
+        float result[FEATURE_DIM_PER_ENTRY] = Encoder.encode<StructuredBufferStorage<float>>(
             params,
             position,
             featureStorage,
