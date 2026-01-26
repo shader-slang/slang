@@ -42,3 +42,4 @@ __include "vectorized-reader";
 __include "shared-memory-pool";
 __include "hash-function";
 __include "permuto-encoder";
+__include "iencoder";
