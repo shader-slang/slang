@@ -121,6 +121,10 @@ static SlangResult _checkLargeFileExists()
     const Int64 kTwoGB = Int64(2) * 1024 * 1024 * 1024;
     const Int64 kOneKB = 1024;
     const Int64 kLargeFileSize = kTwoGB + kOneKB;
+    const SlangPathType kInvalidPathType =
+        static_cast<SlangPathType>(std::numeric_limits<SlangPathTypeIntegral>::max());
+    SlangPathType pathType = kInvalidPathType;
+    SlangResult pathTypeResult = SLANG_FAIL;
     SlangResult result = SLANG_OK;
     if (SLANG_FAILED(_setSparseFileSize(path, kLargeFileSize)))
     {
@@ -130,10 +134,7 @@ static SlangResult _checkLargeFileExists()
 
     SLANG_CHECK(File::exists(path));
 
-    const SlangPathType kInvalidPathType =
-        static_cast<SlangPathType>(std::numeric_limits<SlangPathTypeIntegral>::max());
-    SlangPathType pathType = kInvalidPathType;
-    SlangResult pathTypeResult = Path::getPathType(path, &pathType);
+    pathTypeResult = Path::getPathType(path, &pathType);
     if (SLANG_FAILED(pathTypeResult))
     {
         result = pathTypeResult;
