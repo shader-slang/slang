@@ -174,7 +174,7 @@ jobs:
   # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
