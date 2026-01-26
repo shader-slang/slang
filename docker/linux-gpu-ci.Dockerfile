@@ -1,7 +1,7 @@
 # Linux GPU CI Container Image
 #
 # Base image with CUDA 12.5.1 for GPU testing on self-hosted runners
-# Requires driver 555.42.02 or newer
+# Requires driver 550.54.15 or newer
 #
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
@@ -9,8 +9,8 @@
 # - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
 
 FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
 
@@ -48,12 +48,18 @@ RUN apt-get update && apt-get install -y \
     glslang-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install newer Vulkan validation layers from LunarG
-RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - && \
-    wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list && \
-    apt-get update && \
-    apt-get install -y vulkan-validationlayers && \
-    rm -rf /var/lib/apt/lists/*
+# Install Vulkan SDK 1.4.321.1 from tarball (apt packages discontinued after 1.4.313)
+# Using tarball to get the fixed validation layers that resolve cooperative vector issues
+ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.321.1/x86_64
+ENV PATH="${VULKAN_SDK}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
+ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
+
+RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.321.1/linux/vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+    tar -xf vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+    mkdir -p /opt/vulkan-sdk && \
+    mv 1.4.321.1 /opt/vulkan-sdk/ && \
+    rm -rf vulkansdk-linux-x86_64-1.4.321.1.tar.xz
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
@@ -70,6 +76,10 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
+
+# Install environment info script
+COPY docker/print-env-info.sh /usr/local/bin/print-env-info
+RUN chmod +x /usr/local/bin/print-env-info
 
 # Git configuration for container workflows
 RUN git config --global --add safe.directory '*'

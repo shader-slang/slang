@@ -59,6 +59,7 @@ jobs:
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
+          rm -f cmake-3.30.0-linux-x86_64.tar.gz
 
           # Install CUDA Toolkit 12.5.1 (matching container image)
           wget -q https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda_12.5.1_555.42.06_linux.run
