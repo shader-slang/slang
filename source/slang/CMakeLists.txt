@@ -27,16 +27,28 @@ list(
 )
 list(TRANSFORM SLANG_FIDDLE_OUTPUTS PREPEND "${SLANG_FIDDLE_OUTPUT_DIR}/")
 
+# Use a stamp file as the primary output so the generator run is tracked
+# even when generated content doesn't change.
+set(SLANG_FIDDLE_STAMP "${SLANG_FIDDLE_OUTPUT_DIR}/slang-fiddle.stamp")
+set_source_files_properties(${SLANG_FIDDLE_OUTPUTS} PROPERTIES GENERATED TRUE)
+
 add_custom_command(
-    OUTPUT ${SLANG_FIDDLE_OUTPUTS}
+    OUTPUT ${SLANG_FIDDLE_STAMP}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_FIDDLE_OUTPUT_DIR}
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+    COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_FIDDLE_STAMP}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
+    BYPRODUCTS ${SLANG_FIDDLE_OUTPUTS}
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
 )
+add_custom_target(
+    generate_slang_fiddle_outputs
+    DEPENDS ${SLANG_FIDDLE_STAMP}
+)
+set_target_properties(generate_slang_fiddle_outputs PROPERTIES FOLDER generated)
 add_library(
     slang-fiddle-output
     INTERFACE
@@ -44,6 +56,7 @@ add_library(
     ${SLANG_FIDDLE_OUTPUTS}
 )
 set_target_properties(slang-fiddle-output PROPERTIES FOLDER generated)
+add_dependencies(slang-fiddle-output generate_slang_fiddle_outputs)
 target_include_directories(
     slang-fiddle-output
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
@@ -65,23 +78,33 @@ set(SLANG_CAPABILITY_GENERATED_SOURCE
     ${SLANG_CAPABILITY_GENERATED_HEADERS}
     "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-lookup-capability-defs.cpp"
 )
+set(SLANG_CAPABILITY_STAMP "${SLANG_CAPABILITY_OUTPUT_DIR}/slang-capability.stamp")
+set_source_files_properties(${SLANG_CAPABILITY_GENERATED_SOURCE} PROPERTIES GENERATED TRUE)
 add_custom_command(
-    OUTPUT ${SLANG_CAPABILITY_GENERATED_SOURCE}
+    OUTPUT ${SLANG_CAPABILITY_STAMP}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${SLANG_CAPABILITY_OUTPUT_DIR}
     COMMAND
         slang-capability-generator ${SLANG_CAPABILITY_SOURCE} --target-directory
         ${SLANG_CAPABILITY_OUTPUT_DIR} --doc
         "${slang_SOURCE_DIR}/docs/user-guide/a3-02-reference-capability-atoms.md"
+    COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_CAPABILITY_STAMP}
     DEPENDS ${SLANG_CAPABILITY_SOURCE} slang-capability-generator
+    BYPRODUCTS ${SLANG_CAPABILITY_GENERATED_SOURCE}
     WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
     VERBATIM
 )
+add_custom_target(
+    generate_slang_capability_definitions
+    DEPENDS ${SLANG_CAPABILITY_STAMP}
+)
+set_target_properties(generate_slang_capability_definitions PROPERTIES FOLDER generated)
 slang_add_target(
     slang-capability-defs
     OBJECT
     EXPORT_MACRO_PREFIX SLANG
     USE_EXTRA_WARNINGS
     EXPLICIT_SOURCE ${SLANG_CAPABILITY_GENERATED_HEADERS}
+    REQUIRES generate_slang_capability_definitions
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core
     INCLUDE_DIRECTORIES_PUBLIC
@@ -121,22 +144,33 @@ set(SLANG_LOOKUP_GENERATOR_OUTPUT_DIR
 set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
+set(SLANG_LOOKUP_GENERATED_STAMP
+    "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.stamp"
+)
+set_source_files_properties(${SLANG_LOOKUP_GENERATED_SOURCE} PROPERTIES GENERATED TRUE)
 set(SLANG_RECORD_REPLAY_SYSTEM
     "${slang_SOURCE_DIR}/source/slang-record-replay/record"
     "${slang_SOURCE_DIR}/source/slang-record-replay/util"
 )
 
 add_custom_command(
-    OUTPUT ${SLANG_LOOKUP_GENERATED_SOURCE}
+    OUTPUT ${SLANG_LOOKUP_GENERATED_STAMP}
     COMMAND
         ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
     COMMAND
         slang-lookup-generator ${SLANG_LOOKUP_GENERATOR_INPUT_JSON}
         ${SLANG_LOOKUP_GENERATED_SOURCE} "GLSLstd450" "GLSLstd450"
         "spirv/unified1/GLSL.std.450.h"
+    COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_LOOKUP_GENERATED_STAMP}
     DEPENDS ${SLANG_LOOKUP_GENERATOR_INPUT_JSON} slang-lookup-generator
+    BYPRODUCTS ${SLANG_LOOKUP_GENERATED_SOURCE}
     VERBATIM
 )
+add_custom_target(
+    generate_slang_lookup_tables
+    DEPENDS ${SLANG_LOOKUP_GENERATED_STAMP}
+)
+set_target_properties(generate_slang_lookup_tables PROPERTIES FOLDER generated)
 
 set(SLANG_SPIRV_CORE_SOURCE_JSON
     "${SLANG_SPIRV_HEADERS_INCLUDE_DIR}/spirv/unified1/spirv.core.grammar.json"
@@ -144,16 +178,27 @@ set(SLANG_SPIRV_CORE_SOURCE_JSON
 set(SLANG_SPIRV_CORE_GRAMMAR_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-spirv-core-grammar-embed.cpp"
 )
+set(SLANG_SPIRV_CORE_GRAMMAR_STAMP
+    "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-spirv-core-grammar.stamp"
+)
+set_source_files_properties(${SLANG_SPIRV_CORE_GRAMMAR_SOURCE} PROPERTIES GENERATED TRUE)
 add_custom_command(
-    OUTPUT ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    OUTPUT ${SLANG_SPIRV_CORE_GRAMMAR_STAMP}
     COMMAND
         ${CMAKE_COMMAND} -E make_directory ${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}
     COMMAND
         slang-spirv-embed-generator ${SLANG_SPIRV_CORE_SOURCE_JSON}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    COMMAND ${CMAKE_COMMAND} -E touch ${SLANG_SPIRV_CORE_GRAMMAR_STAMP}
     DEPENDS ${SLANG_SPIRV_CORE_SOURCE_JSON} slang-spirv-embed-generator
+    BYPRODUCTS ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
     VERBATIM
 )
+add_custom_target(
+    generate_slang_spirv_core_grammar
+    DEPENDS ${SLANG_SPIRV_CORE_GRAMMAR_STAMP}
+)
+set_target_properties(generate_slang_spirv_core_grammar PROPERTIES FOLDER generated)
 
 slang_add_target(
     slang-lookup-tables
@@ -163,6 +208,7 @@ slang_add_target(
     EXPLICIT_SOURCE
         ${SLANG_LOOKUP_GENERATED_SOURCE}
         ${SLANG_SPIRV_CORE_GRAMMAR_SOURCE}
+    REQUIRES generate_slang_lookup_tables generate_slang_spirv_core_grammar
     EXPORT_TYPE_AS ${SLANG_LIB_TYPE}
     LINK_WITH_PRIVATE core SPIRV-Headers::SPIRV-Headers
     EXCLUDE_FROM_ALL

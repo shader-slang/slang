@@ -37,16 +37,27 @@ foreach(meta_source ${core_module_meta_source})
     )
 endforeach()
 
+set(core_module_meta_stamp
+    "${core_module_meta_output_dir}/slang-core-module-meta.stamp"
+)
+set_source_files_properties(${core_module_meta_generated_headers} PROPERTIES GENERATED TRUE)
 add_custom_command(
-    OUTPUT ${core_module_meta_generated_headers}
+    OUTPUT ${core_module_meta_stamp}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${core_module_meta_output_dir}
     COMMAND
         slang-generate ${core_module_meta_source} --target-directory
         ${core_module_meta_output_dir}
+    COMMAND ${CMAKE_COMMAND} -E touch ${core_module_meta_stamp}
     DEPENDS ${core_module_meta_source} slang-generate
+    BYPRODUCTS ${core_module_meta_generated_headers}
     WORKING_DIRECTORY "${core_module_meta_source_dir}"
     VERBATIM
 )
+add_custom_target(
+    generate_core_module_meta_headers
+    DEPENDS ${core_module_meta_stamp}
+)
+set_target_properties(generate_core_module_meta_headers PROPERTIES FOLDER generated)
 
 #
 # Generate embedded core module source library (or a dummy library with just nullptrs)
@@ -80,6 +91,7 @@ slang_add_target(
     TARGET_NAME slang-embedded-core-module-source
     EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_EMBED_CORE_MODULE_SOURCE
     EXPLICIT_SOURCE ${core_module_meta_generated_headers}
+    REQUIRES generate_core_module_meta_headers
     EXCLUDE_FROM_ALL
 )
 
@@ -104,6 +116,14 @@ set(glsl_module_generated_header_dir
 set(glsl_module_generated_header
     ${glsl_module_generated_header_dir}/slang-glsl-module-generated.h
 )
+set(core_module_headers_stamp
+    ${core_module_generated_header_dir}/slang-core-module-headers.stamp
+)
+set_source_files_properties(
+    ${core_module_generated_header}
+    ${glsl_module_generated_header}
+    PROPERTIES GENERATED TRUE
+)
 
 # Propagate to parent directory scope, so they're visible to
 # slang-glsl-module/CMakeLists.txt
@@ -114,19 +134,21 @@ set(glsl_module_generated_header_dir
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
 add_custom_command(
-    OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
+    OUTPUT ${core_module_headers_stamp}
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
         ${glsl_module_generated_header}
+    COMMAND ${CMAKE_COMMAND} -E touch ${core_module_headers_stamp}
     DEPENDS slang-bootstrap slang-without-embedded-core-module
+    BYPRODUCTS ${core_module_generated_header} ${glsl_module_generated_header}
     VERBATIM
 )
 # Add a target so that we can depend on the above step when we create the glsl
 # module
 add_custom_target(
     generate_core_module_headers
-    DEPENDS ${core_module_generated_header} ${glsl_module_generated_header}
+    DEPENDS ${core_module_headers_stamp}
 )
 set_target_properties(generate_core_module_headers PROPERTIES FOLDER generated)
 
