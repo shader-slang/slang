@@ -3711,6 +3711,8 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
 
+    IRInst* emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue);
+
     IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeArray(IRType* type, UInt argCount, IRInst* const* args);

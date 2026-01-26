@@ -5812,6 +5812,9 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
 struct WmmaFragment
 {
+    __device__ WmmaFragment() {}
+    __device__ WmmaFragment(T scalarValue) { fill(scalarValue); }
+
     typedef WmmaFragment<T, M, N, K, R> This;
     template<Layout layout>
     void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
