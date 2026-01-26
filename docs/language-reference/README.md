@@ -5,8 +5,7 @@ Slang Language Reference
 
 Contents
 --------
-
-* [1 - Introduction](01-introduction.md)
+* [1 - Introduction and Basic Concepts](01-introduction.md)
 * [2 - Lexical Structure](02-lexical-structure.md)
 * [3 - Preprocessor](03-preprocessor.md)
 * [4 - Types](04-types.md)
@@ -14,3 +13,4 @@ Contents
 * [6 - Statements](06-statements.md)
 * [7 - Declarations](07-declarations.md)
 * [8 - Attributes](08-attributes.md)
+* [Glossary](glossary.md)
