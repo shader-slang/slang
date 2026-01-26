@@ -1448,7 +1448,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    static SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
+    SpvStorageClass addressSpaceToStorageClass(AddressSpace addrSpace)
     {
         SLANG_EXHAUSTIVE_SWITCH_BEGIN
         switch (addrSpace)
@@ -1484,7 +1484,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::IncomingCallableData:
             return SpvStorageClassIncomingCallableDataKHR;
         case AddressSpace::HitObjectAttribute:
-            return SpvStorageClassHitObjectAttributeNV;
+            {
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                    return SpvStorageClassHitObjectAttributeEXT;
+                return SpvStorageClassHitObjectAttributeNV;
+            }
         case AddressSpace::HitAttribute:
             return SpvStorageClassHitAttributeKHR;
         case AddressSpace::ShaderRecordBuffer:
@@ -1856,12 +1861,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (debugLevel == DebugInfoLevel::Minimal)
                 {
                     // For minimal (g1), just emit OpString with the filename for use with OpLine
+                    auto fileNameLit = as<IRStringLit>(debugSource->getFileName());
                     *emittedSpvInst = emitInst(
                         getSection(SpvLogicalSectionID::DebugStringsAndSource),
                         inst,
                         SpvOpString,
                         kResultID,
-                        debugSource->getFileName());
+                        SpvLiteralBits::fromUnownedStringSlice(fileNameLit->getStringSlice()));
                     return true;
                 }
 
@@ -2426,9 +2432,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitOpTypeRayQuery(inst);
 
         case kIROp_HitObjectType:
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-            return emitOpTypeHitObject(inst);
+            {
+                // Use EXT if target has spvShaderInvocationReorderEXT capability,
+                // otherwise fall back to NV for backward compatibility
+                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                    return emitOpTypeHitObjectEXT(inst);
+                }
+                else
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                    return emitOpTypeHitObject(inst);
+                }
+            }
 
         case kIROp_FuncType:
             // > OpTypeFunction
@@ -2485,6 +2507,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MakeCoopVector:
         case kIROp_MakeArray:
         case kIROp_MakeStruct:
+        case kIROp_MakeCoopMatrixFromScalar:
             return emitCompositeConstruct(getSection(SpvLogicalSectionID::ConstantsAndTypes), inst);
         case kIROp_MakeArrayFromElement:
             return emitMakeArrayFromElement(
@@ -2652,7 +2675,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     }
 
-    static SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
+    SpvStorageClass getSpvStorageClass(IRPtrTypeBase* ptrType)
     {
         SpvStorageClass storageClass = SpvStorageClassFunction;
         if (ptrType && ptrType->hasAddressSpace())
@@ -4339,6 +4362,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             result = emitGetElement(parent, as<IRGetElement>(inst));
             break;
         case kIROp_MakeStruct:
+            result = emitCompositeConstruct(parent, inst);
+            break;
+        case kIROp_MakeCoopMatrixFromScalar:
             result = emitCompositeConstruct(parent, inst);
             break;
         case kIROp_MakeArrayFromElement:
@@ -7596,10 +7622,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         IRBuilder builder(inst);
         builder.setInsertBefore(inst);
         auto destPtrType = as<IRPtrTypeBase>(inst->getDest()->getDataType());
+        SLANG_ASSERT(destPtrType);
+
         auto addrSpace = AddressSpace::Function;
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
         auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+
+        // Compute memory access operands for PhysicalStorageBuffer alignment
+        int memoryAccessMask = 0;
+        int alignment = -1;
+        if (addressSpaceToStorageClass(addrSpace) == SpvStorageClassPhysicalStorageBuffer)
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment);
+            alignment = sizeAndAlignment.alignment;
+            if (alignment != -1)
+                memoryAccessMask |= SpvMemoryAccessAlignedMask;
+        }
+
         for (UInt i = 0; i < inst->getElementCount(); i++)
         {
             auto index = inst->getElementIndex(i);
@@ -7615,8 +7656,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 sourceElementType,
                 inst->getSource(),
                 makeArray(SpvLiteralInteger::from32((int32_t)i)));
-            result =
-                emitOpStore(parent, (i == inst->getElementCount() - 1 ? inst : nullptr), addr, val);
+            result = emitInstCustomOperandFunc(
+                parent,
+                (i == inst->getElementCount() - 1 ? inst : nullptr),
+                SpvOpStore,
+                [&]()
+                {
+                    emitOperand(addr);
+                    emitOperand(val);
+                    if (memoryAccessMask)
+                    {
+                        emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                        if (memoryAccessMask & SpvMemoryAccessAlignedMask)
+                            emitOperand(SpvLiteralInteger::from32((uint32_t)alignment));
+                    }
+                });
         }
         return result;
     }
@@ -8145,7 +8199,35 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto srcVal = emitLoad(parent, slangIRLoad);
         auto convertedVal =
             emitInst(parent, nullptr, SpvOpCopyLogical, dstValType, kResultID, srcVal);
-        return emitOpStore(parent, nullptr, inst->getPtr(), convertedVal);
+
+        // Compute memory access operands for PhysicalStorageBuffer alignment
+        int memoryAccessMask = 0;
+        int alignment = -1;
+        MemoryScope memoryScope{};
+        getMemoryAccessOperandsOfLoadStore<MemoryAccessType::Store>(
+            inst,
+            inst->getPtr(),
+            memoryAccessMask,
+            alignment,
+            memoryScope);
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpStore,
+            [&]()
+            {
+                emitOperand(inst->getPtr());
+                emitOperand(convertedVal);
+                if (memoryAccessMask)
+                {
+                    emitOperand(SpvLiteralInteger::from32(memoryAccessMask));
+                    if (memoryAccessMask & SpvMemoryAccessAlignedMask)
+                        emitOperand(SpvLiteralInteger::from32((uint32_t)alignment));
+                    if (memoryAccessMask & SpvMemoryAccessMakePointerAvailableMask)
+                        emitOperand(
+                            emitIntConstant((IRIntegerValue)memoryScope, builder.getIntType()));
+                }
+            });
     }
 
     SpvInst* emitBitfieldExtract(SpvInstParent* parent, IRInst* inst)

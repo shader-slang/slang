@@ -1637,7 +1637,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // `this` of the functor is optional.
         // Skip the synthesis if `this` is not passed.
-        if (ifuncCall->getParamCount() > 3)
+        // If `this` parameter is present, then the first parameter of the functor should be
+        // a struct instead of an int.
+        if (inst->hasIFuncThis())
         {
             auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
             inst->setIFuncCall(funcSynth);

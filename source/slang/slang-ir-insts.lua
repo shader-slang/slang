@@ -901,6 +901,7 @@ local insts = {
 	{ makeArrayFromElement = { operands = { { "element" } } } },
 	{ makeCoopVector = {} },
 	{ makeCoopVectorFromValuePack = { operands = { { "valuePack" } } } },
+	{ makeCoopMatrixFromScalar = {} },
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
