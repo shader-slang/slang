@@ -11,6 +11,7 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
+#include "../core/slang-math.h"
 #include "core/slang-char-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -2425,6 +2426,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         return tryFoldIndexExpr(indexExpr.getExpr(), kind, circularityInfo);
     }
+    // Note: FloatBitCastExpr (__floatAsInt) is folded directly in visitFloatBitCastExpr
+    // and replaced with an IntegerLiteralExpr, so we don't need to handle it here.
     return nullptr;
 }
 
@@ -4220,11 +4223,148 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
         }
+
+        // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
+        // uint2 otherwise). The size calculation is deferred to IR level where target
+        // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
     }
 
     sizeOfLikeExpr->sizedType = type;
 
     return sizeOfLikeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
+{
+    if (!expr->value)
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    // Visit the value expression
+    auto valueExpr = dispatch(expr->value);
+    expr->value = valueExpr;
+
+    // Determine the floating-point type from the expression
+    auto valueType = valueExpr->type.type;
+    BaseType floatBaseType = BaseType::Void;
+    Type* resultType = nullptr;
+
+    if (auto basicType = as<BasicExpressionType>(valueType))
+    {
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Half:
+            floatBaseType = BaseType::Half;
+            resultType = m_astBuilder->getInt16Type();
+            break;
+        case BaseType::Float:
+            floatBaseType = BaseType::Float;
+            resultType = m_astBuilder->getIntType(); // int32
+            break;
+        case BaseType::Double:
+            floatBaseType = BaseType::Double;
+            resultType = m_astBuilder->getInt64Type();
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (floatBaseType == BaseType::Void)
+    {
+        getSink()->diagnose(
+            expr,
+            Diagnostics::floatBitCastTypeMismatch,
+            "__floatAsInt",
+            "half, float, or double");
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    expr->type = resultType;
+
+    // Try to constant fold - __floatAsInt must be evaluated at compile time
+    FloatingPointLiteralExpr* floatLitExpr = nullptr;
+
+    // Check if it's a direct floating-point literal
+    if (auto lit = as<FloatingPointLiteralExpr>(valueExpr))
+    {
+        floatLitExpr = lit;
+    }
+    // Check if it's a type cast like float(x), half(x), double(x)
+    else if (auto invokeExpr = as<InvokeExpr>(valueExpr))
+    {
+        if (invokeExpr->arguments.getCount() == 1)
+        {
+            floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
+            if (!floatLitExpr)
+            {
+                // Also check for integer literal being cast to float
+                if (auto intLitExpr = as<IntegerLiteralExpr>(invokeExpr->arguments[0]))
+                {
+                    double floatVal = (double)intLitExpr->value;
+                    IntegerLiteralValue resultValue = 0;
+
+                    switch (floatBaseType)
+                    {
+                    case BaseType::Half:
+                        resultValue = (int16_t)FloatToHalf((float)floatVal);
+                        break;
+                    case BaseType::Float:
+                        resultValue = FloatAsInt((float)floatVal);
+                        break;
+                    case BaseType::Double:
+                        resultValue = DoubleAsInt64(floatVal);
+                        break;
+                    default:
+                        break;
+                    }
+
+                    // Create the folded integer literal expression
+                    auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
+                    foldedExpr->loc = expr->loc;
+                    foldedExpr->type = QualType(resultType);
+                    foldedExpr->value = resultValue;
+                    return foldedExpr;
+                }
+            }
+        }
+    }
+
+    if (floatLitExpr)
+    {
+        double floatVal = floatLitExpr->value;
+        IntegerLiteralValue resultValue = 0;
+
+        switch (floatBaseType)
+        {
+        case BaseType::Half:
+            resultValue = (int16_t)FloatToHalf((float)floatVal);
+            break;
+        case BaseType::Float:
+            resultValue = FloatAsInt((float)floatVal);
+            break;
+        case BaseType::Double:
+            resultValue = DoubleAsInt64(floatVal);
+            break;
+        default:
+            break;
+        }
+
+        // Create the folded integer literal expression
+        auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
+        foldedExpr->loc = expr->loc;
+        foldedExpr->type = QualType(resultType);
+        foldedExpr->value = resultValue;
+        return foldedExpr;
+    }
+
+    // Could not constant fold - emit error
+    getSink()->diagnose(expr, Diagnostics::floatBitCastRequiresConstant);
+    expr->type = m_astBuilder->getErrorType();
+    return expr;
 }
 
 // Determines if we have a valid `AddressOf` target.
@@ -4797,7 +4937,6 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     LambdaDecl* lambdaStructDecl = m_astBuilder->create<LambdaDecl>();
     auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
-    m_parentFunc->addMember(lambdaStructDecl);
     synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
     StringBuilder nameBuilder;
@@ -4807,6 +4946,11 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         nameBuilder << getText(m_parentFunc->getName());
         nameBuilder << "_";
         nameBuilder << m_parentFunc->getDirectMemberDeclCount();
+        m_parentFunc->addMember(lambdaStructDecl);
+    }
+    else
+    {
+        m_outerScope->containerDecl->addMember(lambdaStructDecl);
     }
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
@@ -4816,6 +4960,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     synthesizer.pushScopeForContainer(funcDecl);
     funcDecl->loc = lambdaExpr->loc;
     funcDecl->nameAndLoc.name = getName("()");
+    funcDecl->nameAndLoc.loc = lambdaExpr->loc;
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
     addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());
@@ -5584,14 +5729,6 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
 
     baseExpr = derefExpr;
 
-    // If the base of the member lookup has an interface type
-    // *without* a suitable this-type substitution, then we are
-    // trying to perform lookup on a value of existential type,
-    // and we should "open" the existential here so that we
-    // can expose its structure.
-    //
-    baseExpr = maybeOpenExistential(baseExpr);
-
     // In case our base expressin is still overloaded, we can perform
     // some more refinement.
     //
@@ -5628,6 +5765,15 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
             overloadedExpr);
         // TODO: handle other cases of OverloadedExpr that need filtering.
     }
+
+    // If the base of the member lookup has an interface type
+    // *without* a suitable this-type substitution, then we are
+    // trying to perform lookup on a value of existential type,
+    // and we should "open" the existential here so that we
+    // can expose its structure.
+    //
+    baseExpr = maybeOpenExistential(baseExpr);
+
 
     return baseExpr;
 }

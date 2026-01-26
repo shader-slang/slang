@@ -2,7 +2,7 @@
 // Per spec: OpBitcast only allows "scalar or vector of numerical type" or pointers
 // Structs and arrays are NOT eligible, so they MUST be lowered to component operations
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // CHECK-DAG: OpBitcast %int %
 // CHECK-DAG: OpBitcast %float %

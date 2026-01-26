@@ -92,7 +92,7 @@ struct OptionalTypeLoweringContext
         }
     }
 
-    LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder*, IRInst* type)
+    LoweredOptionalTypeInfo* getLoweredOptionalType(IRBuilder* builder, IRInst* type)
     {
         if (auto loweredInfo = loweredOptionalTypes.tryGetValue(type))
             return loweredInfo->Ptr();
@@ -109,7 +109,8 @@ struct OptionalTypeLoweringContext
         while (auto valueOptionalType = as<IROptionalType>(valueType))
         {
             // If the value type is also an Optional, we need to keep lowering it.
-            valueType = valueOptionalType->getValueType();
+            auto loweredValueOptionalType = getLoweredOptionalType(builder, valueOptionalType);
+            valueType = loweredValueOptionalType->loweredType;
         }
 
         info->optionalType = (IRType*)type;

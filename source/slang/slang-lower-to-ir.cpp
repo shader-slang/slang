@@ -610,7 +610,7 @@ struct IRGenContext
     // that contains the Inst.
     FunctionDeclBase* funcDecl;
 
-    bool includeDebugInfo = false;
+    DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -921,15 +921,15 @@ LoweredValInfo emitCallToDeclRef(
             SLANG_RELEASE_ASSERT(argCount == 1);
             return LoweredValInfo::simple(args[0]);
         }
-        auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        switch (IROp(intrinsicOp))
+        auto intrinsicOp = IROp(getIntrinsicOp(funcDecl, intrinsicOpModifier));
+        switch (intrinsicOp)
         {
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
         default:
             return LoweredValInfo::simple(
-                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+                builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
         }
     }
 
@@ -4911,6 +4911,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
     }
 
+    LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
+    {
+        // __floatAsInt should always be constant-folded during semantic checking.
+        // If we reach here, something went wrong.
+        SLANG_UNEXPECTED("__floatAsInt should be constant-folded during type checking");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
@@ -7971,6 +7979,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+
         lowerSwitchCases(stmt->body, &info);
 
         // TODO: once we've discovered the cases, we should
@@ -8031,15 +8040,22 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
         return *result;
 
     ComPtr<ISlangBlob> outBlob;
-    if (path.hasFileFoundPath())
-    {
-        context->getLinkage()->getFileSystemExt()->loadFile(
-            path.foundPath.getBuffer(),
-            outBlob.writeRef());
-    }
     UnownedStringSlice content;
-    if (outBlob)
-        content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+
+    // Only embed source content for Standard and Maximal debug level
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+    {
+        if (path.hasFileFoundPath())
+        {
+            context->getLinkage()->getFileSystemExt()->loadFile(
+                path.foundPath.getBuffer(),
+                outBlob.writeRef());
+        }
+        if (outBlob)
+            content =
+                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+    }
+
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
     auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
@@ -8054,7 +8070,8 @@ void maybeEmitDebugLine(
     SourceLoc loc,
     bool allowNullStmt)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug line info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
     if (!allowNullStmt)
@@ -8102,7 +8119,8 @@ void maybeEmitDebugLine(
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug location info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
     auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
     if (!sourceView)
@@ -9799,7 +9817,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
-                if (context->includeDebugInfo && decl->loc.isValid() &&
+                // Requires Standard level or higher for variable debug info
+                if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
                     context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
@@ -11506,6 +11525,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // or attributes.
         IRFunc* irFunc = subBuilder->createFunc();
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+        irFunc->sourceLoc = decl->loc;
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -12942,8 +12962,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo =
-        compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
+    context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
@@ -12953,14 +12972,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // in the translation unit.
     //
     // If debug info is enabled, we emit the DebugSource insts for each source file into IR.
-    if (context->includeDebugInfo)
+    // This is needed for Minimal level and above (for line number correlation)
+    if (context->debugInfoLevel != DebugInfoLevel::None)
     {
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
+            // For Standard and Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                source->getContent(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
+                                                                      : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
@@ -13070,8 +13092,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     lowerExpandType(module);
 
     // Generate DebugValue insts to store values into debug variables,
-    // if debug symbols are enabled.
-    if (context->includeDebugInfo)
+    // if debug symbols are enabled at Standard level or higher.
+    // This allows debugging of local variable values.
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
         insertDebugValueStore(context->shared->debugValueContext, module);
     }

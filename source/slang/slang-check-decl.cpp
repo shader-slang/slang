@@ -2147,9 +2147,11 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // the differentiable context is preserved.
             // This ensures that calls in the initializer (like `dot`) get properly marked
             // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
-            // the differentiableCallDecoration
+            // the differentiableCallDecoration, also allows us to properly check the lambda
+            // expressions nested in AST locations like: `let x = someFunc((int y)=>{...});
+            // (checking of lambda exprs requires parentFunc to be available).
             auto parentFunc = getParentFunc(varDecl);
-            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
+            if (parentFunc != m_parentFunc)
                 contextToUse = contextToUse.withParentFunc(parentFunc);
 
             SemanticsVisitor subVisitor(contextToUse);
@@ -5693,6 +5695,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         {
             if (auto callee = as<CallableDecl>(declRefExpr->declRef))
             {
+                synFuncDecl->loc = callee.getDecl()->loc;
                 auto synParams = synFuncDecl->getParameters();
                 auto calleeParams = callee.getDecl()->getParameters();
                 auto synParamIter = synParams.begin();
@@ -9407,12 +9410,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
                 {
                     if (!hasConflict)
                     {
-                        diagnostic = Diagnostics::FunctionRedefinition{
-                            .name = newDecl->getName(),
-                            .function_location = newDecl->getNameLoc()};
+                        diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
                     }
                     auto prevDecl = *found;
-                    diagnostic.original_location = prevDecl->getNameLoc();
+                    diagnostic.original = prevDecl;
                 }
                 else
                 {
