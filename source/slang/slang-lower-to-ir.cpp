@@ -12110,6 +12110,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 getBuilder()->addDecoration(irFunc, kIROp_ForceInlineDecoration);
                 isInline = true;
             }
+            else if (as<NoInlineAttribute>(modifier))
+            {
+                getBuilder()->addDecoration(irFunc, kIROp_NoInlineDecoration);
+            }
             else if (as<TreatAsDifferentiableAttribute>(modifier))
             {
                 getBuilder()->addDecoration(irFunc, kIROp_TreatAsDifferentiableDecoration);

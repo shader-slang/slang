@@ -1517,6 +1517,14 @@ class ForceInlineAttribute : public Attribute
     FIDDLE(...)
 };
 
+// A `[NoInline]` attribute indicates that the callee should not be inlined.
+//
+FIDDLE()
+class NoInlineAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 
 /// An attribute that marks a type declaration as either allowing or
 /// disallowing the type to be inherited from in other modules.
