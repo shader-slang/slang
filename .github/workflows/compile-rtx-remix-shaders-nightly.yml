@@ -309,7 +309,7 @@ jobs:
               "RTX-Remix-Nightly": ":green-check-mark: RTX Remix nightly status: ${{ job.status }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}
 
       - name: Failure notification
         id: slack-notify-failure
@@ -321,4 +321,4 @@ jobs:
               "RTX-Remix-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nRTX Remix nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}

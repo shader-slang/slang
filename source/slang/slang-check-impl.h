@@ -2429,6 +2429,11 @@ public:
         // Additional subtype witnesses available to the currentt constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
+
+        // Accumulated conversion cost from type promotions during constraint solving.
+        // This tracks costs when a type parameter is promoted to satisfy an interface
+        // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+        ConversionCost typePromotionCost = kConversionCost_None;
     };
 
     Type* TryJoinVectorAndScalarType(
@@ -3057,6 +3062,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr);
     Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);

@@ -1637,7 +1637,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         // `this` of the functor is optional.
         // Skip the synthesis if `this` is not passed.
-        if (ifuncCall->getParamCount() > 3)
+        // If `this` parameter is present, then the first parameter of the functor should be
+        // a struct instead of an int.
+        if (inst->hasIFuncThis())
         {
             auto funcSynth = createWrapperFunctionForPerElement(builder, ifuncCall);
             inst->setIFuncCall(funcSynth);
@@ -2167,6 +2169,26 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Recursively looks for member structs that have the Block / BufferBlock
+    // decoration.
+    void findEmbeddedBlockStructs(IRType* type, HashSet<IRStructType*>& embeddedBlockStructs)
+    {
+        if (auto structType = as<IRStructType>(type))
+        {
+            if (structType->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
+                structType->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
+            {
+                embeddedBlockStructs.add(structType);
+            }
+            for (auto field : structType->getFields())
+                findEmbeddedBlockStructs(field->getFieldType(), embeddedBlockStructs);
+        }
+        else if (auto arrayType = as<IRArrayType>(type))
+        {
+            findEmbeddedBlockStructs(arrayType->getElementType(), embeddedBlockStructs);
+        }
+    }
+
     void legalizeStructBlocks()
     {
         // SPIRV does not allow using a struct with a block declaration as a field
@@ -2177,21 +2199,15 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
         HashSet<IRStructType*> embeddedBlockStructs;
         List<IRGlobalParam*> structGlobalParams;
+
         for (auto globalInst : m_module->getGlobalInsts())
         {
             if (auto outerStruct = as<IRStructType>(globalInst))
             {
+                // This search needs to be done recursively in order to find
+                // structs nested deeper than one layer.
                 for (auto field : outerStruct->getFields())
-                {
-                    if (auto innerStruct = as<IRStructType>(field->getFieldType()))
-                    {
-                        if (innerStruct->findDecorationImpl(kIROp_SPIRVBlockDecoration) ||
-                            innerStruct->findDecorationImpl(kIROp_SPIRVBufferBlockDecoration))
-                        {
-                            embeddedBlockStructs.add(innerStruct);
-                        }
-                    }
-                }
+                    findEmbeddedBlockStructs(field->getFieldType(), embeddedBlockStructs);
             }
             else if (auto globalParam = as<IRGlobalParam>(globalInst))
             {

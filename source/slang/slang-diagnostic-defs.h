@@ -874,6 +874,11 @@ DIAGNOSTIC(
     Error,
     cannotDereferenceType,
     "cannot dereference type '$0', do you mean to use '.'?")
+DIAGNOSTIC(
+    30102,
+    Error,
+    staticRefToThis,
+    "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -1031,6 +1036,14 @@ DIAGNOSTIC(
     Error,
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
+
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
+
+DIAGNOSTIC(
+    30085,
+    Error,
+    floatBitCastRequiresConstant,
+    "'__floatAsInt' requires a compile-time constant floating-point expression")
 
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
@@ -2636,6 +2649,13 @@ DIAGNOSTIC(
     "comma operator used in expression (may be unintended)")
 
 DIAGNOSTIC(
+    41026,
+    Warning,
+    switchFallthroughRestructured,
+    "switch fall-through is not supported by this target and will be restructured; "
+    "this may affect wave/subgroup convergence if the duplicated code contains wave operations")
+
+DIAGNOSTIC(
     41024,
     Error,
     cannotDefaultInitializeResource,
@@ -3234,4 +3254,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC

@@ -1996,7 +1996,10 @@ Token MacroInvocation::_readTokenImpl()
             // at start of line, if it is, we must mark the first token as start of line
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
+            {
                 token.flags |= TokenFlag::AtStartOfLine;
+                m_isStartOfLine = false;
+            }
             return token;
         }
 
@@ -2023,7 +2026,10 @@ Token MacroInvocation::_readTokenImpl()
             // at start of line, if it is, we must mark the first token as start of line
             // as well, otherwise the expanded code could be invalid.
             if (m_isStartOfLine)
+            {
                 token.flags |= TokenFlag::AtStartOfLine;
+                m_isStartOfLine = false;
+            }
             return token;
         }
 

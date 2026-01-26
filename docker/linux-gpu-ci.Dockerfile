@@ -1,7 +1,7 @@
 # Linux GPU CI Container Image
 #
-# Base image with CUDA 12.4.1 for GPU testing on self-hosted runners
-# with driver 550.54.15 (doesn't support newer PTX versions from CUDA 12.9+)
+# Base image with CUDA 12.5.1 for GPU testing on self-hosted runners
+# Requires driver 550.54.15 or newer
 #
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
@@ -9,10 +9,10 @@
 # - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:12.4.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
 
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
 
 # Install essential tools required for GitHub Actions and Copilot
 # - curl: for downloading Copilot runtime and dependencies
@@ -44,10 +44,22 @@ RUN apt-get update && apt-get install -y \
     libxi-dev \
     libgl1-mesa-dev \
     libvulkan-dev \
-    vulkan-validationlayers \
     spirv-tools \
     glslang-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Vulkan SDK 1.4.321.1 from tarball (apt packages discontinued after 1.4.313)
+# Using tarball to get the fixed validation layers that resolve cooperative vector issues
+ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.321.1/x86_64
+ENV PATH="${VULKAN_SDK}/bin:${PATH}"
+ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
+ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
+
+RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.321.1/linux/vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+    tar -xf vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+    mkdir -p /opt/vulkan-sdk && \
+    mv 1.4.321.1 /opt/vulkan-sdk/ && \
+    rm -rf vulkansdk-linux-x86_64-1.4.321.1.tar.xz
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
@@ -65,6 +77,10 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
 
+# Install environment info script
+COPY docker/print-env-info.sh /usr/local/bin/print-env-info
+RUN chmod +x /usr/local/bin/print-env-info
+
 # Git configuration for container workflows
 RUN git config --global --add safe.directory '*'
 
@@ -77,5 +93,5 @@ RUN echo "=== Installed Tools ===" && \
 
 # Set labels for identification
 LABEL org.opencontainers.image.source=https://github.com/shader-slang/slang
-LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 12.4.1"
+LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 12.5.1"
 LABEL org.opencontainers.image.licenses=MIT
