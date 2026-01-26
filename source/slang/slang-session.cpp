@@ -539,9 +539,13 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
-    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
-
-    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+    auto checkedInvokeExpr = as<InvokeExpr>(visitor.CheckInvokeExprWithCheckedOperands(invokeExpr));
+    if (!checkedInvokeExpr)
+        return DeclRef<Decl>();
+    auto funcDeclRefExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return DeclRef<Decl>();
+    return funcDeclRefExpr->declRef;
 }
 
 
