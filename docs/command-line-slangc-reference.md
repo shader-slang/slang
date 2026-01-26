@@ -1278,6 +1278,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
+* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1321,6 +1322,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
+* `spvShaderInvocationReorderEXT` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1343,6 +1345,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
 * `any_target` 
@@ -1399,6 +1402,8 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
 * `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
+* `spvShaderInvocationReorderMotionNV` 
+* `spvShaderInvocationReorderMotionEXT` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
@@ -1457,17 +1462,24 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
+* `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
+* `GL_NV_shader_invocation_reorder_motion` : enables the GL_NV_shader_invocation_reorder_motion extension 
+* `GL_EXT_shader_invocation_reorder_motion` : enables the GL_EXT_shader_invocation_reorder_motion extension 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
+* `ser_nvapi` 
+* `ser_dxr` 
 * `ser` 
-* `motionblur` 
+* `ser_nv` 
+* `motionblur_nv` 
 * `rayquery` 
 * `raytracing_motionblur` 
 * `ser_motion` 
+* `ser_nv_motion` 
 * `shaderclock` 
 * `fragmentshaderinterlock` 
 * `atomic64` 
@@ -1506,6 +1518,7 @@ A capability describes an optional feature that a target may or may not support.
 * `amplification_mesh` 
 * `raytracing_stages` 
 * `anyhit_closesthit` 
+* `anyhit_intersection` 
 * `raygen_closesthit_miss` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
@@ -1672,6 +1685,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_lss` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
+* `raytracing_object_space_ray` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 
 * `raytracing_raygen_closesthit_miss_callable` 
@@ -1681,11 +1695,16 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_nv_raygen` 
+* `ser_nv_raygen_closesthit_miss` 
+* `ser_nv_motion_raygen_closesthit_miss` 
 * `ser_any_closesthit_intersection_miss` 
 * `ser_anyhit_closesthit_intersection` 
 * `ser_anyhit_closesthit` 
 * `ser_motion_raygen_closesthit_miss` 
 * `ser_motion_raygen` 
+* `ser_dxr_raygen_closesthit_miss` 
+* `ser_dxr_raygen` 
 * `all` 
 
 <a id="file-extension"></a>
