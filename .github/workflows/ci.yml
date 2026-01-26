@@ -190,7 +190,7 @@ jobs:
       test-category: full
       full-gpu-tests: true
 
-  # MaterialX Integration Tests (Windows only for initial validation)
+  # MaterialX Integration Tests (Windows only)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
