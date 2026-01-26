@@ -1,7 +1,7 @@
 // Test that matrix types do NOT use OpBitcast per SPIR-V spec
 // Per spec: OpBitcast only allows "scalar or vector of numerical type"
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // CHECK-NOT: OpBitcast %mat4v4float
 // CHECK-NOT: OpBitcast %mat3v3float

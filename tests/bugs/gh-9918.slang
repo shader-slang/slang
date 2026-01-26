@@ -1,4 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry entry_mesh
+//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
+//  This test requires ADCE for SPIRV optimization to produce expected output.
+//DISABLE_TEST:SIMPLE(filecheck=CHECK_SPIRV): -target spirv -entry entry_mesh
 //TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl -entry entry_mesh
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -entry entry_mesh
 

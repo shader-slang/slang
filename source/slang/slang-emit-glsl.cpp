@@ -3469,7 +3469,22 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("hitObjectNV");
+            // Emit appropriate HitObject type based on capability
+            // User must explicitly specify which extension to use
+            auto targetCaps = getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectEXT");
+            }
+            else if (targetCaps.implies(CapabilityAtom::_GL_NV_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectNV");
+            }
+            else
+            {
+                SLANG_UNEXPECTED(
+                    "HitObjectType requires GL_EXT or GL_NV shader_invocation_reorder capability");
+            }
             return;
         }
     case kIROp_TextureFootprintType:
