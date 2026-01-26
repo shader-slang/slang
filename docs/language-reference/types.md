@@ -96,8 +96,8 @@ specifiers are used in:
 - [modern variable (TODO)](TODO) declarations
 - [function parameter (TODO)](TODO) declarations
 - [function return value type (TODO)](TODO) declarations
-- [structure property](types-struct#property)
-- [structure subscript operator](types-struct#subscript)
+- [structure property](types-struct.md#property)
+- [structure subscript operator](types-struct.md#subscript-op)
 - [generic type parameter declarations (TODO)](TODO)
 - [typealias](#alias) declarations
 

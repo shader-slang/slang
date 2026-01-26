@@ -7,6 +7,7 @@ Contents
 --------
 
 * [Introduction](introduction.md)
+* [Basic Concepts](basics.md)
 * [Lexical Structure](lexical-structure.md)
 * [Preprocessor](preprocessor.md)
 * [Types](types.md)
@@ -14,3 +15,4 @@ Contents
 * [Statements](statements.md)
 * [Declarations](declarations.md)
 * [Attributes](attributes.md)
+* [Glossary](glossary.md)
