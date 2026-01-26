@@ -8031,6 +8031,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
     addToWorkList(thisInst, other);
 
+    List<IRSetBase*> setsToUpdate;
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto workItem = workList[i];
@@ -8089,37 +8090,8 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
-            bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
-            if (userIsSetInst)
-            {
-                // Set insts need their operands sorted
-                auto module = user->getModule();
-                SLANG_ASSERT(module);
-
-                List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                    operands.add(user->getOperand(ii));
-
-                auto getUniqueId = [&](IRInst* inst) -> UInt
-                {
-                    auto uniqueIDMap = module->getUniqueIdMap();
-                    auto existingId = uniqueIDMap->tryGetValue(inst);
-                    if (existingId)
-                        return *existingId;
-
-                    auto id = uniqueIDMap->getCount();
-                    uniqueIDMap->add(inst, id);
-                    return (UInt)id;
-                };
-
-                operands.sort(
-                    [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
-
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                    user->getOperandUse(ii)->usedValue = operands[ii];
-
-                module->getContainerPool().free(&operands);
-            }
+            if (auto setBase = as<IRSetBase>(uu->getUser()))
+                setsToUpdate.add(setBase);
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
@@ -8183,6 +8155,29 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
         thisInst->firstUse = nullptr;
 
         ff->debugValidate();
+    }
+
+    for (auto setInst : setsToUpdate)
+    {
+        auto module = setInst->getModule();
+        IRBuilder builder(module);
+
+        HashSet<IRInst*>& elements = *module->getContainerPool().getHashSet<IRInst>();
+
+        for (UInt i = 0; i < setInst->getOperandCount(); i++)
+            elements.add(setInst->getElement(i));
+
+        auto newSetInst = builder.getSet(setInst->getOp(), elements);
+        if (newSetInst != setInst)
+        {
+            // setInst was improperly ordered, so we need to replace its uses
+            // and then delete it.
+            //
+            setInst->replaceUsesWith(newSetInst);
+            setInst->removeAndDeallocate();
+        }
+
+        module->getContainerPool().free(&elements);
     }
 }
 
