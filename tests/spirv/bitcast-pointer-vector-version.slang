@@ -2,8 +2,8 @@
 // Per SPIR-V spec: OpBitcast can handle pointer <-> vector<32-bit integer> bitcasts
 // but only in SPIR-V 1.5 or later
 
-//TEST:SIMPLE(filecheck=CHECK_SPIRV15): -target spirv -emit-spirv-directly
-//TEST:SIMPLE(filecheck=CHECK_SPIRV14): -target spirv -emit-spirv-directly -profile spirv_1_4
+//TEST:SIMPLE(filecheck=CHECK_SPIRV15): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=CHECK_SPIRV14): -target spirv -emit-spirv-directly -O0 -profile spirv_1_4
 
 // With SPIR-V 1.5+, pointer->vector<uint2> should use OpBitcast directly
 // A 64-bit pointer can be cast to uint2 (2×32 = 64 bits)
