@@ -39,12 +39,12 @@ Member list:
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
 - *`identifier`* is an optional name of the declared struct type
 - *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
-- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface).
+- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface.md).
 - *`type-expr`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
 - *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
 - *`member-list`* is a list of struct members. A member is one of:
   - *`var-decl`* is a member variable declaration. See [Variables (TODO)](TODO)
-  - *`type-decl`* is a nested [type declaration](04-types).
+  - *`type-decl`* is a nested [type declaration](04-types.md).
   - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
   - *`constructor-decl`* is a [constructor declaration](#constructor).
   - *`property-decl`* is a [property declaration](#property).
@@ -64,7 +64,7 @@ forms:
 - The *no-body* declaration specifies an existence of a structure type. The declaration simply specifies that
   a structure type with the specified name exists. This enables its use in type expressions without the member
   declarations.
-- The *with-members* declaration defines the structure type with a layout and an [extensible](04-types-extension)
+- The *with-members* declaration defines the structure type with a layout and an [extensible](04-types-extension.md)
   list of non-layout members.
 - The *link-time extern type* declaration specifies the existence of a structure type that is defined in
   another module. See [Modules (TODO)](TODO).
@@ -303,7 +303,7 @@ specified in the declaration, parameter `newValue` with the same type as the pro
 body.
 
 The property declaration forms without accessor or accessor body declarations are useful only in
-[interface](04-interface) declarations.
+[interface](04-interface.md) declarations.
 
 > ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
 > change and may not work as expected.
