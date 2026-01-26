@@ -3844,11 +3844,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return false;
     }
 
-    bool shouldEmitDiscardAsDemote()
-    {
-        return (isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension);
-    }
-
     SpvInst* emitMemorySemanticMask(IRInst* memoryOrderInst, IRInst* ptrInst)
     {
         IRBuilder builder(memoryOrderInst);
