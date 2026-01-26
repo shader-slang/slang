@@ -8,28 +8,26 @@ implementing neural;
 public struct PermutoEncoder<T,
     int Dimensions,
     int FeatureDimensionPerEntry,
-    uint Log2HashmapSize
+    uint Log2HashmapSize,
     >
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
     /// Precomputed per-level information.
-    VISIBILITY_LEVEL struct LevelInfo
+    VISIBILITY_LEVEL struct PerLevelInfo
     {
-        VISIBILITY_LEVEL uint offset;        // Offset into feature table for this level (in number of features)
-        VISIBILITY_LEVEL uint hashmapSize;   // Hashmap size for this level
+        VISIBILITY_LEVEL uint currentLevelIndex;
+        VISIBILITY_LEVEL uint offsetOfFeatureTable;         // Offset into feature table for this level (in number of features)
+        VISIBILITY_LEVEL uint featureTableSize;             // Hashmap size for this level
+        VISIBILITY_LEVEL float scale;                       // Scale for this level
+        VISIBILITY_LEVEL float scalesPerDim[Dimensions];
+        VISIBILITY_LEVEL float shiftsPerDim[Dimensions];
     }
 
     VISIBILITY_LEVEL struct Params
     {
-        VISIBILITY_LEVEL uint currentLevel;
-        VISIBILITY_LEVEL float maxLevel;
-        VISIBILITY_LEVEL float baseScale;               // Base scale for the encoding
-        VISIBILITY_LEVEL float log2PerLevelScale;       // log2(MaxResolution / BaseResolution) / (NumLevels - 1)
-        VISIBILITY_LEVEL float scale;                   // Scale for this level
-        VISIBILITY_LEVEL float scalesPerDim[Dimensions];
-        VISIBILITY_LEVEL float shiftsPerDim[Dimensions];
-        VISIBILITY_LEVEL LevelInfo levelInfo;
+        VISIBILITY_LEVEL float maxLevel;                // It's maxLevelRatio * MaxLevels, where maxLevelRatio is a user defined ratio
+        VISIBILITY_LEVEL PerLevelInfo levelInfo;        // Contains scale, offset, hashmap size, and per-dim scales/shifts
     }
 
     // =========================================================================
@@ -215,12 +213,10 @@ public struct PermutoEncoder<T,
     /// Main forward pass: encodes positions using the permutohedral lattice.
     ///
     /// @param params Encoding parameters containing:
-    ///   - currentLevel: The level to process
-    ///   - maxLevel: Maximum level to use
-    ///   - scale: Scale for this level
-    ///   - scalesPerDim: Per-dimension scaling factors
-    ///   - shiftsPerDim: Per-dimension random shifts
-    ///   - levelInfo: Level offset and hashmap size
+    ///   - maxLevel: Maximum level to use (maxLevelRatio * MaxLevels)
+    ///   - baseScale: Base scale for the encoding
+    ///   - log2PerLevelScale: Log2 of the per-level scale factor
+    ///   - levelInfo: Per-level info (currentLevelIndex, offsetOfFeatureTable, featureTableSize, scale, scalesPerDim, shiftsPerDim)
     /// @param position Input position (Dimensions floats)
     /// @param featureTable Storage containing feature vectors for all levels
     /// @param featureTableAddress Base address for feature table storage
@@ -239,21 +235,21 @@ public struct PermutoEncoder<T,
         T encodedFeatures[FeatureDimensionPerEntry] = {};
 
         // If level is greater than maxLevel, output zero padding
-        if (float(params.currentLevel) >= params.maxLevel + 1e-3f)
+        if (float(params.levelInfo.currentLevelIndex) >= params.maxLevel + 1e-3f)
         {
             return encodedFeatures;
         }
 
         // Use precomputed level-specific parameters
-        uint levelOffset = params.levelInfo.offset;
-        uint hashmapSize = params.levelInfo.hashmapSize;
+        uint levelOffset = params.levelInfo.offsetOfFeatureTable;
+        uint hashmapSize = params.levelInfo.featureTableSize;
 
         // Offset feature table address to the start of this level
         Storage.Address levelFeatureAddress = Storage.getOffset(featureTableAddress, int(levelOffset * FeatureDimensionPerEntry));
 
         // Elevate D-dimension vector to (D+1)-dimension homogeneous vector on hyperplane H_d
         float elevated[Dimensions + 1];
-        permutoElevate(position, params.scalesPerDim, params.shiftsPerDim, elevated);
+        permutoElevate(position, params.levelInfo.scalesPerDim, params.levelInfo.shiftsPerDim, elevated);
 
         // Find the closest remainder-0 and rank
         int rem0[Dimensions + 1];
@@ -296,25 +292,27 @@ public struct PermutoEncoder<T,
         return encodedFeatures;
     }
 
-    /// Helper function to compute scalesPerDim and shiftsPerDim for a given level.
-    /// Users can prepare this data themselves if they prefer.
+    /// Helper function to compute the PerLevelInfo (offset, hashmapSize, etc.) for a given level.
+    /// The hashmap size is 2^Log2HashmapSize for all levels.
+    /// The offset for each level is currentLevel * hashmapSize.
     ///
-    /// @param baseScale Base scale for the encoding
     /// @param currentLevel The current level being processed
+    /// @param baseScale Base scale for the encoding
     /// @param log2PerLevelScale Log2 of the per-level scale factor
     /// @param seed Seed for the random shift generation
-    /// @param scalesPerDim Output: per-dimension scaling factors
-    /// @param shiftsPerDim Output: per-dimension random shifts
-    VISIBILITY_LEVEL static void prepareShiftAndScalePerDim(
-        in float baseScale,
+    /// @param levelInfo Output: the computed level info with all parameters
+    VISIBILITY_LEVEL static void prepareLevelInfo(
         in uint currentLevel,
+        in float baseScale,
         in float log2PerLevelScale,
         in uint seed,
-        out float scalesPerDim[Dimensions],
-        out float shiftsPerDim[Dimensions])
+        out PerLevelInfo levelInfo)
     {
-        // Compute scale for this level
-        float scale = baseScale * exp2(float(currentLevel) * log2PerLevelScale);
+        static const uint HashmapSize = 1u << Log2HashmapSize;
+        levelInfo.currentLevelIndex = currentLevel;
+        levelInfo.featureTableSize = HashmapSize;
+        levelInfo.offsetOfFeatureTable = currentLevel * HashmapSize;
+        levelInfo.scale = baseScale * exp2(float(currentLevel) * log2PerLevelScale);
 
         // Initialize RNG for random shifts (different levels should draw differently)
         Pcg32 rng = Pcg32(seed);
@@ -323,25 +321,10 @@ public struct PermutoEncoder<T,
         [ForceUnroll]
         for (uint dim = 0; dim < Dimensions; ++dim)
         {
-            scalesPerDim[dim] = scale * rsqrt(float((dim + 1) * (dim + 2)));
+            levelInfo.scalesPerDim[dim] = levelInfo.scale * rsqrt(float((dim + 1) * (dim + 2)));
             // Convert uint32 to float in [0, 1) then scale to [-5, 5)
             float randFloat = float(rng.nextUint()) * (1.0f / 4294967296.0f);
-            shiftsPerDim[dim] = randFloat * 10.0f - 5.0f;
+            levelInfo.shiftsPerDim[dim] = randFloat * 10.0f - 5.0f;
         }
-    }
-
-    /// Helper function to compute the LevelInfo (offset and hashmapSize) for a given level.
-    /// The hashmap size is 2^Log2HashmapSize for all levels.
-    /// The offset for each level is currentLevel * hashmapSize.
-    ///
-    /// @param currentLevel The current level being processed
-    /// @param levelInfo Output: the computed level info with offset and hashmapSize
-    VISIBILITY_LEVEL static void prepareLevelInfo(
-        in uint currentLevel,
-        out LevelInfo levelInfo)
-    {
-        static const uint HashmapSize = 1u << Log2HashmapSize;
-        levelInfo.hashmapSize = HashmapSize;
-        levelInfo.offset = currentLevel * HashmapSize;
     }
 }

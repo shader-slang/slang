@@ -25,6 +25,7 @@ static const uint FEATURE_TABLE_SIZE = TOTAL_TABLE_SIZE * FEATURE_DIM_PER_ENTRY;
 // Encoder configuration
 static const float BASE_SCALE = 4.0f;
 static const float LOG2_PER_LEVEL_SCALE = 1.5f;
+static const float MAX_LEVEL_RATIO = 1.1f;  // Matches tiny-cuda-nn default
 
 // Type alias for the encoder
 typealias Encoder = PermutoEncoder<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE>;
@@ -52,51 +53,65 @@ RWStructuredBuffer<float> gDLdPosBuffer;
 //TEST_INPUT:ubuffer(count=2, stride=4):out,name=gVerifyBuffer
 RWStructuredBuffer<uint> gVerifyBuffer;
 
-/// Compute backward pass for all levels using bwd_diff
+/// Differentiable forward pass that encodes position through all levels
+/// Returns the concatenated output features from all levels
+[Differentiable]
+void encodeAllLevels(
+    float position[N_POS_DIMS],
+    StructuredBufferStorage<float> featureStorage,
+    out float output[N_FEATURES])
+{
+    Encoder.Params params;
+    params.maxLevel = MAX_LEVEL_RATIO * float(N_LEVELS);
+
+    // Process all levels
+    [ForceUnroll]
+    for (uint level = 0; level < N_LEVELS; ++level)
+    {
+        // Setup params using prepareLevelInfo which computes all level-specific parameters
+        Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
+
+        // Encode this level - output goes to the appropriate offset
+        uint outputOffset = level * FEATURE_DIM_PER_ENTRY;
+        let levelOut = Encoder.encode<StructuredBufferStorage<float>>(params, position, featureStorage, 0u);
+
+        // Copy to output array at correct offset
+        [ForceUnroll]
+        for (uint f = 0; f < FEATURE_DIM_PER_ENTRY; ++f)
+        {
+            output[outputOffset + f] = levelOut[f];
+        }
+    }
+}
+
+/// Compute backward pass for all levels by calling bwd_diff on encodeAllLevels
 void encodeBackwardAllLevels(
     float position[N_POS_DIMS],
     StructuredBufferStorage<float> featureStorage,
     StructuredBufferStorage<float> dfeatureStorage,
     out float dL_dpos[N_POS_DIMS])
 {
-    // Initialize output gradient to zero
-    dL_dpos[0] = 0.0f;
-    dL_dpos[1] = 0.0f;
+    // Create differential pair for position
+    float dPosition[N_POS_DIMS] = {0.0f, 0.0f};
+    var dpPosition = diffPair(position, dPosition);
 
-    // Process all levels
+    // Create differential pair for feature storage
+    var dpFeatureStorage = DifferentialPtrPair<StructuredBufferStorage<float>>(featureStorage, dfeatureStorage);
+
+    // Upstream gradient: all ones for all output features
+    float dL_dy[N_FEATURES];
     [ForceUnroll]
-    for (uint level = 0; level < N_LEVELS; ++level)
+    for (uint i = 0; i < N_FEATURES; ++i)
     {
-        // Compute per-dimension scales and shifts
-        float scalesPerDim[N_POS_DIMS];
-        float shiftsPerDim[N_POS_DIMS];
-        Encoder.prepareShiftAndScalePerDim(BASE_SCALE, level, LOG2_PER_LEVEL_SCALE, 1337u, scalesPerDim, shiftsPerDim);
-
-        // Setup params
-        Encoder.Params params;
-        params.currentLevel = level;
-        params.maxLevel = float(N_LEVELS);
-        params.scalesPerDim = scalesPerDim;
-        params.shiftsPerDim = shiftsPerDim;
-        Encoder.prepareLevelInfo(level, params.levelInfo);
-
-        // Create differential pairs for backward pass
-        float dPosition[N_POS_DIMS] = {0.0f, 0.0f};
-        var dpPosition = diffPair(position, dPosition);
-
-        // Create differential pair for feature storage
-        var dpFeatureStorage = DifferentialPtrPair<StructuredBufferStorage<float>>(featureStorage, dfeatureStorage);
-
-        // Upstream gradient: all ones
-        float dL_dy[FEATURE_DIM_PER_ENTRY] = {1.0f, 1.0f};
-
-        // Call backward pass
-        bwd_diff(Encoder.encode<StructuredBufferStorage<float>>)(params, dpPosition, dpFeatureStorage, 0u, dL_dy);
-
-        // Accumulate position gradient
-        dL_dpos[0] += dpPosition.d[0];
-        dL_dpos[1] += dpPosition.d[1];
+        dL_dy[i] = 1.0f;
     }
+
+    // Call backward pass on the whole encodeAllLevels function
+    bwd_diff(encodeAllLevels)(dpPosition, dpFeatureStorage, dL_dy);
+
+    // Extract position gradient
+    dL_dpos[0] = dpPosition.d[0];
+    dL_dpos[1] = dpPosition.d[1];
 }
 
 /// Verify dL/dpos for a position against expected values
