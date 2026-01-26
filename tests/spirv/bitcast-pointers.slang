@@ -1,7 +1,7 @@
 // Test that pointer types use OpBitcast directly in SPIR-V where allowed by spec
 // Tests pointer <-> pointer, pointer <-> integer scalar, pointer <-> integer vector
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Per SPIR-V spec: pointer bitcasts MUST use direct OpBitcast when:
 // - Pointer to pointer: same storage class and size

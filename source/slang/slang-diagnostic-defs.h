@@ -1037,6 +1037,14 @@ DIAGNOSTIC(
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
 
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
+
+DIAGNOSTIC(
+    30085,
+    Error,
+    floatBitCastRequiresConstant,
+    "'__floatAsInt' requires a compile-time constant floating-point expression")
+
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 DIAGNOSTIC(
@@ -3246,4 +3254,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC

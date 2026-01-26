@@ -63,6 +63,8 @@ __intrinsic_type($(kIROp_CBufferLayoutType))
 __magic_type(CDataLayoutType)
 [require(spirv)]
 [require(llvm)]
+[require(cpp)]
+[require(cuda)]
 struct CDataLayout : IBufferDataLayout
 {};
 
@@ -26459,14 +26461,14 @@ extension<
     }
 
     [require(tensor_addressing)]
-    This ClampValue(CoopMatClampMode clampMode)
+    This ClampValue(int value)
     {
         __target_switch
         {
         case spirv:
             return spirv_asm
             {
-                result:$$This = OpTensorLayoutSetClampValueNV $this $clampMode;
+                result:$$This = OpTensorLayoutSetClampValueNV $this $value;
             };
         }
     }
@@ -26647,7 +26649,20 @@ Note: Vulkan's supported shapes are device-specific and can be queried at runtim
 VkPhysicalDeviceCooperativeMatrixPropertiesKHR. The above list represents common configurations
 but may vary by GPU vendor and driver. The element distribution across threads in a subgroup
 may differ between CUDA and Vulkan implementations, so code using the subscript operator
-should only perform uniform operations for portability.
+should only perform uniform operations for portability. If your code specifies a combination
+that is not supported by the device, the behavior is undefined.
+
+Additionally, while only `MemoryScope.Subgroup` (warp-level cooperation) is supported on CUDA,
+`MemoryScope.Workgroup` can be used when targeting Vulkan, allowing cooperation among threads
+within the entire workgroup. Whenever `Workgroup` scope is supported, it is recommended to use it
+instead of `Subgroup` scope for simplicity and performance.
+
+When using `MemoryScope.Workgroup`, Slang will emit SPIR-V code that uses the
+`SPV_NV_cooperative_matrix2` extension. A workgroup-scope cooperative
+matrix can use larger matrix shapes that are multiples of 16/32 depending on the target device.
+Workgroup-scope cooperative matrices requires a specific workgroup size setting (specified via
+`[numthreads]`). Use the Vulkan API to query the supported combinations of element type, matrix
+shape and workgroup size settings. 
 
 @category matrix_types
 */
@@ -26748,21 +26763,20 @@ struct CoopMat
         U : __BuiltinArithmeticType
     >(CoopMat<U, S, M, N, R> other)
     {
-    __target_switch
-    {
-    case spirv:
-        if (__isFloat<T>() && __isInt<U>())
-            this = __int_to_float_cast<T>(other);
-        else if (__isInt<T>() && __isFloat<U>())
-            this = __float_to_int_cast<T>(other);
-        else if (__isFloat<T>() && __isFloat<U>())
-            this = __real_cast<T>(other);
-        else if (__isInt<T>() && __isInt<U>())
-            this = __int_cast<T>(other);
-    case cuda:
-        __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
-    }
-
+        __target_switch
+        {
+        case spirv:
+            if (__isFloat<T>() && __isInt<U>())
+                this = __int_to_float_cast<T>(other);
+            else if (__isInt<T>() && __isFloat<U>())
+                this = __float_to_int_cast<T>(other);
+            else if (__isFloat<T>() && __isFloat<U>())
+                this = __real_cast<T>(other);
+            else if (__isInt<T>() && __isInt<U>())
+                this = __int_cast<T>(other);
+        case cuda:
+            __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
+        }
     }
 
     //
@@ -27487,7 +27501,6 @@ $}
     //
     // Load with TensorLayout and TensorView
     //
-
 ${
     StringBuilder tensorViewTypes;
     StringBuilder tensorViewParams;
@@ -27496,7 +27509,123 @@ ${
         tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
         tensorViewParams << ", p" << j;
     }
+$}
+    // Pointer versions
+    //
 
+    /// Load a cooperative matrix from memory using tensor layout.
+    /// 
+    /// @param pointerIn Pointer to the memory location to load from. Address must be 16-byte aligned.
+    /// @param buffer The `ByteAddressBuffer` or [RW]`StructuredBuffer` to load from.
+    /// @param clippedValue A cooperative matrix value whose value will be used for clipped elements.
+    /// @param tensorLayout The tensor layout describing the memory layout.
+    /// @param tensorView The tensor view describing the sub-region to load.
+    /// @param decodeFunc The decoding function that converts data at a given coordinate to element type.
+    /// @remarks For correct results, keep tensorLayout slice extents fixed to the `CoopMat`
+    ///          tile shape. Do not shrink slices for tail tiles; rely on clamp mode to
+    ///          handle out-of-bounds. If a transpose is needed, use a `linalg.TensorView`
+    ///          permutation rather than reversing strides. Pointer alignment must remain
+    ///          16-byte aligned; prefer base pointer + layout slice over pointer shifting.
+    ///
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment None;
+        };
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes),
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment TensorView $tensorView;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes),
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+        };
+    }
+
+    // RW-Buffer versions.
+${
     for (const char* RW : { "", "RW" })
     {
 $}
@@ -27548,7 +27677,7 @@ $}
             result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
-
+    
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -27776,6 +27905,29 @@ $}
     void Store<
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* dest,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(dest);
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment None;
+            };
+        }
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
         let HasDimensions : bool
         $(tensorViewTypes)
@@ -27818,8 +27970,69 @@ $}
         }
     }
 
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes),
+        P
+    >(
+        P* dest,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(dest);
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+            };
+        }
+    }
+
 } // struct CoopMat
 
+
+
+extension<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int> CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator>
+{
+    /// Convert cooperative matrix accumulator to another cooperative matrix with a different use, such as
+    /// `CoopMatMatrixUse.MatrixA` or `CoopMatMatrixUse.MatrixB`.
+    /// Available when targeting SPIR-V only, uses the `SPV_NV_cooperative_matrix2` extension.
+    ///
+    /// @param accu The accumulator `CoopMat` object to convert from.
+    /// @param T The element type of the cooperative matrix.
+    /// @param S The memory scope defining the cooperative group.
+    /// @param M The number of rows in the cooperative matrix.
+    /// @param N The number of columns in the cooperative matrix.
+    /// @param R1 The matrix use specifier to convert to (MatrixA or MatrixB).
+    [require(spvCooperativeMatrixConversionsNV)]
+    CoopMat<T, S, M, N, R1> convertUse<
+        let R1 : CoopMatMatrixUse>()
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability CooperativeMatrixConversionsNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                result:$$CoopMat<T, S, M, N, R1> = OpCooperativeMatrixConvertNV $this;
+            };
+        }
+    }
+}
 
 //
 // Convenience loading functions for cooperative matrices which infer the
@@ -28083,62 +28296,7 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
     let R : CoopMatMatrixUse
 >(CoopMat<U,S,M,N,R> val);
 
-//
-// Cooperative Matrix multiplication with scalar
-//
 
-/// Multiplies a cooperative matrix by a scalar value: CoopMat * scalar
-/// Performs element-wise multiplication of each element in the matrix by the scalar.
-/// @param T The element type of the cooperative matrix.
-/// @param S The memory scope defining the cooperative group.
-/// @param M The number of rows in the matrix fragment.
-/// @param N The number of columns in the matrix fragment.
-/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
-/// @param lhs The cooperative matrix to multiply.
-/// @param rhs The scalar value to multiply each element by.
-/// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
-    let S : MemoryScope,
-    let M : int,
-    let N : int,
-    let R : CoopMatMatrixUse
->(CoopMat<T, S, M, N, R> lhs, const T rhs)
-{
-    __target_switch
-    {
-    case spirv:
-        return spirv_asm
-        {
-            result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
-        };
-    case cuda:
-        __intrinsic_asm "$0 * $1";
-    }
-}
-
-/// Multiplies a scalar value by a cooperative matrix: scalar * CoopMat
-/// Performs element-wise multiplication of each element in the matrix by the scalar.
-/// @param T The element type of the cooperative matrix.
-/// @param S The memory scope defining the cooperative group.
-/// @param M The number of rows in the matrix fragment.
-/// @param N The number of columns in the matrix fragment.
-/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
-/// @param lhs The scalar value to multiply each element by.
-/// @param rhs The cooperative matrix to multiply.
-/// @return A new cooperative matrix with all elements multiplied by the scalar.
-[require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
-    let S : MemoryScope,
-    let M : int,
-    let N : int,
-    let R : CoopMatMatrixUse
->(const T lhs, CoopMat<T, S, M, N, R> rhs)
-{
-    return rhs * lhs;
-}
 
 //
 // Cooperative Matrix Multiply-Accumulate
@@ -28266,6 +28424,62 @@ extension<
 
 } // namespace linalg
 
+//
+// Cooperative Matrix multiplication with scalar
+//
+
+/// Multiplies a cooperative matrix by a scalar value: CoopMat * scalar
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The cooperative matrix to multiply.
+/// @param rhs The scalar value to multiply each element by.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
+[require(cooperative_matrix)]
+linalg.CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse
+>(linalg.CoopMat<T, S, M, N, R> lhs, const T rhs)
+{
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm
+        {
+            result:$$linalg.CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+        };
+    case cuda:
+        __intrinsic_asm "$0 * $1";
+    }
+}
+
+/// Multiplies a scalar value by a cooperative matrix: scalar * CoopMat
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The scalar value to multiply each element by.
+/// @param rhs The cooperative matrix to multiply.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
+[require(cooperative_matrix)]
+linalg.CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse
+>(const T lhs, linalg.CoopMat<T, S, M, N, R> rhs)
+{
+    return rhs * lhs;
+}
 
 //
 // Cooperative Vector

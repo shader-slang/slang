@@ -9,8 +9,8 @@
 # - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.2.0
 
 FROM nvidia/cuda:12.5.1-devel-ubuntu22.04
 
@@ -76,6 +76,10 @@ RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.3
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
+
+# Install environment info script
+COPY docker/print-env-info.sh /usr/local/bin/print-env-info
+RUN chmod +x /usr/local/bin/print-env-info
 
 # Git configuration for container workflows
 RUN git config --global --add safe.directory '*'
