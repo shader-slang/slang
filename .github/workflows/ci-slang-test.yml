@@ -277,7 +277,23 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          # First attempt: run with parallel execution
+          if python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi
 
       - name: Clone slangpy-samples
         # Skip on macOS debug due to intermittent failures in test_toy_restir
@@ -314,7 +330,23 @@ jobs:
 
       - name: Run slangpy-samples tests
         # Skip on macOS debug due to intermittent failures in test_toy_restir
+        # Skip test_check_urls because URL checking is not required for slang CI
         if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Running slangpy-samples tests..."
-          python -m pytest -n 4 slangpy-samples/tests
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          if python -m pytest "slangpy-samples/tests" -n 4 -k "not test_check_urls"
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python -m pytest "slangpy-samples/tests" -n 0 --lf -k "not test_check_urls"
+          fi

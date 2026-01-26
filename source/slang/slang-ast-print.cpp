@@ -610,6 +610,15 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
+    {
+        sb << "__floatAsInt(";
+        if (floatBitCastExpr->value)
+        {
+            addExpr(floatBitCastExpr->value);
+        }
+        sb << ")";
+    }
     else if (const auto addressOfExpr = as<AddressOfExpr>(expr))
     {
         sb << "__getAddress(";

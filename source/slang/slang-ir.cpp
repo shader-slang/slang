@@ -3805,6 +3805,12 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
             }
             break;
         }
+    case kIROp_CoopMatrixType:
+        {
+            return emitMakeCoopMatrixFromScalar(
+                type,
+                emitDefaultConstruct(as<IRCoopMatrixType>(type)->getElementType(), fallback));
+        }
     case kIROp_MatrixType:
         {
             auto inner =
@@ -4332,6 +4338,11 @@ IRInst* IRBuilder::emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* ar
 IRInst* IRBuilder::emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue)
 {
     return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &scalarValue);
+}
+
+IRInst* IRBuilder::emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue)
+{
+    return emitIntrinsicInst(type, kIROp_MakeCoopMatrixFromScalar, 1, &scalarValue);
 }
 
 IRInst* IRBuilder::emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args)
@@ -8484,6 +8495,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
+    case kIROp_MakeCoopMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
     case kIROp_MakeWitnessPack:
