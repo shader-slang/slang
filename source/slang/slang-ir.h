@@ -1969,6 +1969,8 @@ public:
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
+    void removeInstFromConstantMap(IRInst* inst);
+
     void tryHoistInst(IRInst* inst);
 
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;

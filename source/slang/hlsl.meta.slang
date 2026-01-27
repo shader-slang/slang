@@ -27562,9 +27562,9 @@ $}
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes),
+        let HasDimensions : bool,
         P
+        $(tensorViewTypes)
     >(
         P* pointerIn,
         This clippedValue,
@@ -27611,9 +27611,9 @@ $}
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes),
+        let HasDimensions : bool,
         P
+        $(tensorViewTypes)
     >(
         P* pointerIn,
         This clippedValue,
