@@ -4273,14 +4273,6 @@ attribute_syntax [__unsafeForceInlineEarly] : UnsafeForceInlineEarlyAttribute;
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [ForceInline] : ForceInlineAttribute;
 
-/// Prevent inlining of the function at the call site.
-/// Use this attribute on a function to prevent the compiler from inlining the function.
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [NoInline] : NoInlineAttribute;
-
-__attributeTarget(FunctionDeclBase)
-attribute_syntax [noinline] : NoInlineAttribute;
-
 /// @internal
 /// Specify the overload rank of a function for overload resolution.
 __attributeTarget(FunctionDeclBase)
