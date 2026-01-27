@@ -1777,12 +1777,6 @@ local insts = {
 				},
 			},
 			{
-				NoInline = {
-					-- A `[NoInline]` decoration indicates the callee should not be inlined.
-					struct_name = "NoInlineDecoration",
-				},
-			},
-			{
 				ForceUnroll = {
 					-- A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
 					struct_name = "ForceUnrollDecoration",
