@@ -12,13 +12,13 @@ Slang classifies the observable behavior of a program as follows:
    defined behavior:
    - Basic [unsigned integer](04-types-fundamental.md#integer) operations such as addition, subtraction,
      multiplication.
-2. **Implementation-defined.** The observable behavior is defined by the target and it is documented. Target
+2. **Implementation-defined.** The observable behavior is defined by the target and it is documented. The target
    consists of the shader compilation target, the declared extensions, and the target device with
    drivers. Examples of implementation-defined behavior:
    - Size of [bool](04-types-fundamental.md#bool)
    - Evaluation of [floating point](04-types-fundamental.md#floating) numbers. For example, whether the target
      implements [IEEE 754-2019](https://doi.org/10.1109/IEEESTD.2019.8766229) standard or something else.
-   - Memory layout when composited from fundamental types
+   - Memory layout when composed from fundamental types
    - Target capabilities
    - Available texture types and operations
 3. **Unspecified.** The observable behavior is defined by the target but documentation is not
