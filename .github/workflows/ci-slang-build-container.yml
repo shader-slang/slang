@@ -32,6 +32,44 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
+      - name: Install ccache
+        run: |
+          apt-get update
+          apt-get install -y ccache
+          echo "✅ ccache installed: $(ccache --version | head -n1)"
+
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        id: cache-ccache
+        with:
+          path: ~/.ccache
+          key: ccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            ccache-linux-gcc-x86_64-${{ inputs.config }}-
+            ccache-linux-gcc-x86_64-
+
+      - name: Configure ccache
+        run: |
+          # Set ccache directory
+          export CCACHE_DIR="$HOME/.ccache"
+          echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+
+          # Configure ccache settings
+          ccache --set-config=max_size=2G
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=6
+          ccache --set-config=sloppiness=pch_defines,time_macros
+          ccache --set-config=cache_dir="$CCACHE_DIR"
+
+          # Get ccache path for CMake launcher
+          ccache_path=$(which ccache)
+          echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
+
+          echo "🔧 ccache configuration:"
+          ccache --show-config | head -20 || true
+          echo "📊 ccache statistics (pre-build):"
+          ccache --show-stats || true
+
       - name: Build Slang with CUDA
         run: |
           echo "cmake version: $(cmake --version)"
@@ -46,9 +84,12 @@ jobs:
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
           # Configure with CUDA support, disable LLVM (not needed for GPU tests)
+          # Use ccache as compiler launcher
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DCMAKE_C_COMPILER_LAUNCHER="${ccache_symlinks_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${ccache_symlinks_path}"
 
           # Build
           cmake --build --preset ${{ inputs.config }} -j$(nproc)
@@ -60,6 +101,17 @@ jobs:
             echo "⚠️ render-test-tool may not have CUDA linked"
             ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null || true
           fi
+
+          # Show ccache statistics after build
+          echo "📊 ccache statistics (post-build):"
+          ccache --show-stats || true
+
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always() && steps.cache-ccache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+        with:
+          path: ~/.ccache
+          key: ${{ steps.cache-ccache.outputs.cache-primary-key }}
 
       - name: Prepare artifacts for upload
         run: |

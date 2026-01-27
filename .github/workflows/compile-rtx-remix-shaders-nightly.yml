@@ -63,16 +63,43 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Cache Slang build artifacts to speed up subsequent runs
-      - name: Cache Slang build
-        uses: actions/cache@v4
+      # Install ccache for faster incremental builds
+      - name: Install ccache
+        run: choco install ccache -y
+
+      # Restore ccache
+      - name: Restore ccache
+        uses: actions/cache/restore@v4
+        id: cache-ccache
         with:
-          path: |
-            build/
-          key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
+          path: ~\.ccache
+          key: ccache-rtx-remix-windows-${{ github.sha }}
           restore-keys: |
-            slang-build-${{ runner.os }}-
-          enableCrossOsArchive: false
+            ccache-rtx-remix-windows-
+
+      # Configure ccache
+      - name: Configure ccache
+        shell: bash
+        run: |
+          # Set ccache directory
+          export CCACHE_DIR="$HOME/.ccache"
+          echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+
+          # Configure ccache settings
+          ccache --set-config=max_size=2G
+          ccache --set-config=compression=true
+          ccache --set-config=compression_level=6
+          ccache --set-config=sloppiness=pch_defines,time_macros
+          ccache --set-config=cache_dir="$CCACHE_DIR"
+
+          # Get ccache path for CMake launcher
+          ccache_path=$(which ccache)
+          echo "ccache_symlinks_path=$ccache_path" >> $GITHUB_ENV
+
+          echo "🔧 ccache configuration:"
+          ccache --show-config | head -20 || true
+          echo "📊 ccache statistics (pre-build):"
+          ccache --show-stats || true
 
       # Build Slang from checked-out source
       # Note: We only need slangc.exe, so skip the packaging step to avoid CPack errors
@@ -85,6 +112,7 @@ jobs:
 
           # Configure with default preset (Ninja Multi-Config)
           # Disable unnecessary components to speed up build
+          # Use ccache as compiler launcher
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
             -DSLANG_ENABLE_EXAMPLES=OFF \
@@ -92,10 +120,16 @@ jobs:
             -DSLANG_ENABLE_SLANGD=OFF \
             -DSLANG_ENABLE_SLANGRT=OFF \
             -DSLANG_ENABLE_SLANG_GLSLANG=ON \
-            -DSLANG_ENABLE_TESTS=OFF
+            -DSLANG_ENABLE_TESTS=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER="${ccache_symlinks_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${ccache_symlinks_path}"
 
           # Build only (skip packaging to avoid gfx.slang install error)
           cmake --build --preset release
+
+          # Show ccache statistics after build
+          echo "📊 ccache statistics (post-build):"
+          ccache --show-stats || true
 
           endTime=$(date +%s)
           duration=$(( (endTime - startTime) / 60 ))
@@ -110,6 +144,14 @@ jobs:
             echo "Failed to build slangc"
             exit 1
           fi
+
+      # Save ccache
+      - name: Save ccache
+        uses: actions/cache/save@v4
+        if: always() && steps.cache-ccache.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+        with:
+          path: ~\.ccache
+          key: ${{ steps.cache-ccache.outputs.cache-primary-key }}
 
       # Clone dxvk-remix with all submodules (pinned to specific commit for stability)
       - name: Clone dxvk-remix repository
