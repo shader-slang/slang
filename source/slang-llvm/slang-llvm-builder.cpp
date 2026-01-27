@@ -8,6 +8,7 @@
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -169,6 +170,11 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
     // LLVM IR.
     Dictionary<ExternalFunc, llvm::Function*> externalFuncs;
 
+    // Collected diagnostic messages.
+    // TODO: Use these for something. There can be a bunch printed even on
+    // success, though...
+    List<std::string> diagnosticMessages;
+
 public:
     typedef ComBaseObject Super;
 
@@ -192,6 +198,8 @@ public:
         List<LLVMInst*>& outArgs);
 
     void annotateMemoryAccess(llvm::Instruction* inst);
+
+    static void diagnosticHandler(const llvm::DiagnosticInfo* DI, void* context);
 
     //==========================================================================
     // IUnknown
@@ -417,6 +425,11 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     llvmModule.reset(new llvm::Module("module", *llvmContext));
     llvmLinker.reset(new llvm::Linker(*llvmModule));
     llvmDebugBuilder.reset(new llvm::DIBuilder(*llvmModule));
+
+    // We capture the diagnostics so that they're not just printed to stderr.
+    // A lot of the output is stuff that doesn't concern the user, like failed
+    // optimization passes.
+    llvmContext->setDiagnosticHandlerCallBack(diagnosticHandler, this);
 
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
@@ -674,6 +687,9 @@ void LLVMBuilder::optimize()
         passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
 
 #if 0
+    // Dump enabled LLVM passes. If you're wondering if some specific pass runs
+    // and when it runs, check these out.
+
     llvm::PassInstrumentationCallbacks PIC;
     llvm::PrintPassOptions PrintPassOpts;
     PrintPassOpts.Verbose = false;
@@ -712,10 +728,14 @@ void LLVMBuilder::finalize()
             "llvm.global_ctors");
     }
 
-    // std::string out;
-    // llvm::raw_string_ostream rso(out);
-    // llvmModule->print(rso, nullptr);
-    // printf("%s\n", out.c_str());
+#if 0
+    // Dump pre-verification, pre-optimization LLVM IR to stdout.
+    // Check this if you get verification errors.
+    std::string out;
+    llvm::raw_string_ostream rso(out);
+    llvmModule->print(rso, nullptr);
+    printf("%s\n", out.c_str());
+#endif
 
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
@@ -822,6 +842,25 @@ void LLVMBuilder::annotateMemoryAccess(llvm::Instruction* inst)
 {
     if (inst->mayReadOrWriteMemory())
         inst->setMetadata(llvm::LLVMContext::MD_access_group, wiParallelAccessGroup);
+}
+
+void LLVMBuilder::diagnosticHandler(const llvm::DiagnosticInfo* DI, void* context)
+{
+    LLVMBuilder* self = (LLVMBuilder*)context;
+    std::string diagnostic;
+    llvm::raw_string_ostream rso(diagnostic);
+    llvm::DiagnosticPrinterRawOStream DP(rso);
+    DI->print(DP);
+
+    self->diagnosticMessages.add(diagnostic);
+
+#if 0
+    // Dump LLVM diagnostics. These aren't necessarily errors; they can also
+    // just tell you that vectorization or some other optimization pass failed
+    // to do its job.
+
+    printf("LLVM: %s\n", diagnostic.c_str());
+#endif
 }
 
 void* LLVMBuilder::getInterface(const Guid& guid)
