@@ -371,11 +371,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
-            auto target = optionSet.getTarget();
-
             // Check for spvBindlessTextureNV capability
             bool hasBindlessTextureNV = false;
-            for (auto atomVal : optionSet.getArray(CompilerOptionName::Capability))
+            for (auto atomVal : targetReq->getOptionSet().getArray(CompilerOptionName::Capability))
             {
                 if (atomVal.kind == CompilerOptionValueKind::Int &&
                     atomVal.intValue == (int)CapabilityName::spvBindlessTextureNV)
@@ -393,12 +391,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             }
 
             // Check for bindless targets (CPU, CUDA, Metal)
-            if (areResourceTypesBindlessOnTarget(target))
+            if (areResourceTypesBindlessOnTarget(targetReq))
             {
                 // On bindless targets, DescriptorHandle<T> has the layout of T
                 auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
                 return calcSizeAndAlignment(
-                    optionSet,
+                    targetReq,
                     descriptorHandleType->getResourceType(),
                     outSizeAndAlignment);
             }
@@ -434,10 +432,9 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     // Handle StructuredBuffer types
     if (as<IRHLSLStructuredBufferTypeBase>(type))
     {
-        auto target = optionSet.getTarget();
         // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
         // (T* data + size_t count = 16 bytes, 8-byte alignment)
-        if (isCPUTarget(target) || isCUDATarget(target))
+        if (isCPUTarget(targetReq) || isCUDATarget(targetReq))
         {
             *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
             return SLANG_OK;

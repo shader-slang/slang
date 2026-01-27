@@ -27,7 +27,6 @@ struct AnyValueMarshallingContext
     //
     InstWorkList workList;
     InstHashSet workListSet;
-    TargetProgram* targetProgram;
 
     AnyValueMarshallingContext(IRModule* module, TargetProgram* targetProgram)
         : module(module), targetProgram(targetProgram), workList(module), workListSet(module)
@@ -320,12 +319,12 @@ struct AnyValueMarshallingContext
                 // DescriptorHandle<T> representation depends on target:
                 // - Non-bindless (HLSL, GLSL/SPIRV): uint2 (8 bytes)
                 // - Bindless (CUDA, CPU, Metal): same as T (variable size)
-                auto target = context->targetProgram->getOptionSet().getTarget();
-                bool bindless = areResourceTypesBindlessOnTarget(target);
+                auto targetReq = context->targetProgram->getTargetReq();
+                bool bindless = areResourceTypesBindlessOnTarget(targetReq);
 
                 IRSizeAndAlignment sizeAndAlign;
                 auto result = getNaturalSizeAndAlignment(
-                    context->targetProgram->getOptionSet(),
+                    targetReq,
                     dataType,
                     &sizeAndAlign);
 
@@ -1179,13 +1178,13 @@ SlangInt alignUp(SlangInt x, SlangInt alignment)
     return (x + alignment - 1) / alignment * alignment;
 }
 
-SlangInt _getAnyValueSizeRaw(CompilerOptionSet& optionSet, IRType* type, SlangInt offset)
+SlangInt _getAnyValueSizeRaw(IRType* type, TargetRequest* targetReq, SlangInt offset)
 {
     // Try to get size and alignment from the layout system.
     IRSizeAndAlignment sizeAndAlignment;
 
     if (SLANG_SUCCEEDED(getSizeAndAlignment(
-            optionSet,
+            targetReq,
             IRTypeLayoutRules::getNatural(),
             type,
             &sizeAndAlignment)))
@@ -1208,7 +1207,7 @@ SlangInt _getAnyValueSizeRaw(CompilerOptionSet& optionSet, IRType* type, SlangIn
             for (UInt i = 0; i < associatedType->getOperandCount(); i++)
                 maxSize = Math::Max(
                     maxSize,
-                    _getAnyValueSizeRaw(optionSet, (IRType*)associatedType->getOperand(i), offset));
+                    _getAnyValueSizeRaw((IRType*)associatedType->getOperand(i), targetReq, offset));
             return maxSize;
         }
     case kIROp_ThisType:
@@ -1275,9 +1274,9 @@ SlangInt _getAnyValueSizeRaw(CompilerOptionSet& optionSet, IRType* type, SlangIn
     }
 }
 
-SlangInt getAnyValueSize(CompilerOptionSet& optionSet, IRType* type)
+SlangInt getAnyValueSize(IRType* type, TargetRequest* targetReq)
 {
-    auto rawSize = _getAnyValueSizeRaw(optionSet, type, 0);
+    auto rawSize = _getAnyValueSizeRaw(type, targetReq, 0);
     if (rawSize < 0)
         return rawSize;
     return alignUp(rawSize, 4);

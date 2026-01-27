@@ -164,6 +164,5 @@ private:
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?
 bool areResourceTypesBindlessOnTarget(TargetRequest* target);
-bool areResourceTypesBindlessOnTarget(CodeGenTarget target);
 
 } // namespace Slang

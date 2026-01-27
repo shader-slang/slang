@@ -75,14 +75,14 @@ struct ResultTypeLoweringContext
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
-            anyValueSize = getAnyValueSize(targetProgram->getOptionSet(), valueType);
+            anyValueSize = getAnyValueSize(valueType, targetProgram->getTargetReq());
             info->valueType = valueType;
         }
 
         auto errorType = resultType->getErrorType();
         info->errorType = errorType;
 
-        auto errSize = getAnyValueSize(targetProgram->getOptionSet(), errorType);
+        auto errSize = getAnyValueSize(errorType, targetProgram->getTargetReq());
         if (errSize > anyValueSize)
             anyValueSize = errSize;
 
@@ -287,7 +287,7 @@ struct ResultTypeLoweringContext
 
 void lowerResultType(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    ResultTypeLoweringContext context(module);
+    ResultTypeLoweringContext context(module, targetProgram);
     context.targetProgram = targetProgram;
     context.sink = sink;
     context.processModule();
