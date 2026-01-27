@@ -2740,30 +2740,34 @@ struct DiffTransposePass
             // materialize.
             if (auto fwdGetDiff = as<IRDifferentialPairGetDifferential>(gradient.fwdGradInst))
             {
+                /*
                 auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
                     builder,
                     fwdGetDiff->getBase()->getDataType()));
+                */
                 simpleGradients.add(RevGradient(
                     gradient.targetInst,
-                    builder->emitMakeDifferentialPair(
-                        baseType,
-                        diffTypeContext.emitDZeroOfDiffInstType(builder, baseType->getValueType()),
+                    builder->emitMakeDifferentialValuePair(
+                        fwdGetDiff->getBase()->getDataType(),
+                        diffTypeContext.emitDZeroOfDiffInstType(builder, fwdGetDiff->getDataType()),
                         gradient.revGradInst),
                     gradient.fwdGradInst));
             }
             else if (auto fwdGetPrimal = as<IRDifferentialPairGetPrimal>(gradient.fwdGradInst))
             {
+                /*
                 auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
                     builder,
                     fwdGetPrimal->getBase()->getDataType()));
+                */
                 simpleGradients.add(RevGradient(
                     gradient.targetInst,
-                    builder->emitMakeDifferentialPair(
-                        baseType,
+                    builder->emitMakeDifferentialValuePair(
+                        fwdGetPrimal->getBase()->getDataType(),
                         gradient.revGradInst,
                         diffTypeContext.emitDZeroOfDiffInstType(
                             builder,
-                            fwdGetPrimal->getFullType())),
+                            fwdGetPrimal->getDataType())),
                     gradient.fwdGradInst));
             }
         }

@@ -2754,87 +2754,6 @@ static Expr* parseFuncTypeOfExpr(Parser* parser)
     return funcTypeOfExpr;
 }
 
-static Expr* parseFwdDiffFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `fwd_diff_func_type(fn)`
-    FwdDiffFuncTypeExpr* expr = parser->astBuilder->create<FwdDiffFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-
-static Expr* parseBwdDiffFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__bwd_diff_func_type(fn)`
-    BwdDiffFuncTypeExpr* expr = parser->astBuilder->create<BwdDiffFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-
-static Expr* parseApplyForBwdFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__apply_for_bwd_type(fn)`
-    ApplyForBwdFuncTypeExpr* expr = parser->astBuilder->create<ApplyForBwdFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::Comma);
-    expr->ctxType = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-/*
-static Expr* parseApplyForFwdFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__apply_for_fwd_type(fn)`
-    ApplyForFwdFuncTypeExpr* expr = parser->astBuilder->create<ApplyForFwdFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::Comma);
-    expr->ctxType = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-    */
-
-static Expr* parseBwdCallableFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__bwd_callable_type(fn)`
-    BwdCallableFuncTypeExpr* expr = parser->astBuilder->create<BwdCallableFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::Comma);
-    expr->ctxType = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-
-/*
-static Expr* parseFwdCallableFuncTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__fwd_callable_type(fn)`
-    FwdCallableFuncTypeExpr* expr = parser->astBuilder->create<FwdCallableFuncTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-    */
-
-static Expr* parseResultTypeExpr(Parser* parser)
-{
-    // Parse an expr of the form `__result_type(fn)`
-    FuncResultTypeExpr* expr = parser->astBuilder->create<FuncResultTypeExpr>();
-    parser->ReadToken(TokenType::LParent);
-    expr->base = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::Comma);
-    expr->ctxType = parser->ParseTypeExp();
-    parser->ReadToken(TokenType::RParent);
-    return expr;
-}
-
 // parseFuncAsTypeExpr
 static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
 {
@@ -3107,42 +3026,6 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "__func_type_of"))
     {
         typeSpec.expr = parseFuncTypeOfExpr(parser);
-        return typeSpec;
-    }
-    else if (AdvanceIf(parser, "__fwd_diff_func_type"))
-    {
-        typeSpec.expr = parseFwdDiffFuncTypeExpr(parser);
-        return typeSpec;
-    }
-
-    else if (AdvanceIf(parser, "__bwd_diff_func_type"))
-    {
-        typeSpec.expr = parseBwdDiffFuncTypeExpr(parser);
-        return typeSpec;
-    }
-    else if (AdvanceIf(parser, "__apply_bwd_func_type"))
-    {
-        typeSpec.expr = parseApplyForBwdFuncTypeExpr(parser);
-        return typeSpec;
-    }
-    /*else if (AdvanceIf(parser, "__apply_fwd_func_type"))
-    {
-        typeSpec.expr = parseApplyForFwdFuncTypeExpr(parser);
-        return typeSpec;
-    }*/
-    else if (AdvanceIf(parser, "__bwd_callable_type"))
-    {
-        typeSpec.expr = parseBwdCallableFuncTypeExpr(parser);
-        return typeSpec;
-    }
-    /*else if (AdvanceIf(parser, "__fwd_callable_type"))
-    {
-        typeSpec.expr = parseFwdCallableFuncTypeExpr(parser);
-        return typeSpec;
-    }*/
-    else if (AdvanceIf(parser, "__result_type"))
-    {
-        typeSpec.expr = parseResultTypeExpr(parser);
         return typeSpec;
     }
 

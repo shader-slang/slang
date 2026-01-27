@@ -2100,10 +2100,10 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
     }
     else
     {
-        auto resolvedFuncType = as<FuncType>(resolveType(
-            as<Type>(funcDeclRef.getDecl()->funcType.type->substitute(
-                m_astBuilder,
-                SubstitutionSet(funcDeclRef)))));
+        auto resolvedFuncType =
+            as<FuncType>(funcDeclRef.getDecl()
+                             ->funcType.type->substitute(m_astBuilder, SubstitutionSet(funcDeclRef))
+                             ->resolve());
 
         if (!resolvedFuncType)
         {
@@ -2132,8 +2132,6 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         candidate.item = item;
 
         AddOverloadCandidate(context, candidate, baseCost);
-
-        // AddFuncExprOverloadCandidate(resolvedFuncType, context, funcExpr, baseCost);
     }
 }
 
@@ -2483,7 +2481,12 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             //
             // So the question is then whether a mismatch during the
             // unification step should be taken as an immediate failure...
-            auto argType = matchedArgs[aa].argType;
+            //
+            // Additionally, we'll always assume that modifiers do not participate
+            // in generic arg inference, so we will unwrap them here. Modifiers
+            // can still affect type coercion checks later on (post-generic-inference)
+            //
+            auto argType = unwrapModifiedType(matchedArgs[aa].argType);
             auto paramType = (*innerParameterTypes)[aa];
             auto canUnify = TryUnifyTypes(
                 constraints,

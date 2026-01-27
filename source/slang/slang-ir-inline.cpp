@@ -194,6 +194,20 @@ struct InliningPassBase
         return false;
     }
 
+    static IRInst* resolveLookups(IRInst* inst)
+    {
+        if (auto lookup = as<IRLookupWitnessMethod>(inst))
+        {
+            if (auto resolvedTable = as<IRWitnessTable>(resolveLookups(lookup->getWitnessTable())))
+            {
+                if (auto result = findWitnessTableEntry(resolvedTable, lookup->getRequirementKey()))
+                    return result;
+            }
+        }
+
+        return inst;
+    }
+
     /// Determine whether `call` can be inlined, and if so write information about it to
     /// `outCallSite`
     bool canInline(IRCall* call, CallSiteInfo& outCallSite)
@@ -204,7 +218,7 @@ struct InliningPassBase
 
         // Next we consider the callee.
         //
-        IRInst* callee = call->getCallee();
+        IRInst* callee = resolveLookups(call->getCallee());
 
         // If the callee is a `specialize` instruction, then we
         // want to look at what is being specialized instead.

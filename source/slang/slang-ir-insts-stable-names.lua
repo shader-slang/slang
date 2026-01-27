@@ -751,5 +751,6 @@ return {
 	["CompilerDictionary"] = 754,
 	["CompilerDictionaryScope"] = 755,
 	["Decoration.ReturnValueContextFieldDecoration"] = 756,
-	["Decoration.AllowPreTranslationInlining"] = 757
+	["Decoration.AllowPreTranslationInlining"] = 757,
+	["DiffTypeInfo"] = 758,
 }

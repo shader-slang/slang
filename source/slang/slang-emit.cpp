@@ -114,6 +114,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-translate.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -903,6 +904,35 @@ static void fixupLookupWitnessTypes(TargetProgram* targetProgram, IRModule* irMo
     }
 }
 
+// Lower DiffTypeInfo instructions to MakeTuple.
+// DiffTypeInfo is a hoistable instruction that holds witness tables for differential type info.
+// After specialization, it can be safely converted to a regular MakeTuple.
+void lowerDiffTypeInfoInsts(IRModule* module)
+{
+    List<IRInst*> instsToReplace;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->getOp() == kIROp_DiffTypeInfo)
+        {
+            instsToReplace.add(globalInst);
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto inst : instsToReplace)
+    {
+        builder.setInsertBefore(inst);
+        List<IRInst*> args;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            args.add(inst->getOperand(i));
+        }
+        auto tuple =
+            builder.emitMakeTuple(inst->getFullType(), (UInt)args.getCount(), args.getBuffer());
+        inst->replaceUsesWith(tuple);
+        inst->removeAndDeallocate();
+    }
+}
 
 void lowerSumVectorMatrixInsts(IRModule* module)
 {
@@ -1339,6 +1369,8 @@ Result linkAndOptimizeIR(
     // fixupSpecializedWitnessTables(targetProgram, irModule);
     // fixupLookupWitnessTypes(targetProgram, irModule);
 
+    initializeTranslationDictionary(irModule);
+
     // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
     // lowering.
     //
@@ -1371,6 +1403,10 @@ Result linkAndOptimizeIR(
     }
 
     finalizeSpecialization(irModule);
+
+    // Lower DiffTypeInfo instructions to MakeTuple.
+    // This must happen after specialization since DiffTypeInfo is hoistable.
+    lowerDiffTypeInfoInsts(irModule);
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
@@ -1512,6 +1548,8 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(checkGetStringHashInsts(irModule, sink));
     }
 
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     lowerTuples(irModule, sink);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
@@ -1537,8 +1575,8 @@ Result linkAndOptimizeIR(
         weakUse->removeAndDeallocate();
     }
 
-    irModule->getTranslationDict()->removeAndDeallocate();
-    irModule->setTranslationDict(nullptr);
+    // irModule->getTranslationDict()->removeAndDeallocate();
+    clearTranslationDictionary(irModule);
 
     // -----
 

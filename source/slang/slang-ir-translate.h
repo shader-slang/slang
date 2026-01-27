@@ -15,6 +15,9 @@
 namespace Slang
 {
 
+void initializeTranslationDictionary(IRModule* module);
+
+void clearTranslationDictionary(IRModule* module);
 struct TranslationContext
 {
     // AD 2.0 Translators
@@ -23,24 +26,7 @@ public:
     TranslationContext(IRModule* module, DiagnosticSink* inSink)
         : irModule(module), sink(inSink), autodiffContext(module->getModuleInst())
     {
-        if (!module->getTranslationDict())
-        {
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
-            auto dict = cast<IRCompilerDictionary>(builder.emitIntrinsicInst(
-                builder.getVoidType(),
-                kIROp_CompilerDictionary,
-                0,
-                nullptr));
-            module->setTranslationDict(dict);
-
-            builder.setInsertInto(dict);
-            builder.emitIntrinsicInst(
-                builder.getVoidType(),
-                kIROp_CompilerDictionaryScope,
-                0,
-                nullptr);
-        }
+        initializeTranslationDictionary(module);
     }
 
     IRInst* maybeTranslateInst(IRInst* inst);

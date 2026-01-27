@@ -1139,6 +1139,13 @@ public:
         return result;
     }
 
+    SemanticsContext allowDroppingDerivatives()
+    {
+        SemanticsContext result(*this);
+        result.m_allowDroppingDerivatives = true;
+        return result;
+    }
+
     SemanticsContext allowStaticReferenceToNonStaticMember()
     {
         SemanticsContext result(*this);
@@ -1153,6 +1160,11 @@ public:
         return result;
     }
 
+    TreatAsDifferentiableExpr* getTreatAsDifferentiableParentExpr()
+    {
+        return m_treatAsDifferentiableExpr;
+    }
+
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     SemanticsContext excludeTransparentMembersFromLookup()
@@ -1163,6 +1175,8 @@ public:
     }
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
+
+    bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
 
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
@@ -1203,6 +1217,8 @@ protected:
     /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
+
+    bool m_allowDroppingDerivatives = false;
 
     ASTBuilder* m_astBuilder = nullptr;
 
@@ -2391,6 +2407,34 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    FuncType* getCalculatedDiffFuncType(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* contextType = nullptr)
+    {
+        if (contextType)
+        {
+            Val* args[] = {
+                baseFuncAsType,
+                contextType,
+                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+            return as<FuncType>(
+                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        }
+        else
+        {
+            Val* args[] = {
+                baseFuncAsType,
+                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+            return as<FuncType>(
+                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        }
+    }
+
+    Type* getForwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBwdCallableBaseType(Type* baseType);
+
     //
 
     struct Constraint
@@ -2476,6 +2520,8 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
+    SubtypeWitness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+
     bool isValidGenericConstraintType(Type* type);
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
@@ -2505,7 +2551,9 @@ public:
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr);
+    // Handles special modifier cases. In general case, calls createModifierCastExpr.
+    Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
+    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
 
     /// Does there exist an implicit conversion from `fromType` to `toType`?
     bool canConvertImplicitly(Type* toType, QualType fromType);
@@ -3142,13 +3190,6 @@ public:
 
     Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
     Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
-    Expr* visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr);
-    Expr* visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr* expr);
-    Expr* visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr);
-    Expr* visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr);
-    // Expr* visitApplyForFwdFuncTypeExpr(ApplyForFwdFuncTypeExpr* expr);
-    // Expr* visitFwdCallableFuncTypeExpr(FwdCallableFuncTypeExpr* expr);
-    Expr* visitFuncResultTypeExpr(FuncResultTypeExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
@@ -3265,6 +3306,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 

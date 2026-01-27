@@ -275,8 +275,15 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
     }
     else
     {*/
-    return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
+    /*auto returnType = declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
+    if (!declRef.getDecl()->findModifier<NoDiffModifier>())
+        return returnType;
+    else
+    {
+        return astBuilder->getModifiedType(returnType, astBuilder->getNoDiffModifierVal());
     //}
+    //}*/
+    return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
 }
 
 inline Type* getErrorCodeType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
@@ -371,6 +378,8 @@ GenericDeclRefType* getGenericDeclRefType(
 NamespaceType* getNamespaceType(ASTBuilder* astBuilder, DeclRef<NamespaceDeclBase> const& declRef);
 
 SamplerStateType* getSamplerStateType(ASTBuilder* astBuilder);
+
+ModifiedType* getTypeWithModifier(Type* baseType, Val* typeModifier);
 
 
 // Definitions that can't come earlier despite

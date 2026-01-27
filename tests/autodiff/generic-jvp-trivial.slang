@@ -5,6 +5,18 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+// This is a stress test for the interface + auto-diff system.
+//
+// Derivatives are technically zero since `ladd`, `lmul` and `lscale` are all defined in
+// ILinearArithmeticType, where the type are all non-differentiable (in that context).
+// Adding a IDifferentiable conformance on to `T` should not change the fact that `ladd`
+// should still be treated as non-differentiable. 
+//
+// This test stress-tests that differentiability doesn't 'leak' into non-differentiable 
+// contexts. At the time of writing this test, modified types are used to ensure that non-differentiable
+// types remain that way even under substitution.
+// 
+
 typedef float Real;
 
 __generic<let N : int>
@@ -181,23 +193,20 @@ extension float : MyLinearArithmeticDifferentiableType
 };
 
 
-__generic<T : MyLinearArithmeticDifferentiableType>
 [Differentiable]
-T operator +(T a, T b)
+T operator +<T>(T a, T b) where T : MyLinearArithmeticType, IDifferentiable
 {
     return T.ladd(a, b);
 }
 
-__generic<T : MyLinearArithmeticDifferentiableType>
 [Differentiable]
-T operator *(T a, T b)
+T operator *<T>(T a, T b) where T : MyLinearArithmeticType, IDifferentiable
 {
     return T.lmul(a, b);
 }
 
-__generic<G : MyLinearArithmeticDifferentiableType>
 [Differentiable]
-G f(G x)
+G f<G>(G x) where G : MyLinearArithmeticType, IDifferentiable
 {
     G a = x + x;
     G b = x * x;
@@ -215,8 +224,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpfloat3 dpf3 = dpfloat3(myfloat3(float3(1.0, 3.0, 5.0)), myfloat3(float3(0.5, 1.5, 2.5)));
 
         outputBuffer[0] = f(dpa.p);                       // Expect: 22.0
-        outputBuffer[1] = fwd_diff(f)(dpfloat(2.0, 0.5)).d;  // Expect: 9.5
-        outputBuffer[2] = fwd_diff(f)(dpf4).d.val.w;         // Expect: 27.5
-        outputBuffer[3] = fwd_diff(f)(dpf3).d.val.y;         // Expect: 40.5
+        outputBuffer[1] = fwd_diff(f)(dpfloat(2.0, 0.5)).d;  // Expect: 0
+        outputBuffer[2] = fwd_diff(f)(dpf4).d.val.w;         // Expect: 0
+        outputBuffer[3] = fwd_diff(f)(dpf3).d.val.y;         // Expect: 0
     }
 }

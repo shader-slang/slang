@@ -695,44 +695,68 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(DiffTypeInfoInterfaceType)
+interface IHasDiffTypeInfo
+{ };
+
+__magic_type(FwdDiffFuncType)
+__intrinsic_type($(kIROp_ForwardDiffFuncType))
+struct FwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(BwdCallableFuncType)
+__intrinsic_type($(kIROp_BwdCallableFuncType))
+struct BwdCallableFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(ApplyForBwdFuncType)
+__intrinsic_type($(kIROp_ApplyForBwdFuncType))
+struct ApplyForBwdFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(BwdDiffFuncType)
+__intrinsic_type($(kIROp_BackwardDiffFuncType))
+struct BwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(FuncResultType)
+__intrinsic_type($(kIROp_FuncResultType))
+struct FuncResultType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
-interface IForwardDifferentiable<FType>
+interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 {
-
-    // BuiltinRequirementKind::ForwardDerivativeFunc
-    // inserts a synthesized-func-decl, which becomes a 
-    // IRForwardDifferentiate()
-    // 
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc __fwd_diff_func_type(FType) fwd_diff; // -> fwd_diff
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
 };
 
 // Core library interfaces:
 __magic_type(BwdCallableBaseType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
-interface IBwdCallable<FType>
+interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
-    __associatedfunc __bwd_callable_type(FType, This) operator(); // -> bwd_prop
+    __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
-    __associatedfunc __result_type(FType, This) val;
+    __associatedfunc FuncResultType<FType, This> val;
 };
 
 __magic_type(BwdDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
-interface IBackwardDifferentiable<FType>
+interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
-    __associatedfunc __apply_bwd_func_type(FType, This.BwdCallable) apply_bwd; // -> apply_bwd
+    __associatedfunc ApplyForBwdFuncType<FType, This.BwdCallable> apply_bwd; // -> apply_bwd
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
-    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
+    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> primal_ctx
 };
 
 /*__magic_type(LegacyBwdDiffFuncInterfaceType)
@@ -2153,7 +2177,6 @@ struct vector : IRWArray<T>
 
 
         /// Initialize a vector where all elements have the same scalar `value`.
-    [Differentiable]
     __implicit_conversion($(kConversionCost_ScalarToVector))
     __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
@@ -2161,7 +2184,6 @@ struct vector : IRWArray<T>
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [Differentiable]
     __init(vector<T,N> value);
 
     [ForceInline]
@@ -2181,13 +2203,11 @@ struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
-    [Differentiable]
     __init(T val);
 
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [Differentiable]
     __init(This value);
 
     [ForceInline]
@@ -2324,9 +2344,12 @@ extension vector<T,N> : IDifferentiable
 __generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 extension matrix<T,N,M,L> : IFloat
 {
-    [__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
+    // TODO(sai): wut is happening here? before this was just this <= other which is just
+    // self-recursive.
+    //
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0][0] < other[0][0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0][0] <= other[0][0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(this[0][0] == other[0][0]); }
     [Differentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
     [Differentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
     [Differentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
@@ -2347,6 +2370,14 @@ extension matrix<T,N,M,L> : IFloat
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
+    
+    /// Initialize a matrix where all elements have the same scalar `value`.
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __init(T value);
+
 }
 
 __generic<T:IDifferentiable, let N : int, let M : int, let L : int>

@@ -1741,20 +1741,6 @@ Val* maybeRegisterVal(
 
     if (!lookupResult.isOverloaded() && lookupResult.isValid())
     {
-        // TODO: This is a hack to force the func type to be translated
-        // and cached in the resolvedVals map.
-        // We probably want something more robust..
-        //
-        if (lookupResult.item.declRef.as<CallableDecl>())
-        {
-            auto type = visitor->GetTypeForDeclRef(lookupResult.item.declRef, SourceLoc());
-            if (!as<FuncType>(type))
-            {
-                visitor->getShared()->getModule()->getModuleDecl()->m_resolvedVals[type.type] =
-                    visitor->resolveType(type);
-            }
-        }
-
         visitor->getParentDifferentiableAttribute()->addAssocVal(
             baseForRegistry,
             (SlangInt)kind,
@@ -2878,7 +2864,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 context,
                 funcAsType,
                 declRef.declRefBase,
-                context->getASTBuilder()->getForwardDiffFuncInterfaceType(funcAsType),
+                context->getForwardDiffFuncInterfaceType(funcAsType),
                 ValAssociationKind::ForwardDerivativeWitnessTable);
 
             // Lower the fwd_diff : IBackwardDifferentiable witness table
@@ -2886,7 +2872,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 context,
                 funcAsType,
                 declRef.declRefBase,
-                context->getASTBuilder()->getBackwardDiffFuncInterfaceType(funcAsType),
+                context->getBackwardDiffFuncInterfaceType(funcAsType),
                 ValAssociationKind::BackwardDerivativeWitnessTable);
         }
 
@@ -3374,8 +3360,6 @@ static Expr* convertHigherOrderExprToLookup(
                 resultExpr->loc,
                 resultExpr);
 
-            // Slight hack for the fact that some function result types can be "unresolved".
-            lookupResultExpr->type = visitor->resolveType(lookupResultExpr->type);
             return lookupResultExpr;
         }
         else
@@ -4683,7 +4667,7 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
 
 Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
 {
-    auto subContext = withTreatAsDifferentiable(expr);
+    auto subContext = withTreatAsDifferentiable(expr).allowDroppingDerivatives();
     expr->innerExpr = dispatchExpr(expr->innerExpr, subContext);
     expr->type = expr->innerExpr->type;
     auto innerExpr = expr->innerExpr;
@@ -4732,7 +4716,9 @@ Expr* SemanticsExprVisitor::visitDefaultConstructExpr(DefaultConstructExpr* expr
 Expr* SemanticsExprVisitor::visitDetachExpr(DetachExpr* expr)
 {
     expr->inner = CheckTerm(expr->inner);
-    expr->type = expr->inner->type;
+    expr->type = getTypeWithModifier(
+        expr->inner->type,
+        getCurrentASTBuilder()->getOrCreate<NoDiffModifierVal>());
     return expr;
 }
 
@@ -6202,125 +6188,6 @@ Expr* SemanticsExprVisitor::visitStaticMemberExpr(StaticMemberExpr* expr)
     expr->baseExpression = maybeOpenExistential(expr->baseExpression);
     // Do a static lookup
     return _lookupStaticMember(expr, expr->baseExpression);
-}
-
-Expr* SemanticsExprVisitor::visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
-    {
-        auto fwdDiffFuncType = m_astBuilder->getOrCreate<FwdDiffFuncType>(expr->base.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdDiffFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-
-Expr* SemanticsExprVisitor::visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
-    {
-        auto bwdDiffFuncType = m_astBuilder->getOrCreate<BwdDiffFuncType>(expr->base.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(bwdDiffFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-
-Expr* SemanticsExprVisitor::visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-    expr->ctxType = CheckProperType(expr->ctxType);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
-        !as<ErrorType>(expr->ctxType.type))
-    {
-        auto bwdApplyFuncType =
-            m_astBuilder->getOrCreate<ApplyForBwdFuncType>(expr->base.type, expr->ctxType.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(bwdApplyFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-/*
-Expr* SemanticsExprVisitor::visitApplyForFwdFuncTypeExpr(ApplyForFwdFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-    expr->ctxType = CheckProperType(expr->ctxType);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
-        !as<ErrorType>(expr->ctxType.type))
-    {
-        auto fwdApplyFuncType =
-            m_astBuilder->getOrCreate<ApplyForFwdFuncType>(expr->base.type, expr->ctxType.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdApplyFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-*/
-
-Expr* SemanticsExprVisitor::visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-    expr->ctxType = CheckProperType(expr->ctxType);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
-        !as<ErrorType>(expr->ctxType.type))
-    {
-        auto bwdCallableFuncType =
-            m_astBuilder->getOrCreate<BwdCallableFuncType>(expr->base.type, expr->ctxType.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(bwdCallableFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-/*
-Expr* SemanticsExprVisitor::visitFwdCallableFuncTypeExpr(FwdCallableFuncTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type))
-    {
-        auto fwdCallableFuncType = m_astBuilder->getOrCreate<FwdCallableFuncType>(expr->base.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(fwdCallableFuncType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
-}
-*/
-
-Expr* SemanticsExprVisitor::visitFuncResultTypeExpr(FuncResultTypeExpr* expr)
-{
-    // Translate type node.
-    expr->base = CheckProperType(expr->base);
-    expr->ctxType = CheckProperType(expr->ctxType);
-
-    if (expr->base.type && !as<ErrorType>(expr->base.type) && expr->ctxType.type &&
-        !as<ErrorType>(expr->ctxType.type))
-    {
-        auto funcResultType =
-            m_astBuilder->getOrCreate<FuncResultType>(expr->base.type, expr->ctxType.type);
-        expr->type = m_astBuilder->getOrCreate<TypeType>(funcResultType);
-        return expr;
-    }
-
-    SLANG_UNEXPECTED("aaaaah");
 }
 
 Expr* SemanticsVisitor::lookupMemberResultFailure(

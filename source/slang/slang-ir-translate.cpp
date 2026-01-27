@@ -9,6 +9,31 @@
 namespace Slang
 {
 
+
+void initializeTranslationDictionary(IRModule* module)
+{
+    if (!module->getTranslationDict())
+    {
+        IRBuilder builder(module);
+        builder.setInsertInto(module);
+        auto dict = cast<IRCompilerDictionary>(
+            builder.emitIntrinsicInst(builder.getVoidType(), kIROp_CompilerDictionary, 0, nullptr));
+        module->setTranslationDict(dict);
+
+        builder.setInsertInto(dict);
+        builder.emitIntrinsicInst(builder.getVoidType(), kIROp_CompilerDictionaryScope, 0, nullptr);
+    }
+}
+
+void clearTranslationDictionary(IRModule* module)
+{
+    if (auto translationDict = module->getTranslationDict())
+    {
+        translationDict->removeAndDeallocate();
+    }
+    module->setTranslationDict(nullptr);
+}
+
 IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
 {
     IRBuilder builder(irModule);
@@ -401,7 +426,12 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     case kIROp_Specialize:
         {
             if (!isSetSpecializedGeneric(instWithCanonicalOperands))
-                return memoize(specializeGeneric(cast<IRSpecialize>(instWithCanonicalOperands)));
+            {
+                auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
+                auto specResult = specializeGeneric(specInst);
+                specInst->replaceUsesWith(specResult);
+                return memoize(specResult);
+            }
             break;
         }
     case kIROp_LookupWitnessMethod:

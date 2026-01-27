@@ -890,18 +890,34 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             auto indirectFacet = new (arena) Facet::Impl();
 
+            // Look through the heads of all the lists to see if we can find a matching
+            // facet with a lower level of indirection.
+            //
+            // We want to prioritize the most direct facet possible, to minimize the levels of
+            // indirection in the final linearization.
+            //
+            Facet::DirectnessVal baseDirectness =
+                Facet::DirectnessVal(foundFacet.getImpl()->directness);
+            for (auto base : bases)
+            {
+                Facet headFacet = base->facets.getHead();
+                if (originsMatch(foundFacet, headFacet))
+                {
+                    if (Facet::DirectnessVal(headFacet.getImpl()->directness) < baseDirectness)
+                    {
+                        foundFacet = headFacet;
+                        foundBase = base;
+                        baseDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
+                    }
+                }
+            }
+
             // We will initialize the fresh facet to a copy of the state of the
             // `foundFacet`, albeit with a higher level of indirection.
             //
-            // TODO: In principle we could search through  all of the lists to
-            // find the one with a facet matching `foundFacet` with minimum
-            // indirection, so that our measure of indirection is always
-            // as small as possible for any given facet.
-            //
             *indirectFacet = *(foundFacet.getImpl());
             indirectFacet->next = nullptr;
-            indirectFacet->directness =
-                Facet::Directness(Facet::DirectnessVal(indirectFacet->directness) + 1);
+            indirectFacet->directness = Facet::Directness(baseDirectness + 1);
 
             // When using this facet for subtype tests, or when looking
             // up member through this facet, we will need a witness
@@ -1311,7 +1327,66 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo, context);
+        auto baseInheritanceInfo =
+            _calcInheritanceInfo(modifiedType->getBase(), circularityInfo, context);
+
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+        {
+            // Create a filtered facet list that excludes facets whose
+            // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
+            // interface types.
+            //
+            SemanticsVisitor visitor(this);
+            auto directFacet = new (arena) Facet::Impl(
+                astBuilder,
+                Facet::Kind::Type,
+                Facet::Directness::Self,
+                DeclRef<Decl>(),
+                type,
+                visitor.createTypeEqualityWitness(type));
+
+            auto diffInterfaceDecl = astBuilder->getDifferentiableInterfaceDecl().getDecl();
+            auto diffRefInterfaceDecl = astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
+
+            Facet tail = directFacet;
+            for (auto facet : baseInheritanceInfo.facets)
+            {
+                // Skip self facet from base - we already have our own self facet
+                if (facet->directness == Facet::Directness::Self)
+                    continue;
+
+                // Check if this facet corresponds to IDifferentiable or IDifferentiablePtrType
+                bool shouldExclude = false;
+                if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
+                {
+                    auto interfaceDecl = interfaceDeclRef.getDecl();
+                    if (interfaceDecl == diffInterfaceDecl || interfaceDecl == diffRefInterfaceDecl)
+                    {
+                        shouldExclude = true;
+                    }
+                }
+
+                if (shouldExclude)
+                    continue;
+
+                // Copy the facet with updated structure
+                auto newFacet = new (arena) Facet::Impl(
+                    astBuilder,
+                    facet->kind,
+                    facet->directness,
+                    facet->origin.declRef,
+                    facet->origin.type,
+                    facet->subtypeWitness);
+                tail->next = newFacet;
+                tail = newFacet;
+            }
+
+            InheritanceInfo info;
+            info.facets = FacetList(directFacet);
+            return info;
+        }
+
+        return baseInheritanceInfo;
     }
     else
     {

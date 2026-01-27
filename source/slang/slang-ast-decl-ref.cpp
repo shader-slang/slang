@@ -200,6 +200,13 @@ RequirementWitness getUnspecializedLookupRec(
             {
                 witnessTable = nestedWitness.getWitnessTable();
             }
+            /*
+            else if (nestedWitness.getFlavor() == RequirementWitness::Flavor::val)
+            {
+                auto subtypeWitness = as<SubtypeWitness>(nestedWitness.getVal());
+                return getUnspecializedLookupRec(astBuilder, requirementKey, subtypeWitness);
+            }
+            */
             else if (nestedWitness.getFlavor() == RequirementWitness::Flavor::none)
             {
                 return RequirementWitness();

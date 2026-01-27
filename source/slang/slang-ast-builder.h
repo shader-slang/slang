@@ -224,9 +224,6 @@ public:
 
     Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
 
-    // HashSet<Val*> m_valsRequiringResolution;
-    // Dictionary<Val*, Val*> m_resolvedVals;
-
     // For [PrimalSubstitute] and [PrimalSubstituteOf] decorators
     Dictionary<Decl*, ShortList<Decl*, 4>> m_substituteMap;
 
@@ -542,11 +539,9 @@ public:
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
 
-    Type* getForwardDiffFuncInterfaceType(Type* baseType);
-    Type* getBackwardDiffFuncInterfaceType(Type* baseType);
-    // Type* getLegacyBackwardDiffFuncInterfaceType(Type* baseType);
-    Type* getBwdCallableBaseType(Type* baseType);
-    Type* getFwdCallableBaseType(Type* baseType);
+    Type* getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);
+    Type* getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness);
 
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
@@ -619,6 +614,11 @@ public:
 
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
+
+    Type* getDiffTypeInfoInterfaceType();
+    DeclRef<InterfaceDecl> getDiffTypeInfoInterfaceDecl();
+
+    Type* getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness);
 
     DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
 

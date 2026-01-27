@@ -54,7 +54,6 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     IsSubTypeOptions isSubTypeOptions)
 {
     SubtypeWitness* result = nullptr;
-    // TODO: (make sure unknown witnesses don't have problems here: )
     if (getShared()->tryGetSubtypeWitnessFromCache(subType, superType, result))
         return result;
     result = checkAndConstructSubtypeWitness(subType, superType, isSubTypeOptions);
@@ -64,6 +63,78 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
 
     getShared()->cacheSubtypeWitness(subType, superType, result);
     return result;
+}
+
+
+SubtypeWitness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef)
+{
+    List<SubtypeWitness*> paramWitnesses;
+
+    auto astBuilder = getCurrentASTBuilder();
+
+    if (auto fwdDiffFuncType = as<FwdDiffFuncType>(callableDeclRef.getDecl()->funcType.type))
+    {
+        auto diffTypeWitness = as<GenericAppDeclRef>(fwdDiffFuncType->getDeclRefBase())->getArg(1);
+        return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(diffTypeWitness);
+    }
+
+    auto funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
+    auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
+    {
+        // TODO: This should really just be part of the sub-typing system.
+        //
+        // Right now a NoDiff type still returns a valid witness with tryGetSubtypeWitness
+        // which seems wrong.
+        //
+        if (auto modifiedType = as<ModifiedType>(type))
+        {
+            if (modifiedType->findModifier<NoDiffModifierVal>())
+                return nullptr;
+        }
+
+        auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
+
+        if (!witness)
+            witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
+
+        return witness;
+    };
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
+        auto witness = getDiffWitness(paramValueType);
+        paramWitnesses.add(witness);
+    }
+
+    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+
+    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
+    Type* thisParamType = nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
+        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    {
+        thisParamType = nullptr;
+    }
+    else if (thisValueType.type)
+    {
+        if (thisValueType.isLeftValue)
+            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
+        else
+            thisParamType = thisValueType.type;
+    }
+
+    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
+        thisWitness = nullptr;
+
+    return astBuilder->getOrCreate<DiffTypeInfoWitness>(
+        thisParamType,
+        thisWitness,
+        returnWitness,
+        paramWitnesses);
 }
 
 SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
@@ -109,6 +180,13 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     //
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
+
+    // TODO: Un-special case this if possible.
+    if (isDeclRefTypeOf<FunctionDeclBase>(subType) && as<DiffTypeInfoInterfaceType>(superType))
+    {
+        return getDiffTypeInfoWitness(
+            as<DeclRefType>(subType)->getDeclRef().as<FunctionDeclBase>());
+    }
 
     // First, make sure both sub type and super type decl are ready for lookup.
     if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))

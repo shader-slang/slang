@@ -2072,54 +2072,52 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitFwdDiffFuncType(FwdDiffFuncType* fwdFuncType)
     {
-        return LoweredValInfo::simple(
-            lowerFuncDependentType(fwdFuncType->getBase(), kIROp_ForwardDiffFuncType));
+        return LoweredValInfo::simple(lowerFuncDependentType(
+            as<Type>(as<GenericAppDeclRef>(fwdFuncType->getDeclRefBase())->getArg(0)),
+            kIROp_ForwardDiffFuncType));
     }
 
     LoweredValInfo visitBwdDiffFuncType(BwdDiffFuncType* bwdFuncType)
     {
-        return LoweredValInfo::simple(
-            lowerFuncDependentType(bwdFuncType->getBase(), kIROp_BackwardDiffFuncType));
+        return LoweredValInfo::simple(lowerFuncDependentType(
+            as<Type>(as<GenericAppDeclRef>(bwdFuncType->getDeclRefBase())->getArg(0)),
+            kIROp_BackwardDiffFuncType));
     }
 
     LoweredValInfo visitApplyForBwdFuncType(ApplyForBwdFuncType* applyForBwdFuncType)
     {
-        return LoweredValInfo::simple(lowerFuncDependentType(
-            applyForBwdFuncType->getBase(),
-            kIROp_ApplyForBwdFuncType,
-            applyForBwdFuncType->getCtxType()));
+        auto base =
+            as<Type>(as<GenericAppDeclRef>(applyForBwdFuncType->getDeclRefBase())->getArg(0));
+        auto ctxType =
+            as<Type>(as<GenericAppDeclRef>(applyForBwdFuncType->getDeclRefBase())->getArg(1));
+
+        return LoweredValInfo::simple(
+            lowerFuncDependentType(base, kIROp_ApplyForBwdFuncType, ctxType));
     }
 
     LoweredValInfo visitBwdCallableFuncType(BwdCallableFuncType* bwdCallableFuncType)
     {
-        return LoweredValInfo::simple(lowerFuncDependentType(
-            bwdCallableFuncType->getBase(),
-            kIROp_BwdCallableFuncType,
-            bwdCallableFuncType->getCtxType()));
+        auto base =
+            as<Type>(as<GenericAppDeclRef>(bwdCallableFuncType->getDeclRefBase())->getArg(0));
+        auto ctxType =
+            as<Type>(as<GenericAppDeclRef>(bwdCallableFuncType->getDeclRefBase())->getArg(1));
+
+        return LoweredValInfo::simple(
+            lowerFuncDependentType(base, kIROp_BwdCallableFuncType, ctxType));
     }
-
-    /*
-        LoweredValInfo visitApplyForFwdFuncType(ApplyForFwdFuncType* applyForFwdFuncType)
-        {
-            return LoweredValInfo::simple(lowerFuncDependentType(
-                applyForFwdFuncType->getBase(),
-                kIROp_ApplyForFwdFuncType,
-                applyForFwdFuncType->getCtxType()));
-        }
-
-        LoweredValInfo visitFwdCallableFuncType(FwdCallableFuncType* fwdCallableFuncType)
-        {
-            return LoweredValInfo::simple(
-                lowerFuncDependentType(fwdCallableFuncType->getBase(), kIROp_FwdCallableFuncType));
-        }
-    */
 
     LoweredValInfo visitFuncResultType(FuncResultType* funcResultType)
     {
-        return LoweredValInfo::simple(lowerFuncDependentType(
-            funcResultType->getBase(),
-            kIROp_FuncResultType,
-            funcResultType->getCtxType()));
+        auto base = as<Type>(as<GenericAppDeclRef>(funcResultType->getDeclRefBase())->getArg(0));
+        auto ctxType = as<Type>(as<GenericAppDeclRef>(funcResultType->getDeclRefBase())->getArg(1));
+
+        return LoweredValInfo::simple(lowerFuncDependentType(base, kIROp_FuncResultType, ctxType));
+    }
+
+    LoweredValInfo visitHigherOrderDiffTypeTranslationWitness(
+        HigherOrderDiffTypeTranslationWitness* val)
+    {
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 
     LoweredValInfo visitBackwardDifferentiateVal(BackwardDifferentiateVal* val)
@@ -2243,6 +2241,49 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         builder->setInsertLoc(oldLoc);
 
         return LoweredValInfo::simple(noneTable);
+    }
+
+    LoweredValInfo visitDiffTypeInfoWitness(DiffTypeInfoWitness* val)
+    {
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
+        /*
+        // DiffTypeInfoWitness has a bunch of witnesses as operands. We lower them
+        // to a DiffTypeInfo IR instruction. If any operand is null, use NoneWitness.
+        // The first operand is the effective this-type which is not needed at IR level,
+        // so we skip it.
+        auto builder = getBuilder();
+        List<IRInst*> witnesses;
+
+        // Start from operand 1, skipping operand 0 (the effective this-type)
+        for (UIndex i = 1; i < val->getOperandCount(); i++)
+        {
+            auto operand = val->getOperand(i);
+            IRInst* witnessInst = nullptr;
+            if (operand)
+            {
+                witnessInst = lowerSimpleVal(context, operand);
+            }
+            if (!witnessInst)
+            {
+                // Use NoneWitness if operand is null
+                auto voidType = builder->getVoidType();
+                auto oldLoc = builder->getInsertLoc();
+                builder->setInsertInto(builder->getModule());
+                witnessInst = builder->createWitnessTable(voidType, voidType);
+                builder->setInsertLoc(oldLoc);
+            }
+            witnesses.add(witnessInst);
+        }
+
+        // Create a DiffTypeInfo instruction which is hoistable.
+        // It will be lowered to MakeTuple later in the pipeline.
+        //
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_DiffTypeInfo,
+            (UInt)witnesses.getCount(),
+            witnesses.getBuffer()));
+        */
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -3572,27 +3613,7 @@ void collectParameterLists(
                         ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
                         ->resolve();
 
-                FuncType* effectiveFuncType = nullptr;
-
-                // TODO: Pre-compute the translated func-types and put them on the function.
-                //
-                // TODO (alternative): create a new witness type that holds on to the
-                // IDifferentiable conformances for each parameter, the this-type and the return
-                // type.
-                //
-                if (!as<FuncType>(resolvedFuncType))
-                {
-                    if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
-                    {
-                        effectiveFuncType = as<FuncType>(
-                            context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
-                        SLANG_ASSERT(effectiveFuncType);
-                    }
-                }
-                else
-                {
-                    effectiveFuncType = as<FuncType>(resolvedFuncType);
-                }
+                FuncType* effectiveFuncType = as<FuncType>(resolvedFuncType);
 
                 for (auto paramTypeWithDirection : effectiveFuncType->getParamTypes())
                 {
@@ -3677,25 +3698,8 @@ void _lowerInfoFromFuncType(
             ->funcType.type->substitute(context->astBuilder, SubstitutionSet(declRef))
             ->resolve();
 
-    FuncType* effectiveFuncType = nullptr;
-
-    if (!as<FuncType>(resolvedFuncType))
-    {
-        if (context->getMainModuleDecl()->m_resolvedVals.containsKey(resolvedFuncType))
-        {
-            effectiveFuncType =
-                as<FuncType>(context->getMainModuleDecl()->m_resolvedVals[resolvedFuncType]);
-            SLANG_ASSERT(effectiveFuncType);
-        }
-        else
-        {
-            SLANG_UNEXPECTED("expected a function type");
-        }
-    }
-    else
-    {
-        effectiveFuncType = as<FuncType>(resolvedFuncType);
-    }
+    FuncType* effectiveFuncType = as<FuncType>(resolvedFuncType);
+    SLANG_ASSERT(effectiveFuncType);
 
     //
     // TODO: Unify this logic with the this-param lowering
@@ -4769,43 +4773,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             getBuilder()->emitForwardDifferentiateInst(
                 lowerType(context, expr->type),
                 baseVal.val));
-    }
-
-    LoweredValInfo visitBwdDiffFuncTypeExpr(BwdDiffFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("BwdDiffFuncTypeExpr should not be present in IR.");
-    }
-
-    LoweredValInfo visitFwdDiffFuncTypeExpr(FwdDiffFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("FwdDiffFuncTypeExpr should not be present in IR.");
-    }
-
-    LoweredValInfo visitApplyForBwdFuncTypeExpr(ApplyForBwdFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("ApplyForFwdTypeExpr should not be present in IR.");
-    }
-
-    LoweredValInfo visitBwdCallableFuncTypeExpr(BwdCallableFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("BwdCallableFuncTypeExpr should not be present in IR.");
-    }
-
-    /*
-    LoweredValInfo visitApplyForFwdFuncTypeExpr(ApplyForFwdFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("ApplyForFwdTypeExpr should not be present in IR.");
-    }
-
-    LoweredValInfo visitFwdCallableFuncTypeExpr(FwdCallableFuncTypeExpr*)
-    {
-        SLANG_UNEXPECTED("FwdCallableFuncTypeExpr should not be present in IR.");
-    }
-    */
-
-    LoweredValInfo visitFuncResultTypeExpr(FuncResultTypeExpr*)
-    {
-        SLANG_UNEXPECTED("FuncResultTypeExpr should not be present in IR.");
     }
 
     LoweredValInfo visitDetachExpr(DetachExpr* expr)

@@ -677,6 +677,20 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
+    else if (auto modifiedType = as<ModifiedType>(superType))
+    {
+        // We can just look through modified types
+        InheritanceInfo inheritanceInfo =
+            request.semantics->getShared()->getInheritanceInfo(modifiedType);
+        _lookupMembersInSuperTypeFacets(
+            astBuilder,
+            name,
+            modifiedType,
+            inheritanceInfo,
+            request,
+            ioResult,
+            inBreadcrumbs);
+    }
     else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
         // We want lookup to be performed on the underlying interface type of the existential,

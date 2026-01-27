@@ -142,7 +142,6 @@ Val* DeclRefType::_substituteImplOverride(
 {
     if (!subst)
         return this;
-
     int diff = 0;
     DeclRef<Decl> substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
 
@@ -312,149 +311,511 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
-// ----
-void FwdDiffFuncType::_toTextOverride(StringBuilder& out)
+Val* FuncResultType::_resolveImplOverride()
 {
-    out << toSlice("FwdDiffFuncType<") << getBase() << toSlice(">");
-}
+    // Resolve the operands.
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
+    auto resolvedWitness = _getGenericTypeArg(this, 2)->resolve();
 
-Type* FwdDiffFuncType::_createCanonicalTypeOverride()
-{
-    auto canonicalType = getBase()->getCanonicalType();
-    if (canonicalType == this)
-        return this;
-
-    // Otherwise, create a new FwdDiffFuncType.
     auto astBuilder = getCurrentASTBuilder();
-    auto newType = astBuilder->getOrCreate<FwdDiffFuncType>(canonicalType);
-    return newType;
+    if (auto baseDeclRefType = as<DeclRefType>(resolvedBase))
+    {
+        if (auto callableDeclRef = baseDeclRefType->getDeclRef().as<CallableDecl>())
+        {
+            auto funcType = getFuncType(astBuilder, callableDeclRef);
+
+            // Create a func type with no parameters and the result type of the base function.
+            auto newFuncType = astBuilder->getFuncType(
+                List<Type*>().getArrayView(),
+                funcType->getResultType(),
+                funcType->getErrorType());
+
+            return newFuncType;
+        }
+    }
+
+    Val* args[] = {as<Type>(resolvedBase), resolvedCtxType, as<Witness>(resolvedWitness)};
+    return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "FuncResultType");
 }
 
-Val* FwdDiffFuncType::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
+static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
 {
-    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<FwdDiffFuncType>(substBase)->getCanonicalType();
+    if (diffWitness->getSup() == getCurrentASTBuilder()->getDifferentiableInterfaceType())
+    {
+        return getCurrentASTBuilder()->getDifferentialPairType(primalType, diffWitness);
+    }
+    else if (diffWitness->getSup() == getCurrentASTBuilder()->getDifferentiableRefInterfaceType())
+    {
+        return getCurrentASTBuilder()->getDifferentialPtrPairType(primalType, diffWitness);
+    }
+    else
+    {
+        SLANG_UNEXPECTED("Unsupported diff witness for differential pair type");
+        return nullptr;
+    }
 }
 
-// ----
-void BwdDiffFuncType::_toTextOverride(StringBuilder& out)
+Val* BwdCallableFuncType::_resolveImplOverride()
 {
-    out << toSlice("BwdDiffFuncType<") << getBase() << toSlice(">");
-}
+    // Resolve all three operands.
+    // Operand 0: base function type
+    // Operand 1: context type (not used for BwdCallable)
+    // Operand 2: diff-type-info-witness
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
+    auto resolvedWitness = _getGenericTypeArg(this, 2)->resolve();
 
-Type* BwdDiffFuncType::_createCanonicalTypeOverride()
-{
-    auto canonicalType = getBase()->getCanonicalType();
-    if (canonicalType == this)
-        return this;
-
-    // Otherwise, create a new BwdDiffFuncType.
     auto astBuilder = getCurrentASTBuilder();
-    auto newType = astBuilder->getOrCreate<BwdDiffFuncType>(canonicalType);
-    return newType;
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        // If we have a concrete witness, we should be able to turn this into a concrete func-type.
+        List<Type*> newParamTypes;
+
+        auto funcType =
+            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+
+        // Helper function to get the differential value type from a witness.
+        auto getDifferentialValueTypeFromWitness = [&](Type* primalType,
+                                                       SubtypeWitness* witness) -> Type*
+        {
+            if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
+            {
+                if (auto declRefType = as<DeclRefType>(primalType))
+                    if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                        return witness->getSup();
+
+                auto differentialTypeRequirement =
+                    astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                        BuiltinRequirementKind::DifferentialType);
+                return DeclRefType::create(
+                    astBuilder,
+                    astBuilder->getLookupDeclRef(primalType, witness, differentialTypeRequirement));
+            }
+
+            return nullptr;
+        };
+
+        // First translate the this-type.
+        // Get the differential value type and add it with flipped direction.
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        auto [thisParamValueType, thisParamDirection] =
+            splitParameterTypeAndDirection(astBuilder, thisParamType);
+        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        {
+            auto diffThisType =
+                getDifferentialValueTypeFromWitness(thisParamValueType, thisTypeDiffWitness);
+            if (diffThisType)
+            {
+                // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
+                switch (thisParamDirection)
+                {
+                case ParamPassingMode::In:
+                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
+                    break;
+                default:
+                    // For other modes, just add as-is or with out
+                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                    break;
+                }
+            }
+            else
+            {
+                // Non-differentiable this type
+                newParamTypes.add(astBuilder->getNoneType());
+            }
+        }
+
+        // Then, go through and translate all types (parameter & result) to their
+        // differential variants, flipping directions.
+        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+
+            auto diffValueType = getDifferentialValueTypeFromWitness(paramInfo.type, diffWitness);
+
+            if (!diffValueType)
+            {
+                // Non-differentiable param
+                newParamTypes.add(astBuilder->getNoneType());
+            }
+            else
+            {
+                // If differentiable, flip the direction of the type.
+                switch (paramInfo.direction)
+                {
+                case ParamPassingMode::Out:
+                    // Out becomes just the diff value type (no direction wrapper)
+                    newParamTypes.add(diffValueType);
+                    break;
+                case ParamPassingMode::In:
+                    // In becomes Out
+                    newParamTypes.add(astBuilder->getOutParamType(diffValueType));
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    // BorrowInOut stays BorrowInOut
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffValueType));
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unknown parameter direction");
+                    break;
+                }
+            }
+        }
+
+        // Add the differential of the result type as a parameter at the end.
+        if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
+        {
+            auto diffResultType =
+                getDifferentialValueTypeFromWitness(funcType->getResultType(), resultDiffWitness);
+            if (diffResultType)
+            {
+                newParamTypes.add(diffResultType);
+            }
+        }
+
+        // Build a new func type with void return type.
+        return astBuilder->getFuncType(
+            newParamTypes.getArrayView(),
+            astBuilder->getVoidType(),
+            funcType->getErrorType());
+    }
+    else
+    {
+        Val* args[] = {as<Type>(resolvedBase), resolvedCtxType, as<Witness>(resolvedWitness)};
+        return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "BwdCallableFuncType");
+    }
 }
 
-Val* BwdDiffFuncType::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
+Val* ApplyForBwdFuncType::_resolveImplOverride()
 {
-    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<BwdDiffFuncType>(substBase)->getCanonicalType();
-}
+    // Resolve all three operands.
+    // Operand 0: base function type
+    // Operand 1: context type (bwdCallableType)
+    // Operand 2: diff-type-info-witness
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
+    auto resolvedWitness = _getGenericTypeArg(this, 2)->resolve();
 
-// --
-void ApplyForBwdFuncType::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("ApplyForBwdFuncType<") << getBase() << toSlice(">");
-}
-
-/*Type* ApplyForBwdFuncType::_createCanonicalTypeOverride()
-{
-    auto canonicalType = getBase()->getCanonicalType();
-    auto canonicalCtxType = getCtxType()->getCanonicalType();
-    if (canonicalType != getBase() || canonicalCtxType != getCtxType())
-        return getCurrentASTBuilder()->getOrCreate<ApplyForBwdFuncType>(
-            canonicalType,
-            canonicalCtxType);
-
-    // Otherwise, create a new ApplyForBwdFuncType.
-   //auto astBuilder = getCurrentASTBuilder();
-    //auto newType = astBuilder->getOrCreate<ApplyForBwdFuncType>(canonicalType);
-    //return newType;
-    return this;
-}*/
-
-Val* ApplyForBwdFuncType::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<ApplyForBwdFuncType>(substBase, substCtx)->getCanonicalType();
-}
-
-// --
-void BwdCallableFuncType::_toTextOverride(StringBuilder& out)
-{
-    out << toSlice("BwdCallableFuncType<") << getBase() << toSlice(">");
-}
-
-/*Type* BwdCallableFuncType::_createCanonicalTypeOverride()
-{
-    auto canonicalType = getBase()->getCanonicalType();
-    if (canonicalType == this)
-        return this;
-
-    // Otherwise, create a new BwdCallableFuncType.
     auto astBuilder = getCurrentASTBuilder();
-    auto newType = astBuilder->getOrCreate<BwdCallableFuncType>(canonicalType);
-    return newType;
-}*/
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        // If we have a concrete witness, we should be able to turn this into a concrete func-type.
+        List<Type*> newParamTypes;
 
-Val* BwdCallableFuncType::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<BwdCallableFuncType>(substBase, substCtx)->getCanonicalType();
+        auto funcType =
+            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+
+        // The result type is the context type (bwdCallableType).
+        auto resultType = resolvedCtxType;
+        auto errorType = funcType->getErrorType();
+
+        // Get references to the differentiable interfaces to determine witness type.
+        auto differentiableInterface = astBuilder->getDifferentiableInterfaceType();
+        auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
+
+        // Helper to check if witness is for IDifferentiablePtrType.
+        auto isPtrTypeWitness = [&](SubtypeWitness* witness) -> bool
+        {
+            if (!witness)
+                return false;
+            return witness->getSup() == differentiableRefInterface;
+        };
+
+        // Process each parameter.
+        // For ApplyForBwd, differentiable params get wrapped in DifferentialPtrPairType.
+        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+
+            if (diffWitness && isPtrTypeWitness(diffWitness))
+            {
+                // This is an IDifferentiablePtrType param - use DifferentialPtrPairType.
+                auto ptrPairType =
+                    astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
+
+                switch (paramInfo.direction)
+                {
+                case ParamPassingMode::Out:
+                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::In:
+                    newParamTypes.add(ptrPairType);
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::BorrowIn:
+                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::Ref:
+                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unknown parameter direction");
+                    break;
+                }
+            }
+            else
+            {
+                // Non-ptr-differentiable param - add as-is.
+                // TODO: Probably need to wrap in no-diff
+                newParamTypes.add(funcType->getParamTypeWithDirectionWrapper(i));
+            }
+        }
+
+        return astBuilder->getFuncType(newParamTypes.getArrayView(), resultType, errorType);
+    }
+    else
+    {
+        Val* args[] = {as<Type>(resolvedBase), resolvedCtxType, as<Witness>(resolvedWitness)};
+        return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "ApplyForBwdFuncType");
+    }
 }
 
-// --
-void FuncResultType::_toTextOverride(StringBuilder& out)
+Val* BwdDiffFuncType::_resolveImplOverride()
 {
-    out << toSlice("FuncResultType<") << getBase() << toSlice(">");
-}
+    // Resolve all operands.
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedWitness = _getGenericTypeArg(this, 1)->resolve();
 
-/*
-Type* FuncResultType::_createCanonicalTypeOverride()
-{
-    auto canonicalType = getBase()->getCanonicalType();
-    if (canonicalType == this)
-        return this;
-
-    // Otherwise, create a new FuncResultType.
     auto astBuilder = getCurrentASTBuilder();
-    auto newType = astBuilder->getOrCreate<FuncResultType>(canonicalType);
-    return newType;
-}
-*/
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        // If we have a concrete witness, we should be able to turn this into a concrete func-type.
+        List<Type*> newParamTypes;
 
-Val* FuncResultType::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    auto substBase = getBase()->substituteImpl(astBuilder, subst, ioDiff);
-    auto substCtx = getCtxType()->substituteImpl(astBuilder, subst, ioDiff);
-    return astBuilder->getOrCreate<FuncResultType>(substBase, substCtx)->getCanonicalType();
+        auto funcType =
+            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+
+        // The backward diff return type is void.
+        auto resultType = astBuilder->getVoidType();
+        auto errorType = funcType->getErrorType();
+
+        // Helper function to get the differential value type from a witness.
+        // This looks up the Differential associated type from the witness.
+        auto getDifferentialValueTypeFromWitness = [&](Type* primalType,
+                                                       SubtypeWitness* witness) -> Type*
+        {
+            if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
+            {
+                if (auto declRefType = as<DeclRefType>(primalType))
+                    if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                        return witness->getSup();
+
+                auto differentialTypeRequirement =
+                    astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                        BuiltinRequirementKind::DifferentialType);
+                return DeclRefType::create(
+                    astBuilder,
+                    astBuilder->getLookupDeclRef(primalType, witness, differentialTypeRequirement));
+            }
+
+            return nullptr;
+        };
+
+        // Process each parameter according to backward diff rules.
+        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto rawParamType = funcType->getParamTypeWithDirectionWrapper(i);
+
+            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+
+            switch (paramInfo.direction)
+            {
+            case ParamPassingMode::Out:
+                {
+                    // For out params in backward diff, we need the differential value type.
+                    auto diffValueType =
+                        getDifferentialValueTypeFromWitness(paramInfo.type, diffWitness);
+                    if (diffValueType)
+                        newParamTypes.add(diffValueType);
+                    break;
+                }
+            case ParamPassingMode::In:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        // In parameters become inout differential pairs.
+                        if (as<DifferentialPairType>(pairType))
+                            newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
+                        else if (as<DifferentialPtrPairType>(pairType))
+                            newParamTypes.add(pairType);
+                    }
+                    else
+                    {
+                        // Non-differentiable param gets no_diff modifier.
+                        newParamTypes.add(astBuilder->getModifiedType(
+                            paramInfo.type,
+                            {astBuilder->getNoDiffModifierVal()}));
+                    }
+                    break;
+                }
+            case ParamPassingMode::BorrowInOut:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(astBuilder->getBorrowInOutParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(astBuilder->getModifiedType(
+                            paramInfo.type,
+                            {astBuilder->getNoDiffModifierVal()}));
+                    }
+                    break;
+                }
+            case ParamPassingMode::BorrowIn:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(astBuilder->getConstRefParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(
+                            astBuilder->getConstRefParamType(astBuilder->getModifiedType(
+                                paramInfo.type,
+                                {astBuilder->getNoDiffModifierVal()})));
+                    }
+                    break;
+                }
+            case ParamPassingMode::Ref:
+                {
+                    // Ref parameters not allowed in backward diff.
+                    SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+                    break;
+                }
+            default:
+                break;
+            }
+        }
+
+        // Last parameter is the initial derivative of the original return type (dOut).
+        if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
+        {
+            auto dOutType =
+                getDifferentialValueTypeFromWitness(funcType->getResultType(), resultDiffWitness);
+            if (dOutType)
+                newParamTypes.add(dOutType);
+        }
+
+        return astBuilder->getFuncType(newParamTypes.getArrayView(), resultType, errorType);
+    }
+    else
+    {
+        Val* args[] = {as<Type>(resolvedBase), as<Witness>(resolvedWitness)};
+        return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "BwdDiffFuncType");
+    }
 }
+
+Val* FwdDiffFuncType::_resolveImplOverride()
+{
+    // Resolve all operands.
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedWitness = _getGenericTypeArg(this, 1)->resolve();
+
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        // If we have a concrete witness, we should be able to turn this into a concrete func-type.
+        List<Type*> newParamTypes;
+
+        auto funcType = getFuncType(
+            getCurrentASTBuilder(),
+            as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+
+        auto thisParamType = diffTypeWitness->getThisParamType();
+        auto [thisParamValueType, thisParamDirection] =
+            splitParameterTypeAndDirection(getCurrentASTBuilder(), thisParamType);
+        if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
+        {
+            auto thisPairType = getEffectiveDiffPairType(thisParamValueType, thisTypeDiffWitness);
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                newParamTypes.add(thisPairType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(thisPairType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
+        }
+        else if (thisParamType)
+        {
+            // Non-differentiable this type
+            newParamTypes.add(thisParamType);
+        }
+
+        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto rawParamType = funcType->getParamTypeWithDirectionWrapper(i);
+
+            if (auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i))
+            {
+                auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+
+                switch (paramInfo.direction)
+                {
+                case ParamPassingMode::In:
+                    newParamTypes.add(pairType);
+                    break;
+                case ParamPassingMode::Out:
+                    newParamTypes.add(getCurrentASTBuilder()->getOutParamType(pairType));
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(pairType));
+                    break;
+                case ParamPassingMode::Ref:
+                    // do not differentiate ref params
+                    newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
+                    break;
+                case ParamPassingMode::BorrowIn:
+                    newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(paramInfo.type));
+                default:
+                    SLANG_UNEXPECTED("Unhandled param passing mode");
+                    break;
+                }
+
+                continue;
+            }
+
+            // If none of the above applied, just use the original param type.
+            newParamTypes.add(rawParamType);
+            continue;
+        }
+
+        Type* newReturnType = funcType->getResultType();
+        if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
+        {
+            newReturnType = getEffectiveDiffPairType(funcType->getResultType(), resultDiffWitness);
+        }
+
+        return getCurrentASTBuilder()->getFuncType(
+            newParamTypes.getArrayView(),
+            newReturnType,
+            funcType->getErrorType());
+    }
+    else
+    {
+        return getCurrentASTBuilder()->getFwdDiffFuncType(
+            as<Type>(resolvedBase),
+            as<Witness>(resolvedWitness));
+    }
+}
+
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TupleType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* TupleType::getMember(Index i) const

@@ -1272,4 +1272,43 @@ char const* getTryClauseTypeName(TryClauseType c)
     }
 }
 
+ModifiedType* getTypeWithModifier(Type* baseType, Val* typeModifier)
+{
+    // If the type is not a modified type already, just create one.
+    // If the type already has modifiers:
+    //   if the modifier already exists on the type, just return the regular type.
+    //   otherwise, pull them into a list, add the new modifier, and create a new modified type.
+    //
+    auto astBuilder = getCurrentASTBuilder();
+
+    if (auto modifiedType = as<ModifiedType>(baseType))
+    {
+        // Check if the modifier already exists
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            if (modifiedType->getModifier(i) == typeModifier)
+            {
+                // Modifier already exists, return the type as is
+                return modifiedType;
+            }
+        }
+
+        // Collect all existing modifiers and add the new one
+        List<Val*> modifiers;
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            modifiers.add(modifiedType->getModifier(i));
+        }
+        modifiers.add(typeModifier);
+
+        // Create a new modified type with all modifiers
+        return as<ModifiedType>(astBuilder->getModifiedType(modifiedType->getBase(), modifiers));
+    }
+    else
+    {
+        // Type is not a modified type, create one with the single modifier
+        return as<ModifiedType>(astBuilder->getModifiedType(baseType, 1, &typeModifier));
+    }
+}
+
 } // namespace Slang

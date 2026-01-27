@@ -946,6 +946,13 @@ local insts = {
 			hoistable = true,
 		},
 	},
+	-- Holds witness tables for differential type info (this type witness, return type witness, param witnesses).
+	-- This is lowered to MakeTuple after specialization.
+	{
+		DiffTypeInfo = {
+			hoistable = true,
+		},
+	},
 	{ Expand = { operands = { { "value" } } } },
 	{
 		Each = {

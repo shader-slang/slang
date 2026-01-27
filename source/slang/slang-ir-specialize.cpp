@@ -309,6 +309,10 @@ struct SpecializationContext
             }
         }
 
+        IRBuilder builder(module);
+        auto entry =
+            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+
         // We want to see if an existing specialization
         // has already been made. To do that we will construct a key
         // for lookup in the generic specialization context.
@@ -333,6 +337,8 @@ struct SpecializationContext
             //
             if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
                 return specializedVal;
+            if (auto existingVal = entry->getValue())
+                return existingVal;
         }
 
         // If no existing specialization is found, we need
@@ -364,6 +370,8 @@ struct SpecializationContext
                 kIROp_GenericSpecializationDictionary,
                 key.vals,
                 specializedVal));
+
+        builder.setCompilerDictionaryEntryValue(entry, specializedVal);
 
         return specializedVal;
     }
@@ -463,6 +471,18 @@ struct SpecializationContext
         // themselves fully specialized.
         //
         if (!areAllOperandsFullySpecialized(specInst))
+            return false;
+
+        bool hasNonTrivialUses = false;
+        traverseUsers<IRInst>(
+            specInst,
+            [&](IRInst* inst)
+            {
+                if (inst->getOp() != kIROp_AssociatedInstAnnotation)
+                    hasNonTrivialUses = true;
+            });
+
+        if (!hasNonTrivialUses)
             return false;
 
         // The invariant that the arguments are fully specialized

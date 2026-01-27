@@ -813,10 +813,6 @@ class ModuleDecl : public NamespaceDeclBase
     ///
     FIDDLE() Dictionary<Decl*, RefPtr<CandidateExtensionList>> mapDeclToCandidateExtensions;
 
-    /// Unknown vals that need to be resolved.
-    HashSet<Val*> m_valsRequiringResolution;
-    Dictionary<Val*, Val*> m_resolvedVals;
-
     /// Is this module using on-demand deserialization for its exports?
     ///
     bool isUsingOnDemandDeserializationForExports();

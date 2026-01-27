@@ -461,55 +461,34 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
-Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType)
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
 {
     auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
     return DeclRefType::create(
         this,
         this->getGenericAppDeclRef(
             DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
-            makeConstArrayViewSingle(as<Val>(baseType))));
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
 }
 
-Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType)
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
 {
     auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
     return DeclRefType::create(
         this,
         this->getGenericAppDeclRef(
             DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
-            makeConstArrayViewSingle(as<Val>(baseType))));
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
 }
 
-/*
-Type* ASTBuilder::getLegacyBackwardDiffFuncInterfaceType(Type* baseType)
-{
-    auto decl = getSharedASTBuilder()->findMagicDecl("LegacyBwdDiffFuncInterfaceType");
-    return DeclRefType::create(
-        this,
-        this->getGenericAppDeclRef(
-            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
-            makeConstArrayViewSingle(as<Val>(baseType))));
-}*/
-
-Type* ASTBuilder::getBwdCallableBaseType(Type* baseType)
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness)
 {
     auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
     return DeclRefType::create(
         this,
         this->getGenericAppDeclRef(
             DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
-            makeConstArrayViewSingle(as<Val>(baseType))));
-}
-
-Type* ASTBuilder::getFwdCallableBaseType(Type* baseType)
-{
-    auto decl = getSharedASTBuilder()->findMagicDecl("FwdCallableBaseType");
-    return DeclRefType::create(
-        this,
-        this->getGenericAppDeclRef(
-            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
-            makeConstArrayViewSingle(as<Val>(baseType))));
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
 }
 
 Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
@@ -714,6 +693,24 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
     Val* args[] = {valueType, diffTypeWitness};
     return as<DifferentialPairType>(
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
+}
+
+Type* ASTBuilder::getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness)
+{
+    Val* args[] = {baseType, diffTypeInfoWitness};
+    return getSpecializedBuiltinType(makeArrayView(args), "FwdDiffFuncType");
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getDiffTypeInfoInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DiffTypeInfoInterfaceType", nullptr));
+    return declRef;
+}
+
+Type* ASTBuilder::getDiffTypeInfoInterfaceType()
+{
+    return DeclRefType::create(this, getDiffTypeInfoInterfaceDecl());
 }
 
 DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(

@@ -683,7 +683,8 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
             return true;
         break;
     case kIROp_CompilerDictionaryEntry:
-        return true;
+        if (operandIndex != 1)
+            return true;
     default:
         break;
     }

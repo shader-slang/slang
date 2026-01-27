@@ -749,64 +749,6 @@ class TreatAsDifferentiableExpr : public Expr
     FIDDLE() Flavor flavor;
 };
 
-FIDDLE()
-class FwdDiffFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-};
-
-FIDDLE()
-class BwdDiffFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-};
-
-FIDDLE()
-class ApplyForBwdFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-    FIDDLE() TypeExp ctxType;
-};
-
-/*
-FIDDLE()
-class ApplyForFwdFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-    FIDDLE() TypeExp ctxType;
-};
-*/
-
-FIDDLE()
-class BwdCallableFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-    FIDDLE() TypeExp ctxType;
-};
-
-/*
-FIDDLE()
-class FwdCallableFuncTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-};
-*/
-
-
-FIDDLE()
-class FuncResultTypeExpr : public Expr
-{
-    FIDDLE(...)
-    FIDDLE() TypeExp base;
-    FIDDLE() TypeExp ctxType;
-};
-
 /// A type expression of the form `This`
 ///
 /// Refers to the type of `this` in the current context.

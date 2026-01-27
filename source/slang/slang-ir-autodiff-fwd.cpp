@@ -805,6 +805,7 @@ struct ForwardDiffTranslationContext
             IRInst* callee = primalCallee;
 
             // Lookup primal.fwd_diff : IForwardDifferentiable
+            IRInst* higherOrderFwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
             auto higherOrderFwdDiffTable = _lookupWitness(
                 builder,
                 fwdDiffTable,
@@ -812,8 +813,8 @@ struct ForwardDiffTranslationContext
                 builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
                     builder->getTypeKind(),
                     context->sharedContext->forwardDifferentiableInterfaceType,
-                    1,
-                    &fwdDiffCallee)));
+                    2,
+                    higherOrderFwdDiffTableArgs)));
 
             // Lookup `primal.fwd_diff.fwd_diff`
             IRInst* operand = fwdDiffCallee->getFullType();
@@ -838,6 +839,7 @@ struct ForwardDiffTranslationContext
                 higherOrderFwdDiffTable);
 
             // Lookup `primal.fwd_diff : IBackwardDifferentiable`
+            IRInst* higherOrderBwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
             auto higherOrderBwdDiffTable = _lookupWitness(
                 builder,
                 fwdDiffTable,
@@ -845,8 +847,8 @@ struct ForwardDiffTranslationContext
                 builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
                     builder->getTypeKind(),
                     context->sharedContext->backwardDifferentiableInterfaceType,
-                    1,
-                    &fwdDiffCallee)));
+                    2,
+                    higherOrderBwdDiffTableArgs)));
 
             builder->addAnnotation(
                 fwdDiffCallee,
@@ -888,6 +890,9 @@ struct ForwardDiffTranslationContext
 
 
             // Lookup contextType : IBackwardCallable in IBackwardDifferentiable table
+            IRInst* higherOrderContextCallableTableArgs[] = {
+                fwdDiffCallee,
+                builder->getVoidValue()};
             auto higherOrderContextCallableTable = _lookupWitness(
                 builder,
                 higherOrderBwdDiffTable,
@@ -895,8 +900,8 @@ struct ForwardDiffTranslationContext
                 builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
                     builder->getTypeKind(),
                     context->sharedContext->backwardCallableInterfaceType,
-                    1,
-                    &fwdDiffCallee)));
+                    2,
+                    higherOrderContextCallableTableArgs)));
 
             // Lookup 'operator()' (back-prop) in IBackwardCallable table
             IRInst* bwdCallableFuncTypeOperands[] = {
@@ -1251,6 +1256,12 @@ struct ForwardDiffTranslationContext
         placeholderCall->removeAndDeallocate();
         placeholderCallee->removeAndDeallocate();
 
+        // We'll always mark the call as a mixed differential, even if the return
+        // type isn't differentiable since the call may have out-parameters
+        // that are differentiable.
+        //
+        // The unzipping step will take care of splitting the call appropriately.
+        //
         argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
 
         IRBuilder annotationBuilder(argBuilder.getModule());
@@ -1279,7 +1290,7 @@ struct ForwardDiffTranslationContext
             // Return the inst itself if the return value is non-differentiable.
             // This is fine since these values should only be used by non-differentiable code.
             //
-            return InstPair(callInst, callInst);
+            return InstPair(callInst, nullptr);
         }
     }
 
@@ -2952,9 +2963,18 @@ struct ForwardDiffTranslationContext
 
         auto returnDataType =
             (IRType*)findOrTranslatePrimalInst(builder, origReturnVal->getDataType());
+
+        IRFunc* parentFunc = getParentFunc(origReturn);
+        auto funcReturnDataType = (IRType*)findOrTranslatePrimalInst(
+            builder,
+            as<IRFuncType>(parentFunc->getDataType())->getResultType());
+
         if (as<IRFunc>(origReturnVal) || as<IRGeneric>(origReturnVal) ||
             as<IRStructType>(origReturnVal) || as<IRFuncType>(origReturnVal))
         {
+            SLANG_UNEXPECTED(
+                "Function, generic, struct, and functype return values should have been handled "
+                "elsewhere.");
             // If the return value is itself a function, generic or a struct then this
             // is likely to be a generic scope. In this case, we lookup the differential
             // and return that.
@@ -2968,12 +2988,12 @@ struct ForwardDiffTranslationContext
 
             return InstPair(diffReturn, diffReturn);
         }
-        else if (auto pairType = diffTypeContext.tryGetDiffPairType(builder, returnDataType))
+        else if (auto pairType = diffTypeContext.tryGetDiffPairType(builder, funcReturnDataType))
         {
             IRInst* primalReturnVal = findOrTranslatePrimalInst(builder, origReturnVal);
             IRInst* diffReturnVal = findOrTranslateDiffInst(builder, origReturnVal);
             if (!diffReturnVal)
-                diffReturnVal = getDifferentialZeroOfType(builder, returnDataType);
+                diffReturnVal = getDifferentialZeroOfType(builder, funcReturnDataType);
 
             // If the pair type can be formed, this must be non-null.
             SLANG_RELEASE_ASSERT(diffReturnVal);
@@ -3300,7 +3320,7 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         (IRType*)builder.getWitnessTableType((IRType*)builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->forwardDifferentiableInterfaceType,
-            List<IRInst*>(higherOrderfwdDiffFn))),
+            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue()))),
         kIROp_SynthesizedForwardDerivativeWitnessTable,
         1,
         &higherOrderfwdDiffFn);
@@ -3313,7 +3333,7 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         (IRType*)builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->backwardDifferentiableInterfaceType,
-            List<IRInst*>(higherOrderfwdDiffFn)),
+            List<IRInst*>(higherOrderfwdDiffFn, builder.getVoidValue())),
         kIROp_SynthesizedBackwardDerivativeWitnessTable,
         1,
         &higherOrderfwdDiffFn);
@@ -3369,7 +3389,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
         auto callableConformanceType = builder.emitSpecializeInst(
             builder.getTypeKind(),
             sharedContext->backwardCallableInterfaceType,
-            List<IRInst*>(baseFunc));
+            List<IRInst*>(baseFunc, builder.getVoidValue()));
         auto callableWitnessTable =
             builder.createWitnessTable((IRType*)callableConformanceType, (IRType*)contextType);
 
