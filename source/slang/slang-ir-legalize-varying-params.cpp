@@ -2613,7 +2613,7 @@ private:
             if (!funcType)
                 continue;
             auto returnType = funcType->getResultType();
-            if (!returnType) 
+            if (!returnType)
                 continue;
             if (auto structType = as<IRStructType>(returnType))
                 structTypesUsedAsReturnType.add(structType);
