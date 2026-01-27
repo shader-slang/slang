@@ -134,11 +134,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
         // Encode
-        float result[FEATURE_DIM_PER_ENTRY] = Encoder.encode<StructuredBufferStorage<float>>(
+        float result[FEATURE_DIM_PER_ENTRY];
+        Encoder.encode<StructuredBufferStorage<float>, float[N_POS_DIMS], float[FEATURE_DIM_PER_ENTRY]>(
             params,
             position,
             featureStorage,
-            0u  // base address
+            0u,  // base address
+            result
         );
 
         // Write output
