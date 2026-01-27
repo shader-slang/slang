@@ -4,6 +4,7 @@
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related
 // to resolving overloading call operations, by checking
@@ -853,6 +854,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     }
     if (context.mode == OverloadResolveContext::Mode::ForReal)
     {
+        SLANG_ASSERT(context.args || (context.argCount == 0 && resultArgs.getCount() == 0));
         context.argCount = resultArgs.getCount();
         if (context.args)
         {
@@ -3053,53 +3055,103 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             // There were multiple applicable candidates, so we need to report them.
 
-            if (funcName)
+            if (getOptionSet().shouldEmitRichDiagnostics() && funcName)
             {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::ambiguousOverloadForNameWithArgs,
-                    funcName,
-                    argsList);
+                // Use rich diagnostic system with variadic notes
+                Diagnostics::AmbiguousOverloadForNameWithArgs diagnostic;
+                diagnostic.name = funcName->text;
+                diagnostic.args = argsList;
+                diagnostic.expr = expr;
+
+                Index candidateCount = context.bestCandidates.getCount();
+                Index maxCandidatesToPrint = 10;
+                Index candidateIndex = 0;
+
+                context.bestCandidates.sort(
+                    [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                    { return c1.status < c2.status; });
+
+                for (const auto& candidate : context.bestCandidates)
+                {
+                    // Only include visible candidates (skip invisible ones for now)
+                    if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
+                    {
+                        String declString =
+                            ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                        Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
+                        c.candidate = candidate.item.declRef.getDecl();
+                        c.candidate_signature = declString;
+                        diagnostic.candidates.add(c);
+                    }
+
+                    candidateIndex++;
+                    if (candidateIndex == maxCandidatesToPrint)
+                        break;
+                }
+
+                getSink()->diagnose(diagnostic);
+
+                // Emit additional note for remaining candidates if needed
+                if (candidateIndex != candidateCount)
+                {
+                    getSink()->diagnose(
+                        expr,
+                        Diagnostics::moreOverloadCandidates,
+                        candidateCount - candidateIndex);
+                }
             }
             else
             {
-                getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
-            }
-        }
-
-        {
-            Index candidateCount = context.bestCandidates.getCount();
-            Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
-            Index candidateIndex = 0;
-            context.bestCandidates.sort([](const OverloadCandidate& c1, const OverloadCandidate& c2)
-                                        { return c1.status < c2.status; });
-
-            for (auto candidate : context.bestCandidates)
-            {
-                String declString =
-                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-
-                if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                // Use old diagnostic system
+                if (funcName)
+                {
                     getSink()->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::invisibleOverloadCandidate,
-                        declString);
+                        expr,
+                        Diagnostics::ambiguousOverloadForNameWithArgs,
+                        funcName,
+                        argsList);
+                }
                 else
-                    getSink()->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::overloadCandidate,
-                        declString);
+                {
+                    getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                }
 
-                candidateIndex++;
-                if (candidateIndex == maxCandidatesToPrint)
-                    break;
-            }
-            if (candidateIndex != candidateCount)
-            {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::moreOverloadCandidates,
-                    candidateCount - candidateIndex);
+                {
+                    Index candidateCount = context.bestCandidates.getCount();
+                    Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    Index candidateIndex = 0;
+                    context.bestCandidates.sort(
+                        [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                        { return c1.status < c2.status; });
+
+                    for (const auto& candidate : context.bestCandidates)
+                    {
+                        String declString =
+                            ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+
+                        if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                            getSink()->diagnose(
+                                candidate.item.declRef,
+                                Diagnostics::invisibleOverloadCandidate,
+                                declString);
+                        else
+                            getSink()->diagnose(
+                                candidate.item.declRef,
+                                Diagnostics::overloadCandidate,
+                                declString);
+
+                        candidateIndex++;
+                        if (candidateIndex == maxCandidatesToPrint)
+                            break;
+                    }
+                    if (candidateIndex != candidateCount)
+                    {
+                        getSink()->diagnose(
+                            expr,
+                            Diagnostics::moreOverloadCandidates,
+                            candidateCount - candidateIndex);
+                    }
+                }
             }
         }
 

@@ -726,6 +726,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1);\n");
             return true;
         }
+    case kIROp_SetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixSetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     default:
         return false;
     }
@@ -858,6 +869,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            StringBuilder typeSB;
+            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            m_writer->emit(typeSB);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
@@ -929,6 +950,15 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("((");
             emitType(inst->getDataType());
             m_writer->emit(")optixGetSbtDataPointer())");
+            return true;
+        }
+    case kIROp_GetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixGetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("()");
             return true;
         }
     case kIROp_DispatchKernel:

@@ -1032,16 +1032,18 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 DIAGNOSTIC(
-    30100,
-    Error,
-    sizeOfDescriptorHandleNotAllowed,
-    "sizeof/alignof of 'DescriptorHandle' is not allowed because its size is target-dependent; "
-    "use reflection API to query size at runtime")
-DIAGNOSTIC(
     30083,
     Error,
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
+
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
+
+DIAGNOSTIC(
+    30085,
+    Error,
+    floatBitCastRequiresConstant,
+    "'__floatAsInt' requires a compile-time constant floating-point expression")
 
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
@@ -3264,4 +3266,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC

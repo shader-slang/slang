@@ -239,6 +239,8 @@ struct TestClass : ITest
 
 ## Interface-Conforming Variants
 
+> ⚠️ **Warning:** This language feature is experimental and subject to change.
+
 A variable declared with an interface type is an *interface-conforming variant*–or *interface variant* for
 short. An interface variant may have any type conforming to the interface. When an interface variant is
 instantiated, the following restrictions apply:

@@ -148,6 +148,7 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
+
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
@@ -538,9 +539,13 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
-    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
-
-    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+    auto checkedInvokeExpr = as<InvokeExpr>(visitor.CheckInvokeExprWithCheckedOperands(invokeExpr));
+    if (!checkedInvokeExpr)
+        return DeclRef<Decl>();
+    auto funcDeclRefExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return DeclRef<Decl>();
+    return funcDeclRefExpr->declRef;
 }
 
 
@@ -1867,6 +1872,12 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     }
 
     module->addFileDependency(sourceFile);
+
+    // Add to translation unit's source files for debug info generation
+    if (translationUnit)
+    {
+        translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
+    }
 
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();

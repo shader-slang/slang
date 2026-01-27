@@ -3104,6 +3104,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr);
     Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);

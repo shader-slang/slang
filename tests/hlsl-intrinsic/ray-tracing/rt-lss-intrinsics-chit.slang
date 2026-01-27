@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -capability hlsl_nvapi
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm
 //HLSL: NvRtSphereObjectPositionAndRadius
 //HLSL: NvRtLssObjectPositionsAndRadii

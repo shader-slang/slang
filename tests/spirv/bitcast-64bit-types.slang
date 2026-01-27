@@ -1,7 +1,7 @@
 // Test that 64-bit types use OpBitcast directly in SPIR-V
 // Tests uint64 -> double and uint64 -> int64 in scalar, vec2, vec3, vec4 forms
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Scalar: uint64 -> double, uint64 -> int64
 // CHECK-DAG: %d64 = OpBitcast %double %u64

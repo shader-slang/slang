@@ -90,7 +90,7 @@ private:
         const char* arrow;
         const char* noteDash;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
+    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
     constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
     const Glyphs& m_glyphs;
 
@@ -503,6 +503,9 @@ private:
 
             List<LayoutSpan> noteSpans;
             noteSpans.add(makeLayoutSpan(note.span, false));
+            // Add additional spans attached to the note
+            for (const auto& additionalSpan : note.secondarySpans)
+                noteSpans.add(makeLayoutSpan(additionalSpan, false));
             noteEntry.section = buildSectionLayout(noteSpans);
             noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
             layout.notes.add(std::move(noteEntry));

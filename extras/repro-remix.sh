@@ -117,7 +117,7 @@ else
   log_info "Cloning dxvk-remix repository..."
   mkdir -p "$REPO_ROOT/external"
   cd "$REPO_ROOT/external"
-  git clone --recursive --depth 1 https://github.com/NVIDIAGameWorks/dxvk-remix.git
+  git clone --recursive https://github.com/NVIDIAGameWorks/dxvk-remix.git
   cd dxvk-remix
   COMMIT=$(git rev-parse HEAD)
   log_success "Cloned dxvk-remix at commit: $COMMIT"
