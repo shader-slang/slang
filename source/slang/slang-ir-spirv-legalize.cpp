@@ -2,7 +2,6 @@
 #include "slang-ir-spirv-legalize.h"
 
 #include "slang-emit-base.h"
-#include "spirv/unified1/spirv.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-composite-reg-to-mem.h"
@@ -28,6 +27,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "spirv/unified1/spirv.h"
 
 namespace Slang
 {
@@ -1658,8 +1658,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 builder.setInsertBefore(firstChild);
             auto capabilityLit =
                 builder.getIntValue(builder.getIntType(), SpvCapabilityImageGatherExtended);
-            auto capOpcodeOperand =
-                builder.emitSPIRVAsmOperandEnum(builder.getIntValue(builder.getIntType(), SpvOpCapability));
+            auto capOpcodeOperand = builder.emitSPIRVAsmOperandEnum(
+                builder.getIntValue(builder.getIntType(), SpvOpCapability));
             auto capabilityOperand = builder.emitSPIRVAsmOperandEnum(capabilityLit);
             List<IRInst*> operands;
             operands.add(capabilityOperand);
