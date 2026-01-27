@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage hull -entry main
 
-// CHECK: error 40015
+// CHECK: error 30703
 
 // SV_WaveLaneIndex should work in all stages, but let's verify
 // it errors when used as output (it's input-only)

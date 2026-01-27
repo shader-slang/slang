@@ -5,9 +5,9 @@
 // Comprehensive test for ALL SV_* semantics in wrong stages
 // This test systematically checks that each semantic is properly restricted
 
-// CHECK-COMPUTE: error 40015
-// CHECK-VERTEX: error 40015
-// CHECK-FRAGMENT: error 40015
+// CHECK-COMPUTE: error 30703
+// CHECK-VERTEX: error 30703
+// CHECK-FRAGMENT: error 30703
 
 // ============================================================================
 // Fragment-only semantics that should error in compute

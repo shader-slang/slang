@@ -1,12 +1,12 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
-// Test that SV_VertexID can only be used as an input.
-// Using it as an output should produce an error.
+// Test that SV_IsFrontFace can only be used as an input in fragment shader.
+// Using it as an output from vertex shader should produce an error.
 
-// CHECK: ([[# @LINE+2]]): error 40014: system-value semantic 'SV_VertexID' cannot be used as output
+// CHECK: ([[# @LINE+2]]): error 30703: system value semantic 'SV_IsFrontFace' cannot be used as output in 'vertex' shader stage
 [shader("vertex")]
-float4 main(out uint vid : SV_VertexID) : SV_Position
+float4 main(out bool frontFace : SV_IsFrontFace) : SV_Position
 {
-    vid = 0;
+    frontFace = true;
     return float4(0, 0, 0, 1);
 }
