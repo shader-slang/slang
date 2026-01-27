@@ -638,31 +638,56 @@ struct AnyValueMarshallingContext
             else
             {
                 // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
-                // Marshal as raw bytes based on actual size
+                // Marshal as raw bytes based on actual size (8 or 16 bytes)
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
                 SLANG_UNUSED(dataType);
 
-                auto numFields = (sizeInBytes + 3) / 4;
-
-                // For bindless targets, we can use bitcast since the type is native
                 auto srcVal = builder->emitLoad(concreteVar);
-                auto uintType = builder->getUIntType();
-                auto uintArrayType = builder->getArrayType(
-                    uintType,
-                    builder->getIntValue(builder->getIntType(), numFields));
-                auto srcBitcast = builder->emitBitCast(uintArrayType, srcVal);
+                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
 
-                for (IRIntegerValue i = 0; i < numFields; i++)
+                // sizeInBytes is either 8 or 16
+                if (sizeInBytes == 8)
                 {
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    // 8 bytes: one uint2
+                    if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
-                        auto srcElement = builder->emitElementExtract(srcBitcast, i);
-                        auto dstAddr = builder->emitFieldAddress(
+                        auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
+                        auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
+                        auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
+                        
+                        auto dstAddr1 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr, srcElement);
+                        builder->emitStore(dstAddr1, lowBits);
+                        
+                        auto dstAddr2 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + 1]);
+                        builder->emitStore(dstAddr2, highBits);
                     }
-                    advanceOffset(4);
+                    advanceOffset(8);
+                }
+                else // sizeInBytes == 16
+                {
+                    // 16 bytes: uint4
+                    if (fieldOffset + 3 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto uint4Type = builder->getVectorType(builder->getUIntType(), 4);
+                        auto uint4Val = builder->emitBitCast(uint4Type, srcVal);
+                        
+                        for (IRIntegerValue i = 0; i < 4; i++)
+                        {
+                            auto bits = builder->emitElementExtract(uint4Val, i);
+                            auto dstAddr = builder->emitFieldAddress(
+                                uintPtrType,
+                                anyValueVar,
+                                anyValInfo->fieldKeys[fieldOffset + i]);
+                            builder->emitStore(dstAddr, bits);
+                        }
+                    }
+                    advanceOffset(16);
                 }
             }
         }
@@ -998,39 +1023,61 @@ struct AnyValueMarshallingContext
             else
             {
                 // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
-                // Unmarshal from raw bytes based on actual size
-                auto numFields = (sizeInBytes + 3) / 4;
+                // Unmarshal from raw bytes based on actual size (8 or 16 bytes)
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
 
-                auto uintType = builder->getUIntType();
-                auto uintArrayType = builder->getArrayType(
-                    uintType,
-                    builder->getIntValue(builder->getIntType(), numFields));
+                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
 
-                // Create a temporary variable to hold the uint32 array
-                auto tempVar = builder->emitVar(uintArrayType);
-
-                // Read each uint32 field from anyValue into the temp array
-                for (IRIntegerValue i = 0; i < numFields; i++)
+                // sizeInBytes is either 8 or 16
+                if (sizeInBytes == 8)
                 {
-                    if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    // 8 bytes: one uint2
+                    if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
-                        auto srcAddr = builder->emitFieldAddress(
+                        auto srcAddr1 = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
                             anyValInfo->fieldKeys[fieldOffset]);
-                        auto srcVal = builder->emitLoad(srcAddr);
-                        auto dstAddr = builder->emitElementAddress(
-                            tempVar,
-                            builder->getIntValue(builder->getIntType(), i));
-                        builder->emitStore(dstAddr, srcVal);
+                        auto lowBits = builder->emitLoad(srcAddr1);
+                        
+                        auto srcAddr2 = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + 1]);
+                        auto highBits = builder->emitLoad(srcAddr2);
+                        
+                        // Construct uint2 from components
+                        IRInst* components[] = {lowBits, highBits};
+                        auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
+                        
+                        auto result = builder->emitBitCast(dataType, uint2Val);
+                        builder->emitStore(concreteVar, result);
                     }
-                    advanceOffset(4);
+                    advanceOffset(8);
                 }
-
-                // Bitcast the uint32 array to the target type
-                auto tempVal = builder->emitLoad(tempVar);
-                auto result = builder->emitBitCast(dataType, tempVal);
-                builder->emitStore(concreteVar, result);
+                else // sizeInBytes == 16
+                {
+                    // 16 bytes: uint4
+                    if (fieldOffset + 3 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    {
+                        auto uint4Type = builder->getVectorType(builder->getUIntType(), 4);
+                        IRInst* components[4];
+                        
+                        for (IRIntegerValue i = 0; i < 4; i++)
+                        {
+                            auto srcAddr = builder->emitFieldAddress(
+                                uintPtrType,
+                                anyValueVar,
+                                anyValInfo->fieldKeys[fieldOffset + i]);
+                            components[i] = builder->emitLoad(srcAddr);
+                        }
+                        
+                        auto uint4Val = builder->emitMakeVector(uint4Type, 4, components);
+                        auto result = builder->emitBitCast(dataType, uint4Val);
+                        builder->emitStore(concreteVar, result);
+                    }
+                    advanceOffset(16);
+                }
             }
         }
     };
