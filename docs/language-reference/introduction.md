@@ -3,7 +3,7 @@
 # Introduction
 
 Slang is a programming language primarily designed for use in *shader programming*, by which we mean
-performance oriented GPU programming for real-time graphics.
+performance-oriented GPU programming for real-time graphics.
 
 
 ## General Topics
@@ -32,7 +32,7 @@ The Slang compiler *implementation* may deviate from the language as documented 
     documented to discourage use.
 
 Where possible, this document calls out known deviations between the language as defined here and the
-implementation in the compiler, often including github issue links.
+implementation in the compiler, often including GitHub issue links.
 
 
 ## Terminology
