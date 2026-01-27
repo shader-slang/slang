@@ -74,8 +74,8 @@ OutputVector MatVecMulAdd<InputVector, OutputVector>(
 void BasicTestWithoutBias(int tid, int resIndex)
 {
     typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
-    typealias InVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, InputSize, SubgroupSize>;
-    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupSize>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
@@ -128,8 +128,8 @@ void BasicTestWithoutBias(int tid, int resIndex)
 void BasicTestWithBias(int tid, int resIndex)
 {
     typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
-    typealias InVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, InputSize, SubgroupSize>;
-    typealias OutVectorType = AccelerateVectorCoopMat<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupSize>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);

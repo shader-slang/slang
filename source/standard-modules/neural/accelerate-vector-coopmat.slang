@@ -984,12 +984,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 }
 
 // Cooperative matrix is only supported by CUDA and SPIR-V
+// WaveTangledVector is a vector type that emulates the Cooperative Vector type by using Cooperative Matrix feature which is
+// supported by CUDA and SPIR-V.
 [require(cooperative_matrix, subgroup_basic)]
-public struct AccelerateVectorCoopMat<T, ShMemPool : ISharedMemoryPool, int N, int SubgroupSize> : IVector<T>
+public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int SubgroupSize> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = AccelerateVectorCoopMat<T.Differential, ShMemPool, N, SubgroupSize>;
+    public typealias Differential = WaveTangledVector<T.Differential, ShMemPool, N, SubgroupSize>;
 
     public static const int Size = N;
     public no_diff ShMemPool shMemPool;
