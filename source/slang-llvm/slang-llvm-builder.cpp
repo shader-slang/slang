@@ -2148,6 +2148,14 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         loopProperties.push_back(llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.disable_nonforced")}));
 
+        // Allow splitting loop up if only parts are vectorizable.
+        loopProperties.push_back(llvm::MDNode::get(
+            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.distribute.enable"), trueVal}));
+
+        // Allows predicated instructions.
+        loopProperties.push_back(llvm::MDNode::get(
+            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.vectorize.predicate.enable"), trueVal}));
+
         llvm::MDNode* loopMD = llvm::MDNode::getDistinct(*llvmContext, loopProperties);
         loopMD->replaceOperandWith(0, loopMD);
         branchInst->setMetadata(llvm::LLVMContext::MD_loop, loopMD);
