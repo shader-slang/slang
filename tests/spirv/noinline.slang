@@ -4,7 +4,7 @@
 
 RWStructuredBuffer<int> outputBuffer;
 
-// CHECK: %helperFunc = OpFunction {{%[0-9]+}} DontInline
+// CHECK: %helperFunc = OpFunction {{.*}} DontInline
 [noinline]
 int helperFunc(int x)
 {
