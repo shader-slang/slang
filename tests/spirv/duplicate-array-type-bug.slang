@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -disable-short-circuit
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // There was a bug in lowerEnumTypes where if there is already a:
 // %lit0 = OpIntLit : %MyEnum (1)
