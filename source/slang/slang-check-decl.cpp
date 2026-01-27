@@ -405,6 +405,10 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitPropertyDecl(PropertyDecl* decl);
 
+    void visitSemanticDecl(SemanticDecl* decl);
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl);
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl);
+
     void visitStructDecl(StructDecl* decl);
 
     void visitClassDecl(ClassDecl* decl);
@@ -527,6 +531,15 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     }
 
     void visitPropertyDecl(PropertyDecl* decl) { visitTypeExp(decl->type); }
+
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl) { visitTypeExp(decl->type); }
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl) { visitTypeExp(decl->type); }
+    
+    void visitSemanticDecl(SemanticDecl* decl)
+    {
+        for (auto member : decl->getMembers())
+            dispatch(member);
+    }
 };
 
 struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
@@ -10841,6 +10854,22 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticDecl(SemanticDecl* decl)
+{
+    for (auto member : decl->getMembers())
+        dispatch(member);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticGetterDecl(SemanticGetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticSetterDecl(SemanticSetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
 }
 
 Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)

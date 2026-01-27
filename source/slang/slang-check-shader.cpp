@@ -7,10 +7,19 @@
 // attempts to specialize shader code.
 
 #include "slang-lookup.h"
+#include "slang-parameter-binding.h"
 #include "slang-profile.h"
 
 namespace Slang
 {
+
+// Direction of a semantic value (input from previous stage, or output to next stage)
+enum class SemanticDirection
+{
+    Input,
+    Output,
+};
+
 static bool isValidThreadDispatchIDType(Type* type)
 {
     // Can accept a single int/unit
@@ -46,6 +55,248 @@ static bool isValidThreadDispatchIDType(Type* type)
         auto baseType = basicType->getBaseType();
         return (baseType == BaseType::Int || baseType == BaseType::UInt);
     }
+}
+
+// Look up a SemanticDecl by name in the given scope.
+// Semantic names in core.meta.slang are stored lowercase for case-insensitive matching.
+static SemanticDecl* lookUpSemanticDecl(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    const String& semanticName,
+    Scope* scope)
+{
+    auto namePool = astBuilder->getGlobalSession()->getNamePool();
+    
+    // Lowercase the name for lookup (semantics in core.meta.slang are lowercase)
+    String lowerName = semanticName.toLower();
+    auto name = namePool->getName(lowerName);
+    auto lookupResult = lookUp(astBuilder, visitor, name, scope, LookupMask::Default);
+    
+    if (!lookupResult.isValid())
+        return nullptr;
+    
+    if (auto genericDecl = as<GenericDecl>(lookupResult.item.declRef.getDecl()))
+    {
+        if (auto semanticDecl = as<SemanticDecl>(genericDecl->inner))
+            return semanticDecl;
+    }
+    
+    return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
+}
+
+// Validate system value semantics on a type recursively.
+// If a semantic is provided, validates it against the type.
+// If the type is a struct, recursively validates semantics on all fields.
+static void validateTypeSemantics(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    SourceLoc loc,
+    Type* type,
+    HLSLSimpleSemantic* semantic,  // may be null if only validating struct fields
+    Stage stage,
+    SemanticDirection direction,
+    Scope* scope)
+{
+    // Validate the direct semantic if one was provided
+    if (semantic)
+    {
+        bool isOutput = (direction == SemanticDirection::Output);
+        auto semanticNameSlice = semantic->name.getContent();
+        String semanticNameStr = String(semanticNameSlice).toLower();
+        
+        // Only validate SV_ semantics
+        if (semanticNameStr.startsWith("sv_"))
+        {
+            // Split name and index (e.g., "SV_Target0" -> "SV_Target" + "0")
+            UnownedStringSlice baseNameSlice;
+            UnownedStringSlice indexSlice;
+            splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+            String baseName = String(baseNameSlice);
+            
+            // Look up the SemanticDecl
+            auto semanticDecl = lookUpSemanticDecl(
+                visitor->getASTBuilder(),
+                visitor,
+                baseName,
+                scope);
+            
+            // If no SemanticDecl found, the semantic is not defined in core.meta.slang
+            if (!semanticDecl)
+            {
+                diagnoseCapabilityErrors(
+                    sink,
+                    visitor->getOptionSet(),
+                    loc,
+                    Diagnostics::unknownSystemValueSemantic,
+                    baseName);
+            }
+            else
+            {
+                // If the semantic has no accessors defined, it accepts any type (e.g., ray tracing payloads)
+                bool hasAnyAccessors = false;
+                for (auto member : semanticDecl->getMembers())
+                {
+                    if (as<SemanticGetterDecl>(member) || as<SemanticSetterDecl>(member))
+                    {
+                        hasAnyAccessors = true;
+                        break;
+                    }
+                }
+                
+                if (hasAnyAccessors)
+                {
+                    const char* directionStr = isOutput ? "output" : "input";
+                    const char* stageStr = getStageName(stage);
+                    
+                    // Look for matching accessor (getter for input, setter for output)
+                    bool foundMatchingAccessor = false;
+                    bool foundAccessorForDirection = false;
+                    
+                    for (auto member : semanticDecl->getMembers())
+                    {
+                        // Check for getter (input) or setter (output)
+                        bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
+                        bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
+                        
+                        if (!isGetter && !isSetter)
+                            continue;
+                        
+                        // Direction check: getter = input, setter = output
+                        bool accessorIsOutput = isSetter;
+                        if (accessorIsOutput != isOutput)
+                            continue;
+                        
+                        // Check if the accessor's stage requirement matches the current stage
+                        // Multiple [require(stage)] attributes are merged into a single capabilitySet
+                        // using union (OR), so we check if the current stage is compatible
+                        if (auto requireAttr = member->findModifier<RequireCapabilityAttribute>())
+                        {
+                            if (requireAttr->capabilitySet)
+                            {
+                                CapabilityAtom currentStage = getAtomFromStage(stage);
+                                // Use !isIncompatibleWith because the capabilitySet is a union of stages
+                                // (e.g., compute | mesh | amplification), and we want to check if the
+                                // current stage is ANY of the allowed stages
+                                if (requireAttr->capabilitySet->isIncompatibleWith(currentStage))
+                                    continue;
+                            }
+                        }
+                        
+                        foundAccessorForDirection = true;
+                        
+                        // Get the accessor's type
+                        Type* accessorType = nullptr;
+                        if (auto getter = as<SemanticGetterDecl>(member))
+                            accessorType = getter->type.type;
+                        else if (auto setter = as<SemanticSetterDecl>(member))
+                            accessorType = setter->type.type;
+                        
+                        if (!accessorType)
+                        {
+                            // Type not resolved - this shouldn't happen after semantic checking
+                            continue;
+                        }
+                        
+                        // Check if type can be coerced to accessor type
+                        if (visitor->canCoerce(accessorType, type, nullptr))
+                        {
+                            foundMatchingAccessor = true;
+                            break;
+                        }
+                        
+                        // Special case: if accessor is unsized array and type is sized array with same element type
+                        if (auto accessorArrayType = as<ArrayExpressionType>(accessorType))
+                        {
+                            if (auto typeArrayType = as<ArrayExpressionType>(type))
+                            {
+                                // Accessor has unsized array and type has any array - check element types
+                                if (accessorArrayType->isUnsized())
+                                {
+                                    if (visitor->canCoerce(accessorArrayType->getElementType(), typeArrayType->getElementType(), nullptr))
+                                    {
+                                        foundMatchingAccessor = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!foundAccessorForDirection)
+                    {
+                        // No accessor defined for this direction
+                        // Use diagnoseCapabilityErrors to respect IgnoreCapabilities flag
+                        diagnoseCapabilityErrors(
+                            sink,
+                            visitor->getOptionSet(),
+                            loc,
+                            Diagnostics::systemValueSemanticInvalidDirection,
+                            baseName,
+                            directionStr,
+                            stageStr);
+                    }
+                    else if (!foundMatchingAccessor)
+                    {
+                        // Type mismatch
+                        diagnoseCapabilityErrors(
+                            sink,
+                            visitor->getOptionSet(),
+                            loc,
+                            Diagnostics::systemValueSemanticInvalidType,
+                            type,
+                            baseName);
+                    }
+                }
+            }
+        }
+    }
+    
+    // Recursively validate struct field semantics
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+    
+    auto declRef = declRefType->getDeclRef();
+    auto structDeclRef = declRef.as<StructDecl>();
+    if (!structDeclRef)
+        return;
+    
+    auto astBuilder = visitor->getASTBuilder();
+    
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+        auto fieldType = getType(astBuilder, fieldDeclRef);
+        auto fieldSemantic = fieldDecl->findModifier<HLSLSimpleSemantic>();
+        
+        // Recursively validate this field (with its semantic if it has one)
+        validateTypeSemantics(visitor, sink, fieldDecl->loc, fieldType, fieldSemantic, stage, direction, scope);
+    }
+}
+
+// Validate a system value semantic on an entry point parameter
+static void validateSystemValueSemantic(
+    SemanticsVisitor* visitor,
+    DiagnosticSink* sink,
+    ParamDecl* param,
+    HLSLSimpleSemantic* semantic,
+    Stage stage,
+    SemanticDirection direction,
+    Scope* scope)
+{
+    Type* paramType = param->getType();
+    
+    // For mesh shader output types, validate the element type's struct fields as outputs
+    if (auto meshOutputType = as<MeshOutputType>(paramType))
+    {
+        auto elementType = meshOutputType->getElementType();
+        // Mesh output types (OutputVertices, OutputPrimitives, OutputIndices) are always outputs
+        // Pass null semantic since we only want to validate the struct fields
+        validateTypeSemantics(visitor, sink, param->loc, elementType, nullptr, stage, SemanticDirection::Output, scope);
+        return;
+    }
+    
+    validateTypeSemantics(visitor, sink, param->loc, paramType, semantic, stage, direction, scope);
 }
 
 /// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to
@@ -491,6 +742,111 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // Validate system value semantics against SemanticDecl definitions in core module
+    {
+        SharedSemanticsContext shared(linkage, module, sink);
+        SemanticsVisitor visitor(&shared);
+        
+        // Use the session's coreLanguageScope which contains the SemanticDecl definitions
+        // The module's own scope may not include the core module (e.g., when loading from serialized module)
+        Scope* scope = linkage->getSessionImpl()->coreLanguageScope;
+        
+        if (scope)
+        {
+            // Validate input parameters
+            for (const auto& param : entryPointFuncDecl->getParameters())
+            {
+                if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
+                {
+                    // For inout parameters, validate both input and output directions
+                    // since the semantic must be valid for both reading and writing
+                    if (param->hasModifier<InOutModifier>())
+                    {
+                        validateSystemValueSemantic(
+                            &visitor,
+                            sink,
+                            param,
+                            semantic,
+                            stage,
+                            SemanticDirection::Input,
+                            scope);
+                        validateSystemValueSemantic(
+                            &visitor,
+                            sink,
+                            param,
+                            semantic,
+                            stage,
+                            SemanticDirection::Output,
+                            scope);
+                    }
+                    else if (param->hasModifier<OutModifier>())
+                    {
+                        validateSystemValueSemantic(
+                            &visitor,
+                            sink,
+                            param,
+                            semantic,
+                            stage,
+                            SemanticDirection::Output,
+                            scope);
+                    }
+                    else
+                    {
+                        validateSystemValueSemantic(
+                            &visitor,
+                            sink,
+                            param,
+                            semantic,
+                            stage,
+                            SemanticDirection::Input,
+                            scope);
+                    }
+                }
+                else
+                {
+                    // Parameter doesn't have a semantic directly, but might be a
+                    // mesh output type or struct with semantic fields that need validation
+                    Type* paramType = param->getType();
+                    if (auto meshOutputType = as<MeshOutputType>(paramType))
+                    {
+                        // Mesh outputs: validate semantics on element type's struct fields
+                        // Mesh output types are always outputs regardless of parameter direction
+                        auto elementType = meshOutputType->getElementType();
+                        validateTypeSemantics(&visitor, sink, param->loc, elementType, nullptr, stage, SemanticDirection::Output, scope);
+                    }
+                    else
+                    {
+                        // Regular struct parameter: validate any semantic fields
+                        // For inout parameters, validate both directions
+                        if (param->hasModifier<InOutModifier>())
+                        {
+                            validateTypeSemantics(&visitor, sink, param->loc, paramType, nullptr, stage, SemanticDirection::Input, scope);
+                            validateTypeSemantics(&visitor, sink, param->loc, paramType, nullptr, stage, SemanticDirection::Output, scope);
+                        }
+                        else if (param->hasModifier<OutModifier>())
+                        {
+                            validateTypeSemantics(&visitor, sink, param->loc, paramType, nullptr, stage, SemanticDirection::Output, scope);
+                        }
+                        else
+                        {
+                            validateTypeSemantics(&visitor, sink, param->loc, paramType, nullptr, stage, SemanticDirection::Input, scope);
+                        }
+                    }
+                }
+            }
+            
+            // Validate return type semantics
+            Type* returnType = entryPointFuncDecl->returnType.type;
+            if (returnType && !returnType->equals(visitor.getASTBuilder()->getVoidType()))
+            {
+                // The return semantic (if any) is stored as a modifier on the function declaration
+                auto returnSemantic = entryPointFuncDecl->findModifier<HLSLSimpleSemantic>();
+                SourceLoc loc = returnSemantic ? returnSemantic->loc : entryPointFuncDecl->loc;
+                validateTypeSemantics(&visitor, sink, loc, returnType, returnSemantic, stage, SemanticDirection::Output, scope);
+            }
+        }
+    }
+
     bool canHaveVaryingInput = false;
     bool shouldWarnOnNonUniformParam = true;
     switch (stage)
@@ -597,108 +953,6 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 Diagnostics::unhandledModOnEntryPointParameter,
                 "keyword 'packoffset'",
                 param->getName());
-        }
-    }
-
-    // Validate system-value semantics for entry point parameters.
-    // Check if semantics are valid for the given stage and direction.
-    if (stage != Stage::Unknown)
-    {
-        auto session = linkage->getSessionImpl();
-        auto namePool = linkage->getNamePool();
-        auto astBuilder = linkage->getASTBuilder();
-        auto coreScope = session->coreLanguageScope;
-
-        if (coreScope)
-        {
-            CapabilitySet stageCapSet((CapabilityName)getAtomFromStage(stage));
-
-            // Collect declarations to validate: parameters + return type (as output only)
-            struct SemanticToValidate
-            {
-                Decl* decl;
-                HLSLSimpleSemantic* semantic;
-                bool isOutput;
-            };
-            List<SemanticToValidate> toValidate;
-
-            for (const auto& param : entryPointFuncDecl->getParameters())
-            {
-                if (auto semantic = param->findModifier<HLSLSimpleSemantic>())
-                {
-                    bool isOutput =
-                        param->hasModifier<OutModifier>() || param->hasModifier<InOutModifier>();
-                    toValidate.add({param, semantic, isOutput});
-                }
-            }
-
-            if (auto returnSemantic = entryPointFuncDecl->findModifier<HLSLSimpleSemantic>())
-                toValidate.add({entryPointFuncDecl, returnSemantic, true});
-
-            for (const auto& item : toValidate)
-            {
-                String semanticName = String(item.semantic->name.getContent());
-                String lowerName = semanticName.toLower();
-                if (!lowerName.startsWith("sv_"))
-                    continue;
-
-                String baseName = String(lowerName.subString(3, lowerName.getLength() - 3));
-
-                // Strip trailing digits to handle numbered semantics like SV_Target0, SV_Target1
-                while (baseName.getLength() > 0 && baseName[baseName.getLength() - 1] >= '0' &&
-                       baseName[baseName.getLength() - 1] <= '9')
-                {
-                    baseName = baseName.subString(0, baseName.getLength() - 1);
-                }
-
-                auto inLookupResult = lookUp(
-                    astBuilder,
-                    nullptr,
-                    namePool->getName("__sv_" + baseName + "_in"),
-                    coreScope);
-                auto outLookupResult = lookUp(
-                    astBuilder,
-                    nullptr,
-                    namePool->getName("__sv_" + baseName + "_out"),
-                    coreScope);
-
-                bool inDeclExists = inLookupResult.isValid() && !inLookupResult.isOverloaded();
-                bool outDeclExists = outLookupResult.isValid() && !outLookupResult.isOverloaded();
-
-                if (!inDeclExists && !outDeclExists)
-                {
-                    sink->diagnose(
-                        item.decl->loc,
-                        Diagnostics::unknownSystemValueSemantic,
-                        semanticName);
-                    continue;
-                }
-
-                // Check if the semantic is valid for the required direction
-                bool declExists = item.isOutput ? outDeclExists : inDeclExists;
-                if (!declExists)
-                {
-                    sink->diagnose(
-                        item.decl->loc,
-                        Diagnostics::systemSemanticNotValidForDirection,
-                        semanticName,
-                        item.isOutput ? "output" : "input");
-                    continue;
-                }
-
-                auto& lookupResult = item.isOutput ? outLookupResult : inLookupResult;
-                auto requireCapAttr =
-                    lookupResult.item.declRef.getDecl()->findModifier<RequireCapabilityAttribute>();
-                if (requireCapAttr && requireCapAttr->capabilitySet &&
-                    CapabilitySet(requireCapAttr->capabilitySet).isIncompatibleWith(stageCapSet))
-                {
-                    sink->diagnose(
-                        item.decl->loc,
-                        Diagnostics::systemSemanticNotValidForStage,
-                        semanticName,
-                        getStageText(stage));
-                }
-            }
         }
     }
 

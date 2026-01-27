@@ -4235,6 +4235,82 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
+// Parse a typed accessor for a semantic declaration: "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
+static Decl* parseSemanticAccessorDecl(Parser* parser)
+{
+    Modifiers modifiers = ParseModifiers(parser);
+
+    Decl* decl = nullptr;
+    auto loc = peekToken(parser).loc;
+    auto name = peekToken(parser).getName();
+
+    if (AdvanceIf(parser, "get"))
+    {
+        auto getter = parser->astBuilder->create<SemanticGetterDecl>();
+        expect(parser, TokenType::Colon);
+        getter->type = parser->ParseTypeExp();
+        decl = getter;
+    }
+    else if (AdvanceIf(parser, "set"))
+    {
+        auto setter = parser->astBuilder->create<SemanticSetterDecl>();
+        expect(parser, TokenType::Colon);
+        setter->type = parser->ParseTypeExp();
+        decl = setter;
+    }
+    else
+    {
+        Unexpected(parser);
+        return nullptr;
+    }
+
+    decl->loc = loc;
+    decl->nameAndLoc.name = name;
+    decl->nameAndLoc.loc = loc;
+
+    _addModifiers(decl, modifiers);
+
+    parser->ReadToken(TokenType::Semicolon);
+
+    return decl;
+}
+
+// Parse the body of a semantic declaration: { [accessor]* }
+static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::LBrace))
+    {
+        Token closingToken;
+        while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
+        {
+            auto accessor = parseSemanticAccessorDecl(parser);
+            if (accessor)
+                AddMember(decl, accessor);
+        }
+        decl->closingSourceLoc = closingToken.loc;
+    }
+    else
+    {
+        parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken, peekToken(parser));
+    }
+}
+
+// Parse a semantic declaration: "semantic <name> { [accessor]* }"
+static NodeBase* parseSemanticDecl(Parser* parser, void* /*userData*/)
+{
+    SemanticDecl* decl = parser->astBuilder->create<SemanticDecl>();
+    parser->FillPosition(decl);
+    parser->PushScope(decl);
+
+    // Expect an identifier for the semantic name
+    decl->nameAndLoc = expectIdentifier(parser);
+
+    parseSemanticDeclBody(parser, decl);
+
+    parser->PopScope();
+    return decl;
+}
+
 static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 {
     parser->FillPosition(decl);
@@ -9603,6 +9679,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
+    _makeParseDecl("semantic", parseSemanticDecl),
     _makeParseDecl("interface", parseInterfaceDecl),
     _makeParseDecl("syntax", parseSyntaxDecl),
     _makeParseDecl("attribute_syntax", parseAttributeSyntaxDecl),

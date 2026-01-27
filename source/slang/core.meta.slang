@@ -4470,246 +4470,489 @@ attribute_syntax [raypayload] : RayPayloadAttribute;
 
 //@hidden:
 
-// --- Fragment-only output semantics ---
-[require(fragment)]
-out int __sv_depth_out : SV_Depth;
+semantic sv_position
+{
+    [require(fragment)]
+    get : float;
 
-[require(fragment)]
-out int __sv_depthgreaterequal_out : SV_DepthGreaterEqual;
+    [require(fragment)]
+    get : float2;
 
-[require(fragment)]
-out int __sv_depthlessequal_out : SV_DepthLessEqual;
+    [require(fragment)]
+    get : float3;
 
-[require(fragment)]
-out int __sv_target_out : SV_Target;
+    [require(fragment)]
+    get : float4;
 
-[require(fragment)]
-out int __sv_stencilref_out : SV_StencilRef;
+    [require(geometry)]
+    get : float;
 
-// --- Fragment-only input semantics ---
-[require(fragment)]
-in int __sv_isfrontface_in : SV_IsFrontFace;
+    [require(geometry)]
+    get : float2;
 
-[require(fragment)]
-in int __sv_sampleindex_in : SV_SampleIndex;
+    [require(geometry)]
+    get : float3;
 
-[require(fragment)]
-in int __sv_barycentrics_in : SV_Barycentrics;
+    [require(geometry)]
+    get : float4;
 
-[require(fragment)]
-in int __sv_innercoverage_in : SV_InnerCoverage;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float;
 
-[require(fragment)]
-in int __sv_vulkansampleposition_in : SV_VulkanSamplePosition;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
 
-[require(fragment)]
-in int __sv_pointcoord_in : SV_PointCoord;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
 
-// --- Fragment input and output semantics ---
-[require(fragment)]
-in int __sv_coverage_in : SV_Coverage;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float4;
+}
 
-[require(fragment)]
-out int __sv_coverage_out : SV_Coverage;
+semantic sv_depth
+{
+    [require(fragment)]
+    set : float;
+}
 
-// --- Vertex input semantics ---
-[require(vertex)]
-in int __sv_vertexid_in : SV_VertexID;
+semantic sv_depthgreaterequal
+{
+    [require(fragment)]
+    set : float;
+}
 
-[require(vertex)]
-in int __sv_instanceid_in : SV_InstanceID;
+semantic sv_depthlessequal
+{
+    [require(fragment)]
+    set : float;
+}
 
-[require(vertex)]
-in int __sv_startvertexlocation_in : SV_StartVertexLocation;
+semantic sv_clipdistance
+{
+    [require(fragment)]
+    get : float;
 
-[require(vertex)]
-in int __sv_startinstancelocation_in : SV_StartInstanceLocation;
+    [require(fragment)]
+    get : float[];
 
-[require(vertex)]
-in int __sv_vulkanvertexid_in : SV_VulkanVertexID;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float;
 
-[require(vertex)]
-in int __sv_vulkaninstanceid_in : SV_VulkanInstanceID;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float[];
+}
 
-// --- SV_Position: output from vertex/geometry/domain/mesh, input to fragment/geometry/hull ---
-[require(vertex)]
-[require(geometry)]
-[require(domain)]
-[require(mesh)]
-out int __sv_position_out : SV_Position;
+semantic sv_culldistance
+{
+    [require(fragment)]
+    get : float;
 
-[require(fragment)]
-[require(geometry)]
-[require(hull)]
-in int __sv_position_in : SV_Position;
+    [require(fragment)]
+    get : float[];
 
-// --- Compute/mesh/amplification input semantics ---
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-in int __sv_dispatchthreadid_in : SV_DispatchThreadID;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float;
 
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-in int __sv_groupid_in : SV_GroupID;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float[];
+}
 
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-in int __sv_groupindex_in : SV_GroupIndex;
+semantic sv_target
+{
+    // SV_Target accepts any type - structs are flattened to multiple render targets
+}
 
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-in int __sv_groupthreadid_in : SV_GroupThreadID;
+semantic sv_stencilref
+{
+    [require(fragment)]
+    set : uint;
+}
 
-// --- Geometry shader semantics ---
-[require(geometry)]
-in int __sv_gsinstanceid_in : SV_GSInstanceID;
+semantic sv_coverage
+{
+    [require(fragment)]
+    get : uint;
 
-// --- SV_PrimitiveID: input to fragment/geometry/hull/domain, output from geometry/mesh ---
-[require(fragment)]
-[require(geometry)]
-[require(hull)]
-[require(domain)]
-in int __sv_primitiveid_in : SV_PrimitiveID;
+    [require(fragment)]
+    set : uint;
+}
 
-[require(geometry)]
-[require(mesh)]
-out int __sv_primitiveid_out : SV_PrimitiveID;
+semantic sv_innercoverage
+{
+    [require(fragment)]
+    get : uint;
+}
 
-// --- Tessellation semantics ---
-[require(domain)]
-in int __sv_domainlocation_in : SV_DomainLocation;
+semantic sv_dispatchthreadid
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
 
-[require(hull)]
-in int __sv_outputcontrolpointid_in : SV_OutputControlPointID;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
 
-[require(hull)]
-[require(domain)]
-in int __sv_tessfactor_in : SV_TessFactor;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
 
-[require(hull)]
-out int __sv_tessfactor_out : SV_TessFactor;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : int;
 
-// --- Clip/Cull distance: output from vertex/geometry/domain/mesh, input to fragment ---
-[require(vertex)]
-[require(geometry)]
-[require(domain)]
-[require(mesh)]
-out int __sv_clipdistance_out : SV_ClipDistance;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : int2;
 
-[require(fragment)]
-in int __sv_clipdistance_in : SV_ClipDistance;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : int3;
+}
 
-[require(vertex)]
-[require(geometry)]
-[require(domain)]
-[require(mesh)]
-out int __sv_culldistance_out : SV_CullDistance;
+semantic sv_groupid
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
 
-[require(fragment)]
-in int __sv_culldistance_in : SV_CullDistance;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
 
-// --- Render target/viewport array index: output from vertex/geometry/domain/mesh, input to fragment ---
-[require(vertex)]
-[require(geometry)]
-[require(domain)]
-[require(mesh)]
-out int __sv_rendertargetarrayindex_out : SV_RenderTargetArrayIndex;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
 
-[require(fragment)]
-in int __sv_rendertargetarrayindex_in : SV_RenderTargetArrayIndex;
+semantic sv_groupindex
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
 
-[require(vertex)]
-[require(geometry)]
-[require(domain)]
-[require(mesh)]
-out int __sv_viewportarrayindex_out : SV_ViewportArrayIndex;
+semantic sv_groupthreadid
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
 
-[require(fragment)]
-in int __sv_viewportarrayindex_in : SV_ViewportArrayIndex;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
 
-// --- Point size: output from vertex/geometry ---
-[require(vertex)]
-[require(geometry)]
-out int __sv_pointsize_out : SV_PointSize;
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
 
-// --- View ID: input to multiple stages ---
-[require(vertex)]
-[require(hull)]
-[require(domain)]
-[require(geometry)]
-[require(fragment)]
-[require(mesh)]
-in int __sv_viewid_in : SV_ViewID;
+semantic sv_vertexid
+{
+    [require(vertex)]
+    get : uint;
+    
+    [require(vertex)]
+    set : uint;
+}
 
-// --- Draw/Device index: input to vertex and other stages ---
-[require(vertex)]
-[require(mesh)]
-in int __sv_drawindex_in : SV_DrawIndex;
+semantic sv_instanceid
+{
+    [require(vertex)]
+    get : uint;
+    
+    [require(vertex)]
+    set : uint;
+    
+    [require(fragment)]
+    get : uint;
+}
 
-[require(vertex)]
-[require(hull)]
-[require(domain)]
-[require(geometry)]
-[require(fragment)]
-[require(mesh)]
-[require(compute)]
-in int __sv_deviceindex_in : SV_DeviceIndex;
+semantic sv_isfrontface
+{
+    [require(fragment)]
+    get : bool;
 
-// --- Wave/subgroup intrinsics: available in all stages ---
-[require(vertex)]
-[require(hull)]
-[require(domain)]
-[require(geometry)]
-[require(fragment)]
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-[require(raygen)]
-[require(closesthit)]
-[require(miss)]
-[require(anyhit)]
-[require(intersection)]
-[require(callable)]
-in int __sv_wavelanecount_in : SV_WaveLaneCount;
+    [require(geometry)]
+    set : bool;
+}
 
-[require(vertex)]
-[require(hull)]
-[require(domain)]
-[require(geometry)]
-[require(fragment)]
-[require(compute)]
-[require(mesh)]
-[require(amplification)]
-[require(raygen)]
-[require(closesthit)]
-[require(miss)]
-[require(anyhit)]
-[require(intersection)]
-[require(callable)]
-in int __sv_wavelaneindex_in : SV_WaveLaneIndex;
+semantic sv_sampleindex
+{
+    [require(fragment)]
+    get : uint;
+}
 
-[require(fragment)]
-in int __sv_quadlaneindex_in : SV_QuadLaneIndex;
+semantic sv_pointcoord
+{
+    [require(fragment)]
+    get : float2;
+}
 
-// --- Shading rate: input to fragment ---
-[require(fragment)]
-in int __sv_shadingrate_in : SV_ShadingRate;
+semantic sv_primitiveid
+{
+    [require(fragment)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    get : uint;
 
-// --- Ray tracing semantics ---
-[require(closesthit)]
-[require(anyhit)]
-in int __sv_intersectionattributes_in : SV_IntersectionAttributes;
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
 
-[require(closesthit)]
-[require(anyhit)]
-[require(miss)]
-in int __sv_raypayload_in : SV_RayPayload;
+semantic sv_viewportarrayindex
+{
+    [require(fragment)]
+    get : uint;
 
-[require(closesthit)]
-[require(anyhit)]
-[require(miss)]
-out int __sv_raypayload_out : SV_RayPayload;
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_rendertargetarrayindex
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_domainlocation
+{
+    [require(domain)]
+    get : float2;
+
+    [require(domain)]
+    get : float3;
+}
+
+semantic sv_outputcontrolpointid
+{
+    [require(hull)]
+    get : uint;
+}
+
+semantic sv_tessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_insidetessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_gsinstanceid
+{
+    [require(geometry)]
+    get : uint;
+}
+
+semantic sv_pointsize
+{
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : float;
+}
+
+
+semantic sv_drawindex
+{
+    [require(vertex)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_deviceindex
+{
+    [require(vertex)]
+    [require(fragment)]
+    [require(compute)]
+    get : uint;
+}
+
+semantic sv_viewid
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(mesh)]
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_wavelanecount
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_wavelaneindex
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_barycentrics
+{
+    [require(fragment)]
+    get : float3;
+}
+
+semantic sv_startvertexlocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_startinstancelocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_raypayload
+{
+    // Ray payload can be any user-defined type
+}
+
+semantic sv_intersectionattributes
+{
+    // Intersection attributes can be any user-defined type
+}
+
+semantic sv_cullprimitive
+{
+    [require(mesh)]
+    set : bool;
+}
+
+semantic sv_fragsize
+{
+    [require(fragment)]
+    get : int2;
+}
+
+semantic sv_fraginvocationcount
+{
+    [require(fragment)]
+    get : int;
+}
+
+semantic sv_shadingrate
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_vulkanvertexid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkaninstanceid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkansampleposition
+{
+    [require(fragment)]
+    get : float2;
+}

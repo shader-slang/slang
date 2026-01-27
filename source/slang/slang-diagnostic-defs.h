@@ -1822,6 +1822,21 @@ DIAGNOSTIC(
     Error,
     outputParameterCannotHaveDefaultValue,
     "an 'out' or 'inout' parameter cannot have a default-value expression")
+DIAGNOSTIC(
+    30701,
+    Error,
+    systemValueSemanticInvalidType,
+    "type '$0' is not valid for system value semantic '$1'")
+DIAGNOSTIC(
+    30702,
+    Error,
+    systemValueSemanticInvalidStage,
+    "system value semantic '$0' is not valid in '$1' shader stage")
+DIAGNOSTIC(
+    30703,
+    Error,
+    systemValueSemanticInvalidDirection,
+    "system value semantic '$0' cannot be used as $1 in '$2' shader stage")
 
 // 308xx: inheritance
 DIAGNOSTIC(
@@ -2539,18 +2554,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
-
-DIAGNOSTIC(
-    40014,
-    Error,
-    systemSemanticNotValidForDirection,
-    "system-value semantic '$0' cannot be used as $1")
-
-DIAGNOSTIC(
-    40015,
-    Error,
-    systemSemanticNotValidForStage,
-    "system-value semantic '$0' is not valid in $1 shader stage")
 
 DIAGNOSTIC(40007, Internal, irValidationFailed, "IR validation failed: $0")
 
