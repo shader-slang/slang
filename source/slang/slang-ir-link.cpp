@@ -2211,6 +2211,24 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
         addGlobalHashedStringLiterals(pool, state->irModule);
     }
 
+    // Copy all global static_assert instructions
+    {
+        sharedContext->builderStorage.setInsertInto(state->irModule->getModuleInst());
+        for (IRModule* irModule : userModules)
+        {
+            IRModuleInst* moduleInst = irModule->getModuleInst();
+            for (IRInst* child : moduleInst->getChildren())
+            {
+                if (child->getOp() == kIROp_StaticAssert)
+                {
+                    // Clone the static_assert instruction into the linked module
+                    IRCloneEnv cloneEnv;
+                    cloneInst(&cloneEnv, &sharedContext->builderStorage, child);
+                }
+            }
+        }
+    }
+
     // Set up shared and builder insert point
 
     context->shared = sharedContext;
