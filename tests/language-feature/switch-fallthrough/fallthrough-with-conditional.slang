@@ -13,6 +13,13 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -wgpu
 
+// Verify HLSL output preserves fallthrough structure for SM 6.0
+//TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
+
+// CHECK-HLSL: case int(0):
+// CHECK-HLSL-NOT: break
+// CHECK-HLSL: case int(1):
+
 // CHECK:      C8
 // CHECK-NEXT: 190
 // CHECK-NEXT: 2

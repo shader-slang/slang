@@ -318,6 +318,15 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
             }
+            else if (auto typePack = as<GenericTypePackParamDecl>(member))
+            {
+                if (diagSink)
+                {
+                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                    *outProperType = m_astBuilder->getErrorType();
+                }
+                return false;
+            }
             else if (auto valParam = as<GenericValueParamDecl>(member))
             {
                 if (!valParam->initExpr)
