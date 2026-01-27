@@ -836,13 +836,13 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             }
             
             // Validate return type semantics
-            Type* returnType = entryPointFuncDecl->returnType.type;
-            if (returnType && !returnType->equals(visitor.getASTBuilder()->getVoidType()))
+            Type* funcReturnType = entryPointFuncDecl->returnType.type;
+            if (funcReturnType && !funcReturnType->equals(visitor.getASTBuilder()->getVoidType()))
             {
                 // The return semantic (if any) is stored as a modifier on the function declaration
                 auto returnSemantic = entryPointFuncDecl->findModifier<HLSLSimpleSemantic>();
                 SourceLoc loc = returnSemantic ? returnSemantic->loc : entryPointFuncDecl->loc;
-                validateTypeSemantics(&visitor, sink, loc, returnType, returnSemantic, stage, SemanticDirection::Output, scope);
+                validateTypeSemantics(&visitor, sink, loc, funcReturnType, returnSemantic, stage, SemanticDirection::Output, scope);
             }
         }
     }
