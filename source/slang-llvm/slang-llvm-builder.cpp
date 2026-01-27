@@ -20,11 +20,13 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/MC/TargetRegistry.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/Transforms/Scalar/Scalarizer.h"
 
 #include <compiler-core/slang-artifact-associated-impl.h>
 #include <compiler-core/slang-artifact-associated.h>
@@ -130,6 +132,18 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
     // This one is cached here, because we spam it constantly with every GEP.
     llvm::Type* byteType;
 
+    // This is used to annotate all loads and stores that can be done in
+    // parallel between workgroup loop iterations, i.e. all of them since work
+    // items are supposed to run in parallel anyway. There shouldn't be memory
+    // dependencies between work items. This is also not an issue for barriers,
+    // because they're not supported yet and even if they were, they would
+    // fundamentally require splitting up the workgroup loop.
+    //
+    // TODO: If the DeSPMD pass or some other SIMT->SIMD rewriting pass is
+    // integrated here, this may be removed as that pass probably goes over all
+    // loads and stores and adds this same annotation anyway.
+    llvm::MDNode* wiParallelAccessGroup;
+
     llvm::DIScope* currentLocalScope = nullptr;
 
     struct VariableDebugInfo
@@ -177,6 +191,7 @@ public:
         Slice<bool> argIsSigned,
         List<LLVMInst*>& outArgs);
 
+    void annotateMemoryAccess(llvm::Instruction* inst);
 
     //==========================================================================
     // IUnknown
@@ -506,6 +521,7 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     llvmModule->setTargetTriple(targetTriple);
 
     byteType = llvmBuilder->getInt8Ty();
+    wiParallelAccessGroup = llvm::MDNode::getDistinct(*llvmContext, {});
 
     // ParseCommandLineOptions below assumes that the first parameter is the
     // name of the executable, but we do this cute trick to make it complain
@@ -591,7 +607,10 @@ void LLVMBuilder::optimize()
     llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
     llvm::ModuleAnalysisManager moduleAnalysisManager;
 
-    llvm::PassBuilder passBuilder(targetMachine);
+    llvm::PipelineTuningOptions pipelineTuningOptions = llvm::PipelineTuningOptions();
+    pipelineTuningOptions.SLPVectorization = true;
+
+    llvm::PassBuilder passBuilder(targetMachine, pipelineTuningOptions);
     passBuilder.registerModuleAnalyses(moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(CGSCCAnalysisManager);
     passBuilder.registerFunctionAnalyses(functionAnalysisManager);
@@ -621,9 +640,57 @@ void LLVMBuilder::optimize()
         break;
     }
 
+    passBuilder.registerPipelineStartEPCallback(
+        [&](llvm::ModulePassManager& modulePassManager, llvm::OptimizationLevel level)
+        {
+            switch (options.target)
+            {
+            case SLANG_SHADER_SHARED_LIBRARY:
+            case SLANG_SHADER_HOST_CALLABLE:
+            case SLANG_SHADER_LLVM_IR:
+            case SLANG_OBJECT_CODE:
+                // The scalarization pass allows re-vectorizing on the
+                // workgroup loop level, which is why we run it for all of the
+                // shader/kernel targets.
+                //
+                // The loop vectorizer is far more reliable than SLP and we
+                // always have a loop for kernels.
+                if (level != llvm::OptimizationLevel::O0)
+                    modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ScalarizerPass()));
+                break;
+            default:
+                // Non-kernel targets don't run scalarizer for now, because they
+                // are more reliant on the SLP vectorizer, which is abysmal at
+                // re-discovering vectorization opportunities. It would do more
+                // harm than good there.
+                break;
+            }
+        }
+    );
+
+
     // Run the actual optimizations.
     llvm::ModulePassManager modulePassManager =
         passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
+
+#if 0
+    llvm::PassInstrumentationCallbacks PIC;
+    llvm::PrintPassOptions PrintPassOpts;
+    PrintPassOpts.Verbose = false;
+    PrintPassOpts.SkipAnalyses = true;
+    llvm::StandardInstrumentations SI(*llvmContext, false, false, PrintPassOpts);
+    SI.registerCallbacks(PIC, &moduleAnalysisManager);
+
+    std::string out;
+    llvm::raw_string_ostream rso(out);
+    modulePassManager.printPipeline(rso, [&PIC](llvm::StringRef ClassName) {
+      auto PassName = PIC.getPassNameForClassName(ClassName);
+      return PassName.empty() ? ClassName : PassName;
+    });
+
+    printf("LLVM optimization passes: %s\n", out.c_str());
+#endif
+
     modulePassManager.run(*llvmModule, moduleAnalysisManager);
 }
 
@@ -749,6 +816,12 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
         }
         outArgs.add(llvmValue);
     }
+}
+
+void LLVMBuilder::annotateMemoryAccess(llvm::Instruction* inst)
+{
+    if (inst->mayReadOrWriteMemory())
+        inst->setMetadata(llvm::LLVMContext::MD_access_group, wiParallelAccessGroup);
 }
 
 void* LLVMBuilder::getInterface(const Guid& guid)
@@ -1003,13 +1076,17 @@ LLVMInst* LLVMBuilder::emitGetElementPtr(LLVMInst* ptr, int64_t stride, LLVMInst
 LLVMInst* LLVMBuilder::emitStore(LLVMInst* value, LLVMInst* ptr, int64_t alignment, bool isVolatile)
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
-    return llvmBuilder->CreateAlignedStore(value, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    auto inst = llvmBuilder->CreateAlignedStore(value, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    annotateMemoryAccess(inst);
+    return inst;
 }
 
 LLVMInst* LLVMBuilder::emitLoad(LLVMType* type, LLVMInst* ptr, int64_t alignment, bool isVolatile)
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
-    return llvmBuilder->CreateAlignedLoad(type, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    auto inst = llvmBuilder->CreateAlignedLoad(type, ptr, llvm::MaybeAlign(alignment), isVolatile);
+    annotateMemoryAccess(inst);
+    return inst;
 }
 
 LLVMInst* LLVMBuilder::emitIntResize(LLVMInst* value, LLVMType* into, bool isSigned)
@@ -1931,12 +2008,15 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         // groupThreadID
         llvm::VectorType::get(uintType, llvm::ElementCount::getFixed(3)));
 
-    // TODO: DeSPMD? That will also require scalarization of vector
-    // operations, so it should be done after everything has been emitted.
+    // TODO: Once the DeSPMD pass is publicly available, we could use it to
+    // generate the workgroup loop instead. This would also enable barriers and
+    // subgroup operations to function, as it allows splitting up the loop
+    // around barriers.
 
     llvm::Type* groupIDType = llvm::ArrayType::get(uintType, 3);
     llvm::Value* groupID = dispatcher->getArg(0);
-    llvm::Value* threadInput = llvmBuilder->CreateAlloca(threadVaryingInputType);
+    llvm::Value* threadInput = llvmBuilder->CreateAlloca(
+        threadVaryingInputType, nullptr, llvm::Twine("threadInput"));
 
     llvm::Value* threadID[3];
 
@@ -1945,15 +2025,42 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         llvmBuilder->getInt32(ySize),
         llvmBuilder->getInt32(zSize)};
 
+    llvm::BasicBlock* loopBlocks[3];
+    llvm::BasicBlock* exitBlock;
+
+    // We assume that the group ID is less than these values such that thread
+    // ID computation cannot overflow. This is quite important to prevent the
+    // loop vectorizer from generating useless code for the invalid edge case
+    // where it would overflow.
+    uint32_t maxGroupIDValues[3] = {
+        (UINT32_MAX - xSize)/xSize,
+        (UINT32_MAX - ySize)/ySize,
+        (UINT32_MAX - zSize)/zSize
+    };
+
     for (int i = 0; i < 3; ++i)
     {
         llvm::Value* inIndices[2] = {llvmBuilder->getInt32(0), llvmBuilder->getInt32(i)};
 
-        auto inGroupPtr = llvmBuilder->CreateGEP(groupIDType, groupID, inIndices);
+        auto axis = llvm::Twine(i == 0 ? "X" : i == 1 ? "Y" : "Z");
+
+        auto inGroupPtr = llvmBuilder->CreateGEP(
+            groupIDType,
+            groupID,
+            inIndices,
+            llvm::Twine("ptrInGroupID_").concat(axis));
         auto inGroupID = llvmBuilder->CreateLoad(
             uintType,
             inGroupPtr,
-            llvm::Twine("ingroupID").concat(llvm::Twine(i)));
+            llvm::Twine("inGroupID_").concat(axis));
+        annotateMemoryAccess(inGroupID);
+
+        // Set the legal value range for group ID so that optimizations aren't
+        // thwarted by overflows.
+        auto rangeMin = llvm::ConstantAsMetadata::get(llvmBuilder->getInt32(0));
+        auto rangeMax = llvm::ConstantAsMetadata::get(llvmBuilder->getInt32(maxGroupIDValues[i]));
+        auto valueRangeMD = llvm::MDNode::get(*llvmContext, {rangeMin, rangeMax});
+        inGroupID->setMetadata(llvm::LLVMContext::MD_range, valueRangeMD);
 
         llvm::Value* outIndices[3] = {
             llvmBuilder->getInt32(0),
@@ -1963,76 +2070,107 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
             threadVaryingInputType,
             threadInput,
             outIndices,
-            llvm::Twine("groupID").concat(llvm::Twine(i)));
-        llvmBuilder->CreateStore(inGroupID, outGroupPtr);
+            llvm::Twine("ptrOutGroupID_").concat(axis));
+        annotateMemoryAccess(llvmBuilder->CreateStore(inGroupID, outGroupPtr));
 
         outIndices[1] = llvmBuilder->getInt32(1);
         threadID[i] = llvmBuilder->CreateGEP(
             threadVaryingInputType,
             threadInput,
             outIndices,
-            llvm::Twine("threadID").concat(llvm::Twine(i)));
-    }
+            llvm::Twine("ptrThreadID_").concat(axis));
 
-    llvm::BasicBlock* threadEntryBlocks[3];
-    llvm::BasicBlock* threadBodyBlocks[3];
-    llvm::BasicBlock* threadEndBlocks[3];
-    llvm::BasicBlock* endBlock;
-
-    // Create all blocks first, so that they can jump around.
-    for (int i = 0; i < 3; ++i)
-    {
-        threadEntryBlocks[i] = llvm::BasicBlock::Create(
+        loopBlocks[i] = llvm::BasicBlock::Create(
             *llvmContext,
-            llvm::Twine("threadEntry").concat(llvm::Twine(i)),
-            dispatcher);
-        threadBodyBlocks[i] = llvm::BasicBlock::Create(
-            *llvmContext,
-            llvm::Twine("threadBody").concat(llvm::Twine(i)),
+            llvm::Twine("loop_").concat(axis),
             dispatcher);
     }
 
-    for (int i = 2; i >= 0; --i)
-    {
-        threadEndBlocks[i] = llvm::BasicBlock::Create(
-            *llvmContext,
-            llvm::Twine("threadEnd").concat(llvm::Twine(i)),
-            dispatcher);
-    }
-    endBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("end"), dispatcher);
+    exitBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("exit"), dispatcher);
 
-    // Populate thread dispatch headers.
-    for (int i = 0; i < 3; ++i)
-    {
-        llvmBuilder->CreateStore(llvmBuilder->getInt32(0), threadID[i]);
-        llvmBuilder->CreateBr(threadEntryBlocks[i]);
-        llvmBuilder->SetInsertPoint(threadEntryBlocks[i]);
+    auto annotateParallelLoop = [&](llvm::BranchInst* branchInst){
+        llvm::SmallVector<llvm::Metadata*> loopProperties;
+        // This gets replaced by the metadata node itself later.
+        loopProperties.push_back(nullptr);
 
-        auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
-        auto cond =
-            llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, id, workGroupSize[i]);
+        // As long as all loads / stores are denoted with wiParallelAccessGroup,
+        // the loop should be considered parallel by LLVM, enabling far more
+        // aggressive vectorization as potential cross-iteration data
+        // dependencies are ignored.
+        loopProperties.push_back(llvm::MDNode::get(
+            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.parallel_accesses"), wiParallelAccessGroup}));
 
-        auto merge = i == 0 ? endBlock : threadEndBlocks[i - 1];
-        llvmBuilder->CreateCondBr(cond, threadBodyBlocks[i], merge);
-        llvmBuilder->SetInsertPoint(threadBodyBlocks[i]);
-    }
+        // Explicitly request vectorization.
+        auto trueVal = llvm::ConstantAsMetadata::get(llvm::ConstantInt::getTrue(llvm::Type::getInt1Ty(*llvmContext)));
+        loopProperties.push_back(llvm::MDNode::get(
+            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.vectorize.enable"), trueVal}));
+
+        // Disable unrolling so that vectorization occurs instead.
+        loopProperties.push_back(llvm::MDNode::get(
+            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.disable_nonforced")}));
+
+        llvm::MDNode* loopMD = llvm::MDNode::getDistinct(*llvmContext, loopProperties);
+        loopMD->replaceOperandWith(0, loopMD);
+        branchInst->setMetadata(llvm::LLVMContext::MD_loop, loopMD);
+    };
+
+    llvm::BasicBlock* loopHeader = loopBlocks[0];
+    llvmBuilder->CreateBr(loopHeader);
+    llvmBuilder->SetInsertPoint(loopHeader);
+
+    // Initialize all to zero if coming from entry block.
+    auto xPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_X");
+    xPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
+    auto yPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_Y");
+    yPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
+    auto zPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_Z");
+    zPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
+
+    // Save thread ID for entry point call
+    annotateMemoryAccess(llvmBuilder->CreateStore(xPhi, threadID[0]));
+    annotateMemoryAccess(llvmBuilder->CreateStore(yPhi, threadID[1]));
+    annotateMemoryAccess(llvmBuilder->CreateStore(zPhi, threadID[2]));
 
     // Do the call to the actual entry point function.
     llvm::Value* args[3] = {threadInput, dispatcher->getArg(1), dispatcher->getArg(2)};
     llvmBuilder->CreateCall(llvm::cast<llvm::Function>(entryPointFunc), args);
-    llvmBuilder->CreateBr(threadEndBlocks[2]);
 
-    // Finish thread dispatch blocks
-    for (int i = 2; i >= 0; --i)
-    {
-        llvmBuilder->SetInsertPoint(threadEndBlocks[i]);
-        auto id = llvmBuilder->CreateLoad(uintType, threadID[i]);
-        auto inc = llvmBuilder->CreateAdd(id, llvmBuilder->getInt32(1));
-        llvmBuilder->CreateStore(inc, threadID[i]);
-        llvmBuilder->CreateBr(threadEntryBlocks[i]);
-    }
+    // Increment X and insert back edge
+    auto xInc = llvmBuilder->CreateAdd(xPhi, llvmBuilder->getInt32(1), "nextThreadID_X");
+    xPhi->addIncoming(xInc, loopHeader);
+    yPhi->addIncoming(yPhi, loopHeader);
+    zPhi->addIncoming(zPhi, loopHeader);
 
-    llvmBuilder->SetInsertPoint(endBlock);
+    auto condX =
+        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, xInc, workGroupSize[0]);
+    annotateParallelLoop(llvmBuilder->CreateCondBr(condX, loopHeader, loopBlocks[1]));
+
+    llvmBuilder->SetInsertPoint(loopBlocks[1]);
+
+    // Increment Y and insert back edge
+    auto yInc = llvmBuilder->CreateAdd(yPhi, llvmBuilder->getInt32(1), "nextThreadID_Y");
+    xPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[1]);
+    yPhi->addIncoming(yInc, loopBlocks[1]);
+    zPhi->addIncoming(zPhi, loopBlocks[1]);
+
+    auto condY =
+        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, yInc, workGroupSize[1]);
+    annotateParallelLoop(llvmBuilder->CreateCondBr(condY, loopHeader, loopBlocks[2]));
+
+    llvmBuilder->SetInsertPoint(loopBlocks[2]);
+
+    // Increment Z and insert back edge
+    auto zInc = llvmBuilder->CreateAdd(zPhi, llvmBuilder->getInt32(1), "nextThreadID_Z");
+    xPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[2]);
+    yPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[2]);
+    zPhi->addIncoming(zInc, loopBlocks[2]);
+
+    auto condZ =
+        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, zInc, workGroupSize[2]);
+    annotateParallelLoop(llvmBuilder->CreateCondBr(condZ, loopHeader, exitBlock));
+
+    // Exit block.
+    llvmBuilder->SetInsertPoint(exitBlock);
     llvmBuilder->CreateRetVoid();
     return dispatcher;
 }
