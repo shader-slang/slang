@@ -939,7 +939,7 @@ local insts = {
 	{ getOptionalValue = { operands = { { "optionalOperand" } } } },
 	{ optionalHasValue = { operands = { { "optionalOperand" } } } },
 	{ makeOptionalValue = { operands = { { "value" } } } },
-	{ makeOptionalNone = { operands = { { "defaultValue" } } } },
+	{ makeOptionalNone = {} },
 	{ CombinedTextureSamplerGetTexture = { operands = { { "sampler" } } } },
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },

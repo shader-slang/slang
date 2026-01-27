@@ -3721,11 +3721,9 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
         return getNullPtrValue(type);
     case kIROp_OptionalType:
         {
-            auto inner =
-                emitDefaultConstruct(as<IROptionalType>(actualType)->getValueType(), fallback);
-            if (!inner)
-                return nullptr;
-            return emitMakeOptionalNone(type, inner);
+            // The Optional-type lowering pass synthesizes the placeholder payload,
+            // so we don't need to construct `inner` here.
+            return emitMakeOptionalNone(type);
         }
     case kIROp_TupleType:
         {
@@ -4247,9 +4245,9 @@ IRInst* IRBuilder::emitMakeOptionalValue(IRInst* optType, IRInst* value)
     return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalValue, 1, &value);
 }
 
-IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue)
+IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType)
 {
-    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 1, &defaultValue);
+    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue)

@@ -3681,7 +3681,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitOptionalHasValue(IRInst* optValue);
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
-    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitMakeOptionalNone(IRInst* optType);
 
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
