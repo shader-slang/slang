@@ -51,7 +51,8 @@ jobs:
             libvulkan-dev \
             spirv-tools \
             glslang-tools \
-            ca-certificates
+            ca-certificates \
+            libzstd-dev
 
           # Install CMake 3.30 (required for CMakePresets.json version 6)
           wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
