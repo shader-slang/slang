@@ -2634,6 +2634,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg(arg);
     }
 
+    // Enable machine-readable diagnostics if diag option is specified
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
+    }
+
     // If we can't set up for simple compilation, it's because some external resource isn't
     // available such as NVAPI headers. In that case we just ignore the test.
     if (SLANG_FAILED(_initSlangCompiler(context, cmdLine)))

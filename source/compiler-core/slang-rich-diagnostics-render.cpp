@@ -582,7 +582,7 @@ String renderDiagnosticMachineReadable(
 {
     StringBuilder sb;
 
-    // Format: E<code>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+    // Format: E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
     // Get the primary span location information
     HumaneSourceLoc beginLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);
@@ -594,6 +594,7 @@ String renderDiagnosticMachineReadable(
         codeStr = "0" + codeStr;
 
     sb << "E" << codeStr << "\t";
+    sb << getSeverityName(diag.severity) << "\t";
     sb << beginLoc.pathInfo.foundPath << "\t";
     sb << beginLoc.line << "\t";
     sb << beginLoc.column << "\t";
