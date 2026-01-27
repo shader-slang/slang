@@ -6348,6 +6348,28 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
 {
     static constexpr int value = 4;
 };
+
+// Half (f16) - MMA m16n8k16 shape: 4 regs for A, 2 regs for B, 2 regs for C/D
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixC>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixD>
+{
+    static constexpr int value = 2;
+};
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
 // Float (f32) - 8 regs for C/D only
@@ -6523,6 +6545,133 @@ __device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
 }
 
 // ====================================================================================
+// MMA Load specializations for m16n8k16 (uses manual register packing, not wmma.load)
+// ====================================================================================
+#if SLANG_CUDA_ENABLE_HALF
+// Load Matrix A: 16x16, fp16, row-major for m16n8k16 MMA
+template<>
+__device__ inline void wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixA, Layout::RowMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    (void)stride; // stride not used - assumes contiguous row-major layout
+    uint32_t lane_id = _getLaneId();
+    int groupID           = lane_id >> 2;  // 0..7
+    int threadID_in_group = lane_id & 0x3; // 0..3
+
+    const uint32_t* buf_packed = reinterpret_cast<const uint32_t*>(ptr);
+
+    // Map 8 elements (i=0..7) into 4 half2 regs for mma.sync layout
+    // reg0 packs row=groupID, col=tid*2, tid*2+1
+    int row0 = groupID;
+    int col0 = threadID_in_group * 2;
+    int idx0 = row0 * 8 + (col0 >> 1);
+    regs[0] = buf_packed[idx0];
+
+    // reg1 packs row=groupID+8, col=tid*2, tid*2+1
+    int row1 = groupID + 8;
+    int col1 = threadID_in_group * 2;
+    int idx1 = row1 * 8 + (col1 >> 1);
+    regs[1] = buf_packed[idx1];
+
+    // reg2 packs row=groupID, col=tid*2+8, tid*2+9
+    int row2 = groupID;
+    int col2 = threadID_in_group * 2 + 8;
+    int idx2 = row2 * 8 + (col2 >> 1);
+    regs[2] = buf_packed[idx2];
+
+    // reg3 packs row=groupID+8, col=tid*2+8, tid*2+9
+    int row3 = groupID + 8;
+    int col3 = threadID_in_group * 2 + 8;
+    int idx3 = row3 * 8 + (col3 >> 1);
+    regs[3] = buf_packed[idx3];
+}
+
+// Load Matrix A: 16x16 (M=16, N=16), fp16, n16 is ignored
+template<>
+__device__ inline void wmmaLoad<half, 16, 16, 16, MatrixUse::MatrixA, Layout::RowMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixA, Layout::RowMajor>(
+        regs, ptr, stride);
+}
+
+// Load Matrix B: 16x8 (K=16, N=8), fp16, col-major for m16n8k16 MMA
+template<>
+__device__ inline void wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixB, Layout::ColMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    (void)stride; // stride not used - assumes contiguous col-major layout
+    uint32_t lane_id = _getLaneId();
+    int groupID           = lane_id >> 2;  // 0..7
+    int threadID_in_group = lane_id & 0x3; // 0..3
+
+    const uint32_t* buf_packed = reinterpret_cast<const uint32_t*>(ptr);
+
+    // For col-major B (16 rows x 8 cols stored column-by-column)
+    // reg0 packs col=groupID, rows=tid*2, tid*2+1
+    int col = groupID;
+    int row0 = threadID_in_group * 2;
+    int idx0 = col * 8 + (row0 >> 1);
+    regs[0] = buf_packed[idx0];
+
+    // reg1 packs col=groupID, rows=tid*2+8, tid*2+9
+    int row1 = threadID_in_group * 2 + 8;
+    int idx1 = col * 8 + (row1 >> 1);
+    regs[1] = buf_packed[idx1];
+}
+
+// Load Matrix B: 16x16 (K=16, N=16), fp16, col-major for m16n16k16
+template<>
+__device__ inline void wmmaLoad<half, 16, 16, 16, MatrixUse::MatrixB, Layout::ColMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixB, Layout::ColMajor>(
+        regs, ptr, stride);
+    // Next 8 columns (N=8..15): regs[2..3], ptr stepped by 16*8 = 128 halfs
+    wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixB, Layout::ColMajor>(
+        regs + 2, ptr + 128, stride);
+}
+
+
+// Load Matrix C: 16x8 (M=16, N=8), fp16, row-major for m16n8k16 MMA
+template<>
+__device__ inline void wmmaLoad<half, 16, 8, 16, MatrixUse::MatrixC, Layout::RowMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    (void)stride; // stride not used - assumes contiguous row-major layout
+    uint32_t lane_id = _getLaneId();
+    int groupID           = lane_id >> 2;  // 0..7
+    int threadID_in_group = lane_id & 0x3; // 0..3
+
+    const uint32_t* buf_packed = reinterpret_cast<const uint32_t*>(ptr);
+
+    // For row-major C (16 rows x 8 cols)
+    // reg0 packs row=groupID, cols=tid*2, tid*2+1
+    int row0 = groupID;
+    int col0 = threadID_in_group * 2;
+    int idx0 = row0 * 4 + (col0 >> 1);
+    regs[0] = buf_packed[idx0];
+
+    // reg1 packs row=groupID+8, cols=tid*2, tid*2+1
+    int row1 = groupID + 8;
+    int col1 = threadID_in_group * 2;
+    int idx1 = row1 * 4 + (col1 >> 1);
+    regs[1] = buf_packed[idx1];
+}
+
+// Load Matrix C: 16x16 (M=16, N=16), fp16, row-major for m16n16k16
+template<>
+__device__ inline void wmmaLoad<half, 16, 16, 16, MatrixUse::MatrixC, Layout::RowMajor>(
+    uint32_t* regs, const half* ptr, int stride)
+{
+    // Same as MatrixA 16 x 16
+    wmmaLoad<half, 16, 16, 16, MatrixUse::MatrixA, Layout::RowMajor>(
+        regs, ptr, stride);
+}
+
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+// ====================================================================================
 // WMMA Store - Inline PTX
 // ====================================================================================
 
@@ -6567,6 +6716,74 @@ __device__ inline void wmmaStore(ElemT* ptr, const uint32_t* regs, int stride)
         break;
     }
 }
+
+#if SLANG_CUDA_ENABLE_HALF
+// MMA Store specialization for m16n8k16 (uses manual unpacking, not wmma.store)
+// Store Matrix D: 16x8 (M=16, N=8), fp16, row-major for m16n8k16 MMA
+template<>
+__device__ inline void wmmaStore<half, 16, 8, 16, Layout::RowMajor>(
+    half* ptr, const uint32_t* regs, int stride)
+{
+    (void)stride; // stride not used - assumes contiguous row-major layout
+    uint32_t lane_id = _getLaneId();
+    int groupID           = lane_id >> 2;  // 0..7
+    int threadID_in_group = lane_id & 0x3; // 0..3
+
+    uint32_t* buf_packed = reinterpret_cast<uint32_t*>(ptr);
+
+    // For row-major D (16 rows x 8 cols)
+    // reg0 stores to row=groupID, cols=tid*2, tid*2+1
+    int row0 = groupID;
+    int col0 = threadID_in_group * 2;
+    int idx0 = row0 * 4 + (col0 >> 1);
+    buf_packed[idx0] = regs[0];
+
+    // reg1 stores to row=groupID+8, cols=tid*2, tid*2+1
+    int row1 = groupID + 8;
+    int col1 = threadID_in_group * 2;
+    int idx1 = row1 * 4 + (col1 >> 1);
+    buf_packed[idx1] = regs[1];
+}
+
+// MMA Store specialization for m16n16k16 (uses manual unpacking, not wmma.store)
+template<>
+__device__ inline void wmmaStore<half, 16, 16, 16, Layout::RowMajor>(
+    half* ptr, const uint32_t* regs, int stride)
+{
+    (void)stride; // stride not used - assumes contiguous row-major layout
+    uint32_t lane_id = _getLaneId();
+    int groupID           = lane_id >> 2;  // 0..7
+    int threadID_in_group = lane_id & 0x3; // 0..3
+
+    uint32_t* buf_packed = reinterpret_cast<uint32_t*>(ptr);
+
+    // For row-major D (16 rows x 16 cols)
+    // reg0 stores to row=groupID, cols=tid*2, tid*2+1
+    int row0 = groupID;
+    int col0 = threadID_in_group * 2;
+    int idx0 = row0 * 8 + (col0 >> 1);
+    buf_packed[idx0] = regs[0];
+
+    // reg1 stores to row=groupID+8, cols=tid*2, tid*2+1
+    int row1 = groupID + 8;
+    int col1 = threadID_in_group * 2;
+    int idx1 = row1 * 8 + (col1 >> 1);
+    buf_packed[idx1] = regs[1];
+
+    // reg2 stores to row=groupID, cols=tid*2+8, tid*2+9
+    int row2 = groupID;
+    int col2 = threadID_in_group * 2 + 8;
+    int idx2 = row2 * 8 + (col2 >> 1);
+    buf_packed[idx2] = regs[2];
+
+    // reg3 stores to row=groupID+8, cols=tid*2+8, tid*2+9
+    int row3 = groupID + 8;
+    int col3 = threadID_in_group * 2 + 8;
+    int idx3 = row3 * 8 + (col3 >> 1);
+    buf_packed[idx3] = regs[3];
+}
+
+#endif // #if SLANG_CUDA_ENABLE_HALF
 
 // Helper to get M, N, K from ShapeCombination
 template<ShapeCombination shape>
@@ -6901,8 +7118,26 @@ struct WmmaFragment
 template<typename CType, typename DType, int M, int N, int K, Layout LayoutA, Layout LayoutB>
 struct Fp16MMAHelper;
 
+// #define SLANG_CUDA_ENABLE_HALF 1
+
+// MMA m16n8k16 helper function - must be defined before Fp16MMAHelper
+__device__ inline uint2 _hmma(uint4 &a, uint2 &b, uint2 &c)
+{
+    uint2           D;
+    unsigned const *A = reinterpret_cast<unsigned const *>(&a);
+    unsigned const *B = reinterpret_cast<unsigned const *>(&b);
+    unsigned const *C = reinterpret_cast<unsigned const *>(&c);
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16  {%0, %1}, \n"
+                 "    {%2, %3, %4, %5}, \n"
+                 "    {%6, %7}, \n"
+                 "    {%8, %9}; \n"
+                 : "=r"(D.x), "=r"(D.y)
+                 : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[0]), "r"(B[1]), "r"(C[0]), "r"(C[1]));
+    return D;
+}
+
 #if SLANG_CUDA_ENABLE_HALF
-// Specialization: c=half, d=half (f16.f16)
+// Specialization: c=half, d=half (f16.f16) for m16n16k16 using two m16n8k16 MMA calls
 template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
 struct Fp16MMAHelper<half, half, M, N, K, LayoutA, LayoutB>
 {
@@ -6912,39 +7147,50 @@ struct Fp16MMAHelper<half, half, M, N, K, LayoutA, LayoutB>
         const WmmaFragment<half, M, N, K, MatrixUse::MatrixB>& b,
         const WmmaFragment<half, M, N, K, MatrixUse::MatrixC>& c)
     {
-        asm volatile("wmma.mma.sync.aligned.%4.%5.%6.%7.%8 "
-                     "{%0, %1, %2, %3}, "
-                     "{%9, %10, %11, %12, %13, %14, %15, %16}, "
-                     "{%17, %18, %19, %20, %21, %22, %23, %24}, "
-                     "{%25, %26, %27, %28};\n"
-                     : "=r"(d.regs[0]), "=r"(d.regs[1]), "=r"(d.regs[2]), "=r"(d.regs[3])
-                     : "C"(PtxLayoutName<LayoutA>::name),
-                       "C"(PtxLayoutName<LayoutB>::name),
-                       "C"(PtxShapeName<M, N, K>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "C"(PtxTypeName<half>::name),
-                       "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(a.regs[4]),
-                       "r"(a.regs[5]),
-                       "r"(a.regs[6]),
-                       "r"(a.regs[7]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(b.regs[2]),
-                       "r"(b.regs[3]),
-                       "r"(b.regs[4]),
-                       "r"(b.regs[5]),
-                       "r"(b.regs[6]),
-                       "r"(b.regs[7]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]));
+        // Pack A registers (16x16 matrix, 4 registers for m16n8k16 MMA)
+        uint4 a_hmma_reg = {a.regs[0], a.regs[1], a.regs[2], a.regs[3]};
+
+        // Split B into two 16x8 halves (2 registers each)
+        uint2 b_hmma_reg0 = {b.regs[0], b.regs[1]};
+        uint2 b_hmma_reg1 = {b.regs[2], b.regs[3]};
+
+        // Split C into two 16x8 halves (2 registers each)
+        uint2 c_hmma_reg0 = {c.regs[0], c.regs[1]};
+        uint2 c_hmma_reg1 = {c.regs[2], c.regs[3]};
+
+        // Two m16n8k16 MMA calls to compute 16x16 result
+        uint2 d_hmma_reg0 = _hmma(a_hmma_reg, b_hmma_reg0, c_hmma_reg0);
+        uint2 d_hmma_reg1 = _hmma(a_hmma_reg, b_hmma_reg1, c_hmma_reg1);
+
+        // Store results
+        d.regs[0] = d_hmma_reg0.x;
+        d.regs[1] = d_hmma_reg0.y;
+        d.regs[2] = d_hmma_reg1.x;
+        d.regs[3] = d_hmma_reg1.y;
     }
 };
+
+// MMA specialization for m16n8k16 shape using the newer mma.sync instruction
+template<>
+struct Fp16MMAHelper<half, half, 16, 8, 16, Layout::RowMajor, Layout::ColMajor>
+{
+    __device__ static void eval(
+        WmmaFragment<half, 16, 8, 16, MatrixC>& d,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        uint4 a_hmma_reg = {a.regs[0], a.regs[1], a.regs[2], a.regs[3]};
+        uint2 b_hmma_reg = {b.regs[0], b.regs[1]};
+        uint2 c_hmma_reg = {c.regs[0], c.regs[1]};
+
+        uint2 d_hmma_reg = _hmma(a_hmma_reg, b_hmma_reg, c_hmma_reg);
+
+        d.regs[0] = d_hmma_reg.x;
+        d.regs[1] = d_hmma_reg.y;
+    }
+};
+
 
 // Specialization: c=float, d=half (f16.f32)
 template<int M, int N, int K, Layout LayoutA, Layout LayoutB>
