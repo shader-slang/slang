@@ -71,11 +71,13 @@ void encodeAllLevels(
         // Setup params using prepareLevelInfo which computes all level-specific parameters
         Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
-        // Encode this level - output goes to the appropriate offset
-        uint outputOffset = level * FEATURE_DIM_PER_ENTRY;
-        let levelOut = Encoder.encode<StructuredBufferStorage<float>>(params, position, featureStorage, 0u);
+        // Encode this level
+        float levelOut[FEATURE_DIM_PER_ENTRY];
+        Encoder.encode<StructuredBufferStorage<float>, float[N_POS_DIMS], float[FEATURE_DIM_PER_ENTRY]>(
+            params, position, featureStorage, 0u, levelOut);
 
         // Copy to output array at correct offset
+        uint outputOffset = level * FEATURE_DIM_PER_ENTRY;
         [ForceUnroll]
         for (uint f = 0; f < FEATURE_DIM_PER_ENTRY; ++f)
         {

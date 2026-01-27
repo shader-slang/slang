@@ -51,11 +51,13 @@ public struct PermutoEncoder<T,
     /// @param shiftsPerDim Per-dimension shifts [Dimensions].
     /// @param elevated Output elevated coordinates [Dimensions+1].
     [Differentiable]
-    static void permutoElevate(
-        T pos[Dimensions],
+    static void permutoElevate<InArray>(
+        InArray pos,
         no_diff in float scalesPerDim[Dimensions],
         no_diff in float shiftsPerDim[Dimensions],
         out float elevated[Dimensions + 1])
+            where InArray : IArrayAccessor<T>
+            where InArray : IDifferentiable
     {
         float sum = 0.0f;
         [ForceUnroll]
@@ -222,22 +224,27 @@ public struct PermutoEncoder<T,
     /// @param featureTableAddress Base address for feature table storage
     /// @return Encoded feature vector for this position at this level
     [Differentiable]
-    VISIBILITY_LEVEL static T[FeatureDimensionPerEntry] encode<Storage>(
+    VISIBILITY_LEVEL static void encode<Storage, InArray, OutArray>(
         no_diff in Params params,
-        T position[Dimensions],
+        InArray position,
         Storage featureTable,
-        no_diff in Storage.Address featureTableAddress)
+        no_diff in Storage.Address featureTableAddress,
+        out OutArray encodedFeatures)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
+            where InArray : IArrayAccessor<T>
+            where InArray : IDifferentiable
+            where OutArray : IArrayAccessor<T>
+            where OutArray : IDifferentiable
     {
         // Initialize output to zero
-        T encodedFeatures[FeatureDimensionPerEntry] = {};
+        encodedFeatures.dzero();
 
         // If level is greater than maxLevel, output zero padding
         if (float(params.levelInfo.currentLevelIndex) >= params.maxLevel + 1e-3f)
         {
-            return encodedFeatures;
+            return;
         }
 
         // Use precomputed level-specific parameters
@@ -288,8 +295,6 @@ public struct PermutoEncoder<T,
                 encodedFeatures[f] += T(weight) * featureVal[f];
             }
         }
-
-        return encodedFeatures;
     }
 
     /// Helper function to compute the PerLevelInfo (offset, hashmapSize, etc.) for a given level.
