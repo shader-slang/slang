@@ -2404,6 +2404,11 @@ class LegalizeShaderEntryPointContext
 public:
     void legalizeEntryPoints(List<EntryPointInfo>& entryPoints)
     {
+        // Collect struct types used as return types before processing.
+        // We should not remove semantic decorations from these structs
+        // since they are needed for output variable binding (e.g., @location in WGSL).
+        collectStructTypesUsedAsReturnType(entryPoints);
+
         for (auto entryPoint : entryPoints)
             legalizeEntryPoint(entryPoint);
         removeSemanticLayoutsFromLegalizedStructs();
@@ -2595,6 +2600,25 @@ protected:
 
 private:
     HashSet<IRStructField*> semanticInfoToRemove;
+    HashSet<IRStructType*> structTypesUsedAsReturnType;
+
+    void collectStructTypesUsedAsReturnType(List<EntryPointInfo>& entryPoints)
+    {
+        for (auto entryPoint : entryPoints)
+        {
+            auto func = entryPoint.entryPointFunc;
+            if (!func)
+                continue;
+            auto funcType = as<IRFuncType>(func->getDataType());
+            if (!funcType)
+                continue;
+            auto returnType = funcType->getResultType();
+            if (!returnType) 
+                continue;
+            if (auto structType = as<IRStructType>(returnType))
+                structTypesUsedAsReturnType.add(structType);
+        }
+    }
 
     void removeSemanticLayoutsFromLegalizedStructs()
     {
@@ -2684,8 +2708,12 @@ private:
                     field->getKey(),
                     fieldParam);
 
-                // Remove the sementic info from the original struct
-                semanticInfoToRemove.add(field);
+                // Remove the semantic info from the original struct, but only if
+                // the struct is not used as a return type of another entry point.
+                // If the struct is used as a return type, we need to keep the semantic
+                // decorations for output variable binding (e.g., @location in WGSL).
+                if (!structTypesUsedAsReturnType.contains(structType))
+                    semanticInfoToRemove.add(field);
 
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;
