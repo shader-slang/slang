@@ -48,4 +48,8 @@ String renderDiagnostic(
     DiagnosticRenderOptions opts,
     const GenericDiagnostic& diag);
 
+String renderDiagnosticMachineReadable(
+    SourceManager* sm,
+    const GenericDiagnostic& diag);
+
 } // namespace Slang

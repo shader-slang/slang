@@ -576,4 +576,32 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
+String renderDiagnosticMachineReadable(
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
+{
+    StringBuilder sb;
+
+    // Format: E<code>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+
+    // Get the primary span location information
+    HumaneSourceLoc beginLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);
+    HumaneSourceLoc endLoc = sm->getHumaneLoc(diag.primarySpan.range.end);
+
+    // Format the error code as E#### (e.g., E0001, E1234)
+    String codeStr = String(diag.code);
+    while (codeStr.getLength() < 4)
+        codeStr = "0" + codeStr;
+
+    sb << "E" << codeStr << "\t";
+    sb << beginLoc.pathInfo.foundPath << "\t";
+    sb << beginLoc.line << "\t";
+    sb << beginLoc.column << "\t";
+    sb << endLoc.line << "\t";
+    sb << endLoc.column << "\t";
+    sb << diag.message << "\n";
+
+    return sb.produceString();
+}
+
 } // namespace Slang
