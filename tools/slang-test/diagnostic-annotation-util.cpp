@@ -57,29 +57,103 @@ static SlangResult parseAnnotations(
 {
     outAnnotations.clear();
 
-    // Build the comment prefix we're looking for: "//" + prefix
-    StringBuilder markerBuilder;
-    markerBuilder << "//" << prefix;
-    String marker = markerBuilder.produceString();
+    // Build the comment markers we're looking for
+    StringBuilder lineMarkerBuilder;
+    lineMarkerBuilder << "//" << prefix;
+    String lineMarker = lineMarkerBuilder.produceString();
+
+    StringBuilder blockStartBuilder;
+    blockStartBuilder << "/*" << prefix;
+    String blockStart = blockStartBuilder.produceString();
 
     // Split source into lines
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(sourceText, lines);
 
     int lastNonAnnotationLine = -1;
+    bool inBlockComment = false;
+    int blockCommentSourceLine = -1;
 
     for (Index i = 0; i < lines.getCount(); ++i)
     {
         const auto& line = lines[i];
         UnownedStringSlice trimmedLine = line.trim();
 
-        // Check if this is an annotation line
-        if (trimmedLine.startsWith(marker.getUnownedSlice()))
+        // Check for block comment start
+        if (!inBlockComment && trimmedLine.startsWith(blockStart.getUnownedSlice()))
+        {
+            inBlockComment = true;
+            blockCommentSourceLine = lastNonAnnotationLine;
+            continue;
+        }
+
+        // Check for block comment end
+        if (inBlockComment && trimmedLine.startsWith(UnownedStringSlice::fromLiteral("*/")))
+        {
+            inBlockComment = false;
+            continue;
+        }
+
+        // Inside block comment - parse as annotation
+        if (inBlockComment)
+        {
+            // Skip empty lines
+            if (trimmedLine.getLength() == 0)
+                continue;
+
+            Annotation annotation;
+
+            // Check if this is a position-based annotation (contains ^)
+            Index caretPos = line.indexOf('^');
+            if (caretPos != -1)
+            {
+                // Position-based annotation
+                annotation.type = Annotation::Type::PositionBased;
+
+                // Count the carets to determine the span
+                Index caretCount = 0;
+                for (Index j = caretPos; j < line.getLength() && line[j] == '^'; ++j)
+                {
+                    caretCount++;
+                }
+
+                // Extract the message after the carets
+                UnownedStringSlice remaining = line.tail(caretPos + caretCount).trim();
+
+                annotation.expectedSubstring = String(remaining);
+                annotation.sourceLineNumber = blockCommentSourceLine + 1; // 1-based line numbers
+                // caretPos is the 0-based position of '^' in the line
+                // Adding 1 converts it to a 1-based column number
+                annotation.columnStart = int(caretPos + 1);
+                annotation.columnEnd = int(caretPos + caretCount);
+
+                if (annotation.expectedSubstring.getLength() > 0)
+                {
+                    outAnnotations.add(annotation);
+                }
+            }
+            else
+            {
+                // Simple substring annotation
+                annotation.type = Annotation::Type::SimpleSubstring;
+                annotation.expectedSubstring = String(trimmedLine);
+
+                if (annotation.expectedSubstring.getLength() > 0)
+                {
+                    outAnnotations.add(annotation);
+                }
+            }
+
+            continue;
+        }
+
+        // Check for line comment annotation
+        if (trimmedLine.startsWith(lineMarker.getUnownedSlice()))
         {
             Annotation annotation;
 
             // Skip past the marker
-            UnownedStringSlice content = trimmedLine.tail(marker.getLength());
+            UnownedStringSlice content = trimmedLine.tail(lineMarker.getLength());
 
             // Check if this is a position-based annotation (contains ^)
             Index caretPos = content.indexOf('^');
@@ -95,18 +169,6 @@ static SlangResult parseAnnotations(
                     // This shouldn't happen, but handle it
                     continue;
                 }
-
-                // The column in the source is the position of ^ minus the comment prefix length
-                // We need to find where the marker starts in the original line
-                Index markerStartInLine = line.indexOf(marker.getUnownedSlice());
-                if (markerStartInLine == -1)
-                {
-                    continue;
-                }
-
-                // Calculate the column by subtracting the marker position and length
-                // The column is 1-based, so the caret position minus marker end position
-                Index markerEndInLine = markerStartInLine + marker.getLength();
 
                 // Count the carets to determine the span
                 Index caretCount = 0;
