@@ -235,15 +235,18 @@ static bool checkAnnotations(
         }
         else // Position-based
         {
-            // Position-based matching - check line, column, and message substring
+            // Position-based matching - check line, column range, and message substring
             for (const auto& diag : diagnostics)
             {
                 // Check if line number matches
                 if (diag.beginLine != annotation.sourceLineNumber)
                     continue;
 
-                // Check if column position matches (both are 1-based)
+                // Check if column range matches (both are 1-based)
                 if (diag.beginCol != annotation.columnStart)
+                    continue;
+
+                if (diag.endCol != annotation.columnEnd)
                     continue;
 
                 // Check if message contains expected substring
@@ -258,8 +261,10 @@ static bool checkAnnotations(
             {
                 StringBuilder sb;
                 sb << "Position-based match failed at line " << annotation.sourceLineNumber
-                   << ", column " << annotation.columnStart << ": '" << annotation.expectedSubstring
-                   << "'";
+                   << ", columns " << annotation.columnStart;
+                if (annotation.columnEnd != annotation.columnStart)
+                    sb << "-" << annotation.columnEnd;
+                sb << ": '" << annotation.expectedSubstring << "'";
                 outMissingAnnotations.add(sb.produceString());
             }
         }
