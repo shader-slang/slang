@@ -1174,6 +1174,9 @@ struct TypeFlowSpecializationContext
         case kIROp_MakeStruct:
             info = analyzeMakeStruct(context, as<IRMakeStruct>(inst), workQueue);
             break;
+        case kIROp_MakeArray:
+            info = analyzeMakeArray(context, as<IRMakeArray>(inst), workQueue);
+            break;
         case kIROp_Store:
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
             break;
@@ -1514,6 +1517,37 @@ struct TypeFlowSpecializationContext
         }
 
         return none(); // the make struct itself doesn't have any info.
+    }
+
+    IRInst* analyzeMakeArray(IRInst* context, IRMakeArray* makeArray, WorkQueue& workQueue)
+    {
+        // We'll process this in the same way as a get-element,
+        // but for all elements of the array.
+        //
+        auto arrayType = as<IRArrayType>(makeArray->getDataType());
+        if (isConcreteType(arrayType))
+            return none();
+
+        IRInst* unionInfo = none();
+        for (UInt i = 0; i < makeArray->getOperandCount(); i++)
+        {
+            auto element = makeArray->getOperand(i);
+            if (auto elementInfo = tryGetInfo(context, element))
+            {
+                unionInfo = unionPropagationInfo(unionInfo, elementInfo);
+            }
+            else
+            {
+                // If any element has no info, we can't proceed.
+                return none();
+            }
+        }
+
+        IRBuilder builder(module);
+        return builder.getArrayType(
+            (IRType*)unionInfo,
+            arrayType->getElementCount(),
+            getArrayStride(arrayType));
     }
 
     IRInst* analyzeLoadFromUninitializedMemory(IRInst* context, IRInst* inst)
@@ -3030,6 +3064,8 @@ struct TypeFlowSpecializationContext
             return specializeWrapExistential(context, as<IRWrapExistential>(inst));
         case kIROp_MakeStruct:
             return specializeMakeStruct(context, as<IRMakeStruct>(inst));
+        case kIROp_MakeArray:
+            return specializeMakeArray(context, as<IRMakeArray>(inst));
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         case kIROp_RWStructuredBufferLoad:
@@ -3949,6 +3985,40 @@ struct TypeFlowSpecializationContext
             operandIndex++;
         }
 
+        return changed;
+    }
+
+    bool specializeMakeArray(IRInst* context, IRMakeArray* inst)
+    {
+        // The main thing to handle here is that we might have specialized
+        // the element type of the array, so we need to upcast the elements
+        // if necessary.
+        //
+        auto arrayInfo = tryGetInfo(context, inst);
+        if (!arrayInfo)
+            return false;
+
+        auto arrayType = as<IRArrayType>(arrayInfo);
+        auto elementType = arrayType->getElementType();
+
+        // Reinterpret any of the arguments as necessary.
+        bool changed = false;
+        for (UIndex i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto arg = inst->getOperand(i);
+            IRBuilder builder(context);
+            builder.setInsertBefore(inst);
+            auto newArg = upcastSet(&builder, arg, elementType);
+
+            if (arg != newArg)
+            {
+                changed = true;
+                inst->setOperand(i, newArg);
+            }
+        }
+
+        IRBuilder builder(module);
+        builder.replaceOperand(&inst->typeUse, getLoweredType(arrayInfo));
         return changed;
     }
 
