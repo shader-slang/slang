@@ -4688,22 +4688,7 @@ struct IComponentType2 : public ISlangUnknown
         0x7f68,
         0x4e91,
         {0xa5, 0x2c, 0x8b, 0x19, 0x3e, 0x45, 0x7a, 0x9f})
-	
-	/** Get functions accessible through the ISlangSharedLibrary interface.
 
-	The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
-
-	NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
-
-	@param targetIndex      The index of the target to get code for (default: zero).
-	@param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried
-	on.
-	@returns                A `SlangResult` to indicate success or failure.
-	*/
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
-        int targetIndex,
-        ISlangSharedLibrary** outSharedLibrary,
-        slang::IBlob** outDiagnostics = 0) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetCompileResult(
         SlangInt targetIndex,
         ICompileResult** outCompileResult,
@@ -4713,6 +4698,21 @@ struct IComponentType2 : public ISlangUnknown
         SlangInt targetIndex,
         ICompileResult** outCompileResult,
         IBlob** outDiagnostics = nullptr) = 0;
+    /** Get functions accessible through the ISlangSharedLibrary interface.
+
+    The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+
+    NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+
+    @param targetIndex      The index of the target to get code for (default: zero).
+    @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried
+    on.
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = 0) = 0;
 };
     #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 
