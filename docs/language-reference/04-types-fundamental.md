@@ -76,5 +76,5 @@ All fundamental types use [little-endian](https://en.wikipedia.org/wiki/Endianne
 
 All signed integers use [two's complement](https://en.wikipedia.org/wiki/Two%27s_complement) representation.
 
-> Remark: Fundamental types in other languages are not always naturally aligned. In particular, the alignment
+> 📝 **Remark:** Fundamental types in other languages are not always naturally aligned. In particular, the alignment
 > of C type `uint64_t` on x86-32 is typically 4 bytes.

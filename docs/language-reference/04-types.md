@@ -109,10 +109,10 @@ Declaration of new types is allowed in:
 - [extension](04-types-extension.md) members declaring nested types
 - [typedef](#alias) declarations
 
-> Remark 1: *`simple-type-spec`* is a syntactical subset of the full *`type-expr`*. The subset only names a
-> type but never declares one.
+> 📝 **Remark 1:** *`simple-type-spec`* is a syntactical subset of the full *`type-expr`*. The subset only
+> names a type but never declares one.
 
-> Remark 2: The combined nature of the type expression of naming and possibly declaring a type is a
+> 📝 **Remark 2:** The combined nature of the type expression of naming and possibly declaring a type is a
 > side-effect of the C-style grammar for type declarations. This extends to traditional variable declarations
 > where a single declaration can declare a type and one or more variables. (TODO: link)
 
@@ -163,7 +163,7 @@ The use of types with unknown size is restricted as follows:
   on the specific type/function.
 * A type with unknown size cannot be instantiated as a variable.
 
-> Remark: Unknown size is different from unspecified or target-specified size. [Opaque types](04-types-opaque.md)
+> 📝 **Remark:** Unknown size is different from unspecified or target-specified size. [Opaque types](04-types-opaque.md)
 > have target-specified sizes, sizes of [structures](04-types-struct.md) and [arrays](04-types-array.md) are subject to
 > target-specific alignment rules, and certain [4a - Fundamental Types](04-types-fundamental.md) such as
 > `bool` have target-specified size. Unspecified-sized types are not subject to the restrictions of
