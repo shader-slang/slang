@@ -27,9 +27,10 @@ public static const float lc_maxLevel = 4.4f;
 // Per-level indices: [level0, level1, level2, level3]
 public static const uint lc_levelIndices[4] = { 0u, 1u, 2u, 3u };
 
-// Per-level feature table offsets (in number of floats): 
-// Level i: i * HASHMAP_SIZE * FEATURE_DIM_PER_ENTRY = i * 256 * 2
-public static const uint lc_offsets[4] = { 0u, 512u, 1024u, 1536u };
+// Per-level feature table offsets (in number of feature entries, NOT floats): 
+// Level i: i * HASHMAP_SIZE = i * 256
+// Note: encodePerLevel will multiply by FeatureDimensionPerEntry to get the float offset
+public static const uint lc_offsets[4] = { 0u, 256u, 512u, 768u };
 
 // Per-level feature table sizes (all same for this config)
 public static const uint lc_tableSizes[4] = { 256u, 256u, 256u, 256u };
