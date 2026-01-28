@@ -1183,7 +1183,7 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
             switch (row)
             {
             case 16:
-                return {16, 16, 16};
+                return {16, 16, 16}; // k = 16 is not true m16n8k16
             case 8:
                 return {8, 32, 16};
             case 32:
@@ -1207,7 +1207,7 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
             case 32:
                 return {8, 32, 16};
             case 8:
-                return {32, 8, 16};
+                return {(row == 32) ? 32 : 16, 8, 16};
             default:
                 return {0, 0, 0}; // Invalid
             }
@@ -1216,6 +1216,8 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
     default:
         {
             // Check exact (m, n) combinations
+            if (row == 16 && col == 8)
+                return {16, 8, 16};
             if (row == 16 && col == 16)
                 return {16, 16, 16};
             else if (row == 8 && col == 32)
