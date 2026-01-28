@@ -1,23 +1,101 @@
 # Structures
 
-A `struct` is a type consisting of an ordered sequence of members.
+## Syntax
 
-A struct member is declared in the struct body and is one of the following:
-- Non-static data member (*aka.* field); declared as a variable
-- Static data member; declared as a variable with the `static` keyword
-- A constructor
-- Member function; declared as a function
-- Nested type; declared as type or type alias
-- A `property` declaration
-- A `__subscript` declaration
-- A function call operator declaration
+Struct *no-body* declaration:
+> [*`modifier-list`*]<br>
+> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+
+Struct *with-members* declaration:
+> [*`modifier-list`*]<br>
+> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> **`'{'`** *`member-list`* **`'}'`**
+
+Struct *link-time extern type* declaration:
+> [*`modifier-list`*]<br>
+> **`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+
+Struct *link-time export type alias* declaration:
+> [*`modifier-list`*]<br>
+> **`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
+
+Member list:
+> *`member-list`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;( *`var-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`type-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`function-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`constructor-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`property-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`subscript-op-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;| *`function-call-op-decl`* )*
+
+### Parameters
+
+- *`modifier-list`* is an optional list of modifiers (TODO: link)
+- *`identifier`* is an optional name of the declared struct type
+- *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
+- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface.md).
+- *`type-expr`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
+- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+- *`member-list`* is a list of struct members. A member is one of:
+  - *`var-decl`* is a member variable declaration. See [Variables (TODO)](TODO)
+  - *`type-decl`* is a nested [type declaration](04-types.md).
+  - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
+  - *`constructor-decl`* is a [constructor declaration](#constructor).
+  - *`property-decl`* is a [property declaration](#property).
+  - *`subscript-op-decl`* is a [subscript operator declaration](#subscript-op).
+  - *`function-call-op-decl`* is a [function call operator declaration](#function-call-op).
+
+> ⚠️ **Warning:** `Slangc` currently accepts bracketed attributes right after the **`'struct'`** keyword. This
+> is deprecated syntax and expected to be removed. Bracketed attributes should be added in *`modifier-list`*,
+> instead. ([Issue #9691](https://github.com/shader-slang/slang/issues/9691))
+
+
+## Description
+
+A structure is a type consisting of an ordered sequence of members. A `struct` declaration has the following
+forms:
+
+- The *no-body* declaration specifies an existence of a structure type. The declaration simply specifies that
+  a structure type with the specified name exists. This enables its use in type expressions without the member
+  declarations.
+- The *with-members* declaration defines the structure type with a layout and an [extensible](04-types-extension.md)
+  list of non-layout members.
+- The *link-time extern type* declaration specifies the existence of a structure type that is defined in
+  another module. See [Modules (TODO)](TODO).
+- The *link-time export type* declaration specifies that a structure type is exported with a type alias. See
+  [Modules (TODO)](TODO).
+
+When the *`identifier`* is specified, it is the name of the structure. Otherwise, the structure is anonymous,
+which means that it is assigned an unspecified unique name. The main use of anonymous structures is in inline
+type definition expressions. For example, `struct { int a; } obj;` defines variable `obj` with an anonymous
+structure type that has field `int a;`. Anonymous structure declarations are meaningful only in the
+*with-members* form.
+
+A structure member is declared in the structure body and is one of the following:
+- A static data member; declared as a variable with the `static` keyword.
+- A non-static data member (*aka.* field); declared as a variable.
+- A [constructor](#constructor).
+- A [static member function](#static-member-function); declared as a function with the `static` modifier
+  keyword.
+- A [non-static member function](#nonstatic-member-function); declared as a function without the `static`
+  modifier keyword.
+- A nested type; declared as a type or a type alias.
+- A [`property` declaration](#property).
+- A [`__subscript` declaration](#subscript-op).
+- A [function call operator declaration](#function-call-op).
 
 A data member and a member function can be declared with the `static` keyword.
 
 - The storage for a static data member is allocated from the global storage. A static member function may:
-  - Access static data members of the struct.
-  - Invoke other static member functions of the struct.
-- The storage for a non-static data member is allocated as part of the struct. A non-static member function may:
+  - Access static data members of the structure.
+  - Invoke other static member functions of the structure.
+- The storage for a non-static data member is allocated as part of the structure. A non-static member function may:
   - Access both the static and the non-static data members.
   - Invoke both the static and the non-static member functions.
 
@@ -29,8 +107,10 @@ Data members may be assigned with a default initializer. The following rules app
   `const`.
 - `static const` data members must have a default initializer.
 
+For further information, see [Initialization (TODO)](TODO).
+
 The non-static data members are allocated sequentially within the `struct` when a variable of this type is
-allocated.
+allocated. See [Variables (TODO)](TODO).
 
 A nested type is a regular type enclosed within the scope of the outer `struct`.
 
@@ -38,26 +118,38 @@ A structure may conform to one or more [interface](04-types-interface.md) types.
 
 A structure may be extended with a [type extension](04-types-extension.md).
 
-`struct` members may be declared with access control specifiers `public`, `internal`, or `private`. The default
-member visibility is `internal`. Nested `struct` members have access to `private` members of the enclosing
-`struct`. See [access control (TODO)](TODO) for further information.
+`struct` members may be declared with access control specifiers `public`, `internal`, or `private` (specified
+in *`modifier-list`*). The default member visibility is `internal`. Nested `struct` members have access to
+`private` members of the enclosing `struct`. See [access control (TODO)](TODO) for further information.
 
 
-> Remark: Structure inheriting from another structure is deprecated. It may not work as expected.
+> ⚠️ **Warning:** Structure inheriting from another structure is deprecated. It may not work as expected.
 
 
-## Objects
+## Objects {#object}
 
 An object is an *instance* of a `struct`. An instance consists of all non-static data members defined in a
 `struct`. The data members may be initialized using an initializer list or a constructor. For details, see
 [variable declarations](07-declarations.md).
 
-## Constructors
+## Constructors {#constructor}
+
+### Syntax
+
+Declaration without body: (interfaces only)
+> **`'__init'`** **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\* **`';'`**
+
+Declaration with body:
+> **`'__init'`** **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
+
+
+### Description
 
 When a user-provided constructor is defined for a `struct`, a constructor is executed on object
 instantiation. A constructor can have any number of parameters. A constructor does not have a return
 type. More than one constructors may be defined in which case overload resolution is performed to select the
-most appropriate constructor given the parameters.
+most appropriate constructor given the initialization parameters.
 
 The constructor parameters are provided in the optional initializer list. When an initializer is not provided,
 the no-parameter constructor is invoked.
@@ -66,6 +158,9 @@ If a non-static data member is not initialized by the constructor, it has an und
 instantiation.
 
 `const` data members cannot be initialized by the constructor.
+
+*`where-clause`* is an optional generic constraint expression, discussed in [Generics (TODO)](TODO).
+
 
 **Example:**
 ```hlsl
@@ -141,7 +236,15 @@ state.
 > Remark 2: Accessing data members that are in undefined state is undefined behavior.
 
 
-## Non-static Member Functions
+## Static Member Functions {#static-member-function}
+
+A static member function is a regular function enclosed within the `struct` name space. Static member
+functions may access only static structure members.
+
+Invocation of a static member function does not require an object.
+
+
+## Non-static Member Functions {#nonstatic-member-function}
 
 A non-static member function has a hidden parameter `this` that refers to an object. The hidden parameter
 is used to reference the object data members and to invoke other non-static member functions.
@@ -151,26 +254,60 @@ In the function body, other members may be referenced using `this.`, although it
 By default, only a read access to the object members is allowed by a member function. If write access is
 required, the member function must be declared with the `[mutating]` attribute.
 
-Non-static member functions cannot be accessed without an object.
+Non-static member functions cannot be invoked without an object.
 
 > Remark: In C++ terminology, a member function is `const` by default. Attribute `[mutating]` makes it
 > a non-`const` member function.
 
 
-## Properties
+## Properties {#property}
+
+### Syntax
+
+Modern syntax, implicit `get` declaration: (interfaces only)
+> **`'property'`** *`identifier`* **`':'`** *`type-expr`* **`';'`**
+
+Modern syntax, explicit accessor declarations:
+> **`'property'`** *`identifier`* **`':'`** *`type-expr`*<br>
+> **`'{'`** *`accessor-decl`*\*  **`'}'`**
+
+Traditional syntax, implicit `get` declaration: (interfaces only)
+> **`'property'`** *`traditional-var-decl`* **`';'`**
+
+Traditional syntax, explicit accessor declarations:
+> **`'property'`** *`traditional-var-decl`*<br>
+> **`'{'`** *`accessor-decl`*\*  **`'}'`**
+
+Accessor declaration syntax, no body: (interfaces only)
+> *`accessor-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**] **`';'`**
+
+Accessor declaration syntax, with body:
+> *`accessor-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'get'`** \| **`'set'`**) [**`'('`** *`param-list`* **`')'`**]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
+
+### Description
 
 A property is a non-static member that provides a data member access interface. Properties of objects are
-accessed similarly to data members: reading a property is directed to the `get` method of the property and
-writes are directed to the `set` method, respectively.
+accessed similarly to data members: reading a property is directed to the `get` accessor of the property and
+writes are directed to the `set` accessor, respectively.
 
-A property that only provides the `get` method is a read-only property. A property that only provides the
-`set` method is a write-only property. A property that provides both is a read/write property.
+A property that only provides the `get` accessor is a read-only property. A property that only provides the
+`set` accessor is a write-only property. A property that provides both is a read/write property.
 
-The parentheses in the `get` method declaration are optional.
+The parentheses in the `get` accessor declaration are optional. The `get` accessor accepts no parameters.
 
-The parentheses and the parameter in the `set` method declaration are optional. In case the parameter is not
-specified in the declaration, a parameter `newValue` with the same type as the property is provided to the
-`set` body.
+The parentheses and the parameter in the `set` accessor declaration are optional. In case the parameter is not
+specified in the declaration, parameter `newValue` with the same type as the property is provided to the `set`
+body.
+
+The property declaration forms without accessor or accessor body declarations are useful only in
+[interface](04-interface.md) declarations.
+
+> ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
+> change and may not work as expected.
+
 
 **Example:**
 ```hlsl
@@ -237,9 +374,9 @@ void main(uint3 id : SV_DispatchThreadID)
 
 ## Accessing Members and Nested Types
 
-The static and non-static `struct` members and nested types are accessed using \``.`\`.
+The static and non-static structure members and nested types are accessed using \``.`\`.
 
-> Remark: The C++-style scope resolution operator \``::`\` is deprecated.
+> ⚠️ **Warning:** The C++-style scope resolution operator \``::`\` is deprecated. It should not be used.
 
 
 **Example:**
@@ -325,24 +462,40 @@ int tmp3 = TestStruct.getB();
 int tmp4 = TestStruct::incrementAndReturnB();
 ```
 
-## Subscript operator
+## Subscript operator {#subscript-op}
 
-A subscript `[]` operator can be added in a struct using a `__subscript` declaration. It is conceptually
+### Syntax
+
+Implicit `get` declaration: (interfaces only)
+> **`'__subscript'`** [**`'('`** *`param-list`* **`')'`**]<br>
+
+Explicit accessor declarations:
+> **`'__subscript'`** [**`'('`** *`param-list`* **`')'`**] **`'->'`** *`type-expr`*<br>
+> **`'{'`** *`accessor-decl`*\*  **`'}'`**
+
+See [properties](#property) for *`accessor-decl`* syntax.
+
+### Description
+
+A subscript `[]` operator can be added in a structure using a `__subscript` declaration. It is conceptually
 similar to a `property` with the main differences being that it operates on the instance of a `struct`
 (instead of a member) and it accepts parameters.
 
 A subscript declaration may have any number of parameters, including no parameters at all.
 
-The `get` method of a `__subscript` declaration is invoked when the subscript operator is applied to an object
-to return a value. The parentheses in the `get` method declaration are optional.
+The `get` accessor of a `__subscript` declaration is invoked when the subscript operator is applied to an
+object to return a value. The parentheses in the `get` accessor declaration are optional.
 
-The `set` method of a `__subscript` declaration is invoked when the subscript operator is applied to an object
-to assign a value. The parentheses and the parameter in the `set` method declaration are optional. In case the
-parameter is not specified in the declaration, a parameter `newValue` with the same type as specified for the
-subscript operator is provided to the `set` body.
+The `set` accessor of a `__subscript` declaration is invoked when the subscript operator is applied to an
+object to assign a value. The parentheses and the parameter in the `set` accessor declaration are optional. In
+case the parameter is not specified in the declaration, a parameter `newValue` with the same type as specified
+for the subscript operator is provided to the `set` body.
 
 Multiple `__subscript` declarations are allowed as long as the declarations have different
 signatures. Overload resolution is the same as overload resolution with function invocations.
+
+> ⚠️ **Warning:** Subscript operator reference accessor `ref` is a Slang internal language feature. It is
+> subject to change and may not work as expected.
 
 **Example:**
 
@@ -389,7 +542,18 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-## Function call operator
+## Function call operator {#function-call-op}
+
+### Syntax
+
+Declaration without body: (interfaces only)
+> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`** **`';'`**
+
+Declaration with body:
+> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`**<br>
+> **`'{'`** *`body-stmt`*\* **`'}'`**
+
+### Description
 
 A function call `()` operator can be added using an `operator ()` declaration. This allows applying parameters
 to an object as if the object was a function.
@@ -400,7 +564,9 @@ is the same as overload resolution with function invocations.
 **Example:**
 
 ```hlsl
-struct TestStruct : IFunc
+RWStructuredBuffer<float> outputBuffer;
+
+struct TestStruct
 {
     float base;
 
@@ -445,8 +611,8 @@ The *natural layout* for a structure type uses the following rules:
   - The offset of the first data item is 0
   - The offset of the *Nth* data item is the offset+size of the previous item rounded up to the alignment of
     the item
-- The size of the struct is offset+size of the last item. That is, the struct is not tail-padded and rounded
-  up to the alignment of the struct.
+- The size of the structure is offset+size of the last item. That is, the structure is not tail-padded and rounded
+  up to the alignment of the structure.
 
 The following algorithm may be used:
 
