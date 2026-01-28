@@ -1,0 +1,97 @@
+name: Test SPIRV-Tools ToT
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday 2 AM UTC
+  workflow_dispatch:     # Manual trigger for testing
+
+jobs:
+  test-spirv-tot:
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update SPIRV-Tools and run tests
+        id: update
+        shell: bash
+        run: |
+          bash extras/update-spirv-tools.sh --test 2>&1 | tee spirv-update.log
+        continue-on-error: true
+
+      - name: Parse results
+        id: parse
+        if: always()
+        shell: bash
+        run: |
+          # Check if script succeeded
+          if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+          # Extract commit info
+          # CURRENT_SPIRV_COMMIT=<short-hash>
+          # NEW_SPIRV_COMMIT=<short-hash>
+          CURRENT_COMMIT=$(grep "^CURRENT_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+          NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+
+          echo "current_spirv_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "new_spirv_commit=$NEW_COMMIT" >> $GITHUB_OUTPUT
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirv-update-logs
+          path: |
+            spirv-update.log
+            build/test-results/
+
+      - name: Send Slack notification
+        if: false  # Disabled until workflow is stable - change to 'always()' to enable
+        uses: slackapi/slack-github-action@v1
+        with:
+          webhook: ${{ secrets.SLACK_SPIRV_WEBHOOK }}
+          payload: |
+            {
+              "text": "${{ steps.parse.outputs.status == 'success' && '✅' || '⚠️' }} SPIRV-Tools ToT Test ${{ steps.parse.outputs.status == 'success' && 'PASSED' || 'FAILED' }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*SPIRV-Tools ToT Test Result*\n
+                            Status: ${{ steps.parse.outputs.status == 'success' && '✅ PASSED' || '⚠️ FAILED' }}\n
+                            Update: `${{ steps.parse.outputs.current_spirv_commit }}` → `${{ steps.parse.outputs.new_spirv_commit }}`\n
+                            Platform: windows-latest"
+                  }
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Run"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    },
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "Download Logs"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }

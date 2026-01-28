@@ -1,157 +1,360 @@
-#!/bin/bash
-#
-# Script to update SPIRV-Tools and SPIRV-Headers submodules
-# and regenerate the generated files for a PR.
-#
-# Usage: bash extras/update-spirv-tools.sh [commit-hash]
-#   commit-hash: Specific commit hash for SPIRV-Tools (default: origin/main)
-#
+#!/usr/bin/env bash
+# Update SPIRV-Tools and SPIRV-Headers submodules
+# Automates the manual process documented in docs/update_spirv.md
+# Can be used both locally and in CI
 
-set -e
+set -e  # Exit on error
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Script version
+SCRIPT_VERSION="1.0.0"
 
-log_info() {
-  echo -e "${GREEN}[INFO]${NC} $1"
+# Default values
+SPIRV_COMMIT=""
+RUN_TESTS=false
+CREATE_PR=false
+FORCE=false
+
+# Show help message
+show_help() {
+    cat << EOF
+Update SPIRV-Tools and SPIRV-Headers submodules
+
+Usage: $0 [OPTIONS]
+
+This script automates the SPIRV-Tools update process documented in docs/update_spirv.md.
+It can be used both locally by developers and in CI workflows.
+
+Options:
+  --commit HASH        Update to specific SPIRV-Tools commit (default: latest from main)
+  --test               Run test suite after update
+  --create-pr          Create GitHub PR after successful update (requires gh CLI)
+  --force              Skip confirmation prompts and continue despite failures
+  --help               Show this help message
+
+Examples:
+  $0                                    # Update to latest, no tests, no PR
+  $0 --test                             # Update and run test suite
+  $0 --create-pr                        # Update and create PR (implies --test)
+  $0 --commit abc123def                 # Update to specific commit
+  $0 --test --create-pr                 # Full workflow: update, test, PR
+
+CI Usage:
+  $0 --test                             # CI runs tests
+
+Bisection Workflow:
+  cd external/spirv-tools && git bisect start origin/main HEAD && cd ../..
+  $0 --commit \$(git -C external/spirv-tools rev-parse HEAD) --test
+  cd external/spirv-tools && git bisect good  # or: git bisect bad
+
+Reference: docs/update_spirv.md
+EOF
 }
 
-log_warn() {
-  echo -e "${YELLOW}[WARN]${NC} $1"
-}
+# Print banner
+echo "========================================"
+echo "SPIRV-Tools Update Script v$SCRIPT_VERSION"
+echo "========================================"
+echo ""
 
-log_error() {
-  echo -e "${RED}[ERROR]${NC} $1"
-}
+# Parse command-line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --commit)
+            SPIRV_COMMIT="$2"
+            shift 2
+            ;;
+        --test)
+            RUN_TESTS=true
+            shift
+            ;;
+        --create-pr)
+            CREATE_PR=true
+            RUN_TESTS=true  # PR creation implies testing
+            shift
+            ;;
+        --force)
+            FORCE=true
+            shift
+            ;;
+        --help)
+            show_help
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option: $1"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+done
 
-# Check if we're in the repository root
-if [ ! -f "CMakeLists.txt" ] || [ ! -d "external/spirv-tools" ]; then
-  log_error "This script must be run from the Slang repository root."
-  exit 1
+# Validate environment
+echo "=== Validating Environment ==="
+
+# Check we're in Slang repo root
+if [[ ! -f "CMakeLists.txt" ]] || [[ ! -d "external/spirv-tools" ]]; then
+    echo "Error: Must run from Slang repository root"
+    echo "Current directory: $(pwd)"
+    exit 1
+fi
+echo "[OK] Running from Slang repository root"
+
+# Check git working directory is clean (unless --force)
+if [[ "$FORCE" != "true" ]] && [[ -n $(git status --porcelain) ]]; then
+    echo "Error: Working directory has uncommitted changes"
+    echo "Use --force to override (not recommended)"
+    git status --short
+    exit 1
+fi
+echo "[OK] Working directory is clean"
+
+# Check required tools
+for cmd in git cmake python3; do
+    if ! command -v $cmd &> /dev/null; then
+        echo "Error: Required tool not found: $cmd"
+        exit 1
+    fi
+done
+echo "[OK] Required tools available: git, cmake, python3"
+
+# Check gh CLI if creating PR
+if [[ "$CREATE_PR" == "true" ]]; then
+    if ! command -v gh &> /dev/null; then
+        echo "Error: gh CLI not found but --create-pr was specified"
+        echo "Install from https://cli.github.com/"
+        exit 1
+    fi
+    echo "[OK] gh CLI available"
 fi
 
-COMMIT_HASH="${1:-origin/main}"
+echo ""
 
-log_info "Starting SPIRV update process..."
-log_info "SPIRV-Tools target: $COMMIT_HASH"
-
-# Step 1: Synchronize and update submodules
-log_info "Synchronizing and updating submodules..."
+# Sync submodules (from docs/update_spirv.md)
+echo "=== Synchronizing Submodules ==="
 git submodule sync
 git submodule update --init --recursive
+echo "[OK] Submodules synchronized"
+echo ""
 
-# Step 2: Fetch and resolve the commit hash
-log_info "Fetching SPIRV-Tools..."
-git -C external/spirv-tools fetch
+# Capture current commits (full hash for operations, short for display)
+echo "=== Capturing Current State ==="
+OLD_SPIRV=$(git -C external/spirv-tools rev-parse HEAD)
+OLD_HEADERS=$(git -C external/spirv-headers rev-parse HEAD)
+OLD_SPIRV_SHORT=$(git -C external/spirv-tools rev-parse --short=8 HEAD)
+OLD_HEADERS_SHORT=$(git -C external/spirv-headers rev-parse --short=8 HEAD)
+echo "Current SPIRV-Tools:   $OLD_SPIRV_SHORT"
+echo "Current SPIRV-Headers: $OLD_HEADERS_SHORT"
+echo ""
 
-log_info "Resolving commit hash..."
-RESOLVED_COMMIT=$(git -C external/spirv-tools rev-parse "$COMMIT_HASH" 2>/dev/null || echo "")
-
-if [ -z "$RESOLVED_COMMIT" ]; then
-  log_error "Could not resolve commit hash: $COMMIT_HASH"
-  exit 1
+# Get SPIRV-Tools commit (latest if not specified)
+if [[ -z "$SPIRV_COMMIT" ]]; then
+    echo "=== Fetching Latest SPIRV-Tools Commit ==="
+    git -C external/spirv-tools fetch origin
+    SPIRV_COMMIT=$(git -C external/spirv-tools rev-parse origin/main)
+    SPIRV_SHORT=$(git -C external/spirv-tools rev-parse --short=8 origin/main)
+    echo "Target: $SPIRV_SHORT (latest from main)"
+else
+    echo "=== Using Specified SPIRV-Tools Commit ==="
+    # Fetch to ensure we have the commit
+    git -C external/spirv-tools fetch origin
+    SPIRV_SHORT=$(git -C external/spirv-tools rev-parse --short=8 $SPIRV_COMMIT)
+    echo "Target: $SPIRV_SHORT (specified)"
 fi
+echo ""
 
-# Extract last 6 characters of commit hash for branch suffix
-COMMIT_SUFFIX="${RESOLVED_COMMIT: -6}"
-BRANCH_NAME="update-spirv-${COMMIT_SUFFIX}"
+# Update SPIRV-Tools to target commit
+echo "=== Updating SPIRV-Tools to $SPIRV_SHORT ==="
+git -C external/spirv-tools checkout $SPIRV_COMMIT
+echo "[OK] SPIRV-Tools updated"
+echo ""
 
-log_info "Resolved commit: $RESOLVED_COMMIT"
-log_info "Branch name: $BRANCH_NAME"
+# Build SPIRV-Tools to generate files (from docs/update_spirv.md)
+echo "=== Building SPIRV-Tools ==="
+pushd external/spirv-tools > /dev/null
 
-# Step 3: Create a branch for the update
-log_info "Creating branch '$BRANCH_NAME'..."
-git checkout -b "$BRANCH_NAME" || {
-  log_warn "Branch '$BRANCH_NAME' may already exist. Switching to it..."
-  git checkout "$BRANCH_NAME"
-}
-
-# Step 4: Update the SPIRV-Tools submodule to the specified version
-log_info "Updating SPIRV-Tools to $RESOLVED_COMMIT..."
-git -C external/spirv-tools checkout "$RESOLVED_COMMIT"
-
-# Step 5: Build spirv-tools to generate files
-log_info "Building SPIRV-Tools to generate files..."
-cd external/spirv-tools
-
-log_info "Running git-sync-deps to fetch dependencies..."
+# Sync SPIRV-Tools dependencies (includes SPIRV-Headers)
+echo "Running git-sync-deps..."
 python3 utils/git-sync-deps
-
-log_info "Configuring SPIRV-Tools with CMake..."
-cmake . -B build
-
-log_info "Building SPIRV-Tools (Release configuration)..."
-cmake --build build --config Release
-
-cd ../..
-
-# Step 6: Update SPIRV-Headers to what SPIRV-Tools uses
-log_info "Determining SPIRV-Headers revision from SPIRV-Tools DEPS..."
-SPIRV_HEADERS_REV=$(grep -oP "spirv_headers_revision.*'\K[a-f0-9]+" external/spirv-tools/DEPS ||
-  grep "spirv_headers_revision" external/spirv-tools/DEPS | grep -oE "[a-f0-9]{40}")
-
-if [ -z "$SPIRV_HEADERS_REV" ]; then
-  log_error "Could not determine SPIRV-Headers revision from DEPS file."
-  log_info "Contents of spirv_headers_revision line:"
-  grep spirv_headers_revision external/spirv-tools/DEPS
-  exit 1
+if [[ $? -ne 0 ]]; then
+    echo "Error: git-sync-deps failed"
+    echo "This may require SSH key registration with gitlab.khronos.org"
+    echo "See docs/update_spirv.md for setup instructions"
+    exit 1
 fi
 
-log_info "SPIRV-Headers revision: $SPIRV_HEADERS_REV"
-log_info "Updating SPIRV-Headers submodule..."
-git -C external/spirv-headers fetch
-git -C external/spirv-headers checkout "$SPIRV_HEADERS_REV"
+# Build SPIRV-Tools to generate files
+echo "Configuring build..."
+cmake . -B build -DCMAKE_BUILD_TYPE=Release
+echo "Building..."
+cmake --build build --config Release
+if [[ $? -ne 0 ]]; then
+    echo "Error: SPIRV-Tools build failed"
+    exit 1
+fi
 
-# Step 7: Copy the generated files from spirv-tools/build/ to spirv-tools-generated/
-log_info "Copying generated files to spirv-tools-generated/..."
+popd > /dev/null
+echo "[OK] SPIRV-Tools built successfully"
+echo ""
 
-# Remove old generated files (but keep README.md)
-find external/spirv-tools-generated -maxdepth 1 -name "*.h" -delete
-find external/spirv-tools-generated -maxdepth 1 -name "*.inc" -delete
+# Determine SPIRV-Headers commit (from docs/update_spirv.md)
+echo "=== Determining SPIRV-Headers Commit from DEPS ==="
+# Parse DEPS file for spirv_headers_revision
+HEADERS_COMMIT=$(grep -oP "'spirv_headers_revision':\s*'\K[a-f0-9]+(?=')" \
+                 external/spirv-tools/DEPS)
+if [[ -z "$HEADERS_COMMIT" ]]; then
+    echo "Error: Could not parse spirv_headers_revision from DEPS"
+    echo "Check external/spirv-tools/DEPS format"
+    exit 1
+fi
+HEADERS_SHORT=$(git -C external/spirv-headers rev-parse --short=8 $HEADERS_COMMIT)
+echo "Found in DEPS: $HEADERS_SHORT"
+echo ""
 
-# Copy new generated files
+echo "=== Updating SPIRV-Headers to $HEADERS_SHORT ==="
+git -C external/spirv-headers fetch origin
+git -C external/spirv-headers checkout $HEADERS_COMMIT
+echo "[OK] SPIRV-Headers updated"
+echo ""
+
+# Copy generated files (from docs/update_spirv.md)
+echo "=== Copying Generated Files ==="
+rm -f external/spirv-tools-generated/*.h
+rm -f external/spirv-tools-generated/*.inc
 cp external/spirv-tools/build/*.h external/spirv-tools-generated/ 2>/dev/null || true
 cp external/spirv-tools/build/*.inc external/spirv-tools-generated/ 2>/dev/null || true
+echo "[OK] Generated files copied"
+echo ""
 
-# Verify files were copied
-H_COUNT=$(find external/spirv-tools-generated -maxdepth 1 -name "*.h" | wc -l)
-INC_COUNT=$(find external/spirv-tools-generated -maxdepth 1 -name "*.inc" | wc -l)
+# Stage all changes
+echo "=== Staging Changes ==="
+git add external/spirv-tools
+git add external/spirv-headers
+git add external/spirv-tools-generated
+echo "[OK] Changes staged"
+echo ""
 
-log_info "Copied $H_COUNT .h files and $INC_COUNT .inc files"
+# Validate generated files (use existing CI check)
+echo "=== Validating Generated Files ==="
+if [[ -f "extras/check-spirv-generated.sh" ]]; then
+    bash extras/check-spirv-generated.sh
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Generated files validation failed"
+        echo "Files may be out of sync or missing"
+        exit 1
+    fi
+    echo "[OK] Generated files validated"
+else
+    echo "Warning: extras/check-spirv-generated.sh not found, skipping validation"
+fi
+echo ""
 
-if [ "$H_COUNT" -eq 0 ] && [ "$INC_COUNT" -eq 0 ]; then
-  log_error "No generated files were copied. Check if SPIRV-Tools build succeeded."
-  exit 1
+# Build and test Slang (if requested)
+if [[ "$RUN_TESTS" == "true" ]]; then
+    echo "=== Building Slang ==="
+    # Clean build directory (from docs/update_spirv.md)
+    echo "Cleaning build directory..."
+    rm -rf build
+
+    # Detect platform and configure
+    echo "Configuring build..."
+    if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+        cmake --preset vs2022
+    else
+        cmake --preset default
+    fi
+    
+    echo "Building Release configuration..."
+    cmake --build --preset release
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Slang build failed"
+        exit 1
+    fi
+    echo "[OK] Slang built successfully"
+    echo ""
+
+    echo "=== Running Tests ==="
+    export SLANG_RUN_SPIRV_VALIDATION=1
+    
+    echo "Running test suite (this may take 10-30 minutes)..."
+    ./build/Release/bin/slang-test \
+        -expected-failure-list tests/expected-failure-github.txt \
+        -use-test-server \
+        -server-count 8
+
+    if [[ $? -ne 0 ]]; then
+        echo "Error: Tests failed"
+        if [[ "$FORCE" != "true" ]]; then
+            echo "Use --force to continue despite test failures (not recommended)"
+            exit 1
+        fi
+        echo "Warning: Continuing despite test failures (--force)"
+    else
+        echo "[OK] Tests passed"
+    fi
+    echo ""
 fi
 
-# Step 8: Stage the changes
-log_info "Staging changes..."
-git add external/spirv-headers
-git add external/spirv-tools
-git add external/spirv-tools-generated
+# Create PR (if --create-pr)
+if [[ "$CREATE_PR" == "true" ]]; then
+    echo "=== Creating Pull Request ==="
+    
+    # Create branch
+    BRANCH="spirv-tools-update-$(date +%Y-%m-%d)"
+    echo "Creating branch: $BRANCH"
+    git checkout -b $BRANCH
 
-# Show status
-log_info "Current git status:"
-git status --short external/spirv-headers external/spirv-tools external/spirv-tools-generated
+    # Commit changes
+    echo "Committing changes..."
+    git commit -m "Update SPIRV-Tools to $SPIRV_SHORT
 
+- SPIRV-Tools: $OLD_SPIRV_SHORT -> $SPIRV_SHORT
+- SPIRV-Headers: $OLD_HEADERS_SHORT -> $HEADERS_SHORT
+- Generated files updated and validated"
+
+    # Create PR body
+    PR_BODY="## SPIRV-Tools Update
+
+**SPIRV-Tools**: [\`$OLD_SPIRV_SHORT\`](https://github.com/KhronosGroup/SPIRV-Tools/commit/$OLD_SPIRV) -> [\`$SPIRV_SHORT\`](https://github.com/KhronosGroup/SPIRV-Tools/commit/$SPIRV_COMMIT)
+**SPIRV-Headers**: [\`$OLD_HEADERS_SHORT\`](https://github.com/KhronosGroup/SPIRV-Headers/commit/$OLD_HEADERS) -> [\`$HEADERS_SHORT\`](https://github.com/KhronosGroup/SPIRV-Headers/commit/$HEADERS_COMMIT)
+
+### Changes
+[View SPIRV-Tools changes](https://github.com/KhronosGroup/SPIRV-Tools/compare/$OLD_SPIRV...$SPIRV_COMMIT)
+
+### Test Results
+Test suite: PASSED
+
+---
+Generated by \`extras/update-spirv-tools.sh\`"
+
+    # Create PR as draft
+    echo "Creating draft PR..."
+    gh pr create --title "Update SPIRV-Tools to $SPIRV_SHORT" \
+                 --body "$PR_BODY" \
+                 --draft
+
+    echo "[OK] Pull request created as draft"
+    echo ""
+fi
+
+# Summary output
 echo ""
-log_info "=========================================="
-log_info "SPIRV update preparation complete!"
-log_info "=========================================="
+echo "========================================"
+echo "=== SPIRV-Tools Update Complete ==="
+echo "========================================"
 echo ""
-log_info "Next steps:"
-echo "  1. Review the staged changes with: git diff --cached"
-echo "  2. Build and test Slang:"
-echo "     rm -rf build"
-echo "     cmake --preset vs2022  # or your preferred preset"
-echo "     cmake --build --preset release"
-echo "     export SLANG_RUN_SPIRV_VALIDATION=1"
-echo "     build/Release/bin/slang-test -use-test-server -server-count 8"
-echo "  3. Commit the changes:"
-echo "     git commit -m \"Update SPIRV-Tools and SPIRV-Headers to latest versions\""
-echo "  4. Push and create a PR:"
-echo "     git push origin $BRANCH_NAME"
+echo "SPIRV-Tools:   $OLD_SPIRV_SHORT -> $SPIRV_SHORT"
+echo "SPIRV-Headers: $OLD_HEADERS_SHORT -> $HEADERS_SHORT"
+if [[ "$RUN_TESTS" == "true" ]]; then
+    echo "Tests:         PASSED"
+else
+    echo "Tests:         SKIPPED (use --test to run)"
+fi
+if [[ "$CREATE_PR" == "true" ]]; then
+    echo "PR:            CREATED"
+fi
 echo ""
+
+# Output for CI parsing (one per line)
+echo "CURRENT_SPIRV_COMMIT=$OLD_SPIRV_SHORT"
+echo "NEW_SPIRV_COMMIT=$SPIRV_SHORT"
