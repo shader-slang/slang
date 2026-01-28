@@ -70,7 +70,12 @@ public struct InlineVector<T, int N> : IVector<T>
     */
     public __subscript(int index) -> T
     {
+        [ForceInline]
+        [Differentiable]
         get() { return this.data[index]; }
+
+        [ForceInline]
+        [Differentiable]
         set() { this.data[index] = newValue; }
     }
 

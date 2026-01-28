@@ -1,10 +1,6 @@
 implementing neural;
 
-#ifdef UNIT_TEST
-#define VISIBILITY_LEVEL public
-#else
-#define VISIBILITY_LEVEL internal
-#endif
+#include "common-def.slang"
 
 
 internal interface IArrayAccessor<T> : IRWArray<T>
