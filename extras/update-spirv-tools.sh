@@ -101,10 +101,11 @@ fi
 echo "[OK] Running from Slang repository root"
 
 # Check git working directory is clean (unless --force)
-if [[ "$FORCE" != "true" ]] && [[ -n $(git status --porcelain) ]]; then
+# Ignore untracked files, only check for uncommitted changes to tracked files
+if [[ "$FORCE" != "true" ]] && [[ -n $(git status --porcelain --untracked-files=no) ]]; then
     echo "Error: Working directory has uncommitted changes"
-    echo "Use --force to override (not recommended)"
-    git status --short
+    echo "Use --force to override"
+    git status --short --untracked-files=no
     exit 1
 fi
 echo "[OK] Working directory is clean"
