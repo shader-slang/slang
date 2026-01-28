@@ -844,41 +844,37 @@ static TestResult _diagnosticAnnotationTest(
         return TestResult::Fail;
     }
 
-    // Parse annotations from source
-    List<String> annotations;
-    if (SLANG_FAILED(DiagnosticAnnotationUtil::parseAnnotations(
+    // Extract standard error from the formatted output
+    // Format: "result code = X\nstandard error = {\n<content>\n}\n..."
+    String standardError;
+    {
+        UnownedStringSlice output = outputToCheck.getUnownedSlice();
+        Index stderrStart = output.indexOf(UnownedStringSlice::fromLiteral("standard error = {\n"));
+        if (stderrStart != -1)
+        {
+            stderrStart += strlen("standard error = {\n");
+            // Search for "\n}" after stderrStart
+            UnownedStringSlice remaining = output.tail(stderrStart);
+            Index stderrEnd = remaining.indexOf(UnownedStringSlice::fromLiteral("\n}"));
+            if (stderrEnd != -1)
+            {
+                standardError = String(remaining.head(stderrEnd));
+            }
+        }
+    }
+
+    // Check diagnostic annotations
+    String errorMessage;
+    if (!DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
             sourceText.getUnownedSlice(),
             diagPrefix.getUnownedSlice(),
-            annotations)))
+            standardError.getUnownedSlice(),
+            errorMessage))
     {
-        testReporter.message(
-            TestMessageType::RunError,
-            "Failed to parse diagnostic annotations");
+        testReporter.message(TestMessageType::TestFailure, errorMessage.getBuffer());
         return TestResult::Fail;
     }
 
-    // Check if all annotations are present in output
-    List<String> missingAnnotations;
-    if (!DiagnosticAnnotationUtil::checkAnnotations(
-            annotations,
-            outputToCheck.getUnownedSlice(),
-            missingAnnotations))
-    {
-        // Report missing annotations
-        StringBuilder errorMsg;
-        errorMsg << "Diagnostic annotation check failed. Missing expected substrings:\n";
-        for (const auto& missing : missingAnnotations)
-        {
-            errorMsg << "  //" << diagPrefix << " " << missing << "\n";
-        }
-        testReporter.message(TestMessageType::TestFailure, errorMsg.getBuffer());
-        return TestResult::Fail;
-    }
-
-    testReporter.messageFormat(
-        TestMessageType::Info,
-        "All %d diagnostic annotation(s) matched",
-        int(annotations.getCount()));
     return TestResult::Pass;
 }
 

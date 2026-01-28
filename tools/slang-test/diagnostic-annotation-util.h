@@ -9,43 +9,38 @@ namespace Slang
 
 /// Utility for checking diagnostic test annotations.
 ///
-/// Diagnostic annotations allow test files to specify expected substrings
-/// in the program output using a simple annotation format:
+/// Diagnostic annotations support two formats:
 ///
+/// 1. Simple substring matching:
 ///   //PREFIX expected substring
+///
+/// 2. Position-based matching with column indicators:
+///   some code line
+///   //PREFIX        ^^^^^ Expected message substring
 ///
 /// Where PREFIX is specified via the test command option: DIAGNOSTIC_TEST(diag=PREFIX):...
 ///
 /// Example:
 ///   //DIAGNOSTIC_TEST(diag=CHECK):SIMPLE:
 ///   void test() {
-///       if (x);  // This triggers a warning
+///       if (x);
+///   //CHECK        ^ warning
 ///   }
-///   //CHECK warning
-///   //CHECK empty statement
 ///
-/// The checker will verify that all annotated substrings appear somewhere in the output.
+/// The checker will verify diagnostics match the expected positions and messages.
 struct DiagnosticAnnotationUtil
 {
-    /// Parse diagnostic annotations from source file
-    /// @param sourceText The source file contents
+    /// Check diagnostic annotations in source file against machine-readable diagnostic output
+    /// @param sourceText The source file contents containing annotations
     /// @param prefix The annotation prefix (e.g., "CHECK", "foo")
-    /// @param outAnnotations List to populate with expected substrings
-    /// @return SLANG_OK on success, SLANG_FAIL if parsing fails
-    static SlangResult parseAnnotations(
+    /// @param machineReadableOutput The machine-readable diagnostic output from compiler
+    /// @param outErrorMessage Error message if check fails
+    /// @return true if all annotations matched, false otherwise
+    static bool checkDiagnosticAnnotations(
         const UnownedStringSlice& sourceText,
         const UnownedStringSlice& prefix,
-        List<String>& outAnnotations);
-
-    /// Check that all annotations appear in the output
-    /// @param annotations List of expected substrings from parseAnnotations
-    /// @param output The actual program output to check
-    /// @param outMissingAnnotations List to populate with annotations not found in output
-    /// @return true if all annotations found, false otherwise
-    static bool checkAnnotations(
-        const List<String>& annotations,
-        const UnownedStringSlice& output,
-        List<String>& outMissingAnnotations);
+        const UnownedStringSlice& machineReadableOutput,
+        String& outErrorMessage);
 };
 
 } // namespace Slang
