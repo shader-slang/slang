@@ -7,8 +7,11 @@ There are three directories under `external` that are related to SPIR-V:
 
 In order to use the latest or custom SPIR-V, they need to be updated.
 
+---
 
-## Update SPIRV-Tools
+## Manual Update Process
+
+### Update SPIRV-Tools
 
 On the Slang repo, you need to update to use the latest commit of SPIRV-Tools and SPIRV-Headers.
 
@@ -31,7 +34,7 @@ On the Slang repo, you need to update to use the latest commit of SPIRV-Tools an
    git -C external/spirv-tools checkout origin/main
    ```
 
-## Build spirv-tools
+### Build spirv-tools
 
 A directory, `external/spirv-tools/generated`, holds a set of files generated from spirv-tools directory.
 You need to build spirv-tools in order to generate them.
@@ -47,7 +50,7 @@ cmake.exe --build build --config Release
 cd ../..
 ```
 
-## Update SPIRV-Headers
+### Update SPIRV-Headers
 
 1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
    ```
@@ -63,7 +66,7 @@ cd ../..
 Note that the update of SPIRV-Headers should be done after running `python3.exe utils\git-sync-deps`, because the python script will update `external/spirv-tools/external/spirv-headers` to whichever commit the current SPIRV-Tools depends on.
 
 
-## Copy the generated files from `spirv-tools/build/` to `spirv-tools-generated/`
+### Copy the generated files from `spirv-tools/build/` to `spirv-tools-generated/`
 
 Copy the generated header files from `external/spirv-tools/build/` to `external/spirv-tools-generated/`.
 ```
@@ -74,7 +77,7 @@ cp external/spirv-tools/build/*.inc external/spirv-tools-generated/
 ```
 
 
-## Build Slang and run slang-test
+### Build Slang and run slang-test
 
 After SPIRV submodules are updated, you need to build and test.
 ```
@@ -99,7 +102,7 @@ It is often the case that some of tests fail, because of the changes on SPIRV-He
 You need to properly resolve them before proceed.
 
 
-## Commit and create a Pull Request
+### Commit and create a Pull Request
 
 After testing is done, you need to stage and commit the updated submodule references and any generated files.
 Note that when you want to use new commit IDs of the submodules, you have to stage with git-add command for the directory of the submodule itself.
@@ -116,6 +119,73 @@ git push origin update_spirv # Use your own branch name as needed
 ```
 
 Once all changes are pushed to GitHub, you can create a Pull Request on the main Slang repository.
+
+---
+
+## Automated Update Process
+
+The repository includes automation to simplify SPIRV-Tools updates:
+- Update script: `extras/update-spirv-tools.sh`
+  - Automates the manual steps above
+- CI workflow: `.github/workflows/update-spirv-tools.yml`
+  - Weekly testing against SPIRV-Tools main branch to catch breaking changes
+
+### Using the Update Script
+
+The `extras/update-spirv-tools.sh` script automates all the manual steps described above.
+
+**Basic usage**:
+```bash
+# Update to latest SPIRV-Tools main branch (no tests, no PR)
+./extras/update-spirv-tools.sh
+
+# Update and run full test suite with SPIRV validation
+./extras/update-spirv-tools.sh --test
+
+# Update, test, and create PR automatically
+./extras/update-spirv-tools.sh --test --create-pr
+
+# Update to specific commit (useful for bisection)
+./extras/update-spirv-tools.sh --commit abc123de --test
+
+# Force update even with uncommitted changes
+./extras/update-spirv-tools.sh --force --test
+```
+
+**What the script does**:
+1. Validates you're in the repository root with a clean working directory
+2. Updates `external/spirv-tools` to latest (or specified commit)
+3. Builds SPIRV-Tools and generates files
+4. Determines correct SPIRV-Headers commit from `DEPS` and updates it
+5. Copies generated files to `external/spirv-tools-generated/`
+6. Validates everything with `extras/check-spirv-generated.sh`
+7. Builds Slang with the new SPIRV-Tools
+8. Runs full test suite with SPIRV validation (if `--test` specified)
+9. Creates PR with detailed description (if `--create-pr` specified)
+
+**Options**:
+- `--commit <hash>` - Update to specific SPIRV-Tools commit instead of latest
+- `--test` - Run full test suite with SPIRV validation after update
+- `--create-pr` - Create GitHub PR automatically (requires `gh` CLI and `--test`)
+- `--force` - Skip dirty working directory check (use with caution)
+- `--help` - Show detailed usage information
+
+### Weekly CI Testing
+
+The repository includes a CI workflow (`.github/workflows/update-spirv-tools.yml`) that
+automatically tests Slang against the latest SPIRV-Tools main branch weekly on Monday at 2 AM UTC
+
+You can trigger the workflow manually:
+```bash
+gh workflow run update-spirv-tools.yml
+```
+
+On success the CI provides a command to run locally to create an update PR:
+```bash
+./extras/update-spirv-tools.sh --test --create-pr
+```
+
+---
 
 ## CI Validation
 
