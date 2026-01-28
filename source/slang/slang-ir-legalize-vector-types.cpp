@@ -111,7 +111,9 @@ struct VectorTypeLoweringContext
                         return scalar;
                     // Otherwise, create a broadcast of this scalar
                     else
-                        return (IRInst*)builder.emitMakeVectorFromScalar(swizzle->getFullType(), scalar);
+                        return (IRInst*)builder.emitMakeVectorFromScalar(
+                            swizzle->getFullType(),
+                            scalar);
                 }
                 // Swizzling a 0-vector should produce poison (undefined)
                 if (has0VectorType(swizzled))
@@ -134,7 +136,9 @@ struct VectorTypeLoweringContext
             {
                 const auto base = swizzledStore->getDest();
                 if (has1VectorPtrType(base))
-                    return (IRInst*)builder.emitStore(getReplacement(base), swizzledStore->getSource());
+                    return (IRInst*)builder.emitStore(
+                        getReplacement(base),
+                        swizzledStore->getSource());
                 // Storing to a 0-vector does nothing, remove the instruction
                 if (has0VectorPtrType(base))
                 {
