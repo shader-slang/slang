@@ -15,8 +15,8 @@
 // only has one OpTypeArray instruction, which indicate the deduplication is handled correctly
 // across enum-lowering.
 
-// CHECK: OpEntryPoint
-// CHECK-COUNT-1: OpTypeArray
+// CHECK: OpTypeArray %int %int_1
+// CHECK-NOT: OpTypeArray %int %int_1
 
 enum class MyEnum
 {
