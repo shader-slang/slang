@@ -1,6 +1,4 @@
 // Test permuto encoder backward pass using autodiff
-// Reference: tiny-cuda-nn permuto.h encoding
-// Run the CUDA reference first: cd tiny-cuda-nn/build && ./permuto_jit_test b
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature
@@ -28,7 +26,9 @@ static const float LOG2_PER_LEVEL_SCALE = 1.5f;
 static const float MAX_LEVEL_RATIO = 1.1f;  // Matches tiny-cuda-nn default
 
 // Type alias for the encoder
-typealias Encoder = PermutoEncoder<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE>;
+typealias InArray = float[N_POS_DIMS];
+typealias OutArray = float[N_FEATURES];
+typealias Encoder = PermutoEncoder<float, N_POS_DIMS, FEATURE_DIM_PER_ENTRY, LOG2_HASHMAP_SIZE, N_LEVELS, InArray, OutArray>;
 
 static const float EPSILON = 0.1f;  // Allow for floating-point precision differences
 
@@ -64,25 +64,16 @@ void encodeAllLevels(
     Encoder.Params params;
     params.maxLevel = MAX_LEVEL_RATIO * float(N_LEVELS);
 
-    // Process all levels
+    // Process all levels - encodePerLevel writes to output at correct offset
     [ForceUnroll]
     for (uint level = 0; level < N_LEVELS; ++level)
     {
         // Setup params using prepareLevelInfo which computes all level-specific parameters
         Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
-        // Encode this level
-        float levelOut[FEATURE_DIM_PER_ENTRY];
-        Encoder.encode<StructuredBufferStorage<float>, float[N_POS_DIMS], float[FEATURE_DIM_PER_ENTRY]>(
-            params, position, featureStorage, 0u, levelOut);
-
-        // Copy to output array at correct offset
-        uint outputOffset = level * FEATURE_DIM_PER_ENTRY;
-        [ForceUnroll]
-        for (uint f = 0; f < FEATURE_DIM_PER_ENTRY; ++f)
-        {
-            output[outputOffset + f] = levelOut[f];
-        }
+        // Encode this level - writes to output at offset level * FEATURE_DIM_PER_ENTRY
+        Encoder.encodePerLevel<StructuredBufferStorage<float>>(
+            params, position, featureStorage, 0u, output);
     }
 }
 
