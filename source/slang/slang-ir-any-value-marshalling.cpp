@@ -1,14 +1,10 @@
 #include "slang-ir-any-value-marshalling.h"
 
 #include "../core/slang-math.h"
-#include "slang-compiler-options.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
-#include "slang-ir.h"
 #include "slang-legalize-types.h"
-#include "slang-target-program.h"
-#include "slang-target.h"
 
 namespace Slang
 {
@@ -323,10 +319,7 @@ struct AnyValueMarshallingContext
                 bool bindless = areResourceTypesBindlessOnTarget(targetReq);
 
                 IRSizeAndAlignment sizeAndAlign;
-                auto result = getNaturalSizeAndAlignment(
-                    targetReq,
-                    dataType,
-                    &sizeAndAlign);
+                auto result = getNaturalSizeAndAlignment(targetReq, dataType, &sizeAndAlign);
 
                 IRIntegerValue size = 8; // Default to 8 bytes for non-bindless
                 if (SLANG_SUCCEEDED(result) && sizeAndAlign.size > 0)
@@ -593,6 +586,7 @@ struct AnyValueMarshallingContext
             }
         }
 
+        // pack: DescriptorHandle -> AnyValue
         virtual void marshalDescriptorHandle(
             IRBuilder* builder,
             IRType* dataType,
@@ -643,52 +637,29 @@ struct AnyValueMarshallingContext
                 SLANG_UNUSED(dataType);
 
                 auto srcVal = builder->emitLoad(concreteVar);
-                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
 
-                // sizeInBytes is either 8 or 16
-                if (sizeInBytes == 8)
+                // sizeInBytes should be either 8 or 16
+                const IRIntegerValue numFieldsNeeded = (sizeInBytes + 3) / 4;
+                SLANG_ASSERT(numFieldsNeeded == 2 || numFieldsNeeded == 4);
+
+                if (fieldOffset + numFieldsNeeded <=
+                    static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    // 8 bytes: one uint2
-                    if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    auto uintVectorType =
+                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                    auto uintVectorVal = builder->emitBitCast(uintVectorType, srcVal);
+
+                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
                     {
-                        auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
-                        auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
-                        auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
-                        
-                        auto dstAddr1 = builder->emitFieldAddress(
+                        auto bits = builder->emitElementExtract(uintVectorVal, i);
+                        auto dstAddr = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        builder->emitStore(dstAddr1, lowBits);
-                        
-                        auto dstAddr2 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + 1]);
-                        builder->emitStore(dstAddr2, highBits);
+                            anyValInfo->fieldKeys[fieldOffset + i]);
+                        builder->emitStore(dstAddr, bits);
                     }
-                    advanceOffset(8);
                 }
-                else // sizeInBytes == 16
-                {
-                    // 16 bytes: uint4
-                    if (fieldOffset + 3 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto uint4Type = builder->getVectorType(builder->getUIntType(), 4);
-                        auto uint4Val = builder->emitBitCast(uint4Type, srcVal);
-                        
-                        for (IRIntegerValue i = 0; i < 4; i++)
-                        {
-                            auto bits = builder->emitElementExtract(uint4Val, i);
-                            auto dstAddr = builder->emitFieldAddress(
-                                uintPtrType,
-                                anyValueVar,
-                                anyValInfo->fieldKeys[fieldOffset + i]);
-                            builder->emitStore(dstAddr, bits);
-                        }
-                    }
-                    advanceOffset(16);
-                }
+                advanceOffset((uint32_t)sizeInBytes);
             }
         }
     };
@@ -978,6 +949,7 @@ struct AnyValueMarshallingContext
             }
         }
 
+        // unpack: AnyValue -> DescriptorHandle
         virtual void marshalDescriptorHandle(
             IRBuilder* builder,
             IRType* dataType,
@@ -1026,58 +998,32 @@ struct AnyValueMarshallingContext
                 // Unmarshal from raw bytes based on actual size (8 or 16 bytes)
                 // Use uint2 instead of uint64 to avoid Int64 capability requirement
 
-                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                // sizeInBytes should be either 8 or 16
+                const IRIntegerValue numFieldsNeeded = (sizeInBytes + 3) / 4;
+                SLANG_ASSERT(numFieldsNeeded == 2 || numFieldsNeeded == 4);
 
-                // sizeInBytes is either 8 or 16
-                if (sizeInBytes == 8)
+                if (fieldOffset + numFieldsNeeded <=
+                    static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
-                    // 8 bytes: one uint2
-                    if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                    auto uintVectorType =
+                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                    IRInst* components[4]; // max 4 uints needed
+
+                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
                     {
-                        auto srcAddr1 = builder->emitFieldAddress(
+                        auto srcAddr = builder->emitFieldAddress(
                             uintPtrType,
                             anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset]);
-                        auto lowBits = builder->emitLoad(srcAddr1);
-                        
-                        auto srcAddr2 = builder->emitFieldAddress(
-                            uintPtrType,
-                            anyValueVar,
-                            anyValInfo->fieldKeys[fieldOffset + 1]);
-                        auto highBits = builder->emitLoad(srcAddr2);
-                        
-                        // Construct uint2 from components
-                        IRInst* components[] = {lowBits, highBits};
-                        auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
-                        
-                        auto result = builder->emitBitCast(dataType, uint2Val);
-                        builder->emitStore(concreteVar, result);
+                            anyValInfo->fieldKeys[fieldOffset + i]);
+                        components[i] = builder->emitLoad(srcAddr);
                     }
-                    advanceOffset(8);
+
+                    auto uintVecVal =
+                        builder->emitMakeVector(uintVectorType, numFieldsNeeded, components);
+                    auto result = builder->emitBitCast(dataType, uintVecVal);
+                    builder->emitStore(concreteVar, result);
                 }
-                else // sizeInBytes == 16
-                {
-                    // 16 bytes: uint4
-                    if (fieldOffset + 3 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
-                    {
-                        auto uint4Type = builder->getVectorType(builder->getUIntType(), 4);
-                        IRInst* components[4];
-                        
-                        for (IRIntegerValue i = 0; i < 4; i++)
-                        {
-                            auto srcAddr = builder->emitFieldAddress(
-                                uintPtrType,
-                                anyValueVar,
-                                anyValInfo->fieldKeys[fieldOffset + i]);
-                            components[i] = builder->emitLoad(srcAddr);
-                        }
-                        
-                        auto uint4Val = builder->emitMakeVector(uint4Type, 4, components);
-                        auto result = builder->emitBitCast(dataType, uint4Val);
-                        builder->emitStore(concreteVar, result);
-                    }
-                    advanceOffset(16);
-                }
+                advanceOffset((uint32_t)sizeInBytes);
             }
         }
     };
