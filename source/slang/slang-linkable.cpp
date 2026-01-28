@@ -296,30 +296,6 @@ SLANG_NO_THROW void SLANG_MCALL ComponentType::getEntryPointHash(
     *outHash = hash.detach();
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
-    int targetIndex,
-    ISlangSharedLibrary** outSharedLibrary,
-    slang::IBlob** outDiagnostics)
-{
-    auto linkage = getLinkage();
-    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
-        return SLANG_E_INVALID_ARG;
-    auto target = linkage->targets[targetIndex];
-
-    auto targetProgram = getTargetProgram(target);
-
-    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
-    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    if (artifact == nullptr)
-        return SLANG_FAIL;
-
-    return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
-}
-
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getEntryPointHostCallable(
     int entryPointIndex,
     int targetIndex,
@@ -572,6 +548,30 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
     *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
     (*outCompileResult)->addRef();
     return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
 }
 
 /// Visitor used by `ComponentType::enumerateModules`
