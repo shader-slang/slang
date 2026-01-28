@@ -988,14 +988,16 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
         return SimpleLayoutInfo(getKind(), 1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t elementCount)
+        override
     {
         SLANG_UNUSED(elementType);
         // Vectors take up one slot by default
+        // takes 0 slots if elementCount is 0
         //
         // TODO: some platforms may decide that vectors of `double` need
         // special handling
-        return SimpleLayoutInfo(getKind(), 1);
+        return SimpleLayoutInfo(getKind(), elementCount == 0 ? 0 : 1);
     }
 };
 
@@ -5342,7 +5344,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        
+
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
         auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
         if (!as<ConstantIntVal>(elementCountVal))
@@ -5354,7 +5356,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             typeLayout->rules = rules;
             return TypeLayoutResult(typeLayout, element.info);
         }
-        
+
         size_t elementCount = (size_t)getIntVal(elementCountVal);
 
         auto element = _createTypeLayout(context, elementType);
@@ -6061,9 +6063,9 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        
+
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
-        auto elementCountVal = vecType->getElementCount();
+        auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
         if (!as<ConstantIntVal>(elementCountVal))
         {
             // If the vector size is not a compile-time constant, we cannot
@@ -6074,7 +6076,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             typeLayout->rules = rules;
             return typeLayout;
         }
-        
+
         size_t elementCount = (size_t)getIntVal(elementCountVal);
 
         BaseType elementBaseType = BaseType::Void;
