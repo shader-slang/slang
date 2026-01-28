@@ -59,7 +59,7 @@ Encoder.HyperParameters buildHyperParameters()
 RWStructuredBuffer<float> gFeatureTable;
 
 // Output buffer: store all results (N_POSITIONS * N_FEATURES = 2048 floats)
-//TEST_INPUT:ubuffer(count=2048, stride=4):out, name=gOutputBuffer
+//TEST_INPUT:ubuffer(count=2048, stride=4):name=gOutputBuffer
 RWStructuredBuffer<float> gOutputBuffer;
 
 // Verification result buffer: pass count
