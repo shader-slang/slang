@@ -325,8 +325,50 @@ static SlangResult _parseGCCFamilyLine(
     }
     else if (split.getCount() == 4)
     {
+        const auto split0 = split[0].trim();
+        const auto split1 = split[1].trim();
+        const auto split2 = split[2].trim();
+
+        // Check for GCC 13.x format: "gcc 13.3: filename: link error : message"
+        // or "gcc 13.3: : link error : message" (when filename is empty)
+        // Verify it's actually a link error by checking split[2] contains "link"
+        if ((split0.startsWith(UnownedStringSlice::fromLiteral("gcc")) ||
+             split0.startsWith(UnownedStringSlice::fromLiteral("g++"))) &&
+            split2.indexOf(UnownedStringSlice::fromLiteral("link")) != -1)
+        {
+            // "link error" is not a standard severity keyword
+            outDiagnostic.severity = Severity::Error;
+            outDiagnostic.stage = Diagnostic::Stage::Link;
+            // Use split1 as filename if not empty
+            if (split1.getLength() > 0)
+            {
+                outDiagnostic.filePath = allocator.allocate(split1);
+            }
+            outDiagnostic.text = allocator.allocate(split[3].trim());
+            outLineParseResult = LineParseResult::Single;
+            return SLANG_OK;
+        }
+
         // Probably a link error, give the source line
         String ext = Path::getPathExt(split[0]);
+
+        // Check if this is a link error based on message content
+        if (split[3].indexOf(UnownedStringSlice::fromLiteral("undefined reference")) != -1)
+        {
+            // This is a link error with format: filepath:line:section:message
+            Int lineNumber = 0;
+            if (SLANG_SUCCEEDED(StringUtil::parseInt(split1, lineNumber)))
+            {
+                outDiagnostic.filePath = allocator.allocate(split[0]);
+                outDiagnostic.location.line = lineNumber;
+                outDiagnostic.location.column = 0;
+                outDiagnostic.severity = Diagnostic::Severity::Error;
+                outDiagnostic.stage = Diagnostic::Stage::Link;
+                outDiagnostic.text = allocator.allocate(split[3]);
+                outLineParseResult = LineParseResult::Single;
+                return SLANG_OK;
+            }
+        }
 
         // Maybe a bit fragile -> but probably okay for now
         if (ext != "o" && ext != "obj")
@@ -349,7 +391,27 @@ static SlangResult _parseGCCFamilyLine(
     }
     else if (split.getCount() >= 5)
     {
-        // Probably a regular error line
+        Index undefinedIdx =
+            split[4].indexOf(UnownedStringSlice::fromLiteral("undefined reference"));
+        bool startsWithParen = split[3].trim().startsWith(UnownedStringSlice::fromLiteral("("));
+
+        // Check if this is a link error: file:line:section:message (where section is like
+        // "(.text+0x0)") vs regular error: file:line:column:severity:message
+        if (undefinedIdx != -1 || startsWithParen)
+        {
+            // Link error format: /usr/bin/ld:file:line:section:message
+            // split[0] is "/usr/bin/ld", split[1] is the file
+            outDiagnostic.filePath = allocator.allocate(split[1]);
+            StringUtil::parseInt(split[2], outDiagnostic.location.line);
+            outDiagnostic.location.column = 0;
+            outDiagnostic.severity = Diagnostic::Severity::Error;
+            outDiagnostic.stage = Diagnostic::Stage::Link;
+            outDiagnostic.text = allocator.allocate(split[4].begin(), split.getLast().end());
+            outLineParseResult = LineParseResult::Single;
+            return SLANG_OK;
+        }
+
+        // Regular error line: file:line:column:severity:message
         SLANG_RETURN_ON_FAIL(_parseSeverity(split[3].trim(), outDiagnostic.severity));
 
         outDiagnostic.filePath = allocator.allocate(split[0]);
