@@ -9,19 +9,24 @@ public struct PermutoEncoder<T,
     int Dimensions,
     int FeatureDimensionPerEntry,
     uint Log2HashmapSize,
-    >
+    uint MaxLevels,
+    InArray,
+    OutArray
+    > :ITrainableEncoder<T, InArray, OutArray>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
+    where InArray : IArrayAccessor<T>, IDifferentiable
+    where OutArray : IArrayAccessor<T>, IDifferentiable
 {
     /// Precomputed per-level information.
-    VISIBILITY_LEVEL struct PerLevelInfo
+    public struct PerLevelInfo
     {
-        VISIBILITY_LEVEL uint currentLevelIndex;
-        VISIBILITY_LEVEL uint offsetOfFeatureTable;         // Offset into feature table for this level (in number of features)
-        VISIBILITY_LEVEL uint featureTableSize;             // Hashmap size for this level
-        VISIBILITY_LEVEL float scale;                       // Scale for this level
-        VISIBILITY_LEVEL float scalesPerDim[Dimensions];
-        VISIBILITY_LEVEL float shiftsPerDim[Dimensions];
+        public uint currentLevelIndex;
+        public uint offsetOfFeatureTable;         // Offset into feature table for this level (in number of features)
+        public uint featureTableSize;             // Hashmap size for this level
+        public float scale;                       // Scale for this level
+        public float scalesPerDim[Dimensions];
+        public float shiftsPerDim[Dimensions];
     }
 
     VISIBILITY_LEVEL struct Params
@@ -29,6 +34,12 @@ public struct PermutoEncoder<T,
         VISIBILITY_LEVEL float maxLevel;                // It's maxLevelRatio * MaxLevels, where maxLevelRatio is a user defined ratio
         VISIBILITY_LEVEL PerLevelInfo levelInfo;        // Contains scale, offset, hashmap size, and per-dim scales/shifts
     }
+
+    public struct HyperParameters
+    {
+        public float maxLevel;
+        public PerLevelInfo[MaxLevels] levelInfo;
+    };
 
     // =========================================================================
     // Permutohedral Lattice Helper Functions
@@ -212,36 +223,38 @@ public struct PermutoEncoder<T,
     }
 
 
-    /// Main forward pass: encodes positions using the permutohedral lattice.
+    /// Main forward pass: encodes positions using the permutohedral lattice for a single level.
+    /// Writes results to the appropriate offset in the full output array.
     ///
     /// @param params Encoding parameters containing:
     ///   - maxLevel: Maximum level to use (maxLevelRatio * MaxLevels)
-    ///   - baseScale: Base scale for the encoding
-    ///   - log2PerLevelScale: Log2 of the per-level scale factor
     ///   - levelInfo: Per-level info (currentLevelIndex, offsetOfFeatureTable, featureTableSize, scale, scalesPerDim, shiftsPerDim)
     /// @param position Input position (Dimensions floats)
     /// @param featureTable Storage containing feature vectors for all levels
     /// @param featureTableAddress Base address for feature table storage
-    /// @return Encoded feature vector for this position at this level
+    /// @param encodedFeatures Output array of size MaxLevels * FeatureDimensionPerEntry. Results are written at offset currentLevelIndex * FeatureDimensionPerEntry.
     [Differentiable]
-    VISIBILITY_LEVEL static void encode<Storage, InArray, OutArray>(
+    VISIBILITY_LEVEL static void encodePerLevel<Storage>(
         no_diff in Params params,
         InArray position,
         Storage featureTable,
         no_diff in Storage.Address featureTableAddress,
-        out OutArray encodedFeatures)
+        inout OutArray encodedFeatures)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where InArray : IArrayAccessor<T>
-            where InArray : IDifferentiable
-            where OutArray : IArrayAccessor<T>
-            where OutArray : IDifferentiable
     {
-        // Initialize output to zero
-        encodedFeatures.dzero();
+        // Compute offset into output array for this level
+        uint outputOffset = params.levelInfo.currentLevelIndex * FeatureDimensionPerEntry;
 
-        // If level is greater than maxLevel, output zero padding
+        // Initialize this level's output to zero
+        [ForceUnroll]
+        for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
+        {
+            encodedFeatures[outputOffset + f] = T(0);
+        }
+
+        // If level is greater than maxLevel, output zero padding (already initialized above)
         if (float(params.levelInfo.currentLevelIndex) >= params.maxLevel + 1e-3f)
         {
             return;
@@ -292,9 +305,39 @@ public struct PermutoEncoder<T,
             [ForceUnroll]
             for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
             {
-                encodedFeatures[f] += T(weight) * featureVal[f];
+                encodedFeatures[outputOffset + f] += T(weight) * featureVal[f];
             }
         }
+    }
+
+    [Differentiable]
+    public static OutArray encode<Storage>(HyperParameters params, in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
+        where Storage : IStorage<T>
+        where Storage.Differential : IStorage<T.Differential>
+        where Storage.Address == Storage.Differential.Address
+    {
+        OutArray encodedFeatures = OutArray();
+
+        Params levelParams;
+        levelParams.maxLevel = params.maxLevel;
+
+        [ForceUnroll]
+        for (uint level = 0; level < MaxLevels; ++level)
+        {
+            levelParams.levelInfo = params.levelInfo[level];
+            encodePerLevel<Storage>(levelParams, input, parameters, parametersAddress, encodedFeatures);
+        }
+
+        return encodedFeatures;
+    }
+
+    [Differentiable]
+    public static OutArray encode<Address>(HyperParameters params, in InArray input, Address parametersAddress)
+        where Address : IPointerLikeAddress<T>
+    {
+        OutArray encodedFeatures = OutArray();
+        static_assert(false, "Not implemented");
+        return encodedFeatures;
     }
 
     /// Helper function to compute the PerLevelInfo (offset, hashmapSize, etc.) for a given level.
