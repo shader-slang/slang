@@ -3276,6 +3276,14 @@ struct AutoDiffPass : public InstPassBase
 
     HashSet<IRInst*> fullyDifferentiatedInsts;
 
+    // Cache for generic functions that have been determined to be unreachable.
+    // This allows early termination when traversing reference chains that
+    // include previously-analyzed unreachable generics.
+    HashSet<IRInst*> unreachableGenericFunctionsCache;
+
+    // Cache for generic functions that have been determined to be reachable.
+    HashSet<IRInst*> reachableGenericFunctionsCache;
+
     // Returns true if `type` is fully differentiated, i.e. does not have
     // any unmaterialized intermediate context types.
     bool isTypeFullyDifferentiated(IRInst* type)
@@ -3355,10 +3363,11 @@ struct AutoDiffPass : public InstPassBase
     // Helper function to check if a generic function is reachable by recursively
     // checking the reference chain. The `visitedSet` is used to detect circular
     // references (e.g., A->B->C->A), which are considered unreachable.
-    bool isGenericFunctionReachable(IRGeneric* genericInst, HashSet<IRInst*>& visitedSet)
+    // Note: Callers are responsible for checking/updating the reachability caches.
+    bool isGenericFunctionReachableImpl(IRGeneric* genericInst, HashSet<IRInst*>& visitedSet)
     {
-        // If we've already visited this generic, we have a circular reference.
-        // Circular references are considered unreachable.
+        // If we've already visited this generic in the current traversal,
+        // we have a circular reference. Circular references are considered unreachable.
         if (visitedSet.contains(genericInst))
             return false;
 
@@ -3400,6 +3409,29 @@ struct AutoDiffPass : public InstPassBase
         }
 
         return false;
+    }
+
+    // Wrapper that handles caching for reachability checks.
+    // Uses `unreachableGenericFunctionsCache` and `reachableGenericFunctionsCache`
+    // to avoid redundant traversals.
+    bool isGenericFunctionReachable(IRGeneric* genericInst, HashSet<IRInst*>& visitedSet)
+    {
+        // Check caches first
+        if (reachableGenericFunctionsCache.contains(genericInst))
+            return true;
+        if (unreachableGenericFunctionsCache.contains(genericInst))
+            return false;
+
+        // Perform the actual reachability check
+        bool result = isGenericFunctionReachableImpl(genericInst, visitedSet);
+
+        // Cache the result
+        if (result)
+            reachableGenericFunctionsCache.add(genericInst);
+        else
+            unreachableGenericFunctionsCache.add(genericInst);
+
+        return result;
     }
 
     bool isReachableInst(IRInst* inst)
