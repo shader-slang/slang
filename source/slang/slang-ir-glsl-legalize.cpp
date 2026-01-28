@@ -3397,6 +3397,10 @@ static void replaceAllUsesOfMeshOutputValWithLegalizedVal(
                 auto tmpVarVal = ScalarizedVal::address(tmpVarPtr);
                 assign(builder, replacementArgVal, tmpVarVal);
             }
+            else if (auto debugVal = as<IRDebugValue>(user))
+            {
+                debugVal->removeAndDeallocate();
+            }
             else
             {
                 SLANG_UNEXPECTED("unhandled case for use of mesh output parameter in Slang IR");

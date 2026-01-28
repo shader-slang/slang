@@ -2848,13 +2848,7 @@ void addArg(
             // First, if we are able to easily get an address for the
             // `argVal`, then we will simply use that and be done.
             //
-            // Note that by passing `TryGetAddressMode::Default` here we
-            // are ensuring that the operation will not diagnose an error
-            // if it fails to get a simple address, but as a consequence
-            // it might actually fail to yield an address in some of the
-            // cases where it would have been able to for a `ref` parameter.
-            //
-            LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Default);
+            LoweredValInfo argPtr = tryGetAddress(context, argVal, TryGetAddressMode::Aggressive);
             if (argPtr.flavor == LoweredValInfo::Flavor::Ptr)
             {
                 addSimpleArg(context, ioArgs, LoweredValInfo::simple(argPtr.val));
