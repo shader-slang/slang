@@ -369,7 +369,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// Represents builtin types that can represent integers.
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger, ICoopElement
 {}
 
 /// Represents a `int` or `uint` type.
@@ -1053,7 +1053,6 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
-    , IFloatingPointCoopElement
 ${
         break;
     case BaseType::Int8:
@@ -1063,7 +1062,6 @@ ${
     case BaseType::IntPtr:
 $}
     ,  __BuiltinSignedArithmeticType
-    , ICoopElement
 ${
         ; // fall through
     case BaseType::UInt8:

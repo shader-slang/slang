@@ -28450,7 +28450,7 @@ extension<
 > CoopMat<T,S,M,N,R> : IArithmetic
     where T : ICoopElement, __BuiltinArithmeticType
 {
-    /// Performs element-wise addition of two cooperative matrices.
+     /// Performs element-wise addition of two cooperative matrices.
     /// @param other The cooperative matrix to add.
     /// @return A new cooperative matrix containing the element-wise sum.
     __intrinsic_op($(kIROp_Add))
@@ -28482,41 +28482,71 @@ extension<
     /// Performs element-wise modulo operation of two cooperative matrices.
     /// @param other The cooperative matrix to compute modulo with.
     /// @return A new cooperative matrix containing the element-wise remainder.
-    [ForceInline]
     This mod(This other)
     {
-        if (__isInt<T>())
-            return __irem(this, other);
-        else
-            return __frem(this, other);
+        This ret;
+        for (int i = 0; i < GetLength(); ++i)
+        {
+            ret[i] = this[i] % other[i];
+        }
+        return ret;
     }
 
     //
     // Equality and ordering
     //
 
-    /// CoopMatrix comparison has no meaning, nor can it be implemented correctly and efficiently.
-    /// However this is required by IArithmetic interface, so we provide a stub implementation here that
-    /// always returns false.
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
-        return false;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
-    /// CoopMatrix comparison has no meaning, nor can it be implemented correctly and efficiently.
-    /// However this is required by IArithmetic interface, so we provide a stub implementation here that
-    /// always returns false.
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
     bool lessThan(This other)
     {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
         return false;
     }
 
-    /// CoopMatrix comparison has no meaning, nor can it be implemented correctly and efficiently.
-    /// However this is required by IArithmetic interface, so we provide a stub implementation here that
-    /// always returns false.
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
     bool lessThanOrEquals(This other)
     {
-        return false;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }
 
