@@ -2106,11 +2106,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (opName == getName("!"))
         {
-            resultValue = constArgVals[0] != 0;
+            resultValue = constArgVals[0] == 0;
         }
         else if (opName == getName("~"))
         {
             resultValue = ~constArgVals[0];
+        }
+        else if (opName == getName("&&"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
+        }
+        else if (opName == getName("||"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
         // simple binary operators
