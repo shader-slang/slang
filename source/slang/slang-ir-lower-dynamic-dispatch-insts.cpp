@@ -855,7 +855,7 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         SlangInt maxSize = 0;
         for (auto type : types)
         {
-            auto size = getAnyValueSize(type, targetProgram);
+            auto size = getAnyValueSize(type, targetProgram->getTargetReq());
             if (size > maxSize)
                 maxSize = size;
 
@@ -1309,6 +1309,40 @@ struct TaggedUnionLoweringContext : public InstPassBase
                      baseInterfaceValue))});
     }
 
+    // Extract the required components from a tagged union tuple,
+    // and create the interface-typed value from the result by using
+    // CreateExistentialObject.
+    //
+    IRInst* convertToInterface(
+        IRBuilder* builder,
+        IRInst* val,
+        IRInst* interfaceType,
+        IRInst* taggedUnionType)
+    {
+        // Do the reverse of `convertToTaggedUnion`.
+        auto taggedUnionTupleType = cast<IRTupleType>(taggedUnionType);
+        auto tableTag =
+            builder->emitGetTupleElement((IRType*)taggedUnionTupleType->getOperand(0), val, 0);
+        auto valuePart =
+            builder->emitGetTupleElement((IRType*)taggedUnionTupleType->getOperand(1), val, 1);
+
+        IRInst* getSeqIDOperands[] = {interfaceType, tableTag};
+        auto tableSeqID = builder->emitIntrinsicInst(
+            (IRType*)builder->getUIntType(),
+            kIROp_GetSequentialIDFromTag,
+            2,
+            getSeqIDOperands);
+
+        IRInst* getWitnessTableOperands[] = {tableSeqID, valuePart};
+        auto existentialObject = builder->emitIntrinsicInst(
+            (IRType*)interfaceType,
+            kIROp_CreateExistentialObject,
+            2,
+            getWitnessTableOperands);
+
+        return existentialObject;
+    }
+
     void lowerCastInterfaceToTaggedUnionPtr(IRCastInterfaceToTaggedUnionPtr* inst)
     {
         // `CastInterfaceToTaggedUnionPtr` is used to 'reinterpret' a pointer to an interface-typed
@@ -1378,6 +1412,30 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         {
                             builder.replaceOperand(oldUse, newVal);
                         }
+                        break;
+                    }
+                case kIROp_Store:
+                    {
+                        auto storeInst = cast<IRStore>(user);
+
+                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfaceType = as<IRInterfaceType>(
+                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+
+                        // Rewrite the store to use the original ptr and store
+                        // an interface type'd object.
+                        //
+                        IRBuilder builder(module);
+                        builder.setInsertBefore(user);
+
+                        auto newVal = convertToInterface(
+                            &builder,
+                            storeInst->getVal(),
+                            baseInterfaceType,
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+
+                        builder.replaceOperand(storeInst->getPtrUse(), baseInterfacePtr);
+                        builder.replaceOperand(storeInst->getValUse(), newVal);
                         break;
                     }
                 case kIROp_StructuredBufferLoad:
@@ -1898,6 +1956,59 @@ struct ExistentialLoweringContext : public InstPassBase
         }
     }
 
+    bool lowerCreateExistentialObject(IRCreateExistentialObject* inst)
+    {
+        // Turn an instruction of the form `IRCreateExistentialObject(witnessTableID, value)`
+        // into a `MakeTuple(makeVector(rttiHandleType, 0, 0), makeVector(witnessTableIDType,
+        // witnessTableId, 0), reinterpret(targetValueType, value))`.
+        //
+
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        auto witnessTableID = inst->getOperand(0);
+        auto value = inst->getOperand(1);
+
+        // Create the RTTI handle component (uint2 with zeros)
+        IRInst* rttiHandleArgs[] = {
+            builder.getIntValue(builder.getUIntType(), 0),
+            builder.getIntValue(builder.getUIntType(), 0)};
+
+        auto rttiHandle = builder.emitMakeVector(
+            builder.getVectorType(
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), 2)),
+            2,
+            rttiHandleArgs);
+
+        // Create the witness table ID component (uint2 with witnessTableID and 0)
+        IRInst* witnessTableIDArgs[] = {
+            witnessTableID,
+            builder.getIntValue(builder.getUIntType(), 0)};
+        auto witnessTableIDVec = builder.emitMakeVector(
+            builder.getVectorType(
+                builder.getUIntType(),
+                builder.getIntValue(builder.getIntType(), 2)),
+            2,
+            witnessTableIDArgs);
+
+        // Get the target value type from the existential tuple type
+        auto tupleType = as<IRTupleType>(inst->getDataType());
+        auto targetValueType = (IRType*)tupleType->getOperand(2);
+
+        // Reinterpret the value to the target type
+        auto reinterpretedValue = builder.emitPackAnyValue(targetValueType, value);
+
+        // Create the tuple
+        auto tuple = builder.emitMakeTuple(
+            inst->getDataType(),
+            {rttiHandle, witnessTableIDVec, reinterpretedValue});
+
+        inst->replaceUsesWith(tuple);
+        inst->removeAndDeallocate();
+        return true;
+    }
+
     bool processGetSequentialIDInst(IRGetSequentialID* inst)
     {
         // If the operand is a witness table, it is already replaced with a uint2
@@ -2012,6 +2123,10 @@ struct ExistentialLoweringContext : public InstPassBase
                     lowerExtractExistentialWitnessTable(
                         cast<IRExtractExistentialWitnessTable>(inst));
                     break;
+                case kIROp_CreateExistentialObject:
+                    // Should have been removed during tagged-union lowering.
+                    lowerCreateExistentialObject(cast<IRCreateExistentialObject>(inst));
+                    break;
                 case kIROp_GetValueFromBoundInterface:
                     lowerGetValueFromBoundInterface(cast<IRGetValueFromBoundInterface>(inst));
                     break;
@@ -2035,5 +2150,4 @@ bool lowerExistentials(IRModule* module, TargetProgram* targetProgram, Diagnosti
     context.processModule();
     return true;
 };
-
 }; // namespace Slang
