@@ -674,16 +674,78 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
+                auto maybeTargetCapSet = targetCaps.getAtomSets();
+                if (maybeTargetCapSet)
                 {
                     if (auto combinedSet = combinedSets.getAtomSets())
                     {
                         CapabilityAtomSet::calcSubtract(
                             addedAtoms,
                             (*combinedSet),
-                            (*targetCapSet));
+                            (*maybeTargetCapSet));
                     }
                 }
+
+                // Filter out alternative vendor atoms (e.g., NV when EXT is specified).
+                CapabilityAtomSet filteredAddedAtoms{};
+                for (auto atom : addedAtoms.getElements<CapabilityAtom>())
+                {
+                    auto atomName = capabilityNameToString((CapabilityName)atom);
+                    bool hasAlternativeInTarget = false;
+
+                    auto checkAlternativeVariant = [&](const char* fromVendor,
+                                                       const char* toVendor) -> bool
+                    {
+                        Index fromLen = Index(strlen(fromVendor));
+
+                        // Suffix pattern: "...NV" -> "...EXT"
+                        if (atomName.endsWith(fromVendor))
+                        {
+                            StringBuilder altName;
+                            altName.append(atomName.head(atomName.getLength() - fromLen));
+                            altName.append(toVendor);
+                            auto altCapName = findCapabilityName(altName.getUnownedSlice());
+                            if (altCapName != CapabilityName::Invalid && maybeTargetCapSet)
+                            {
+                                if ((*maybeTargetCapSet).contains(UInt(altCapName)))
+                                    return true;
+                            }
+                        }
+
+                        // Infix pattern: "_NV_" -> "_EXT_"
+                        StringBuilder infixPattern;
+                        infixPattern.append("_");
+                        infixPattern.append(fromVendor);
+                        infixPattern.append("_");
+                        Index infixPos = atomName.indexOf(infixPattern.getUnownedSlice());
+                        if (infixPos >= 0)
+                        {
+                            StringBuilder altName;
+                            altName.append(atomName.head(infixPos + 1));
+                            altName.append(toVendor);
+                            altName.append(atomName.tail(infixPos + fromLen + 1));
+                            auto altCapName = findCapabilityName(altName.getUnownedSlice());
+                            if (altCapName != CapabilityName::Invalid && maybeTargetCapSet)
+                            {
+                                if ((*maybeTargetCapSet).contains(UInt(altCapName)))
+                                    return true;
+                            }
+                        }
+                        return false;
+                    };
+
+                    hasAlternativeInTarget = checkAlternativeVariant("NV", "EXT") ||
+                                             checkAlternativeVariant("EXT", "NV") ||
+                                             checkAlternativeVariant("KHR", "EXT") ||
+                                             checkAlternativeVariant("EXT", "KHR");
+
+                    if (!hasAlternativeInTarget)
+                        filteredAddedAtoms.add(UInt(atom));
+                }
+
+                if (filteredAddedAtoms.isEmpty())
+                    continue;
+
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -693,7 +755,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
                     entryPointFuncDecl,
                     target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    filteredAddedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
