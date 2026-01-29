@@ -2906,7 +2906,18 @@ void addArg(
             //
             if (paramPassingMode != ParamPassingMode::Out)
             {
-                assign(context, tempVar, argVal);
+                // Don't generate an assignment for bound-storage values
+                // without getters: reading from these types isn't allowed,
+                // such as for mesh shader output types.
+                if (!(argVal.flavor == LoweredValInfo::Flavor::BoundStorage &&
+                      getMembersOfType<GetterDecl>(
+                          context->astBuilder,
+                          argVal.getBoundStorageInfo()->declRef,
+                          MemberFilterStyle::Instance)
+                          .isEmpty()))
+                {
+                    assign(context, tempVar, argVal);
+                }
             }
 
             // We can pass the address of the temporary variable directly
