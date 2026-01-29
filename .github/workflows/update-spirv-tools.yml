@@ -2,8 +2,8 @@ name: Test SPIRV-Tools ToT
 
 on:
   schedule:
-    - cron: '0 2 * * 1'  # Weekly on Monday 2 AM UTC
-  workflow_dispatch:     # Manual trigger for testing
+    - cron: "0 2 * * 1" # Weekly on Monday 2 AM UTC
+  workflow_dispatch: # Manual trigger for testing
 
 jobs:
   test-spirv-tot:
