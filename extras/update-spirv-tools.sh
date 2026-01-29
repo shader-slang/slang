@@ -66,7 +66,6 @@ COMMIT_HASH=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-<<<<<<< HEAD
     --test)
       RUN_TESTS=true
       shift
@@ -89,21 +88,6 @@ while [[ $# -gt 0 ]]; do
       COMMIT_HASH="$1"
       shift
       ;;
-=======
-  --test)
-    RUN_TESTS=true
-    shift
-    ;;
-  --create-pr)
-    CREATE_PR=true
-    RUN_TESTS=true # PR creation requires tests
-    shift
-    ;;
-  *)
-    COMMIT_HASH="$1"
-    shift
-    ;;
->>>>>>> 895fd3e566e01cf302b7625d094d4c3deedb217f
   esac
 done
 
