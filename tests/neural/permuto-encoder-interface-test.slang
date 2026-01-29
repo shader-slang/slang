@@ -130,12 +130,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     Encoder.HyperParameters hyperParams = buildHyperParameters();
 
     // Encode using the interface with precomputed HyperParameters
-    OutArray output = Encoder.encode<StructuredBufferStorage<float>>(
-        hyperParams,
-        position,
-        featureStorage,
-        0u
-    );
+    Encoder encoder = Encoder(hyperParams);
+    OutArray output = encoder.encode<StructuredBufferStorage<float>>(position, featureStorage, 0u);
 
     // Write output to buffer
     [ForceUnroll]

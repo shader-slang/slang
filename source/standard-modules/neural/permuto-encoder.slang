@@ -41,6 +41,12 @@ public struct PermutoEncoder<T,
         public PerLevelInfo[MaxLevels] levelInfo;
     };
 
+    internal HyperParameters params;
+    public __init(HyperParameters params)
+    {
+        this.params = params;
+    }
+
     // =========================================================================
     // Permutohedral Lattice Helper Functions
     // =========================================================================
@@ -313,7 +319,7 @@ public struct PermutoEncoder<T,
     }
 
     [Differentiable]
-    public static OutArray encode<Storage>(HyperParameters params, in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
+    public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
         where Storage.Address == Storage.Differential.Address
@@ -334,7 +340,7 @@ public struct PermutoEncoder<T,
     }
 
     [Differentiable]
-    public static OutArray encode<Address>(HyperParameters params, in InArray input, Address parametersAddress)
+    public OutArray encode<Address>(in InArray input, Address parametersAddress)
         where Address : IPointerLikeAddress<T>
     {
         OutArray encodedFeatures = OutArray();

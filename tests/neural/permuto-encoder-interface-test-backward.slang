@@ -78,12 +78,8 @@ OutArray encodeWithInterface(
     Encoder.HyperParameters hyperParams,
     StructuredBufferStorage<float> featureStorage)
 {
-    return Encoder.encode<StructuredBufferStorage<float>>(
-        hyperParams,
-        position,
-        featureStorage,
-        0u
-    );
+    Encoder encoder = Encoder(hyperParams);
+    return encoder.encode<StructuredBufferStorage<float>>(position, featureStorage, 0u);
 }
 
 /// Compute backward pass by calling bwd_diff on encodeWithInterface

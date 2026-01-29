@@ -13,7 +13,7 @@ public interface IStaticEncoder<T,
     public associatedtype HyperParameters;
 
     [Differentiable]
-    public static OutArray encode(in InArray input);
+    public OutArray encode(in InArray input);
 }
 
 public interface ITrainableEncoder<T,
@@ -30,12 +30,12 @@ public interface ITrainableEncoder<T,
     public associatedtype HyperParameters;
 
     [Differentiable]
-    public static OutArray encode<Storage>(HyperParameters params, in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
+    public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
         where Storage : IStorage<T>
         where Storage.Differential : IStorage<T.Differential>
         where Storage.Address == Storage.Differential.Address;
 
     [Differentiable]
-    public static OutArray encode<Address>(HyperParameters params, in InArray input, Address parametersAddress)
+    public OutArray encode<Address>(in InArray input, Address parametersAddress)
         where Address : IPointerLikeAddress<T>;
 }
