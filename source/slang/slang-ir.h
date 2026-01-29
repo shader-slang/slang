@@ -1969,6 +1969,8 @@ public:
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
+    void removeInstFromConstantMap(IRInst* inst);
+
     void tryHoistInst(IRInst* inst);
 
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
@@ -2125,7 +2127,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 5;
+    const static UInt k_maxSupportedModuleVersion = 6;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
