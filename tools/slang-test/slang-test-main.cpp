@@ -4839,6 +4839,22 @@ static bool shouldRunTest(TestContext* context, String filePath)
         }
     }
 
+    // Check skip list - if any entry matches, skip the test
+    for (auto& skipEntry : context->options.skipList)
+    {
+        if (filePath.startsWith(skipEntry))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is skipped because it is found in the skip list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
