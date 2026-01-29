@@ -1343,6 +1343,18 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
+        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
+        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
+        }
+
+        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
+        if (isD3DTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+        }
+
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -1699,9 +1711,9 @@ Result linkAndOptimizeIR(
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
         SLANG_PASS(legalizeLogicalAndOr, targetProgram);
 
-    // Legalize non struct parameters that are expected to be structs for HLSL.
-    if (isD3DTarget(targetRequest))
-        SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+    // Note: legalizeNonStructParameterToStructForHLSL is now called earlier in the pipeline
+    // (before legalizeExistentialTypeLayout) to ensure ForceVarIntoRayPayloadStructTemporarily
+    // is unwrapped before empty struct parameters are removed.
 
     // Create aliases for all dynamic resource parameters.
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
