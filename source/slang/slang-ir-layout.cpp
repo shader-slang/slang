@@ -1,8 +1,10 @@
 // slang-ir-layout.cpp
 #include "slang-ir-layout.h"
 
+#include "slang-compiler-options.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -369,6 +371,37 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
+            // Check for spvBindlessTextureNV capability
+            bool hasBindlessTextureNV = false;
+            for (auto atomVal : targetReq->getOptionSet().getArray(CompilerOptionName::Capability))
+            {
+                if (atomVal.kind == CompilerOptionValueKind::Int &&
+                    atomVal.intValue == (int)CapabilityName::spvBindlessTextureNV)
+                {
+                    hasBindlessTextureNV = true;
+                    break;
+                }
+            }
+
+            if (hasBindlessTextureNV)
+            {
+                // For spvBindlessTextureNV, DescriptorHandle<T> is uint64_t
+                *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+                return SLANG_OK;
+            }
+
+            // Check for bindless targets (CPU, CUDA, Metal)
+            if (areResourceTypesBindlessOnTarget(targetReq))
+            {
+                // On bindless targets, DescriptorHandle<T> has the layout of T
+                auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
+                return calcSizeAndAlignment(
+                    targetReq,
+                    descriptorHandleType->getResourceType(),
+                    outSizeAndAlignment);
+            }
+
+            // Non-bindless targets: DescriptorHandle<T> is uint2 (8 bytes, 4-byte alignment)
             IRBuilder builder(type);
             builder.setInsertBefore(type);
             auto uintType = builder.getUIntType();
@@ -395,6 +428,22 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     default:
         break;
     }
+
+    // Handle StructuredBuffer types
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
+        // (T* data + size_t count = 16 bytes, 8-byte alignment)
+        if (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+            return SLANG_OK;
+        }
+        // On other targets (including Metal), use default resource size (8 bytes)
+        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        return SLANG_OK;
+    }
+
     if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
