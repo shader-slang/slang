@@ -276,41 +276,37 @@ public vector<T, C> operator*<T:__BuiltinFloatingPointType, let C : int, let R :
 [OverloadRank(15)]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<float, N, N> operator*=<let N:int>(matrix<float, N, N> m1, matrix<float, N, N> m2)
+public matrix<float, N, N> operator*=<let N:int>(inout matrix<float, N, N> m1, matrix<float, N, N> m2)
 {
-    return mul(m2, m1);
+    m1 = mul(m2, m1);
+    return m1;
 }
 
 [OverloadRank(15)]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<half, N, N> operator*=<let N:int>(matrix<half, N, N> m1, matrix<half, N, N> m2)
+public matrix<half, N, N> operator*=<let N:int>(inout matrix<half, N, N> m1, matrix<half, N, N> m2)
 {
-    return mul(m2, m1);
+    m1 = mul(m2, m1);
+    return m1;
 }
 
 [OverloadRank(15)]
 [ForceInline]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<double, N, N> operator*=<let N:int>(matrix<double, N, N> m1, matrix<double, N, N> m2)
+public matrix<double, N, N> operator*=<let N:int>(inout matrix<double, N, N> m1, matrix<double, N, N> m2)
 {
-    return mul(m2, m1);
+    m1 = mul(m2, m1);
+    return m1;
 }
 
 [ForceInline]
 [OverloadRank(15)]
 [require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public matrix<T, R, L> operator*=<T:__BuiltinFloatingPointType, let L : int, let C : int, let R : int>(matrix<T, C, L> m1, matrix<T, R, C> m2)
+public vector<T, C> operator*=<T:__BuiltinFloatingPointType, let C : int>(inout vector<T, C> v, matrix<T, C, C> m)
 {
-    return mul(m2, m1);
-}
-
-[ForceInline]
-[OverloadRank(15)]
-[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
-public vector<T, R> operator*=<T:__BuiltinFloatingPointType, let C : int, let R : int>(vector<T, C> v, matrix<T, R, C> m)
-{
-    return mul(m, v);
+    v = mul(m, v);
+    return v;
 }
 
 __intrinsic_op(mul)
