@@ -307,7 +307,7 @@ specified in the declaration, parameter `newValue` with the same type as the pro
 body.
 
 The property declaration forms without accessor or accessor body declarations are useful only in
-[interface](04-interface.md) declarations.
+[interface](04-types-interface.md) declarations.
 
 > ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
 > change and may not work as expected.
