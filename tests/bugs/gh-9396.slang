@@ -1,14 +1,11 @@
 // Test that @location attributes are correctly emitted when a struct is used
 // as both vertex shader output and fragment shader input.
-// Regression test for https://github.com/shader-slang/slang/issues/9396
 
-// This test requires whole-program compilation to trigger the bug where semantic
-// decorations were incorrectly removed from VertexOutput when it was hoisted as a
-// fragment shader input parameter. The wgsl-spirv-asm target triggers whole-program
-// mode, and tint will validate the WGSL output (failing on missing @location).
+// This test requires whole-program compilation to trigger the bug
+// The wgsl-spirv-asm target triggers whole-program compilation
+// and tint will validate the WGSL output (failing on missing @location)
+
 //TEST:SIMPLE(filecheck=CHECK):-target wgsl-spirv-asm
-
-// Check that we get valid SPIRV output (tint compiled the WGSL successfully)
 // CHECK: OpEntryPoint Vertex %vertexMain
 // CHECK: OpEntryPoint Fragment %fragmentMain
 
