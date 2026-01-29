@@ -817,12 +817,31 @@ bool MetalSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inO
     case kIROp_BitCast:
         {
             auto toType = inst->getDataType();
+            auto fromType = inst->getOperand(0)->getDataType();
 
-            m_writer->emit("as_type<");
-            emitType(toType);
-            m_writer->emit(">(");
-            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
-            m_writer->emit(")");
+            // Metal doesn't allow as_type<> casts involving pointer types.
+            // Use C-style cast for pointer-to-pointer, pointer-to-int, and int-to-pointer.
+            bool toIsPointer = as<IRPtrTypeBase>(toType) || as<IRRawPointerTypeBase>(toType);
+            bool fromIsPointer = as<IRPtrTypeBase>(fromType) || as<IRRawPointerTypeBase>(fromType);
+
+            if (toIsPointer || fromIsPointer)
+            {
+                // C-style cast for pointer conversions
+                m_writer->emit("(");
+                emitType(toType);
+                m_writer->emit(")(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
+            else
+            {
+                // as_type<> for non-pointer bitcasts
+                m_writer->emit("as_type<");
+                emitType(toType);
+                m_writer->emit(">(");
+                emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+                m_writer->emit(")");
+            }
             return true;
         }
     case kIROp_StringLit:
