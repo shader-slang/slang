@@ -1,5 +1,6 @@
 // diagnostic-annotation-util.cpp
 #include "diagnostic-annotation-util.h"
+
 #include "../../source/core/slang-string-util.h"
 
 namespace Slang
@@ -8,8 +9,8 @@ namespace Slang
 // Internal structures
 struct Diagnostic
 {
-    String errorCode;     // e.g., "E20101"
-    String severity;      // e.g., "warning", "error"
+    String errorCode; // e.g., "E20101"
+    String severity;  // e.g., "warning", "error"
     String filename;
     int beginLine = 0;
     int beginCol = 0;
@@ -22,24 +23,25 @@ struct Annotation
 {
     enum class Type
     {
-        SimpleSubstring,  // Just check substring appears somewhere
+        SimpleSubstring, // Just check substring appears somewhere
         PositionBased    // Check specific line/column position and message
     };
 
     Type type = Type::SimpleSubstring;
-    String expectedSubstring;  // Message substring to match
+    String expectedSubstring; // Message substring to match
 
     // For position-based annotations:
-    int sourceLineNumber = 0;   // Line number in source where diagnostic should appear
-    int columnStart = 0;        // Starting column (1-based)
-    int columnEnd = 0;          // Ending column (1-based)
+    int sourceLineNumber = 0; // Line number in source where diagnostic should appear
+    int columnStart = 0;      // Starting column (1-based)
+    int columnEnd = 0;        // Ending column (1-based)
 };
 
 // Internal functions
 static SlangResult parseAnnotations(
     const UnownedStringSlice& sourceText,
     const UnownedStringSlice& prefix,
-    List<Annotation>& outAnnotations);
+    List<Annotation>& outAnnotations,
+    List<UnownedStringSlice>* outSourceLines);
 
 static SlangResult parseMachineReadableDiagnostics(
     const UnownedStringSlice& output,
@@ -48,12 +50,15 @@ static SlangResult parseMachineReadableDiagnostics(
 static bool checkAnnotations(
     const List<Annotation>& annotations,
     const List<Diagnostic>& diagnostics,
+    const UnownedStringSlice& prefix,
+    const List<UnownedStringSlice>& sourceLines,
     List<String>& outMissingAnnotations);
 
 static SlangResult parseAnnotations(
     const UnownedStringSlice& sourceText,
     const UnownedStringSlice& prefix,
-    List<Annotation>& outAnnotations)
+    List<Annotation>& outAnnotations,
+    List<UnownedStringSlice>* outSourceLines)
 {
     outAnnotations.clear();
 
@@ -69,6 +74,12 @@ static SlangResult parseAnnotations(
     // Split source into lines
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(sourceText, lines);
+
+    // Store lines if requested
+    if (outSourceLines)
+    {
+        *outSourceLines = lines;
+    }
 
     int lastNonAnnotationLine = -1;
     bool inBlockComment = false;
@@ -227,7 +238,8 @@ static SlangResult parseMachineReadableDiagnostics(
         if (line.getLength() == 0)
             continue;
 
-        // Machine-readable format: E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+        // Machine-readable format:
+        // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
         List<UnownedStringSlice> parts;
         StringUtil::split(line, '\t', parts);
 
@@ -268,6 +280,8 @@ static SlangResult parseMachineReadableDiagnostics(
 static bool checkAnnotations(
     const List<Annotation>& annotations,
     const List<Diagnostic>& diagnostics,
+    const UnownedStringSlice& prefix,
+    const List<UnownedStringSlice>& sourceLines,
     List<String>& outMissingAnnotations)
 {
     outMissingAnnotations.clear();
@@ -310,6 +324,110 @@ static bool checkAnnotations(
                             sb << diag.beginCol << "-" << diag.endCol;
                         sb << ": \"" << diag.message << "\"\n";
                     }
+
+                    sb << "\n  Suggested position-based annotations you can copy:\n";
+                    sb << "  (Note: These show where the diagnostics actually are.)\n";
+                    sb << "  (Add them after the appropriate source lines.)\n";
+
+                    // Group diagnostics by line
+                    Dictionary<int, List<const Diagnostic*>> diagsByLine;
+                    for (const auto& diag : diagnostics)
+                    {
+                        if (!diagsByLine.containsKey(diag.beginLine))
+                        {
+                            diagsByLine.add(diag.beginLine, List<const Diagnostic*>());
+                        }
+                        diagsByLine[diag.beginLine].add(&diag);
+                    }
+
+                    // Calculate the prefix length: "//" + prefix
+                    int linePrefixLength = 2 + prefix.getLength();
+
+                    // Generate annotations for each line
+                    for (const auto& [lineNum, diagList] : diagsByLine)
+                    {
+                        sb << "\n  After line " << lineNum << ":\n";
+                        sb << "  \u22ee\n"; // Vertical ellipsis (indented)
+
+                        // Show the source line for context (no indentation)
+                        if (lineNum >= 1 && lineNum <= sourceLines.getCount())
+                        {
+                            UnownedStringSlice sourceLine = sourceLines[lineNum - 1];
+                            sb << sourceLine;
+                            if (!sourceLine.endsWith("\n"))
+                                sb << "\n";
+                        }
+
+                        // Check if we should use block comment
+                        bool useBlockComment = false;
+                        for (const auto* diag : diagList)
+                        {
+                            if (diag->beginCol <= linePrefixLength)
+                            {
+                                useBlockComment = true;
+                                break;
+                            }
+                        }
+
+                        if (useBlockComment)
+                        {
+                            // Generate block comment format (no indentation)
+                            sb << "/*" << prefix << "\n";
+                            for (const auto* diag : diagList)
+                            {
+                                // Generate spacing to align caret with column
+                                // Caret should be at position (diag->beginCol - 1)
+                                StringBuilder spacingBuilder;
+                                int numSpaces = diag->beginCol - 1;
+                                for (int i = 0; i < numSpaces; ++i)
+                                {
+                                    spacingBuilder << " ";
+                                }
+
+                                StringBuilder caretBuilder;
+                                int caretCount = diag->endCol - diag->beginCol + 1;
+                                for (int i = 0; i < caretCount; ++i)
+                                {
+                                    caretBuilder << "^";
+                                }
+
+                                sb << spacingBuilder.getUnownedSlice()
+                                   << caretBuilder.getUnownedSlice() << " " << diag->message
+                                   << "\n";
+                            }
+                            sb << "*/\n";
+                        }
+                        else
+                        {
+                            // Generate line comment format (no indentation)
+                            for (const auto* diag : diagList)
+                            {
+                                // Generate spacing to align caret with column
+                                // Caret should be at position (diag->beginCol - 1)
+                                // Prefix takes up first linePrefixLength positions
+                                // So we need (diag->beginCol - 1) - linePrefixLength spaces
+                                StringBuilder spacingBuilder;
+                                int numSpaces = (diag->beginCol - 1) - linePrefixLength;
+                                for (int i = 0; i < numSpaces; ++i)
+                                {
+                                    spacingBuilder << " ";
+                                }
+
+                                StringBuilder caretBuilder;
+                                int caretCount = diag->endCol - diag->beginCol + 1;
+                                for (int i = 0; i < caretCount; ++i)
+                                {
+                                    caretBuilder << "^";
+                                }
+
+                                sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+                                   << caretBuilder.getUnownedSlice() << " " << diag->message
+                                   << "\n";
+                            }
+                        }
+
+                        sb << "  \u22ee\n"; // Trailing vertical ellipsis (indented)
+                    }
                 }
 
                 outMissingAnnotations.add(sb.produceString());
@@ -343,7 +461,8 @@ static bool checkAnnotations(
                         diag.endCol == annotation.columnEnd)
                     {
                         columnMatched = true;
-                        if (diag.message.indexOf(annotation.expectedSubstring.getUnownedSlice()) != -1)
+                        if (diag.message.indexOf(annotation.expectedSubstring.getUnownedSlice()) !=
+                            -1)
                         {
                             messageMatched = true;
                             found = true;
@@ -399,7 +518,8 @@ static bool checkAnnotations(
 
                     if (columnMatched && !messageMatched)
                     {
-                        sb << "  Note: Column position matched but message didn't contain expected substring\n";
+                        sb << "  Note: Column position matched but message didn't contain expected "
+                              "substring\n";
                     }
                     else if (!columnMatched)
                     {
@@ -410,6 +530,105 @@ static bool checkAnnotations(
                             sb << " " << annotation.columnStart;
                         sb << "\n";
                     }
+
+                    // Generate suggested annotations based on actual diagnostics
+                    sb << "\n  Suggested annotations you can copy:\n";
+                    sb << "  \u22ee\n"; // Vertical ellipsis (indented)
+
+                    // Show the source line for context (no indentation)
+                    if (annotation.sourceLineNumber >= 1 &&
+                        annotation.sourceLineNumber <= sourceLines.getCount())
+                    {
+                        UnownedStringSlice sourceLine =
+                            sourceLines[annotation.sourceLineNumber - 1];
+                        sb << sourceLine;
+                        if (!sourceLine.endsWith("\n"))
+                            sb << "\n";
+                    }
+
+                    // Calculate the prefix length: "//" + prefix
+                    int linePrefixLength = 2 + prefix.getLength();
+
+                    // Determine if we should use block comment format
+                    bool useBlockComment = false;
+                    for (const auto& diag : diagnostics)
+                    {
+                        if (diag.beginLine == annotation.sourceLineNumber)
+                        {
+                            // Use block comment if any diagnostic is in early columns
+                            // that would be taken up by line comment prefix
+                            if (diag.beginCol <= linePrefixLength)
+                            {
+                                useBlockComment = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (useBlockComment)
+                    {
+                        // Generate block comment format (no indentation)
+                        sb << "/*" << prefix << "\n";
+                        for (const auto& diag : diagnostics)
+                        {
+                            if (diag.beginLine == annotation.sourceLineNumber)
+                            {
+                                // Generate spacing to align caret with column
+                                // Caret should be at position (diag.beginCol - 1)
+                                StringBuilder spacingBuilder;
+                                int numSpaces = diag.beginCol - 1;
+                                for (int i = 0; i < numSpaces; ++i)
+                                {
+                                    spacingBuilder << " ";
+                                }
+
+                                // Generate carets for the column range
+                                StringBuilder caretBuilder;
+                                int caretCount = diag.endCol - diag.beginCol + 1;
+                                for (int i = 0; i < caretCount; ++i)
+                                {
+                                    caretBuilder << "^";
+                                }
+
+                                sb << spacingBuilder.getUnownedSlice()
+                                   << caretBuilder.getUnownedSlice() << " " << diag.message << "\n";
+                            }
+                        }
+                        sb << "*/\n";
+                    }
+                    else
+                    {
+                        // Generate line comment format (no indentation)
+                        for (const auto& diag : diagnostics)
+                        {
+                            if (diag.beginLine == annotation.sourceLineNumber)
+                            {
+                                // Generate spacing to align caret with column
+                                // Caret should be at position (diag.beginCol - 1)
+                                // Prefix takes up first linePrefixLength positions
+                                // So we need (diag.beginCol - 1) - linePrefixLength spaces
+                                StringBuilder spacingBuilder;
+                                int numSpaces = (diag.beginCol - 1) - linePrefixLength;
+                                for (int i = 0; i < numSpaces; ++i)
+                                {
+                                    spacingBuilder << " ";
+                                }
+
+                                // Generate carets for the column range
+                                StringBuilder caretBuilder;
+                                int caretCount = diag.endCol - diag.beginCol + 1;
+                                for (int i = 0; i < caretCount; ++i)
+                                {
+                                    caretBuilder << "^";
+                                }
+
+                                sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+                                   << caretBuilder.getUnownedSlice() << " " << diag.message << "\n";
+                            }
+                        }
+                    }
+
+                    sb << "  \u22ee\n"; // Trailing vertical ellipsis (indented)
                 }
 
                 outMissingAnnotations.add(sb.produceString());
@@ -427,9 +646,10 @@ bool DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
     const UnownedStringSlice& machineReadableOutput,
     String& outErrorMessage)
 {
-    // Parse annotations from source
+    // Parse annotations from source and capture source lines
     List<Annotation> annotations;
-    if (SLANG_FAILED(parseAnnotations(sourceText, prefix, annotations)))
+    List<UnownedStringSlice> sourceLines;
+    if (SLANG_FAILED(parseAnnotations(sourceText, prefix, annotations, &sourceLines)))
     {
         outErrorMessage = "Failed to parse diagnostic annotations";
         return false;
@@ -445,7 +665,7 @@ bool DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
 
     // Check if all annotations match diagnostics
     List<String> missingAnnotations;
-    if (!checkAnnotations(annotations, diagnostics, missingAnnotations))
+    if (!checkAnnotations(annotations, diagnostics, prefix, sourceLines, missingAnnotations))
     {
         // Build error message
         StringBuilder sb;
