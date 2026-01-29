@@ -475,10 +475,7 @@ bool isConcreteType(IRInst* inst)
             // Tuple is concrete if all element types are concrete
             for (UInt i = 0; i < inst->getOperandCount(); i++)
             {
-                auto operand = inst->getOperand(i);
-                if (as<IRAttr>(operand))
-                    break;
-                if (!isConcreteType(operand))
+                if (!isConcreteType(inst->getOperand(i)))
                     return false;
             }
             return true;
@@ -526,10 +523,7 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
         List<IRType*> elementInfos;
         for (UInt i = 0; i < tupleType->getOperandCount(); i++)
         {
-            auto operand = tupleType->getOperand(i);
-            if (as<IRAttr>(operand))
-                break;
-            elementInfos.add((IRType*)makeInfoForConcreteType(module, operand));
+            elementInfos.add((IRType*)makeInfoForConcreteType(module, tupleType->getOperand(i)));
         }
         return builder.getTupleType(elementInfos);
     }
@@ -906,11 +900,8 @@ struct TypeFlowSpecializationContext
             List<IRType*> elementInfos;
             for (UInt i = 0; i < info1->getOperandCount(); i++)
             {
-                auto operand1 = info1->getOperand(i);
-                if (as<IRAttr>(operand1))
-                    break;
-                auto operand2 = info2->getOperand(i);
-                elementInfos.add((IRType*)unionPropagationInfo(operand1, operand2));
+                elementInfos.add(
+                    (IRType*)unionPropagationInfo(info1->getOperand(i), info2->getOperand(i)));
             }
             return builder.getTupleType(elementInfos);
         }
@@ -1983,9 +1974,9 @@ struct TypeFlowSpecializationContext
                     auto index = intLit->getValue();
                     if (index >= 0 && (UInt)index < tupleType->getOperandCount())
                     {
-                        auto operand = tupleType->getOperand((UInt)index);
-                        if (!as<IRAttr>(operand))
-                            return builder.getPtrTypeWithAddressSpace((IRType*)operand, ptrType);
+                        return builder.getPtrTypeWithAddressSpace(
+                            (IRType*)tupleType->getOperand((UInt)index),
+                            ptrType);
                     }
                 }
             }
@@ -2097,9 +2088,7 @@ struct TypeFlowSpecializationContext
                 auto index = intLit->getValue();
                 if (index >= 0 && (UInt)index < tupleInfo->getOperandCount())
                 {
-                    auto operand = tupleInfo->getOperand((UInt)index);
-                    if (!as<IRAttr>(operand))
-                        return operand;
+                    return tupleInfo->getOperand((UInt)index);
                 }
             }
             return none();
@@ -2115,10 +2104,7 @@ struct TypeFlowSpecializationContext
                 auto index = intLit->getValue();
                 if (index >= 0 && (UInt)index < tupleInfo->getOperandCount())
                 {
-                    auto operand = tupleInfo->getOperand((UInt)index);
-                    if (as<IRAttr>(operand))
-                        return none();
-                    elementInfos.add((IRType*)operand);
+                    elementInfos.add((IRType*)tupleInfo->getOperand((UInt)index));
                 }
                 else
                 {
@@ -3019,7 +3005,6 @@ struct TypeFlowSpecializationContext
                 {
                     // Build effective tuple type by replacing the element type at the given index.
                     IRBuilder builder(module);
-                    // Build effective tuple type by replacing the element type at the given index.
                     auto elementIndex = getElementPtr->getIndex();
                     if (auto intLit = as<IRIntLit>(elementIndex))
                     {
@@ -3029,13 +3014,10 @@ struct TypeFlowSpecializationContext
                             List<IRType*> elementTypes;
                             for (UInt i = 0; i < baseValueType->getOperandCount(); i++)
                             {
-                                auto operand = baseValueType->getOperand(i);
-                                if (as<IRAttr>(operand))
-                                    break;
                                 if (i == index)
                                     elementTypes.add((IRType*)thisValueInfo);
                                 else
-                                    elementTypes.add((IRType*)operand);
+                                    elementTypes.add((IRType*)baseValueType->getOperand(i));
                             }
                             auto baseInfo = builder.getPtrTypeWithAddressSpace(
                                 builder.getTupleType(elementTypes),
@@ -4618,14 +4600,7 @@ struct TypeFlowSpecializationContext
         if (!tupleType)
             return false;
 
-        // Count the number of non-attribute operands
-        UInt elementCount = 0;
-        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
-        {
-            if (as<IRAttr>(tupleType->getOperand(i)))
-                break;
-            elementCount++;
-        }
+        UInt elementCount = tupleType->getOperandCount();
 
         // Reinterpret any of the arguments as necessary.
         bool changed = false;
