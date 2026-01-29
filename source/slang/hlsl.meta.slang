@@ -28448,7 +28448,7 @@ extension<
     let N : int,
     let R : CoopMatMatrixUse
 > CoopMat<T,S,M,N,R> : IArithmetic
-    where T : ICoopElement, __BuiltinArithmeticType
+    where T : __BuiltinArithmeticType
 {
      /// Performs element-wise addition of two cooperative matrices.
     /// @param other The cooperative matrix to add.

@@ -349,7 +349,7 @@ interface __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
+interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 {
 }
 
@@ -369,7 +369,7 @@ interface __BuiltinSignedArithmeticType : __BuiltinArithmeticType {}
 /// Represents builtin types that can represent integers.
 [sealed]
 [builtin]
-interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger, ICoopElement
+interface __BuiltinIntegerType : __BuiltinArithmeticType, IInteger
 {}
 
 /// Represents a `int` or `uint` type.
