@@ -1,0 +1,18 @@
+name: Test SPIRV-Tools ToT
+
+# This is a placeholder workflow file.
+# The full implementation will be added in a subsequent PR.
+
+on:
+  workflow_dispatch: # Manual trigger only
+
+jobs:
+  placeholder:
+    runs-on: windows-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Placeholder step
+        run: |
+          echo "This is a placeholder for the SPIRV-Tools ToT testing workflow."
+          echo "The full implementation will be added in a subsequent PR."
