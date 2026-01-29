@@ -2106,11 +2106,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (opName == getName("!"))
         {
-            resultValue = constArgVals[0] != 0;
+            resultValue = constArgVals[0] == 0;
         }
         else if (opName == getName("~"))
         {
             resultValue = ~constArgVals[0];
+        }
+        else if (opName == getName("&&"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
+        }
+        else if (opName == getName("||"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
         // simple binary operators
@@ -2238,10 +2250,23 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 
     if (decl->hasModifier<ExternModifier>())
     {
-        // Extern const is not considered compile-time constant by the front-end.
+        // For compile-time folding, try to fold the initializer if present.
+        // This allows extern const with initializers to be used in generic type parameters.
         if (kind == ConstantFoldingKind::CompileTime)
+        {
+            if (auto initExpr = getInitExpr(m_astBuilder, declRef))
+            {
+                ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
+                ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
+                if (auto val = tryConstantFoldExpr(initExpr, kind, &newCircularityInfo))
+                    return val;
+            }
+            // No initializer or couldn't fold it - extern const can't be used at compile time
             return nullptr;
-        // But if we are OK with link-time constants, we can still fold it into a val.
+        }
+
+        // For link-time constants, return a symbolic reference (don't fold initializer).
+        // This allows the value to be overridden at link time.
         auto rs = m_astBuilder->getOrCreate<DeclRefIntVal>(
             declRef.substitute(m_astBuilder, declRef.getDecl()->getType()),
             declRef);
