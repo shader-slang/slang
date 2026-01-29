@@ -157,6 +157,38 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
                 upcastedElements.getBuffer());
         }
     }
+    else if (as<IRTupleType>(argInfo) && as<IRTupleType>(destInfo))
+    {
+        // If both arg and dest are tuples, we need to upcast each element.
+        //
+        auto argTupleType = as<IRTupleType>(argInfo);
+        auto destTupleType = as<IRTupleType>(destInfo);
+
+        if (argTupleType != destTupleType)
+        {
+            // Count the number of non-attribute operands
+            UInt argElementCount = 0;
+            for (UInt i = 0; i < argTupleType->getOperandCount(); i++)
+            {
+                if (as<IRAttr>(argTupleType->getOperand(i)))
+                    break;
+                argElementCount++;
+            }
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)argElementCount);
+            for (UInt i = 0; i < argElementCount; i++)
+            {
+                auto argElementType = (IRType*)argTupleType->getOperand(i);
+                auto destElementType = (IRType*)destTupleType->getOperand(i);
+                auto argElement = builder->emitGetTupleElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeTuple(destTupleType, upcastedElements);
+        }
+    }
 
     return arg; // Can use as-is.
 }

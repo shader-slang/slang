@@ -470,6 +470,19 @@ bool isConcreteType(IRInst* inst)
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
         return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+    case kIROp_TupleType:
+        {
+            // Tuple is concrete if all element types are concrete
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                if (as<IRAttr>(operand))
+                    break;
+                if (!isConcreteType(operand))
+                    return false;
+            }
+            return true;
+        }
     default:
         break;
     }
@@ -506,6 +519,19 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
             (IRType*)makeInfoForConcreteType(module, arrayType->getElementType()),
             arrayType->getElementCount(),
             getArrayStride(arrayType));
+    }
+
+    if (auto tupleType = as<IRTupleType>(type))
+    {
+        List<IRType*> elementInfos;
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            auto operand = tupleType->getOperand(i);
+            if (as<IRAttr>(operand))
+                break;
+            elementInfos.add((IRType*)makeInfoForConcreteType(module, operand));
+        }
+        return builder.getTupleType(elementInfos);
     }
 
     return builder.getUntaggedUnionType(
@@ -827,11 +853,10 @@ struct TypeFlowSpecializationContext
         // can be built out of collections.
         //
         // We allow some level of nesting of collections into other type instructions,
-        // to let us propagate information elegantly for pointers, parameters, arrays
-        // and existential tuples.
+        // to let us propagate information elegantly for pointers, parameters, arrays,
+        // tuples and existential tuples.
         //
         // A few cases are missing, but could be added in easily in the future:
-        //    - TupleType (will allow us to propagate information for each tuple element)
         //    - Vector/Matrix types
         //    - TypePack
 
@@ -870,6 +895,24 @@ struct TypeFlowSpecializationContext
             return builder.getPtrTypeWithAddressSpace(
                 (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
                 as<IRPtrTypeBase>(info1));
+        }
+
+        if (as<IRTupleType>(info1) && as<IRTupleType>(info2))
+        {
+            // If both are tuple types, union each element type
+            SLANG_ASSERT(info1->getOperandCount() == info2->getOperandCount());
+            IRBuilder builder(module);
+            builder.setInsertInto(module);
+            List<IRType*> elementInfos;
+            for (UInt i = 0; i < info1->getOperandCount(); i++)
+            {
+                auto operand1 = info1->getOperand(i);
+                if (as<IRAttr>(operand1))
+                    break;
+                auto operand2 = info2->getOperand(i);
+                elementInfos.add((IRType*)unionPropagationInfo(operand1, operand2));
+            }
+            return builder.getTupleType(elementInfos);
         }
 
         // For all other cases which are structured composites of sets,
@@ -1180,8 +1223,14 @@ struct TypeFlowSpecializationContext
         case kIROp_MakeArrayFromElement:
             info = analyzeMakeArrayFromElement(context, as<IRMakeArrayFromElement>(inst));
             break;
+        case kIROp_MakeTuple:
+            info = analyzeMakeTuple(context, inst);
+            break;
         case kIROp_Store:
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
+            break;
+        case kIROp_SwizzledStore:
+            info = analyzeSwizzledStore(context, as<IRSwizzledStore>(inst), workQueue);
             break;
         case kIROp_GetElementPtr:
             info = analyzeGetElementPtr(context, as<IRGetElementPtr>(inst));
@@ -1194,6 +1243,18 @@ struct TypeFlowSpecializationContext
             break;
         case kIROp_GetElement:
             info = analyzeGetElement(context, as<IRGetElement>(inst));
+            break;
+        case kIROp_GetTupleElement:
+            info = analyzeGetTupleElement(context, as<IRGetTupleElement>(inst));
+            break;
+        case kIROp_Swizzle:
+            info = analyzeSwizzle(context, as<IRSwizzle>(inst));
+            break;
+        case kIROp_SwizzleSet:
+            info = analyzeSwizzleSet(context, as<IRSwizzleSet>(inst));
+            break;
+        case kIROp_UpdateElement:
+            info = analyzeUpdateElement(context, as<IRUpdateElement>(inst));
             break;
         case kIROp_MakeOptionalNone:
             info = analyzeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
@@ -1578,6 +1639,69 @@ struct TypeFlowSpecializationContext
             getArrayStride(arrayType));
     }
 
+    IRInst* analyzeMakeTuple(IRInst* context, IRInst* makeTuple)
+    {
+        auto tupleType = as<IRTupleType>(makeTuple->getDataType());
+
+        // If tuple is concrete, no need to proceed.
+        if (isConcreteType(tupleType))
+            return none();
+
+        //
+        // MakeTuple's effective type is a tuple of the element infos.
+        // Each element can have different type info.
+        //
+
+        List<IRType*> elementInfos;
+        for (UInt i = 0; i < makeTuple->getOperandCount(); i++)
+        {
+            auto element = makeTuple->getOperand(i);
+            auto elementType = (IRType*)tupleType->getOperand(i);
+            if (auto elementInfo = tryGetInfo(context, element))
+            {
+                elementInfos.add((IRType*)elementInfo);
+            }
+            else if (isConcreteType(elementType))
+            {
+                // For concrete element types, just use the type itself.
+                elementInfos.add(elementType);
+            }
+            else
+            {
+                // If any non-concrete element has no info, we can't proceed.
+                return none();
+            }
+        }
+
+        IRBuilder builder(module);
+        return builder.getTupleType(elementInfos);
+    }
+
+    IRInst* analyzeGetTupleElement(IRInst* context, IRGetTupleElement* getTupleElement)
+    {
+        // If the base info is a tuple type, we can return the element info at the specified index.
+        //
+
+        auto baseInfo = tryGetInfo(context, getTupleElement->getTuple());
+        if (!baseInfo)
+            return none();
+
+        if (auto tupleInfo = as<IRTupleType>(baseInfo))
+        {
+            auto elementIndex = getTupleElement->getElementIndex();
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto index = intLit->getValue();
+                if (index >= 0 && (UInt)index < tupleInfo->getOperandCount())
+                {
+                    return tupleInfo->getOperand((UInt)index);
+                }
+            }
+        }
+
+        return none();
+    }
+
     IRInst* analyzeLoadFromUninitializedMemory(IRInst* context, IRInst* inst)
     {
         SLANG_UNUSED(context);
@@ -1730,19 +1854,141 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    IRInst* analyzeSwizzledStore(
+        IRInst* context,
+        IRSwizzledStore* swizzledStore,
+        WorkQueue& workQueue)
+    {
+        // SwizzledStore stores elements from source into specific indices of the dest pointer.
+        // Similar to Store, we need to propagate information to the destination.
+        //
+        auto dest = swizzledStore->getDest();
+        auto source = swizzledStore->getSource();
+        auto destPtrType = as<IRPtrTypeBase>(dest->getDataType());
+        if (!destPtrType)
+            return none();
+
+        auto destValueType = as<IRTupleType>(destPtrType->getValueType());
+        if (!destValueType)
+            return none();
+
+        auto elementCount = (Index)destValueType->getOperandCount();
+
+        // Get current info for the destination (if any)
+        auto destInfo = tryGetInfo(context, dest);
+        auto destPtrInfo = as<IRPtrTypeBase>(destInfo);
+        auto destTupleInfo = destPtrInfo ? as<IRTupleType>(destPtrInfo->getValueType()) : nullptr;
+
+        // Build new tuple info starting from existing dest info or the type
+        List<IRType*> elementInfos;
+        for (Index i = 0; i < elementCount; i++)
+        {
+            auto elemType = destValueType->getOperand(i);
+            if (destTupleInfo)
+            {
+                elementInfos.add((IRType*)destTupleInfo->getOperand(i));
+            }
+            else if (isConcreteType(elemType))
+            {
+                elementInfos.add((IRType*)elemType);
+            }
+            else
+            {
+                return none();
+            }
+        }
+
+        // Update elements at the swizzle indices with infos from the source
+        auto sourceInfo = tryGetInfo(context, source);
+        auto sourceTupleInfo = as<IRTupleType>(sourceInfo);
+        auto sourceType = as<IRTupleType>(source->getDataType());
+
+        for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
+        {
+            auto elementIndex = swizzledStore->getElementIndex(i);
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto destIndex = (Index)intLit->getValue();
+                if (destIndex < 0 || destIndex >= elementCount)
+                    return none();
+
+                // Get the source element's info
+                IRInst* sourceElemInfo = nullptr;
+                if (sourceTupleInfo)
+                {
+                    sourceElemInfo = sourceTupleInfo->getOperand(i);
+                }
+                else if (sourceInfo)
+                {
+                    // Source is a single value (not a tuple)
+                    sourceElemInfo = sourceInfo;
+                }
+                else if (sourceType)
+                {
+                    auto sourceElemType = sourceType->getOperand(i);
+                    if (isConcreteType(sourceElemType))
+                        sourceElemInfo = sourceElemType;
+                    else
+                        return none();
+                }
+                else
+                {
+                    // Single value source with concrete type
+                    if (isConcreteType(source->getDataType()))
+                        sourceElemInfo = source->getDataType();
+                    else
+                        return none();
+                }
+
+                elementInfos[destIndex] = (IRType*)sourceElemInfo;
+            }
+            else
+            {
+                return none();
+            }
+        }
+
+        // Construct the new pointer info and propagate to the destination
+        IRBuilder builder(module);
+        auto newTupleInfo = builder.getTupleType(elementInfos);
+        auto ptrInfo = builder.getPtrTypeWithAddressSpace((IRType*)newTupleInfo, destPtrType);
+
+        // Propagate the information up the access chain to the base location.
+        maybeUpdateInfoForAddress(context, dest, ptrInfo, workQueue);
+
+        // The store inst itself doesn't produce anything, so it has no info
+        return none();
+    }
+
     IRInst* analyzeGetElementPtr(IRInst* context, IRGetElementPtr* getElementPtr)
     {
-        // The base info should be in Ptr<Array<T>> form, so we just need to unpack and
-        // return Ptr<T> as the result.
+        // The base info should be in Ptr<Array<T>> or Ptr<Tuple<...>> form,
+        // so we just need to unpack and return Ptr<ElementType> as the result.
         //
         IRBuilder builder(module);
         builder.setInsertAfter(getElementPtr);
         auto basePtr = getElementPtr->getBase();
         if (auto ptrType = as<IRPtrTypeBase>(tryGetInfo(context, basePtr)))
         {
-            auto arrayType = as<IRArrayType>(ptrType->getValueType());
-            SLANG_ASSERT(arrayType);
-            return builder.getPtrTypeWithAddressSpace(arrayType->getElementType(), ptrType);
+            if (auto arrayType = as<IRArrayType>(ptrType->getValueType()))
+            {
+                return builder.getPtrTypeWithAddressSpace(arrayType->getElementType(), ptrType);
+            }
+
+            if (auto tupleType = as<IRTupleType>(ptrType->getValueType()))
+            {
+                auto elementIndex = getElementPtr->getIndex();
+                if (auto intLit = as<IRIntLit>(elementIndex))
+                {
+                    auto index = intLit->getValue();
+                    if (index >= 0 && (UInt)index < tupleType->getOperandCount())
+                    {
+                        auto operand = tupleType->getOperand((UInt)index);
+                        if (!as<IRAttr>(operand))
+                            return builder.getPtrTypeWithAddressSpace((IRType*)operand, ptrType);
+                    }
+                }
+            }
         }
 
         return none(); // No info for the base pointer => no info for the result.
@@ -1824,6 +2070,237 @@ struct TypeFlowSpecializationContext
         if (auto arrayInfo = as<IRArrayType>(baseInfo))
         {
             return arrayInfo->getElementType();
+        }
+
+        return none();
+    }
+
+    IRInst* analyzeSwizzle(IRInst* context, IRSwizzle* swizzle)
+    {
+        // For swizzle on tuples, we extract the element infos at the specified indices
+        // and create a new tuple type with those infos.
+        //
+        auto baseInfo = tryGetInfo(context, swizzle->getBase());
+        if (!baseInfo)
+            return none();
+
+        auto tupleInfo = as<IRTupleType>(baseInfo);
+        if (!tupleInfo)
+            return none();
+
+        // If only one element, return just that element's info
+        if (swizzle->getElementCount() == 1)
+        {
+            auto elementIndex = swizzle->getElementIndex(0);
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto index = intLit->getValue();
+                if (index >= 0 && (UInt)index < tupleInfo->getOperandCount())
+                {
+                    auto operand = tupleInfo->getOperand((UInt)index);
+                    if (!as<IRAttr>(operand))
+                        return operand;
+                }
+            }
+            return none();
+        }
+
+        // Multiple elements - build a tuple of the element infos
+        List<IRType*> elementInfos;
+        for (UInt i = 0; i < swizzle->getElementCount(); i++)
+        {
+            auto elementIndex = swizzle->getElementIndex(i);
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto index = intLit->getValue();
+                if (index >= 0 && (UInt)index < tupleInfo->getOperandCount())
+                {
+                    auto operand = tupleInfo->getOperand((UInt)index);
+                    if (as<IRAttr>(operand))
+                        return none();
+                    elementInfos.add((IRType*)operand);
+                }
+                else
+                {
+                    return none();
+                }
+            }
+            else
+            {
+                return none();
+            }
+        }
+
+        IRBuilder builder(module);
+        return builder.getTupleType(elementInfos);
+    }
+
+    IRInst* analyzeSwizzleSet(IRInst* context, IRSwizzleSet* swizzleSet)
+    {
+        // SwizzleSet takes a base tuple and a source, and returns a new tuple with
+        // some elements replaced at specified indices.
+        //
+        auto base = swizzleSet->getBase();
+        auto source = swizzleSet->getSource();
+        auto baseType = as<IRTupleType>(base->getDataType());
+        if (!baseType)
+            return none();
+
+        auto elementCount = (Index)baseType->getOperandCount();
+
+        // Start with the base tuple's element infos
+        List<IRType*> elementInfos;
+        auto baseInfo = tryGetInfo(context, base);
+        auto baseTupleInfo = as<IRTupleType>(baseInfo);
+
+        for (Index i = 0; i < elementCount; i++)
+        {
+            auto elemType = baseType->getOperand(i);
+            if (baseTupleInfo)
+            {
+                elementInfos.add((IRType*)baseTupleInfo->getOperand(i));
+            }
+            else if (isConcreteType(elemType))
+            {
+                elementInfos.add((IRType*)elemType);
+            }
+            else
+            {
+                return none();
+            }
+        }
+
+        // Now replace elements at the swizzle indices with infos from the source
+        auto sourceInfo = tryGetInfo(context, source);
+        auto sourceTupleInfo = as<IRTupleType>(sourceInfo);
+        auto sourceTupleType = as<IRTupleType>(source->getDataType());
+
+        for (UInt i = 0; i < swizzleSet->getElementCount(); i++)
+        {
+            auto elementIndex = swizzleSet->getElementIndex(i);
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto baseIndex = (Index)intLit->getValue();
+                if (baseIndex < 0 || baseIndex >= elementCount)
+                    return none();
+
+                // Get the source element's info
+                IRInst* sourceElemInfo = nullptr;
+                if (sourceTupleInfo)
+                {
+                    sourceElemInfo = sourceTupleInfo->getOperand(i);
+                }
+                else if (sourceInfo)
+                {
+                    // Source is a single value (not a tuple)
+                    sourceElemInfo = sourceInfo;
+                }
+                else if (sourceTupleType)
+                {
+                    auto sourceElemType = sourceTupleType->getOperand(i);
+                    if (isConcreteType(sourceElemType))
+                        sourceElemInfo = sourceElemType;
+                    else
+                        return none(); // If a non-concrete element type has no info, we can't
+                                       // proceed
+                }
+                else
+                {
+                    // Single value source with concrete type
+                    if (isConcreteType(source->getDataType()))
+                        sourceElemInfo = source->getDataType();
+                    else
+                        return none(); // If a non-concrete element type has no info, we can't
+                                       // proceed
+                }
+
+                elementInfos[baseIndex] = (IRType*)sourceElemInfo;
+            }
+            else
+            {
+                return none();
+            }
+        }
+
+        IRBuilder builder(module);
+        return builder.getTupleType(elementInfos);
+    }
+
+    IRInst* analyzeUpdateElement(IRInst* context, IRUpdateElement* updateElement)
+    {
+        // UpdateElement replaces an element in a composite type (tuple or array) at a given index.
+        // We need to construct a new info where the element at the specified index has its info
+        // replaced with the new value's info.
+        //
+        auto oldValue = updateElement->getOldValue();
+        auto elementValue = updateElement->getElementValue();
+        auto oldValueType = oldValue->getDataType();
+
+        // Get the index - UpdateElement can have multiple access keys for nested access,
+        // but we only handle the single-index case for now.
+        if (updateElement->getAccessKeyCount() != 1)
+            return none();
+
+        auto accessKey = updateElement->getAccessKey(0);
+        auto intLit = as<IRIntLit>(accessKey);
+        if (!intLit)
+            return none();
+
+        auto index = (Index)intLit->getValue();
+
+        if (auto tupleType = as<IRTupleType>(oldValueType))
+        {
+            // For tuples, construct a new tuple info with the element at index replaced.
+            auto elementCount = (Index)tupleType->getOperandCount();
+            if (index < 0 || index >= elementCount)
+                return none();
+
+            List<IRType*> elementInfos;
+            for (Index i = 0; i < elementCount; i++)
+            {
+                if (i == index)
+                {
+                    // Use the new element's info
+                    auto newElemInfo = tryGetInfo(context, elementValue);
+                    auto elemType = tupleType->getOperand(i);
+                    if (!newElemInfo)
+                    {
+                        if (isConcreteType(elemType))
+                            newElemInfo = elemType;
+                        else
+                            return none();
+                    }
+                    elementInfos.add((IRType*)newElemInfo);
+                }
+                else
+                {
+                    // Use the old value's element info
+                    auto oldValueInfo = tryGetInfo(context, oldValue);
+                    auto elemType = tupleType->getOperand(i);
+                    if (auto oldTupleInfo = as<IRTupleType>(oldValueInfo))
+                    {
+                        elementInfos.add((IRType*)oldTupleInfo->getOperand(i));
+                    }
+                    else if (isConcreteType(elemType))
+                    {
+                        elementInfos.add((IRType*)elemType);
+                    }
+                    else
+                    {
+                        return none();
+                    }
+                }
+            }
+
+            IRBuilder builder(module);
+            return builder.getTupleType(elementInfos);
+        }
+        else if (auto arrayType = as<IRArrayType>(oldValueType))
+        {
+            // For arrays, we can't track per-element info, so just return the old value's info.
+            auto oldValueInfo = tryGetInfo(context, oldValue);
+            if (oldValueInfo)
+                return oldValueInfo;
         }
 
         return none();
@@ -2519,19 +2996,60 @@ struct TypeFlowSpecializationContext
 
                 IRInst* baseValueType =
                     as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType())->getValueType();
-                SLANG_ASSERT(as<IRArrayType>(baseValueType));
+                if (as<IRArrayType>(baseValueType))
+                {
+                    // Propagate 'this' information to the base by wrapping it as a pointer to
+                    // array.
+                    IRBuilder builder(module);
+                    auto baseInfo = builder.getPtrTypeWithAddressSpace(
+                        builder.getArrayType(
+                            (IRType*)thisValueInfo,
+                            as<IRArrayType>(baseValueType)->getElementCount(),
+                            getArrayStride(as<IRArrayType>(baseValueType))),
+                        as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
 
-                // Propagate 'this' information to the base by wrapping it as a pointer to array.
-                IRBuilder builder(module);
-                auto baseInfo = builder.getPtrTypeWithAddressSpace(
-                    builder.getArrayType(
-                        (IRType*)thisValueInfo,
-                        as<IRArrayType>(baseValueType)->getElementCount(),
-                        getArrayStride(as<IRArrayType>(baseValueType))),
-                    as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
+                    // Recursively try to update the base pointer.
+                    maybeUpdateInfoForAddress(
+                        context,
+                        getElementPtr->getBase(),
+                        baseInfo,
+                        workQueue);
+                }
+                else if (as<IRTupleType>(baseValueType))
+                {
+                    // Build effective tuple type by replacing the element type at the given index.
+                    IRBuilder builder(module);
+                    // Build effective tuple type by replacing the element type at the given index.
+                    auto elementIndex = getElementPtr->getIndex();
+                    if (auto intLit = as<IRIntLit>(elementIndex))
+                    {
+                        auto index = (UInt)intLit->getValue();
+                        if (index < baseValueType->getOperandCount())
+                        {
+                            List<IRType*> elementTypes;
+                            for (UInt i = 0; i < baseValueType->getOperandCount(); i++)
+                            {
+                                auto operand = baseValueType->getOperand(i);
+                                if (as<IRAttr>(operand))
+                                    break;
+                                if (i == index)
+                                    elementTypes.add((IRType*)thisValueInfo);
+                                else
+                                    elementTypes.add((IRType*)operand);
+                            }
+                            auto baseInfo = builder.getPtrTypeWithAddressSpace(
+                                builder.getTupleType(elementTypes),
+                                as<IRPtrTypeBase>(getElementPtr->getBase()->getDataType()));
 
-                // Recursively try to update the base pointer.
-                maybeUpdateInfoForAddress(context, getElementPtr->getBase(), baseInfo, workQueue);
+                            // Recursively try to update the base pointer.
+                            maybeUpdateInfoForAddress(
+                                context,
+                                getElementPtr->getBase(),
+                                baseInfo,
+                                workQueue);
+                        }
+                    }
+                }
             }
         }
         else if (auto fieldAddress = as<IRFieldAddress>(inst))
@@ -3096,6 +3614,8 @@ struct TypeFlowSpecializationContext
             return specializeMakeArray(context, as<IRMakeArray>(inst));
         case kIROp_MakeArrayFromElement:
             return specializeMakeArrayFromElement(context, as<IRMakeArrayFromElement>(inst));
+        case kIROp_MakeTuple:
+            return specializeMakeTuple(context, inst);
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         case kIROp_RWStructuredBufferLoad:
@@ -3113,6 +3633,8 @@ struct TypeFlowSpecializationContext
             return specializeLoad(context, inst);
         case kIROp_Store:
             return specializeStore(context, as<IRStore>(inst));
+        case kIROp_SwizzledStore:
+            return specializeSwizzledStore(context, as<IRSwizzledStore>(inst));
         case kIROp_GetSequentialID:
             return specializeGetSequentialID(context, as<IRGetSequentialID>(inst));
         case kIROp_IsType:
@@ -4082,6 +4604,51 @@ struct TypeFlowSpecializationContext
         return changed;
     }
 
+    bool specializeMakeTuple(IRInst* context, IRInst* inst)
+    {
+        // The main thing to handle here is that we might have specialized
+        // the element types of the tuple, so we need to upcast the elements
+        // if necessary.
+        //
+        auto tupleInfo = tryGetInfo(context, inst);
+        if (!tupleInfo)
+            return false;
+
+        auto tupleType = as<IRTupleType>(tupleInfo);
+        if (!tupleType)
+            return false;
+
+        // Count the number of non-attribute operands
+        UInt elementCount = 0;
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (as<IRAttr>(tupleType->getOperand(i)))
+                break;
+            elementCount++;
+        }
+
+        // Reinterpret any of the arguments as necessary.
+        bool changed = false;
+        for (UInt i = 0; i < elementCount && i < inst->getOperandCount(); i++)
+        {
+            auto arg = inst->getOperand(i);
+            auto elementType = (IRType*)tupleType->getOperand(i);
+            IRBuilder builder(context);
+            builder.setInsertBefore(inst);
+            auto newArg = upcastSet(&builder, arg, elementType);
+
+            if (arg != newArg)
+            {
+                changed = true;
+                inst->setOperand(i, newArg);
+            }
+        }
+
+        IRBuilder builder(module);
+        builder.replaceOperand(&inst->typeUse, getLoweredType(tupleInfo));
+        return changed;
+    }
+
     bool specializeMakeExistential(IRInst* context, IRMakeExistential* inst)
     {
         // After specialization, existentials (that are not unbounded) are treated as tuples
@@ -4576,6 +5143,90 @@ struct TypeFlowSpecializationContext
         {
             // If the value was changed, we need to update the store instruction.
             builder.replaceOperand(inst->getValUse(), specializedVal);
+            return true;
+        }
+
+        return false;
+    }
+
+    bool specializeSwizzledStore(IRInst* context, IRSwizzledStore* inst)
+    {
+        // Similar to `specializeStore`, we upcast the source elements
+        // to match the destination pointer's element types before storing.
+        //
+        auto dest = inst->getDest();
+        auto source = inst->getSource();
+        auto destPtrType = as<IRPtrTypeBase>(dest->getDataType());
+        if (!destPtrType)
+            return false;
+
+        auto destValueType = as<IRTupleType>(destPtrType->getValueType());
+        if (!destValueType)
+            return false;
+
+        auto sourceType = as<IRTupleType>(source->getDataType());
+
+        IRBuilder builder(context);
+        builder.setInsertBefore(inst);
+
+        bool hasChanges = false;
+
+        // Build the new source value with upcasted elements
+        List<IRInst*> newSourceElements;
+        for (UInt i = 0; i < inst->getElementCount(); i++)
+        {
+            auto elementIndex = inst->getElementIndex(i);
+            if (auto intLit = as<IRIntLit>(elementIndex))
+            {
+                auto destIndex = (Index)intLit->getValue();
+                auto destElemType = (IRType*)destValueType->getOperand(destIndex);
+
+                // Extract source element
+                IRInst* sourceElement = nullptr;
+                if (sourceType)
+                {
+                    auto sourceElemType = (IRType*)sourceType->getOperand(i);
+                    sourceElement = builder.emitGetTupleElement(sourceElemType, source, i);
+                }
+                else
+                {
+                    // Source is a single value
+                    sourceElement = source;
+                }
+
+                // Upcast the element to match destination type
+                auto upcastedElement = upcastSet(&builder, sourceElement, destElemType);
+                if (upcastedElement != sourceElement)
+                    hasChanges = true;
+
+                newSourceElements.add(upcastedElement);
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if (hasChanges)
+        {
+            // Build a new source tuple if needed
+            IRInst* newSource = nullptr;
+            if (sourceType)
+            {
+                // Build new tuple type for the upcasted elements
+                List<IRType*> newElemTypes;
+                for (auto elem : newSourceElements)
+                    newElemTypes.add(elem->getFullType());
+                auto newSourceType = builder.getTupleType(newElemTypes);
+                newSource = builder.emitMakeTuple(newSourceType, newSourceElements);
+            }
+            else
+            {
+                // Single element case
+                newSource = newSourceElements[0];
+            }
+
+            builder.replaceOperand(inst->getOperands() + 1, newSource);
             return true;
         }
 

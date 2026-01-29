@@ -5127,6 +5127,9 @@ IRInst* IRBuilder::emitElementExtract(IRType* type, IRInst* base, IRInst* index)
     if (base->getOp() == kIROp_MakeArrayFromElement)
         return base->getOperand(0);
 
+    if (as<IRTupleType>(base->getDataType()))
+        return emitGetTupleElement(type, base, index);
+
     auto inst = createInst<IRGetElement>(this, kIROp_GetElement, type, base, index);
 
     addInst(inst);
