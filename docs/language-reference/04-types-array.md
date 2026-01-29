@@ -54,12 +54,12 @@ Restrictions for unknown-length arrays:
   compile-time in which case it becomes a known-length array.
 - A function parameter with an unknown-length array cannot be `out` or `inout`.
 
-> Remark 1: Declaring an array as part of the type is recommended. For example:
+> 📝 **Remark 1:** Declaring an array as part of the type is recommended. For example:
 > ```hlsl
 > var arr : int[3][4];
 > ```
 
-> Remark 2: When using the C-style variable declaration syntax, array declarations binding to the variable
+> 📝 **Remark 2:** When using the C-style variable declaration syntax, array declarations binding to the variable
 > identifier are applied from right to left. However, when binding to the type, the declarations are
 > applied from left to right. Consider:
 > ```hlsl
@@ -70,15 +70,15 @@ Restrictions for unknown-length arrays:
 > int[2][3][4][5] arr;
 > ```
 
-> Remark 3: Equivalent to `ElementType[N][M]` array type declaration would be
+> 📝 **Remark 3:** Equivalent to `ElementType[N][M]` array type declaration would be
 > `std::array<std::array<ElementType, N>, M>` in C++.
 
-> Remark 4: Unlike in C and C++, array types in Slang do not decay to pointer types. The implication is that
+> 📝 **Remark 4:** Unlike in C and C++, array types in Slang do not decay to pointer types. The implication is that
 > array objects are always passed as values in assignment and function calls, similar to `std::array`. To
 > avoid memory copies when possible, the compiler attempts to optimize these as pass by constant references or
 > pointers when the target supports it.
 
-> Remark 5: 0-length arrays can be used to disable data members in `struct` types. See [Generics (TODO)](TODO)
+> 📝 **Remark 5:** 0-length arrays can be used to disable data members in `struct` types. See [Generics (TODO)](TODO)
 > for further information.
 
 

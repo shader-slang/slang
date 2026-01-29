@@ -2162,6 +2162,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     types.add(field->getFieldType());
                 }
+
+                maybeAssignAnonymousMemberNames(as<IRStructType>(inst));
+
                 auto spvStructType = emitOpTypeStruct(inst, types);
                 emitDecorations(inst, getID(spvStructType));
 
@@ -3548,11 +3551,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // [3.24. Function Control]
         //
-        // TODO: We should eventually support emitting the "function control"
-        // mask to include inline and other hint bits based on decorations
-        // set on `irFunc`.
+        // Check for inline-related decorations on the function and set the
+        // appropriate function control mask.
         //
         SpvFunctionControlMask spvFunctionControl = SpvFunctionControlMaskNone;
+        if (irFunc->findDecoration<IRNoInlineDecoration>())
+        {
+            spvFunctionControl = SpvFunctionControlDontInlineMask;
+        }
 
         // [3.32.9. Function Instructions]
         //
@@ -3627,11 +3633,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // [3.24. Function Control]
         //
-        // TODO: We should eventually support emitting the "function control"
-        // mask to include inline and other hint bits based on decorations
-        // set on `irFunc`.
+        // Check for inline-related decorations on the function and set the
+        // appropriate function control mask.
         //
         SpvFunctionControlMask spvFunctionControl = SpvFunctionControlMaskNone;
+        if (irFunc->findDecoration<IRNoInlineDecoration>())
+        {
+            spvFunctionControl = SpvFunctionControlDontInlineMask;
+        }
 
         // [3.32.9. Function Instructions]
         //
@@ -3723,6 +3732,31 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
                     funcDebugScope);
+
+                // For the first block only, emit a DebugLine immediately after DebugScope.
+                // This is required for debuggers like RenderDoc to be able to step into
+                // functions. Without this, parameter copying code (DebugDeclare, OpStore)
+                // appears between DebugScope and the first DebugLine, preventing the
+                // debugger from mapping the function entry point to source code.
+                if (irBlock == irFunc->getFirstBlock())
+                {
+                    if (auto debugFuncDecor = irFunc->findDecoration<IRDebugFuncDecoration>())
+                    {
+                        if (auto irDebugFunc = as<IRDebugFunction>(debugFuncDecor->getDebugFunc()))
+                        {
+                            emitOpDebugLine(
+                                spvBlock,
+                                nullptr,
+                                m_voidType,
+                                getNonSemanticDebugInfoExtInst(),
+                                irDebugFunc->getFile(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getLine(),
+                                irDebugFunc->getCol(),
+                                irDebugFunc->getCol());
+                        }
+                    }
+                }
             }
             // In addition to normal basic blocks,
             // all loops gets a header block.
@@ -9056,6 +9090,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // We can simply emit a store into the backing variable for the DebugValue operation.
         //
         return emitStore(parent, debugValue, debugVar, debugValueVal);
+    }
+
+    void maybeAssignAnonymousMemberNames(IRStructType* structType)
+    {
+        // if any of the members have names associated with them, don't generate any names
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            for (auto decor : key->getDecorations())
+            {
+                if (as<IRNameHintDecoration>(decor) || as<IRLinkageDecoration>(decor))
+                {
+                    return;
+                }
+            }
+        }
+
+        // assign names of the keys to `__memberN`; this aligns with what debuggers expect
+        IRBuilder builder(structType);
+        uint32_t index = 0;
+        for (auto field : structType->getFields())
+        {
+            auto key = field->getKey();
+            StringBuilder sbName;
+            sbName << "__member" << index;
+            builder.addNameHintDecoration(key, sbName.getUnownedSlice());
+            index++;
+        }
     }
 
     IRInst* getName(IRInst* inst)

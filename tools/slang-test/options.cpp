@@ -86,6 +86,7 @@ static bool _isSubCommand(const char* arg)
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
         "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
         "  -expected-failure-list <file>  Specify file containing expected failures\n"
+        "  -skip-list <file>              Specify file containing tests to skip (path prefixes)\n"
         "  -use-shared-library            Run tests in-process using shared library\n"
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
@@ -495,6 +496,39 @@ static bool _isSubCommand(const char* arg)
                 if (trimmedLine.getLength() > 0)
                 {
                     optionsOut->expectedFailureList.add(trimmedLine);
+                }
+            }
+        }
+        else if (strcmp(arg, "-skip-list") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            auto fileName = *argCursor++;
+            String text;
+            File::readAllText(fileName, text);
+            List<UnownedStringSlice> lines;
+            StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            for (auto line : lines)
+            {
+                // Remove comments (everything after '#' character)
+                auto trimmedLine = line;
+                auto commentIndex = line.indexOf('#');
+                if (commentIndex != -1)
+                {
+                    trimmedLine = line.head(commentIndex);
+                }
+
+                // Trim whitespace and skip empty lines
+                trimmedLine = trimmedLine.trim();
+                if (trimmedLine.getLength() > 0)
+                {
+                    Slang::StringBuilder sb;
+                    Slang::Path::simplify(trimmedLine, Slang::Path::SimplifyStyle::NoRoot, sb);
+                    optionsOut->skipList.add(sb);
                 }
             }
         }

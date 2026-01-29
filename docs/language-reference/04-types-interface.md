@@ -1,50 +1,93 @@
 # Interfaces
 
+## Syntax
+
+Interface declaration:
+
+> [*`modifier-list`*]<br>
+> **`'interface'`** *`identifier`* [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> **`'{'`** *`member-list`* **`'}'`**
+
+Associated named type declaration:
+
+> *`associated-type-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'associatedtype'`** *`identifier`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`';'`**
+
+### Parameters
+
+- *`modifier-list`* is an optional list of modifiers (TODO: link)
+- *`identifier`* is the name of the declared interface type
+- *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
+- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface).
+- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+- *`member-list`* is a list of interface members. A member is one of:
+  - *`var-decl`* is a `static` `const` member variable declaration of type
+    [int](04-types-fundamental#integer) or [bool](04-types-fundamental#boolean). See [Variables (TODO)](TODO)
+  - *`associated-type-decl`* is an associated type declaration. See below.
+  - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
+  - *`constructor-decl`* is a [constructor declaration](04-types-struct#constructor).
+  - *`property-decl`* is a [property declaration](04-types-struct#property).
+  - *`subscript-op-decl`* is a [subscript operator declaration](04-types-struct#subscript-op).
+  - *`function-call-op-decl`* is a [function call operator declaration](04-types-struct#function-call-op).
+
+
+
+## Description
+
 An `interface` specifies a set of member functions that a conforming type must provide. An interface can then
 be used in place of a concrete type, allowing for the same code to use different concrete types via the
 methods defined by the interface.
 
 An interface consists of:
 
-- Any number of member function prototypes, constructors, or function call operator declarations. A concrete
-  type inheriting from the interface must provide compatible member function implementations with the same
-  names.
-- Any number of member functions with the implementation body, which are added to the inheriting type (either
-  a concrete `struct` or another `interface`). Constructors are not allowed.
-  - Inheriting types may override member functions by using the `override` keyword with a compatible member
+- Any number of member function prototypes, [constructors](04-types-struct#constructor), or
+  [function call operator declarations](04-types-struct#function-call-op) without a body. A concrete type
+  inheriting from the interface must provide compatible member function implementations with the same names.
+- Any number of member functions or [function call operators](04-types-struct#function-call-op) with the
+  implementation body, which are added to the inheriting type (either a concrete `struct` or another
+  `interface`). Constructors are not allowed.
+  - Inheriting types may override member functions by using the `override` modifier with a compatible member
     function declaration.
-- Any number of property or `__subscript` declarations. Interface may declare either `get` or `set` or
-  both methods without the implementation body. A concrete type inheriting from the interface must provide
-  implementations for the properties and `__subscript` declarations.
-  - A property or a `__subscript` declaration may be implemented with compatible `get` and `set` methods
+- Any number of [property](04-types-struct#property) or [subscript operator](04-types-struct#subscript-op)
+  declarations. An interface may declare either `get` or `set` or both methods without the implementation
+  body. A concrete type inheriting from the interface must provide implementations for the property and
+  subscript operator declarations.
+  - A property or a subscript operator declaration may be implemented with compatible `get` and `set` methods
     as required by the interface.
   - Alternatively, a property may be implemented by declaring a compatible variable with a matching name.
-- Any number of associated named types, which a concrete inheriting type must provide. An associated named
+- Any number of *associated named types*, which a concrete inheriting type must provide. An associated named
   type may be provided by:
-  - Declaring a nested `struct` with the same name. OR
-  - Defining a type alias for the name with `typealias` or `typedef`.
+  - Declaring a nested [structure](04-types-struct) with the same name. OR
+  - Defining a type alias for the name with [typealias](04-types#declarations) or
+    [typedef](04-types#declarations) declarations.
 - Any number of `static` `const` data members without initializers. A concrete inheriting type must provide
   compatible static data members with the same names and types.
   - The type of a `static` `const` member must be either `int` or `bool`.
 
 The interface member functions may be static or non-static.
 
-An object inheriting from an interface can be converted to the interface type.
+An object of a type conforming to an interface can be converted to the interface type.
 
 An interface may also inherit from another interface. The inherited members add to the inheriting interface.
 
 A member function implementation is compatible with an interface member function when:
-- The implementation function can be called with the parameter types of the interface.; AND
-- The implementation function return type can be converted to the interface type.
+- The implementation function can be called with the parameter types of the interface; AND
+- The implementation function return type can be converted to the interface function return type.
 
 A member property (or variable) is compatible with an interface member property when the implementation
 property (or variable) is convertible to the interface property and vice versa.
 
-`interface` members may be declared with access control specifiers `public` or `internal`. The default member
-visibility is the visibility of the `interface`. See [access control (TODO)](TODO) for further information.
+Interface members may be declared with access control specifiers `public` or `internal`. The default member
+visibility is the same as the visibility of the interface. See [access control (TODO)](TODO) for further
+information.
 
-When a struct implements an interface member requirement, the visibility of the member may not be higher than
-the requirement. However, it can be lower.
+When a [structure](04-types-struct) implements an interface member requirement, the visibility of the member
+may not be higher than the requirement. However, it can be lower.
 
 **Example:**
 
@@ -118,7 +161,7 @@ struct TestClass : ITest
     // Required property
     //
     // Note that alternatively, a data member
-    // "float testProp;" could have also be provided.
+    // "float testProp;" could have also been provided.
     property testProp : float
     {
         get
@@ -173,7 +216,7 @@ struct TestClass : ITest
 }
 ```
 
-> Remark 1: The test for an inheriting member function compatibility is equivalent to whether a wrapper
+> 📝 **Remark 1:** The test for an inheriting member function compatibility is equivalent to whether a wrapper
 > function with the interface member function signature may invoke the inheriting member function, passing the
 > parameters and the return value as is.
 >
@@ -207,7 +250,7 @@ struct TestClass : ITest
 > }
 > ```
 
-> Remark 2: An interface can also be parameterized using generics.
+> 📝 **Remark 2:** An interface can also be parameterized using generics.
 >
 > For example:
 >
@@ -239,6 +282,8 @@ struct TestClass : ITest
 
 ## Interface-Conforming Variants
 
+> ⚠️ **Warning:** This language feature is experimental and subject to change.
+
 A variable declared with an interface type is an *interface-conforming variant*–or *interface variant* for
 short. An interface variant may have any type conforming to the interface. When an interface variant is
 instantiated, the following restrictions apply:
@@ -250,15 +295,15 @@ instantiated, the following restrictions apply:
 Further, invoking a member function of an interface variant has performance overhead due to dynamic
 dispatching.
 
-> Remark 1: Function parameters with interface types do not impose the above restrictions when invoked with
-> variables with types known at compile time.
+> 📝 **Remark 1:** Function parameters with interface types do not impose the above restrictions when invoked
+> with variables with types known at compile time.
 
-> Remark 2: Initializing an interface variant using the default initializer is deprecated. Invoking a
+> 📝 **Remark 2:** Initializing an interface variant using the default initializer is deprecated. Invoking a
 > default-initialized interface variant is undefined behavior.
 
-> Remark 3: In `slangc`, an interface variant is said to have an
-> [existential type](https://en.wikipedia.org/wiki/Type_system#Existential_types), meaning that its type
-> exists such that it conforms to the specified interface.
+> 📝 **Remark 3:** In `slangc`, an interface variant is said to have an [existential
+> type](https://en.wikipedia.org/wiki/Type_system#Existential_types), meaning that its type exists such that
+> it conforms to the specified interface.
 
 
 ## Example
@@ -289,7 +334,7 @@ interface ITest : IBase
         return getA() + bias;
     }
 
-    // a static member function thet ConcreteInt16 and
+    // a static member function that ConcreteInt16 and
     // ConcreteInt32 must provide.
     static int getUnderlyingWidth();
 }
@@ -338,7 +383,6 @@ struct ConcreteInt16 : ITest
 // interface ITest
 int getValSquared(ITest i)
 {
-    int lhs = i.getA();
     return i.getA() * i.getA();
 }
 
@@ -401,22 +445,23 @@ void main(uint3 id : SV_DispatchThreadID)
     // has the overhead of dynamic dispatching.
     outputBuffer[id.x] += iobj.someFunc();
 
-    // Dynamic dispatch overhead also here.
+    // Dynamic dispatch overhead also here:
     outputBuffer[id.x] += iobj.getUnderlyingWidth();
 }
 ```
 
 
-# Memory Layout and Dispatch Mechanism
+## Memory Layout and Dispatch Mechanism
 
-The memory layout of an interface variant is unspecified. Type-based dynamic dispatching of a member function
-invocation is unspecified. Both are subject to change in future versions of `slangc`.
+The memory layout of an interface-conforming variant is unspecified. Type-based dynamic dispatching of a
+member function invocation is unspecified. Both are subject to change in future versions of `slangc`.
 
-## Non-Normative Description of Interface Variants
+### Non-Normative Description of Interface-Conforming Variants
 
-> Remark: The contents of this section is informational only and subject to change.
+> 📝 **Remark:** The contents of this section are informational only and subject to change.
 
-In the current implementation, the layout of an interface is a tagged union, conceptually as follows:
+In the current implementation, the layout of an interface-conforming variant is a tagged union, conceptually
+as follows:
 
 ```hlsl
 // Note: unions do not exist in Slang
@@ -440,10 +485,10 @@ types, union types are emulated. Emulation is performed by packing/unpacking the
 object to/from the underlying representation. This involves memory copies.
 
 When the type is not known at compile-time, dynamic dispatch based on the type tag is performed to invoke
-member functions. Internally, this performed as follows:
+member functions. Internally, this is performed as follows:
 
-1. `switch` statement based on the type tag selects the correct type-specific implementation for the follow-up
-   steps.
+1. A `switch` statement based on the type tag selects the correct type-specific implementation for the
+   subsequent steps.
 2. The concretely-typed object from the union is unpacked (non-static member functions only)
 3. The member function of the concrete type is invoked
 4. The concretely-typed object is packed back to the union (non-static mutating member functions only)
@@ -451,9 +496,9 @@ member functions. Internally, this performed as follows:
 When the type is known at compile-time, the code using an interface type is specialized for the concrete
 type. This avoids the performance overhead of dynamic dispatching and union types.
 
-## Non-Normative Description of Interface-typed Function Parameters
+### Non-Normative Description of Interface-typed Function Parameters
 
-> Remark: The contents of this section is informational only and subject to change.
+> 📝 **Remark:** The contents of this section are informational only and subject to change.
 
 In the current implementation, when a function with an interface-typed parameter is invoked with a type known
 at compile time, the function is specialized for the concrete type. This essentially creates a copy of the
