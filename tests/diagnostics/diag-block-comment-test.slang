@@ -8,10 +8,12 @@ void test()
 {
     if (1);
 /*CHECK
+        ^ implicit conversion
           ^ empty statement
 */
     if (2);
 /*CHECK
+        ^ implicit conversion
           ^ empty statement
 */
 }

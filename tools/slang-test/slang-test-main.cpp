@@ -96,6 +96,10 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("diag", prefix);
     }
+    bool isNonExhaustiveDiagTest() const
+    {
+        return commandOptions.containsKey("non-exhaustive");
+    }
 
     Type type = Type::Normal;
 
@@ -827,7 +831,7 @@ static TestResult _fileCheckTest(
 //
 static TestResult _diagnosticAnnotationTest(
     TestContext& context,
-    const String& sourceFilePath,
+    const TestInput& input,
     const String& diagPrefix,
     const String& outputToCheck)
 {
@@ -835,12 +839,12 @@ static TestResult _diagnosticAnnotationTest(
 
     // Read the source file to get annotations
     String sourceText;
-    if (SLANG_FAILED(File::readAllText(sourceFilePath, sourceText)))
+    if (SLANG_FAILED(File::readAllText(input.filePath, sourceText)))
     {
         testReporter.messageFormat(
             TestMessageType::RunError,
             "Failed to read source file for diagnostic annotations: '%s'",
-            sourceFilePath.getBuffer());
+            input.filePath.getBuffer());
         return TestResult::Fail;
     }
 
@@ -863,12 +867,16 @@ static TestResult _diagnosticAnnotationTest(
         }
     }
 
+    // Check if exhaustive mode (default) or non-exhaustive
+    bool exhaustive = !input.testOptions->isNonExhaustiveDiagTest();
+
     // Check diagnostic annotations
     String errorMessage;
     if (!DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
             sourceText.getUnownedSlice(),
             diagPrefix.getUnownedSlice(),
             standardError.getUnownedSlice(),
+            exhaustive,
             errorMessage))
     {
         testReporter.message(TestMessageType::TestFailure, errorMessage.getBuffer());
@@ -938,7 +946,7 @@ static TestResult _validateOutput(
     String diagPrefix;
     if (input.testOptions->getDiagTestPrefix(diagPrefix))
     {
-        result = _diagnosticAnnotationTest(*context, input.filePath, diagPrefix, actualOutput);
+        result = _diagnosticAnnotationTest(*context, input, diagPrefix, actualOutput);
     }
     else
     {

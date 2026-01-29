@@ -82,6 +82,53 @@
 //     - Any line, any column
 //     - Message contains "unused variable"
 //
+// MATCHING AGAINST SEVERITY AND ERROR CODES
+// ------------------------------------------
+//
+// Annotations can match against multiple fields of a diagnostic:
+// - The message text
+// - The severity (e.g., "warning", "error")
+// - The error code (e.g., "E20101")
+// - Combined "severity errorCode" (e.g., "warning E20101")
+//
+// Examples:
+//     if (x);
+//     //CHECK   ^ warning
+//     //CHECK   ^ E20101
+//     //CHECK   ^ warning E20101
+//     //CHECK   ^ empty statement
+//
+// This is useful for checking specific error codes without needing the full message.
+//
+// EXHAUSTIVE vs NON-EXHAUSTIVE MODE
+// ----------------------------------
+//
+// By default, tests are EXHAUSTIVE: all diagnostics must have annotations.
+// If the compiler produces diagnostics that aren't annotated, the test fails.
+//
+// Example (fails in exhaustive mode):
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//     void test() {
+//         if (1);
+//     //CHECK   ^ empty statement
+//         // Missing annotation for "implicit conversion" warning!
+//     }
+//
+// Use non-exhaustive mode to only check that annotations match:
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//     void test() {
+//         if (1);
+//     //CHECK   ^ empty statement
+//         // implicit conversion warning is OK to ignore
+//     }
+//
+// When to use non-exhaustive:
+// - Testing a specific diagnostic while ignoring others
+// - Incremental test development (annotate one diagnostic at a time)
+// - When other diagnostics are noise for the test
+//
+// Prefer exhaustive mode (default) to ensure no unexpected diagnostics appear.
+//
 // COLUMN RANGE MATCHING
 // ---------------------
 //
@@ -163,12 +210,15 @@ struct DiagnosticAnnotationUtil
     /// @param machineReadableOutput The machine-readable diagnostic output from compiler
     ///                              (tab-separated format from
     ///                              -enable-machine-readable-diagnostics)
+    /// @param exhaustive If true (default), fail if any diagnostics lack annotations
+    ///                   If false, only check that annotations match (ignore extra diagnostics)
     /// @param outErrorMessage Detailed error message if check fails, including expected vs actual
-    /// @return true if all annotations matched, false otherwise
+    /// @return true if all checks passed, false otherwise
     static bool checkDiagnosticAnnotations(
         const UnownedStringSlice& sourceText,
         const UnownedStringSlice& prefix,
         const UnownedStringSlice& machineReadableOutput,
+        bool exhaustive,
         String& outErrorMessage);
 };
 
