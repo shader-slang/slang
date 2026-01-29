@@ -674,16 +674,66 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
+                auto maybeTargetCapSet = targetCaps.getAtomSets();
+                if (maybeTargetCapSet)
                 {
                     if (auto combinedSet = combinedSets.getAtomSets())
                     {
                         CapabilityAtomSet::calcSubtract(
                             addedAtoms,
                             (*combinedSet),
-                            (*targetCapSet));
+                            (*maybeTargetCapSet));
                     }
                 }
+
+                // Filter out alternative vendor atoms when user specified the alternative.
+                // Only filter known-equivalent pairs to avoid hiding important differences.
+                struct VendorAlternativePair
+                {
+                    CapabilityName first;
+                    CapabilityName second;
+                };
+                static const VendorAlternativePair kVendorAlternatives[] = {
+                    {CapabilityName::spvShaderInvocationReorderNV,
+                     CapabilityName::spvShaderInvocationReorderEXT},
+                    {CapabilityName::SPV_NV_shader_invocation_reorder,
+                     CapabilityName::SPV_EXT_shader_invocation_reorder},
+                    {CapabilityName::_GL_NV_shader_invocation_reorder,
+                     CapabilityName::_GL_EXT_shader_invocation_reorder},
+                };
+
+                CapabilityAtomSet filteredAddedAtoms{};
+                for (auto atom : addedAtoms.getElements<CapabilityAtom>())
+                {
+                    bool hasAlternativeInTarget = false;
+
+                    if (maybeTargetCapSet)
+                    {
+                        for (const auto& pair : kVendorAlternatives)
+                        {
+                            // If this atom is one of a known pair, check if user specified the other
+                            if (atom == CapabilityAtom(pair.first) &&
+                                (*maybeTargetCapSet).contains(UInt(pair.second)))
+                            {
+                                hasAlternativeInTarget = true;
+                                break;
+                            }
+                            if (atom == CapabilityAtom(pair.second) &&
+                                (*maybeTargetCapSet).contains(UInt(pair.first)))
+                            {
+                                hasAlternativeInTarget = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!hasAlternativeInTarget)
+                        filteredAddedAtoms.add(UInt(atom));
+                }
+
+                if (filteredAddedAtoms.isEmpty())
+                    continue;
+
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -693,7 +743,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
                     entryPointFuncDecl,
                     target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    filteredAddedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
