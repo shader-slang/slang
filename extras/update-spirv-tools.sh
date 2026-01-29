@@ -15,7 +15,7 @@ set -e
 
 # Show help message
 show_help() {
-  cat << EOF
+  cat <<EOF
 Update SPIRV-Tools and SPIRV-Headers submodules
 
 Usage: $0 [OPTIONS] [commit-hash]
@@ -66,28 +66,28 @@ COMMIT_HASH=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --test)
-      RUN_TESTS=true
-      shift
-      ;;
-    --create-pr)
-      CREATE_PR=true
-      shift
-      ;;
-    --help)
-      show_help
-      exit 0
-      ;;
-    -*)
-      log_error "Unknown option: $1"
-      echo ""
-      show_help
-      exit 1
-      ;;
-    *)
-      COMMIT_HASH="$1"
-      shift
-      ;;
+  --test)
+    RUN_TESTS=true
+    shift
+    ;;
+  --create-pr)
+    CREATE_PR=true
+    shift
+    ;;
+  --help)
+    show_help
+    exit 0
+    ;;
+  -*)
+    log_error "Unknown option: $1"
+    echo ""
+    show_help
+    exit 1
+    ;;
+  *)
+    COMMIT_HASH="$1"
+    shift
+    ;;
   esac
 done
 
