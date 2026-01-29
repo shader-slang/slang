@@ -4473,49 +4473,8 @@ attribute_syntax [raypayload] : RayPayloadAttribute;
 semantic sv_position
 {
     [require(fragment)]
-    get : float;
-
-    [require(fragment)]
-    get : float2;
-
-    [require(fragment)]
-    get : float3;
-
-    [require(fragment)]
-    get : float4;
-
-    [require(geometry)]
-    get : float;
-
-    [require(geometry)]
-    get : float2;
-
-    [require(geometry)]
-    get : float3;
-
     [require(geometry)]
     get : float4;
-
-    [require(vertex)]
-    [require(geometry)]
-    [require(hull)]
-    [require(domain)]
-    [require(mesh)]
-    set : float;
-
-    [require(vertex)]
-    [require(geometry)]
-    [require(hull)]
-    [require(domain)]
-    [require(mesh)]
-    set : float2;
-
-    [require(vertex)]
-    [require(geometry)]
-    [require(hull)]
-    [require(domain)]
-    [require(mesh)]
-    set : float3;
 
     [require(vertex)]
     [require(geometry)]
@@ -4613,6 +4572,9 @@ semantic sv_innercoverage
 
 semantic sv_dispatchthreadid
 {
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
@@ -4627,25 +4589,13 @@ semantic sv_dispatchthreadid
     [require(mesh)]
     [require(amplification)]
     get : uint3;
-
-    [require(compute)]
-    [require(mesh)]
-    [require(amplification)]
-    get : int;
-
-    [require(compute)]
-    [require(mesh)]
-    [require(amplification)]
-    get : int2;
-
-    [require(compute)]
-    [require(mesh)]
-    [require(amplification)]
-    get : int3;
 }
 
 semantic sv_groupid
 {
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
@@ -4672,6 +4622,9 @@ semantic sv_groupindex
 
 semantic sv_groupthreadid
 {
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components.
     [require(compute)]
     [require(mesh)]
     [require(amplification)]
@@ -4692,19 +4645,27 @@ semantic sv_vertexid
 {
     [require(vertex)]
     get : uint;
-    
+
+    // Vertex output + fragment input enables passing vertex ID as a varying
+    // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
     [require(vertex)]
     set : uint;
+
+    [require(fragment)]
+    get : uint;
 }
 
 semantic sv_instanceid
 {
     [require(vertex)]
     get : uint;
-    
+
+    // Vertex output + fragment input enables passing instance ID as a varying
+    // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
+    // See tests/bugs/gh-3087.slang for an examples
     [require(vertex)]
     set : uint;
-    
+
     [require(fragment)]
     get : uint;
 }
