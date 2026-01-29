@@ -125,7 +125,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID) {
     outputBuffer[7] = applyOperations(opsB, 3.0); // CHECK: 8
 
     // Test 8: Array modification through inout and reuse
-    Array<IOperation, 2> ops8 = { Scale(1.0), Scale(1.0) };
+    Array<IOperation, 2> ops8 = makeArrayFromElement<IOperation, 2>(Scale(1.0));
     modifyOperations(ops8);
     // 1.0 * 1.0 * 10.0 = 10.0
     outputBuffer[8] = applyOperations(ops8, 1.0); // CHECK: 10
