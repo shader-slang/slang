@@ -36,12 +36,12 @@ jobs:
           fi
 
           # Extract commit info
-          # CURRENT_SPIRV_COMMIT=<short-hash>
+          # OLD_SPIRV_COMMIT=<short-hash>
           # NEW_SPIRV_COMMIT=<short-hash>
-          CURRENT_COMMIT=$(grep "^CURRENT_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+          OLDCOMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
           NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
 
-          echo "current_spirv_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          echo "old_spirv_commit=$OLD_COMMIT" >> $GITHUB_OUTPUT
           echo "new_spirv_commit=$NEW_COMMIT" >> $GITHUB_OUTPUT
 
       - name: Upload logs
