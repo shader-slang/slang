@@ -102,10 +102,9 @@ static void validateTypeSemantics(
     {
         bool isOutput = (direction == SemanticDirection::Output);
         auto semanticNameSlice = semantic->name.getContent();
-        String semanticNameStr = String(semanticNameSlice).toLower();
         
         // Only validate SV_ semantics
-        if (semanticNameStr.startsWith("sv_"))
+        if (semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
         {
             // Split name and index (e.g., "SV_Target0" -> "SV_Target" + "0")
             UnownedStringSlice baseNameSlice;
