@@ -2,13 +2,13 @@
 
 The types in the Slang language consist of the following categories:
 
-* [4a - Fundamental Types](04-types-fundamental.md)
-* [4b - Vector and Matrix Types](04-types-vector-and-matrix.md)
-* [4c - Structures](04-types-struct.md)
-* [4d - Interfaces](04-types-interface.md)
-* [4e - Extensions](04-types-extension.md)
-* [4f - Array types](04-types-array.md)
-* [4g - Opaque types](04-types-opaque.md)
+* [Fundamental Types](types-fundamental.md)
+* [Vector and Matrix Types](types-vector-and-matrix.md)
+* [Structures](types-struct.md)
+* [Interfaces](types-interface.md)
+* [Extensions](types-extension.md)
+* [Array types](types-array.md)
+* [Opaque types](types-opaque.md)
 
 A [type specifier](#specifier) names a type. Type specifiers are used in variable declarations, function
 parameter and return type declarations, and elsewhere where a type is required. Type specifiers are divided
@@ -23,11 +23,11 @@ into two categories:
   - *Simple function type specifier* specifying a function type.
 - A **type specifier** is a type expression that names a type, possibly by declaring it. A simple type
   specifier is a subset of the full type specifier. A type specifier is a part of the
-  [variable declaration](07-declarations.md) syntax, which is used to declare variables, as the name suggests.
+  [variable declaration](declarations.md) syntax, which is used to declare variables, as the name suggests.
 
 A type is incomplete when it is declared but not defined. An incomplete type cannot be used to declare
 variables. An incomplete type other than `void` may be completed with a subsequent definition. For further
-information, see [declarations](07-declarations.md).
+information, see [declarations](declarations.md).
 
 A [type alias](#alias) is a name that refers to a previously declared type.
 
@@ -71,17 +71,17 @@ Full type specifier, possibly declaring a new type:
 
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
 - *`type-identifier`* is an identifier that names an existing type or a generic type. This may be, *e.g.*, a
-  [fundamental type](04-types-fundamental.md), [vector/matrix generic type](04-types-vector-and-matrix.md),
-  user-defined type such as a named [structure type](04-types-struct.md),
-  [interface type](04-types-interface.md), [enumeration type](04-types-enum.md), type alias, or a type
+  [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
+  user-defined type such as a named [structure type](types-struct.md),
+  [interface type](types-interface.md), [enumeration type](types-enum.md), type alias, or a type
   provided by a module.
 - *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
-- *`constant-index-expr`* is an optional constant integral expression for an [array](04-types-array.md) type
+- *`constant-index-expr`* is an optional constant integral expression for an [array](types-array.md) type
   declaration.
 - *`param-list`* is a function parameter list. See [function parameter list (TODO)](TODO).
-- *`struct-decl`* is a [structure](04-types-struct.md) type declaration, possibly also defining the type.
-- *`class-decl`* is a [class (TODO)](04-types-class.md) type declaration, possibly also defining the type.
-- *`enum-decl`* is an [enumeration (TODO)](04-types-enum.md) type declaration, possibly also defining the type.
+- *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
+- *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
+- *`enum-decl`* is an [enumeration (TODO)](types-enum.md) type declaration, possibly also defining the type.
 - *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
 
 ### Description
@@ -96,8 +96,8 @@ specifiers are used in:
 - [modern variable (TODO)](TODO) declarations
 - [function parameter (TODO)](TODO) declarations
 - [function return value type (TODO)](TODO) declarations
-- [structure property](04-types-struct#property)
-- [structure subscript operator](04-types-struct#subscript)
+- [structure property](types-struct#property)
+- [structure subscript operator](types-struct#subscript)
 - [generic type parameter declarations (TODO)](TODO)
 - [typealias](#alias) declarations
 
@@ -105,8 +105,8 @@ Declaration of new types is allowed in:
 - Global declaration statements (TODO: link)
 - Function body declaration statements (TODO: link)
 - Traditional variable declarations (TODO: link)
-- [structure](04-types-struct.md) members declaring nested types
-- [extension](04-types-extension.md) members declaring nested types
+- [structure](types-struct.md) members declaring nested types
+- [extension](types-extension.md) members declaring nested types
 - [typedef](#alias) declarations
 
 > 📝 **Remark 1:** *`simple-type-spec`* is a syntactical subset of the full *`type-expr`*. The subset only
@@ -163,8 +163,8 @@ The use of types with unknown size is restricted as follows:
   on the specific type/function.
 * A type with unknown size cannot be instantiated as a variable.
 
-> 📝 **Remark:** Unknown size is different from unspecified or target-specified size. [Opaque types](04-types-opaque.md)
-> have target-specified sizes, sizes of [structures](04-types-struct.md) and [arrays](04-types-array.md) are subject to
-> target-specific alignment rules, and certain [4a - Fundamental Types](04-types-fundamental.md) such as
+> 📝 **Remark:** Unknown size is different from unspecified or target-specified size. [Opaque types](types-opaque.md)
+> have target-specified sizes, sizes of [structures](types-struct.md) and [arrays](types-array.md) are subject to
+> target-specific alignment rules, and certain [fundamental types](types-fundamental.md) such as
 > `bool` have target-specified size. Unspecified-sized types are not subject to the restrictions of
 > unknown-sized types.

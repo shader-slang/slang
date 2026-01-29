@@ -23,17 +23,17 @@ Associated named type declaration:
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
 - *`identifier`* is the name of the declared interface type
 - *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
-- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface.md).
+- *`bases-clause`* is an optional list of inherited [interfaces](types-interface.md).
 - *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
 - *`member-list`* is a list of interface members. A member is one of:
   - *`var-decl`* is a `static` `const` member variable declaration of type
-    [int](04-types-fundamental.md#integer) or [bool](04-types-fundamental.md#boolean). See [Variables (TODO)](TODO)
+    [int](types-fundamental.md#integer) or [bool](types-fundamental.md#boolean). See [Variables (TODO)](TODO)
   - *`associated-type-decl`* is an associated type declaration. See below.
   - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
-  - *`constructor-decl`* is a [constructor declaration](04-types-struct.md#constructor).
-  - *`property-decl`* is a [property declaration](04-types-struct.md#property).
-  - *`subscript-op-decl`* is a [subscript operator declaration](04-types-struct.md#subscript-op).
-  - *`function-call-op-decl`* is a [function call operator declaration](04-types-struct.md#function-call-op).
+  - *`constructor-decl`* is a [constructor declaration](types-struct.md#constructor).
+  - *`property-decl`* is a [property declaration](types-struct.md#property).
+  - *`subscript-op-decl`* is a [subscript operator declaration](types-struct.md#subscript-op).
+  - *`function-call-op-decl`* is a [function call operator declaration](types-struct.md#function-call-op).
 
 
 
@@ -45,15 +45,15 @@ methods defined by the interface.
 
 An interface consists of:
 
-- Any number of member function prototypes, [constructors](04-types-struct.md#constructor), or
-  [function call operator declarations](04-types-struct.md#function-call-op) without a body. A concrete type
+- Any number of member function prototypes, [constructors](types-struct.md#constructor), or
+  [function call operator declarations](types-struct.md#function-call-op) without a body. A concrete type
   inheriting from the interface must provide compatible member function implementations with the same names.
-- Any number of member functions or [function call operators](04-types-struct.md#function-call-op) with the
+- Any number of member functions or [function call operators](types-struct.md#function-call-op) with the
   implementation body, which are added to the inheriting type (either a concrete `struct` or another
   `interface`). Constructors are not allowed.
   - Inheriting types may override member functions by using the `override` modifier with a compatible member
     function declaration.
-- Any number of [property](04-types-struct.md#property) or [subscript operator](04-types-struct.md#subscript-op)
+- Any number of [property](types-struct.md#property) or [subscript operator](types-struct.md#subscript-op)
   declarations. An interface may declare either `get` or `set` or both methods without the implementation
   body. A concrete type inheriting from the interface must provide implementations for the property and
   subscript operator declarations.
@@ -62,9 +62,9 @@ An interface consists of:
   - Alternatively, a property may be implemented by declaring a compatible variable with a matching name.
 - Any number of *associated named types*, which a concrete inheriting type must provide. An associated named
   type may be provided by:
-  - Declaring a nested [structure](04-types-struct.md) with the same name. OR
-  - Defining a type alias for the name with [typealias](04-types.md#alias) or
-    [typedef](04-types.md#alias) declarations.
+  - Declaring a nested [structure](types-struct.md) with the same name. OR
+  - Defining a type alias for the name with [typealias](types.md#alias) or
+    [typedef](types.md#alias) declarations.
 - Any number of `static` `const` data members without initializers. A concrete inheriting type must provide
   compatible static data members with the same names and types.
   - The type of a `static` `const` member must be either `int` or `bool`.
@@ -86,7 +86,7 @@ Interface members may be declared with access control specifiers `public` or `in
 visibility is the same as the visibility of the interface. See [access control (TODO)](TODO) for further
 information.
 
-When a [structure](04-types-struct.md) implements an interface member requirement, the visibility of the member
+When a [structure](types-struct.md) implements an interface member requirement, the visibility of the member
 may not be higher than the requirement. However, it can be lower.
 
 **Example:**

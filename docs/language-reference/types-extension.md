@@ -17,16 +17,16 @@
 
 - *`type-expr`* is the type to extend.
 - *`generic-params-decl`* are the generic parameters for a [generic struct extension](#generic-struct).
-- *`bases-clause`* is an optional list of [interface](04-types-interface.md) conformance specifications to be added.
+- *`bases-clause`* is an optional list of [interface](types-interface.md) conformance specifications to be added.
 - *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
 - *`member-list`* is a list of struct members to be added. A member is one of:
   - *`var-decl`* is a member static variable declaration. See [Variables (TODO)](TODO)
-  - *`type-decl`* is a nested [type declaration](04-types.md).
+  - *`type-decl`* is a nested [type declaration](types.md).
   - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
-  - *`constructor-decl`* is a [constructor declaration](04-types-struct.md#constructor).
-  - *`property-decl`* is a [property declaration](04-types-struct.md#property).
-  - *`subscript-op-decl`* is a [subscript operator declaration](04-types-struct.md#subscript-op).
-  - *`function-call-op-decl`* is a [function call operator declaration](04-types-struct.md#function-call-op).
+  - *`constructor-decl`* is a [constructor declaration](types-struct.md#constructor).
+  - *`property-decl`* is a [property declaration](types-struct.md#property).
+  - *`subscript-op-decl`* is a [subscript operator declaration](types-struct.md#subscript-op).
+  - *`function-call-op-decl`* is a [function call operator declaration](types-struct.md#function-call-op).
 
 
 ## Description
@@ -36,7 +36,7 @@ declarations. An `extension` may be used to add static data members, member func
 properties, subscript operators, and function call operators to an existing type. An `extension` may not
 change the data layout of a `struct`, that is, it cannot be used to append non-static data members.
 
-> 📝 **Remark:** An [interface](04-types-interface.md) type cannot be extended. This would add new requirements
+> 📝 **Remark:** An [interface](types-interface.md) type cannot be extended. This would add new requirements
 > to all conforming types, which would invalidate existing conformances.
 
 ## Struct Extension {#struct}
