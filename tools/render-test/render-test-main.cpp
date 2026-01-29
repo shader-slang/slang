@@ -326,9 +326,11 @@ struct AssignValsFromLayoutContext
         default:
             break;
         }
-        auto typeSize = dataCursor.getTypeLayout()->getSize();
+        size_t destSize = bufferSize;
+        if (auto destTypeLayout = dataCursor.getTypeLayout())
+            destSize = dataCursor.getTypeLayout()->getSize();
         SLANG_RETURN_ON_FAIL(
-            dataCursor.setData(srcVal->bufferData.getBuffer(), Math::Min(typeSize, bufferSize)));
+            dataCursor.setData(srcVal->bufferData.getBuffer(), Math::Min(destSize, bufferSize)));
         return SLANG_OK;
     }
 
@@ -697,7 +699,8 @@ struct AssignValsFromLayoutContext
         auto typeName = srcVal->typeName;
         ComPtr<IShaderObject> shaderObject;
 
-        if (typeName.getLength() != 0)
+        auto slangTypeLayout = dstCursor.getTypeLayout();
+        if (!slangTypeLayout)
         {
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
@@ -706,7 +709,7 @@ struct AssignValsFromLayoutContext
             device->createShaderObject(
                 slangSession(),
                 slangType,
-                ShaderObjectContainerType::None,
+                dstCursor.m_containerType,
                 shaderObject.writeRef());
         }
         else
@@ -715,7 +718,6 @@ struct AssignValsFromLayoutContext
             // then we will infer the type from the type of the
             // value pointed to by `entryCursor`.
             //
-            auto slangTypeLayout = dstCursor.getTypeLayout();
             switch (slangTypeLayout->getKind())
             {
             default:
