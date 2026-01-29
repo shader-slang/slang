@@ -367,11 +367,15 @@ AttributeDecl* SemanticsVisitor::findOrSynthesizeAttributeDeclFromUserDefinedAtt
     {
         if (isEffectivelyStatic(varMember))
             continue;
+
         ParamDecl* paramDecl = m_astBuilder->create<ParamDecl>();
         paramDecl->nameAndLoc = varMember->nameAndLoc;
         paramDecl->type = varMember->type;
         paramDecl->loc = varMember->loc;
-        paramDecl->setCheckState(varMember->checkState.getState());
+        // Don't set the check state to DefinitionChecked here because
+        // the type may not be fully resolved yet. The type will be
+        // resolved later when validateAttribute calls ensureDecl on
+        // the paramDecl with CanUseTypeOfValueDecl state.
         attrDecl->addMember(paramDecl);
     }
 
