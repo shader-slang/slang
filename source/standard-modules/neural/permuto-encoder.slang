@@ -91,6 +91,7 @@ public struct PermutoEncoder<T,
         out int rem0[Dimensions + 1],
         out int rank[Dimensions + 1])
     {
+        rank = {};
         // Find the closest remainder-0 point through rounding
         int sum = 0;
         [ForceUnroll]
@@ -164,6 +165,7 @@ public struct PermutoEncoder<T,
         out float barycentric[Dimensions + 2])
     {
         // Compute the barycentric coordinates
+        barycentric = {};
         [ForceUnroll]
         for (uint dim = 0; dim <= Dimensions; ++dim)
         {
@@ -273,11 +275,11 @@ public struct PermutoEncoder<T,
 
         // Find the closest remainder-0 and rank
         int rem0[Dimensions + 1];
-        int rank[Dimensions + 1] = {};
+        int rank[Dimensions + 1];
         permutoFindRem0(elevated, rem0, rank);
 
         // Compute the barycentric coordinates
-        float barycentric[Dimensions + 2] = {};
+        float barycentric[Dimensions + 2];
         permutoBarycentric(elevated, rem0, rank, barycentric);
 
         // Interpolate the values using barycentric weights
