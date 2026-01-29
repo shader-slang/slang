@@ -3,26 +3,30 @@
 ## Syntax
 
 Struct *no-body* declaration:
-> [*`modifier-list`*]<br>
-> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *with-members* declaration:
-> [*`modifier-list`*]<br>
-> **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
 > **`'{'`** *`member-list`* **`'}'`**
 
 Struct *link-time extern type* declaration:
-> [*`modifier-list`*]<br>
-> **`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
 
 Struct *link-time export type alias* declaration:
-> [*`modifier-list`*]<br>
-> **`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
+> *`struct-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
 
 Member list:
 > *`member-list`* =<br>
@@ -210,7 +214,7 @@ initializer list does not contain enough values, the remaining data members are 
 initializer list is provided, a class without a user-provided constructor is instantiated in an undefined
 state.
 
-> Remark 1: When a class without user-provided constructor is instantiated without an initializer list, the
+> 📝 **Remark 1:** When a class without user-provided constructor is instantiated without an initializer list, the
 > object's initial state is undefined. This includes data members which have members with user-provided
 > constructors.
 >
@@ -233,7 +237,7 @@ state.
 > TestClass obj;
 > ```
 
-> Remark 2: Accessing data members that are in undefined state is undefined behavior.
+> 📝 **Remark 2:** Accessing data members that are in undefined state is undefined behavior.
 
 
 ## Static Member Functions {#static-member-function}
@@ -256,7 +260,7 @@ required, the member function must be declared with the `[mutating]` attribute.
 
 Non-static member functions cannot be invoked without an object.
 
-> Remark: In C++ terminology, a member function is `const` by default. Attribute `[mutating]` makes it
+> 📝 **Remark:** In C++ terminology, a member function is `const` by default. Attribute `[mutating]` makes it
 > a non-`const` member function.
 
 
@@ -343,13 +347,13 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
-> Remark 1: A property can be used to replace a non-`static` data member when additional logic is desired to
+> 📝 **Remark 1:** A property can be used to replace a non-`static` data member when additional logic is desired to
 > be added systematically to data member access. This can avoid refactoring call sites.
 
-> Remark 2: A non-static data member can be used to implement an interface property requirement. See
+> 📝 **Remark 2:** A non-static data member can be used to implement an interface property requirement. See
 > [interfaces](04-types-interface.md) for details.
 
-> Remark 3: In the example above, the property could have also been declared as:
+> 📝 **Remark 3:** In the example above, the property could have also been declared as:
 >
 > ```hlsl
 > struct TestClass
@@ -625,7 +629,7 @@ The following algorithm may be used:
 
 When this algorithm completes, `size` and `alignment` will be the size and alignment of the structure type.
 
-> Remark: Most target platforms do not use the natural layout directly, but it provides a baseline for
+> 📝 **Remark:** Most target platforms do not use the natural layout directly, but it provides a baseline for
 > defining other layouts. Any layout for a structure type must guarantee an alignment at least as large as the
 > standard layout.
 
