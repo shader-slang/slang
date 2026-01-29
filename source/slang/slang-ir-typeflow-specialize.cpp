@@ -1186,6 +1186,9 @@ struct TypeFlowSpecializationContext
         case kIROp_FieldExtract:
             info = analyzeFieldExtract(context, as<IRFieldExtract>(inst));
             break;
+        case kIROp_GetElement:
+            info = analyzeGetElement(context, as<IRGetElement>(inst));
+            break;
         case kIROp_MakeOptionalNone:
             info = analyzeMakeOptionalNone(context, as<IRMakeOptionalNone>(inst));
             break;
@@ -1741,6 +1744,26 @@ struct TypeFlowSpecializationContext
                 return this->fieldInfo[structField];
             }
         }
+        return none();
+    }
+
+    IRInst* analyzeGetElement(IRInst* context, IRGetElement* getElement)
+    {
+        // If the base info is an array of some type, we can return that element type.
+        // as the info for the get-element inst.
+        //
+
+        IRBuilder builder(module);
+
+        auto baseInfo = tryGetInfo(context, getElement->getBase());
+        if (!baseInfo)
+            return none();
+
+        if (auto arrayInfo = as<IRArrayType>(baseInfo))
+        {
+            return arrayInfo->getElementType();
+        }
+
         return none();
     }
 
