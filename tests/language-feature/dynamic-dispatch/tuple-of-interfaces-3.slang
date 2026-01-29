@@ -4,7 +4,8 @@
 RWStructuredBuffer<float> outputBuffer;
 
 //
-// Test vectors of interface types
+// Test tuples of interface types with some concrete elements and
+// as struct fields
 // 
 
 public interface ITerm 
