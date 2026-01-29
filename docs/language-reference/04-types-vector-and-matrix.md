@@ -157,9 +157,9 @@ The [matrix multiplication](https://en.wikipedia.org/wiki/Matrix_multiplication)
 - matrix/vector form `mul(m, v)` where `m` is an `M`×`N` matrix and `v` is a vector of length `N`. The result is a vector of length `M`.
   - `v` is interpreted as a column vector, *i.e.*, an `N`×`1` matrix.
 
-> Remark 1: The operator `*` performs element-wise multiplication. It should be used only when the element-wise multiplication of same-sized matrices is desired.
+> 📝 **Remark 1:** The operator `*` performs element-wise multiplication. It should be used only when the element-wise multiplication of same-sized matrices is desired.
 
-> Remark 2: The operator `*` differs from GLSL, where it performs matrix multiplication. When porting code from GLSL to Slang, replace matrix multiplications using `*` with calls to `mul()`.
+> 📝 **Remark 2:** The operator `*` differs from GLSL, where it performs matrix multiplication. When porting code from GLSL to Slang, replace matrix multiplications using `*` with calls to `mul()`.
 
 
 ### Standard Type Aliases
@@ -191,7 +191,7 @@ Under row-major layout, a matrix is laid out in memory equivalently to an `R`-el
 Under column-major layout, a matrix is laid out in memory equivalent to the row-major layout of its transpose.
 That is, the layout is equivalent to a `C`-element array of `vector<T,R>` elements.
 
-> Remark 1: Slang currently does *not* support the HLSL `row_major` and `column_major` modifiers to set the
+> 📝 **Remark 1:** Slang currently does *not* support the HLSL `row_major` and `column_major` modifiers to set the
 > layout used for specific declarations.
 
 The alignment of a matrix is target-specified. In general, it is at least the alignment of the element and at
