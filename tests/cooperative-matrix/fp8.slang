@@ -1,4 +1,4 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -render-features fp8
 
 // This test exercises using fp8 Cooperative Matrix type in matmuladd operation.
 // This currently runs only on Vulkan, as Vulkan only allows using fp8 types in m16k32n16 shape,
