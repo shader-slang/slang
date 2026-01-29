@@ -38,7 +38,7 @@ jobs:
           # Extract commit info
           # OLD_SPIRV_COMMIT=<short-hash>
           # NEW_SPIRV_COMMIT=<short-hash>
-          OLDCOMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+          OLD_COMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
           NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
 
           echo "old_spirv_commit=$OLD_COMMIT" >> $GITHUB_OUTPUT
@@ -76,7 +76,6 @@ jobs:
         if: always()
         uses: slackapi/slack-github-action@v1
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_SPIRV }}
           payload: |
             {
               "text": "${{ steps.parse.outputs.status == 'success' && '✅' || '⚠️' }} SPIRV-Tools ToT Test ${{ steps.parse.outputs.status == 'success' && 'PASSED' || 'FAILED' }}",
@@ -87,7 +86,7 @@ jobs:
                     "type": "mrkdwn",
                     "text": "*SPIRV-Tools ToT Test Result*\n
                             Status: ${{ steps.parse.outputs.status == 'success' && '✅ PASSED' || '⚠️ FAILED' }}\n
-                            Update: `${{ steps.parse.outputs.current_spirv_commit }}` → `${{ steps.parse.outputs.new_spirv_commit }}`\n
+                            Update: `${{ steps.parse.outputs.old_spirv_commit }}` → `${{ steps.parse.outputs.new_spirv_commit }}`\n
                             Platform: windows-latest"
                   }
                 },
@@ -114,3 +113,5 @@ jobs:
                 }
               ]
             }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SPIRV }}
