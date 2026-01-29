@@ -159,6 +159,17 @@ public:
         return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);
     }
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics) SLANG_OVERRIDE
+    {
+        return Super::getTargetHostCallable(
+            targetIndex,
+            outSharedLibrary,
+            outDiagnostics);
+    }
+
     SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
         int entryPointIndex,
         int targetIndex,
