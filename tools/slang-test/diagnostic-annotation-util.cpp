@@ -291,42 +291,127 @@ static bool checkAnnotations(
             if (!found)
             {
                 StringBuilder sb;
-                sb << "Simple substring match failed: '" << annotation.expectedSubstring << "'";
+                sb << "Simple substring match failed:\n";
+                sb << "  Expected substring: \"" << annotation.expectedSubstring << "\"\n";
+
+                if (diagnostics.getCount() == 0)
+                {
+                    sb << "  No diagnostics were produced\n";
+                }
+                else
+                {
+                    sb << "  Actual diagnostics:\n";
+                    for (const auto& diag : diagnostics)
+                    {
+                        sb << "    Line " << diag.beginLine << ", column ";
+                        if (diag.beginCol == diag.endCol)
+                            sb << diag.beginCol;
+                        else
+                            sb << diag.beginCol << "-" << diag.endCol;
+                        sb << ": \"" << diag.message << "\"\n";
+                    }
+                }
+
                 outMissingAnnotations.add(sb.produceString());
             }
         }
         else // Position-based
         {
             // Position-based matching - check line, column range, and message substring
+            bool lineMatched = false;
+            bool columnMatched = false;
+            bool messageMatched = false;
+            List<String> candidateDiagnostics;
+
             for (const auto& diag : diagnostics)
             {
-                // Check if line number matches
-                if (diag.beginLine != annotation.sourceLineNumber)
-                    continue;
-
-                // Check if column range matches (both are 1-based)
-                if (diag.beginCol != annotation.columnStart)
-                    continue;
-
-                if (diag.endCol != annotation.columnEnd)
-                    continue;
-
-                // Check if message contains expected substring
-                if (diag.message.indexOf(annotation.expectedSubstring.getUnownedSlice()) != -1)
+                // Collect diagnostics on the same line for detailed reporting
+                if (diag.beginLine == annotation.sourceLineNumber)
                 {
-                    found = true;
-                    break;
+                    lineMatched = true;
+                    StringBuilder diagInfo;
+                    diagInfo << "    Line " << diag.beginLine << ", column ";
+                    if (diag.beginCol == diag.endCol)
+                        diagInfo << diag.beginCol;
+                    else
+                        diagInfo << diag.beginCol << "-" << diag.endCol;
+                    diagInfo << ": \"" << diag.message << "\"";
+                    candidateDiagnostics.add(diagInfo.produceString());
+
+                    // Check if this is a full match
+                    if (diag.beginCol == annotation.columnStart &&
+                        diag.endCol == annotation.columnEnd)
+                    {
+                        columnMatched = true;
+                        if (diag.message.indexOf(annotation.expectedSubstring.getUnownedSlice()) != -1)
+                        {
+                            messageMatched = true;
+                            found = true;
+                            break;
+                        }
+                    }
                 }
             }
 
             if (!found)
             {
                 StringBuilder sb;
-                sb << "Position-based match failed at line " << annotation.sourceLineNumber
-                   << ", columns " << annotation.columnStart;
+                sb << "Position-based match failed:\n";
+                sb << "  Expected: Line " << annotation.sourceLineNumber << ", column";
                 if (annotation.columnEnd != annotation.columnStart)
-                    sb << "-" << annotation.columnEnd;
-                sb << ": '" << annotation.expectedSubstring << "'";
+                    sb << "s " << annotation.columnStart << "-" << annotation.columnEnd;
+                else
+                    sb << " " << annotation.columnStart;
+                sb << ", message containing: \"" << annotation.expectedSubstring << "\"\n";
+
+                if (!lineMatched)
+                {
+                    sb << "  No diagnostics found on line " << annotation.sourceLineNumber << "\n";
+
+                    // Show nearby diagnostics for context
+                    bool foundNearby = false;
+                    for (const auto& diag : diagnostics)
+                    {
+                        int lineDistance = diag.beginLine - annotation.sourceLineNumber;
+                        if (lineDistance >= -2 && lineDistance <= 2 && lineDistance != 0)
+                        {
+                            if (!foundNearby)
+                            {
+                                sb << "  Nearby diagnostics:\n";
+                                foundNearby = true;
+                            }
+                            sb << "    Line " << diag.beginLine << ", column ";
+                            if (diag.beginCol == diag.endCol)
+                                sb << diag.beginCol;
+                            else
+                                sb << diag.beginCol << "-" << diag.endCol;
+                            sb << ": \"" << diag.message << "\"\n";
+                        }
+                    }
+                }
+                else
+                {
+                    sb << "  Actual diagnostics on line " << annotation.sourceLineNumber << ":\n";
+                    for (const auto& diagStr : candidateDiagnostics)
+                    {
+                        sb << diagStr << "\n";
+                    }
+
+                    if (columnMatched && !messageMatched)
+                    {
+                        sb << "  Note: Column position matched but message didn't contain expected substring\n";
+                    }
+                    else if (!columnMatched)
+                    {
+                        sb << "  Note: Column position(s) don't match expected column";
+                        if (annotation.columnEnd != annotation.columnStart)
+                            sb << "s " << annotation.columnStart << "-" << annotation.columnEnd;
+                        else
+                            sb << " " << annotation.columnStart;
+                        sb << "\n";
+                    }
+                }
+
                 outMissingAnnotations.add(sb.produceString());
             }
         }
@@ -365,9 +450,12 @@ bool DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
         // Build error message
         StringBuilder sb;
         sb << "Diagnostic annotation check failed:\n";
-        for (const auto& missing : missingAnnotations)
+        sb << "\n";
+        for (Index i = 0; i < missingAnnotations.getCount(); ++i)
         {
-            sb << "  " << missing << "\n";
+            if (i > 0)
+                sb << "\n";
+            sb << missingAnnotations[i];
         }
         outErrorMessage = sb.produceString();
         return false;
