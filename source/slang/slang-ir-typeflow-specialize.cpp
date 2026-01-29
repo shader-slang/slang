@@ -1175,7 +1175,10 @@ struct TypeFlowSpecializationContext
             info = analyzeMakeStruct(context, as<IRMakeStruct>(inst), workQueue);
             break;
         case kIROp_MakeArray:
-            info = analyzeMakeArray(context, as<IRMakeArray>(inst), workQueue);
+            info = analyzeMakeArray(context, as<IRMakeArray>(inst));
+            break;
+        case kIROp_MakeArrayFromElement:
+            info = analyzeMakeArrayFromElement(context, as<IRMakeArrayFromElement>(inst));
             break;
         case kIROp_Store:
             info = analyzeStore(context, as<IRStore>(inst), workQueue);
@@ -1519,14 +1522,18 @@ struct TypeFlowSpecializationContext
         return none(); // the make struct itself doesn't have any info.
     }
 
-    IRInst* analyzeMakeArray(IRInst* context, IRMakeArray* makeArray, WorkQueue& workQueue)
+    IRInst* analyzeMakeArray(IRInst* context, IRMakeArray* makeArray)
     {
-        // We'll process this in the same way as a get-element,
-        // but for all elements of the array.
-        //
         auto arrayType = as<IRArrayType>(makeArray->getDataType());
+
+        // If array is concrete, no need to proceed.
         if (isConcreteType(arrayType))
             return none();
+
+        //
+        // OpMakeArray's effective type is the union of all element types used
+        // to construct it.
+        //
 
         IRInst* unionInfo = none();
         for (UInt i = 0; i < makeArray->getOperandCount(); i++)
@@ -1546,6 +1553,27 @@ struct TypeFlowSpecializationContext
         IRBuilder builder(module);
         return builder.getArrayType(
             (IRType*)unionInfo,
+            arrayType->getElementCount(),
+            getArrayStride(arrayType));
+    }
+
+    IRInst* analyzeMakeArrayFromElement(IRInst* context, IRMakeArrayFromElement* makeArray)
+    {
+        // MakeArrayFromElement creates an array where all elements have the same value.
+        // We propagate the element's info to the array type.
+        //
+        auto arrayType = as<IRArrayType>(makeArray->getDataType());
+        if (isConcreteType(arrayType))
+            return none();
+
+        auto element = makeArray->getOperand(0);
+        auto elementInfo = tryGetInfo(context, element);
+        if (!elementInfo)
+            return none();
+
+        IRBuilder builder(module);
+        return builder.getArrayType(
+            (IRType*)elementInfo,
             arrayType->getElementCount(),
             getArrayStride(arrayType));
     }
@@ -3066,6 +3094,8 @@ struct TypeFlowSpecializationContext
             return specializeMakeStruct(context, as<IRMakeStruct>(inst));
         case kIROp_MakeArray:
             return specializeMakeArray(context, as<IRMakeArray>(inst));
+        case kIROp_MakeArrayFromElement:
+            return specializeMakeArrayFromElement(context, as<IRMakeArrayFromElement>(inst));
         case kIROp_CreateExistentialObject:
             return specializeCreateExistentialObject(context, as<IRCreateExistentialObject>(inst));
         case kIROp_RWStructuredBufferLoad:
@@ -4019,6 +4049,36 @@ struct TypeFlowSpecializationContext
 
         IRBuilder builder(module);
         builder.replaceOperand(&inst->typeUse, getLoweredType(arrayInfo));
+        return changed;
+    }
+
+    bool specializeMakeArrayFromElement(IRInst* context, IRMakeArrayFromElement* inst)
+    {
+        // Similar to MakeArray, but only a single element value is provided
+        // that will be replicated to all array positions.
+        //
+        auto arrayInfo = tryGetInfo(context, inst);
+        if (!arrayInfo)
+            return false;
+
+        auto arrayType = as<IRArrayType>(arrayInfo);
+        auto elementType = arrayType->getElementType();
+
+        // Reinterpret the single element argument as necessary.
+        auto arg = inst->getOperand(0);
+        IRBuilder builder(context);
+        builder.setInsertBefore(inst);
+        auto newArg = upcastSet(&builder, arg, elementType);
+
+        bool changed = false;
+        if (arg != newArg)
+        {
+            changed = true;
+            inst->setOperand(0, newArg);
+        }
+
+        IRBuilder moduleBuilder(module);
+        moduleBuilder.replaceOperand(&inst->typeUse, getLoweredType(arrayInfo));
         return changed;
     }
 

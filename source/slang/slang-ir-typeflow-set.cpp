@@ -129,6 +129,34 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         //
         return builder->emitPackAnyValue((IRType*)destInfo, arg);
     }
+    else if (as<IRArrayType>(argInfo) && as<IRArrayType>(destInfo))
+    {
+        // If both arg and dest are arrays, we need to upcast each element.
+        //
+        auto argArrayType = as<IRArrayType>(argInfo);
+        auto destArrayType = as<IRArrayType>(destInfo);
+        auto argElementType = argArrayType->getElementType();
+        auto destElementType = destArrayType->getElementType();
+
+        if (argElementType != destElementType)
+        {
+            auto arraySize = getIntVal(argArrayType->getElementCount());
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)arraySize);
+            for (IRIntegerValue i = 0; i < arraySize; i++)
+            {
+                auto argElement = builder->emitGetElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeArray(
+                destArrayType,
+                upcastedElements.getCount(),
+                upcastedElements.getBuffer());
+        }
+    }
 
     return arg; // Can use as-is.
 }
