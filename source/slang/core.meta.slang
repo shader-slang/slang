@@ -807,6 +807,21 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 };
 
 
+[sealed]
+[builtin]
+interface ICoopElement
+{
+    [OverloadRank(-1)]
+    __init(int val);
+}
+
+[sealed]
+[builtin]
+interface IFloatingPointCoopElement : ICoopElement
+{
+}
+
+
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 ///
@@ -814,7 +829,7 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPointCoopElement
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
@@ -1038,6 +1053,7 @@ $}
     ,  __BuiltinRealType
     ,  __BuiltinSignedArithmeticType
     ,  __BuiltinArithmeticType
+    , IFloatingPointCoopElement
 ${
         break;
     case BaseType::Int8:
@@ -1047,6 +1063,7 @@ ${
     case BaseType::IntPtr:
 $}
     ,  __BuiltinSignedArithmeticType
+    , ICoopElement
 ${
         ; // fall through
     case BaseType::UInt8:
@@ -1588,6 +1605,59 @@ extension uintptr_t : IRangedValue
     static const uintptr_t minValue = 0z;
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
+
+
+// Packed float types.
+
+/// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE4M3Type))
+__magic_type(FloatE4M3Type)
+struct FloatE4M3 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+}
+
+/// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE5M2Type))
+__magic_type(FloatE5M2Type)
+struct FloatE5M2 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+}
+
+/// Represent a 16-bit floating point value with 8 bits of exponent and 7 bits of mantissa.
+[require(spvBFloat16KHR)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_BFloat16Type))
+__magic_type(BFloat16Type)
+struct BFloat16 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+}
+
+extension<T:__BuiltinFloatingPointType> T
+{
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<T:IFloatingPointCoopElement>
+    __init(T val);
+}
+
+extension<T:IFloatingPointCoopElement> T
+{
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<T:__BuiltinFloatingPointType>
+    __init(T val);
+}
+
 
 //@hidden:
 
@@ -2196,6 +2266,15 @@ extension vector<T,N> : IInteger
     __init(vector<U, N> other);
 }
 
+extension<T:IFloatingPointCoopElement, let N : int> vector<T,N>
+{
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(vector<U, N> other);
+}
+
 __generic<T:__BuiltinFloatingPointType, let N : int>
 extension vector<T,N> : IFloat
 {
@@ -2210,12 +2289,6 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) This neg();
     [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
-
-    [OverloadRank(-1)]
-    __implicit_conversion($(kConversionCost_Default))
-    __intrinsic_op($(kIROp_FloatCast))
-    __generic<U:__BuiltinFloatingPointType>
-    __init(vector<U, N> other);
 
     [OverloadRank(-1)]
     __intrinsic_op($(kIROp_CastIntToFloat))
@@ -3610,6 +3683,11 @@ __intrinsic_op($(kIROp_IsFloat))
 bool __isFloat_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsCoopFloat))
+bool __isCoopFloat_impl(T t);
+
+
+__generic<T>
 __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
@@ -3618,6 +3696,13 @@ __generic<T>
 bool __isFloat()
 {
     return __isFloat_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isCoopFloat()
+{
+    return __isCoopFloat_impl(__declVal<T>());
 }
 
 __generic<T>
@@ -3691,6 +3776,12 @@ int32_t __byteToElemOffset<T>(int32_t byteOffset)
 {
     return byteOffset / __naturalStrideOf<T>();
 }
+
+__intrinsic_op($(kIROp_IRem))
+internal T __irem<T>(T left, T right);
+
+__intrinsic_op($(kIROp_FRem))
+internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);

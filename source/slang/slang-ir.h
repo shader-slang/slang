@@ -996,6 +996,9 @@ bool isIntegralType(IRType* t);
 
 bool isFloatingType(IRType* t);
 
+// True if t is fp8 or bf16 types.
+bool isPackedFloatType(IRType* t);
+
 struct IntInfo
 {
     Int width;
