@@ -1,8 +1,6 @@
-//  DISABLED: SPIRV-Tools ADCE pass is temporarily disabled (see #9675).
-//  This test requires ADCE for SPIRV optimization to produce expected output.
-//DISABLE_TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -entry HitMain -stage closesthit -target spirv-assembly
+//TEST:CROSS_COMPILE: -profile glsl_460+GL_NV_ray_tracing -entry HitMain -stage closesthit -target spirv-assembly
 //TEST:SIMPLE(filecheck=DXIL): -target dxil -entry HitMain -stage closesthit -profile sm_6_5
-//DISABLE_TEST:SIMPLE(filecheck=SPV): -target spirv
+//TEST:SIMPLE(filecheck=SPV): -target spirv
 
 // DXIL: define void @
 // SPV: OpEntryPoint
