@@ -35,37 +35,26 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     if (!(isForcedStruct || isForcedRayPayloadStruct))
                         continue;
 
-                    // Safety check: ensure the wrapper has an operand
-                    if (arg->getOperandCount() == 0)
-                        continue;
+                    SLANG_ASSERT(arg->getOperandCount() > 0);
 
                     auto forceStructArg = arg->getOperand(0);
-                    if (!forceStructArg)
-                        continue;
+                    SLANG_ASSERT(forceStructArg);
 
                     auto dataType = forceStructArg->getDataType();
-                    if (!dataType)
-                        continue;
+                    SLANG_ASSERT(dataType);
 
-                    // For pointer types, extract the pointed-to type
-                    IRType* forceStructBaseType = nullptr;
-                    if (auto ptrType = as<IRPtrTypeBase>(dataType))
-                    {
-                        forceStructBaseType = ptrType->getValueType();
-                    }
-                    else if (dataType->getOperandCount() > 0)
-                    {
-                        forceStructBaseType = (IRType*)(dataType->getOperand(0));
-                    }
-
-                    if (!forceStructBaseType)
-                        continue;
+                    // The operand should be a pointer type - extract the pointed-to type
+                    // Note: getValueType() returns getOperand(0)
+                    auto ptrType = as<IRPtrTypeBase>(dataType);
+                    SLANG_ASSERT(ptrType);
+                    IRType* forceStructBaseType = ptrType->getValueType();
 
                     IRBuilder builder(call);
                     if (forceStructBaseType->getOp() == kIROp_StructType)
                     {
                         // The wrapped value is already a struct, just unwrap it
-                        // Replace the wrapper with the direct argument
+                        if (isForcedRayPayloadStruct)
+                            builder.addRayPayloadDecoration(forceStructBaseType);
                         arg->replaceUsesWith(forceStructArg);
                         arg->removeAndDeallocate();
                         continue;
@@ -113,24 +102,21 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
                     arg->removeAndDeallocate();
 
                     // Check if we need to copy back (for out/inout parameters)
-                    // Use the correct API to get parameter type
                     auto callee = call->getCallee();
                     auto funcType = as<IRFuncType>(callee->getDataType());
-                    if (funcType && i < funcType->getParamCount())
-                    {
-                        auto paramType = funcType->getParamType(i);
-                        // Only copy back if the parameter is a pointer-like type (out/inout/ref)
-                        if (!isPtrLikeOrHandleType(paramType))
-                            continue;
+                    SLANG_ASSERT(funcType);
+                    auto paramType = funcType->getParamType(i);
+                    // Only copy back if the parameter is a pointer-like type (out/inout/ref)
+                    if (!isPtrLikeOrHandleType(paramType))
+                        continue;
 
-                        builder.setInsertAfter(call);
-                        builder.emitStore(
-                            forceStructArg,
-                            builder.emitFieldAddress(
-                                builder.getPtrType(_dataField->getFieldType()),
-                                structVar,
-                                _dataField->getKey()));
-                    }
+                    builder.setInsertAfter(call);
+                    builder.emitStore(
+                        forceStructArg,
+                        builder.emitFieldAddress(
+                            builder.getPtrType(_dataField->getFieldType()),
+                            structVar,
+                            _dataField->getKey()));
                 }
                 break;
             }
@@ -142,8 +128,10 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
-        // Search all global instructions for ForceVarIntoStructTemporarily wrappers.
-        // These can appear in functions, generics, or other structures.
+        // Only process functions - at this stage generics are already resolved,
+        // and the search only handles Block and Call children.
+        if (globalInst->getOp() != kIROp_Func)
+            continue;
         searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
     }
 }
