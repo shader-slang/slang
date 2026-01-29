@@ -2058,7 +2058,8 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         llvmBuilder->getInt32(ySize),
         llvmBuilder->getInt32(zSize)};
 
-    llvm::BasicBlock* loopBlocks[3];
+    llvm::Value* workGroupTotalSize = llvmBuilder->getInt32(xSize * ySize * zSize);
+
     llvm::BasicBlock* exitBlock;
 
     // We assume that the group ID is less than these values such that thread
@@ -2112,12 +2113,8 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
             threadInput,
             outIndices,
             llvm::Twine("ptrThreadID_").concat(axis));
-
-        loopBlocks[i] = llvm::BasicBlock::Create(
-            *llvmContext,
-            llvm::Twine("loop_").concat(axis),
-            dispatcher);
     }
+
 
     exitBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("exit"), dispatcher);
 
@@ -2133,8 +2130,9 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         loopProperties.push_back(llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.parallel_accesses"), wiParallelAccessGroup}));
 
-        // Explicitly request vectorization.
         auto trueVal = llvm::ConstantAsMetadata::get(llvm::ConstantInt::getTrue(llvm::Type::getInt1Ty(*llvmContext)));
+
+        // Explicitly request vectorization.
         loopProperties.push_back(llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.vectorize.enable"), trueVal}));
 
@@ -2155,60 +2153,34 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         branchInst->setMetadata(llvm::LLVMContext::MD_loop, loopMD);
     };
 
-    llvm::BasicBlock* loopHeader = loopBlocks[0];
+    llvm::BasicBlock* loopHeader = llvm::BasicBlock::Create(
+        *llvmContext, llvm::Twine("wiLoop"), dispatcher);
     llvmBuilder->CreateBr(loopHeader);
     llvmBuilder->SetInsertPoint(loopHeader);
 
-    // Initialize all to zero if coming from entry block.
-    auto xPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_X");
-    xPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
-    auto yPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_Y");
-    yPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
-    auto zPhi = llvmBuilder->CreatePHI(uintType, 4, "threadID_Z");
-    zPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
+    auto indexPhi = llvmBuilder->CreatePHI(uintType, 2, "threadIndex");
+    indexPhi->addIncoming(llvmBuilder->getInt32(0), entryBlock);
 
-    // Save thread ID for entry point call
-    annotateMemoryAccess(llvmBuilder->CreateStore(xPhi, threadID[0]));
-    annotateMemoryAccess(llvmBuilder->CreateStore(yPhi, threadID[1]));
-    annotateMemoryAccess(llvmBuilder->CreateStore(zPhi, threadID[2]));
+    // x = i % w
+    auto threadIDX = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::URem, indexPhi, workGroupSize[0]);
+    auto divYZ = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::UDiv, indexPhi, workGroupSize[0]);
+    // y = (i / w) % h
+    auto threadIDY = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::URem, divYZ, workGroupSize[1]);
+    // z = (i / w / h)
+    auto threadIDZ = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::UDiv, indexPhi, workGroupSize[1]);
+
+    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDX, threadID[0]));
+    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDY, threadID[1]));
+    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDZ, threadID[2]));
 
     // Do the call to the actual entry point function.
     llvm::Value* args[3] = {threadInput, dispatcher->getArg(1), dispatcher->getArg(2)};
     llvmBuilder->CreateCall(llvm::cast<llvm::Function>(entryPointFunc), args);
 
-    // Increment X and insert back edge
-    auto xInc = llvmBuilder->CreateAdd(xPhi, llvmBuilder->getInt32(1), "nextThreadID_X");
-    xPhi->addIncoming(xInc, loopHeader);
-    yPhi->addIncoming(yPhi, loopHeader);
-    zPhi->addIncoming(zPhi, loopHeader);
-
-    auto condX =
-        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, xInc, workGroupSize[0]);
-    annotateParallelLoop(llvmBuilder->CreateCondBr(condX, loopHeader, loopBlocks[1]));
-
-    llvmBuilder->SetInsertPoint(loopBlocks[1]);
-
-    // Increment Y and insert back edge
-    auto yInc = llvmBuilder->CreateAdd(yPhi, llvmBuilder->getInt32(1), "nextThreadID_Y");
-    xPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[1]);
-    yPhi->addIncoming(yInc, loopBlocks[1]);
-    zPhi->addIncoming(zPhi, loopBlocks[1]);
-
-    auto condY =
-        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, yInc, workGroupSize[1]);
-    annotateParallelLoop(llvmBuilder->CreateCondBr(condY, loopHeader, loopBlocks[2]));
-
-    llvmBuilder->SetInsertPoint(loopBlocks[2]);
-
-    // Increment Z and insert back edge
-    auto zInc = llvmBuilder->CreateAdd(zPhi, llvmBuilder->getInt32(1), "nextThreadID_Z");
-    xPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[2]);
-    yPhi->addIncoming(llvmBuilder->getInt32(0), loopBlocks[2]);
-    zPhi->addIncoming(zInc, loopBlocks[2]);
-
-    auto condZ =
-        llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, zInc, workGroupSize[2]);
-    annotateParallelLoop(llvmBuilder->CreateCondBr(condZ, loopHeader, exitBlock));
+    auto indexInc = llvmBuilder->CreateAdd(indexPhi, llvmBuilder->getInt32(1), "nextThreadIndex");
+    indexPhi->addIncoming(indexInc, loopHeader);
+    auto cond = llvmBuilder->CreateCmp(llvm::CmpInst::Predicate::ICMP_ULT, indexInc, workGroupTotalSize);
+    annotateParallelLoop(llvmBuilder->CreateCondBr(cond, loopHeader, exitBlock));
 
     // Exit block.
     llvmBuilder->SetInsertPoint(exitBlock);
