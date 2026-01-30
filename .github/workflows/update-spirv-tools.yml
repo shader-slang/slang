@@ -25,13 +25,21 @@ jobs:
       - name: Set up MSVC dev tools
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Add Python to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Python311"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Python311\\Scripts"
+          # Create python3 symlink if it doesn't exist (Windows has python.exe, not python3.exe)
+          if (-not (Test-Path "C:\\Python311\\python3.exe")) {
+            Copy-Item "C:\\Python311\\python.exe" "C:\\Python311\\python3.exe"
+          }
+
       - name: Update SPIRV-Tools and run tests
         id: update
         shell: bash
         run: |
-          set +e
           bash extras/update-spirv-tools.sh --test 2>&1 | tee spirv-update.log
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Parse results
@@ -39,8 +47,8 @@ jobs:
         if: always()
         shell: bash
         run: |
-          # Check if script succeeded
-          if [ "${{ steps.update.outputs.exit_code }}" = "0" ]; then
+          # Check if script succeeded by checking the step outcome
+          if [ "${{ steps.update.outcome }}" = "success" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
             STATUS_MSG=":green-check-mark: SPIRV-Tools ToT test PASSED"
           else
@@ -102,3 +110,7 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SPIRV }}
+
+      - name: Fail workflow if tests failed
+        if: steps.parse.outputs.status == 'failure'
+        run: exit 1
