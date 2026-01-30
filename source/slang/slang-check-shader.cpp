@@ -57,6 +57,42 @@ static bool isValidThreadDispatchIDType(Type* type)
     }
 }
 
+// Unwrap Conditional<T, hasValue> types to T.
+// If the type is Conditional<T, hasValue> (where hasValue can be true or false),
+// returns the inner type T. Otherwise, returns the original type unchanged.
+static Type* unwrapConditionalType(Type* type)
+{
+    // Check if this is a DeclRefType referring to a struct
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return type;
+    
+    // Check if it's a reference to a StructDecl
+    auto structDeclRef = isDeclRefTypeOf<StructDecl>(declRefType);
+    if (!structDeclRef)
+        return type;
+    
+    auto structDecl = structDeclRef.getDecl();
+    if (!structDecl)
+        return type;
+    
+    // Check if the struct name is "Conditional"
+    auto name = structDecl->nameAndLoc.name;
+    if (!name || name->text != "Conditional")
+        return type;
+    
+    // Extract the first generic type argument (T)
+    auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
+    if (args.getCount() == 0)
+        return type;
+    
+    auto innerType = as<Type>(args[0]);
+    if (!innerType)
+        return type;
+    
+    return innerType;
+}
+
 // Check if two types are compatible for system value semantics.
 // This is stricter than canCoerce alone - it requires that both types have
 // the same "shape" (both scalars or both vectors) to prevent scalar-to-vector
@@ -65,6 +101,11 @@ static bool isValidThreadDispatchIDType(Type* type)
 // Returns true if 'type' is a valid type for a semantic that expects 'expectedType'.
 static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedType, Type* type)
 {
+    // Unwrap Conditional<T, hasValue> to T for both types
+    // This allows Conditional<float, true> and Conditional<float, false> to match against float
+    expectedType = unwrapConditionalType(expectedType);
+    type = unwrapConditionalType(type);
+    
     // Must be coercible
     if (!visitor->canCoerce(expectedType, type, nullptr))
         return false;
