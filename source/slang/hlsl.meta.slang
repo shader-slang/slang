@@ -28472,7 +28472,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T2::ElementType,
                                                          $TR::ElementType,
                                                          $T0::m_M,
-                                                         $T0::m_N,
+                                                         $T1::m_N,
                                                          $T0::m_K,
                                                          true
                                                         >($0, $1, $2))";
@@ -28483,7 +28483,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T2::ElementType,
                                                          $TR::ElementType,
                                                          $T0::m_M,
-                                                         $T0::m_N,
+                                                         $T1::m_N,
                                                          $T0::m_K,
                                                          false
                                                         >($0, $1, $2))";
