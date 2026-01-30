@@ -215,9 +215,6 @@ static void validateTypeSemantics(
                             continue;
                         }
                         
-                        // Check if type is compatible with accessor type
-                        // Use strict semantic type compatibility (same shape: both scalar or both vector)
-                        // rather than canCoerce alone (which would allow uint -> float4 conversion)
                         if (isSemanticTypeCompatible(visitor, accessorType, type))
                         {
                             foundMatchingAccessor = true;
