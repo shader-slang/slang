@@ -4268,9 +4268,9 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
         auto paramValType = originalType->getParamValueType(i);
-        auto paramDirection = originalType->getParamDirection(i);
+        auto paramPassingMode = originalType->getParamPassingMode(i);
 
-        switch (paramDirection)
+        switch (paramPassingMode)
         {
         case ParamPassingMode::Out:
             {

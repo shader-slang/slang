@@ -85,28 +85,6 @@ syntax snorm : SNormModifier;
 ///
 syntax __extern_cpp : ExternCppModifier;
 
-/// Function interface o 
-/*interface IDifferentiableFuncBase
-{
-    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
-    associatedtype __fwd_diff_func_type;
-}
-
-interface IForwardDifferentiable : IDifferentiableFuncBase
-{
-    associatedfunc __fwd_diff_func_type(This) __fwd_diff__;
-}*/
-
-/*interface IDifferentiableFuncBase
-{
-    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFuncType) )
-    associatedtype __fwd_diff_func_type;
-};*/
-
-__magic_type(FunctionBaseType)
-interface IFunctionBase
-{ };
-
 /// Represents types that can be initialized with a default constructor.
 __magic_type(DefaultInitializableType)
 interface IDefaultInitializable
@@ -758,14 +736,6 @@ interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
     __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> primal_ctx
 };
-
-/*__magic_type(LegacyBwdDiffFuncInterfaceType)
-[KnownBuiltin("ILegacyBackwardDifferentiable")]
-interface ILegacyBackwardDifferentiable<FType>
-{
-    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
-    __associatedfunc __bwd_diff_func_type(FType) bwd_diff; // -> primal_ctx
-};*/
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.
 /// It is defined as follows:

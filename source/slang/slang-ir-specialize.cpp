@@ -1249,7 +1249,7 @@ struct SpecializationContext
                     this->module,
                     targetProgram,
                     this->sink);
-                unrollLoopsInModule(targetProgram, module, sink);
+                unrollLoopsInModule(module, targetProgram, sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1264,7 +1264,7 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = specializeDynamicInsts(module, sink);
+                iterChanged = specializeDynamicInsts(module, targetProgram, sink);
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());

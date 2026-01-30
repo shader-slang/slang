@@ -193,8 +193,10 @@ IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(
 
     return nullptr;
 }
-AutoDiffSharedContext::AutoDiffSharedContext(IRModuleInst* inModuleInst)
-    : moduleInst(inModuleInst)
+AutoDiffSharedContext::AutoDiffSharedContext(
+    TargetProgram* targetProgram,
+    IRModuleInst* inModuleInst)
+    : targetProgram(targetProgram), moduleInst(inModuleInst)
 {
     auto module = moduleInst->getModule();
 
@@ -920,7 +922,7 @@ bool canTypeBeStored(IRInst* type)
     }
 }
 
-void checkAutodiffPatterns(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_UNUSED(target);
 
@@ -1103,12 +1105,12 @@ void releaseDifferentiableInterfaces(AutoDiffSharedContext* context)
         decoration->removeAndDeallocate();
 }
 
-bool finalizeAutoDiffPass(TargetProgram* target, IRModule* module)
+bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target)
 {
     bool modified = false;
 
     // Create shared context for all auto-diff related passes
-    AutoDiffSharedContext autodiffContext(module->getModuleInst());
+    AutoDiffSharedContext autodiffContext(target, module->getModuleInst());
 
     // Replaces IRDifferentialPairType with an auto-generated struct,
     // IRDifferentialPairGetDifferential with 'differential' field access,

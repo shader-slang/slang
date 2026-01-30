@@ -587,6 +587,7 @@ public:
             bool first = true;
             UInt count = 0;
             forEachInSet(
+                module,
                 witnessTableSet,
                 [&](IRInst* table)
                 {
@@ -619,6 +620,7 @@ public:
             bool first = true;
             UInt count = 0;
             forEachInSet(
+                module,
                 witnessTableSet,
                 [&](IRInst* table)
                 {
@@ -755,6 +757,7 @@ public:
         Dictionary<IRInst*, IRInst*> elements;
         IRBuilder builder(dispatcher->getModule());
         forEachInSet(
+            module,
             witnessTableSet,
             [&](IRInst* table)
             {

@@ -5047,8 +5047,8 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
-    TypeFlowSpecializationContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink), translationContext(module, sink)
+    TypeFlowSpecializationContext(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+        : module(module), sink(sink), translationContext(target, module, sink)
     {
     }
 
@@ -5088,9 +5088,9 @@ struct TypeFlowSpecializationContext
 };
 
 // Main entry point
-bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink)
+bool specializeDynamicInsts(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    TypeFlowSpecializationContext context(module, sink);
+    TypeFlowSpecializationContext context(module, target, sink);
     return context.processModule();
 }
 

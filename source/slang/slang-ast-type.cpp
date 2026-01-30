@@ -446,7 +446,7 @@ Val* BwdCallableFuncType::_resolveImplOverride()
             else
             {
                 // If differentiable, flip the direction of the type.
-                switch (paramInfo.direction)
+                switch (paramInfo.mode)
                 {
                 case ParamPassingMode::Out:
                     // Out becomes just the diff value type (no direction wrapper)
@@ -539,7 +539,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
                 auto ptrPairType =
                     astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.direction)
+                switch (paramInfo.mode)
                 {
                 case ParamPassingMode::Out:
                     newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
@@ -565,7 +565,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
             {
                 // Non-ptr-differentiable param - add as-is.
                 // TODO: Probably need to wrap in no-diff
-                newParamTypes.add(funcType->getParamTypeWithDirectionWrapper(i));
+                newParamTypes.add(funcType->getParamTypeWithModeWrapper(i));
             }
         }
 
@@ -623,11 +623,11 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         for (UIndex i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            auto rawParamType = funcType->getParamTypeWithDirectionWrapper(i);
+            auto rawParamType = funcType->getParamTypeWithModeWrapper(i);
 
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
-            switch (paramInfo.direction)
+            switch (paramInfo.mode)
             {
             case ParamPassingMode::Out:
                 {
@@ -761,13 +761,13 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         for (UIndex i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            auto rawParamType = funcType->getParamTypeWithDirectionWrapper(i);
+            auto rawParamType = funcType->getParamTypeWithModeWrapper(i);
 
             if (auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i))
             {
                 auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
 
-                switch (paramInfo.direction)
+                switch (paramInfo.mode)
                 {
                 case ParamPassingMode::In:
                     newParamTypes.add(pairType);

@@ -256,7 +256,7 @@ static void reportCheckpointIntermediates(
                 //
                 IRType* fieldType = field->getFieldType();
                 IRSizeAndAlignment fieldSize;
-                getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+                getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
                 structSize.size -= fieldSize.size;
                 break;
             }
@@ -1291,7 +1291,7 @@ Result linkAndOptimizeIR(
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
-    SLANG_PASS(finalizeSpecialization(irModule));
+    SLANG_PASS(finalizeSpecialization);
 
     // Lower DiffTypeInfo instructions to MakeTuple.
     // This must happen after specialization since DiffTypeInfo is hoistable.
@@ -1399,9 +1399,9 @@ Result linkAndOptimizeIR(
     // but are not used for dynamic dispatch, unpin them so we don't
     // do unnecessary work to lower them.
     //
-    SLANG_PASS(unpinWitnessTables, irModule);
+    SLANG_PASS(unpinWitnessTables);
 
-    SLANG_PASS(lowerSumVectorMatrixInsts, irModule);
+    SLANG_PASS(lowerSumVectorMatrixInsts);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -2221,7 +2221,7 @@ Result linkAndOptimizeIR(
     // TODO: Maybe make this conditional (only touch the optimizable types).
     // to make it more narrowly scoped.
     //
-    legalizeEmptyTypes(targetProgram, irModule, sink);
+    SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
 
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and

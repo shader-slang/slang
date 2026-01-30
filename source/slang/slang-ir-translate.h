@@ -23,8 +23,11 @@ struct TranslationContext
     // AD 2.0 Translators
 
 public:
-    TranslationContext(IRModule* module, DiagnosticSink* inSink)
-        : irModule(module), sink(inSink), autodiffContext(module->getModuleInst())
+    TranslationContext(TargetProgram* target, IRModule* module, DiagnosticSink* inSink)
+        : irModule(module)
+        , sink(inSink)
+        , targetProgram(target)
+        , autodiffContext(target, module->getModuleInst())
     {
         initializeTranslationDictionary(module);
     }
@@ -35,8 +38,12 @@ public:
 
     IRModule* getModule() const { return irModule; }
 
+    TargetProgram* getTargetProgram() const { return targetProgram; }
+
 private:
     IRModule* irModule;
+
+    TargetProgram* targetProgram;
 
     // Diagnostic object from the compile request for
     // error messages.

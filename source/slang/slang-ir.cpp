@@ -2464,16 +2464,6 @@ IRVoidLit* IRBuilder::getVoidValue(IRType* type)
     return (IRVoidLit*)_findOrEmitConstant(keyInst);
 }
 
-IRVoidLit* IRBuilder::getVoidValue(IRType* type)
-{
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
-    keyInst.m_op = kIROp_VoidLit;
-    keyInst.typeUse.usedValue = type;
-    keyInst.value.intVal = 0;
-    return (IRVoidLit*)_findOrEmitConstant(keyInst);
-}
-
 IRInst* IRBuilder::getCapabilityValue(CapabilitySet const& caps)
 {
     IRType* capabilityAtomType = getIntType();
@@ -8804,9 +8794,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_UninitializedWitnessTableElement:
     case kIROp_NoneTypeElement:
     case kIROp_NoneWitnessTableElement:
-    case kIROp_DetachDerivative:
-        return false;
-
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:

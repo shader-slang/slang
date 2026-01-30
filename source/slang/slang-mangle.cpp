@@ -674,7 +674,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
 
         // Get parameter type as a list.
         List<Type*> parameterTypes;
-        List<ParamPassingMode> parameterDirections;
+        List<ParamPassingMode> paramPassingModes;
         Type* resultType = nullptr;
 
         if (!callableDeclRef.getDecl()->funcType.type)
@@ -684,7 +684,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
             {
                 auto paramType = getType(context->astBuilder, paramDeclRef);
                 parameterTypes.add(paramType);
-                parameterDirections.add(getParameterDirection(paramDeclRef.getDecl()));
+                paramPassingModes.add(getParamPassingMode(paramDeclRef.getDecl()));
             }
             resultType = getResultType(context->astBuilder, callableDeclRef);
 
@@ -697,7 +697,7 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 // parameter modifier makes big difference in the spirv code generation, for example
                 // "out"/"inout" parameter will be passed by pointer. Therefore, we need to
                 // distinguish them in the mangled name to avoid name collision.
-                ParamPassingMode paramDirection = parameterDirections[i];
+                ParamPassingMode paramDirection = paramPassingModes[i];
                 switch (paramDirection)
                 {
                 case ParamPassingMode::Ref:

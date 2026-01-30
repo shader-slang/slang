@@ -157,7 +157,7 @@ public struct InlineVector<T, int N> : IVector<T>
             // N is the column count of the weight matrix.
             for (int i = 0; i < N; i++)
             {
-                Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i * OutputSize + j);
+                Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i + j * N);
                 T.Differential prod = __realCast<T.Differential, T>(dWeightStorage.p.read(elementOffset)) * dy;
                 d[i] = T.Differential.dadd(d[i], prod);
             }
@@ -278,7 +278,7 @@ public struct InlineVector<T, int N> : IVector<T>
             [ForceUnroll]
             for (int i = 0; i < N; i++)
             {
-                T.Differential prod = __realCast<T.Differential, T>(dparameters.p[i * OutputSize + j]) * dy;
+                T.Differential prod = __realCast<T.Differential, T>(dparameters.p[i + j * N]) * dy;
                 d[i] = T.Differential.dadd(d[i], prod);
             }
         }
@@ -294,7 +294,6 @@ public struct InlineVector<T, int N> : IVector<T>
             for (int col = 0; col < N; col++)
             {
                 let x = dthis.p[col];
-                //T.Differential prod = T.Differential.dmul(x, dy);
                 T.Differential prod = __realCast<T.Differential, T>(x) * dy;
                 rowAddr.atomicAdd(col, prod);
             }

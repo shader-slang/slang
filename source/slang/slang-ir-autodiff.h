@@ -47,6 +47,8 @@ ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction);
 
 struct AutoDiffSharedContext
 {
+    TargetProgram* targetProgram = nullptr;
+
     IRModuleInst* moduleInst = nullptr;
 
     // A reference to the builtin IDifferentiable interface type.
@@ -121,7 +123,7 @@ struct AutoDiffSharedContext
     bool isInterfaceAvailable = false;
     bool isPtrInterfaceAvailable = false;
 
-    AutoDiffSharedContext(IRModuleInst* inModuleInst);
+    AutoDiffSharedContext(TargetProgram* targetProgram, IRModuleInst* inModuleInst);
 };
 
 struct DifferentiableTypeConformanceContext

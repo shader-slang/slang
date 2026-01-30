@@ -77,14 +77,13 @@ SlangResult prepareFuncForBackwardDiff(
 
     eliminateContinueBlocksInFunc(func->getModule(), func);
 
-    eliminateMultiLevelBreakForFunc(autoDiffSharedContext->targetProgram, func->getModule(), func);
+    eliminateMultiLevelBreakForFunc(
+        diffTypeContext.sharedContext->targetProgram,
+        func->getModule(),
+        func);
 
-    IRCFGNormalizationPass cfgPass = {this->getSink()};
-    normalizeCFG(
-        autoDiffSharedContext->targetProgram,
-        autoDiffSharedContext->moduleInst->getModule(),
-        func,
-        cfgPass);
+    IRCFGNormalizationPass cfgPass = {sink};
+    normalizeCFG(diffTypeContext.sharedContext->targetProgram, func->getModule(), func, cfgPass);
 
     return SLANG_OK;
 }

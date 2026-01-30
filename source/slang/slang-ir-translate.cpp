@@ -363,7 +363,8 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
     if (isEvaluableOpCode(inst->getOp()))
     {
-        if (auto constFoldedResult = tryConstantFoldInst(ctx->getModule(), inst))
+        if (auto constFoldedResult =
+                tryConstantFoldInst(ctx->getModule(), ctx->getTargetProgram(), inst))
         {
             inst->replaceUsesWith(constFoldedResult);
             return constFoldedResult;
