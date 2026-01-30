@@ -4241,7 +4241,8 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-// Parse a typed accessor for a semantic declaration: "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
+// Parse a typed accessor for a semantic declaration:
+// "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
 static Decl* parseSemanticAccessorDecl(Parser* parser)
 {
     Modifiers modifiers = ParseModifiers(parser);
@@ -4297,7 +4298,10 @@ static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
     }
     else
     {
-        parser->sink->diagnose(parser->tokenReader.peekLoc(), Diagnostics::unexpectedToken, peekToken(parser));
+        parser->sink->diagnose(
+            parser->tokenReader.peekLoc(),
+            Diagnostics::unexpectedToken,
+            peekToken(parser));
     }
 }
 

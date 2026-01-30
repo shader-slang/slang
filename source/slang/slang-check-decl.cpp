@@ -534,7 +534,7 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
 
     void visitSemanticGetterDecl(SemanticGetterDecl* decl) { visitTypeExp(decl->type); }
     void visitSemanticSetterDecl(SemanticSetterDecl* decl) { visitTypeExp(decl->type); }
-    
+
     void visitSemanticDecl(SemanticDecl* decl)
     {
         for (auto member : decl->getMembers())
