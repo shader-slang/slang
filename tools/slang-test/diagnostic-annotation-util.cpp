@@ -47,6 +47,14 @@ static SlangResult parseMachineReadableDiagnostics(
     const UnownedStringSlice& output,
     List<Diagnostic>& outDiagnostics);
 
+// Helper to generate suggested annotations for a group of diagnostics
+static void generateSuggestedAnnotations(
+    StringBuilder& sb,
+    const List<const Diagnostic*>& diagnostics,
+    int lineNumber,
+    const UnownedStringSlice& prefix,
+    const List<UnownedStringSlice>& sourceLines);
+
 static bool checkAnnotations(
     const List<Annotation>& annotations,
     const List<Diagnostic>& diagnostics,
@@ -278,6 +286,97 @@ static SlangResult parseMachineReadableDiagnostics(
     return SLANG_OK;
 }
 
+// Helper to generate suggested annotations for a group of diagnostics
+static void generateSuggestedAnnotations(
+    StringBuilder& sb,
+    const List<const Diagnostic*>& diagnostics,
+    int lineNumber,
+    const UnownedStringSlice& prefix,
+    const List<UnownedStringSlice>& sourceLines)
+{
+    sb << "  ⋮\n"; // Vertical ellipsis (indented)
+
+    // Show source line (no indentation)
+    if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
+    {
+        UnownedStringSlice sourceLine = sourceLines[lineNumber - 1];
+        sb << sourceLine;
+        if (!sourceLine.endsWith("\n"))
+            sb << "\n";
+    }
+
+    // Calculate the prefix length: "//" + prefix
+    int linePrefixLength = 2 + prefix.getLength();
+
+    // Check if we should use block comment
+    bool useBlockComment = false;
+    for (const auto* diag : diagnostics)
+    {
+        if (diag->beginCol <= linePrefixLength)
+        {
+            useBlockComment = true;
+            break;
+        }
+    }
+
+    if (useBlockComment)
+    {
+        // Generate block comment format (no indentation)
+        sb << "/*" << prefix << "\n";
+        for (const auto* diag : diagnostics)
+        {
+            // Generate spacing to align caret with column
+            // Caret should be at position (diag->beginCol - 1)
+            StringBuilder spacingBuilder;
+            int numSpaces = diag->beginCol - 1;
+            for (int i = 0; i < numSpaces; ++i)
+            {
+                spacingBuilder << " ";
+            }
+
+            StringBuilder caretBuilder;
+            int caretCount = diag->endCol - diag->beginCol + 1;
+            for (int i = 0; i < caretCount; ++i)
+            {
+                caretBuilder << "^";
+            }
+
+            sb << spacingBuilder.getUnownedSlice() << caretBuilder.getUnownedSlice() << " "
+               << diag->message << "\n";
+        }
+        sb << "*/\n";
+    }
+    else
+    {
+        // Generate line comment format (no indentation)
+        for (const auto* diag : diagnostics)
+        {
+            // Generate spacing to align caret with column
+            // Caret should be at position (diag->beginCol - 1)
+            // Prefix takes up first linePrefixLength positions
+            // So we need (diag->beginCol - 1) - linePrefixLength spaces
+            StringBuilder spacingBuilder;
+            int numSpaces = (diag->beginCol - 1) - linePrefixLength;
+            for (int i = 0; i < numSpaces; ++i)
+            {
+                spacingBuilder << " ";
+            }
+
+            StringBuilder caretBuilder;
+            int caretCount = diag->endCol - diag->beginCol + 1;
+            for (int i = 0; i < caretCount; ++i)
+            {
+                caretBuilder << "^";
+            }
+
+            sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+               << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
+        }
+    }
+
+    sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
+}
+
 static bool checkAnnotations(
     const List<Annotation>& annotations,
     const List<Diagnostic>& diagnostics,
@@ -372,8 +471,9 @@ static bool checkAnnotations(
                 else
                 {
                     sb << "  Actual diagnostics:\n";
-                    for (const auto& diag : diagnostics)
+                    for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
                     {
+                        const auto& diag = diagnostics[diagIdx];
                         sb << "    Line " << diag.beginLine << ", column ";
                         if (diag.beginCol == diag.endCol)
                             sb << diag.beginCol;
@@ -382,14 +482,12 @@ static bool checkAnnotations(
                         sb << ": \"" << diag.message << "\"\n";
                     }
 
+                    // Group diagnostics by line and generate suggestions
                     sb << "\n  Suggested position-based annotations you can copy:\n";
-                    sb << "  (Note: These show where the diagnostics actually are.)\n";
-                    sb << "  (Add them after the appropriate source lines.)\n";
-
-                    // Group diagnostics by line
                     Dictionary<int, List<const Diagnostic*>> diagsByLine;
-                    for (const auto& diag : diagnostics)
+                    for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
                     {
+                        const auto& diag = diagnostics[diagIdx];
                         if (!diagsByLine.containsKey(diag.beginLine))
                         {
                             diagsByLine.add(diag.beginLine, List<const Diagnostic*>());
@@ -397,93 +495,10 @@ static bool checkAnnotations(
                         diagsByLine[diag.beginLine].add(&diag);
                     }
 
-                    // Calculate the prefix length: "//" + prefix
-                    int linePrefixLength = 2 + prefix.getLength();
-
-                    // Generate annotations for each line
                     for (const auto& [lineNum, diagList] : diagsByLine)
                     {
                         sb << "\n  After line " << lineNum << ":\n";
-                        sb << "  \u22ee\n"; // Vertical ellipsis (indented)
-
-                        // Show the source line for context (no indentation)
-                        if (lineNum >= 1 && lineNum <= sourceLines.getCount())
-                        {
-                            UnownedStringSlice sourceLine = sourceLines[lineNum - 1];
-                            sb << sourceLine;
-                            if (!sourceLine.endsWith("\n"))
-                                sb << "\n";
-                        }
-
-                        // Check if we should use block comment
-                        bool useBlockComment = false;
-                        for (const auto* diag : diagList)
-                        {
-                            if (diag->beginCol <= linePrefixLength)
-                            {
-                                useBlockComment = true;
-                                break;
-                            }
-                        }
-
-                        if (useBlockComment)
-                        {
-                            // Generate block comment format (no indentation)
-                            sb << "/*" << prefix << "\n";
-                            for (const auto* diag : diagList)
-                            {
-                                // Generate spacing to align caret with column
-                                // Caret should be at position (diag->beginCol - 1)
-                                StringBuilder spacingBuilder;
-                                int numSpaces = diag->beginCol - 1;
-                                for (int i = 0; i < numSpaces; ++i)
-                                {
-                                    spacingBuilder << " ";
-                                }
-
-                                StringBuilder caretBuilder;
-                                int caretCount = diag->endCol - diag->beginCol + 1;
-                                for (int i = 0; i < caretCount; ++i)
-                                {
-                                    caretBuilder << "^";
-                                }
-
-                                sb << spacingBuilder.getUnownedSlice()
-                                   << caretBuilder.getUnownedSlice() << " " << diag->message
-                                   << "\n";
-                            }
-                            sb << "*/\n";
-                        }
-                        else
-                        {
-                            // Generate line comment format (no indentation)
-                            for (const auto* diag : diagList)
-                            {
-                                // Generate spacing to align caret with column
-                                // Caret should be at position (diag->beginCol - 1)
-                                // Prefix takes up first linePrefixLength positions
-                                // So we need (diag->beginCol - 1) - linePrefixLength spaces
-                                StringBuilder spacingBuilder;
-                                int numSpaces = (diag->beginCol - 1) - linePrefixLength;
-                                for (int i = 0; i < numSpaces; ++i)
-                                {
-                                    spacingBuilder << " ";
-                                }
-
-                                StringBuilder caretBuilder;
-                                int caretCount = diag->endCol - diag->beginCol + 1;
-                                for (int i = 0; i < caretCount; ++i)
-                                {
-                                    caretBuilder << "^";
-                                }
-
-                                sb << "//" << prefix << spacingBuilder.getUnownedSlice()
-                                   << caretBuilder.getUnownedSlice() << " " << diag->message
-                                   << "\n";
-                            }
-                        }
-
-                        sb << "  \u22ee\n"; // Trailing vertical ellipsis (indented)
+                        generateSuggestedAnnotations(sb, diagList, lineNum, prefix, sourceLines);
                     }
                 }
 
@@ -621,102 +636,24 @@ static bool checkAnnotations(
 
                     // Generate suggested annotations based on actual diagnostics
                     sb << "\n  Suggested annotations you can copy:\n";
-                    sb << "  \u22ee\n"; // Vertical ellipsis (indented)
 
-                    // Show the source line for context (no indentation)
-                    if (annotation.sourceLineNumber >= 1 &&
-                        annotation.sourceLineNumber <= sourceLines.getCount())
+                    // Collect diagnostics on this line
+                    List<const Diagnostic*> diagsOnLine;
+                    for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
                     {
-                        UnownedStringSlice sourceLine =
-                            sourceLines[annotation.sourceLineNumber - 1];
-                        sb << sourceLine;
-                        if (!sourceLine.endsWith("\n"))
-                            sb << "\n";
-                    }
-
-                    // Calculate the prefix length: "//" + prefix
-                    int linePrefixLength = 2 + prefix.getLength();
-
-                    // Determine if we should use block comment format
-                    bool useBlockComment = false;
-                    for (const auto& diag : diagnostics)
-                    {
+                        const auto& diag = diagnostics[diagIdx];
                         if (diag.beginLine == annotation.sourceLineNumber)
                         {
-                            // Use block comment if any diagnostic is in early columns
-                            // that would be taken up by line comment prefix
-                            if (diag.beginCol <= linePrefixLength)
-                            {
-                                useBlockComment = true;
-                                break;
-                            }
+                            diagsOnLine.add(&diag);
                         }
                     }
 
-                    if (useBlockComment)
-                    {
-                        // Generate block comment format (no indentation)
-                        sb << "/*" << prefix << "\n";
-                        for (const auto& diag : diagnostics)
-                        {
-                            if (diag.beginLine == annotation.sourceLineNumber)
-                            {
-                                // Generate spacing to align caret with column
-                                // Caret should be at position (diag.beginCol - 1)
-                                StringBuilder spacingBuilder;
-                                int numSpaces = diag.beginCol - 1;
-                                for (int i = 0; i < numSpaces; ++i)
-                                {
-                                    spacingBuilder << " ";
-                                }
-
-                                // Generate carets for the column range
-                                StringBuilder caretBuilder;
-                                int caretCount = diag.endCol - diag.beginCol + 1;
-                                for (int i = 0; i < caretCount; ++i)
-                                {
-                                    caretBuilder << "^";
-                                }
-
-                                sb << spacingBuilder.getUnownedSlice()
-                                   << caretBuilder.getUnownedSlice() << " " << diag.message << "\n";
-                            }
-                        }
-                        sb << "*/\n";
-                    }
-                    else
-                    {
-                        // Generate line comment format (no indentation)
-                        for (const auto& diag : diagnostics)
-                        {
-                            if (diag.beginLine == annotation.sourceLineNumber)
-                            {
-                                // Generate spacing to align caret with column
-                                // Caret should be at position (diag.beginCol - 1)
-                                // Prefix takes up first linePrefixLength positions
-                                // So we need (diag.beginCol - 1) - linePrefixLength spaces
-                                StringBuilder spacingBuilder;
-                                int numSpaces = (diag.beginCol - 1) - linePrefixLength;
-                                for (int i = 0; i < numSpaces; ++i)
-                                {
-                                    spacingBuilder << " ";
-                                }
-
-                                // Generate carets for the column range
-                                StringBuilder caretBuilder;
-                                int caretCount = diag.endCol - diag.beginCol + 1;
-                                for (int i = 0; i < caretCount; ++i)
-                                {
-                                    caretBuilder << "^";
-                                }
-
-                                sb << "//" << prefix << spacingBuilder.getUnownedSlice()
-                                   << caretBuilder.getUnownedSlice() << " " << diag.message << "\n";
-                            }
-                        }
-                    }
-
-                    sb << "  \u22ee\n"; // Trailing vertical ellipsis (indented)
+                    generateSuggestedAnnotations(
+                        sb,
+                        diagsOnLine,
+                        annotation.sourceLineNumber,
+                        prefix,
+                        sourceLines);
                 }
 
                 outMissingAnnotations.add(sb.produceString());
@@ -753,9 +690,6 @@ static bool checkAnnotations(
                 diagsByLine[diag->beginLine].add(diag);
             }
 
-            // Calculate the prefix length: "//" + prefix
-            int linePrefixLength = 2 + prefix.getLength();
-
             // Show unannotated diagnostics grouped by line
             for (const auto& [lineNum, diagList] : diagsByLine)
             {
@@ -773,77 +707,12 @@ static bool checkAnnotations(
 
                 // Generate suggestions for this line
                 sb << "\n  Suggested annotations you can copy:\n";
-                sb << "  \u22ee\n";
-
-                // Show source line
-                if (lineNum >= 1 && lineNum <= sourceLines.getCount())
-                {
-                    UnownedStringSlice sourceLine = sourceLines[lineNum - 1];
-                    sb << sourceLine;
-                    if (!sourceLine.endsWith("\n"))
-                        sb << "\n";
-                }
-
-                // Check if we should use block comment
-                bool useBlockComment = false;
-                for (const auto* diag : diagList)
-                {
-                    if (diag->beginCol <= linePrefixLength)
-                    {
-                        useBlockComment = true;
-                        break;
-                    }
-                }
-
-                if (useBlockComment)
-                {
-                    sb << "/*" << prefix << "\n";
-                    for (const auto* diag : diagList)
-                    {
-                        StringBuilder spacingBuilder;
-                        int numSpaces = diag->beginCol - 1;
-                        for (int i = 0; i < numSpaces; ++i)
-                        {
-                            spacingBuilder << " ";
-                        }
-
-                        StringBuilder caretBuilder;
-                        int caretCount = diag->endCol - diag->beginCol + 1;
-                        for (int i = 0; i < caretCount; ++i)
-                        {
-                            caretBuilder << "^";
-                        }
-
-                        sb << spacingBuilder.getUnownedSlice() << caretBuilder.getUnownedSlice()
-                           << " " << diag->message << "\n";
-                    }
-                    sb << "*/\n";
-                }
-                else
-                {
-                    for (const auto* diag : diagList)
-                    {
-                        StringBuilder spacingBuilder;
-                        int numSpaces = (diag->beginCol - 1) - linePrefixLength;
-                        for (int i = 0; i < numSpaces; ++i)
-                        {
-                            spacingBuilder << " ";
-                        }
-
-                        StringBuilder caretBuilder;
-                        int caretCount = diag->endCol - diag->beginCol + 1;
-                        for (int i = 0; i < caretCount; ++i)
-                        {
-                            caretBuilder << "^";
-                        }
-
-                        sb << "//" << prefix << spacingBuilder.getUnownedSlice()
-                           << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
-                    }
-                }
-
-                sb << "  \u22ee\n";
+                generateSuggestedAnnotations(sb, diagList, lineNum, prefix, sourceLines);
             }
+
+            // Suggest using non-exhaustive mode as an alternative
+            sb << "\n  Or add 'non-exhaustive' to skip checking unannotated diagnostics:\n";
+            sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << ",non-exhaustive):\n";
 
             outMissingAnnotations.add(sb.produceString());
         }
