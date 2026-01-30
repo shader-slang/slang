@@ -1120,13 +1120,18 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     // Get C++ size and alignment of a type using CUDA layout rules.
     // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
     // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
-    bool getTypeCppSizeAndAlignment(IRType* type, IRBuilder* builder, int& outSize, int& outAlignment)
+    bool getTypeCppSizeAndAlignment(
+        IRType* type,
+        IRBuilder* builder,
+        int& outSize,
+        int& outAlignment)
     {
         if (auto ptrValType = tryGetPointedToType(builder, type))
             type = ptrValType;
 
         IRSizeAndAlignment sizeAndAlign;
-        Result result = getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
+        Result result =
+            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
         if (SLANG_FAILED(result))
             return false;
 
@@ -1512,7 +1517,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         1,
                         &regIdxInst);
                     // Clear the byte we're writing
-                    auto clearMask = builder->getIntValue(uintType, ~IRIntegerValue(0xFFu << (byteInReg * 8)));
+                    auto clearMask =
+                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFu << (byteInReg * 8)));
                     auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
                     // OR in the new value
                     auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
@@ -1559,7 +1565,8 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         1,
                         &regIdxInst);
                     // Clear the bytes we're writing
-                    auto clearMask = builder->getIntValue(uintType, ~IRIntegerValue(0xFFFFu << (byteInReg * 8)));
+                    auto clearMask =
+                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFFFu << (byteInReg * 8)));
                     auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
                     // OR in the new value
                     auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
