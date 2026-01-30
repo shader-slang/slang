@@ -1873,12 +1873,6 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     module->addFileDependency(sourceFile);
 
-    // Add to translation unit's source files for debug info generation
-    if (translationUnit)
-    {
-        translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
-    }
-
     // Create a transparent FileDecl to hold all children from the included file.
     auto fileDecl = module->getASTBuilder()->create<FileDecl>();
     fileDecl->nameAndLoc.name = name;
