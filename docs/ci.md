@@ -2,6 +2,28 @@
 
 There are github actions for building and testing slang.
 
+## Checks
+
+### Submodule Commit Validation
+
+We have a CI check that ensures any submodule commit changes in a PR point to commits that exist in the main/master branch of the respective submodule repository. This prevents issues where:
+- A submodule accidentally points to a commit from a user's branch
+- A submodule points to a commit that isn't on any branch
+- A submodule reference becomes invalid or hard to track
+
+The check is implemented in `extras/check-submodule-commits.sh` and runs automatically on PRs that modify files in `external/` or `.gitmodules`.
+
+If your PR fails this check, update the submodule to point to a commit that exists on the main branch of the submodule repository:
+
+```bash
+cd external/<submodule-name>
+git fetch origin
+git checkout origin/main  # or origin/master
+cd ../..
+git add external/<submodule-name>
+git commit -m "Update <submodule-name> to commit on main branch"
+```
+
 ## Tests
 
 Most configurations run a restricted set of tests, however on some self hosted
