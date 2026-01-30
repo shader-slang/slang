@@ -4378,6 +4378,15 @@ static __forceinline__ __device__ void optixInvoke(
     packOptiXRayPayloadPointer((void*)Payload, r0, r1);
     optixInvoke(r0, r1);
 }
+
+// Overload for empty payloads (when payload is eliminated by type legalization)
+static __forceinline__ __device__ void optixInvoke(
+    OptixTraversableHandle AccelerationStructure,
+    OptixTraversableHandle* HitOrMiss)
+{
+    // Call OptiX invoke with no payload for empty payload case
+    optixInvoke();
+}
 #endif
 
 #if (OPTIX_VERSION >= 80100)

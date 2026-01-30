@@ -123,6 +123,11 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     // the NvInvokeHitObject macro expects a Payload argument.
     IRBuilder builder(module);
 
+    // First, collect all empty ray payload structs to process.
+    // We must collect first because the processing phase inserts new global
+    // instructions (struct keys, string values) which would invalidate the iterator.
+    List<IRStructType*> emptyRayPayloadStructs;
+
     for (auto globalInst : module->getGlobalInsts())
     {
         auto structType = as<IRStructType>(globalInst);
@@ -141,6 +146,12 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         if (structType->getFields().begin() != structType->getFields().end())
             continue;
 
+        emptyRayPayloadStructs.add(structType);
+    }
+
+    // Now process the collected structs
+    for (auto structType : emptyRayPayloadStructs)
+    {
         // Add a dummy field to the empty ray payload struct
         // Insert the key BEFORE the struct type so it's defined before being referenced
         builder.setInsertBefore(structType);
@@ -148,8 +159,6 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
 
         // Add stage access decorations that ray payload fields require
-        // This matches what would be generated for: int _slang_dummy : read(caller) :
-        // write(caller);
         IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
         builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
         builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
@@ -157,8 +166,6 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
         builder.createStructField(structType, dummyKey, builder.getIntType());
 
         // Now find and update all makeStruct instructions that create this struct type.
-        // Since we added a field, we need to add a default value (0) as an operand.
-        // Collect uses first to avoid modifying the list while iterating
         List<IRInst*> makeStructsToUpdate;
         for (auto use = structType->firstUse; use; use = use->nextUse)
         {
@@ -171,7 +178,6 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
 
         for (auto makeStructInst : makeStructsToUpdate)
         {
-            // Add a default value (0) for the new field
             builder.setInsertBefore(makeStructInst);
             auto defaultValue = builder.getIntValue(builder.getIntType(), 0);
             auto newMakeStruct = builder.emitMakeStruct(structType, 1, &defaultValue);
