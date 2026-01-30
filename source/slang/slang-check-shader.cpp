@@ -94,12 +94,6 @@ static SemanticDecl* lookUpSemanticDecl(
     if (!lookupResult.isValid())
         return nullptr;
     
-    if (auto genericDecl = as<GenericDecl>(lookupResult.item.declRef.getDecl()))
-    {
-        if (auto semanticDecl = as<SemanticDecl>(genericDecl->inner))
-            return semanticDecl;
-    }
-    
     return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
 }
 
