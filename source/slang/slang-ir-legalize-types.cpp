@@ -2216,27 +2216,58 @@ static LegalVal legalizeCoopMatMapElementIFunc(
     IRTypeLegalizationContext* context,
     IRCoopMatMapElementIFunc* inst)
 {
-    // When the functor object is a lambda with no captures,
-    // it will be removed as a part of the legalization process,
-    // because it is a zero-sized struct.
-    // We need to explicitly remove it from its user.
+    // When the functor object legalizes to something different, we need to
+    // update the MapElementIFunc inst to reflect its new form.
     if (inst->hasIFuncThis())
     {
-        // Check if `this` is valid.
         auto legalArg = legalizeOperand(context, inst->getIFuncThis());
-        if (legalArg.flavor == LegalVal::Flavor::none)
+        switch (legalArg.flavor)
         {
-            // If `this` is not valid, remove it from IR.
-            IRBuilder builder{inst};
-            builder.setInsertBefore(inst);
-            auto newInst = builder.emitCoopMatMapElementFunc(
-                inst->getFullType(),
-                inst->getOperand(0),
-                inst->getOperand(1));
+        case LegalVal::Flavor::simple:
+            {
+                // If the functor legalizes to a simple value,
+                // we just need to update the argument list of the mapElement inst.
+                if (legalArg.getSimple() != inst->getIFuncThis())
+                {
+                    IRBuilder builder{inst};
+                    builder.setInsertBefore(inst);
+                    auto newInst = builder.emitCoopMatMapElementFunc(
+                        inst->getFullType(),
+                        legalArg.getSimple(),
+                        inst->getOperand(1));
+                    inst->replaceUsesWith(newInst);
+                    inst->removeAndDeallocate();
+                    return LegalVal::simple(newInst);
+                }
+                break;
+            }
+        case LegalVal::Flavor::none:
+            {
+                // If the functor is a lambda with no captures,
+                // it will be removed as a part of the legalization process.
+                // We need to explicitly remove it from the argument list of the mapElement inst.
+                IRBuilder builder{inst};
+                builder.setInsertBefore(inst);
+                auto newInst = builder.emitCoopMatMapElementFunc(
+                    inst->getFullType(),
+                    inst->getOperand(0),
+                    inst->getOperand(1));
 
-            inst->replaceUsesWith(newInst);
-            inst->removeAndDeallocate();
-            return LegalVal::simple(newInst);
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return LegalVal::simple(newInst);
+            }
+        case LegalVal::Flavor::pair:
+        case LegalVal::Flavor::tuple:
+            {
+                // If functor legalizes to one or many special (resource) values, we
+                // can't handle this case very easily at the moment, so diagnose an error
+                // instead of crashing.
+                context->m_sink->diagnose(
+                    inst->getIFuncCall(),
+                    Diagnostics::cooperativeMatrixUnsupportedCapture);
+                return LegalVal();
+            }
         }
     }
     return LegalVal::simple(inst);
@@ -3924,7 +3955,7 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 // wrappers around `legalizeTypes()` that pick an appropriately
 // specialized context type to use to get the job done.
 
-void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -3932,7 +3963,7 @@ void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSi
     legalizeTypes(&context);
 }
 
-void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     SLANG_PROFILE;
 
@@ -3940,7 +3971,7 @@ void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, Diag
     legalizeTypes(&context);
 }
 
-void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
     IREmptyTypeLegalizationContext context(target, module, sink);
     legalizeTypes(&context);

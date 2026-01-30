@@ -51,6 +51,11 @@ struct EnumTypeLoweringContext
 
         if (auto attributedType = as<IRAttributedType>(type))
         {
+            // Recursively get the lowered enum type for the base type
+            auto baseLoweredInfo = getLoweredEnumType(type->getOperand(0));
+            if (!baseLoweredInfo)
+                return nullptr; // Base type is not an enum, so this isn't an enum type either
+
             IRBuilder builder(module);
 
             List<IRAttr*> attrs;
@@ -59,9 +64,7 @@ struct EnumTypeLoweringContext
 
             RefPtr<LoweredEnumTypeInfo> info = new LoweredEnumTypeInfo();
             info->enumType = (IRType*)type;
-            info->loweredType = builder.getAttributedType(
-                getLoweredEnumType(type->getOperand(0))->loweredType,
-                attrs);
+            info->loweredType = builder.getAttributedType(baseLoweredInfo->loweredType, attrs);
             loweredEnumTypes[type] = info;
             return info.Ptr();
         }

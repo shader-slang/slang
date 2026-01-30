@@ -1071,7 +1071,11 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    size_t getFiniteSize() { return getSize().getFiniteValue(); }
+    UInt getFiniteSize()
+    {
+        SLANG_ASSERT(getSize().isFinite());
+        return getSize().getFiniteValue().getValidValue();
+    }
 };
 
 // Layout
@@ -1642,7 +1646,7 @@ struct IRVarLayout : IRLayout
         struct ResInfo
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
-            UInt offset = 0;
+            LayoutOffset offset = 0;
             UInt space = 0;
         };
 
@@ -2979,30 +2983,6 @@ struct IRUntaggedUnionType : IRType
     IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
 };
 
-FIDDLE()
-struct IRCompilerDictionaryValue : IRInst
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRCompilerDictionaryEntry : IRInst
-{
-    FIDDLE(leafInst())
-    IRInst* getValue()
-    {
-        for (auto child : getDecorationsAndChildren())
-        {
-            if (auto dictValue = as<IRCompilerDictionaryValue>(child))
-            {
-                return dictValue->getValue();
-            }
-        }
-
-        return nullptr;
-    }
-};
-
 // Generate struct definitions for all IR instructions not explicitly defined in this file
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-ir.h.lua")
@@ -3768,7 +3748,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitOptionalHasValue(IRInst* optValue);
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
-    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitMakeOptionalNone(IRInst* optType);
 
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
@@ -3795,6 +3775,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
+
+    IRInst* emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue);
 
     IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
 
@@ -3944,7 +3926,10 @@ $(type_info.return_type) $(type_info.method_name)(
     ///
     IRBlock* emitBlock();
 
-    static void insertBlockAlongEdge(IRModule* module, IREdge const& edge);
+    static void insertBlockAlongEdge(
+        IRModule* module,
+        IREdge const& edge,
+        bool copyDebugLine = false);
 
     IRParam* createParam(IRType* type);
     IRParam* emitParam(IRType* type);

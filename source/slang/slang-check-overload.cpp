@@ -4,6 +4,7 @@
 #include "slang-ast-print.h"
 #include "slang-check-impl.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related
 // to resolving overloading call operations, by checking
@@ -29,7 +30,7 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(
     for (auto param : params)
     {
         Index allowedArgCountToAdd = 1;
-        auto paramType = unwrapModifiedType(getParamType(m_astBuilder, param));
+        auto paramType = unwrapModifiedType(getParamValueType(m_astBuilder, param));
         if (isTypePack(paramType))
         {
             if (auto typePack = as<ConcreteTypePack>(paramType))
@@ -195,6 +196,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
                 Diagnostics::tooManyArguments,
                 argCount,
                 paramCounts.allowed);
+        }
+
+        // Add a note showing the candidate signature for context
+        if (candidate.item.declRef.getDecl())
+        {
+            String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+            getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+        }
+        else if (candidate.funcType)
+        {
+            // For Flavor::Expr cases where there's no decl, show the function type
+            getSink()->diagnose(context.loc, Diagnostics::overloadCandidate, candidate.funcType);
         }
     }
 
@@ -630,7 +643,7 @@ static QualType getParamQualType(ASTBuilder* astBuilder, DeclRef<ParamDecl> para
 {
     auto paramType = getType(astBuilder, param);
     bool isLVal = false;
-    switch (getParameterDirection(param.getDecl()))
+    switch (getParamPassingMode(param.getDecl()))
     {
     case ParamPassingMode::BorrowInOut:
     case ParamPassingMode::Out:
@@ -696,7 +709,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
             Count paramCount = funcType->getParamCount();
             for (Index i = 0; i < paramCount; ++i)
             {
-                auto paramType = getParamQualType(funcType->getParamTypeWithDirectionWrapper(i));
+                auto paramType = getParamQualType(funcType->getParamTypeWithModeWrapper(i));
                 paramTypes.add(paramType);
             }
         }
@@ -841,6 +854,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
     }
     if (context.mode == OverloadResolveContext::Mode::ForReal)
     {
+        SLANG_ASSERT(context.args || (context.argCount == 0 && resultArgs.getCount() == 0));
         context.argCount = resultArgs.getCount();
         if (context.args)
         {
@@ -2794,8 +2808,7 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
             List<QualType> paramTypes;
 
             for (Index ii = 0; ii < diffFuncType->getParamCount(); ii++)
-                paramTypes.add(
-                    getParamQualType(diffFuncType->getParamTypeWithDirectionWrapper(ii)));
+                paramTypes.add(getParamQualType(diffFuncType->getParamTypeWithModeWrapper(ii)));
 
             // Try to infer generic arguments, based on the updated context.
             OverloadResolveContext subContext = context;
@@ -3060,53 +3073,103 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             // There were multiple applicable candidates, so we need to report them.
 
-            if (funcName)
+            if (getOptionSet().shouldEmitRichDiagnostics() && funcName)
             {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::ambiguousOverloadForNameWithArgs,
-                    funcName,
-                    argsList);
+                // Use rich diagnostic system with variadic notes
+                Diagnostics::AmbiguousOverloadForNameWithArgs diagnostic;
+                diagnostic.name = funcName->text;
+                diagnostic.args = argsList;
+                diagnostic.expr = expr;
+
+                Index candidateCount = context.bestCandidates.getCount();
+                Index maxCandidatesToPrint = 10;
+                Index candidateIndex = 0;
+
+                context.bestCandidates.sort(
+                    [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                    { return c1.status < c2.status; });
+
+                for (const auto& candidate : context.bestCandidates)
+                {
+                    // Only include visible candidates (skip invisible ones for now)
+                    if (candidate.status != OverloadCandidate::Status::VisibilityChecked)
+                    {
+                        String declString =
+                            ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+                        Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
+                        c.candidate = candidate.item.declRef.getDecl();
+                        c.candidate_signature = declString;
+                        diagnostic.candidates.add(c);
+                    }
+
+                    candidateIndex++;
+                    if (candidateIndex == maxCandidatesToPrint)
+                        break;
+                }
+
+                getSink()->diagnose(diagnostic);
+
+                // Emit additional note for remaining candidates if needed
+                if (candidateIndex != candidateCount)
+                {
+                    getSink()->diagnose(
+                        expr,
+                        Diagnostics::moreOverloadCandidates,
+                        candidateCount - candidateIndex);
+                }
             }
             else
             {
-                getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
-            }
-        }
-
-        {
-            Index candidateCount = context.bestCandidates.getCount();
-            Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
-            Index candidateIndex = 0;
-            context.bestCandidates.sort([](const OverloadCandidate& c1, const OverloadCandidate& c2)
-                                        { return c1.status < c2.status; });
-
-            for (auto candidate : context.bestCandidates)
-            {
-                String declString =
-                    ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-
-                if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                // Use old diagnostic system
+                if (funcName)
+                {
                     getSink()->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::invisibleOverloadCandidate,
-                        declString);
+                        expr,
+                        Diagnostics::ambiguousOverloadForNameWithArgs,
+                        funcName,
+                        argsList);
+                }
                 else
-                    getSink()->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::overloadCandidate,
-                        declString);
+                {
+                    getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                }
 
-                candidateIndex++;
-                if (candidateIndex == maxCandidatesToPrint)
-                    break;
-            }
-            if (candidateIndex != candidateCount)
-            {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::moreOverloadCandidates,
-                    candidateCount - candidateIndex);
+                {
+                    Index candidateCount = context.bestCandidates.getCount();
+                    Index maxCandidatesToPrint = 10; // don't show too many candidates at once...
+                    Index candidateIndex = 0;
+                    context.bestCandidates.sort(
+                        [](const OverloadCandidate& c1, const OverloadCandidate& c2)
+                        { return c1.status < c2.status; });
+
+                    for (const auto& candidate : context.bestCandidates)
+                    {
+                        String declString =
+                            ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
+
+                        if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
+                            getSink()->diagnose(
+                                candidate.item.declRef,
+                                Diagnostics::invisibleOverloadCandidate,
+                                declString);
+                        else
+                            getSink()->diagnose(
+                                candidate.item.declRef,
+                                Diagnostics::overloadCandidate,
+                                declString);
+
+                        candidateIndex++;
+                        if (candidateIndex == maxCandidatesToPrint)
+                            break;
+                    }
+                    if (candidateIndex != candidateCount)
+                    {
+                        getSink()->diagnose(
+                            expr,
+                            Diagnostics::moreOverloadCandidates,
+                            candidateCount - candidateIndex);
+                    }
+                }
             }
         }
 
@@ -3141,14 +3204,14 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
         {
             for (Index i = 0; i < funcType->getParamCount(); i++)
             {
-                paramDirections.add(funcType->getParamDirection(i));
+                paramDirections.add(funcType->getParamPassingMode(i));
             }
         }
         else if (auto callableDeclRef = context.bestCandidate->item.declRef.as<CallableDecl>())
         {
             for (auto param : callableDeclRef.getDecl()->getParameters())
             {
-                paramDirections.add(getParameterDirection(param));
+                paramDirections.add(getParamPassingMode(param));
             }
         }
         for (Index i = 0; i < expr->arguments.getCount(); i++)

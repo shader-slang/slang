@@ -290,9 +290,19 @@ Reports the time spent in the downstream compiler.
 Reports compiler performance benchmark results. 
 
 
+<a id="report-detailed-perf-benchmark"></a>
+### -report-detailed-perf-benchmark
+Reports compiler performance benchmark results for each intermediate pass (implies [-report-perf-benchmark](#report-perf-benchmark)). 
+
+
 <a id="report-checkpoint-intermediates"></a>
 ### -report-checkpoint-intermediates
 Reports information about checkpoint contexts used for reverse-mode automatic differentiation. 
+
+
+<a id="report-dynamic-dispatch-sites"></a>
+### -report-dynamic-dispatch-sites
+Reports information about dynamic dispatch sites for interface calls. 
 
 
 <a id="skip-spirv-validation"></a>
@@ -570,6 +580,40 @@ Specify the space index for the system defined global bindless resource array.
 Emit debug data to a separate file, and strip it from the main output file. 
 
 
+<a id="emit-cpu-via-cpp"></a>
+### -emit-cpu-via-cpp
+Generate CPU targets using C++ (default) 
+
+
+<a id="emit-cpu-via-llvm"></a>
+### -emit-cpu-via-llvm
+Generate CPU targets using LLVM 
+
+
+<a id="llvm-target-triple"></a>
+### -llvm-target-triple
+
+**-llvm-target-triple &lt;target triple&gt;**
+
+Sets the target triple for the LLVM target, enabling cross compilation. The default value is the host platform. 
+
+
+<a id="llvm-cpu"></a>
+### -llvm-cpu
+
+**-llvm-cpu &lt;cpu name&gt;**
+
+Sets the target CPU for the LLVM target, enabling the extensions and features of that CPU. The default value is "generic". 
+
+
+<a id="llvm-features"></a>
+### -llvm-features
+
+**-llvm-features &lt;a1,+enable,-disable,...&gt;**
+
+Sets a comma-separates list of architecture-specific features for the LLVM targets. 
+
+
 
 <a id="Downstream"></a>
 ## Downstream
@@ -638,7 +682,7 @@ Dump intermediate outputs for debugging.
 
 <a id="dump-ir"></a>
 ### -dump-ir
-Dump the IR for debugging. 
+Dump the IR after every pass for debugging. 
 
 
 <a id="dump-ir-ids"></a>
@@ -673,7 +717,28 @@ Skip the code generation phase.
 
 <a id="validate-ir"></a>
 ### -validate-ir
-Validate the IR between the phases. 
+Validate the IR after select intermediate passes. 
+
+
+<a id="validate-ir-detailed"></a>
+### -validate-ir-detailed
+Perform debug validation on IR after each intermediate pass. 
+
+
+<a id="dump-ir-before"></a>
+### -dump-ir-before
+
+**-dump-ir-before &lt;pass-names&gt;**
+
+Dump IR before specified pass, may be specified more than once 
+
+
+<a id="dump-ir-after"></a>
+### -dump-ir-after
+
+**-dump-ir-after &lt;pass-names&gt;**
+
+Dump IR after specified pass, may be specified more than once 
 
 
 <a id="verbose-paths"></a>
@@ -823,6 +888,11 @@ Embed downstream IR into emitted slang IR
 <a id="experimental-feature"></a>
 ### -experimental-feature
 Enable experimental features (loading builtin neural module) 
+
+
+<a id="enable-experimental-rich-diagnostics"></a>
+### -enable-experimental-rich-diagnostics
+Enable experimental rich diagnostics with enhanced formatting and details 
 
 
 
@@ -1091,16 +1161,18 @@ Target
 * `spirv-asm`, `spirv-assembly` : SPIR-V assembly 
 * `c` : C source code 
 * `cpp`, `c++`, `cxx` : C++ source code 
+* `hpp` : C++ source header 
 * `torch`, `torch-binding`, `torch-cpp`, `torch-cpp-binding` : C++ for pytorch binding 
 * `host-cpp`, `host-c++`, `host-cxx` : C++ source for host execution 
 * `exe`, `executable` : Executable binary 
 * `shader-sharedlib`, `shader-sharedlibrary`, `shader-dll` : Shared library/Dll for shader kernel 
 * `sharedlib`, `sharedlibrary`, `dll` : Shared library/Dll for host execution 
 * `cuda`, `cu` : CUDA source code 
+* `cuh` : CUDA source header 
 * `ptx` : PTX assembly 
 * `cuobj`, `cubin` : CUDA binary 
 * `host-callable`, `callable` : Host callable 
-* `object-code` : Object code 
+* `object-code`, `shader-object-code` : Object code for host execution (shader style) 
 * `host-host-callable` : Host callable for host execution 
 * `metal` : Metal shader source 
 * `metallib` : Metal Library Bytecode 
@@ -1109,6 +1181,9 @@ Target
 * `wgsl-spirv-asm`, `wgsl-spirv-assembly` : SPIR-V assembly via WebGPU shading language 
 * `wgsl-spirv` : SPIR-V via WebGPU shading language 
 * `slangvm`, `slang-vm` : Slang VM byte code 
+* `host-object-code` : Object code for host execution (host style) 
+* `llvm-host-ir`, `llvm-ir` : LLVM IR assembly (host style) 
+* `llvm-shader-ir` : LLVM IR assembly (shader style) 
 
 <a id="stage"></a>
 ## stage
@@ -1157,6 +1232,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spirv` 
 * `wgsl` 
 * `slangvm` 
+* `llvm` 
 * `glsl_spirv_1_0` 
 * `glsl_spirv_1_1` 
 * `glsl_spirv_1_2` 
@@ -1170,8 +1246,8 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_3_1` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
-* `hlsl_coopvec_poc` 
 * `optix_coopvec` 
+* `optix_multilevel_traversal` 
 * `vertex` 
 * `fragment` 
 * `compute` 
@@ -1193,6 +1269,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_fragment_shader_barycentric` : enables the SPV_KHR_fragment_shader_barycentric extension 
 * `SPV_KHR_non_semantic_info` : enables the SPV_KHR_non_semantic_info extension 
 * `SPV_KHR_device_group` : enables the SPV_KHR_device_group extension 
+* `SPV_KHR_variable_pointers` : enables the SPV_KHR_variable_pointers extension 
 * `SPV_KHR_ray_tracing` : enables the SPV_KHR_ray_tracing extension 
 * `SPV_KHR_ray_query` : enables the SPV_KHR_ray_query extension 
 * `SPV_KHR_ray_tracing_position_fetch` : enables the SPV_KHR_ray_tracing_position_fetch extension 
@@ -1201,6 +1278,7 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
 * `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
+* `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1244,6 +1322,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
 * `spvShaderInvocationReorderNV` 
+* `spvShaderInvocationReorderEXT` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1266,23 +1345,31 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `ser_hlsl_native` 
 * `metallib_latest` 
-* `hlsl_coopvec_poc_sm_6_9` 
 * `dxil_lib` 
 * `any_target` 
 * `any_textual_target` 
 * `any_gfx_target` 
 * `any_cpp_target` 
 * `cpp_cuda` 
+* `cpp_llvm` 
+* `cpp_cuda_llvm` 
 * `cpp_cuda_spirv` 
+* `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 
+* `cpp_cuda_glsl_hlsl_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv` 
+* `cpp_cuda_glsl_hlsl_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_spirv_wgsl_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_llvm` 
 * `cpp_cuda_glsl_hlsl_metal_spirv_wgsl` 
+* `cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm` 
 * `cpp_cuda_hlsl` 
 * `cpp_cuda_hlsl_spirv` 
 * `cpp_cuda_hlsl_metal_spirv` 
@@ -1295,12 +1382,14 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_glsl_hlsl` 
 * `cuda_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_spirv` 
+* `cuda_glsl_hlsl_spirv_llvm` 
 * `cuda_glsl_hlsl_spirv_wgsl` 
 * `cuda_glsl_hlsl_metal_spirv` 
 * `cuda_glsl_hlsl_metal_spirv_wgsl` 
 * `cuda_glsl_spirv` 
 * `cuda_glsl_metal_spirv` 
 * `cuda_glsl_metal_spirv_wgsl` 
+* `cuda_glsl_metal_spirv_wgsl_llvm` 
 * `cuda_hlsl` 
 * `cuda_hlsl_spirv` 
 * `glsl_hlsl_spirv` 
@@ -1313,6 +1402,8 @@ A capability describes an optional feature that a target may or may not support.
 * `glsl_spirv_wgsl` 
 * `hlsl_spirv` 
 * `SPV_NV_compute_shader_derivatives` : enables the SPV_NV_compute_shader_derivatives extension 
+* `spvShaderInvocationReorderMotionNV` 
+* `spvShaderInvocationReorderMotionEXT` 
 * `GL_EXT_buffer_reference` : enables the GL_EXT_buffer_reference extension 
 * `GL_EXT_buffer_reference_uvec2` : enables the GL_EXT_buffer_reference_uvec2 extension 
 * `GL_EXT_debug_printf` : enables the GL_EXT_debug_printf extension 
@@ -1371,17 +1462,24 @@ A capability describes an optional feature that a target may or may not support.
 * `GL_NV_ray_tracing_motion_blur` : enables the GL_NV_ray_tracing_motion_blur extension 
 * `GL_NV_shader_atomic_fp16_vector` : enables the GL_NV_shader_atomic_fp16_vector extension 
 * `GL_NV_shader_invocation_reorder` : enables the GL_NV_shader_invocation_reorder extension 
+* `GL_EXT_shader_invocation_reorder` : enables the GL_EXT_shader_invocation_reorder extension 
+* `GL_NV_shader_invocation_reorder_motion` : enables the GL_NV_shader_invocation_reorder_motion extension 
+* `GL_EXT_shader_invocation_reorder_motion` : enables the GL_EXT_shader_invocation_reorder_motion extension 
 * `GL_NV_shader_subgroup_partitioned` : enables the GL_NV_shader_subgroup_partitioned extension 
 * `GL_NV_shader_texture_footprint` : enables the GL_NV_shader_texture_footprint extension 
 * `GL_NV_cluster_acceleration_structure` : enables the GL_NV_cluster_acceleration_structure extension 
 * `GL_NV_cooperative_vector` : enables the GL_NV_cooperative_vector extension 
 * `nvapi` 
 * `raytracing` 
+* `ser_nvapi` 
+* `ser_dxr` 
 * `ser` 
-* `motionblur` 
+* `ser_nv` 
+* `motionblur_nv` 
 * `rayquery` 
 * `raytracing_motionblur` 
 * `ser_motion` 
+* `ser_nv_motion` 
 * `shaderclock` 
 * `fragmentshaderinterlock` 
 * `atomic64` 
@@ -1394,6 +1492,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cooperative_vector` 
 * `cooperative_vector_training` 
 * `cooperative_matrix` 
+* `cooperative_matrix_spirv` 
 * `cooperative_matrix_reduction` 
 * `cooperative_matrix_conversion` 
 * `cooperative_matrix_map_element` 
@@ -1419,6 +1518,7 @@ A capability describes an optional feature that a target may or may not support.
 * `amplification_mesh` 
 * `raytracing_stages` 
 * `anyhit_closesthit` 
+* `anyhit_intersection` 
 * `raygen_closesthit_miss` 
 * `anyhit_closesthit_intersection` 
 * `anyhit_closesthit_intersection_miss` 
@@ -1522,6 +1622,7 @@ A capability describes an optional feature that a target may or may not support.
 * `consumestructuredbuffer` 
 * `structuredbuffer` 
 * `structuredbuffer_rw` 
+* `implicit_derivatives_sampling` 
 * `fragmentprocessing` 
 * `fragmentprocessing_derivativecontrol` 
 * `getattributeatvertex` 
@@ -1540,6 +1641,7 @@ A capability describes an optional feature that a target may or may not support.
 * `texture_querylod` 
 * `texture_querylevels` 
 * `texture_shadowlod` 
+* `texture_shadowgrad` 
 * `atomic_glsl_float1` 
 * `atomic_glsl_float2` 
 * `atomic_glsl_halfvec` 
@@ -1583,6 +1685,7 @@ A capability describes an optional feature that a target may or may not support.
 * `raytracing_lss` 
 * `raytracing_lss_ho` 
 * `raytracing_anyhit_closesthit_intersection` 
+* `raytracing_object_space_ray` 
 * `raytracing_raygen_closesthit_miss` 
 * `raytracing_anyhit_closesthit_intersection_miss` 
 * `raytracing_raygen_closesthit_miss_callable` 
@@ -1592,11 +1695,16 @@ A capability describes an optional feature that a target may or may not support.
 * `rayquery_position` 
 * `ser_raygen` 
 * `ser_raygen_closesthit_miss` 
+* `ser_nv_raygen` 
+* `ser_nv_raygen_closesthit_miss` 
+* `ser_nv_motion_raygen_closesthit_miss` 
 * `ser_any_closesthit_intersection_miss` 
 * `ser_anyhit_closesthit_intersection` 
 * `ser_anyhit_closesthit` 
 * `ser_motion_raygen_closesthit_miss` 
 * `ser_motion_raygen` 
+* `ser_dxr_raygen_closesthit_miss` 
+* `ser_dxr_raygen` 
 * `all` 
 
 <a id="file-extension"></a>
@@ -1623,9 +1731,11 @@ A [&lt;language&gt;](#language), &lt;format&gt;, and/or [&lt;stage&gt;](#stage) 
 * `spv-asm` : SPIR-V assembly 
 * `c` 
 * `cpp`, `c++`, `cxx` : C++ 
+* `hpp` : C++ Header 
 * `exe` : executable 
 * `dll`, `so` : sharedlibrary/dll 
 * `cu` : CUDA 
+* `cuh` : CUDA Header 
 * `ptx` : PTX 
 * `obj`, `o` : object-code 
 * `zip` : container 

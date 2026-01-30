@@ -90,8 +90,8 @@ List<IRInterfaceType*> sortTopologically(
 }
 
 void inferAnyValueSizeWhereNecessary(
-    TargetProgram* targetProgram,
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
     // Go through the global insts and collect all interface types.
@@ -227,7 +227,7 @@ void inferAnyValueSizeWhereNecessary(
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 (IRType*)implType,
                 &sizeAndAlignment);
 

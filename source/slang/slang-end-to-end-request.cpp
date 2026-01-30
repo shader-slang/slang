@@ -1576,8 +1576,14 @@ SlangResult EndToEndCompileRequest::compile()
     auto reflectionPath = getOptionSet().getStringOption(CompilerOptionName::EmitReflectionJSON);
     if (reflectionPath.getLength() != 0)
     {
+        auto reflection = this->getReflection();
+        if (!reflection)
+        {
+            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget);
+            return SLANG_FAIL;
+        }
         auto bufferWriter = PrettyWriter();
-        emitReflectionJSON(this, this->getReflection(), bufferWriter);
+        emitReflectionJSON(this, reflection, bufferWriter);
         if (reflectionPath == "-")
         {
             auto builder = bufferWriter.getBuilder();
@@ -1740,6 +1746,8 @@ static SlangResult _getWholeProgramResult(
     if (!targetProgram)
         return SLANG_FAIL;
     outArtifact = targetProgram->getExistingWholeProgramResult();
+    if (!outArtifact)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 

@@ -100,12 +100,8 @@ static const char s_xyzwNames[] = "xyzw";
         return UnownedStringSlice("uint64_t");
     case kIROp_UIntPtrType:
         return UnownedStringSlice("uintptr_t");
-
-        // Not clear just yet how we should handle half... we want all processing as float
-        // probly, but when reading/writing to memory converting
     case kIROp_HalfType:
         return UnownedStringSlice("half");
-
     case kIROp_FloatType:
         return UnownedStringSlice("float");
     case kIROp_DoubleType:
@@ -240,12 +236,6 @@ SlangResult CPPSourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, S
 {
     switch (type->getOp())
     {
-    case kIROp_HalfType:
-        {
-            // Special case half
-            out << getBuiltinTypeName(kIROp_FloatType);
-            return SLANG_OK;
-        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
@@ -1072,6 +1062,13 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     if (inst->getOp() == kIROp_FloatLit)
     {
         IRConstant* constantInst = static_cast<IRConstant*>(inst);
+
+        IRType* type = constantInst->getDataType();
+        if (type && type->getOp() == kIROp_HalfType)
+        {
+            m_writer->emit("half(");
+        }
+
         switch (constantInst->getFloatKind())
         {
         case IRConstant::FloatKind::Nan:
@@ -1098,13 +1095,17 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
 
                 // If the literal is a float, then we need to add 'f' at end, as
                 // without literal suffix the value defaults to double.
-                IRType* type = constantInst->getDataType();
                 if (type && type->getOp() == kIROp_FloatType)
                 {
                     m_writer->emitChar('f');
                 }
                 break;
             }
+        }
+
+        if (type && type->getOp() == kIROp_HalfType)
+        {
+            m_writer->emit(")");
         }
     }
     else
@@ -1820,7 +1821,7 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
 
 void CPPSourceEmitter::emitPreModuleImpl()
 {
-    if (m_target == CodeGenTarget::CPPSource)
+    if (m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
     {
         // TODO(JS): Previously this opened an anonymous scope for all generated functions
         // Unfortunately this is a problem if we are just emitting code that is externally available
@@ -1843,7 +1844,6 @@ void CPPSourceEmitter::emitPreModuleImpl()
     }
     Super::emitPreModuleImpl();
 }
-
 
 void CPPSourceEmitter::emitGlobalInstImpl(IRInst* inst)
 {
@@ -2273,7 +2273,7 @@ void CPPSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     // Now that we can have any function available externally (not just entry points)
     // this doesn't work.
 
-    // if (m_target == CodeGenTarget::CPPSource)
+    // if (m_target == CodeGenTarget::CPPSource || m_target == CodeGenTarget::CPPHeader)
     //{
     //  Need to close the anonymous namespace when outputting for C++ kernel.
     // m_writer->emit("} // anonymous\n\n");

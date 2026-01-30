@@ -102,15 +102,15 @@ void IRUse::debugValidate()
     auto uv = this->usedValue;
     if (!uv)
     {
-        assert(!nextUse);
-        assert(!prevLink);
+        SLANG_ASSERT(!nextUse);
+        SLANG_ASSERT(!prevLink);
         return;
     }
 
     auto pp = &uv->firstUse;
     for (auto u = uv->firstUse; u;)
     {
-        assert(u->prevLink == pp);
+        SLANG_ASSERT(u->prevLink == pp);
 
         pp = &u->nextUse;
         u = u->nextUse;
@@ -840,7 +840,7 @@ void fixUpDebugFuncType(IRFunc* func)
             oldDebugFunc->getFile(),
             funcType);
         debugFuncDecor->removeAndDeallocate();
-        builder.addDecoration(funcType, kIROp_DebugFuncDecoration, newDebugFunc);
+        builder.addDecoration(func, kIROp_DebugFuncDecoration, newDebugFunc);
     }
 }
 
@@ -1206,9 +1206,13 @@ IRVarLayout* IRVarLayout::Builder::build()
     {
         if (resInfo.kind == LayoutResourceKind::None)
             continue;
+        if (resInfo.offset.isInvalid())
+            continue;
 
-        IRInst* varOffsetAttr =
-            irBuilder->getVarOffsetAttr(resInfo.kind, resInfo.offset, resInfo.space);
+        IRInst* varOffsetAttr = irBuilder->getVarOffsetAttr(
+            resInfo.kind,
+            resInfo.offset.getValidValue(),
+            resInfo.space);
         operands.add(varOffsetAttr);
     }
 
@@ -2052,7 +2056,7 @@ HashCode IRInstKey::_getHashCode()
 
 UnownedStringSlice IRConstant::getStringSlice()
 {
-    assert(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
+    SLANG_ASSERT(getOp() == kIROp_StringLit || getOp() == kIROp_BlobLit);
     // If the transitory decoration is set, then this is uses the transitoryStringVal for the text
     // storage. This is typically used when we are using a transitory IRInst held on the stack (such
     // that it can be looked up in cached), that just points to a string elsewhere, and NOT the
@@ -2280,10 +2284,13 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
             IRConstant::StringValue& dstString = irValue->value.stringVal;
 
             dstString.numChars = uint32_t(sliceSize);
-            // Turn into pointer to avoid warning of array overrun
-            char* dstChars = dstString.chars;
-            // Copy the chars
-            memcpy(dstChars, slice.begin(), sliceSize);
+            if (sliceSize > 0)
+            {
+                // Turn into pointer to avoid warning of array overrun
+                char* dstChars = dstString.chars;
+                // Copy the chars
+                memcpy(dstChars, slice.begin(), sliceSize);
+            }
 
             break;
         }
@@ -2301,8 +2308,7 @@ IRConstant* IRBuilder::_findOrEmitConstant(IRConstant& keyInst)
 
 IRInst* IRBuilder::getBoolValue(bool inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_BoolLit;
     keyInst.typeUse.usedValue = getBoolType();
     keyInst.value.intVal = IRIntegerValue(inValue);
@@ -2316,8 +2322,7 @@ IRInst* IRBuilder::getIntValue(IRIntegerValue value)
 
 IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_IntLit;
     keyInst.typeUse.usedValue = type;
     // Truncate the input value based on `type`.
@@ -2354,8 +2359,7 @@ IRInst* IRBuilder::getIntValue(IRType* type, IRIntegerValue inValue)
 
 IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_FloatLit;
     keyInst.typeUse.usedValue = type;
     // Truncate the input value based on `type`.
@@ -2377,12 +2381,10 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
 
 IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
 
     // Mark that this is on the stack...
-    IRDecoration stackDecoration;
-    memset(&stackDecoration, 0, sizeof(stackDecoration));
+    IRDecoration stackDecoration{};
     stackDecoration.m_op = kIROp_TransitoryDecoration;
     stackDecoration.insertAtEnd(&keyInst);
 
@@ -2398,8 +2400,7 @@ IRStringLit* IRBuilder::getStringValue(const UnownedStringSlice& inSlice)
 
 IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
 
     char* buffer = (char*)(getModule()->getMemoryArena().allocate(blob->getBufferSize()));
     if (!buffer)
@@ -2411,8 +2412,7 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
     UnownedStringSlice inSlice(buffer, blob->getBufferSize());
 
     // Mark that this is on the stack...
-    IRDecoration stackDecoration;
-    memset(&stackDecoration, 0, sizeof(stackDecoration));
+    IRDecoration stackDecoration{};
     stackDecoration.m_op = kIROp_TransitoryDecoration;
     stackDecoration.insertAtEnd(&keyInst);
 
@@ -2428,8 +2428,7 @@ IRBlobLit* IRBuilder::getBlobValue(ISlangBlob* blob)
 
 IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_PtrLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.ptrVal = data;
@@ -2438,8 +2437,7 @@ IRPtrLit* IRBuilder::getPtrValue(IRType* type, void* data)
 
 IRPtrLit* IRBuilder::getNullPtrValue(IRType* type)
 {
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_PtrLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.ptrVal = nullptr;
@@ -2450,8 +2448,16 @@ IRVoidLit* IRBuilder::getVoidValue()
 {
     IRType* type = getVoidType();
 
-    IRConstant keyInst;
-    memset(&keyInst, 0, sizeof(keyInst));
+    IRConstant keyInst{};
+    keyInst.m_op = kIROp_VoidLit;
+    keyInst.typeUse.usedValue = type;
+    keyInst.value.intVal = 0;
+    return (IRVoidLit*)_findOrEmitConstant(keyInst);
+}
+
+IRVoidLit* IRBuilder::getVoidValue(IRType* type)
+{
+    IRConstant keyInst{};
     keyInst.m_op = kIROp_VoidLit;
     keyInst.typeUse.usedValue = type;
     keyInst.value.intVal = 0;
@@ -3303,6 +3309,7 @@ IRInst* IRBuilder::emitDebugInlinedAt(
     IRInst* debugFunc,
     IRInst* outerInlinedAt)
 {
+    SLANG_ASSERT(debugFunc);
     if (outerInlinedAt)
     {
         IRInst* args[] = {line, col, file, debugFunc, outerInlinedAt};
@@ -3863,11 +3870,9 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
         return getNullPtrValue(type);
     case kIROp_OptionalType:
         {
-            auto inner =
-                emitDefaultConstruct(as<IROptionalType>(actualType)->getValueType(), fallback);
-            if (!inner)
-                return nullptr;
-            return emitMakeOptionalNone(type, inner);
+            // The Optional-type lowering pass synthesizes the placeholder payload,
+            // so we don't need to construct `inner` here.
+            return emitMakeOptionalNone(type);
         }
     case kIROp_TupleType:
         {
@@ -3946,6 +3951,12 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
                 return emitMakeCoopVector(type, elements.getCount(), elements.getBuffer());
             }
             break;
+        }
+    case kIROp_CoopMatrixType:
+        {
+            return emitMakeCoopMatrixFromScalar(
+                type,
+                emitDefaultConstruct(as<IRCoopMatrixType>(type)->getElementType(), fallback));
         }
     case kIROp_MatrixType:
         {
@@ -4383,9 +4394,9 @@ IRInst* IRBuilder::emitMakeOptionalValue(IRInst* optType, IRInst* value)
     return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalValue, 1, &value);
 }
 
-IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue)
+IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType)
 {
-    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 1, &defaultValue);
+    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue)
@@ -4461,6 +4472,11 @@ IRInst* IRBuilder::emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* ar
 IRInst* IRBuilder::emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue)
 {
     return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &scalarValue);
+}
+
+IRInst* IRBuilder::emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue)
+{
+    return emitIntrinsicInst(type, kIROp_MakeCoopMatrixFromScalar, 1, &scalarValue);
 }
 
 IRInst* IRBuilder::emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args)
@@ -5336,7 +5352,17 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
         accessQualifier = ptrType->getAccessQualifier();
-        addrSpace = ptrType->getAddressSpace();
+        if (!ptrType->hasAddressSpace())
+        {
+            if (as<IRGroupSharedRate>(basePtr->getRate()))
+            {
+                addrSpace = AddressSpace::GroupShared;
+            }
+        }
+        else
+        {
+            addrSpace = ptrType->getAddressSpace();
+        }
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -6580,7 +6606,7 @@ IRLayoutDecoration* IRBuilder::addLayoutDecoration(IRInst* value, IRLayout* layo
 IRTypeSizeAttr* IRBuilder::getTypeSizeAttr(LayoutResourceKind kind, LayoutSize size)
 {
     auto kindInst = getIntValue(getIntType(), IRIntegerValue(kind));
-    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.raw));
+    auto sizeInst = getIntValue(getIntType(), IRIntegerValue(size.unsafeGetRaw()));
 
     IRInst* operands[] = {kindInst, sizeInst};
 
@@ -6731,7 +6757,10 @@ UInt IRBuilder::getUniqueID(IRInst* inst)
     if (existingId)
         return *existingId;
 
-    auto id = uniqueIDMap->getCount();
+    // Note: the ID sequence starts from 1 to ensure that IDs in
+    // zero-initialized memory do not get confused with generated IDs.
+    // (Issue #9191)
+    auto id = uniqueIDMap->getCount() + 1U;
     uniqueIDMap->add(inst, id);
     return id;
 }
@@ -7797,41 +7826,66 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
-IntInfo getIntTypeInfo(const IRType* intType)
+Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType)
+{
+    switch (intType->getOp())
+    {
+    case kIROp_UIntPtrType:
+    case kIROp_IntPtrType:
+        return Int(getPointerSize(targetReq)) * 8;
+    default:
+        return maybeGetIntTypeWidth(intType).value();
+    }
+}
+
+std::optional<Int> maybeGetIntTypeWidth(IRType* intType)
 {
     switch (intType->getOp())
     {
     case kIROp_UInt8Type:
-        return {8, false};
-    case kIROp_UInt16Type:
-        return {16, false};
-    case kIROp_UIntType:
-        return {32, false};
-    case kIROp_UInt64Type:
-        return {64, false};
-    case kIROp_UIntPtrType:
-#if SLANG_PTR_IS_32
-        return {32, false};
-#else
-        return {64, false};
-#endif
     case kIROp_Int8Type:
-        return {8, true};
+        return 8;
+    case kIROp_UInt16Type:
     case kIROp_Int16Type:
-        return {16, true};
+        return 16;
+    case kIROp_UIntType:
     case kIROp_IntType:
-        return {32, true};
+        return 32;
+    case kIROp_UInt64Type:
     case kIROp_Int64Type:
-        return {64, true};
+        return 64;
+    case kIROp_UIntPtrType:
     case kIROp_IntPtrType:
-#if SLANG_PTR_IS_32
-        return {32, true};
-#else
-        return {64, true};
-#endif
+        return {};
+    default:
+        SLANG_UNEXPECTED("Unhandled type passed to getIntTypeWidth");
+    }
+}
+
+bool getIntTypeSigned(IRType* intType)
+{
+    switch (intType->getOp())
+    {
+    case kIROp_UInt8Type:
+    case kIROp_UInt16Type:
+    case kIROp_UIntType:
+    case kIROp_UInt64Type:
+    case kIROp_UIntPtrType:
+        return false;
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+    case kIROp_IntType:
+    case kIROp_Int64Type:
+    case kIROp_IntPtrType:
+        return true;
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getIntTypeInfo");
     }
+}
+
+IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType)
+{
+    return {getIntTypeWidth(targetReq, intType), getIntTypeSigned(intType)};
 }
 
 IROp getIntTypeOpFromInfo(const IntInfo info)
@@ -8153,7 +8207,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             SLANG_ASSERT(uu->get() == thisInst);
 
             auto user = uu->getUser();
-            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
+            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable() || as<IRConstant>(user);
 
             // We want to de-duplicate WitnessTable but we don't really want to hoist them.
             bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
@@ -8165,17 +8219,17 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                     SLANG_ASSERT(user->getModule());
                     dedupContext = user->getModule()->getDeduplicationContext();
                 }
-                dedupContext->_removeGlobalNumberingEntry(user);
+                if (auto userConstant = as<IRConstant>(user))
+                    dedupContext->removeInstFromConstantMap(userConstant);
+                else
+                    dedupContext->_removeGlobalNumberingEntry(user);
             }
 
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
-            bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
-            if (userIsSetInst)
-            {
-                setsToUpdate.add(as<IRSetBase>(user));
-            }
+            if (auto setBase = as<IRSetBase>(uu->getUser()))
+                setsToUpdate.add(setBase);
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
@@ -8186,21 +8240,44 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing
                 // value.
-                IRInst* existingVal = nullptr;
-                if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
-                        IRInstKey{user},
-                        existingVal))
+                if (auto userConstant = as<IRConstant>(user))
                 {
-                    // If existingVal has been replaced by something else, use that.
-                    dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
-                    addToWorkList(user, existingVal);
-
-                    if (!user->hasUses() && (as<IRAssociatedInstAnnotation>(user)))
-                        duplicateAnnotations.add(user);
+                    // If the user is a constant, it should be deduplicated against the constant
+                    // map.
+                    IRConstant* existingConstant = nullptr;
+                    if (dedupContext->getConstantMap().tryGetValue(
+                            IRConstantKey{userConstant},
+                            existingConstant))
+                    {
+                        IRInst* existingVal = existingConstant;
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->getConstantMap()[IRConstantKey{userConstant}] = userConstant;
+                    }
                 }
                 else
                 {
-                    dedupContext->_addGlobalNumberingEntry(user);
+                    // Otherwise, check the global value numbering map for duplication after
+                    // replacing the use.
+                    IRInst* existingVal = nullptr;
+                    if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
+                            IRInstKey{user},
+                            existingVal))
+                    {
+                        // If existingVal has been replaced by something else, use that.
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+
+                        if (!user->hasUses() && (as<IRAssociatedInstAnnotation>(user)))
+                            duplicateAnnotations.add(user);
+                    }
+                    else
+                    {
+                        dedupContext->_addGlobalNumberingEntry(user);
+                    }
                 }
             }
 
@@ -8260,7 +8337,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
         auto newSetInst = builder.getSet(setInst->getOp(), elements);
         if (newSetInst != setInst)
         {
-            // setInst was improperly ordered, so we need to replace its uses.
+            // setInst was improperly ordered, so we need to replace its uses
             // and then delete it.
             //
             setInst->replaceUsesWith(newSetInst);
@@ -8455,7 +8532,7 @@ void IRInst::removeAndDeallocate()
         }
         else if (auto constInst = as<IRConstant>(this))
         {
-            module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{constInst});
+            module->getDeduplicationContext()->removeInstFromConstantMap(constInst);
         }
         module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         if (auto func = as<IRGlobalValueWithCode>(this))
@@ -8588,6 +8665,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeVector:
     case kIROp_MakeMatrix:
     case kIROp_MakeMatrixFromScalar:
+    case kIROp_MakeCoopMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
     case kIROp_MakeWitnessPack:
@@ -8726,22 +8804,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_UninitializedWitnessTableElement:
     case kIROp_NoneTypeElement:
     case kIROp_NoneWitnessTableElement:
+    case kIROp_DetachDerivative:
         return false;
 
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
         return false;
-
-        /* TODO: Remove..
-        case kIROp_ForwardDifferentiate:
-        case kIROp_BackwardDifferentiate:
-        case kIROp_BackwardDifferentiatePrimal:
-        case kIROp_BackwardDifferentiatePropagate:
-        case kIROp_BackwardContextGetPrimalVal:
-        case kIROp_ForwardDifferentiatePropagate:
-        case kIROp_FunctionCopy:
-            return false;*/
 
     case kIROp_Div:
     case kIROp_IRem:

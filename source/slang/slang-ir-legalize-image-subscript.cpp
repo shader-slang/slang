@@ -150,7 +150,7 @@ void legalizeStore(
             auto swizzledStore = cast<IRSwizzledStore>(storeInst);
             // Here we assume the imageElementType is already lowered into float4/uint4 types from
             // any user-defined type.
-            assert(imageElementType->getOp() == kIROp_VectorType);
+            SLANG_ASSERT(imageElementType->getOp() == kIROp_VectorType);
             auto originalValue = builder.emitImageLoad(vector4Type, loadParams);
             Array<IRInst*, 4> indices;
             for (UInt i = 0; i < swizzledStore->getElementCount(); i++)
@@ -177,7 +177,7 @@ void legalizeStore(
         break;
     }
 }
-void legalizeImageSubscript(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
+void legalizeImageSubscript(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     IRBuilder builder(module);
     for (auto globalInst : module->getModuleInst()->getChildren())

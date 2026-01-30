@@ -24,6 +24,7 @@ namespace myintrinsiclib
                     OpExtInst $$T result glsl450 27 $x
             };
             case wgsl: __intrinsic_asm "exp";
+            case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
         }
     }
 
@@ -52,6 +53,7 @@ namespace myintrinsiclib
                     OpExtInst $$T result glsl450 13 $x
             };
             case wgsl: __intrinsic_asm "sin($0)";
+            case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
         }
     }
 
@@ -79,6 +81,7 @@ namespace myintrinsiclib
                 OpExtInst $$T result glsl450 14 $x
             };
             case wgsl: __intrinsic_asm "cos($0)";
+            case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
         }
     }
 

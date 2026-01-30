@@ -338,7 +338,7 @@ struct FunctionParameterSpecializationContext
     struct FuncSpecializationInfo
     {
         List<IRParam*> newParams;
-        List<IRInst*> newBodyInsts;
+        IRBlock* newBodyInsts;
         List<IRInst*> replacementsForOldParameters;
     };
 
@@ -686,6 +686,11 @@ struct FunctionParameterSpecializationContext
     //
     void gatherFuncInfo(IRCall* oldCall, IRFunc* oldFunc, FuncSpecializationInfo& funcInfo)
     {
+        // Create a new block to hold the specialized instructions so that they
+        // have a valid parent.
+        auto builder = getBuilder();
+        funcInfo.newBodyInsts = builder->createBlock();
+
         UInt oldArgCounter = 0;
         for (auto oldParam : oldFunc->getParams())
         {
@@ -886,30 +891,10 @@ struct FunctionParameterSpecializationContext
             // instructions if an insertion location
             // is set.
             //
-            // TODO(tfoley): We should really question any cases where
-            // we are creating IR instructions but not inserting them into the
-            // hierarchy of the IR module anywhere. Ideally we would have an
-            // invariant that all IR instructions are always parented somewhere
-            // under their IR module, except during very brief interludes.
-            //
-            // A good fix here would be for a pass like this to create a transient
-            // IR block to serve as a "nursery" for the newly-created instructions,
-            // instead of using `newBodyInsts` to hold them. The new IR block could
-            // be placed directly under the IR module during the construction phase
-            // of things, and then inserted to a more permanent location later.
-            //
-            builder->setInsertLoc(IRInsertLoc());
+            builder->setInsertInto(ioInfo.newBodyInsts);
             IRInst* newOperands[] = {newBase, newIndex};
             auto newVal =
                 builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
-
-            // Because our new instruction wasn't
-            // actually inserted anywhere, we need to
-            // add it to our gathered list of instructions
-            // that should be inserted into the body of
-            // the specialized callee.
-            //
-            ioInfo.newBodyInsts.add(newVal);
 
             return newVal;
         }
@@ -928,12 +913,10 @@ struct FunctionParameterSpecializationContext
 
             auto builder = getBuilder();
 
-            builder->setInsertLoc(IRInsertLoc());
+            builder->setInsertInto(ioInfo.newBodyInsts);
             IRInst* newOperands[] = {newBase, structKey};
             auto newVal =
                 builder->emitIntrinsicInst(oldArg->getFullType(), oldArg->getOp(), 2, newOperands);
-
-            ioInfo.newBodyInsts.add(newVal);
 
             return newVal;
         }
@@ -943,9 +926,8 @@ struct FunctionParameterSpecializationContext
             auto newPtr = getSpecializedValueForArg(ioInfo, oldPtr);
 
             auto builder = getBuilder();
-            builder->setInsertLoc(IRInsertLoc());
+            builder->setInsertInto(ioInfo.newBodyInsts);
             auto newVal = builder->emitLoad(oldArg->getFullType(), newPtr);
-            ioInfo.newBodyInsts.add(newVal);
 
             return newVal;
         }
@@ -958,14 +940,13 @@ struct FunctionParameterSpecializationContext
             auto newHandle = builder->createParam(oldHandle->getFullType());
             ioInfo.newParams.add(newHandle);
 
-            builder->setInsertLoc(IRInsertLoc());
+            builder->setInsertInto(ioInfo.newBodyInsts);
             IRInst* newOperands[] = {newHandle};
             auto newVal = builder->emitIntrinsicInst(
                 oldArg->getFullType(),
                 kIROp_CastDescriptorHandleToResource,
                 1,
                 newOperands);
-            ioInfo.newBodyInsts.add(newVal);
             return newVal;
         }
         else
@@ -1030,6 +1011,7 @@ struct FunctionParameterSpecializationContext
             oldFunc->getResultType());
 
         IRFunc* newFunc = builder->createFunc();
+        funcInfo.newBodyInsts->insertAtStart(newFunc);
         newFunc->setFullType(funcType);
 
         // The above step has accomplished the "first phase"
@@ -1107,10 +1089,14 @@ struct FunctionParameterSpecializationContext
         {
             newParam->insertBefore(newFirstOrdinary);
         }
-        for (auto newBodyInst : funcInfo.newBodyInsts)
+        for (auto newBodyInst = funcInfo.newBodyInsts->getFirstChild(); newBodyInst;)
         {
+            auto next = newBodyInst->next;
             newBodyInst->insertBefore(newFirstOrdinary);
+            newBodyInst = next;
         }
+
+        funcInfo.newBodyInsts->removeAndDeallocate();
 
         // We need to handle a corner case where the new argument of
         // the callee of this specialized function could be a use of

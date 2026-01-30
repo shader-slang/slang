@@ -19,6 +19,9 @@ uniform RaytracingAccelerationStructure scene;
 // HitObject intrinsics - uses generic templated call, not individual _N functions
 //CHECK-DAG: optixHitObjectGetAttribute<CustomAttributes_0>
 //CHECK-DAG: slangOptixHitObjectIsMiss
+//CHECK-DAG: optixHitObjectGetHitKind()
+//CHECK-DAG: optixGetObjectRayOrigin()
+//CHECK-DAG: optixGetObjectRayDirection()
 
 // Control flow intrinsics
 //CHECK-DAG: optixTerminateRay
@@ -26,13 +29,19 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK-DAG: optixMakeHitObject
 //CHECK-DAG: optixIgnoreIntersection
 
+// Transform matrix intrinsics
+//CHECK-DAG: slangOptixGetObjectToWorldTransformMatrix
+//CHECK-DAG: slangOptixGetWorldToObjectTransformMatrix
+//CHECK-DAG: slangOptixGetObjectToWorldTransformMatrix4x3
+//CHECK-DAG: slangOptixGetWorldToObjectTransformMatrix4x3
+
 // Traditional SBT data access
 //CHECK-DAG: optixGetSbtDataPointer
 
 // PTX intrinsics validation - using actual PTX names (order independent)
 //CHECK_PTX-DAG: _optix_get_hit_kind
 //CHECK_PTX-DAG: _optix_read_instance_idx
-//CHECK_PTX-DAG: _optix_read_instance_id  
+//CHECK_PTX-DAG: _optix_read_instance_id
 //CHECK_PTX-DAG: _optix_get_object_ray_direction_x
 //CHECK_PTX-DAG: _optix_get_object_ray_origin_x
 //CHECK_PTX-DAG: _optix_read_primitive_idx
@@ -45,6 +54,7 @@ uniform RaytracingAccelerationStructure scene;
 //CHECK_PTX-DAG: _optix_hitobject_get_traverse_data
 //CHECK_PTX-DAG: _optix_hitobject_make_with_traverse_data
 //CHECK_PTX-DAG: _optix_get_sbt_data_ptr_64
+//CHECK_PTX-DAG: _optix_hitobject_get_hitkind
 
 struct CustomAttributes
 {
@@ -71,7 +81,13 @@ struct IntrinsicData
     float3 worldRayOrigin;
     float rayTmin;
     uint rayFlags;
-    
+
+    // Transform matrices
+    float3x4 objectToWorld3x4;
+    float3x4 worldToObject3x4;
+    float4x3 objectToWorld4x3;
+    float4x3 worldToObject4x3;
+
     // HitObject attributes
     float hitObjAttr0;
     uint hitObjAttr1;
@@ -81,7 +97,7 @@ struct IntrinsicData
     uint hitObjAttr5;
     float hitObjAttr6;
     uint hitObjAttr7;
-    
+
     // HitObject state
     bool isMiss;
 };
@@ -110,7 +126,7 @@ struct AnyHitPayload
 [shader("closesthit")]
 void closestHitShader(
     uniform TraditionalSbtData sbtData,  // This triggers traditional optixGetSbtDataPointer
-    inout RayPayload payload, 
+    inout RayPayload payload,
     in CustomAttributes attr)
 {
     // Test basic ray query intrinsics using correct HLSL names
@@ -118,12 +134,19 @@ void closestHitShader(
     payload.data.instanceIndex = InstanceIndex();
     payload.data.instanceID = InstanceID();
     payload.data.primitiveIndex = PrimitiveIndex();
-    payload.data.objectRayDirection = ObjectRayDirection();
-    payload.data.objectRayOrigin = ObjectRayOrigin();
+    // Note: ObjectRayDirection/ObjectRayOrigin are NOT available in closesthit on CUDA/OptiX
+    // They are only available in anyhit and intersection shaders per OptiX documentation.
+    // See issue #9258 for details.
     payload.data.worldRayDirection = WorldRayDirection();
     payload.data.worldRayOrigin = WorldRayOrigin();
     payload.data.rayTmin = RayTMin();
     payload.data.rayFlags = RayFlags();
+
+    // Test transform matrix intrinsics (now support CUDA via OptiX)
+    payload.data.objectToWorld3x4 = ObjectToWorld3x4();
+    payload.data.worldToObject3x4 = WorldToObject3x4();
+    payload.data.objectToWorld4x3 = ObjectToWorld4x3();
+    payload.data.worldToObject4x3 = WorldToObject4x3();
     
     // Test HitObject operations (using a NOP HitObject for simplicity)
     HitObject hitObj = HitObject::MakeNop();
@@ -160,17 +183,21 @@ void anyHitShader(inout AnyHitPayload payload, in CustomAttributes attr)
     uint hitKind = HitKind();
     uint instanceID = InstanceID();
     float rayT = RayTCurrent();
-    
+
+    // Test ObjectRayOrigin/ObjectRayDirection - only available in anyhit and intersection on CUDA/OptiX
+    float3 objOrigin = ObjectRayOrigin();
+    float3 objDir = ObjectRayDirection();
+
     // Count hits for testing
     payload.hitCount++;
-    
+
     // Test termination based on some criteria
-    if (payload.terminateRequested || payload.hitCount > 3)
+    if (payload.terminateRequested || payload.hitCount > 3 || objOrigin.x > 100.0f)
     {
         // Test optixTerminateRay - only available in anyhit shaders
         AcceptHitAndEndSearch();  // This maps to optixTerminateRay for CUDA
     }
-    else
+    else if (objDir.z < 0)
     {
         // Test ignoring hit to continue traversal
         IgnoreHit();
@@ -244,5 +271,15 @@ void rayGenShader()
         CustomAttributes retrievedAttrs = customHit.GetAttributes<CustomAttributes>();
         payload.data.hitObjAttr0 = retrievedAttrs.attr0;
         payload.data.hitObjAttr1 = retrievedAttrs.attr1;
+
+        // Test HitObject.GetHitKind() - should generate optixHitObjectGetHitKind()
+        uint hitObjKind = customHit.GetHitKind();
+        payload.data.hitKind = hitObjKind;
+
+        // Test HitObject.GetObjectRayOrigin() and GetObjectRayDirection()
+        float3 objOrigin = customHit.GetObjectRayOrigin();
+        float3 objDirection = customHit.GetObjectRayDirection();
+        payload.data.objectRayOrigin = objOrigin;
+        payload.data.objectRayDirection = objDirection;
     }
 }

@@ -16,11 +16,12 @@ class DiagnosticSink;
 //   type, then the scalar is converted to a composite type.
 // - If 'inst' is not a shift, and if operands are integers of mixed signedness, then the
 //   signed operand is converted to unsigned.
-void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target);
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetProgram);
 
 // The logical binary operators such as AND and OR takes boolean types are its input.
 // If they are in integer type, as an example, we need to explicitly cast to bool type.
 // Also the return type from the logical operators should be a boolean type.
-void legalizeLogicalAndOr(IRInst* inst);
+void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram);
+void legalizeLogicalAndOr(IRModule* module, TargetProgram* targetProgram);
 
 } // namespace Slang

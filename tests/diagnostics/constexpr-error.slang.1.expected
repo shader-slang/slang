@@ -1,0 +1,30 @@
+result code = -1
+standard error = {
+error[E40012]: expected a compile-time constant
+  --> tests/diagnostics/constexpr-error.slang:32:31
+   |
+32 | result += t.Sample(s, uv, offset);
+   |                           ^^^^^^
+error[E40012]: expected a compile-time constant
+  --> tests/diagnostics/constexpr-error.slang:41:35
+   |
+41 | result += t.Sample(s, uv, int2(ii));
+   |                               ^
+error[E40012]: expected a compile-time constant
+  --> tests/diagnostics/constexpr-error.slang:46:22
+   |
+46 | for(uint jj = 0; jj < uv.y; jj++)
+   |                  ^^
+error[E40012]: expected a compile-time constant
+  --> tests/diagnostics/constexpr-error.slang:48:36
+   |
+48 | result += t.Sample(s, uv, int2(jj));
+   |                               ^
+error[E40012]: expected a compile-time constant
+  --> tests/diagnostics/constexpr-error.slang:46:35
+   |
+46 | for(uint jj = 0; jj < uv.y; jj++)
+   |                               ^^
+}
+standard output = {
+}

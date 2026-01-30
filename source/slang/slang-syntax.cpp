@@ -940,36 +940,16 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
     auto errorType = getErrorCodeType(astBuilder, declRef);
     auto visitParamDecl = [&](DeclRef<ParamDecl> paramDeclRef)
     {
-        auto paramDecl = paramDeclRef.getDecl();
-        auto paramType = getParamType(astBuilder, paramDeclRef);
-        if (!paramType)
+        auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+        if (!paramValueType)
         {
-            paramType = astBuilder->getErrorType();
+            paramValueType = astBuilder->getErrorType();
         }
 
-        // TODO(tfoley): This code should first compute the appropriate
-        // parameter-passing mode ("direction") for the `paramDecl` and
-        // then use that mode to decide which wrapper type to use.
-        //
-        if (paramDecl->findModifier<RefModifier>())
-        {
-            paramType = astBuilder->getRefParamType(paramType);
-        }
-        else if (paramDecl->findModifier<BorrowModifier>())
-        {
-            paramType = astBuilder->getConstRefParamType(paramType);
-        }
-        else if (paramDecl->findModifier<OutModifier>())
-        {
-            if (paramDecl->findModifier<InOutModifier>() || paramDecl->findModifier<InModifier>())
-            {
-                paramType = astBuilder->getBorrowInOutParamType(paramType);
-            }
-            else
-            {
-                paramType = astBuilder->getOutParamType(paramType);
-            }
-        }
+        auto paramDecl = paramDeclRef.getDecl();
+        auto paramMode = getParamPassingMode(paramDecl);
+        auto paramType = getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+
         paramTypes.add(paramType);
     };
     auto parent = declRef.getParent();
@@ -985,8 +965,7 @@ FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declR
         visitParamDecl(paramDeclRef);
     }
 
-    FuncType* funcType =
-        astBuilder->getOrCreate<FuncType>(paramTypes.getArrayView(), resultType, errorType);
+    FuncType* funcType = astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
     return funcType;
 }
 

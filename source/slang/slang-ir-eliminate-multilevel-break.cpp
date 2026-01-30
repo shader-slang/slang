@@ -20,6 +20,7 @@ bool isUnreachableRootBlock(IRBlock* block)
 struct EliminateMultiLevelBreakContext
 {
     IRModule* irModule;
+    TargetProgram* targetProgram;
 
     struct BreakableRegionInfo : RefObject
     {
@@ -32,6 +33,9 @@ struct EliminateMultiLevelBreakContext
 
         // Track exit blocks for this region (break block and continue block for loops)
         List<IRBlock*> exitBlocks;
+
+        // For loops, store the continue block separately
+        IRBlock* continueBlock = nullptr;
 
         IRBlock* getBreakBlock()
         {
@@ -64,11 +68,11 @@ struct EliminateMultiLevelBreakContext
             exitBlocks.clear();
             exitBlocks.add(getBreakBlock());
 
-            // If this is a loop, add any non-trivial continue block to the exit blocks
-            if (auto loop = as<IRLoop>(headerInst))
-                if (auto continueBlock = getContinueBlock())
-                    if (continueBlock != loop->getTargetBlock())
-                        exitBlocks.add(continueBlock);
+            // If this is a loop, store the continue block.
+            // We add it to the exitBlocks stack separately in collectBreakableRegionBlocks
+            // so that nested constructs treat it as an exit point.
+            if (as<IRLoop>(headerInst))
+                continueBlock = getContinueBlock();
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -129,6 +133,11 @@ struct EliminateMultiLevelBreakContext
                 if (info.blockSet.add(successor))
                     info.blocks.add(successor);
             }
+
+            // Add continueBlock to the exitBlocks stack so nested constructs
+            // (e.g., switch with continue) treat it as an exit point.
+            if (info.continueBlock)
+                exitBlocks.add(info.continueBlock);
 
             for (Index i = 0; i < info.blocks.getCount(); i++)
             {
@@ -591,14 +600,15 @@ struct EliminateMultiLevelBreakContext
             }
         }
 
-        legalizeDefUse(func);
+        legalizeDefUse(func, targetProgram);
     }
 };
 
-void eliminateMultiLevelBreak(IRModule* irModule)
+void eliminateMultiLevelBreak(IRModule* irModule, TargetProgram* targetProgram)
 {
     EliminateMultiLevelBreakContext context;
     context.irModule = irModule;
+    context.targetProgram = targetProgram;
     for (auto globalInst : irModule->getGlobalInsts())
     {
         if (auto codeInst = as<IRGlobalValueWithCode>(globalInst))
@@ -608,10 +618,14 @@ void eliminateMultiLevelBreak(IRModule* irModule)
     }
 }
 
-void eliminateMultiLevelBreakForFunc(IRModule* irModule, IRGlobalValueWithCode* func)
+void eliminateMultiLevelBreakForFunc(
+    TargetProgram* targetProgram,
+    IRModule* irModule,
+    IRGlobalValueWithCode* func)
 {
     EliminateMultiLevelBreakContext context;
     context.irModule = irModule;
+    context.targetProgram = targetProgram;
     context.processFunc(func);
 }
 

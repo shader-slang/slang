@@ -209,6 +209,7 @@ struct TestResourceContext
     List<ComPtr<IResource>> resources;
 };
 
+
 class RenderTestApp
 {
 public:
@@ -820,7 +821,7 @@ struct AssignValsFromLayoutContext
                 dstCursor,
                 (ShaderInputLayout::AccelerationStructureVal*)srcVal.Ptr());
         default:
-            assert(!"Unhandled type");
+            SLANG_ASSERT(!"Unhandled type");
             return SLANG_FAIL;
         }
     }
@@ -897,7 +898,7 @@ SlangResult RenderTestApp::initialize(
         switch (m_options.shaderType)
         {
         default:
-            assert(!"unexpected test shader type");
+            SLANG_ASSERT(!"unexpected test shader type");
             return SLANG_FAIL;
 
         case Options::ShaderProgramType::Compute:
@@ -912,16 +913,17 @@ SlangResult RenderTestApp::initialize(
         case Options::ShaderProgramType::Graphics:
         case Options::ShaderProgramType::GraphicsCompute:
             {
-                // TODO: We should conceivably be able to match up the "available" vertex
-                // attributes, as defined by the vertex stream(s) on the model being
-                // renderer, with the "required" vertex attributes as defiend on the
-                // shader.
+                // We define a fixed set of "available" vertex attributes for the single
+                // triangle used by all graphics tests.
                 //
-                // For now we just create a fixed input layout for all graphics tests
-                // since at present they all draw the same single triangle with a
-                // fixed/known set of attributes.
+                // We filter this list to only include attributes actually used by the
+                // vertex shader to avoid validation warnings.
                 //
-                const InputElementDesc inputElements[] = {
+                // TODO: In the future we should be more flexible and support matching
+                // available attributes from arbitrary models/streams with the shader's
+                // requirements.
+                //
+                const InputElementDesc allInputElements[] = {
                     {"A", 0, Format::RGB32Float, offsetof(Vertex, position)},
                     {"A", 1, Format::RGB32Float, offsetof(Vertex, color)},
                     {"A", 2, Format::RG32Float, offsetof(Vertex, uv)},
@@ -931,11 +933,24 @@ SlangResult RenderTestApp::initialize(
                     {"A", 6, Format::RGBA32Float, offsetof(Vertex, customData3)},
                 };
 
+                List<InputElementDesc> inputElements;
+                if (slang::IComponentType* slangProgram = m_compilationOutput.output.slangProgram)
+                {
+                    inputElements = filterInputElements(
+                        allInputElements,
+                        SLANG_COUNT_OF(allInputElements),
+                        slangProgram->getLayout());
+                }
+                else
+                {
+                    inputElements.addRange(allInputElements, SLANG_COUNT_OF(allInputElements));
+                }
+
                 ComPtr<IInputLayout> inputLayout;
                 SLANG_RETURN_ON_FAIL(device->createInputLayout(
                     sizeof(Vertex),
-                    inputElements,
-                    SLANG_COUNT_OF(inputElements),
+                    inputElements.getBuffer(),
+                    inputElements.getCount(),
                     inputLayout.writeRef()));
 
                 BufferDesc vertexBufferDesc;
@@ -1262,11 +1277,24 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
             if (!blob)
             {
+                printf("Missing output blob\n");
                 return SLANG_FAIL;
             }
+
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            if (m_options.outputUsingType)
+            {
+                // TODO: always output using type
+                typeLayout = outputItem.typeLayout;
+                if (typeLayout == nullptr)
+                {
+                    printf("Output using type layout requested but type layout was null\n");
+                    return SLANG_FAIL;
+                }
+            }
+
             const SlangResult res = ShaderInputLayout::writeBinding(
-                m_options.outputUsingType ? outputItem.typeLayout
-                                          : nullptr, // TODO: always output using type
+                typeLayout,
                 blob->getBufferPointer(),
                 bufferSize,
                 &writer);
@@ -1390,7 +1418,7 @@ Result RenderTestApp::update()
                 auto i = binding.entryIndex;
                 const auto& layoutBinding = m_shaderInputLayout.entries[i];
 
-                assert(layoutBinding.isOutput);
+                SLANG_ASSERT(layoutBinding.isOutput);
                 
                 if (binding.resource && binding.resource->isBuffer())
                 {
@@ -1494,7 +1522,7 @@ static void initializeRenderDoc()
         pRENDERDOC_GetAPI RENDERDOC_GetAPI =
             (pRENDERDOC_GetAPI)GetProcAddress(mod, "RENDERDOC_GetAPI");
         int ret = RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_1_2, (void**)&rdoc_api);
-        assert(ret == 1);
+        SLANG_ASSERT(ret == 1);
     }
 }
 static void renderDocBeginFrame()
@@ -1583,8 +1611,16 @@ static SlangResult _innerMain(
     case DeviceType::CPU:
         input.target = SLANG_SHADER_HOST_CALLABLE;
         input.profile = "";
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
-        slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        if (options.useLLVMDirectly)
+        {
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+            slangPassThrough = SLANG_PASS_THROUGH_NONE;
+        }
+        else
+        {
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+            slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        }
         break;
     case DeviceType::CUDA:
         input.target = SLANG_PTX;
@@ -1650,15 +1686,19 @@ static SlangResult _innerMain(
                 if (SLANG_FAILED(
                         spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_NVRTC)))
                     return SLANG_FAIL;
+                break;
 #else
                 return SLANG_FAIL;
 #endif
             }
         case DeviceType::CPU:
+            if (!options.useLLVMDirectly)
             {
                 // As long as we have CPU, then this should work
                 return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
             }
+            else
+                return SLANG_OK;
         default:
             break;
         }

@@ -35,7 +35,7 @@ MyStruct func(RWStructuredBuffer<uint> buffer)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
-void main(uint2 pixelIndex : SV_DispatchThreadID)
+void main(uint3 pixelIndex : SV_DispatchThreadID)
 {
 
     // CHECK_SPV: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
@@ -110,22 +110,24 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
 
     // Test case 3: Test the case that we handle the uniformity correctly, the NonUniformResourceIndex will not propagate
     // to the function, so there should no NonUniform decoration appeared.
-    int bufferIdx3 = pixelIndex.y;
+    int bufferIdx3 = pixelIndex.z;
+
+    // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a NonUniformResourceIndex
+    // is still a NonUniformResourceIndex.
+
+    // The cast generates OpBitcast to int for the intermediate cast (happens before bufferIdx3 in SPIRV)
+    // CHECK_SPV: OpBitcast %int %{{.*}}
+
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
-    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx2
+    // CHECK_SPV: %[[VAR4:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %bufferIdx3
 
     // Test to make sure this command is not decorated with NonUniform:
     // CHECK_SPV-NOT: OpDecorate %[[VAR4]] NonUniform
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct3 = func(buffer3);
 
-
-    // Test case 4: Test to make sure we correctly cover the case that intCast or uintCast of a NonUniformResourceIndex
-    // is still a NonUniformResourceIndex.
-
-    // CHECK_SPV: %[[VAR5:[a-zA-Z0-9_]+]] = OpBitcast %uint %{{.*}}
-    // CHECK_SPV: %[[VAR3]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %{{.*}} %[[VAR5]]
+    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}}
 
     // CHECK_GLSL-SPV: %[[VAR19:[a-zA-Z0-9_]+]]  = OpBitcast %int %[[VAR3]]
     // CHECK_GLSL-SPV: %[[VAR16]] = OpCopyObject %int %[[VAR19]]

@@ -560,31 +560,31 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "int";
         break;
     case kIROp_Int8Type:
-        sb << "int8";
+        sb << "int8_t";
         break;
     case kIROp_Int16Type:
-        sb << "int16";
+        sb << "int16_t";
         break;
     case kIROp_Int64Type:
-        sb << "int64";
+        sb << "int64_t";
         break;
     case kIROp_IntPtrType:
-        sb << "intptr";
+        sb << "intptr_t";
         break;
     case kIROp_UIntType:
         sb << "uint";
         break;
     case kIROp_UInt8Type:
-        sb << "uint8";
+        sb << "uint8_t";
         break;
     case kIROp_UInt16Type:
-        sb << "uint16";
+        sb << "uint16_t";
         break;
     case kIROp_UInt64Type:
-        sb << "uint64";
+        sb << "uint64_t";
         break;
     case kIROp_UIntPtrType:
-        sb << "uintptr";
+        sb << "uintptr_t";
         break;
     case kIROp_CharType:
         sb << "char";
@@ -725,7 +725,7 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         sb << "AtomicCounter";
         break;
     case kIROp_RaytracingAccelerationStructureType:
-        sb << "RayTracingAccelerationStructure";
+        sb << "RaytracingAccelerationStructure";
         break;
     case kIROp_HitObjectType:
         sb << "HitObject";
@@ -1330,7 +1330,7 @@ IRInst* emitLoopBlocks(
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func)
 {
-    auto order = getReversePostorder(func);
+    auto order = getReverseMirroredPostorder(func);
     for (auto block : order)
         block->insertAtEnd(func);
 }
@@ -2200,23 +2200,23 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
     case kIROp_IntType:
         return UnownedStringSlice::fromLiteral("int");
     case kIROp_Int8Type:
-        return UnownedStringSlice::fromLiteral("int8");
+        return UnownedStringSlice::fromLiteral("int8_t");
     case kIROp_Int16Type:
-        return UnownedStringSlice::fromLiteral("int16");
+        return UnownedStringSlice::fromLiteral("int16_t");
     case kIROp_Int64Type:
-        return UnownedStringSlice::fromLiteral("int64");
+        return UnownedStringSlice::fromLiteral("int64_t");
     case kIROp_IntPtrType:
-        return UnownedStringSlice::fromLiteral("intptr");
+        return UnownedStringSlice::fromLiteral("intptr_t");
     case kIROp_UIntType:
         return UnownedStringSlice::fromLiteral("uint");
     case kIROp_UInt8Type:
-        return UnownedStringSlice::fromLiteral("uint8");
+        return UnownedStringSlice::fromLiteral("uint8_t");
     case kIROp_UInt16Type:
-        return UnownedStringSlice::fromLiteral("uint16");
+        return UnownedStringSlice::fromLiteral("uint16_t");
     case kIROp_UInt64Type:
-        return UnownedStringSlice::fromLiteral("uint64");
+        return UnownedStringSlice::fromLiteral("uint64_t");
     case kIROp_UIntPtrType:
-        return UnownedStringSlice::fromLiteral("uintptr");
+        return UnownedStringSlice::fromLiteral("uintptr_t");
     case kIROp_FloatType:
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
@@ -2493,8 +2493,89 @@ IRBlock* getLoopHeaderForConditionBlock(IRBlock* block)
     return nullptr;
 }
 
-void legalizeDefUse(IRGlobalValueWithCode* func)
+// Return true if `inst` is defined at the start of `block`.
+// That is, either `inst` is defined in a block that dominates `block`,
+// or `inst` is defined in a parent of `block`.
+bool isInstAvailableAtBlock(IRDominatorTree& dom, IRInst* inst, IRBlock* block)
 {
+    auto defBlock = as<IRBlock>(inst->getParent());
+    if (!defBlock)
+        return true;
+    if (dom.dominates(defBlock, block))
+        return true;
+    // If inst is a parent of block, it is available.
+    for (IRInst* curr = block; curr; curr = curr->getParent())
+    {
+        if (curr == defBlock)
+            return true;
+    }
+    return false;
+}
+
+
+bool doesTargetSupportUnrestrictedPointers(TargetRequest* req)
+{
+    return isCPUTarget(req) || isCUDATarget(req) || isCPUTargetViaLLVM(req);
+}
+
+bool canInstBeStored(IRInst* inst)
+{
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
+    // stored into variables or context structs as normal values.
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
+        !inst->getDataType())
+        return false;
+
+    return true;
+}
+
+// Should `inst` be duplicated at use sites instead of being
+// stored to a temporary variable?
+// Some targets such as spirv don't support forming variables of pointer types,
+// so in those cases we will duplicate pointer access chains at use sites.
+//
+bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastDynamicResource:
+        // These casts potentially produces non-storable types, so we will always duplicate them at
+        // use sites.
+        return true;
+    }
+
+    if (!canInstBeStored(inst))
+        return true;
+
+    // For targets that don't support forming variables of pointer types,
+    // we will duplicate pointer access chains at use sites.
+    if (isPtrLikeOrHandleType(inst->getDataType()))
+    {
+        if (doesTargetSupportUnrestrictedPointers(target->getTargetReq()))
+            return false;
+        if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+        {
+            // A user-pointer type can be stored to a variable.
+            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
+{
+    // After multi-level break lowering, we may create situations where an inst
+    // defined in an inner region is referenced from an outer region, which creates
+    // an invalid IR form where the def does not dominate its use. This function
+    // fixes up such situations by creating temporary variables in the common dominator block, and
+    // insert a store to the variable in the inner region, and replacing the uses with loads from
+    // the variable.
     auto dom = computeDominatorTree(func);
 
     // Make a map of loop condition blocks to their loop header.
@@ -2508,122 +2589,162 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
         if (auto header = getLoopHeaderForConditionBlock(block))
             loopHeaderBlockMap.add(block, header);
     }
-
-    for (auto block : func->getBlocks())
+    bool needRerun = true;
+    while (needRerun)
     {
-        for (auto inst : block->getModifiableChildren())
+        needRerun = false;
+        for (auto block : func->getBlocks())
         {
-            // Inspect all uses of `inst` and find the common dominator of all use sites.
-            IRBlock* commonDominator = block;
-            for (auto use = inst->firstUse; use; use = use->nextUse)
+            for (auto inst : block->getModifiableChildren())
             {
-                auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                if (!userBlock)
-                    continue;
-                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                // Inspect all uses of `inst` and find the common dominator of all use sites.
+                IRBlock* commonDominator = block;
+                for (auto use = inst->firstUse; use; use = use->nextUse)
                 {
-                    commonDominator = dom->getImmediateDominator(commonDominator);
-                }
-            }
-            SLANG_ASSERT(commonDominator);
-
-            // If commonDominator is 'block' and if the inst is not a Var in
-            // a loop condition block, we can skip the legalization.
-            //
-            if (commonDominator == block &&
-                !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
-                continue;
-
-            // Normally, if the common dominator is not `block`, we can simply move the
-            // definition to the common dominator. An exception is when the common dominator is
-            // the target block of a loop. Another exception is when a var in the loop condition
-            // block is accessed both inside and outside the loop. It is technically visible,
-            // but effects on the 'var' are not visible outside the loop, so we'll need to hoist
-            // it out of the loop.
-            //
-            // Note that after normalization, loops are in the form of:
-            // ```
-            // loop { if (condition) block; else break; }
-            // ```
-            // If we find ourselves needing to make the inst available right before
-            // the `if`, it means we are seeing uses of the inst outside the loop.
-            // In this case, we should insert a var/move the inst before the loop
-            // instead of before the `if`. This situation can occur in the IR if
-            // the original code is lowered from a `do-while` loop.
-            //
-            bool shouldInitializeVar = false;
-            if (loopHeaderBlockMap.containsKey(commonDominator))
-            {
-                bool shouldMoveToHeader = false;
-
-                // Check that the break-block dominates any of the uses are past the break
-                // block
-                for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
-                {
-                    if (dom->dominates(
-                            as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
-                                ->getBreakBlock(),
-                            _use->getUser()->getParent()))
+                    auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                    if (!userBlock)
+                        continue;
+                    while (commonDominator && !dom->dominates(commonDominator, userBlock))
                     {
-                        shouldMoveToHeader = true;
-                        break;
+                        commonDominator = dom->getImmediateDominator(commonDominator);
                     }
                 }
-                if (shouldMoveToHeader)
+                SLANG_ASSERT(commonDominator);
+
+                // If commonDominator is 'block' and if the inst is not a Var in
+                // a loop condition block, we can skip the legalization.
+                //
+                if (commonDominator == block &&
+                    !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
+                    continue;
+
+                // Normally, if the common dominator is not `block`, we can simply move the
+                // definition to the common dominator. An exception is when the common dominator is
+                // the target block of a loop. Another exception is when a var in the loop condition
+                // block is accessed both inside and outside the loop. It is technically visible,
+                // but effects on the 'var' are not visible outside the loop, so we'll need to hoist
+                // it out of the loop.
+                //
+                // Note that after normalization, loops are in the form of:
+                // ```
+                // loop { if (condition) block; else break; }
+                // ```
+                // If we find ourselves needing to make the inst available right before
+                // the `if`, it means we are seeing uses of the inst outside the loop.
+                // In this case, we should insert a var/move the inst before the loop
+                // instead of before the `if`. This situation can occur in the IR if
+                // the original code is lowered from a `do-while` loop.
+                //
+                bool shouldInitializeVar = false;
+                if (loopHeaderBlockMap.containsKey(commonDominator))
                 {
-                    commonDominator = loopHeaderBlockMap[commonDominator];
-                    shouldInitializeVar = true;
-                }
-            }
+                    bool shouldMoveToHeader = false;
 
-            // Now we can legalize uses based on the type of `inst`.
-            if (auto var = as<IRVar>(inst))
-            {
-                // If inst is an var, this is easy, we just move it to the
-                // common dominator.
-                if (var->getParent() != commonDominator)
-                    var->insertBefore(commonDominator->getTerminator());
-
-                if (shouldInitializeVar)
-                {
-                    IRBuilder builder(func);
-                    builder.setInsertAfter(var);
-                    builder.emitStore(
-                        var,
-                        builder.emitDefaultConstruct(
-                            as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-                }
-            }
-            else
-            {
-                // For all other insts, we need to create a local var for it,
-                // and replace all uses with a load from the local var.
-                IRBuilder builder(func);
-                builder.setInsertBefore(commonDominator->getTerminator());
-                IRVar* tempVar = builder.emitVar(inst->getFullType());
-                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
-                builder.emitStore(tempVar, defaultVal);
-
-                builder.setInsertAfter(inst);
-                builder.emitStore(tempVar, inst);
-
-                traverseUses(
-                    inst,
-                    [&](IRUse* use)
+                    // Check that the break-block dominates any of the uses are past the break
+                    // block
+                    for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
                     {
-                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (!userBlock)
-                            return;
-                        // Only fix the use of the current definition of `inst` does not
-                        // dominate it.
-                        if (!dom->dominates(block, userBlock))
+                        if (dom->dominates(
+                                as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
+                                    ->getBreakBlock(),
+                                _use->getUser()->getParent()))
                         {
-                            // Replace the use with a load of tempVar.
-                            builder.setInsertBefore(use->getUser());
-                            auto load = builder.emitLoad(tempVar);
-                            builder.replaceOperand(use, load);
+                            shouldMoveToHeader = true;
+                            break;
                         }
-                    });
+                    }
+                    if (shouldMoveToHeader)
+                    {
+                        commonDominator = loopHeaderBlockMap[commonDominator];
+                        shouldInitializeVar = true;
+                    }
+                }
+
+                // Now we can legalize uses based on the type of `inst`.
+                if (auto var = as<IRVar>(inst))
+                {
+                    // If inst is an var, this is easy, we just move it to the
+                    // common dominator.
+                    if (var->getParent() != commonDominator)
+                        var->insertBefore(commonDominator->getTerminator());
+
+                    if (shouldInitializeVar)
+                    {
+                        IRBuilder builder(func);
+                        builder.setInsertAfter(var);
+                        builder.emitStore(
+                            var,
+                            builder.emitDefaultConstruct(
+                                as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+                    }
+                }
+                else if (shouldDuplicateInstAtUseSite(inst, target))
+                {
+                    // If inst must be duplicated at use sites due to target restrictions,
+                    // we will make a copy of it at its use, and rerun the entire processing loop
+                    // to transitively duplicate referenced operands.
+                    traverseUses(
+                        inst,
+                        [&](IRUse* use)
+                        {
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (!userBlock)
+                                return;
+                            // Only fix the use of the current definition of `inst` does not
+                            // dominate it.
+                            if (!dom->dominates(block, userBlock))
+                            {
+                                IRBuilder builder(func);
+                                builder.setInsertBefore(use->getUser());
+                                IRCloneEnv env;
+                                auto clonedInst = Slang::cloneInst(&env, &builder, inst);
+                                builder.replaceOperand(use, clonedInst);
+
+                                // If any operands of the gep inst is not defined at the use site,
+                                // we need to rerun the legalization and make sure they are
+                                // also made available.
+                                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                                {
+                                    auto operand = inst->getOperand(i);
+                                    if (!isInstAvailableAtBlock(*dom, operand, userBlock))
+                                    {
+                                        needRerun = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                }
+                else
+                {
+                    // For all other insts, we need to create a local var for it,
+                    // and replace all uses with a load from the local var.
+                    IRBuilder builder(func);
+                    builder.setInsertBefore(commonDominator->getTerminator());
+                    IRVar* tempVar = builder.emitVar(inst->getFullType());
+                    auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                    builder.emitStore(tempVar, defaultVal);
+
+                    traverseUses(
+                        inst,
+                        [&](IRUse* use)
+                        {
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (!userBlock)
+                                return;
+                            // Only fix the use of the current definition of `inst` does not
+                            // dominate it.
+                            if (!dom->dominates(block, userBlock))
+                            {
+                                // Replace the use with a load of tempVar.
+                                builder.setInsertBefore(use->getUser());
+                                auto load = builder.emitLoad(tempVar);
+                                builder.replaceOperand(use, load);
+                            }
+                        });
+                    builder.setInsertAfter(inst);
+                    builder.emitStore(tempVar, inst);
+                }
             }
         }
     }
@@ -2812,8 +2933,13 @@ bool isIROpaqueType(IRType* type)
     switch (type->getOp())
     {
     case kIROp_TextureType:
+    case kIROp_GLSLImageType:
     case kIROp_SamplerStateType:
     case kIROp_SamplerComparisonStateType:
+    case kIROp_SubpassInputType:
+    case kIROp_RaytracingAccelerationStructureType:
+    case kIROp_RayQueryType:
+    case kIROp_HitObjectType:
         return true;
     default:
         return false;

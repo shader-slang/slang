@@ -75,7 +75,94 @@ struct ControlFlowRestructuringContext
 
     /// The region tree we are in the process of building.
     RegionTree* regionTree = nullptr;
+
+    /// Whether to preserve fall-through structure in switch statements.
+    /// When false, fall-through is not preserved (legacy behavior for HLSL/WGSL).
+    bool preserveFallThrough = true;
 };
+
+/// Check if a block or any of its reachable blocks (within a case)
+/// branches unconditionally to the target block.
+/// This is used to detect if a switch case falls through to the next case.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
+static bool caseBlocksFallThroughTo(
+    IRBlock* startBlock,
+    IRBlock* targetBlock,
+    IRBlock* breakLabel,
+    HashSet<IRBlock*>& visited)
+{
+    if (!startBlock || !targetBlock)
+        return false;
+
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
+
+    while (worklist.getCount() > 0)
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Don't follow branches to the break label
+        if (block == breakLabel)
+            continue;
+
+        // If we reached the target, there's fall-through
+        if (block == targetBlock)
+            return true;
+
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        switch (terminator->getOp())
+        {
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = as<IRUnconditionalBranch>(terminator);
+                auto target = branch->getTargetBlock();
+                if (target == targetBlock)
+                    return true;
+                if (target != breakLabel)
+                    worklist.add(target);
+            }
+            break;
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+            {
+                auto branch = as<IRConditionalBranch>(terminator);
+                worklist.add(branch->getTrueBlock());
+                worklist.add(branch->getFalseBlock());
+            }
+            break;
+        case kIROp_Loop:
+            {
+                // For loops, follow the break block (where control goes after the loop)
+                auto loop = as<IRLoop>(terminator);
+                worklist.add(loop->getBreakBlock());
+            }
+            break;
+        case kIROp_Switch:
+            {
+                // For nested switches, follow the break label (where control goes after)
+                auto nestedSwitch = as<IRSwitch>(terminator);
+                worklist.add(nestedSwitch->getBreakLabel());
+            }
+            break;
+        default:
+            // Return, throw, etc. - don't follow
+            break;
+        }
+    }
+
+    return false;
+}
 
 /// Convert a range of blocks in the IR CFG into a region.
 ///
@@ -468,77 +555,91 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                 switchBreakLabelStack.block = breakLabel;
                 switchBreakLabelStack.region = switchRegion;
 
-                // We need to track whether we've dealt with
-                // the `default` case already.
-                //
-                bool defaultLabelHandled = false;
+                // Track whether we've warned about fall-through being restructured
+                bool warnedAboutFallthrough = false;
 
-                // If the `default` case just branches to
-                // the join point, then we don't need to
-                // do anything with it.
+                // Build a source-ordered list of switch case blocks.
+                // This is necessary to correctly handle fall-through when default
+                // appears before explicit cases in source order (e.g., default -> case 0).
                 //
-                if (defaultLabel == breakLabel)
-                    defaultLabelHandled = true;
+                // We collect all unique case/default blocks with their associated values,
+                // then sort by their position in the function to get source order.
 
-                // We will now iterate over the different `case`s, and
-                // try to group them together to minimize the number of
-                // sub-regions we have to create.
-                //
-                UInt caseIndex = 0;
-                UInt caseCount = switchInst->getCaseCount();
-                while (caseIndex < caseCount)
+                struct SwitchCaseInfo
                 {
-                    // We are going to extract one case here,
-                    // but we might need to fold additional
-                    // cases into it, if they share the
-                    // same label.
-                    //
-                    // Note: this makes assumptions that the
-                    // IR code generator orders cases such
-                    // that: (1) cases with the same label
-                    // are consecutive, and (2) any case
-                    // that "falls through" to another must
-                    // come right before it in the list.
+                    IRBlock* label;
+                    List<IRInst*> values; // empty for default-only
+                    bool isDefault;
+                };
 
-                    auto caseVal = switchInst->getCaseValue(caseIndex);
-                    auto caseLabel = switchInst->getCaseLabel(caseIndex);
-                    caseIndex++;
+                // Build a map from block to position in function (source order)
+                Dictionary<IRBlock*, Index> blockOrder;
+                {
+                    Index orderIdx = 0;
+                    auto func = cast<IRGlobalValueWithCode>(block->getParent());
+                    for (auto b = func->getFirstBlock(); b; b = b->getNextBlock())
+                    {
+                        blockOrder[b] = orderIdx++;
+                    }
+                }
+
+                // Collect all unique case blocks with their values
+                Dictionary<IRBlock*, Index> blockToInfoIndex;
+                List<SwitchCaseInfo> caseInfos;
+
+                UInt caseCount = switchInst->getCaseCount();
+                for (UInt i = 0; i < caseCount; i++)
+                {
+                    auto label = switchInst->getCaseLabel(i);
+                    auto value = switchInst->getCaseValue(i);
+
+                    Index infoIdx;
+                    if (blockToInfoIndex.tryGetValue(label, infoIdx))
+                    {
+                        // Multiple case values share the same label
+                        caseInfos[infoIdx].values.add(value);
+                    }
+                    else
+                    {
+                        SwitchCaseInfo info;
+                        info.label = label;
+                        info.values.add(value);
+                        info.isDefault = (label == defaultLabel);
+                        caseInfos.add(info);
+                        blockToInfoIndex[label] = caseInfos.getCount() - 1;
+                    }
+                }
+
+                // If default wasn't already added (not sharing label with a case)
+                // and default actually has a body (doesn't just branch to break)
+                if (defaultLabel != breakLabel && !blockToInfoIndex.containsKey(defaultLabel))
+                {
+                    SwitchCaseInfo info;
+                    info.label = defaultLabel;
+                    info.isDefault = true;
+                    caseInfos.add(info);
+                }
+
+                // Sort by block position in function (source order)
+                caseInfos.sort([&](const SwitchCaseInfo& a, const SwitchCaseInfo& b)
+                               { return blockOrder[a.label] < blockOrder[b.label]; });
+
+                // Now iterate through cases in source order
+                for (Index caseIdx = 0; caseIdx < caseInfos.getCount(); caseIdx++)
+                {
+                    auto& info = caseInfos[caseIdx];
 
                     RefPtr<SwitchRegion::Case> currentCase = new SwitchRegion::Case();
                     switchRegion->cases.add(currentCase);
 
-                    // Add the case value for this case, and any
-                    // others that share the same label
-                    //
-                    for (;;)
-                    {
-                        currentCase->values.add(caseVal);
+                    // Add case values
+                    for (auto val : info.values)
+                        currentCase->values.add(val);
 
-                        // Are there any more `case`s left?
-                        //
-                        if (caseIndex >= caseCount)
-                            break;
-
-                        // Does the next `case` share the same target label?
-                        auto nextCaseLabel = switchInst->getCaseLabel(caseIndex);
-                        if (nextCaseLabel != caseLabel)
-                            break;
-
-                        // If those checks passed, then we will fold
-                        // the next `case` into the same region, and
-                        // keep looking.
-                        caseVal = switchInst->getCaseValue(caseIndex);
-                        caseIndex++;
-                    }
-
-                    // The label for the current `case` might also
-                    // be the label used by the `default` case, so
-                    // check for that here.
-                    //
-                    if (caseLabel == defaultLabel)
+                    // Track if this is the default
+                    if (info.isDefault)
                     {
                         switchRegion->defaultCase = currentCase;
-                        defaultLabelHandled = true;
                     }
 
                     // Now we need to generate a region for the instructions
@@ -553,12 +654,40 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     // this `case` will fall through to the next, and
                     // so we need to prepare for that possibility here.
                     //
-                    // If there *is* a next `case`, then we will set its
-                    // label up as the "end" label when emitting
-                    // the statements inside the block.
-                    if (caseIndex < caseCount)
+                    // If there *is* a next case/default in source order, then we will
+                    // set its label up as the "end" label when emitting the statements
+                    // inside the block.
+                    //
+                    // However, if the target doesn't support fall-through (e.g., HLSL/WGSL),
+                    // we should NOT set the end label to the next case, so that each case
+                    // body will be treated as terminating independently.
+                    IRBlock* potentialFallThroughTarget = nullptr;
+                    if (caseIdx + 1 < caseInfos.getCount())
                     {
-                        caseEndLabel = switchInst->getCaseLabel(caseIndex);
+                        potentialFallThroughTarget = caseInfos[caseIdx + 1].label;
+                    }
+
+                    if (ctx->preserveFallThrough && potentialFallThroughTarget)
+                    {
+                        caseEndLabel = potentialFallThroughTarget;
+                    }
+                    else if (
+                        !ctx->preserveFallThrough && potentialFallThroughTarget &&
+                        !warnedAboutFallthrough && ctx->getSink())
+                    {
+                        // Check if this case actually falls through
+                        HashSet<IRBlock*> visited;
+                        if (caseBlocksFallThroughTo(
+                                info.label,
+                                potentialFallThroughTarget,
+                                breakLabel,
+                                visited))
+                        {
+                            ctx->getSink()->diagnose(
+                                switchInst,
+                                Diagnostics::switchFallthroughRestructured);
+                            warnedAboutFallthrough = true;
+                        }
                     }
 
                     // Now we can actually generate the region.
@@ -566,31 +695,9 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                     currentCase->body = generateRegionsForIRBlocks(
                         ctx,
                         switchRegion,
-                        caseLabel,
+                        info.label,
                         caseEndLabel,
                         &switchBreakLabelStack);
-                }
-
-                // If we've gone through all the cases and haven't
-                // managed to encounter the `default:` label,
-                // then assume it is a distinct case and handle it here.
-                if (!defaultLabelHandled)
-                {
-                    RefPtr<SwitchRegion::Case> defaultCase = new SwitchRegion::Case();
-                    switchRegion->cases.add(defaultCase);
-
-                    // Note: we use `null` instead of `breakLabel` as the end block
-                    // here, to ensure that the `default` region will end with an
-                    // explicit `break` rather than just falling off the end.
-
-                    defaultCase->body = generateRegionsForIRBlocks(
-                        ctx,
-                        switchRegion,
-                        defaultLabel,
-                        nullptr,
-                        &switchBreakLabelStack);
-
-                    switchRegion->defaultCase = defaultCase;
                 }
 
                 *resultLink = switchRegion;
@@ -631,7 +738,10 @@ static RefPtr<Region> generateRegionsForIRBlocks(
     return resultRegion;
 }
 
-RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, DiagnosticSink* sink)
+RefPtr<RegionTree> generateRegionTreeForFunc(
+    IRGlobalValueWithCode* code,
+    DiagnosticSink* sink,
+    bool preserveFallThrough)
 {
     RefPtr<RegionTree> regionTree = new RegionTree();
     regionTree->irCode = code;
@@ -639,6 +749,7 @@ RefPtr<RegionTree> generateRegionTreeForFunc(IRGlobalValueWithCode* code, Diagno
     ControlFlowRestructuringContext restructuringContext;
     restructuringContext.sink = sink;
     restructuringContext.regionTree = regionTree;
+    restructuringContext.preserveFallThrough = preserveFallThrough;
 
     regionTree->rootRegion = generateRegionsForIRBlocks(
         &restructuringContext,

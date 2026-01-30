@@ -8,17 +8,17 @@
 /// @remarks
 /// - The signature of `fwdFn` must match the expected signature of `fwd_diff(decoratedFn)`.
 /// - See the [reference](https://shader-slang.org/slang/user-guide/autodiff.html#fwd_difff--slang_function---slang_function) for `fwd_diff` for a full list of signature rules.
-/// - See the [user guide's section](https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions) on custom derivatives for an introduction to this approach. 
+/// - See the [user guide's section](https://shader-slang.org/slang/user-guide/autodiff.html#user-defined-derivative-functions) on custom derivatives for an introduction to this approach.
 ///
 /// - This attribute can be used on generic functions, member functions and accessors.
 /// - For generic functions, the generic signatures (parameters + constraints) of both functions must match exactly.
 ///
-/// - The decorated function will be considered forward-differentiable. There is no need for a `[Differentiable]` tag. 
-/// If the `[Differentiable]` tag is present, 
+/// - The decorated function will be considered forward-differentiable. There is no need for a `[Differentiable]` tag.
+/// If the `[Differentiable]` tag is present,
 /// and no custom backward derivative is specified with `[BackwardDerivative]`, then the
 /// Slang will use auto-diff to generate the backward=mode derivative, but will use the provided
 /// derivative for forward-mode.
-/// 
+///
 /// Example:
 /// ```csharp
 /// [ForwardDerivative(foo_fwd)]
@@ -27,7 +27,7 @@
 /// DifferentialPair<T> foo_fwd<T : IFloat, P : IArray<T>>( // Use the same generic signature for a match.
 ///     DifferentialPair<T> x, P dp_xarr) { /* ... */ }
 /// ```
-/// 
+///
 /// For member functions, or functions nested inside namespaces, `fwdFn` may need a fully qualified name.
 ///
 /// Example:
@@ -59,9 +59,9 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 ///
 /// This attribute can be used on generic functions, member functions and accessors.
 /// For generic functions, the generic signatures (parameters + constraints) of both functions
-/// must match exactly. 
+/// must match exactly.
 /// Overloaded functions are also supported. The compiler will attempt to resolve the overload
-/// from the expected derivative signature. If it is unable to do so, it will issue a 
+/// from the expected derivative signature. If it is unable to do so, it will issue a
 /// diagnostic error.
 ///
 /// The decorated function will be considered differentiable.
@@ -76,7 +76,7 @@ attribute_syntax [ForwardDerivative(function)] : ForwardDerivativeAttribute;
 ///     inout DifferentialPair<T> x, P dp_xarr, T.Differential dresult) { /* ... */ }
 /// ```
 ///
-/// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified 
+/// For member functions, or functions nested inside namespaces, `bwdFn` may need to be a fully qualified
 /// name.
 ///
 __attributeTarget(FunctionDeclBase)
@@ -105,15 +105,15 @@ attribute_syntax [BackwardDerivative(function)] : BackwardDerivativeAttribute;
 /// ```
 /// @remarks
 /// `substFn` must have a function definition (i.e. a body).
-/// 
-/// In case that a function has both custom defined derivatives and a differentiable 
-/// primal substitute, the primal substitute overrides the custom defined derivative 
-/// on the original function. All calls to the original function will be translated 
-/// into calls to the primal substitute first, and differentiation step follows after. 
-/// This means that the derivatives of the primal substitute function will be used instead 
+///
+/// In case that a function has both custom defined derivatives and a differentiable
+/// primal substitute, the primal substitute overrides the custom defined derivative
+/// on the original function. All calls to the original function will be translated
+/// into calls to the primal substitute first, and differentiation step follows after.
+/// This means that the derivatives of the primal substitute function will be used instead
 /// of the derivatives defined on the original function.
 ///
-/// This attribute can be used on generic functions and member functions. 
+/// This attribute can be used on generic functions and member functions.
 /// For generic functions, the generic signatures (parameters + constraints) of both functions
 /// must match exactly.
 /// For member functions, or functions nested inside namespaces, `substFn` should be a fully qualified name.
@@ -136,7 +136,7 @@ attribute_syntax [PrimalSubstitute(function)] : PrimalSubstituteAttribute;
 /// When used to decorate a function, the decorated function is considered the forward-derivative
 /// implementation of the referenced function `fn`.
 ///
-/// Apart from this, the semantics of the custom derivative are the same as for 
+/// Apart from this, the semantics of the custom derivative are the same as for
 /// `[ForwardDerivative(derivFn)]`
 ///
 __attributeTarget(FunctionDeclBase)
@@ -155,9 +155,9 @@ attribute_syntax [BackwardDerivativeOf(function)] : BackwardDerivativeOfAttribut
 
 /// `[PrimalSubstituteOf(fn)]` is the back-reference version of `[PrimalSubstitute(substFn)]`
 ///
-/// When used to decorate a function, that function is considered the substitute for the 
-/// referenced `fn`. 
-/// Apart from this difference, the semantics of the substitution are the same as for 
+/// When used to decorate a function, that function is considered the substitute for the
+/// referenced `fn`.
+/// Apart from this difference, the semantics of the substitution are the same as for
 /// `[PrimalSubstitute(substFn)]`
 ///
 __attributeTarget(FunctionDeclBase)
@@ -166,7 +166,7 @@ attribute_syntax [PrimalSubstituteOf(function)] : PrimalSubstituteOfAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [DerivativeMember(memberName)] : DerivativeMemberAttribute;
 
-// Exclude "this" parameter from differentiation. Effectively like putting a 'no_diff' on the 
+// Exclude "this" parameter from differentiation. Effectively like putting a 'no_diff' on the
 // "this" parameter.
 //
 __attributeTarget(FunctionDeclBase)
@@ -178,7 +178,7 @@ attribute_syntax [NoDiffThis] : NoDiffThisAttribute;
 [__AutoDiffBuiltin]
 [KnownBuiltin($((int)KnownBuiltinDeclName::NullDifferential))]
 struct NullDifferential : IDifferentiable
-{ 
+{
     // for now, we'll use at least one field to make sure the type is non-empty
     float dummy;
     typedef NullDifferential Differential;
@@ -376,7 +376,7 @@ struct TensorView
         case cuda: __intrinsic_asm "*($3) = atomicAdd($0.data_ptr_at<$T2>($1), $2)";
         }
     }
-    
+
     __generic<let N:int>
     [require(cuda)]
     void InterlockedAdd(vector<uint, N> index, T val, out T oldVal)
@@ -420,7 +420,7 @@ struct TensorView
     __subscript(uint index) -> T
     {
         [ForceInline] [__NoSideEffect] get { return load(index); }
-        
+
         [ForceInline]
         [nonmutating]
         set
@@ -448,7 +448,7 @@ struct TensorView
         {
             store(i1, i2, newValue);
         }
-        
+
         [__NoSideEffect]
         ref
         {
@@ -593,10 +593,10 @@ struct TensorView
     }
 }
 
-${{{{
+${
 for (auto atomicIntegerTypeName : kCudaAtomicIntegerTypes)
 {
-}}}}
+$}
 extension TensorView<$(atomicIntegerTypeName)>
 {
     typealias __Element = $(atomicIntegerTypeName);
@@ -704,7 +704,7 @@ extension TensorView<$(atomicIntegerTypeName)>
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<$T2>($1), $2)";
         }
     }
-    
+
     __generic<let N:int>
     [require(cuda)]
     void InterlockedExchange(vector<uint, N> index, __Element val, out __Element oldVal)
@@ -723,7 +723,7 @@ extension TensorView<$(atomicIntegerTypeName)>
         case cuda: __intrinsic_asm "atomicCAS($0.data_ptr_at<$T2>($1), $2, $3)";
         }
     }
-    
+
     __generic<let N:int>
     [require(cuda)]
     void InterlockedCompareExchange(vector<uint, N> index, __Element compare, __Element val)
@@ -735,9 +735,9 @@ extension TensorView<$(atomicIntegerTypeName)>
     }
 }
 
-${{{{
+${
 } // end for atomicIntegerTypeName
-}}}}
+$}
 
 extension TensorView<float>
 {
@@ -749,7 +749,7 @@ extension TensorView<float>
         case cuda: __intrinsic_asm "*($3) = atomicExch($0.data_ptr_at<float>($1), $2)";
         }
     }
-    
+
     __generic<let N:int>
     [require(cuda)]
     float InterlockedExchange(vector<uint, N> index, float val, out float oldVal)
@@ -1130,7 +1130,7 @@ struct DiffTensorView
         ref;
     }
 
-    // loadOnce/storeOnce operations. These operations are designed to only run once per-address and 
+    // loadOnce/storeOnce operations. These operations are designed to only run once per-address and
     // don't need atomic gradient handling.
     //
 
@@ -1653,7 +1653,7 @@ DifferentialPair<vector<T, 3>> __d_cross(DifferentialPair<vector<T, 3>> a, Diffe
     T aybx = a.p.y * b.p.x;
     T pz = axby - aybx;
     T dz = a.d.x * b.p.y + a.p.x * b.d.y - a.d.y * b.p.x - a.p.y * b.d.x;
-    
+
     return DifferentialPair<vector<T, 3>>(vector<T, 3>(px, py, pz), vector<T, 3>.Differential(dx, dy, dz));
 }
 
@@ -1971,7 +1971,7 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(radians, ReturnType(T(0.017453292519943295769236907
 SIMPLE_UNARY_DERIVATIVE_IMPL(degrees, ReturnType(T(57.295779513082320876798154814105)))
 // Exponent
 SIMPLE_UNARY_DERIVATIVE_IMPL(exp, exp(dpx.p))
-SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p)* T(50.69314718055994530941723212145818))
+SIMPLE_UNARY_DERIVATIVE_IMPL(exp2, exp2(dpx.p)* T(0.69314718055994530941723212145818))
 // sin, sinh
 SIMPLE_UNARY_DERIVATIVE_IMPL(sin, cos(dpx.p))
 SIMPLE_UNARY_DERIVATIVE_IMPL(sinh, cosh(dpx.p))
@@ -1983,8 +1983,8 @@ SIMPLE_UNARY_DERIVATIVE_IMPL(tan, T(1.0) / (cos(dpx.p) * cos(dpx.p)))
 SIMPLE_UNARY_DERIVATIVE_IMPL(tanh, T(1.0) / (cosh(dpx.p) * cosh(dpx.p)))
 // Logarithm
 SIMPLE_UNARY_DERIVATIVE_IMPL(log, T(1.0) / dpx.p)
-SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(52.3025850929940456840179914546844)))
-SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(50.69314718055994530941723212145818)))
+SIMPLE_UNARY_DERIVATIVE_IMPL(log10, T(1.0) / (dpx.p * T(2.3025850929940456840179914546844)))
+SIMPLE_UNARY_DERIVATIVE_IMPL(log2, T(1.0) / (dpx.p * T(0.69314718055994530941723212145818)))
 // Square root
 SIMPLE_UNARY_DERIVATIVE_IMPL(sqrt, T(0.5) / sqrt(max(ReturnType(T(1e-7)), dpx.p)))
 // Reciprocal

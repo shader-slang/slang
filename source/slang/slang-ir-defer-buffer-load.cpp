@@ -66,10 +66,8 @@ bool isTypePreferrableToDeferLoad(CodeGenContext* codeGenContext, IRType* type)
     // we expect them to be expensive to pass by value.
     //
     IRSizeAndAlignment sizeAlignment = {};
-    if (SLANG_FAILED(getNaturalSizeAndAlignment(
-            codeGenContext->getTargetProgram()->getOptionSet(),
-            type,
-            &sizeAlignment)))
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment)))
     {
         // If type contains fields that we don't know how to compute natural size
         // for, default to specialize if it contains arrays.
@@ -312,7 +310,7 @@ struct DeferBufferLoadContext
     }
 };
 
-void deferBufferLoad(CodeGenContext* codeGenContext, IRModule* module)
+void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
 {
     DeferBufferLoadContext context;
     context.codeGenContext = codeGenContext;

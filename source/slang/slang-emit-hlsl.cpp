@@ -34,7 +34,7 @@ void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     IRStringLit* val)
 {
     SLANG_UNUSED(entryPoint);
-    assert(val);
+    SLANG_ASSERT(val);
 
     m_writer->emit("[");
     m_writer->emit(name);
@@ -1176,7 +1176,7 @@ void HLSLSourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
     // although we should not expect to run into types that don't
     // have a sugared form.
     //
-    m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
+    m_writer->emit("vector<");
     emitType(elementType);
     m_writer->emit(",");
     m_writer->emit(elementCount);
@@ -1246,6 +1246,22 @@ void HLSLSourceEmitter::emitSwitchDecorationsImpl(IRSwitch* switchInst)
     {
         m_writer->emit("[branch]\n");
     }
+}
+
+bool HLSLSourceEmitter::supportsSwitchFallThrough()
+{
+    // FXC (SM 5.x and earlier) doesn't support fall-through in switch statements.
+    // DXC (SM 6.0 and later) does support fall-through.
+    //
+    // We use m_effectiveProfile which includes the fallback logic that sets
+    // SM for DXBC targets when no profile is explicitly specified.
+    if (m_effectiveProfile.getFamily() == ProfileFamily::DX)
+    {
+        // SM 6.0+ supports fall-through, SM 5.x and earlier do not
+        return m_effectiveProfile.getVersion() >= ProfileVersion::DX_6_0;
+    }
+    // For non-DX profiles targeting HLSL, assume modern compiler (supports fall-through)
+    return true;
 }
 
 void HLSLSourceEmitter::emitFuncDecorationImpl(IRDecoration* decoration)
@@ -1356,21 +1372,21 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             m_writer->emit(getDefaultBuiltinTypeName(type->getOp()));
             return;
         }
-#if SLANG_PTR_IS_64
+
     case kIROp_IntPtrType:
-        m_writer->emit("int64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("int64_t");
+        else
+            m_writer->emit("int");
         return;
+
     case kIROp_UIntPtrType:
-        m_writer->emit("uint64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            m_writer->emit("uint64_t");
+        else
+            m_writer->emit("uint");
         return;
-#else
-    case kIROp_IntPtrType:
-        m_writer->emit("int");
-        return;
-    case kIROp_UIntPtrType:
-        m_writer->emit("uint");
-        return;
-#endif
+
     case kIROp_StructType:
         m_writer->emit(getName(type));
         return;
@@ -1453,7 +1469,29 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("NvHitObject");
+            // Emit appropriate HitObject type based on capability
+            // User must explicitly specify which SER path to use
+            auto targetCaps = getTargetReq()->getTargetCaps();
+            auto nvapiCapabilitySet = CapabilitySet(CapabilityName::hlsl_nvapi);
+            auto sm69CapabilitySet = CapabilitySet(CapabilityName::_sm_6_9);
+
+            if (targetCaps.implies(sm69CapabilitySet))
+            {
+                // DXR 1.3 native: use dx::HitObject namespace
+                m_writer->emit("dx::HitObject");
+            }
+            else if (targetCaps.implies(nvapiCapabilitySet))
+            {
+                // NVAPI extension: use NvHitObject
+                m_writer->emit("NvHitObject");
+                // Ensure NVAPI header is included when using NvHitObject type
+                m_extensionTracker->m_requiresNVAPI = true;
+            }
+            else
+            {
+                SLANG_UNEXPECTED("HitObjectType requires either SM 6.9+ (DXR 1.3 native) or "
+                                 "hlsl_nvapi capability");
+            }
             return;
         }
     case kIROp_TextureFootprintType:
@@ -1469,7 +1507,7 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_CoopVectorType:
         {
             auto coopVecType = (IRCoopVectorType*)type;
-            m_writer->emit(isCoopvecPoc ? "CoopVector<" : "vector<");
+            m_writer->emit("vector<");
             emitType(coopVecType->getElementType());
             m_writer->emit(",");
             m_writer->emit(getIntVal(coopVecType->getElementCount()));
@@ -1612,12 +1650,47 @@ void HLSLSourceEmitter::emitRateQualifiersAndAddressSpaceImpl(
     }
 }
 
+// Helper function to determine if an HLSL semantic accepts an index suffix
+static bool doesHLSLSemanticAcceptIndex(UnownedStringSlice semanticName)
+{
+    // Table of system semantics that accept indices
+    static const UnownedStringSlice kIndexedSystemSemantics[] = {
+        toSlice("SV_Target"),
+        toSlice("SV_ClipDistance"),
+        toSlice("SV_CullDistance"),
+    };
+
+    // User semantics (non-SV_*) always accept indices
+    if (!semanticName.startsWithCaseInsensitive(toSlice("SV_")))
+    {
+        return true;
+    }
+
+    // Check if this system semantic is in the indexed list
+    for (const auto& indexedSemantic : kIndexedSystemSemantics)
+    {
+        if (semanticName.caseInsensitiveEquals(indexedSemantic))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
 {
     if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
     {
         m_writer->emit(" : ");
-        m_writer->emit(semanticDecoration->getSemanticName());
+        auto semanticName = semanticDecoration->getSemanticName();
+        m_writer->emit(semanticName);
+
+        // Only emit semantic index for semantics that accept them
+        if (doesHLSLSemanticAcceptIndex(semanticName))
+        {
+            m_writer->emit(semanticDecoration->getSemanticIndex());
+        }
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())

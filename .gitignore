@@ -86,6 +86,8 @@ prelude/*.h.cpp
 /external/slang-llvm/
 /external/slang-glslang/
 /external/mimalloc/
+/external/slangpy/
+/external/dxvk-remix/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -115,8 +117,19 @@ CLAUDE.local.md
 /lock
 /tests/library/linked.spirv
 
+# IR dump split directories
+dump-*/
+
 # Coverage reports and data
 *.profraw
 *.profdata
 /coverage-html/
 /coverage.lcov
+
+# Valgrind, perf,
+callgrind.out.*
+perf.data
+perf.data.*
+
+# gh command
+.gh-pm.yml

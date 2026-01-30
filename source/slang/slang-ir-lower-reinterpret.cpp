@@ -60,7 +60,7 @@ struct ReinterpretLoweringContext
         auto operand = inst->getOperand(0);
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
-        SlangInt fromTypeSize = getAnyValueSize(fromType);
+        SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
         if (fromTypeSize < 0)
         {
             sink->diagnose(
@@ -68,7 +68,7 @@ struct ReinterpretLoweringContext
                 Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
                 fromType);
         }
-        SlangInt toTypeSize = getAnyValueSize(toType);
+        SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
         if (toTypeSize < 0)
         {
             sink->diagnose(
@@ -89,13 +89,8 @@ struct ReinterpretLoweringContext
     }
 };
 
-void lowerReinterpret(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
+void lowerReinterpret(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    // Before processing reinterpret insts, ensure that existential types without
-    // user-defined sizes have inferred sizes where possible.
-    //
-    /*inferAnyValueSizeWhereNecessary(target, module, sink);*/
-
     ReinterpretLoweringContext context;
     context.module = module;
     context.targetProgram = target;

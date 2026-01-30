@@ -382,8 +382,11 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink->diagnose(
             SourceLoc(),
             Diagnostics::mismatchSpecializationArguments,
-            Math::Max(consumedArgCount, getSpecializationParamCount(), specializationArgCount));
+            Math::Max(consumedArgCount, getSpecializationParamCount()),
+            specializationArgCount);
     }
+    if (sink->getErrorCount() != 0)
+        return nullptr;
     return new SpecializedComponentType(this, specializationInfo, specializationArgs, sink);
 }
 
@@ -393,6 +396,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType** outSpecializedComponentType,
     ISlangBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
     List<SpecializationArg> expandedArgs;
@@ -813,6 +817,74 @@ Expr* ComponentType::tryResolveOverloadedExpr(Expr* exprIn)
     return visitor.maybeResolveOverloadedExpr(exprIn, LookupMask::Function, nullptr);
 }
 
+// This function tries to simplify an overloaded expr into OverloadedExpr for reflection API usage.
+// There are two kinds of overloaded expr in the AST: OverloadedExpr and OverloadedExpr2.
+//
+// OverloadedExpr stores candidates in LookupResult, where a list of `DeclRef<Decl>` hold
+// the properly-specialized reference to the declaration that was found. And all the candidates
+// must share a same base (if it is coming from a member-reference), and same orignalExpr.
+//
+// While OverloadedExpr2 stores candidates in a list of Expr, which is not necessary to be
+// DeclRefExpr.
+//
+// When the input orignalExpr is already OverloadedExpr, we can directly return it. But when
+// the input orignalExpr is OverloadedExpr2, we need to simplify it by converting it into
+// OverloadedExpr. The conversion routine conservatively performs the conversion when each Expr
+// candidates of OverloadedExpr2 is DeclRefExpr and all the candidates DeclRefExpr share the same
+// orignalExpr. If such condition is not met, it will return nullptr to indicated failed conversion.
+static Expr* maybeSimplifyExprForReflectionAPIUsage(Expr* originalExpr, ASTBuilder* astBuilder)
+{
+    // return directly if it is already OverloadedExpr
+    if (as<OverloadedExpr>(originalExpr))
+        return originalExpr;
+
+    OverloadedExpr2* overloadedExpr2 = as<OverloadedExpr2>(originalExpr);
+    // Don't perform any conversion if it is not OverloadedExpr2
+    if (!overloadedExpr2)
+        return originalExpr;
+
+    if (!overloadedExpr2->candidateExprs.getCount())
+        return nullptr;
+
+    auto overloadedExpr = astBuilder->create<OverloadedExpr>();
+
+    Expr* sharedOriginalExpr = nullptr;
+
+    // Start the conversion
+    for (auto candidate : overloadedExpr2->candidateExprs)
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(candidate))
+        {
+            LookupResultItem item;
+            item.declRef = declRefExpr->declRef;
+            overloadedExpr->lookupResult2.items.add(item);
+
+            if (!sharedOriginalExpr)
+            {
+                sharedOriginalExpr = declRefExpr->originalExpr;
+            }
+            else if (sharedOriginalExpr != declRefExpr->originalExpr)
+            {
+                return nullptr;
+            }
+        }
+        else
+        {
+            return nullptr;
+        }
+    }
+
+    if (overloadedExpr->lookupResult2.items.getCount())
+    {
+        overloadedExpr->lookupResult2.item = overloadedExpr->lookupResult2.items[0];
+        overloadedExpr->base = overloadedExpr2->base;
+        overloadedExpr->originalExpr = sharedOriginalExpr;
+        return overloadedExpr;
+    }
+
+    return nullptr;
+}
+
 Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink)
 {
     // If we've looked up this type name before,
@@ -850,11 +922,13 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckTerm(expr);
+    checkedExpr = visitor.maybeResolveOverloadedExpr(checkedExpr, LookupMask::Default, nullptr);
 
     if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {
         result = checkedExpr;
     }
+    result = maybeSimplifyExprForReflectionAPIUsage(checkedExpr, astBuilder);
 
     m_decls[name] = result;
     return result;
@@ -945,6 +1019,8 @@ Expr* ComponentType::findDeclFromStringInType(
     }
 
     auto checkedTerm = visitor.CheckTerm(expr);
+
+    checkedTerm = maybeSimplifyExprForReflectionAPIUsage(checkedTerm, astBuilder);
 
     if (auto overloadedExpr = as<OverloadedExpr>(checkedTerm))
     {

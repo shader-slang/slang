@@ -171,8 +171,8 @@ void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
 }
 
 void replaceLocationIntrinsicsWithRaytracingObject(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink)
 {
     // currently only applies to GLSL syntax

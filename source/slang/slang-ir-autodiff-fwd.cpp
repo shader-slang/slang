@@ -1840,7 +1840,6 @@ struct ForwardDiffTranslationContext
                                                    diffWrappedType,
                                                    ValAssociationKind::DifferentialPairType))
                         ->getWitness();
-
                 return InstPair(
                     primalResult,
                     builder->emitMakeExistential(

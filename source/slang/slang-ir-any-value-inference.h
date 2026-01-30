@@ -9,7 +9,7 @@
 namespace Slang
 {
 void inferAnyValueSizeWhereNecessary(
-    TargetProgram* targetProgram,
     IRModule* module,
+    TargetProgram* targetProgram,
     DiagnosticSink* sink);
 }

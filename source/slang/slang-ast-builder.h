@@ -654,6 +654,9 @@ public:
     /// Create a UIntSetVal from a UIntSet
     UIntSetVal* getUIntSetVal(const UIntSet& uintSet);
 
+    /// Create a singleton CapabilitySetVal from a single CapabilityName
+    CapabilitySetVal* getCapabilitySetVal(CapabilityName capability);
+
     TupleType* getTupleType(ArrayView<Type*> types);
 
     FuncType* getFuncType(ArrayView<Type*> parameters, Type* result, Type* errorType = nullptr);

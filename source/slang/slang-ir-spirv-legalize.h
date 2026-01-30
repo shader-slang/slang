@@ -29,6 +29,7 @@ struct SPIRVEmitSharedContext
     IRInst* m_voidType;
 
     unsigned int m_spvVersion = 0x10000;
+    bool m_needVariablePointer = false;
     bool m_useDemoteToHelperInvocationExtension = false;
 
     SpvMemoryModel m_memoryModel = SpvMemoryModelGLSL450;
@@ -36,6 +37,14 @@ struct SPIRVEmitSharedContext
     bool isSpirv14OrLater() { return m_spvVersion >= 0x10400; }
     bool isSpirv15OrLater() { return m_spvVersion >= 0x10500; }
     bool isSpirv16OrLater() { return m_spvVersion >= 0x10600; }
+
+    // Returns true if discard should be emitted as OpDemoteToHelperInvocation
+    // (which is NOT a terminator), false if it should be emitted as OpKill
+    // (which IS a terminator).
+    bool shouldEmitDiscardAsDemote()
+    {
+        return isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension;
+    }
 
     void requireSpirvVersion(unsigned int version)
     {

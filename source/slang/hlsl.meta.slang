@@ -47,6 +47,7 @@ struct Std140DataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_Std430BufferLayoutType))
 [require(spirv)]
 [require(glsl)]
+[require(llvm)]
 __magic_type(Std430DataLayoutType)
 struct Std430DataLayout : IBufferDataLayout
 {};
@@ -61,6 +62,9 @@ struct ScalarDataLayout : IBufferDataLayout
 __intrinsic_type($(kIROp_CBufferLayoutType))
 __magic_type(CDataLayoutType)
 [require(spirv)]
+[require(llvm)]
+[require(cpp)]
+[require(cuda)]
 struct CDataLayout : IBufferDataLayout
 {};
 
@@ -72,24 +76,24 @@ struct GLSLShaderStorageBuffer {}
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
 uint2 __structuredBufferGetDimensions(AppendStructuredBuffer<T,L> buffer);
 
 __generic<T,L:IBufferDataLayout>
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, consumestructuredbuffer)]
 uint2 __structuredBufferGetDimensions(ConsumeStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(StructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RWStructuredBuffer<T,L> buffer);
 
 __intrinsic_op($(kIROp_StructuredBufferGetDimensions))
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
 uint2 __structuredBufferGetDimensions<T,L:IBufferDataLayout>(RasterizerOrderedStructuredBuffer<T,L> buffer);
 
 //@public:
@@ -115,7 +119,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLAppendStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLAppendStructuredBufferType))
-[require(cpp_cuda_glsl_hlsl_spirv, appendstructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, appendstructuredbuffer)]
 struct AppendStructuredBuffer
 {
     __intrinsic_op($(kIROp_StructuredBufferAppend))
@@ -150,14 +154,14 @@ For all other targets, this type maps to a buffer of 32bit unsigned integers.
 */
 __magic_type(HLSLByteAddressBufferType)
 __intrinsic_type($(kIROp_HLSLByteAddressBufferType))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
 struct ByteAddressBuffer
 {
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -186,7 +190,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint Load(int location)
     {
         __target_switch
@@ -225,7 +229,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -238,7 +242,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -267,7 +271,7 @@ struct ByteAddressBuffer
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -294,7 +298,7 @@ struct ByteAddressBuffer
     /// When targeting non-HLSL, the status is always 0.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -307,7 +311,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -335,7 +339,7 @@ struct ByteAddressBuffer
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -361,7 +365,7 @@ struct ByteAddressBuffer
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -374,7 +378,7 @@ struct ByteAddressBuffer
 
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -402,7 +406,7 @@ struct ByteAddressBuffer
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv, byteaddressbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, byteaddressbuffer)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -551,7 +555,7 @@ extension<T:__BuiltinArithmeticType> T : ITexelElement
     __intrinsic_op(0) __init(Element x);
 }
 
-${{{
+${
 // Scalar types that can be used as texel element.
 const char* texeElementScalarTypes[] = {
     "half",
@@ -565,16 +569,16 @@ const char* texeElementScalarTypes[] = {
 };
 for (auto elementType : texeElementScalarTypes)
 {
-}}}
+$}
 extension<int N> vector<$(elementType), N> : ITexelElement
 {
     typealias Element = $(elementType);
     static const int elementCount = N;
     __intrinsic_op($(kIROp_MakeVectorFromScalar)) __init(Element x);
 }
-${{{
+${
 } // end for texelElementScalarTypes.
-}}}
+$}
 
 // Additional 64-bit types that can be used as texel element.
 extension double:ITexelElement
@@ -698,8 +702,48 @@ struct _Texture<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let is
 }
 
 //@hidden:
-// Combined texture sampler specific functions
 
+// Returns true when the stage supports implicit derivatives on the
+// target. This must match with capability `implicit_derivatives_sampling`.
+//
+[__readNone]
+[ForceInline]
+bool __targetHasImplicitDerivatives()
+{
+    __stage_switch
+    {
+    case fragment:
+        return true;
+
+    case _amplification:
+    case _anyhit:
+    case _callable:
+    case _closesthit:
+    case _intersection:
+    case _mesh:
+    case _miss:
+    case _raygen:
+    case compute:
+        __target_switch
+        {
+        case _GL_NV_compute_shader_derivatives:
+        case SPV_KHR_compute_shader_derivatives:
+        case _sm_6_6:
+            return true;
+
+        case hlsl:
+        case glsl:
+        case spirv:
+        default:
+            return false;
+        }
+
+    default:
+        return false;
+    }
+}
+
+// Combined texture sampler specific functions
 [require(glsl, texture_sm_4_1)]
 float __glsl_texture<TSampler, TCoord>(TSampler s, TCoord value)
 {
@@ -721,7 +765,7 @@ float __glsl_texture_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value)
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -771,6 +815,16 @@ float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value,
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
 float __glsl_texture_level_offset<TSampler, TCoord, TOffset>(TSampler s, TCoord value, float level, constexpr TOffset offset)
 {
     __target_switch
@@ -810,7 +864,7 @@ float __glsl_texture_1d_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonSt
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_shadowlod)]
-float __glsl_texture_3d_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
+float __glsl_texture_cube_array_shadow<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float compare)
 {
     __target_switch
     {
@@ -853,6 +907,16 @@ float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerCompari
     __target_switch
     {
     case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+__glsl_extension(GL_EXT_texture_shadow_lod)
+[require(glsl, texture_shadowlod)]
+float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
@@ -916,7 +980,6 @@ void __wgsl_check_texture_type_texel_offset()
      static_assert(Shape.flavor != $(SLANG_TEXTURE_2D) || Shape.flavor != $(SLANG_TEXTURE_3D)
          , "WGSL texture shape must be 2D or 3D when sampling with texel offsets");
 }
-
 
 //@public:
 
@@ -990,26 +1053,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
         }
     }
 
-    /// Samples the texture at the given location.
+    /// Samples the texture at a given location using implicit level of detail.
     ///
     ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
     ///@param location The location to sample the texture at.
     ///@param offset Texel offset to apply.
-    ///@param clamp The max level of detail to use.
+    ///@param clamp The maximum level of detail to use.
     ///@param[out] status The result status of the operation.
     ///                   This parameter is currently only used when targeting HLSL.
     ///                   For other targets, the result status is always 0.
     ///@return The sampled texture value.
-    ///@see `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`.
+    ///
+    /// `location` is a vector of floats as follows:
+    /// - For 1d/2d/3d-textures, the vector is a 1d/2d/3d-vector specifying the sample location. Usually, normalized coordinates are used
+    ///   such that the coordinate range `[0, 1]` denotes the full span of the texture. Depending on the sampler state and the sampled texture type,
+    ///   other conventions may also be used. For example, `GL_TEXTURE_RECTANGLE` uses non-normalized texel locations.
+    /// - For cube textures, the location is a 3d-vector specifying the direction from the center of the cube at the sample. The direction
+    ///   does not need to be normalized.
+    /// - For texture arrays, the location vector is appended with the array index. The array
+    ///   index (float) is first rounded to the nearest integer value and then clamped to `[0, d-1]` where `d` is the number of array elements.
+    ///
     ///@remarks
     /// The `Sample` function is defined for all read-only texture types, including
     /// `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`,
     /// `Texture1DArray`, `Texture2DArray` and `TextureCubeArray`.
     ///
-    /// The function is not available for read-write texture types.
+    /// This function requires the implicit sampling derivatives, which are always available in the fragment stage. In other stages, the derivatives
+    /// are enabled on the target using the appropriate target extensions as necessary. It is an error to use this function when
+    /// implicit derivatives cannot be enabled. See also capability `GL_NV_compute_shader_derivatives`.
+    ///
+    /// This function is not available for read-write and write-only texture types.
     ///
     /// For HLSL/D3D targets, the texture element type must be a scalar or vector of float or half types.
     ///
+    ///@see `SampleBias`, `SampleLevel`, `SampleLevelZero`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `SampleCmpBias`, `SampleCmpGrad`.
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0_fragment)]
@@ -1262,7 +1339,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, location, compareValue);
             }
             else
             {
@@ -1299,6 +1376,27 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue));
+                }
+                else if (Shape.dimensions == 3 && isArray == 1)
+                {
+                    return __glsl_texture_cube_array_shadow(this, location, compareValue);
+                }
+                else
+                {
+                    return __glsl_texture(this, __makeVector(location, compareValue));
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0);
+            }
+
         default:
             return SampleCmpLevel(location, compareValue, 0.0);
         }
@@ -1382,6 +1480,22 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
         case wgsl:
             return __getTexture().SampleCmpLevelZero(__getComparisonSampler(), location, compareValue, offset);
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+            {
+                if (Shape.dimensions == 1 && isArray == 0)
+                {
+                    return __glsl_texture_offset_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), offset);
+                }
+                else
+                {
+                    return __glsl_texture_offset(this, __makeVector(location, compareValue), offset);
+                }
+            }
+            else
+            {
+                return SampleCmpLevel(location, compareValue, 0.0, offset);
+            }
         default:
             return SampleCmpLevel(location, compareValue, 0.0, offset);
         }
@@ -1415,6 +1529,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             if (Shape.dimensions == 1 && isArray == 0)
             {
                 return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+            }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
             else
             {
@@ -1485,6 +1603,150 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 %sparseResultType = OpTypeStruct $$uint $$float;
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpGrad(__getComparisonSampler(), location, compareValue, gradX, gradY, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod $this $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset);
+        case spirv:
+            return spirv_asm
+            {
+                result:$$float = OpImageSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            return __getTexture().SampleCmpBias(__getComparisonSampler(), location, compareValue, bias, offset, status);
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod $this $location $compareValue Bias|ConstOffset $bias $offset;
 
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
                 OpStore &status %residentCode;
@@ -1719,6 +1981,70 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
                 __truncate $$T result __sampledType(T) %sampled;
             };
         }
+    }
+
+    /// Samples the texture at a given location using MIP level 0.
+    ///
+    ///@param s The `SamplerState` to use for the sampling operation. This parameter is omitted when `this` is a combined texture sampler type (`isCombined == 0`).
+    ///@param location The location to sample the texture at.
+    ///@param offset Texel offset to apply.
+    ///@param[out] status The result status of the operation.
+    ///                   This parameter is currently only used when targeting HLSL.
+    ///                   For other targets, the result status is always 0.
+    ///@return The sampled texture value.
+    ///
+    /// See `Sample()` for the full specification.
+    ///
+    ///@remarks
+    /// When targeting GLSL, depending on whether implicit derivatives are enabled, this function translates to `texture()` (derivatives disabled)
+    /// or `textureLod()` (derivatives enabled). This allows the use of texture types in stages without implicit derivatives that would otherwise
+    /// be unusable due to the missing `textureLod()` variants.
+    ///
+    ///@see `Sample`, `SampleBias`, `SampleLevel`, `SampleGrad`, `SampleCmp`, `SampleCmpLevelZero`, `SampleCmpLevel`, `GL_NV_compute_shader_derivatives`.
+    [__readNone]
+    [ForceInline]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctexture($0, $1)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(cpp_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        __target_switch
+        {
+        case glsl:
+            if (!__targetHasImplicitDerivatives())
+                __intrinsic_asm "$ctextureOffset($0, $1, $2)$z";
+            break;
+
+        default:
+            break;
+        }
+
+        return SampleLevel(location, 0.0f, offset);
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, sm_5_0)]
+    T SampleLevelZero(vector<float, Shape.dimensions+isArray> location, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        return SampleLevel(location, 0.0f, offset, status);
     }
 }
 
@@ -2340,7 +2666,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             }
             else if (Shape.dimensions == 3 && isArray == 1)
             {
-                return __glsl_texture_3d_array_shadow(this, s, location, compareValue);
+                return __glsl_texture_cube_array_shadow(this, s, location, compareValue);
             }
             else
             {
@@ -2548,6 +2874,10 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
             {
                 return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
             }
+            else if (Shape.dimensions == 3 && isArray == 1)
+            {
+                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
+            }
             else
             {
                 return __glsl_texture_level(this, s, __makeVector(location,compareValue), level);
@@ -2620,6 +2950,156 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
                 %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
 
                 %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Lod|ConstOffset $level $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad $gradX $gradY;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpGrad(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, vector<float, Shape.dimensions> gradX, vector<float, Shape.dimensions> gradY, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube && isArray != 0), "SampleCmpGrad is not supported for TextureCubeArray");
+        static_assert(!(Shape is __ShapeCube), "SampleCmpGrad with offset is not supported for TextureCube or TextureCubeArray");
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpGrad";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefExplicitLod %sampledImage $location $compareValue Grad|ConstOffset $gradX $gradY $offset;
+
+                %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
+                OpStore &status %residentCode;
+                result:$$float = OpCompositeExtract %sparseResult 1;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias)
+    {
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias $bias;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                %sampledImage : __sampledImageType(this) = OpSampledImage $this $s;
+                result:$$float = OpImageSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
+            };
+        }
+    }
+
+    [__readNone]
+    [ForceInline]
+    [require(hlsl_spirv, texture_shadowgrad)]
+    float SampleCmpBias(SamplerComparisonState s, vector<float, Shape.dimensions+isArray> location, float compareValue, float bias, constexpr vector<int, Shape.planeDimensions> offset, out uint status)
+    {
+        static_assert(!(Shape is __ShapeCube), "SampleCmpBias with offset is not supported for TextureCube or TextureCubeArray");
+        __requireComputeDerivative();
+        __target_switch
+        {
+        case hlsl:
+            static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
+                || T is half || T is vector<half,2> || T is vector<half,3> || T is vector<half,4>
+                , "HLSL supports only float and half type textures");
+            __intrinsic_asm ".SampleCmpBias";
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability SparseResidency;
+                %sparseResultType = OpTypeStruct $$uint $$float;
+                %sampledImage:__sampledImageType(this) = OpSampledImage $this $s;
+
+                %sparseResult:%sparseResultType = OpImageSparseSampleDrefImplicitLod %sampledImage $location $compareValue Bias|ConstOffset $bias $offset;
 
                 %residentCode:$$uint = OpCompositeExtract %sparseResult 0;
                 OpStore &status %residentCode;
@@ -3029,7 +3509,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
 }
 
 // Texture.GetDimensions and Sampler.GetDimensions
-${{{{
+${
 const char* kTextureShapeTypeNames[] = {
     "__Shape1D", "__Shape2D", "__Shape3D", "__ShapeCube"};
 for (int shapeIndex = 0; shapeIndex < 4; shapeIndex++)
@@ -3047,19 +3527,19 @@ for (int isMS = 0; isMS <= 1; isMS++) {
     }
     auto shapeTypeName = kTextureShapeTypeNames[shapeIndex];
     TextureTypeInfo textureTypeInfo(kBaseTextureShapes[shapeIndex], isArray, isMS, 0, sb, path);
-}}}}
+$}
 
 __generic<T:ITexelElement, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
 extension _Texture<T,$(shapeTypeName),$(isArray),$(isMS),sampleCount,access,isShadow,isCombined,format>
 {
-    ${{{{
+    ${
     textureTypeInfo.writeGetDimensionFunctions();
-    }}}}
+    $}
 }
 
-${{{{
+${
 }
-}}}}
+$}
 
 // Texture.GetSamplePosition(int s);
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -3513,16 +3993,16 @@ vector<T.Element,4> __texture_gatherCmp_offsets(
     }
 }
 
-${{{{
+${
 for (int isCombined = 0; isCombined < 2; isCombined++)
 {
-}}}}
+$}
 // Gather for [isCombined = $(isCombined)]
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,0,isShadow,$(isCombined),format>
 {
-${{{{
+${
     for (int isShadow = 0; isShadow < 2; isShadow++)
     for (auto componentId = 0;  componentId < 5; componentId++)
     {
@@ -3540,7 +4020,7 @@ ${{{{
         const char* componentArgString[] = { ", 0", ", 0", ", 1", ", 2", ", 3" };
         const char* componentFunc = componentFuncString[componentId];
         const char* componentArg = (isShadow ? "" : componentArgString[componentId]);
-}}}}
+$}
     [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv_wgsl, texture_gather)]
     vector<T.Element,4> Gather$(compareFunc)$(componentFunc)(
@@ -3683,14 +4163,14 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // for (componentId)
-}}}}
+$}
 } // End of: Gather for [isCombined = $(isCombined)]
 
-${{{{
+${
 } // for (isScalarTexture)
-}}}}
+$}
 
 // End of all Texture Gather
 
@@ -4202,13 +4682,13 @@ extension _Texture<T,Shape,isArray,1,sampleCount,0,isShadow,isCombined,format>
 }
 
 // Load/Subscript for readwrite textures
-${{{{
+${
     for (int access = kCoreModule_ResourceAccessReadWrite; access <= kCoreModule_ResourceAccessRasterizerOrdered; access++) {
         const char* glslIntrinsic = "$cimageLoad($0, $1)$z";
         const char* glslIntrinsicOffset = "$cimageLoad($0, ($1)+($2))$z";
         const char* glslIntrinsicMS = "$cimageLoad($0, $1, $2)$z";
         const char* glslIntrinsicMSOffset = "$cimageLoad($0, ($1)+($3), $2)$z";
-}}}}
+$}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
@@ -4219,10 +4699,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
 
     //@public:
 
-    ${{{{
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     [__readNone]
     [ForceInline]
     [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, texture_sm_4_1)]
@@ -4389,9 +4869,9 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
     [require(glsl, texture_sm_4_1)]
     void __glslImageStore(vector<int, Shape.dimensions+isArray> location, T value)
     {
@@ -4501,10 +4981,10 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         }
     }
 
-    ${{{{
+    ${
         if (access != kCoreModule_ResourceAccessWriteOnly)
         {
-    }}}}
+    $}
     __subscript(vector<uint, Shape.dimensions+isArray> location) -> T
     {
         [__readNone]
@@ -4540,15 +5020,15 @@ extension _Texture<T,Shape,isArray,0,sampleCount,$(access),isShadow, 0,format>
         [nonmutating]
         ref;
     }
-    ${{{{
+    ${
         } // if (access != kCoreModule_ResourceAccessWriteOnly)
-    }}}}
+    $}
 
 }
 
-${{{{
+${
 if (access == kCoreModule_ResourceAccessReadWrite) {
-}}}}
+$}
 
 // RW MS textures.
 
@@ -4703,10 +5183,10 @@ extension _Texture<T,Shape,isArray,1,sampleCount,$(access),isShadow, 0,format>
     }
 }
 
-${{{{
+${
 } // if (access == kCoreModule_ResourceAccessReadWrite) // for RW MS textures.
 } // for (access).
-}}}}
+$}
 
 // Definitions to support the legacy texture .mips[][] operator.
 struct __TextureMip<T:ITexelElement, Shape : __ITextureShape, let isArray : int, let isCombined : int, let format : int>
@@ -4777,7 +5257,7 @@ extension _Texture<T, Shape, isArray, 1 /*isMS*/, 0 /*sampleCount*/, 0 /*access*
 
 // Texture type aliases.
 // T, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int
-${{{{
+${
     const char* shapeTypeNames[] = {"1D", "2D", "3D", "Cube"};
     const char* accessPrefix[] = {"", "RW", "W", "RasterizerOrdered", "Feedback"};
     const char* accessDocumentation[] = {"read-only", "read-write", "write-only", "rasterizer-ordered", "feedback"};
@@ -4813,7 +5293,7 @@ ${{{{
         if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
         const char* textureTypeName = isCombined ? "Sampler" : "Texture";
-}}}}
+$}
 /// Represents a handle to a $(accessDocumentation[access])$(isMS?", multisampled": "") $(shapeTypeNames[shape]) $(isCombined?"combined texture-sampler": "texture")$(isArray?" array":"").
 /// @param T The texel type of the texture.
 /// @param sampleCount The number of samples in the texture, when the texture is multisampled.
@@ -4821,12 +5301,12 @@ ${{{{
 /// @see Please refer to `_Texture` for more information about texture types.
 /// @category texture_types
 typealias $(accessPrefix[access])$(textureTypeName)$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])<T:ITexelElement=float4, let sampleCount:int=0, let format:int=0> = _Texture<T, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), sampleCount, $(access), 0, $(isCombined), format>;
-${{{{
+${
 }
-}}}}
+$}
 
 // Declare DepthTexture* and Sampler*Shadow type aliases.
-${{{{
+${
     for (int shape = 0; shape < 4; shape++)
     for (int isArray : { 0, 1 })
     for (int isMS : { 0, 1 })
@@ -4841,7 +5321,7 @@ ${{{{
         // No 3D Array.
         if (shape == kCoreModule_ShapeIndex3D && isArray == 1)
             continue;
-}}}}
+$}
 /// Represents a handle to a$(isMS?" multisampled": "") $(shapeTypeNames[shape]) depth texture$(isArray?" array":"").
 /// @param format The storage format of the texture.
 /// @see Please refer to `_Texture` for more information about texture types.
@@ -4854,9 +5334,9 @@ typealias DepthTexture$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[i
 /// @category texture_types
 typealias Sampler$(shapeTypeNames[shape])$(msPostFix[isMS])$(arrayPostFix[isArray])Shadow<int format=0> = _Texture<float, __Shape$(shapeTypeNames[shape]), $(isArray), $(isMS), 0, 0, 1, 1, format>;
 
-${{{{
+${
     }
-}}}}
+$}
 
 // Atomic intrinsic insts.
 
@@ -4890,13 +5370,13 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 
 // Conversion between uint64_t and uint2
 
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 uint2 __asuint2(uint64_t i)
 {
     return uint2(uint(i), uint(uint64_t(i) >> 32));
 }
 
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 uint64_t __asuint64(uint2 i)
 {
     return (uint64_t(i.y) << 32) | i.x;
@@ -4905,23 +5385,23 @@ uint64_t __asuint64(uint2 i)
 //
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer)]
 T __byteAddressBufferLoad<T>(ByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RWByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferLoad))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
 T __byteAddressBufferLoad<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RWByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_ByteAddressBufferStore))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, byteaddressbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, byteaddressbuffer_rw)]
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
@@ -4957,7 +5437,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
-struct StructuredBuffer
+struct StructuredBuffer : IArray<T>
 {
 
     /// Get the dimensions of the buffer.
@@ -4965,7 +5445,7 @@ struct StructuredBuffer
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -4989,7 +5469,7 @@ struct StructuredBuffer
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     __intrinsic_op($(kIROp_StructuredBufferLoad))
     [__readNone]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer)]
     T Load<TIndex : __BuiltinIntegerType>(TIndex location);
 
     __intrinsic_op($(kIROp_StructuredBufferLoadStatus))
@@ -5005,7 +5485,7 @@ struct StructuredBuffer
     {
         [__readNone]
         __intrinsic_op($(kIROp_StructuredBufferLoad))
-        [require(cpp_cuda_glsl_hlsl_spirv, structuredbuffer)]
+        [require(cpp_cuda_glsl_hlsl_spirv_llvm, structuredbuffer)]
         get;
     };
 };
@@ -5032,7 +5512,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLConsumeStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLConsumeStructuredBufferType))
-[require(cpp_cuda_glsl_hlsl_spirv, consumestructuredbuffer)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, consumestructuredbuffer)]
 struct ConsumeStructuredBuffer
 {
     /// Reading the element at the end of the buffer indicated by the associated atomic counter
@@ -5108,7 +5588,7 @@ struct OutputPatch
     }
 };
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -5118,7 +5598,7 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedByteAddressBufferType, "RasterizerOrderedByteAddressBuffer" },
 };
 for(auto item : kMutableByteAddressBufferCases) {
-}}}}
+$}
 
 //@public:
 /**
@@ -5141,7 +5621,7 @@ struct $(item.name)
     /// Get the number of bytes in the buffer.
     ///@param[out] dim The number of bytes in the buffer.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm)]
     void GetDimensions(out uint dim)
     {
         __target_switch
@@ -5170,7 +5650,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint Load(int location)
     {
         __target_switch
@@ -5209,7 +5689,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint2 Load2(uint location)
     {
         __target_switch
@@ -5222,7 +5702,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint2 Load2Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5239,7 +5719,7 @@ struct $(item.name)
     ///@return `uint2` Two 32-bit unsigned integers loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint2 Load2Aligned(uint location)
     {
         __target_switch
@@ -5277,7 +5757,7 @@ struct $(item.name)
     /// When targeting non-HLSL, the status is always 0.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint3 Load3(uint location)
     {
         __target_switch
@@ -5290,7 +5770,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint3 Load3Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5307,7 +5787,7 @@ struct $(item.name)
     ///@return `uint3` Three 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint3 Load3Aligned(uint location)
     {
         __target_switch
@@ -5344,7 +5824,7 @@ struct $(item.name)
     /// If any values were taken from an unmapped tile, `CheckAccessFullyMapped` returns FALSE.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint4 Load4(uint location)
     {
         __target_switch
@@ -5357,7 +5837,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint4 Load4Aligned(uint location, uint alignment)
     {
         __target_switch
@@ -5374,7 +5854,7 @@ struct $(item.name)
     ///@return `uint4` Four 32-bit unsigned integer value loaded from the buffer.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     uint4 Load4Aligned(uint location)
     {
         __target_switch
@@ -5398,7 +5878,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     T Load<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, 0);
@@ -5406,7 +5886,7 @@ struct $(item.name)
 
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     T LoadAligned<T>(uint location, uint alignment)
     {
         return __byteAddressBufferLoad<T>(this, location, alignment);
@@ -5419,13 +5899,13 @@ struct $(item.name)
     ///Currently, this function only supports when `T` is scalar, vector, or matrix type.
     [__NoSideEffect]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     T LoadAligned<T>(uint location)
     {
         return __byteAddressBufferLoad<T>(this, location, __naturalStrideOf<T>());
     }
 
-${{{{
+${
     struct BufferAtomicOps
     {
         const char* name;
@@ -5442,7 +5922,7 @@ ${{{{
     };
     if (item.op == kIROp_HLSLRWByteAddressBufferType)
     {
-}}}}
+$}
 
     // float32 and int64 atomic support. This is a Slang specific extension, it uses
     // GL_EXT_shader_atomic_float on Vulkan
@@ -5536,7 +6016,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(sm_5_0)]
+    [require(cuda_hlsl_spirv, sm_5_0)]
     void InterlockedAddF16(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5576,7 +6056,7 @@ ${{{{
     /// maps to `atomicAdd`.
     [__requiresNVAPI]
     [ForceInline]
-    [require(sm_5_0)]
+    [require(cuda_hlsl_spirv, sm_5_0)]
     void InterlockedAddF16Emulated(uint byteAddress, half value, out half originalValue)
     {
         __target_switch
@@ -5681,9 +6161,9 @@ ${{{{
     // SM6.6 6 64bit atomics.
 
     // InterlockedMax64, InterlockedMin64, InterlockedAdd64, InterlockedAnd64, InterlockedOr64, InterlockedXor64, InterlockedExchange64
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform a 64-bit unsigned integer atomic $(op.internalName) operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic $(op.internalName) operation.
@@ -5722,9 +6202,9 @@ ${{{{
             return;
         }
     }
-${{{{
+${
 } // for (each bufferOps)
-}}}}
+$}
 
     /// Perform a 64-bit integer atomic compare-and-exchange operation at `byteAddress`.
     /// @param byteAddress The address at which to perform the atomic compare-and-exchange operation.
@@ -5837,15 +6317,15 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // endif (type == RWByteAddressBuffer)
-}}}}
+$}
 
     // 32-bit atomic operations:
     // InterlockedMax, InterlockedMin, InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor, InterlockedExchange
-${{{{
+${
     for (auto op : bufferAtomicOps) {
-}}}}
+$}
 
     /// Perform an atomic $(op.internalName) operation at the specified byte
     /// location of the byte address buffer.
@@ -5882,9 +6362,9 @@ ${{{{
             ::Interlocked$(op.name)(buf[dest / 4], value);
         }
     }
-${{{{
+${
 } // for (buffer atomic ops)
-}}}}
+$}
 
     /// Perform a 32-bit integer atomic compare-and-exchange operation at
     /// the specified byte address within the `RWByteAddressBuffer`.
@@ -5942,7 +6422,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 4.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store(uint address, uint value)
     {
         __target_switch
@@ -5959,7 +6439,7 @@ ${{{{
     ///@param value Two input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store2(uint address, uint2 value)
     {
         __target_switch
@@ -5972,7 +6452,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store2(uint address, uint2 value, uint alignment)
     {
         __target_switch
@@ -5988,7 +6468,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 8.
     ///@param value Two input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store2Aligned(uint address, uint2 value)
     {
         __target_switch
@@ -6004,7 +6484,7 @@ ${{{{
     ///@param value Three input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store3(uint address, uint3 value)
     {
         __target_switch
@@ -6016,7 +6496,7 @@ ${{{{
     }
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store3(uint address, uint3 value, uint alignment)
     {
         __target_switch
@@ -6032,7 +6512,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 12.
     ///@param value Three input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store3Aligned(uint address, uint3 value)
     {
         __target_switch
@@ -6048,7 +6528,7 @@ ${{{{
     ///@param value Four input values.
     ///@param alignment Specifies the alignment of the location, which must be a multiple of 4.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store4(uint address, uint4 value)
     {
         __target_switch
@@ -6061,7 +6541,7 @@ ${{{{
 
 
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store4(uint address, uint4 value, uint alignment)
     {
         __target_switch
@@ -6077,7 +6557,7 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of 16.
     ///@param value Four input values.
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store4Aligned(uint address, uint4 value)
     {
         __target_switch
@@ -6089,14 +6569,14 @@ ${{{{
     }
 
     [__unsafeForceInlineEarly]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, 0, value);
     }
 
     [__unsafeForceInlineEarly]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void Store<T>(uint address, T value, uint alignment)
     {
         __byteAddressBufferStore(this, address, alignment, value);
@@ -6108,18 +6588,18 @@ ${{{{
     ///@param address The input address in bytes, which must be a multiple of size of `T`.
     ///@param value The input value.
     [__unsafeForceInlineEarly]
-    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+    [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
     void StoreAligned<T>(uint address, T value)
     {
         __byteAddressBufferStore(this, address, __naturalStrideOf<T>(), value);
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     IROp op;
     char const* name;
@@ -6129,12 +6609,12 @@ static const struct {
     { kIROp_HLSLRasterizerOrderedStructuredBufferType, "RasterizerOrderedStructuredBuffer" },
 };
 for(auto item : kMutableStructuredBufferCases) {
-}}}}
+$}
 
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSL$(item.name)Type)
 __intrinsic_type($(item.op))
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, structuredbuffer_rw)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, structuredbuffer_rw)]
 /**
 Represents an opaque handle to a mutable structured buffer allocated in global memory.
 A structured buffer can be viewed as an array of the specified element type.
@@ -6149,12 +6629,13 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name)
+struct $(item.name) : IRWArray<T>
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint DecrementCounter();
 
     /// Get the dimensions of the buffer.
@@ -6162,7 +6643,7 @@ struct $(item.name)
     /// @param stride The stride, in bytes, of each structure element.
     [__readNone]
     [ForceInline]
-    [require(cpp_cuda_glsl_hlsl_spirv_wgsl, structuredbuffer_rw)]
+    [require(cpp_cuda_glsl_hlsl_spirv_wgsl_llvm, structuredbuffer_rw)]
     void GetDimensions(
         out uint numStructs,
         out uint stride)
@@ -6181,6 +6662,7 @@ struct $(item.name)
     /// @return The pre-incremented counter value.
     /// @remarks
     /// This function is not implemented when targeting non-HLSL.
+    [require(hlsl)]
     uint IncrementCounter();
 
     /// Load a element from the buffer at the specified location.
@@ -6221,9 +6703,9 @@ struct $(item.name)
     }
 };
 
-${{{{
+${
 }
-}}}}
+$}
 
 /// @category stage_io
 __generic<T>
@@ -6344,7 +6826,7 @@ void abort();
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
     __target_switch
@@ -6358,6 +6840,7 @@ T abs(T x)
         result:$$T = OpExtInst glsl450 SAbs $x
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     //default:
     // Note: this simple definition may not be appropriate for floating-point inputs
     // return x < 0 ? -x : x;
@@ -6366,7 +6849,7 @@ T abs(T x)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -6378,6 +6861,7 @@ vector<T, N> abs(vector<T, N> x)
         result:$$vector<T,N> = OpExtInst glsl450 SAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.abs($0, i1 true)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -6385,7 +6869,7 @@ vector<T, N> abs(vector<T, N> x)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
@@ -6398,7 +6882,7 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T abs(T x)
 {
     __target_switch
@@ -6412,12 +6896,13 @@ T abs(T x)
         result:$$T = OpExtInst glsl450 FAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fabs($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> abs(vector<T, N> x)
 {
     __target_switch
@@ -6429,6 +6914,7 @@ vector<T, N> abs(vector<T, N> x)
         result:$$vector<T,N> = OpExtInst glsl450 FAbs $x;
     };
     case wgsl: __intrinsic_asm "abs";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fabs($0)";
     default:
         VECTOR_MAP_UNARY(T, N, abs, x);
     }
@@ -6436,7 +6922,7 @@ vector<T, N> abs(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> abs(matrix<T,N,M> x)
 {
     __target_switch
@@ -6456,7 +6942,7 @@ matrix<T,N,M> abs(matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T fabs(T x)
 {
     __target_switch
@@ -6470,7 +6956,7 @@ T fabs(T x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fabs(vector<T, N> x)
 {
     __target_switch
@@ -6488,7 +6974,7 @@ vector<T, N> fabs(vector<T, N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T acos(T x)
 {
     __target_switch
@@ -6502,12 +6988,13 @@ T acos(T x)
         OpExtInst $$T result glsl450 Acos $x
     };
     case wgsl: __intrinsic_asm "acos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.acos($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> acos(vector<T, N> x)
 {
     __target_switch
@@ -6519,6 +7006,7 @@ vector<T, N> acos(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Acos $x
     };
     case wgsl: __intrinsic_asm "acos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.acos($0)";
     default:
         VECTOR_MAP_UNARY(T, N, acos, x);
     }
@@ -6526,7 +7014,7 @@ vector<T, N> acos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> acos(matrix<T, N, M> x)
 {
     __target_switch
@@ -6544,7 +7032,7 @@ matrix<T, N, M> acos(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T acosh(T x)
 {
     __target_switch
@@ -6565,7 +7053,7 @@ T acosh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> acosh(vector<T,N> x)
 {
     __target_switch
@@ -6583,7 +7071,7 @@ vector<T,N> acosh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> acosh(matrix<T, N, M> x)
 {
     __target_switch
@@ -6597,7 +7085,7 @@ matrix<T, N, M> acosh(matrix<T, N, M> x)
 // Test if all components are non-zero.
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(T x)
 {
     __target_switch
@@ -6622,6 +7110,15 @@ bool all(T x)
             return __slang_noop_cast<bool>(x);
         else
             return false;
+    case llvm:
+        if (__isFloat<T>())
+            __intrinsic_asm "%result = fcmp une $0, 0.0";
+        else if (__isInt<T>())
+            __intrinsic_asm "%result = icmp ne $0, 0";
+        else if (__isBool<T>())
+            __intrinsic_asm "ret $0";
+        else
+            return false;
     default:
         __intrinsic_asm "bool($0)";
     }
@@ -6629,7 +7126,7 @@ bool all(T x)
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(vector<T,N> x)
 {
     if(N == 1)
@@ -6690,7 +7187,7 @@ bool all(vector<T,N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool all(matrix<T,N,M> x)
 {
     __target_switch
@@ -6770,7 +7267,7 @@ uint3 WorkgroupCount()
 
 __generic<T : __BuiltinType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(T x)
 {
     __target_switch
@@ -6799,12 +7296,21 @@ bool any(T x)
         else if (__isBool<T>())
             return __slang_noop_cast<bool>(x);
         return false;
+    case llvm:
+        if (__isFloat<T>())
+            __intrinsic_asm "%result = fcmp une $0, 0.0";
+        else if (__isInt<T>())
+            __intrinsic_asm "%result = icmp ne $0, 0";
+        else if (__isBool<T>())
+            __intrinsic_asm "ret $0";
+        else
+            return false;
     }
 }
 
 __generic<T : __BuiltinType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(vector<T, N> x)
 {
     if(N == 1)
@@ -6873,7 +7379,7 @@ bool any(vector<T, N> x)
 
 __generic<T : __BuiltinType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 bool any(matrix<T, N, M> x)
 {
     __target_switch
@@ -6892,7 +7398,7 @@ bool any(matrix<T, N, M> x)
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 double asdouble(uint lowbits, uint highbits)
 {
     __target_switch
@@ -6905,12 +7411,15 @@ double asdouble(uint lowbits, uint highbits)
         %v:$$uint2 = OpCompositeConstruct $lowbits $highbits;
         result:$$double = OpExtInst glsl450 59 %v
     };
+    case llvm:
+        uint64_t val = uint64_t(lowbits) | (uint64_t(highbits)<<32u);
+        return bit_cast<double>(val);
     }
 }
 
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 double2 asdouble(uint2 lowbits, uint2 highbits)
 {
     __target_switch
@@ -6925,7 +7434,7 @@ double2 asdouble(uint2 lowbits, uint2 highbits)
 /// Reinterpret bits as a float.
 /// @category conversion
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(int x)
 {
     __target_switch
@@ -6939,11 +7448,12 @@ float asfloat(int x)
         OpBitcast $$float result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 float asfloat(uint x)
 {
     __target_switch
@@ -6957,12 +7467,13 @@ float asfloat(uint x)
         OpBitcast $$float result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float, N> asfloat(vector< int, N> x)
 {
     __target_switch
@@ -6974,6 +7485,7 @@ vector<float, N> asfloat(vector< int, N> x)
         OpBitcast $$vector<float, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -6981,7 +7493,7 @@ vector<float, N> asfloat(vector< int, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<float,N> asfloat(vector<uint,N> x)
 {
     __target_switch
@@ -6993,6 +7505,7 @@ vector<float,N> asfloat(vector<uint,N> x)
         OpBitcast $$vector<float,N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, asfloat, x);
     }
@@ -7000,8 +7513,8 @@ vector<float,N> asfloat(vector<uint,N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
-matrix<float,N,M> asfloat(matrix< int,N,M> x)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
+matrix<float,N,M> asfloat(matrix<int,N,M> x)
 {
     __target_switch
     {
@@ -7013,7 +7526,7 @@ matrix<float,N,M> asfloat(matrix< int,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<float,N,M> asfloat(matrix<uint,N,M> x)
 {
     __target_switch
@@ -7047,7 +7560,7 @@ matrix<float,N,M> asfloat(matrix<float,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T asin(T x)
 {
     __target_switch
@@ -7061,12 +7574,13 @@ T asin(T x)
         OpExtInst $$T result glsl450 Asin $x
     };
     case wgsl: __intrinsic_asm "asin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> asin(vector<T, N> x)
 {
     __target_switch
@@ -7078,6 +7592,7 @@ vector<T, N> asin(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Asin $x
     };
     case wgsl: __intrinsic_asm "asin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.asin($0)";
     default:
         VECTOR_MAP_UNARY(T,N,asin,x);
     }
@@ -7085,7 +7600,7 @@ vector<T, N> asin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> asin(matrix<T, N, M> x)
 {
     __target_switch
@@ -7103,7 +7618,7 @@ matrix<T, N, M> asin(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T asinh(T x)
 {
     __target_switch
@@ -7124,7 +7639,7 @@ T asinh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> asinh(vector<T,N> x)
 {
     __target_switch
@@ -7142,7 +7657,7 @@ vector<T,N> asinh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> asinh(matrix<T, N, M> x)
 {
     __target_switch
@@ -7156,7 +7671,7 @@ matrix<T, N, M> asinh(matrix<T, N, M> x)
 /// Reinterpret bits as an int.
 /// @category conversion
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 int asint(float x)
 {
     __target_switch
@@ -7170,11 +7685,12 @@ int asint(float x)
     case spirv: return spirv_asm {
         OpBitcast $$int result $x
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 int asint(uint x)
 {
     __target_switch
@@ -7188,12 +7704,13 @@ int asint(uint x)
         OpBitcast $$int result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<float, N> x)
 {
     __target_switch
@@ -7205,6 +7722,7 @@ vector<int, N> asint(vector<float, N> x)
         OpBitcast $$vector<int, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -7212,7 +7730,7 @@ vector<int, N> asint(vector<float, N> x)
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<int, N> asint(vector<uint, N> x)
 {
     if(N == 1)
@@ -7226,6 +7744,7 @@ vector<int, N> asint(vector<uint, N> x)
         OpBitcast $$vector<int, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(int, N, asint, x);
     }
@@ -7233,7 +7752,7 @@ vector<int, N> asint(vector<uint, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<float, N, M> x)
 {
     __target_switch
@@ -7246,7 +7765,7 @@ matrix<int, N, M> asint(matrix<float, N, M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<int, N, M> asint(matrix<uint, N, M> x)
 {
     __target_switch
@@ -7279,7 +7798,7 @@ matrix<int,N,M> asint(matrix<int,N,M> x)
 /// @category conversion
 __glsl_extension(GL_ARB_gpu_shader5)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_4_0)]
 void asuint(double value, out uint lowbits, out uint highbits)
 {
     __target_switch
@@ -7297,13 +7816,18 @@ void asuint(double value, out uint lowbits, out uint highbits)
         lowbits = uv.x;
         highbits = uv.y;
         return;
+    case llvm:
+        let value = bit_cast<uint64_t>(value);
+        lowbits = uint(value);
+        highbits = uint(value>>32u);
+        return;
     }
 }
 
 // Reinterpret bits as a uint.
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 uint asuint(float x)
 {
     __target_switch
@@ -7317,11 +7841,12 @@ uint asuint(float x)
     case spirv: return spirv_asm {
         OpBitcast $$uint result $x
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 uint asuint(int x)
 {
     __target_switch
@@ -7335,12 +7860,13 @@ uint asuint(int x)
         OpBitcast $$uint result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint,N> asuint(vector<float,N> x)
 {
     __target_switch
@@ -7354,12 +7880,13 @@ vector<uint,N> asuint(vector<float,N> x)
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_4_0)]
 vector<uint, N> asuint(vector<int, N> x)
 {
     if(N == 1)
@@ -7373,6 +7900,7 @@ vector<uint, N> asuint(vector<int, N> x)
         OpBitcast $$vector<uint, N> result $x
     };
     case wgsl: __intrinsic_asm "bitcast<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(uint, N, asuint, x);
     }
@@ -7380,7 +7908,7 @@ vector<uint, N> asuint(vector<int, N> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint,N,M> asuint(matrix<float,N,M> x)
 {
     __target_switch
@@ -7393,7 +7921,7 @@ matrix<uint,N,M> asuint(matrix<float,N,M> x)
 
 __generic<let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 matrix<uint, N, M> asuint(matrix<int, N, M> x)
 {
     __target_switch
@@ -7461,7 +7989,7 @@ matrix<uint,N,M> asuint(matrix<uint,N,M> x)
 // Float->unsigned cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 uint16_t asuint16(float16_t value)
 {
     __target_switch
@@ -7472,11 +8000,14 @@ uint16_t asuint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$uint16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    default:
+        return bit_cast<uint16_t>(value);
     }
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
 {
     __target_switch
@@ -7485,20 +8016,21 @@ vector<uint16_t,N> asuint16<let N : int>(vector<float16_t,N> value)
     case spirv: return spirv_asm {
         result:$$vector<uint16_t,N> = OpBitcast $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(uint16_t, N, asuint16, value);
     }
 }
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
 matrix<uint16_t,R,C> asuint16<let R : int, let C : int>(matrix<float16_t,R,C> value)
 { MATRIX_MAP_UNARY(uint16_t, R, C, asuint16, value); }
 
 // Unsigned->float cases:
 
 [__readNone]
-[require(cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 float16_t asfloat16(uint16_t value)
 {
     __target_switch
@@ -7509,6 +8041,9 @@ float16_t asfloat16(uint16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
+    default:
+        return bit_cast<float16_t>(value);
     }
 }
 
@@ -7521,6 +8056,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<uint16_t,N> value)
     case spirv: return spirv_asm {
         result:$$vector<float16_t,N> = OpBitcast $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, asfloat16, value);
     }
@@ -7544,6 +8080,7 @@ int16_t asint16(float16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$int16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asuint16(value);
     }
 }
@@ -7556,6 +8093,7 @@ vector<int16_t,N> asint16<let N : int>(vector<float16_t,N> value)
     {
     case hlsl: __intrinsic_asm "asint16";
     case metal: __intrinsic_asm "as_type<$TR>($0)";
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asuint16(value);
     }
 }
@@ -7583,6 +8121,7 @@ float16_t asfloat16(int16_t value)
     case spirv: return spirv_asm {
         OpBitcast $$float16_t result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asfloat16(asuint16(value));
     }
 }
@@ -7598,6 +8137,7 @@ vector<float16_t,N> asfloat16<let N : int>(vector<int16_t,N> value)
     case spirv: return spirv_asm {
         OpBitcast $$vector<float16_t,N> result $value
     };
+    case llvm: __intrinsic_asm "%result = bitcast $0 to $TR";
     default: return asfloat16(asuint16(value));
     }
 }
@@ -7619,7 +8159,7 @@ matrix<float16_t,R,C> asfloat16<let R : int, let C : int>(matrix<int16_t,R,C> va
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T atan(T x)
 {
     __target_switch
@@ -7633,12 +8173,13 @@ T atan(T x)
         OpExtInst $$T result glsl450 Atan $x
     };
     case wgsl: __intrinsic_asm "atan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> atan(vector<T, N> x)
 {
     __target_switch
@@ -7650,6 +8191,7 @@ vector<T, N> atan(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Atan $x
     };
     case wgsl: __intrinsic_asm "atan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan($0)";
     default:
         VECTOR_MAP_UNARY(T, N, atan, x);
     }
@@ -7657,7 +8199,7 @@ vector<T, N> atan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> atan(matrix<T, N, M> x)
 {
     __target_switch
@@ -7675,7 +8217,7 @@ matrix<T, N, M> atan(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T atan2(T y, T x)
 {
     __target_switch
@@ -7689,12 +8231,13 @@ T atan2(T y, T x)
         OpExtInst $$T result glsl450 Atan2 $y $x
     };
     case wgsl: __intrinsic_asm "atan2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.atan2($0, $1)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 {
     __target_switch
@@ -7713,7 +8256,7 @@ vector<T, N> atan2(vector<T, N> y, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 {
     __target_switch
@@ -7731,7 +8274,7 @@ matrix<T,N,M> atan2(matrix<T,N,M> y, matrix<T,N,M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T atanh(T x)
 {
     __target_switch
@@ -7752,7 +8295,7 @@ T atanh(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> atanh(vector<T,N> x)
 {
     __target_switch
@@ -7770,7 +8313,7 @@ vector<T,N> atanh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> atanh(matrix<T, N, M> x)
 {
     __target_switch
@@ -7787,7 +8330,7 @@ matrix<T, N, M> atanh(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T ceil(T x)
 {
     __target_switch
@@ -7801,12 +8344,13 @@ T ceil(T x)
         OpExtInst $$T result glsl450 Ceil $x
     };
     case wgsl: __intrinsic_asm "ceil";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ceil($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ceil(vector<T, N> x)
 {
     __target_switch
@@ -7818,6 +8362,7 @@ vector<T, N> ceil(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Ceil $x
     };
     case wgsl: __intrinsic_asm "ceil";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ceil($0)";
     default:
         VECTOR_MAP_UNARY(T, N, ceil, x);
     }
@@ -7825,7 +8370,7 @@ vector<T, N> ceil(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> ceil(matrix<T, N, M> x)
 {
     __target_switch
@@ -7843,7 +8388,7 @@ matrix<T, N, M> ceil(matrix<T, N, M> x)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 {
     let ux = reinterpret<vector<uint16_t,N>>(x);
@@ -7860,7 +8405,7 @@ vector<half,N> copysign_half(vector<half,N> x, vector<half,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 {
     let ux = reinterpret<vector<uint32_t,N>>(x);
@@ -7877,7 +8422,7 @@ vector<float,N> copysign_float(vector<float,N> x, vector<float,N> y)
 /// @category math
 __generic<let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<double,N> copysign_double(vector<double,N> x, vector<double,N> y)
 {
     let ux = reinterpret<vector<uint64_t,N>>(x);
@@ -7898,7 +8443,7 @@ vector<T,N> __real_cast(vector<U,N> val);
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -7924,7 +8469,7 @@ vector<T,N> copysign(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T copysign(T x, T y)
 {
     __target_switch
@@ -7961,7 +8506,7 @@ bool CheckAccessFullyMapped(uint status)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -7986,7 +8531,7 @@ T clamp(T x, T minBound, T maxBound)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -8011,7 +8556,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -8024,7 +8569,7 @@ matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBo
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T clamp(T x, T minBound, T maxBound)
 {
     __target_switch
@@ -8043,7 +8588,7 @@ T clamp(T x, T minBound, T maxBound)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 {
     __target_switch
@@ -8062,7 +8607,7 @@ vector<T, N> clamp(vector<T, N> x, vector<T, N> minBound, vector<T, N> maxBound)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> clamp(matrix<T,N,M> x, matrix<T,N,M> minBound, matrix<T,N,M> maxBound)
 {
     __target_switch
@@ -8116,7 +8661,7 @@ void clip(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T cos(T x)
 {
     __target_switch
@@ -8130,12 +8675,13 @@ T cos(T x)
         OpExtInst $$T result glsl450 Cos $x
     };
     case wgsl: __intrinsic_asm "cos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> cos(vector<T, N> x)
 {
     __target_switch
@@ -8147,6 +8693,7 @@ vector<T, N> cos(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Cos $x
     };
     case wgsl: __intrinsic_asm "cos";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.cos($0)";
     default:
         VECTOR_MAP_UNARY(T,N, cos, x);
     }
@@ -8154,7 +8701,7 @@ vector<T, N> cos(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> cos(matrix<T, N, M> x)
 {
     __target_switch
@@ -8171,7 +8718,7 @@ matrix<T, N, M> cos(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T cosh(T x)
 {
     __target_switch
@@ -8185,12 +8732,13 @@ T cosh(T x)
         OpExtInst $$T result glsl450 Cosh $x
     };
     case wgsl: __intrinsic_asm "cosh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.cosh($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> cosh(vector<T,N> x)
 {
     __target_switch
@@ -8209,7 +8757,7 @@ vector<T,N> cosh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> cosh(matrix<T, N, M> x)
 {
     __target_switch
@@ -8227,7 +8775,7 @@ matrix<T, N, M> cosh(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T cospi(T x)
 {
     __target_switch
@@ -8240,7 +8788,7 @@ T cospi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> cospi(vector<T,N> x)
 {
     __target_switch
@@ -8270,7 +8818,7 @@ internal uint __emulatedCountbits64(uint64_t value)
 /// @category bitops
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 __generic<T : __BuiltinIntegerType>
 uint countbits(T value)
 {
@@ -8332,13 +8880,20 @@ uint countbits(T value)
                 return countbits(__intCast<uint32_t>(value));
             }
             __intrinsic_asm "countOneBits";
+    case llvm:
+        if (T is int32_t || T is uint32_t)
+            __intrinsic_asm "%result = call $T0 @llvm.ctpop($0)";
+        else if (T is int64_t || T is uint64_t || T is uintptr_t || T is intptr_t)
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = trunc $T0 %c to $TR";
+        else
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = zext $T0 %c to $TR";
     }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> countbits(vector<T, N> value)
 {
     // Emulate 8-bit support
@@ -8386,6 +8941,13 @@ vector<uint, N> countbits(vector<T, N> value)
             return ret;
         }
             __intrinsic_asm "countOneBits";
+    case llvm:
+        if (T is int32_t || T is uint32_t)
+            __intrinsic_asm "%result = call $T0 @llvm.ctpop($0)";
+        else if (T is int64_t || T is uint64_t || T is uintptr_t || T is intptr_t)
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = trunc $T0 %c to $TR";
+        else
+            __intrinsic_asm "%c = call $T0 @llvm.ctpop($0)\n%result = zext $T0 %c to $TR";
     default:
         VECTOR_MAP_UNARY(uint, N, countbits, value);
     }
@@ -8398,7 +8960,7 @@ vector<uint, N> countbits(vector<T, N> value)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 {
     // TODO: SPIRV does not support integer vectors.
@@ -8421,7 +8983,7 @@ vector<T,3> cross(vector<T,3> left, vector<T,3> right)
 
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 {
     __target_switch
@@ -8442,7 +9004,7 @@ vector<T, 3> cross(vector<T, 3> left, vector<T, 3> right)
 
 // Convert encoded color
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 int4 D3DCOLORtoUBYTE4(float4 color)
 {
     __target_switch
@@ -8456,10 +9018,10 @@ int4 D3DCOLORtoUBYTE4(float4 color)
 }
 
 // Partial-difference derivatives
-${{{{
+${
 const char* diffDimensions[2] = {"x", "y"};
 for (auto xOrY : diffDimensions) {
-}}}}
+$}
 /// Take the partial derivative of `p` with respect to $(xOrY) in screen space.
 /// @param p The value to take partial derivative for.
 /// @return The partial derivative of `p`.
@@ -8626,9 +9188,9 @@ matrix<T, N, M> dd$(xOrY)_fine(matrix<T, N, M> p)
     }
 }
 
-${{{{
+${
 } // for (xOrY)
-}}}}
+$}
 
 
 /// Convert radians to degrees.
@@ -8637,7 +9199,7 @@ ${{{{
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T degrees(T x)
 {
     __target_switch
@@ -8655,7 +9217,7 @@ T degrees(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T, N> degrees(vector<T, N> x)
 {
     __target_switch
@@ -8673,7 +9235,7 @@ vector<T, N> degrees(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 matrix<T, N, M> degrees(matrix<T, N, M> x)
 {
     __target_switch
@@ -8691,7 +9253,7 @@ matrix<T, N, M> degrees(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [PreferCheckpoint]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -8743,7 +9305,7 @@ T determinant(matrix<T,N,N> m)
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T determinant(matrix<T,N,N> m)
 {
     __target_switch
@@ -8833,7 +9395,7 @@ void DeviceMemoryBarrierWithGroupSync()
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T distance(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -8852,7 +9414,7 @@ T distance(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T distance(T x, T y)
 {
     __target_switch
@@ -8874,7 +9436,7 @@ T distance(T x, T y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fdim(T x, T y)
 {
     __target_switch
@@ -8887,7 +9449,7 @@ T fdim(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -8905,7 +9467,7 @@ vector<T,N> fdim(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 T divide(T x, T y)
 {
     __target_switch
@@ -8918,7 +9480,7 @@ T divide(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm)]
 vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -8938,7 +9500,7 @@ vector<T,N> divide(vector<T,N> x, vector<T,N> y)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(T x, T y)
 {
     __target_switch
@@ -8953,7 +9515,7 @@ T dot(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Handle 1-vector case explicitly since many backends don't support it natively
@@ -8961,7 +9523,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
         return x[0] * y[0];
     }
-    
+
     __target_switch
     {
     case glsl: __intrinsic_asm "dot";
@@ -8981,7 +9543,7 @@ T dot(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T dot(vector<T, N> x, vector<T, N> y)
 {
     // Handle 1-vector case explicitly since many backends don't support it natively
@@ -8989,7 +9551,7 @@ T dot(vector<T, N> x, vector<T, N> y)
     {
         return x[0] * y[0];
     }
-    
+
     __target_switch
     {
     case hlsl: __intrinsic_asm "dot";
@@ -9300,7 +9862,7 @@ matrix<T,N,M> EvaluateAttributeSnapped(__constref matrix<T,N,M> x, int2 offset)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp(T x)
 {
     __target_switch
@@ -9314,13 +9876,14 @@ T exp(T x)
         OpExtInst $$T result glsl450 Exp $x
     };
     case wgsl: __intrinsic_asm "exp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     }
 }
 
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> exp(vector<T, N> x)
 {
     __target_switch
@@ -9332,6 +9895,7 @@ vector<T, N> exp(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Exp $x
     };
     case wgsl: __intrinsic_asm "exp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp($0)";
     default:
         VECTOR_MAP_UNARY(T, N, exp, x);
     }
@@ -9340,7 +9904,7 @@ vector<T, N> exp(vector<T, N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> exp(matrix<T, N, M> x)
 {
     __target_switch
@@ -9357,7 +9921,7 @@ matrix<T, N, M> exp(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp2(T x)
 {
     __target_switch
@@ -9385,13 +9949,15 @@ T exp2(T x)
         __intrinsic_asm "$P_exp2($0)";
     case wgsl:
         __intrinsic_asm "exp2";
+    case llvm:
+        __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
     }
 
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp2(vector<T,N> x)
 {
     __target_switch
@@ -9404,6 +9970,7 @@ vector<T,N> exp2(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Exp2 $x
     };
     case wgsl: __intrinsic_asm "exp2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.exp2($0)";
     default:
         VECTOR_MAP_UNARY(T, N, exp2, x);
     }
@@ -9411,7 +9978,7 @@ vector<T,N> exp2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp2(matrix<T,N,M> x)
 {
     __target_switch
@@ -9428,7 +9995,7 @@ matrix<T,N,M> exp2(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T exp10(T x)
 {
     __target_switch
@@ -9442,7 +10009,7 @@ T exp10(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> exp10(vector<T,N> x)
 {
     __target_switch
@@ -9456,7 +10023,7 @@ vector<T,N> exp10(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> exp10(matrix<T,N,M> x)
 {
     __target_switch
@@ -9472,7 +10039,7 @@ matrix<T,N,M> exp10(matrix<T,N,M> x)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 float f16tof32(uint value)
 {
     __target_switch
@@ -9491,12 +10058,17 @@ float f16tof32(uint value)
         };
     }
     case wgsl: __intrinsic_asm "unpack2x16float($0).x";
+    case llvm: __intrinsic_asm R"(
+        %a = trunc $0 to i16
+        %b = bitcast i16 %a to half
+        %result = fpext half %b to float
+    )";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<uint, N> value)
 {
     __target_switch
@@ -9520,7 +10092,7 @@ vector<float, N> f16tof32(vector<uint, N> value)
 __glsl_version(420)
 __cuda_sm_version(6.0)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 uint f32tof16(float value)
 {
     __target_switch
@@ -9539,12 +10111,17 @@ uint f32tof16(float value)
         };
     }
     case wgsl: __intrinsic_asm "pack2x16float(vec2f($0,0.0))";
+    case llvm: __intrinsic_asm R"(
+        %a = fptrunc $0 to half
+        %b = bitcast half %a to i16
+        %result = zext i16 %b to i32
+    )";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<uint, N> f32tof16(vector<float, N> value)
 {
     __target_switch
@@ -9570,7 +10147,7 @@ vector<uint, N> f32tof16(vector<float, N> value)
 
 __glsl_version(420)
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 float f16tof32(float16_t value)
 {
     __target_switch
@@ -9587,12 +10164,13 @@ float f16tof32(float16_t value)
         };
     }
     case wgsl: __intrinsic_asm "f32($0)";
+    case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float, N> f16tof32(vector<float16_t, N> value)
 {
     __target_switch
@@ -9603,6 +10181,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float, N> result $value
     };
+    case llvm: __intrinsic_asm "%result = fpext $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float, N, f16tof32, value);
     }
@@ -9612,7 +10191,7 @@ vector<float, N> f16tof32(vector<float16_t, N> value)
 /// @category conversion
 __glsl_version(420)
 [__readNone]
-[require(cuda_glsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 float16_t f32tof16_(float value)
 {
     __target_switch
@@ -9624,12 +10203,13 @@ float16_t f32tof16_(float value)
         OpFConvert $$float16_t result $value
     };
     case wgsl: __intrinsic_asm "f16($0)";
+    case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     }
 }
 
 __generic<let N : int>
 [__readNone]
-[require(cuda_glsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cuda_glsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<float16_t, N> f32tof16_(vector<float, N> value)
 {
     __target_switch
@@ -9639,6 +10219,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
     case spirv: return spirv_asm {
         OpFConvert $$vector<float16_t, N> result $value
     };
+    case llvm: __intrinsic_asm "%result = fptrunc $0 to $TR";
     default:
         VECTOR_MAP_UNARY(float16_t, N, f32tof16_, value);
     }
@@ -9654,7 +10235,7 @@ vector<float16_t, N> f32tof16_(vector<float, N> value)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 {
     __target_switch
@@ -9672,7 +10253,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 // Helper functions for Metal target
-internal int __metal_clz(int value)
+internal T __metal_clz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -9680,15 +10261,7 @@ internal int __metal_clz(int value)
     }
 }
 
-internal uint __metal_clz(uint value)
-{
-    __target_switch
-    {
-    case metal: __intrinsic_asm "clz";
-    }
-}
-
-internal int __metal_ctz(int value)
+internal T __metal_ctz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -9696,11 +10269,35 @@ internal int __metal_ctz(int value)
     }
 }
 
-internal uint __metal_ctz(uint value)
+internal T __llvm_ctlz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case metal: __intrinsic_asm "ctz";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.ctlz($0, i1 1)";
+    }
+}
+
+internal T __llvm_cttz<T : __BuiltinIntegerType>(T value)
+{
+    __target_switch
+    {
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.cttz($0, i1 1)";
+    }
+}
+
+internal T __wgsl_firstLeadingBit<T>(T value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "firstLeadingBit";
+    }
+}
+
+internal T __wgsl_firstTrailingBit<T>(T value)
+{
+    __target_switch
+    {
+    case wgsl: __intrinsic_asm "firstTrailingBit";
     }
 }
 
@@ -9715,86 +10312,105 @@ internal uint __metal_ctz(uint value)
 ///          or `FindUMsb` if `value` is unsigned.
 /// @category bitops Bit operation functions
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-int firstbithigh(int value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+uint firstbithigh<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_firstbithigh($0)";
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
-    case glsl: __intrinsic_asm "findMSB";
+    case glsl:
+        __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
     case metal:
         {
-            if ((int)value < 0)
+            if (__isSignedInt<T>() && value < T(0))
                 value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __metal_clz(value);
+            if (value == T(0))
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__metal_clz(value));
         }
-    case spirv: return spirv_asm {
-        OpExtInst $$int result glsl450 FindSMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
-    }
-}
-
-__generic<let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<int, N> firstbithigh(vector<int, N> value)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "findMSB";
-    case hlsl: __intrinsic_asm "firstbithigh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
-    default:
-        VECTOR_MAP_UNARY(int, N, firstbithigh, value);
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint firstbithigh(uint value)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_firstbithigh($0)";
-    case cuda: __intrinsic_asm "$P_firstbithigh($0)";
-    case glsl: __intrinsic_asm "findMSB";
-    case hlsl: __intrinsic_asm "firstbithigh";
-    case metal:
+    case spirv:
+        if (T is int)
         {
-            if ((int)value < 0)
-                value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __metal_clz(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindSMsb $value
+            };
         }
-    case spirv: return spirv_asm {
-        OpExtInst $$uint result glsl450 FindUMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+        else if (T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $value
+            };
+        }
+        else if (T is int8_t || T is int16_t)
+        {
+            int value32 = __intCast<int>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindSMsb $value32
+            };
+        }
+        else if (T is uint8_t || T is uint16_t)
+        {
+            uint value32 = __intCast<uint>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $value32
+            };
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            if (__isSignedInt<T>() && value < T(0))
+                val = ~val;
+
+            uint2 halves = __asuint2(val);
+            uint highestBitHalf = halves.y != 0 ? halves.y : halves.x;
+            uint count = spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $highestBitHalf
+            };
+
+            if (count == ~0u)
+                return uint(-1);
+
+            if (halves.y != 0)
+                count += 32;
+            return count;
+        }
+    case wgsl: return __intCast<uint>(__wgsl_firstLeadingBit(value));
+    case llvm:
+        {
+            if (__isSignedInt<T>() && value < T(0))
+                value = ~value;
+            if (value == T(0))
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__llvm_ctlz(value));
+        }
     }
 }
 
-__generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<uint,N> firstbithigh(vector<uint,N> value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+    case spirv:
+        if (T is int)
+        {
+            return spirv_asm {
+                OpExtInst $$vector<uint, N> result glsl450 FindSMsb $value
+            };
+        }
+        else if (T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$vector<uint, N> result glsl450 FindUMsb $value
+            };
+        }
+        else VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
+    case wgsl: return vector<uint, N>(__wgsl_firstLeadingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     }
@@ -9807,72 +10423,72 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 /// @remarks For SPIR-V, this function maps to GLSL extended instruction `FindILsb`.
 /// @category bitops
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-int firstbitlow(int value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+uint firstbitlow<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_firstbitlow($0)";
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
-    case glsl: __intrinsic_asm "findLSB";
+    case glsl:
+        if (T is int64_t || T is uint64_t)
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+        __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: return (value==0) ? -1 : __metal_ctz(value);
-    case spirv: return spirv_asm {
-        OpExtInst $$int result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
+    case metal: return (value == T(0)) ? uint(-1) : __intCast<uint>(__metal_ctz(value));
+    case spirv:
+        if (T is int || T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $value
+            };
+        }
+        else if (T is int8_t || T is int16_t || T is uint8_t || T is uint16_t)
+        {
+            uint value32 = __intCast<uint>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $value
+            };
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            uint2 halves = __asuint2(val);
+            uint lowestBitHalf = halves.x != 0 ? halves.x : halves.y;
+            uint count = spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $lowestBitHalf
+            };
+
+            if (count == ~0u)
+                return uint(-1);
+
+            if (halves.x == 0)
+                count += 32;
+
+            return count;
+        }
+    case wgsl: return __intCast<uint>(__wgsl_firstTrailingBit(value));
+    case llvm: return value == T(0) ? uint(-1) : __intCast<uint>(__llvm_cttz(value));
     }
 }
 
-__generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<int,N> firstbitlow(vector<int,N> value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<int,N> result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
-    default:
-        VECTOR_MAP_UNARY(int, N, firstbitlow, value);
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint firstbitlow(uint value)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_firstbitlow($0)";
-    case cuda: __intrinsic_asm "$P_firstbitlow($0)";
-    case glsl: __intrinsic_asm "findLSB";
-    case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: return (value==0) ? -1 : __metal_ctz(value);
-    case spirv: return spirv_asm {
-        OpExtInst $$uint result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
-    }
-}
-
-__generic<let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<uint,N> firstbitlow(vector<uint,N> value)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "findLSB";
-    case hlsl: __intrinsic_asm "firstbitlow";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
+    case spirv:
+        if (T is int || T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
+            };
+        }
+        else VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
+    case wgsl: return vector<uint, N>(__wgsl_firstTrailingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     }
@@ -9884,7 +10500,7 @@ vector<uint,N> firstbitlow(vector<uint,N> value)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T floor(T x)
 {
     __target_switch
@@ -9898,12 +10514,13 @@ T floor(T x)
         OpExtInst $$T result glsl450 Floor $x
     };
     case wgsl: __intrinsic_asm "floor";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.floor($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> floor(vector<T, N> x)
 {
     __target_switch
@@ -9915,6 +10532,7 @@ vector<T, N> floor(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Floor $x
     };
     case wgsl: __intrinsic_asm "floor";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.floor($0)";
     default:
         VECTOR_MAP_UNARY(T, N, floor, x);
     }
@@ -9922,7 +10540,7 @@ vector<T, N> floor(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> floor(matrix<T, N, M> x)
 {
     __target_switch
@@ -9941,7 +10559,7 @@ matrix<T, N, M> floor(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 T fma(T a, T b, T c)
 {
     __target_switch
@@ -9959,6 +10577,7 @@ T fma(T a, T b, T c)
         OpExtInst $$T result glsl450 Fma $a $b $c
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fmuladd($0, $1, $2)";
     default:
         return a*b + c;
     }
@@ -9966,7 +10585,7 @@ T fma(T a, T b, T c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 {
     __target_switch
@@ -9978,6 +10597,7 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
         OpExtInst $$vector<T, N> result glsl450 Fma $a $b $c
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fmuladd($0, $1, $2)";
     default:
         VECTOR_MAP_TRINARY(T, N, fma, a, b, c);
     }
@@ -9985,7 +10605,7 @@ vector<T, N> fma(vector<T, N> a, vector<T, N> b, vector<T, N> c)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 {
     __target_switch
@@ -10007,7 +10627,7 @@ matrix<T, N, M> fma(matrix<T, N, M> a, matrix<T, N, M> b, matrix<T, N, M> c)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T fmod(T x, T y)
 {
     // In HLSL, `fmod` returns a remainder.
@@ -10074,13 +10694,15 @@ T fmod(T x, T y)
         };
     case wgsl:
         __intrinsic_asm "(($0) % ($1))";
+    case llvm:
+        __intrinsic_asm "%result = frem $0, $_1";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -10097,7 +10719,7 @@ vector<T, N> fmod(vector<T, N> x, vector<T, N> y)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -10114,7 +10736,7 @@ matrix<T, N, M> fmod(matrix<T, N, M> x, matrix<T, N, M> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T frac(T x)
 {
     __target_switch
@@ -10128,12 +10750,14 @@ T frac(T x)
         OpExtInst $$T result glsl450 Fract $x
     };
     case wgsl: __intrinsic_asm "fract";
+    default:
+        return x - floor(x);
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frac(vector<T, N> x)
 {
     __target_switch
@@ -10145,6 +10769,8 @@ vector<T, N> frac(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Fract $x
     };
     case wgsl: __intrinsic_asm "fract";
+    case llvm:
+        return x - floor(x);
     default:
         VECTOR_MAP_UNARY(T, N, frac, x);
     }
@@ -10164,7 +10790,7 @@ matrix<T, N, M> frac(matrix<T, N, M> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T fract(T x)
 {
     return frac(x);
@@ -10173,7 +10799,7 @@ T fract(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> fract(vector<T, N> x)
 {
     return frac(x);
@@ -10187,7 +10813,7 @@ vector<T, N> fract(vector<T, N> x)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T frexp(T x, out int exp)
 {
     __target_switch
@@ -10204,6 +10830,14 @@ T frexp(T x, out int exp)
         T fract;
         __wgsl_frexp<T>(x, fract, exp);
         return fract;
+    case llvm:
+        __intrinsic_asm R"(
+            %a = call {$TR, i32} @llvm.frexp($0)
+            %f = extractvalue {$TR, i32} %a, 0
+            %e = extractvalue {$TR, i32} %a, 1
+            store i32 %e, $1
+            ret $TR %f
+        )";
     }
 }
 
@@ -10219,7 +10853,7 @@ void __wgsl_frexp(T x, out T fract, out int exp)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> frexp(vector<T, N> x, out vector<int, N> exp)
 {
     __target_switch
@@ -10251,7 +10885,7 @@ void __wgsl_frexp(vector<T, N> x, out vector<T, N> fract, out vector<int, N> exp
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> frexp(matrix<T, N, M> x, out matrix<int, N, M, L> exp)
 {
     __target_switch
@@ -10659,7 +11293,7 @@ __generic<TextureAccess>
 __intrinsic_op($(kIROp_ExtractArrayCoordFromTextureAccess))
 uint __extractArrayCoordFromTextureAccess(__ref TextureAccess x);
 
-${{{{
+${
 // Generates code for:
 // InterlockedAdd, InterlockedAnd, InterlockedOr, InterlockedXor,
 // InterlockedMax, InterlockedMin, InterlockedExchange
@@ -10682,7 +11316,7 @@ SlangAtomicOperationInfo slangAtomicOperationInfo[7] = {
 
 for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
 {
-}}}}
+$}
 
 /// Perform an atomic $(atomicOp.internalCallSuffix) operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -10719,9 +11353,9 @@ void Interlocked$(atomicOp.slangCallSuffix)(__ref uint dest, int value)
     __atomic_$(atomicOp.internalCallSuffix)(dest, (uint)value);
 }
 
-${{{{
+${
 } // for (SlangAtomicOperationInfo atomicOp : slangAtomicOperationInfo)
-}}}}
+$}
 
 /// Perform an atomic compare and exchange operation on `dest`.
 /// @param T The type of the value to perform the atomic operation on.
@@ -10833,7 +11467,7 @@ void InterlockedCompareStoreFloatBitwise<T:IAtomicable>(__ref  T dest,  T compar
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 bool isfinite(T x)
 {
     __target_switch
@@ -10844,6 +11478,8 @@ bool isfinite(T x)
         __intrinsic_asm "$P_isfinite($0)";
     case metal:
         __intrinsic_asm "isfinite";
+    case llvm:
+    __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 u0x1F8)";
     default:
         return !(isinf(x) || isnan(x));
     }
@@ -10851,7 +11487,7 @@ bool isfinite(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isfinite(vector<T, N> x)
 {
     __target_switch
@@ -10869,7 +11505,7 @@ vector<bool, N> isfinite(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 {
     __target_switch
@@ -10886,7 +11522,7 @@ matrix<bool, N, M> isfinite(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 bool isinf(T x)
 {
     __target_switch
@@ -10910,12 +11546,13 @@ bool isinf(T x)
             return exp == 0xffu && frac == 0u;
         }
         return false;
+    case llvm: __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 u0x204)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isinf(vector<T, N> x)
 {
     __target_switch
@@ -10933,7 +11570,7 @@ vector<bool, N> isinf(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isinf(matrix<T, N, M> x)
 {
     __target_switch
@@ -10950,7 +11587,7 @@ matrix<bool, N, M> isinf(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 bool isnan(T x)
 {
     __target_switch
@@ -10974,12 +11611,13 @@ bool isnan(T x)
             return exp == 0xffu && frac != 0u;
         }
         return false;
+    case llvm: __intrinsic_asm "%result = call i1 @llvm.is.fpclass($0, i32 3)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<bool, N> isnan(vector<T, N> x)
 {
     __target_switch
@@ -10997,7 +11635,7 @@ vector<bool, N> isnan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<bool, N, M> isnan(matrix<T, N, M> x)
 {
     __target_switch
@@ -11015,7 +11653,7 @@ matrix<bool, N, M> isnan(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T ldexp(T x, T exp)
 {
     __target_switch
@@ -11030,7 +11668,7 @@ T ldexp(T x, T exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 {
     __target_switch
@@ -11045,7 +11683,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<T, N> exp)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 {
     __target_switch
@@ -11058,7 +11696,7 @@ matrix<T, N, M> ldexp(matrix<T, N, M> x, matrix<T, N, M> exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T ldexp(T x, E exp)
 {
     __target_switch
@@ -11070,6 +11708,7 @@ T ldexp(T x, E exp)
         OpExtInst $$T result glsl450 Ldexp $x $exp
     };
     case wgsl: __intrinsic_asm "ldexp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ldexp($0, $1)";
     default:
         return ldexp(x, __realCast<T>(exp));
     }
@@ -11077,7 +11716,7 @@ T ldexp(T x, E exp)
 
 __generic<T : __BuiltinFloatingPointType, E : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 {
     __target_switch
@@ -11089,6 +11728,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
         OpExtInst $$vector<T,N> result glsl450 Ldexp $x $exp
     };
     case wgsl: __intrinsic_asm "ldexp";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.ldexp($0, $1)";
     default:
         vector<T,N> temp;
         [ForceUnroll]
@@ -11105,7 +11745,7 @@ vector<T, N> ldexp(vector<T, N> x, vector<E, N> exp)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T length(vector<T, N> x)
 {
     __target_switch
@@ -11123,7 +11763,7 @@ T length(vector<T, N> x)
 }
 
 __generic<T : __BuiltinFloatingPointType>
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T length(T x)
 {
     __target_switch
@@ -11201,7 +11841,7 @@ matrix<T,N,M> lerp(matrix<T,N,M> x, matrix<T,N,M> y, matrix<T,N,M> s)
 /// @deprecated
 /// @category math
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 float4 lit(float n_dot_l, float n_dot_h, float m)
 {
     __target_switch
@@ -11221,7 +11861,7 @@ float4 lit(float n_dot_l, float n_dot_h, float m)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T log(T x)
 {
     __target_switch
@@ -11235,12 +11875,13 @@ T log(T x)
         OpExtInst $$T result glsl450 Log $x
     };
     case wgsl: __intrinsic_asm "log";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> log(vector<T, N> x)
 {
     __target_switch
@@ -11252,6 +11893,7 @@ vector<T, N> log(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Log $x
     };
     case wgsl: __intrinsic_asm "log";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log, x);
     }
@@ -11259,7 +11901,7 @@ vector<T, N> log(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> log(matrix<T, N, M> x)
 {
     __target_switch
@@ -11276,7 +11918,7 @@ matrix<T, N, M> log(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T log10(T x)
 {
     __target_switch
@@ -11295,12 +11937,13 @@ T log10(T x)
             result:$$T = OpFMul %baseElog $tmp
         };
     }
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> log10(vector<T,N> x)
 {
     __target_switch
@@ -11317,6 +11960,7 @@ vector<T,N> log10(vector<T,N> x)
             result:$$vector<T,N> = OpVectorTimesScalar %baseElog $tmp
         };
     }
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log10($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log10, x);
     }
@@ -11324,7 +11968,7 @@ vector<T,N> log10(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 matrix<T,N,M> log10(matrix<T,N,M> x)
 {
     __target_switch
@@ -11341,7 +11985,7 @@ matrix<T,N,M> log10(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T log2(T x)
 {
     __target_switch
@@ -11355,12 +11999,13 @@ T log2(T x)
         OpExtInst $$T result glsl450 Log2 $x
     };
     case wgsl: __intrinsic_asm "log2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> log2(vector<T,N> x)
 {
     __target_switch
@@ -11372,6 +12017,7 @@ vector<T,N> log2(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Log2 $x
     };
     case wgsl: __intrinsic_asm "log2";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.log2($0)";
     default:
         VECTOR_MAP_UNARY(T, N, log2, x);
     }
@@ -11379,7 +12025,7 @@ vector<T,N> log2(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> log2(matrix<T,N,M> x)
 {
     __target_switch
@@ -11398,7 +12044,7 @@ matrix<T,N,M> log2(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
@@ -11412,12 +12058,13 @@ T mad(T mvalue, T avalue, T bvalue)
         OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fma($0, $1, $2)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
@@ -11429,6 +12076,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
         OpExtInst $$vector<T, N> result glsl450 Fma $mvalue $avalue $bvalue
     };
     case wgsl: __intrinsic_asm "fma";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.fma($0, $1, $2)";
     default:
         VECTOR_MAP_TRINARY(T, N, mad, mvalue, avalue, bvalue);
     }
@@ -11436,7 +12084,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     __target_switch
@@ -11449,7 +12097,7 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 T mad(T mvalue, T avalue, T bvalue)
 {
     __target_switch
@@ -11461,12 +12109,14 @@ T mad(T mvalue, T avalue, T bvalue)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 Fma $mvalue $avalue $bvalue
     };
+    default:
+        return mvalue * avalue + bvalue;
     }
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 {
     __target_switch
@@ -11483,7 +12133,7 @@ vector<T, N> mad(vector<T, N> mvalue, vector<T, N> avalue, vector<T, N> bvalue)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, shader5_sm_5_0)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, shader5_sm_5_0)]
 matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N, M> bvalue)
 {
     __target_switch
@@ -11494,6 +12144,47 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
     }
 }
 
+// Internal helper for max - contains the intrinsic implementations.
+// Caller must ensure T is a builtin scalar type (float, int, etc.).
+//@ hidden:
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T __max_impl(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "max";
+    case glsl: __intrinsic_asm "max";
+    case metal: __intrinsic_asm "max";
+    case wgsl: __intrinsic_asm "max";
+    case cuda: __intrinsic_asm "$P_max($0, $1)";
+    case cpp: __intrinsic_asm "$P_max($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 FMax $x $y };
+        else if (__isSignedInt<T>())
+                return spirv_asm { result:$$T = OpExtInst glsl450 SMax $x $y };
+            else
+                return spirv_asm { result:$$T = OpExtInst glsl450 UMax $x $y };
+    case llvm:
+        if (__isFloat<T>())
+        {
+            // We can only handle NaN for __BuiltinFloatingPointType,
+            // but not types conforming to IFloat for now
+            // if (isnan(x)) return y;
+            // if (isnan(y)) return x;
+            return x > y ? x : y;
+        }
+        else if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
+    }
+}
+
+//@public:
 /// Maximum.
 /// @param x The first value.
 /// @param y The second value.
@@ -11501,44 +12192,40 @@ matrix<T, N, M> mad(matrix<T, N, M> mvalue, matrix<T, N, M> avalue, matrix<T, N,
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
-    // Note: a core module implementation of `max` (or `min`) will require splitting
-    // floating-point and integer cases apart, because the floating-point
-    // version needs to correctly handle the case where one of the inputs
-    // is not-a-number.
+    return __max_impl(x, y);
+}
 
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    case cpp: __intrinsic_asm "$P_max($0, $1)";
-    case spirv:
-    {
-        if (__isSignedInt<T>())
-        {
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 SMax $x $y
-            };
-        }
-        else
-        {
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 UMax $x $y
-            };
-        }
-    }
-    case wgsl: __intrinsic_asm "max";
-    }
+/// Maximum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The maximum of `x` and `y`.
+/// @remarks This overload allows using `max` in generic code constrained by `IComparable`.
+/// For concrete integer and floating-point types, the more specific overloads are preferred.
+/// @category math
+__generic<T : IComparable>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T max(T x, T y)
+{
+    // For builtin scalar types, use optimized intrinsics
+    if (__isFloat<T>() || __isInt<T>())
+        return __max_impl(x, y);
+
+    // For user-defined types, use IComparable.lessThan
+    if (x.lessThan(y))
+        return y;
+    return x;
 }
 
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -11562,6 +12249,13 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
         }
     }
     case wgsl: __intrinsic_asm "max";
+    case llvm:
+    {
+        if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smax($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umax($0, $1)";
+    }
     default:
         VECTOR_MAP_BINARY(T, N, max, x, y);
     }
@@ -11570,7 +12264,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 /// @category math
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -11583,26 +12277,28 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T max(T x, T y)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "max";
-    case metal: __intrinsic_asm "max";
-    case glsl: __intrinsic_asm "max";
-    case cuda: __intrinsic_asm "$P_max($0, $1)";
-    case cpp: __intrinsic_asm "$P_max($0, $1)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 FMax $x $y
-    };
-    case wgsl: __intrinsic_asm "max";
+    case llvm:
+        // Unfortunately, as of LLVM 21.1.1, maximumnum seems to generate
+        // invalid code on x86.
+        //__intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
+        if (isnan(x)) return y;
+        if (isnan(y)) return x;
+        return x > y ? x : y;
+
+    default:    
+        return __max_impl(x, y);
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> max(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -11614,6 +12310,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
         result:$$vector<T, N> = OpExtInst glsl450 FMax $x $y
     };
     case wgsl: __intrinsic_asm "max";
+    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.maximumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, max, x, y);
     }
@@ -11621,7 +12318,7 @@ vector<T, N> max(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 {
     __target_switch
@@ -11640,7 +12337,7 @@ matrix<T, N, M> max(matrix<T, N, M> x, matrix<T, N, M> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T max3(T x, T y, T z)
 {
     __target_switch
@@ -11653,7 +12350,7 @@ T max3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -11672,7 +12369,7 @@ vector<T,N> max3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fmax(T x, T y)
 {
     __target_switch
@@ -11685,7 +12382,7 @@ T fmax(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -11705,7 +12402,7 @@ vector<T,N> fmax(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fmax3(T x, T y, T z)
 {
     __target_switch
@@ -11720,7 +12417,7 @@ T fmax3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -11731,6 +12428,47 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
     }
 }
 
+// Internal helper for min - contains the intrinsic implementations.
+// Caller must ensure T is a builtin scalar type (float, int, etc.).
+//@ hidden:
+__generic<T : IComparable>
+[__unsafeForceInlineEarly]
+[__readNone]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T __min_impl(T x, T y)
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "min";
+    case glsl: __intrinsic_asm "min";
+    case metal: __intrinsic_asm "min";
+    case wgsl: __intrinsic_asm "min";
+    case cuda: __intrinsic_asm "$P_min($0, $1)";
+    case cpp: __intrinsic_asm "$P_min($0, $1)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 FMin $x $y };
+        else if (__isSignedInt<T>())
+            return spirv_asm { result:$$T = OpExtInst glsl450 SMin $x $y };
+        else
+            return spirv_asm { result:$$T = OpExtInst glsl450 UMin $x $y };
+    case llvm:
+        if (__isFloat<T>())
+        {
+            // We can only handle NaN for __BuiltinFloatingPointType,
+            // but not types conforming to IFloat for now
+            // if (isnan(x)) return y;
+            // if (isnan(y)) return x;
+            return x < y ? x : y;
+        }
+        else if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
+    }
+}
+
+//@public:
 /// Minimum.
 /// @param x The first value to compare.
 /// @param y The second value to compare.
@@ -11740,36 +12478,16 @@ vector<T,N> fmax3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @category math
 __generic<T : __BuiltinIntegerType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
-    __target_switch
-    {
-    case hlsl:
-    case glsl:
-    case metal:
-        __intrinsic_asm "min";
-    case cuda:
-    case cpp:
-        __intrinsic_asm "$P_min($0, $1)";
-    case spirv:
-    {
-        if (__isSignedInt<T>())
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 SMin $x $y
-            };
-        else
-            return spirv_asm {
-                result:$$T = OpExtInst glsl450 UMin $x $y
-            };
-    }
-    case wgsl: __intrinsic_asm "min";
-    }
+    return __min_impl(x, y);
 }
 
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -11777,6 +12495,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     case hlsl: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
+    case wgsl: __intrinsic_asm "min";
     case spirv:
     {
         if (__isSignedInt<T>())
@@ -11788,7 +12507,13 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
                 result:$$vector<T,N> = OpExtInst glsl450 UMin $x $y
             };
     }
-    case wgsl: __intrinsic_asm "min";
+    case llvm:
+    {
+        if (__isSignedInt<T>())
+            __intrinsic_asm "%result = call $T0 @llvm.smin($0, $1)";
+        else
+            __intrinsic_asm "%result = call $T0 @llvm.umin($0, $1)";
+    }
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
@@ -11796,7 +12521,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -11809,26 +12534,28 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[ForceInline]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T min(T x, T y)
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "min";
-    case metal: __intrinsic_asm "min";
-    case glsl: __intrinsic_asm "min";
-    case cuda: __intrinsic_asm "$P_min($0, $1)";
-    case cpp: __intrinsic_asm "$P_min($0, $1)";
-    case spirv: return spirv_asm {
-        result:$$T = OpExtInst glsl450 FMin $x $y
-    };
-    case wgsl: __intrinsic_asm "min";
+    // Need to handle llvm case here because we need to call isnan(),
+    // which takes __BuiltinFloatingPointType
+    case llvm:
+        {
+            if (isnan(x)) return y;
+            if (isnan(y)) return x;
+            return x < y ? x : y;
+        }
+    default:
+        return __min_impl(x, y);
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> min(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -11836,10 +12563,11 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
     case hlsl: __intrinsic_asm "min";
     case metal: __intrinsic_asm "min";
     case glsl: __intrinsic_asm "min";
+    case wgsl: __intrinsic_asm "min";
     case spirv: return spirv_asm {
         result:$$vector<T,N> = OpExtInst glsl450 FMin $x $y
     };
-    case wgsl: __intrinsic_asm "min";
+    //case llvm: __intrinsic_asm "%result = call $T0 @llvm.minimumnum($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, min, x, y);
     }
@@ -11847,7 +12575,7 @@ vector<T,N> min(vector<T,N> x, vector<T,N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -11856,6 +12584,29 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
     default:
         MATRIX_MAP_BINARY(T, N, M, min, x, y);
     }
+}
+
+/// Minimum.
+/// @param x The first value.
+/// @param y The second value.
+/// @return The minimum of `x` and `y`.
+/// @remarks This overload allows using `min` in generic code constrained by `IComparable`.
+/// For concrete integer and floating-point types, the more specific overloads are preferred.
+/// @category math
+__generic<T : IComparable>
+[__readNone]
+[OverloadRank(-10)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
+T min(T x, T y)
+{
+    // For builtin scalar types, use optimized intrinsics
+    if (__isFloat<T>() || __isInt<T>())
+        return __min_impl(x, y);
+
+    // For user-defined IComparable types, use IComparable.lessThan
+    if (x.lessThan(y))
+        return x;
+    return y;
 }
 
 /// Minimum of 3 inputs.
@@ -11866,7 +12617,7 @@ matrix<T,N,M> min(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T min3(T x, T y, T z)
 {
     __target_switch
@@ -11880,7 +12631,7 @@ T min3(T x, T y, T z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -11899,7 +12650,7 @@ vector<T,N> min3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fmin(T x, T y)
 {
     __target_switch
@@ -11912,7 +12663,7 @@ T fmin(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -11932,7 +12683,7 @@ vector<T,N> fmin(vector<T,N> x, vector<T,N> y)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fmin3(T x, T y, T z)
 {
     __target_switch
@@ -11947,7 +12698,7 @@ T fmin3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -11967,7 +12718,7 @@ vector<T,N> fmin3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T median3(T x, T y, T z)
 {
     __target_switch
@@ -11996,7 +12747,7 @@ T median3(T x, T y, T z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -12023,7 +12774,7 @@ vector<T,N> median3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T fmedian3(T x, T y, T z)
 {
     __target_switch
@@ -12038,7 +12789,7 @@ T fmedian3(T x, T y, T z)
 
 __generic<T : __BuiltinFloatingPointType, let N: int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 {
     __target_switch
@@ -12057,7 +12808,7 @@ vector<T,N> fmedian3(vector<T,N> x, vector<T,N> y, vector<T,N> z)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T modf(T x, out T ip)
 {
     __target_switch
@@ -12074,6 +12825,12 @@ T modf(T x, out T ip)
         T fract;
         __wgsl_modf<T>(x, fract, ip);
         return fract;
+    case llvm: __intrinsic_asm R"(
+        %values = call {$T0, $T0} @llvm.modf($0)
+        %ipa = extractvalue {$T0, $T0} %values, 1
+        %result = extractvalue {$T0, $T0} %values, 0
+        store $T0 %ipa, $1
+    )";
     }
 }
 
@@ -12089,7 +12846,7 @@ void __wgsl_modf(T x, out T fract, out T whole)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> modf(vector<T,N> x, out vector<T,N> ip)
 {
     __target_switch
@@ -12121,7 +12878,7 @@ void __wgsl_modf(vector<T,N> x, out vector<T,N> fract, out vector<T,N> whole)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 {
     __target_switch
@@ -12141,7 +12898,7 @@ matrix<T,N,M> modf(matrix<T,N,M> x, out matrix<T,N,M,L> ip)
 /// @remarks In HLSL, this is implemented with the msad4 intrinsic.
 /// @category math
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, sm_4_0_version)]
 uint4 msad4(uint reference, uint2 source, uint4 accum)
 {
     __target_switch
@@ -12174,40 +12931,40 @@ uint4 msad4(uint reference, uint2 source, uint4 accum)
 __generic<T : __BuiltinArithmeticType>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T mul(T x, T y);
 
 // scalar-vector and vector-scalar
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T, N> mul(vector<T, N> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T, N> mul(T x, vector<T, N> y);
 
 // scalar-matrix and matrix-scalar
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 matrix<T, N, M> mul(matrix<T, N, M> x, T y);
 
 __generic<T : __BuiltinArithmeticType, let N : int, let M :int>
 __intrinsic_op($(kIROp_Mul))
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 matrix<T, N, M> mul(T x, matrix<T, N, M> y);
 
 // vector-vector (dot product)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -12222,7 +12979,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 }
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T mul(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -12236,7 +12993,7 @@ T mul(vector<T, N> x, vector<T, N> y)
 // vector-matrix
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -12264,7 +13021,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -12290,7 +13047,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 {
     __target_switch
@@ -12317,7 +13074,7 @@ vector<T, M> mul(vector<T, N> left, matrix<T, N, M> right)
 // matrix-vector
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -12345,7 +13102,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -12371,7 +13128,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 {
     __target_switch
@@ -12398,7 +13155,7 @@ vector<T,N> mul(matrix<T,N,M> left, vector<T,M> right)
 // matrix-matrix
 __generic<T : __BuiltinFloatingPointType, let R : int, let N : int, let C : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -12427,7 +13184,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 }
 __generic<T : __BuiltinIntegerType, let R : int, let N : int, let C : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -12454,7 +13211,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 __generic<T : __BuiltinLogicalType, let R : int, let N : int, let C : int>
 [__readNone]
 [OverloadRank(-1)]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 {
     __target_switch
@@ -12484,7 +13241,7 @@ matrix<T,R,C> mul(matrix<T,R,N> left, matrix<T,N,C> right)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 T nextafter(T x, T y)
 {
     __target_switch
@@ -12529,7 +13286,7 @@ T nextafter(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, shader5_sm_4_0)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, shader5_sm_4_0)]
 vector<T,N> nextafter(vector<T,N> x, vector<T,N> y)
 {
     __target_switch
@@ -12591,7 +13348,7 @@ T NonUniformResourceIndex<T>(T value) { return value; }
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> normalize(vector<T,N> x)
 {
     __target_switch
@@ -12610,7 +13367,7 @@ vector<T,N> normalize(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T normalize(T x)
 {
     __target_switch
@@ -12634,7 +13391,7 @@ T normalize(T x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T pow(T x, T y)
 {
     __target_switch
@@ -12648,12 +13405,13 @@ T pow(T x, T y)
         OpExtInst $$T result glsl450 Pow $x $y
     };
     case wgsl: __intrinsic_asm "pow";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -12665,6 +13423,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
         OpExtInst $$vector<T, N> result glsl450 Pow $x $y
     };
     case wgsl: __intrinsic_asm "pow";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.pow($0, $1)";
     default:
         VECTOR_MAP_BINARY(T, N, pow, x, y);
     }
@@ -12672,7 +13431,7 @@ vector<T, N> pow(vector<T, N> x, vector<T, N> y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 {
     __target_switch
@@ -12691,7 +13450,7 @@ matrix<T,N,M> pow(matrix<T,N,M> x, matrix<T,N,M> y)
 /// @remarks Return value is undefined for non-positive values of `x`.
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T powr(T x, T y)
 {
     __target_switch
@@ -12704,7 +13463,7 @@ T powr(T x, T y)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 {
     __target_switch
@@ -12733,7 +13492,7 @@ vector<T, N> powr(vector<T, N> x, vector<T, N> y)
 ///     printf(R"(x = "%d", y = "%f")", x, y);
 /// }
 /// ```
-[require(cpp_cuda_glsl_hlsl_spirv, printf)]
+[require(cpp_cuda_glsl_hlsl_spirv_llvm, printf)]
 [require(slangvm)]
 __intrinsic_op($(kIROp_Printf))
 void printf<each T>(NativeString format, expand each T args);
@@ -12834,7 +13593,7 @@ void ProcessTriTessFactorsMin(
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T radians(T x)
 {
     __target_switch
@@ -12852,7 +13611,7 @@ T radians(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> radians(vector<T, N> x)
 {
     __target_switch
@@ -12870,7 +13629,7 @@ vector<T, N> radians(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> radians(matrix<T, N, M> x)
 {
     __target_switch
@@ -12887,7 +13646,7 @@ matrix<T, N, M> radians(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T rcp(T x)
 {
     __target_switch
@@ -12900,7 +13659,7 @@ T rcp(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> rcp(vector<T, N> x)
 {
     __target_switch
@@ -12909,6 +13668,7 @@ vector<T, N> rcp(vector<T, N> x)
     case glsl:
     case spirv:
     case wgsl:
+    case llvm:
         return T(1.0) / x;
     default:
         VECTOR_MAP_UNARY(T, N, rcp, x);
@@ -12917,7 +13677,7 @@ vector<T, N> rcp(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> rcp(matrix<T, N, M> x)
 {
     __target_switch
@@ -12935,7 +13695,7 @@ matrix<T, N, M> rcp(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T reflect(T i, T n)
 {
     __target_switch
@@ -12954,7 +13714,7 @@ T reflect(T i, T n)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 {
     __target_switch
@@ -12978,7 +13738,7 @@ vector<T,N> reflect(vector<T,N> i, vector<T,N> n)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 {
     __target_switch
@@ -13000,7 +13760,7 @@ vector<T,N> refract(vector<T,N> i, vector<T,N> n, T eta)
 
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T refract(T i, T n, T eta)
 {
     __target_switch
@@ -13026,42 +13786,63 @@ T refract(T i, T n, T eta)
 /// @remarks For SPIR-V, this function maps to `OpBitReverse`.
 /// @category bitops
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-uint reversebits(uint value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+T reversebits<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "reversebits";
     case glsl:
-        __intrinsic_asm "bitfieldReverse";
+        if (T is int64_t || T is uint64_t)
+            __intrinsic_asm "pack64(bitfieldReverse(unpack32($0)).yx)";
+        else
+            __intrinsic_asm "bitfieldReverse";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_reversebits($0)";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$uint result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$T result $value};
+        else if (T is int8_t || T is uint8_t || T is int16_t || T is uint16_t)
+        {
+            uint val = __intCast<uint>(value);
+            uint reversed = spirv_asm {OpBitReverse $$uint result $val};
+            return T(reversed >> (32 - sizeof(T) * 8));
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            uint2 halves = __asuint2(val);
+            halves.x = spirv_asm {OpBitReverse $$uint result $halves.x};
+            halves.y = spirv_asm {OpBitReverse $$uint result $halves.y};
+            return T(__asuint64(halves.yx));
+        }
     case wgsl: __intrinsic_asm "reverseBits";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
 }
 
-__generic<let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, shader5_sm_5_0)]
-vector<uint, N> reversebits(vector<uint, N> value)
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
+vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
     __target_switch
     {
     default:
-        VECTOR_MAP_UNARY(uint, N, reversebits, value);
+        VECTOR_MAP_UNARY(T, N, reversebits, value);
     case glsl:
         __intrinsic_asm "bitfieldReverse";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$vector<uint, N> result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$vector<T, N> result $value};
+        else VECTOR_MAP_UNARY(T, N, reversebits, value);
     case wgsl: __intrinsic_asm "reverseBits";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
 }
 
@@ -13072,7 +13853,7 @@ vector<uint, N> reversebits(vector<uint, N> value)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 T rint(T x)
 {
     __target_switch
@@ -13082,6 +13863,7 @@ T rint(T x)
     case spirv: return spirv_asm {
         OpExtInst $$T result glsl450 RoundEven $x
     };
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.roundeven($0)";
     default:
         T nearest = round(x);
 
@@ -13103,7 +13885,7 @@ T rint(T x)
 __generic<T : __BuiltinFloatingPointType, let N:int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_llvm, sm_4_0_version)]
 vector<T,N> rint(vector<T,N> x)
 {
     __target_switch
@@ -13125,7 +13907,7 @@ vector<T,N> rint(vector<T,N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T round(T x)
 {
     __target_switch
@@ -13139,12 +13921,13 @@ T round(T x)
         OpExtInst $$T result glsl450 Round $x
     };
     case wgsl: __intrinsic_asm "round";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.round($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> round(vector<T, N> x)
 {
     __target_switch
@@ -13163,7 +13946,7 @@ vector<T, N> round(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> round(matrix<T,N,M> x)
 {
     __target_switch
@@ -13180,7 +13963,7 @@ matrix<T,N,M> round(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T rsqrt(T x)
 {
     __target_switch
@@ -13200,7 +13983,7 @@ T rsqrt(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> rsqrt(vector<T, N> x)
 {
     __target_switch
@@ -13211,6 +13994,8 @@ vector<T, N> rsqrt(vector<T, N> x)
     case spirv: return spirv_asm {
         OpExtInst $$vector<T, N> result glsl450 InverseSqrt $x
     };
+    case llvm:
+        return vector<T, N>(1.0) / sqrt(x);
     default:
         VECTOR_MAP_UNARY(T, N, rsqrt, x);
     }
@@ -13218,7 +14003,7 @@ vector<T, N> rsqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -13235,7 +14020,7 @@ matrix<T, N, M> rsqrt(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T saturate(T x)
 {
     __target_switch
@@ -13250,7 +14035,7 @@ T saturate(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> saturate(vector<T,N> x)
 {
     __target_switch
@@ -13267,7 +14052,7 @@ vector<T,N> saturate(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> saturate(matrix<T,N,M> x)
 {
     __target_switch
@@ -13352,6 +14137,8 @@ int sign(T x)
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$T result glsl450 SSign $x});
     case wgsl: __intrinsic_asm "i32(sign($0))";
+    default:
+        return x == T(0) ? 0 : (x < T(0) ? -1 : 1);
     }
 }
 
@@ -13376,6 +14163,11 @@ vector<int, N> sign(vector<T, N> x)
         else
             return __int_cast<int>(spirv_asm {OpExtInst $$vector<T,N> result glsl450 SSign $x});
     case wgsl: __intrinsic_asm "vec$N0<i32>(sign($0))";
+    case llvm:
+        return select(
+            x == vector<T, N>(0),
+            vector<int, N>(0),
+            select(x < vector<T, N>(0), vector<int, N>(-1), vector<int, N>(1)));
     default:
         VECTOR_MAP_UNARY(int, N, sign, x);
     }
@@ -13383,7 +14175,7 @@ vector<int, N> sign(vector<T, N> x)
 
 __generic<T : __BuiltinSignedArithmeticType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<int, N, M> sign(matrix<T, N, M> x)
 {
     __target_switch
@@ -13400,7 +14192,7 @@ matrix<int, N, M> sign(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T sin(T x)
 {
     __target_switch
@@ -13414,12 +14206,13 @@ T sin(T x)
         OpExtInst $$T result glsl450 Sin $x
     };
     case wgsl: __intrinsic_asm "sin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sin(vector<T, N> x)
 {
     __target_switch
@@ -13431,6 +14224,7 @@ vector<T, N> sin(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sin $x
     };
     case wgsl: __intrinsic_asm "sin";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sin($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sin, x);
     }
@@ -13438,7 +14232,7 @@ vector<T, N> sin(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sin(matrix<T, N, M> x)
 {
     __target_switch
@@ -13481,7 +14275,7 @@ vector<T,N> __sincos_metal(vector<T,N> x, out vector<T,N> c)
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 void sincos(T x, out T s, out T c)
 {
     __target_switch
@@ -13492,6 +14286,13 @@ void sincos(T x, out T s, out T c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
+    case llvm: __intrinsic_asm R"(
+        %parts = call { $T0, $T0 } @llvm.sincos($0)
+        %sinval = extractvalue {$T0, $T0} %parts, 0
+        %cosval = extractvalue {$T0, $T0} %parts, 1
+        store $T0 %sinval, $1
+        store $T0 %cosval, $2
+    )";
     default:
         s = sin(x);
         c = cos(x);
@@ -13501,7 +14302,7 @@ void sincos(T x, out T s, out T c)
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 {
     __target_switch
@@ -13511,6 +14312,13 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
         //__intrinsic_asm "*($1) = sincos($0, *($2))";
         s = __sincos_metal(x, c);
         return;
+    case llvm: __intrinsic_asm R"(
+        %parts = call { $T0, $T0 } @llvm.sincos($0)
+        %sinval = extractvalue {$T0, $T0} %parts, 0
+        %cosval = extractvalue {$T0, $T0} %parts, 1
+        store $T0 %sinval, $1
+        store $T0 %cosval, $2
+    )";
     default:
         s = sin(x);
         c = cos(x);
@@ -13520,7 +14328,7 @@ void sincos(vector<T,N> x, out vector<T,N> s, out vector<T,N> c)
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int, let L1: int, let L2 : int>
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 {
     __target_switch
@@ -13538,7 +14346,7 @@ void sincos(matrix<T,N,M> x, out matrix<T,N,M,L1> s, out matrix<T,N,M,L2> c)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T sinh(T x)
 {
     __target_switch
@@ -13552,12 +14360,13 @@ T sinh(T x)
         OpExtInst $$T result glsl450 Sinh $x
     };
     case wgsl: __intrinsic_asm "sinh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sinh($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sinh(vector<T, N> x)
 {
     __target_switch
@@ -13569,6 +14378,7 @@ vector<T, N> sinh(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sinh $x
     };
     case wgsl: __intrinsic_asm "sinh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sinh($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sinh, x);
     }
@@ -13576,7 +14386,7 @@ vector<T, N> sinh(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sinh(matrix<T, N, M> x)
 {
     __target_switch
@@ -13593,7 +14403,7 @@ matrix<T, N, M> sinh(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T sinpi(T x)
 {
     __target_switch
@@ -13606,7 +14416,7 @@ T sinpi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> sinpi(vector<T,N> x)
 {
     __target_switch
@@ -13626,7 +14436,7 @@ vector<T,N> sinpi(vector<T,N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T smoothstep(T min, T max, T x)
 {
     __target_switch
@@ -13646,7 +14456,7 @@ T smoothstep(T min, T max, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 {
     __target_switch
@@ -13665,7 +14475,7 @@ vector<T, N> smoothstep(vector<T, N> min, vector<T, N> max, vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N, M> x)
 {
     __target_switch
@@ -13682,7 +14492,7 @@ matrix<T, N, M> smoothstep(matrix<T, N, M> min, matrix<T, N, M> max, matrix<T, N
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T sqrt(T x)
 {
     __target_switch
@@ -13696,12 +14506,13 @@ T sqrt(T x)
         OpExtInst $$T result glsl450 Sqrt $x
     };
     case wgsl: __intrinsic_asm "sqrt";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sqrt($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> sqrt(vector<T, N> x)
 {
     __target_switch
@@ -13713,6 +14524,7 @@ vector<T, N> sqrt(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Sqrt $x
     };
     case wgsl: __intrinsic_asm "sqrt";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.sqrt($0)";
     default:
         VECTOR_MAP_UNARY(T, N, sqrt, x);
     }
@@ -13720,7 +14532,7 @@ vector<T, N> sqrt(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> sqrt(matrix<T, N, M> x)
 {
     __target_switch
@@ -13738,7 +14550,7 @@ matrix<T, N, M> sqrt(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T step(T y, T x)
 {
     __target_switch
@@ -13757,7 +14569,7 @@ T step(T y, T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> step(vector<T,N> y, vector<T,N> x)
 {
     __target_switch
@@ -13776,7 +14588,7 @@ vector<T,N> step(vector<T,N> y, vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 {
     __target_switch
@@ -13793,7 +14605,7 @@ matrix<T, N, M> step(matrix<T, N, M> y, matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T tan(T x)
 {
     __target_switch
@@ -13807,12 +14619,13 @@ T tan(T x)
         OpExtInst $$T result glsl450 Tan $x
     };
     case wgsl: __intrinsic_asm "tan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> tan(vector<T, N> x)
 {
     __target_switch
@@ -13824,6 +14637,7 @@ vector<T, N> tan(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Tan $x
     };
     case wgsl: __intrinsic_asm "tan";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tan($0)";
     default:
         VECTOR_MAP_UNARY(T, N, tan, x);
     }
@@ -13831,7 +14645,7 @@ vector<T, N> tan(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> tan(matrix<T, N, M> x)
 {
     __target_switch
@@ -13848,7 +14662,7 @@ matrix<T, N, M> tan(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T tanh(T x)
 {
     __target_switch
@@ -13862,12 +14676,13 @@ T tanh(T x)
         OpExtInst $$T result glsl450 Tanh $x
     };
     case wgsl: __intrinsic_asm "tanh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tanh($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> tanh(vector<T,N> x)
 {
     __target_switch
@@ -13879,6 +14694,7 @@ vector<T,N> tanh(vector<T,N> x)
         OpExtInst $$vector<T,N> result glsl450 Tanh $x
     };
     case wgsl: __intrinsic_asm "tanh";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.tanh($0)";
     default:
         VECTOR_MAP_UNARY(T, N, tanh, x);
     }
@@ -13886,7 +14702,7 @@ vector<T,N> tanh(vector<T,N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T,N,M> tanh(matrix<T,N,M> x)
 {
     __target_switch
@@ -13903,7 +14719,7 @@ matrix<T,N,M> tanh(matrix<T,N,M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T tanpi(T x)
 {
     __target_switch
@@ -13916,7 +14732,7 @@ T tanpi(T x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T,N> tanpi(vector<T,N> x)
 {
     __target_switch
@@ -13934,7 +14750,7 @@ vector<T,N> tanpi(vector<T,N> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -13942,6 +14758,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
     {
     case glsl: __intrinsic_asm "transpose";
     case hlsl: __intrinsic_asm "transpose";
+    case metal: __intrinsic_asm "transpose";
     case spirv: return spirv_asm {
         OpTranspose $$matrix<T, M, N> result $x
     };
@@ -13956,7 +14773,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinIntegerType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
 {
@@ -13974,7 +14791,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 }
 __generic<T : __BuiltinLogicalType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 [PreferRecompute]
 [OverloadRank(-1)]
 matrix<T, M, N> transpose(matrix<T, N, M> x)
@@ -13999,7 +14816,7 @@ matrix<T, M, N> transpose(matrix<T, N, M> x)
 /// @category math
 __generic<T : __BuiltinFloatingPointType>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 T trunc(T x)
 {
     __target_switch
@@ -14013,12 +14830,13 @@ T trunc(T x)
         OpExtInst $$T result glsl450 Trunc $x
     };
     case wgsl: __intrinsic_asm "trunc";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.trunc($0)";
     }
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 vector<T, N> trunc(vector<T, N> x)
 {
     __target_switch
@@ -14030,6 +14848,7 @@ vector<T, N> trunc(vector<T, N> x)
         OpExtInst $$vector<T, N> result glsl450 Trunc $x
     };
     case wgsl: __intrinsic_asm "trunc";
+    case llvm: __intrinsic_asm "%result = call $T0 @llvm.trunc($0)";
     default:
         VECTOR_MAP_UNARY(T, N, trunc, x);
     }
@@ -14037,7 +14856,7 @@ vector<T, N> trunc(vector<T, N> x)
 
 __generic<T : __BuiltinFloatingPointType, let N : int, let M : int>
 [__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_4_0_version)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
 matrix<T, N, M> trunc(matrix<T, N, M> x)
 {
     __target_switch
@@ -14851,6 +15670,60 @@ matrix<T,N,M> WaveMaskPrefixSum(WaveMask mask, matrix<T,N,M> expr)
     return WaveMultiPrefixSum(expr, uint4(mask, 0, 0, 0));
 }
 
+/// Exclusive prefix minimum within a masked subset of lanes.
+/// Returns the minimum of all values from masked lanes with a lower index.
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMaskPrefixMin(WaveMask mask, T expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T,N> WaveMaskPrefixMin(WaveMask mask, vector<T,N> expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMaskPrefixMin(WaveMask mask, matrix<T,N,M> expr)
+{
+    return WaveMultiPrefixExclusiveMin(expr, uint4(mask, 0, 0, 0));
+}
+
+/// Exclusive prefix maximum within a masked subset of lanes.
+/// Returns the maximum of all values from masked lanes with a lower index.
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+T WaveMaskPrefixMax(WaveMask mask, T expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+vector<T,N> WaveMaskPrefixMax(WaveMask mask, vector<T,N> expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[ForceInline]
+[require(cuda_glsl_spirv, subgroup_partitioned)]
+matrix<T,N,M> WaveMaskPrefixMax(WaveMask mask, matrix<T,N,M> expr)
+{
+    return WaveMultiPrefixExclusiveMax(expr, uint4(mask, 0, 0, 0));
+}
+
 __generic<T : __BuiltinType>
 __glsl_extension(GL_KHR_shader_subgroup_ballot)
 __spirv_version(1.3)
@@ -15250,11 +16123,11 @@ vector<T,N> QuadReadAcrossDiagonal(vector<T,N> localValue)
 __generic<T : __BuiltinType, let N : int, let M : int> matrix<T,N,M> QuadReadAcrossDiagonal(matrix<T,N,M> localValue);
 
 // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-${{{{
+${
 struct WaveActiveBitOpEntry { const char* hlslName; const char* glslName; const char* spirvName; const char* metalName; };
 const WaveActiveBitOpEntry kWaveActiveBitOpEntries[] = {{"BitAnd", "And", "BitwiseAnd", "and"}, {"BitOr", "Or", "BitwiseOr", "or"}, {"BitXor", "Xor", "BitwiseXor", "xor"}};
 for (auto opName : kWaveActiveBitOpEntries) {
-}}}}
+$}
 /// @category wave Wave and quad functions
 __generic<T : __BuiltinLogicalType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15320,16 +16193,16 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveBitAnd, WaveActiveBitOr, WaveActiveBitXor
-}}}}
+$}
 
 // WaveActiveMin/Max
-${{{{
+${
 struct WaveActiveMinMaxEntry { const char* name; const char* metalName; };
 const WaveActiveMinMaxEntry kWaveActiveMinMaxNames[] = {{"Min", "min"}, {"Max", "max"}};
 for (const auto opName : kWaveActiveMinMaxNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15406,16 +16279,16 @@ matrix<T, N, M> WaveActive$(opName.name)(matrix<T, N, M> expr)
     }
 }
 
-${{{{
+${
 } // WaveActiveMinMax.
-}}}}
+$}
 
 // WaveActiveProduct/Sum
-${{{{
+${
 struct WaveActiveProductSumEntry { const char* hlslName; const char* glslName; const char* metalName; };
 const WaveActiveProductSumEntry kWaveActivProductSumNames[] = {{"Product", "Mul", "product"}, {"Sum", "Add", "sum"}};
 for (auto opName : kWaveActivProductSumNames) {
-}}}}
+$}
 /// @category wave
 __generic<T : __BuiltinArithmeticType>
 __glsl_extension(GL_KHR_shader_subgroup_arithmetic)
@@ -15505,9 +16378,9 @@ matrix<T, N, M> WaveActive$(opName.hlslName)(matrix<T, N, M> expr)
         return result;
     }
 }
-${{{{
+${
 } // WaveActiveProduct/WaveActiveProductSum.
-}}}}
+$}
 
 /// @category wave
 __generic<T : __BuiltinType>
@@ -15735,6 +16608,242 @@ uint WaveGetLaneIndex()
     }
 }
 
+/// Returns the number of waves (subgroups) in the current workgroup.
+/// Equivalent to GLSL gl_NumSubgroups.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_basic)
+__spirv_version(1.3)
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_basic)]
+uint WaveGetNumWaves()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_NumSubgroups)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniform;
+            result:$$uint = OpLoad builtin(NumSubgroups:uint)
+        };
+    default:
+        // For HLSL/CUDA/Metal/WGSL: compute from workgroup size and wave size
+        __stage_switch
+        {
+        case compute:
+            {
+                int3 workgroupSize = WorkgroupSize();
+                uint totalThreads = uint(workgroupSize.x * workgroupSize.y * workgroupSize.z);
+                uint waveSize = WaveGetLaneCount();
+                return (totalThreads + waveSize - 1) / waveSize;
+            }
+        default:
+            static_assert(false, "WaveGetNumWaves is only supported in compute shaders");
+            return 0; // unreachable, but needed to satisfy compiler
+        }
+    }
+}
+
+/// Returns a mask with only the current lane's bit set.
+/// Equivalent to GLSL gl_SubgroupEqMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneEqMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupEqMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupEqMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        return uint4(
+            component == 0 ? (1u << bit) : 0u,
+            component == 1 ? (1u << bit) : 0u,
+            component == 2 ? (1u << bit) : 0u,
+            component == 3 ? (1u << bit) : 0u
+        );
+    }
+}
+
+/// Returns a mask with bits set for lanes >= current lane.
+/// Equivalent to GLSL gl_SubgroupGeMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneGeMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupGeMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupGeMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes >= laneIndex, but only within the actual wave size
+        uint laneIndex = WaveGetLaneIndex();
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;  // which component contains the last lane
+        uint waveBit = (waveSize - 1) & 31;   // bit position of last lane
+        // Use ~0u when waveBit == 31 to avoid shift overflow
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        uint4 geMask = uint4(
+            0 < component ? 0u : (0 == component ? (~0u << bit) : ~0u),
+            1 < component ? 0u : (1 == component ? (~0u << bit) : ~0u),
+            2 < component ? 0u : (2 == component ? (~0u << bit) : ~0u),
+            3 < component ? 0u : (3 == component ? (~0u << bit) : ~0u)
+        );
+        return geMask & validMask;
+    }
+}
+
+/// Returns a mask with bits set for lanes > current lane.
+/// Equivalent to GLSL gl_SubgroupGtMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneGtMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupGtMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupGtMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes > laneIndex, but only within the actual wave size
+        uint laneIndex = WaveGetLaneIndex();
+        uint waveSize = WaveGetLaneCount();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // Create mask for valid lanes based on wave size
+        uint waveComp = (waveSize - 1) >> 5;
+        uint waveBit = (waveSize - 1) & 31;
+        uint lastCompMask = waveBit >= 31 ? ~0u : ((1u << (waveBit + 1)) - 1);
+        uint4 validMask = uint4(
+            waveComp >= 0 ? (waveComp == 0 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 1 ? (waveComp == 1 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 2 ? (waveComp == 2 ? lastCompMask : ~0u) : 0u,
+            waveComp >= 3 ? (waveComp == 3 ? lastCompMask : ~0u) : 0u
+        );
+        // For the current component: if bit < 31, set bits above; if bit == 31, set 0
+        uint currentMask = bit >= 31 ? 0u : (~0u << (bit + 1));
+        uint4 gtMask = uint4(
+            0 < component ? 0u : (0 == component ? currentMask : ~0u),
+            1 < component ? 0u : (1 == component ? currentMask : ~0u),
+            2 < component ? 0u : (2 == component ? currentMask : ~0u),
+            3 < component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+        return gtMask & validMask;
+    }
+}
+
+/// Returns a mask with bits set for lanes <= current lane.
+/// Equivalent to GLSL gl_SubgroupLeMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneLeMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupLeMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupLeMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes <= laneIndex
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit (inclusive)
+        uint currentMask = bit >= 31 ? ~0u : ((1u << (bit + 1)) - 1);
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+    }
+}
+
+/// Returns a mask with bits set for lanes < current lane.
+/// Equivalent to GLSL gl_SubgroupLtMask.
+/// @category wave
+__glsl_extension(GL_KHR_shader_subgroup_ballot)
+__spirv_version(1.3)
+[ForceInline]
+[require(cuda_glsl_hlsl_metal_spirv_wgsl, subgroup_ballot)]
+uint4 WaveGetLaneLtMask()
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "(gl_SubgroupLtMask)";
+    case spirv:
+        return spirv_asm
+        {
+            OpCapability GroupNonUniformBallot;
+            result:$$uint4 = OpLoad builtin(SubgroupLtMask:uint4)
+        };
+    default:
+        // Handle lane indices 0-127 across all 4 components of uint4
+        // Set bits for all lanes < laneIndex
+        uint laneIndex = WaveGetLaneIndex();
+        uint component = laneIndex >> 5;  // laneIndex / 32
+        uint bit = laneIndex & 31;        // laneIndex % 32
+        // For the current component: set bits 0 to bit-1 (exclusive of bit)
+        uint currentMask = (1u << bit) - 1;
+        return uint4(
+            0 > component ? 0u : (0 == component ? currentMask : ~0u),
+            1 > component ? 0u : (1 == component ? currentMask : ~0u),
+            2 > component ? 0u : (2 == component ? currentMask : ~0u),
+            3 > component ? 0u : (3 == component ? currentMask : ~0u)
+        );
+    }
+}
+
 /// @category wave
 __glsl_extension(GL_KHR_shader_subgroup_basic)
 __spirv_version(1.3)
@@ -15870,10 +16979,7 @@ matrix<T, N, M> WavePrefixProduct(matrix<T, N, M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixProduct";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixProduct(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixProduct, expr);
     }
 }
 
@@ -15953,10 +17059,332 @@ matrix<T,N,M> WavePrefixSum(matrix<T,N,M> expr)
     case hlsl:
         __intrinsic_asm "WavePrefixSum";
     default:
-        matrix<T, N, M> result;
-        for (int i = 0; i < N; ++i)
-            result[i] = WavePrefixSum(expr[i]);
-        return result;
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixSum, expr);
+    }
+}
+
+/// WavePrefixMin - Exclusive prefix minimum (equivalent to GLSL subgroupExclusiveMin)
+/// Returns the minimum of all values from lanes with a lower index.
+/// Lane 0 gets the identity value (type max), lane i gets min(val[0], ..., val[i-1]).
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+T WavePrefixMin(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMin($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$T result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+vector<T,N> WavePrefixMin(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMin($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMin $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+matrix<T,N,M> WavePrefixMin(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixMin(WaveGetActiveMask(), expr);
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMin, expr);
+    }
+}
+
+/// WavePrefixMax - Exclusive prefix maximum (equivalent to GLSL subgroupExclusiveMax)
+/// Returns the maximum of all values from lanes with a lower index.
+/// Lane 0 gets the identity value (type min), lane i gets max(val[0], ..., val[i-1]).
+/// @category wave
+__generic<T : __BuiltinArithmeticType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+T WavePrefixMax(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMax($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$T result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$T result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$T result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+vector<T,N> WavePrefixMax(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        if (__isHalf<T>()) __requireTargetExtension("GL_EXT_shader_subgroup_extended_types_float16");
+        __intrinsic_asm "subgroupExclusiveMax($0)";
+    case spirv:
+        if (__isFloat<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformFMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isSignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformSMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else if (__isUnsignedInt<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformUMax $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else return expr;
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    }
+}
+
+__generic<T : __BuiltinArithmeticType, let N : int, let M : int>
+[require(cuda_glsl_spirv, subgroup_arithmetic)]
+matrix<T,N,M> WavePrefixMax(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixMax(WaveGetActiveMask(), expr);
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixMax, expr);
+    }
+}
+
+/// WavePrefixBitAnd - Exclusive prefix bitwise AND (equivalent to GLSL subgroupExclusiveAnd)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitAnd(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveAnd($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitAnd(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveAnd($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseAnd $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitAnd(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitAnd(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitAnd(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitAnd, expr);
+    }
+}
+
+/// WavePrefixBitOr - Exclusive prefix bitwise OR (equivalent to GLSL subgroupExclusiveOr)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitOr(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveOr($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitOr(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveOr($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseOr $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitOr(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitOr(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitOr(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitOr, expr);
+    }
+}
+
+/// WavePrefixBitXor - Exclusive prefix bitwise XOR (equivalent to GLSL subgroupExclusiveXor)
+/// Note: CUDA/HLSL require subgroup_partitioned capability (SM 6.5 for HLSL)
+/// @category wave
+__generic<T : __BuiltinLogicalType>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+T WavePrefixBitXor(T expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveXor($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$T result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$T result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int>
+__glsl_extension(GL_KHR_shader_subgroup_arithmetic)
+__spirv_version(1.3)
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+vector<T,N> WavePrefixBitXor(vector<T,N> expr)
+{
+    __target_switch
+    {
+    case glsl:
+        __intrinsic_asm "subgroupExclusiveXor($0)";
+    case spirv:
+        if (__isBool<T>())
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformLogicalXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
+        else
+            return spirv_asm {OpCapability GroupNonUniformArithmetic; OpGroupNonUniformBitwiseXor $$vector<T,N> result Subgroup ExclusiveScan $expr};
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    }
+}
+
+__generic<T : __BuiltinLogicalType, let N : int, let M : int>
+[require(glsl_spirv, subgroup_arithmetic)]
+[require(cuda_hlsl, subgroup_partitioned)]
+matrix<T,N,M> WavePrefixBitXor(matrix<T,N,M> expr)
+{
+    __target_switch
+    {
+    case cuda:
+        return WaveMaskPrefixBitXor(WaveGetActiveMask(), expr);
+    case hlsl:
+        return WaveMultiPrefixBitXor(expr, WaveActiveBallot(true));
+    default:
+        MATRIX_MAP_UNARY(T, N, M, WavePrefixBitXor, expr);
     }
 }
 
@@ -16559,11 +17987,11 @@ void __shaderSubgroupPartitionedPreamble()
 //
 // WaveMultiSum/WaveMultiProduct.
 //
-${{{{
+${
 struct WaveMultiSumProductEntry { const char* name; const char* spirvName; };
 const WaveMultiSumProductEntry kWaveMultiSumProductNames[] = { {"Sum", "Add"}, {"Product", "Mul"} };
 for (auto opName : kWaveMultiSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16627,9 +18055,9 @@ matrix<T,N,M> WaveMulti$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiSum/WaveMultiProduct.
-}}}}
+$}
 
 
 //
@@ -16637,7 +18065,7 @@ ${{{{
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
 //
-${{{{
+${
 struct WaveMultiPrefixSumProductEntry
 {
     const char* name;
@@ -16668,7 +18096,7 @@ const WaveMultiPrefixSumProductEntry kWaveMultiPrefixSumProductNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixSumProductNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16726,10 +18154,10 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
 {
     __target_switch
     {
-    ${{{{ if(opName.cudaMatrixVariantSupport) { }}}}
+    ${ if(opName.cudaMatrixVariantSupport) { $}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.cudaName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-    ${{{{ } }}}}
+    ${ } $}
     default:
         matrix<T, N, M> result;
         for (int i = 0; i < N; ++i)
@@ -16738,22 +18166,22 @@ matrix<T,N,M> WaveMultiPrefix$(opName.name)(matrix<T,N,M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveSum/WaveMultiPrefixInclusiveProduct.
 // WaveMultiPrefixExclusiveSum/WaveMultiPrefixExclusiveProduct.
 // WaveMultiPrefixSum/WaveMultiPrefixProduct.
-}}}}
+$}
 
 
 //
 // WaveMultiMin/WaveMultiMax.
 //
-${{{{
+${
 struct WaveMultiMinMaxEntry { const char* name; };
 const WaveMultiMinMaxEntry kWaveMultiMinMaxNames[] = { {"Min"}, {"Max"} };
 for (auto opName : kWaveMultiMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16822,16 +18250,16 @@ matrix<T, N, M> WaveMulti$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiMin/WaveMultiMax.
-}}}}
+$}
 
 
 //
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
 //
-${{{{
+${
 struct WaveMultiPrefixMinMaxEntry
 {
     const char* name;
@@ -16850,7 +18278,7 @@ const WaveMultiPrefixMinMaxEntry kWaveMultiPrefixMinMaxNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixMinMaxNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinArithmeticType>
 __spirv_version(1.3)
@@ -16913,21 +18341,21 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
     return result;
 }
 
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveMin/WaveMultiPrefixInclusiveMax.
 // WaveMultiPrefixExclusiveMin/WaveMultiPrefixExclusiveMax.
-}}}}
+$}
 
 
 //
 // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiBitsEntry { const char* name; };
 const WaveMultiBitsEntry kWaveMultiBitsNames[] = { {"And"}, {"Or"} , {"Xor"} };
 for (auto opName : kWaveMultiBitsNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -16988,9 +18416,9 @@ matrix<T, N, M> WaveMultiBit$(opName.name)(matrix<T, N, M> value, uint4 mask)
     }
 }
 
-${{{{
+${
 } // WaveMultiBitAnd/WaveMultiBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -16998,7 +18426,7 @@ ${{{{
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
 //
-${{{{
+${
 struct WaveMultiPrefixBitwiseEntry
 {
     const char* name;
@@ -17028,7 +18456,7 @@ const WaveMultiPrefixBitwiseEntry kWaveMultiPrefixBitwiseNames[] =
 };
 
 for (auto opName : kWaveMultiPrefixBitwiseNames) {
-}}}}
+$}
 
 __generic<T : __BuiltinLogicalType>
 __spirv_version(1.3)
@@ -17082,14 +18510,14 @@ matrix<T, N, M> WaveMultiPrefix$(opName.name)(matrix<T, N, M> value, uint4 mask)
 {
     __target_switch
     {
-${{{{
+${
     if (opName.cudaMatrixVariantSupport) {
-}}}}
+$}
     case cuda:
         __intrinsic_asm "_wavePrefix$(opName.spirvName)Multiple($1.x, $0) $(opName.cudaExtraOperation)";
-${{{{
+${
     }
-}}}}
+$}
     default:
         matrix<T,N,M> result;
         [ForceUnroll]
@@ -17098,12 +18526,12 @@ ${{{{
         return result;
     }
 }
-${{{{
+${
 }
 // WaveMultiPrefixInclusiveBitAnd/WaveMultiPrefixInclusiveBitOr/WaveMultiInclusiveBitXor.
 // WaveMultiPrefixExclusiveBitAnd/WaveMultiPrefixExclusiveBitXor/WaveMultiExclusiveBitXor.
 // WaveMultiPrefixBitAnd/WaveMultiPrefixBitOr/WaveMultiBitXor.
-}}}}
+$}
 
 
 //
@@ -17172,7 +18600,7 @@ bool QuadAll(bool expr)
 typedef Texture2D texture2D;
 //@public:
 
-${{{{
+${
 
 // Buffer types
 
@@ -17203,7 +18631,7 @@ for (int aa = 0; aa < kBaseBufferAccessLevelCount; ++aa)
     char const* requireToSetQuery = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_size)]" : "[require(glsl_hlsl_metal_spirv, image_size)]";
     char const* requireToSet = (isReadOnly) ? "[require(glsl_hlsl_metal_spirv, texture_sm_4_1)]" : "[require(glsl_hlsl_metal_spirv, texture_sm_4_1_compute_fragment)]";
     char const* requireToSet_onlyHLSL = (isReadOnly) ? "[require(hlsl, texture_sm_4_1)]" : "[require(hlsl, texture_sm_4_1_compute_fragment)]";
-}}}}
+$}
 
 __generic<T:ITexelElement, let format:int>
 extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
@@ -17261,9 +18689,9 @@ extension _Texture<T, __ShapeBuffer, 0, 0, 0, $(aa), 0, 0, format>
         [ForceInline]
         $(requireToSet)
         get { return Load((int)index); }
-${{{{
+${
         if (access != SLANG_RESOURCE_ACCESS_READ) {
-}}}}
+$}
             [nonmutating]
             $(requireToSet)
             set
@@ -17284,17 +18712,17 @@ ${{{{
             __intrinsic_op($(kIROp_ImageSubscript))
             [nonmutating]
             ref;
-${{{{
+${
         } // access != SLANG_RESOURCE_ACCESS_READ
-}}}}
+$}
 
         }
 
 
     };  // end extension
-${{{{
+${
 }
-}}}}
+$}
 
 
 // DirectX Raytracing (DXR) Support
@@ -17353,6 +18781,11 @@ static const RAY_FLAG RAY_FLAG_SKIP_TRIANGLES = 0x100;
 /// Skips all procedural primitive intersections.
 /// @category raytracing
 static const RAY_FLAG RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES = 0x200;
+
+/// Forces unknown opaque and unknown transparent as opaque and transparent during traversal.
+/// Used with Opacity Micromaps (OMM) - DXR 1.2+
+/// @category raytracing
+static const RAY_FLAG RAY_FLAG_FORCE_OMM_2_STATE = 0x400;
 
 // 10.1.2 - Ray Description Structure
 /// Describes a ray for traversal through an acceleration structure.
@@ -17659,31 +19092,6 @@ void TraceRay(
     }
 }
 
-// NOTE!
-// The name of the following functions may change when DXR supports
-// a feature similar to the `GL_NV_ray_tracing_motion_blur` extension
-//
-// https://github.com/KhronosGroup/GLSL/blob/master/extensions/nv/GLSL_NV_ray_tracing_motion_blur.txt
-
-__generic<payload_t>
-[require(hlsl, raytracing_motionblur)]
-void __traceMotionRayHLSL(
-        RaytracingAccelerationStructure AccelerationStructure,
-        uint RayFlags,
-        uint InstanceInclusionMask,
-        uint RayContributionToHitGroupIndex,
-        uint MultiplierForGeometryContributionToHitGroupIndex,
-        uint MissShaderIndex,
-        RayDesc Ray,
-        float CurrentTime,
-        inout payload_t Payload)
-{
-    __target_switch
-    {
-    case hlsl: __intrinsic_asm "TraceMotionRay";
-    }
-}
-
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 [require(glsl, raytracing_motionblur_raygen_closesthit_miss)]
 void __traceMotionRay(
@@ -17719,7 +19127,7 @@ void __traceMotionRay(
 /// @remarks Extended version of TraceRay with motion blur support
 /// @category raytracing
 [ForceInline]
-[require(glsl_hlsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
+[require(glsl_spirv, raytracing_motionblur_raygen_closesthit_miss)]
 __generic<payload_t>
 void TraceMotionRay(
     RaytracingAccelerationStructure AccelerationStructure,
@@ -17734,18 +19142,6 @@ void TraceMotionRay(
 {
     __target_switch
     {
-    case hlsl:
-        __traceMotionRayHLSL(
-            AccelerationStructure,
-            RayFlags,
-            InstanceInclusionMask,
-            RayContributionToHitGroupIndex,
-            MultiplierForGeometryContributionToHitGroupIndex,
-            MissShaderIndex,
-            Ray,
-            CurrentTime,
-            __forceVarIntoRayPayloadStructTemporarily(Payload));
-        return;
     case glsl:
     {
         [__vulkanRayPayload]
@@ -18136,10 +19532,10 @@ uint PrimitiveIndex()
 
 /// Returns the ray origin in object space of the current instance.
 /// @return Object-space position where the ray originated
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayOrigin()
 {
     __target_switch
@@ -18157,10 +19553,10 @@ float3 ObjectRayOrigin()
 
 /// Returns the ray direction in object space of the current instance.
 /// @return Object-space direction vector of the ray
-/// @remarks Transformed by the inverse of the instance transform
+/// @remarks Transformed by the inverse of the instance transform. On CUDA/OptiX, only available in anyhit and intersection stages.
 /// @category raytracing
 [NonUniformReturn]
-[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(raytracing_object_space_ray)]
 float3 ObjectRayDirection()
 {
     __target_switch
@@ -18183,13 +19579,14 @@ float3 ObjectRayDirection()
 /// @remarks Includes position and orientation of the current instance
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 ObjectToWorld3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld3x4";
     case glsl: __intrinsic_asm "transpose(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18204,13 +19601,14 @@ float3x4 ObjectToWorld3x4()
 /// @remarks Inverse of the object-to-world transform
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float3x4 WorldToObject3x4()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject3x4";
     case glsl: __intrinsic_asm "transpose(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix";
     case spirv:
         return spirv_asm
         {
@@ -18225,13 +19623,14 @@ float3x4 WorldToObject3x4()
 /// @remarks Transposed version of ObjectToWorld3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 ObjectToWorld4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "ObjectToWorld4x3";
     case glsl: __intrinsic_asm "(gl_ObjectToWorldEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetObjectToWorldTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18245,13 +19644,14 @@ float4x3 ObjectToWorld4x3()
 /// @remarks Transposed version of WorldToObject3x4
 /// @category raytracing
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
+[require(cuda_glsl_hlsl_spirv, raytracing_anyhit_closesthit_intersection)]
 float4x3 WorldToObject4x3()
 {
     __target_switch
     {
     case hlsl:  __intrinsic_asm "WorldToObject4x3";
     case glsl: __intrinsic_asm "(gl_WorldToObjectEXT)";
+    case cuda: __intrinsic_asm "slangOptixGetWorldToObjectTransformMatrix4x3";
     case spirv:
         return spirv_asm
         {
@@ -18271,12 +19671,11 @@ float4x3 WorldToObject4x3()
 __glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
 [NonUniformReturn]
-[require(glsl_hlsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
+[require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
 {
     __target_switch
     {
-    case hlsl:  __intrinsic_asm "RayCurrentTime";
     case glsl:  __intrinsic_asm "(gl_CurrentRayTimeNV)";
     case spirv:
         return spirv_asm
@@ -18302,6 +19701,8 @@ int GetClusterID()
     case spirv:
         return spirv_asm
         {
+            OpExtension "SPV_NV_cluster_acceleration_structure";
+            OpCapability RayTracingClusterAccelerationStructureNV;
             result:$$int = OpLoad builtin(ClusterIDNV:int);
         };
     }
@@ -18462,6 +19863,159 @@ static const uint HIT_KIND_TRIANGLE_FRONT_FACE = 254;
 static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 
 //
+// Multi-level Traversal Intrinsics
+//
+
+/// Type representing transform types in multi-level traversal.
+/// @category raytracing
+enum TRAVERSABLE_TRANSFORM_TYPE : uint
+{
+    /// No transformation applied
+    TRAVERSABLE_TRANSFORM_TYPE_NONE = 0,
+
+    /// Static matrix transformation
+    TRAVERSABLE_TRANSFORM_TYPE_STATIC = 1,
+
+    /// Matrix motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_MATRIX_MOTION = 2,
+
+    /// SRT (scale/rotation/translation) motion transformation
+    TRAVERSABLE_TRANSFORM_TYPE_SRT_MOTION = 3,
+
+    /// Instance transformation
+    TRAVERSABLE_TRANSFORM_TYPE_INSTANCE = 4
+};
+
+/// Returns the transform type of a traversable handle from a transform list.
+/// @param handle Traversable handle to query
+/// @return Transform type enumeration value
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+TRAVERSABLE_TRANSFORM_TYPE GetTraversableTransformType(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformTypeFromHandle";
+    }
+}
+
+/// Returns an instance traversable from an IAS by index.
+/// @param ias Instance acceleration structure handle
+/// @param instIdx Instance index
+/// @return Traversable handle for the specified instance
+/// @remarks IAS must be built with OPTIX_BUILD_FLAG_ALLOW_RANDOM_INSTANCE_ACCESS
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetInstanceTraversable(uint64_t ias, uint instIdx)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceTraversableFromIAS";
+    }
+}
+
+/// Returns the instance ID from a traversable handle.
+/// @param handle Traversable handle to query
+/// @return Instance ID, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint GetTraversableInstanceId(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceIdFromHandle";
+    }
+}
+
+/// Returns the child traversable handle from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return Child traversable handle, or 0 if handle does not reference an instance
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+uint64_t GetTraversableChild(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetInstanceChildFromHandle";
+    }
+}
+
+/// Returns the object-to-world transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the object-to-world transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableObjectToWorld(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceTransformFromHandle";
+    }
+}
+
+/// Returns the world-to-object transform from an instance traversable.
+/// @param handle Instance traversable handle to query
+/// @return 3x4 transform matrix representing the world-to-object transformation
+/// @remarks Currently only supported on CUDA/OptiX
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_stages)]
+float3x4 GetTraversableWorldToObject(uint64_t handle)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "_slang_optixGetInstanceInverseTransformFromHandle";
+    }
+}
+
+/// Returns the number of transforms in the path from root to the current primitive.
+/// @return Number of transforms from root traversable to current primitive
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint GetTransformListSize()
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListSize";
+    }
+}
+
+/// Returns the traversable handle at a specific index in the transform path.
+/// @param index Index in the transform list (0 = root, GetTransformListSize()-1 = closest to primitive)
+/// @return Traversable handle at the specified index
+/// @remarks Currently only supported on CUDA/OptiX. Can only be called from intersection, any-hit, or closest-hit programs.
+/// @category raytracing
+[NonUniformReturn]
+[__readNone]
+[require(optix_multilevel_traversal, raytracing_anyhit_closesthit_intersection)]
+uint64_t GetTransformListHandle(uint index)
+{
+    __target_switch
+    {
+    case cuda: __intrinsic_asm "optixGetTransformListHandle";
+    }
+}
+
+//
 // Shader Model 6.4
 // @public:
 //
@@ -18470,7 +20024,7 @@ static const uint HIT_KIND_TRIANGLE_BACK_FACE = 255;
 /// @category math
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_6_4)]
 uint dot4add_u8packed(uint x, uint y, uint acc)
 {
     __target_switch
@@ -18498,7 +20052,7 @@ uint dot4add_u8packed(uint x, uint y, uint acc)
 /// @category math
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_6_4)]
 int dot4add_i8packed(uint x, uint y, int acc)
 {
     __target_switch
@@ -18527,7 +20081,7 @@ int dot4add_i8packed(uint x, uint y, int acc)
 /// @category math
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, sm_6_4)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_6_4)]
 float dot2add(half2 x, half2 y, float acc)
 {
     __target_switch
@@ -18830,7 +20384,7 @@ uint GeometryIndex()
 /// Get the vertex positions of the currently hit triangle in any-hit or closest-hit shader.
 /// https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GLSL_EXT_ray_tracing_position_fetch.txt
 /// @param index Index of the vertex (0-2)
-/// @return World-space position of the specified vertex
+/// @return Object-space position of the specified vertex
 /// @remarks Requires ray tracing position fetch extension
 /// @see GL_EXT_ray_tracing_position_fetch
 /// @category raytracing
@@ -18923,6 +20477,19 @@ static const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
 ///
 ///cannot use a cap for struct with unequal target support
 ///since it will propegate rules to children.
+
+/// https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html#rayquery-flags
+/// @category raytracing
+typedef uint RAYQUERY_FLAG;
+
+/// No options selected
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_NONE = 0x00;
+
+/// Flag to specify rayquery object supports Opacity Micromaps.
+/// @category raytracing
+static const RAYQUERY_FLAG RAYQUERY_FLAG_ALLOW_OPACITY_MICROMAPS = 0x01;
+
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_query)
 [__NonCopyableType]
@@ -19679,7 +21246,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     }
 ///~
 
-${{{{
+${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
 
     // Access Candidate and Committed Matrices.
@@ -19687,7 +21254,7 @@ ${{{{
     {
         auto ccName = kCandidateCommitted[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
@@ -19729,10 +21296,10 @@ ${{{{
 
     // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
     // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
-    ${{{{
+    ${
     const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
     for (auto matName : kRayQueryMatrixNames) {
-    }}}}
+    $}
 
     /// Gets the object-to-world transform as a 3x4 matrix.
     /// @return 3x4 matrix transforming from object to world space
@@ -19779,7 +21346,7 @@ ${{{{
         }
     }
 
-${{{{
+${
     } // ObjectToWorld/WorldToObject.
 
     // Access Candidate and Committed properties.
@@ -19801,7 +21368,7 @@ ${{{{
         {"float2", "TriangleBarycentrics", "Barycentrics"},
     };
     for (auto method : rayQueryMethods) {
-}}}}
+$}
 
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
@@ -19821,10 +21388,10 @@ ${{{{
             };
         }
     }
-${{{{
+${
     } // Candidate/Committed properties.
     } // for ("Candidate", "Committed")
-}}}}
+$}
 
     // Access properties of the ray being traced.
 
@@ -20041,9 +21608,13 @@ struct HitObject
 
         /// Executes ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+        ///
+        /// Generic payload parameter T can be:
+        /// - payload_t: for HLSL data-based API (payload structure)
+        /// - int: for GLSL location-based API (payload location ID)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
-    static HitObject TraceRay<payload_t>(
+    static HitObject TraceRay<T>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
         uint InstanceInclusionMask,
@@ -20051,7 +21622,7 @@ struct HitObject
         uint MultiplierForGeometryContributionToHitGroupIndex,
         uint MissShaderIndex,
         RayDesc Ray,
-        inout payload_t Payload)
+        inout T Payload)
     {
         __target_switch
         {
@@ -20070,74 +21641,197 @@ struct HitObject
                     hitObj);
                 return hitObj;
             }
+        case _GL_NV_shader_invocation_reorder:
+            {
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    // T is int: Payload is already a location, pass directly to GLSL helper
+                    int payloadLoc = reinterpret<int>(Payload);  // Use reinterpret for T→int cast
+                    __glslTraceRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Convert data to location via __rayPayloadLocation
+                    [__vulkanRayPayload]
+                    static T p;
+
+                    p = Payload;
+
+                    __glslTraceRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        __rayPayloadLocation(p));
+
+                    Payload = p;
+                }
+            }
         case glsl:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    // T is int: Payload is already a location, pass directly to GLSL helper
+                    int payloadLoc = reinterpret<int>(Payload);  // Use reinterpret for T→int cast
+                    __glslTraceRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Convert data to location via __rayPayloadLocation
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceRay(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    __rayPayloadLocation(p));
+                    __glslTraceRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case cuda: __intrinsic_asm "optixTraverse";
+        case spvShaderInvocationReorderNV:
+            {
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                // and pass compile-time constant to __rayPayloadFromLocation
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        p);
+                    Payload = p;
+                }
+            }
         case spirv:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                // and pass compile-time constant to __rayPayloadFromLocation
+                if (T is int)
                 {
-                    OpExtension "SPV_NV_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderNV;
-                    OpHitObjectTraceRayNV
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        p);
+                    Payload = p;
+                }
             }
         }
     }
 
         /// Executes motion ray traversal (including anyhit and intersection shaders) like TraceRay, but returns the
         /// resulting hit information as a HitObject and does not trigger closesthit or miss shaders.
+        ///
+        /// Generic payload parameter T can be:
+        /// - payload_t: for HLSL data-based API (payload structure)
+        /// - int: for GLSL location-based API (payload location ID)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
-    static HitObject TraceMotionRay<payload_t>(
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    static HitObject TraceMotionRay<T>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
         uint InstanceInclusionMask,
@@ -20146,84 +21840,190 @@ struct HitObject
         uint MissShaderIndex,
         RayDesc Ray,
         float CurrentTime,
-        inout payload_t Payload)
+        inout T Payload)
     {
         __target_switch
         {
-        case hlsl:
-            __traceMotionRayHLSL(
-                AccelerationStructure,
-                RayFlags,
-                InstanceInclusionMask,
-                RayContributionToHitGroupIndex,
-                MultiplierForGeometryContributionToHitGroupIndex,
-                MissShaderIndex,
-                Ray,
-                CurrentTime,
-                __forceVarIntoRayPayloadStructTemporarily(Payload));
+        case _GL_NV_shader_invocation_reorder:
+            {
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __glslTraceMotionRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    [__vulkanRayPayload]
+                    static T p;
+
+                    p = Payload;
+
+                    __glslTraceMotionRay(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        __rayPayloadLocation(p));
+
+                    Payload = p;
+                }
+            }
         case glsl:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
+                // Conditional: if T is int (location), pass directly; else convert data to location
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __glslTraceMotionRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    [__vulkanRayPayload]
+                    static T p;
 
-                // Save the payload
-                p = Payload;
+                    p = Payload;
 
-                __glslTraceMotionRay(
-                    __return_val,
-                    AccelerationStructure,
-                    RayFlags,                                           // Assumes D3D/VK have some RayFlags values
-                    InstanceInclusionMask,                              // cullMask
-                    RayContributionToHitGroupIndex,                     // sbtRecordOffset
-                    MultiplierForGeometryContributionToHitGroupIndex,   // sbtRecordStride
-                    MissShaderIndex,
-                    Ray.Origin,
-                    Ray.TMin,
-                    Ray.Direction,
-                    Ray.TMax,
-                    CurrentTime,
-                    __rayPayloadLocation(p));
+                    __glslTraceMotionRayEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        __rayPayloadLocation(p));
 
-                // Write the payload out
-                Payload = p;
+                    Payload = p;
+                }
             }
         case cuda: __intrinsic_asm "optixTraverse";
+        case spvShaderInvocationReorderNV:
+            {
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                if (T is int)
+                {
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceMotionRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceMotionRayHitObjectNV(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        p);
+                    Payload = p;
+                }
+            }
         case spirv:
             {
-                [__vulkanRayPayload]
-                static payload_t p;
-
-                // Save the payload
-                p = Payload;
-
-                let origin = Ray.Origin;
-                let direction = Ray.Direction;
-                let tmin = Ray.TMin;
-                let tmax = Ray.TMax;
-                spirv_asm
+                // Conditional: if T is int (location), extract value to ensure proper overload selection
+                if (T is int)
                 {
-                    OpExtension "SPV_NV_shader_invocation_reorder";
-                    OpCapability ShaderInvocationReorderNV;
-                    OpExtension "SPV_NV_ray_tracing_motion_blur";
-                    OpCapability RayTracingMotionBlurNV;
-                    OpHitObjectTraceRayMotionNV
-                        /**/ &__return_val
-                        /**/ $AccelerationStructure
-                        /**/ $RayFlags
-                        /**/ $InstanceInclusionMask
-                        /**/ $RayContributionToHitGroupIndex
-                        /**/ $MultiplierForGeometryContributionToHitGroupIndex
-                        /**/ $MissShaderIndex
-                        /**/ $origin
-                        /**/ $tmin
-                        /**/ $direction
-                        /**/ $tmax
-                        /**/ $CurrentTime
-                        /**/ &p;
-                };
-
-                // Write the payload out
-                Payload = p;
+                    int payloadLoc = reinterpret<int>(Payload);
+                    __spirvTraceMotionRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        payloadLoc);
+                }
+                else
+                {
+                    // T is payload_t: Create RayPayloadKHR variable and copy data to/from it
+                    [__vulkanRayPayload]
+                    static T p;
+                    p = Payload;
+                    __spirvTraceMotionRayHitObjectEXT(
+                        __return_val,
+                        AccelerationStructure,
+                        RayFlags,
+                        InstanceInclusionMask,
+                        RayContributionToHitGroupIndex,
+                        MultiplierForGeometryContributionToHitGroupIndex,
+                        MissShaderIndex,
+                        Ray.Origin,
+                        Ray.TMin,
+                        Ray.Direction,
+                        Ray.TMax,
+                        CurrentTime,
+                        p);
+                    Payload = p;
+                }
             }
         }
 
@@ -20236,7 +22036,10 @@ struct HitObject
         /// Attributes parameter must either be an attribute struct, such as
         /// BuiltInTriangleIntersectionAttributes, or another HitObject to copy the attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -20250,9 +22053,9 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            HitObject hitObj;
-            __hlslMakeHit(
+        case hlsl_nvapi:
+            HitObject hitObj_nvapi;
+            __hlslMakeHit_NVAPI(
                 AccelerationStructure,
                 InstanceIndex,
                 GeometryIndex,
@@ -20262,8 +22065,22 @@ struct HitObject
                 MultiplierForGeometryContributionToHitGroupIndex,
                 Ray,
                 attributes,
-                hitObj);
-            return hitObj;
+                hitObj_nvapi);
+            return hitObj_nvapi;
+        case hlsl:
+            HitObject hitObj_dxr;
+            __hlslMakeHit_DXR(
+                AccelerationStructure,
+                InstanceIndex,
+                GeometryIndex,
+                PrimitiveIndex,
+                HitKind,
+                RayContributionToHitGroupIndex,
+                MultiplierForGeometryContributionToHitGroupIndex,
+                Ray,
+                attributes,
+                hitObj_dxr);
+            return hitObj_dxr;
         case glsl:
             {
                 // Save the attributes
@@ -20285,7 +22102,7 @@ struct HitObject
                     __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
             }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             {
                 // Save the attributes
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20322,7 +22139,8 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
@@ -20337,7 +22155,6 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "MakeMotionHit";
         case glsl:
         {
             // Save the attributes
@@ -20360,7 +22177,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20405,7 +22222,8 @@ struct HitObject
         /// attribute struct, such as BuiltInTriangleIntersectionAttributes, or another HitObject to copy the
         /// attributes from.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_nv_raygen_closesthit_miss)]
     static HitObject MakeHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -20451,7 +22269,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20484,7 +22302,8 @@ struct HitObject
         /// See MakeHit but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda, ser_motion_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_nv_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionHit<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -20519,7 +22338,7 @@ struct HitObject
                 __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>()));
         }
         case cuda: __intrinsic_asm "optixMakeHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
         {
             // Save the attributes
             __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
@@ -20563,11 +22382,14 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
-        case glsl:
+        case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
+        case _GL_NV_shader_invocation_reorder:
             __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case glsl:
+            // EXT spec requires RayFlags parameter, pass 0 as default
+            __glslMakeMissEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -20586,13 +22408,16 @@ struct HitObject
                         /**/ $tmax;
                 };
             }
+        case spirv:
+            // EXT requires RayFlags, default to 0
+            __spirvRecordMissEXT(__return_val, 0u, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         }
     }
 
         /// See MakeMiss but handles Motion
         /// Currently only supported on VK
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_motion_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_motion_raygen_closesthit_miss)]
     static HitObject MakeMotionMiss(
         uint MissShaderIndex,
         RayDesc Ray,
@@ -20600,11 +22425,13 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "($3=NvMakeMotionMiss($0,$1,$2))";
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case glsl:
+            // EXT requires RayFlags parameter - use 0 as default
+            __intrinsic_asm "hitObjectRecordMissMotionEXT($R, 0, $0, $1.Origin, $1.TMin, $1.Direction, $1.TMax, $2)";
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             {
                 let origin = Ray.Origin;
                 let direction = Ray.Direction;
@@ -20626,27 +22453,54 @@ struct HitObject
                         /**/ $CurrentTime;
                 };
             }
+        case spirv:
+            {
+                let origin = Ray.Origin;
+                let direction = Ray.Direction;
+                let tmin = Ray.TMin;
+                let tmax = Ray.TMax;
+                let rayFlags = 0u;  // EXT requires RayFlags, default to 0
+                spirv_asm
+                {
+                    OpExtension "SPV_NV_ray_tracing_motion_blur";
+                    OpCapability RayTracingMotionBlurNV;
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectRecordMissMotionEXT
+                        /**/ &__return_val
+                        /**/ $rayFlags
+                        /**/ $MissShaderIndex
+                        /**/ $origin
+                        /**/ $tmin
+                        /**/ $direction
+                        /**/ $tmax
+                        /**/ $CurrentTime;
+                };
+            }
         }
     }
 
-        /// Creates a HitObject representing “NOP” (no operation) which is neither a hit nor a miss. Invoking a
+        /// Creates a HitObject representing "NOP" (no operation) which is neither a hit nor a miss. Invoking a
         /// NOP hit object using HitObject::Invoke has no effect. Reordering by hit objects using
         /// ReorderThread will group NOP hit objects together. This can be useful in some reordering
         /// scenarios where future control flow for some threads is known to process neither a hit nor a
         /// miss.
-    [__requiresNVAPI]
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static HitObject MakeNop()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             __intrinsic_asm "($0 = NvMakeNop())";
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             __glslMakeNop(__return_val);
+        case glsl:
+            __intrinsic_asm "hitObjectRecordEmptyEXT($R)";
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20654,27 +22508,45 @@ struct HitObject
                 OpHitObjectRecordEmptyNV
                     /**/ &__return_val;
             };
+        case spirv:
+            __spirvRecordEmptyEXT(__return_val);
+        case hlsl:
+            // DXR 1.3 native path (hlsl without nvapi)
+            __intrinsic_asm "($0 = dx::HitObject::MakeNop())";
         }
     }
 
-    [require(hlsl, ser)]
+    [__requiresNVAPI]
+    [require(nvapi, ser_nvapi)]
     __generic<payload_t>
-    static void __InvokeHLSL(
+    static void __InvokeHLSL_NVAPI(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
         inout payload_t Payload)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvInvokeHitObject";
+        case hlsl_nvapi: __intrinsic_asm "NvInvokeHitObject";
+        }
+    }
+
+    [require(hlsl, ser_dxr)]
+    __generic<payload_t>
+    static void __InvokeHLSL_DXR(
+        HitObject HitOrMiss,
+        inout payload_t Payload)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "dx::HitObject::Invoke";
         }
     }
 
         /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
-        /// shader is invoked.
-    [__requiresNVAPI]
+        /// shader is invoked. (NVAPI/SPIRV/CUDA variant with AccelerationStructure parameter)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     static void Invoke<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         HitObject HitOrMiss,
@@ -20682,12 +22554,12 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl:
-            __InvokeHLSL(
+        case hlsl_nvapi:
+            __InvokeHLSL_NVAPI(
                 AccelerationStructure,
                 HitOrMiss,
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -20700,8 +22572,21 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case glsl:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+
+                // Save the payload
+                p = Payload;
+
+                __glslInvokeEXT(HitOrMiss, __rayPayloadLocation(p));
+
+                // Write payload result
+                Payload = p;
+            }
         case cuda: __intrinsic_asm "optixInvoke";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -20711,8 +22596,8 @@ struct HitObject
 
                 spirv_asm
                 {
-                OpExtension "SPV_NV_shader_invocation_reorder";
-                OpCapability ShaderInvocationReorderNV;
+                    OpExtension "SPV_NV_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderNV;
                     OpHitObjectExecuteShaderNV
                         /**/ &HitOrMiss
                         /**/ &p;
@@ -20721,11 +22606,35 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
+        case spirv:
+            {
+                [__vulkanRayPayload]
+                static payload_t p;
+                p = Payload;
+                __spirvExecuteShaderEXT(HitOrMiss, p);
+                Payload = p;
+            }
+        }
+    }
+
+        /// Invokes closesthit or miss shading for the specified hit object. In case of a NOP HitObject, no
+        /// shader is invoked. (DXR 1.3 variant without AccelerationStructure parameter)
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void Invoke<payload_t>(
+        HitObject HitOrMiss,
+        inout payload_t Payload)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __InvokeHLSL_DXR(
+                HitOrMiss,
+                __forceVarIntoRayPayloadStructTemporarily(Payload));
         }
     }
 
         /// Returns true if the HitObject encodes a miss, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsMiss()
@@ -20733,20 +22642,27 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
-        case glsl: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsMissNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsMissEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsMissNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsMissEXT &this;
+            };
         }
     }
 
         /// Returns true if the HitObject encodes a hit, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsHit()
@@ -20754,20 +22670,27 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
-        case glsl: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsHitNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsHitEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
-            {
+             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsHitNV &this;
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsHitEXT &this;
             };
         }
     }
 
         /// Returns true if the HitObject encodes a nop, otherwise returns false.
-    [__requiresNVAPI]
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     bool IsNop()
@@ -20775,35 +22698,49 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
-        case glsl: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case glsl: __intrinsic_asm "hitObjectIsEmptyEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$bool = OpHitObjectIsEmptyNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$bool = OpHitObjectIsEmptyEXT &this;
+            };
         }
     }
 
         /// Queries ray properties from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
+        /// Note: This is an NVAPI/SPIRV/CUDA extension. DXR 1.3 uses individual accessors (GetRayTMin, GetRayTCurrent, etc.)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     RayDesc GetRayDesc()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             __intrinsic_asm ".GetRayDesc";
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             {
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
+        case glsl:
+            {
+                RayDesc ray = { __glslGetRayWorldOriginEXT(), __glslGetTMinEXT(), __glslGetRayWorldDirectionEXT(), __glslGetTMaxEXT() };
+                return ray;
+            }
         case cuda: __intrinsic_asm "optixHitObjectGetRayDesc";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
@@ -20814,11 +22751,21 @@ struct HitObject
                 %tmax:$$float = OpHitObjectGetRayTMaxNV &this;
                 result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                %origin:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+                %tmin:$$float = OpHitObjectGetRayTMinEXT &this;
+                %direction:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+                %tmax:$$float = OpHitObjectGetRayTMaxEXT &this;
+                result:$$RayDesc = OpCompositeConstruct %origin %tmin %direction %tmax;
+            };
         }
     }
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20826,33 +22773,51 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetShaderTableIndex";
-        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetShaderTableIndex";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetShaderBindingTableRecordIndexEXT &this;
+            };
         }
     }
 
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_hlsl, ser_raygen_closesthit_miss)]
-    uint SetShaderTableIndex(uint RecordIndex)
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    void SetShaderTableIndex(uint RecordIndex)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".SetShaderTableIndex";
+        case ser_hlsl_native:
+            __intrinsic_asm ".SetShaderTableIndex";
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
+        case spvShaderInvocationReorderEXT:
+            spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                OpHitObjectSetShaderBindingTableRecordIndexEXT &this $RecordIndex;
+            };
         }
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20860,21 +22825,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetInstanceIndex";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetInstanceIndex";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceIdNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceIdEXT &this;
+            };
         }
     }
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20882,21 +22855,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetInstanceID";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetInstanceID";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetInstanceCustomIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetInstanceCustomIndexEXT &this;
+            };
         }
     }
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20904,21 +22885,29 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetGeometryIndex";
-        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetGeometryIndex";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetGeometryIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetGeometryIndexEXT &this;
+            };
         }
     }
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
@@ -20926,51 +22915,70 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetPrimitiveIndex";
-        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case hlsl:
+            __intrinsic_asm ".GetPrimitiveIndex";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetPrimitiveIndexNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetPrimitiveIndexEXT &this;
+            };
         }
     }
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetHitKind";
-        case glsl: __intrinsic_asm "hitObjectGetHitKindNV($0)";
-        case spirv:
+        case hlsl:
+            __intrinsic_asm ".GetHitKind";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetHitKindEXT($0)";
+        case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint = OpHitObjectGetHitKindNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetHitKindEXT &this;
+            };
         }
     }
 
     /// Returns the cluster ID of the current hit. Valid if the hit object represents a hit.
-    [__requiresNVAPI]
+    /// Note: This is an NVAPI/SPIRV/CUDA extension, not available in DXR 1.3.
     __glsl_extension(GL_NV_cluster_acceleration_structure)
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
     int GetClusterID()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetClusterID";
+        case hlsl_nvapi: __intrinsic_asm ".GetClusterID";
         case glsl: __intrinsic_asm "hitObjectGetClusterIdNV($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetClusterId";
         case spirv:
@@ -21083,93 +23091,153 @@ struct HitObject
         }
     }
 
-    [__requiresNVAPI]
+        /// Returns 4x3 world-to-object transform matrix. Valid if the hit object represents a hit.
+        /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetWorldToObject3x4() and GetWorldToObject4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetWorldToObject";
-        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
-        case spirv:
+        case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetWorldToObjectNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetWorldToObjectEXT &this;
+            };
         }
     }
 
-    [__requiresNVAPI]
+        /// Returns 4x3 object-to-world transform matrix. Valid if the hit object represents a hit.
+        /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetObjectToWorld3x4() and GetObjectToWorld4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm ".GetObjectToWorld";
-        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case spirv:
+        case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float4x3 = OpHitObjectGetObjectToWorldNV &this;
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float4x3 = OpHitObjectGetObjectToWorldEXT &this;
+            };
         }
     }
 
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float = OpHitObjectGetCurrentTimeNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetCurrentTimeEXT &this
+            };
         }
     }
 
+        /// Returns object-space ray origin. Valid if the hit object represents a hit.
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
         __target_switch
         {
-        case glsl:
+        case hlsl:
+            __intrinsic_asm ".GetObjectRayOrigin";
+        case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayOriginEXT($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayOriginNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayOriginEXT &this
+            };
         }
     }
 
+        /// Returns object-space ray direction. Valid if the hit object represents a hit.
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
         __target_switch
         {
-        case glsl:
+        case hlsl:
+            __intrinsic_asm ".GetObjectRayDirection";
+        case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
+        case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$float3 = OpHitObjectGetObjectRayDirectionNV &this
+            };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetObjectRayDirectionEXT &this
             };
         }
     }
@@ -21179,44 +23247,68 @@ struct HitObject
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
-        case glsl:
+        case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
-        case spirv:
+        case glsl:
+            __intrinsic_asm "hitObjectGetShaderRecordBufferHandleEXT($0)";
+        case spvShaderInvocationReorderNV:
             return spirv_asm
             {
                 OpExtension "SPV_NV_shader_invocation_reorder";
                 OpCapability ShaderInvocationReorderNV;
                 result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleNV &this
             };
+        case spirv:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint2 = OpHitObjectGetShaderRecordBufferHandleEXT &this
+            };
         }
     }
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
         {
-        case hlsl:
+        case hlsl_nvapi:
             {
                 attr_t v;
                 __hlslGetAttributesFromHitObject(v);
                 return v;
+            }
+        case hlsl:
+            // DXR 1.3 native - direct method call
+            __intrinsic_asm ".GetAttributes";
+        case _GL_NV_shader_invocation_reorder:
+            {
+                // Work out the location
+                int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
+
+                // Load the attributes from the location (NV version)
+                __glslGetAttributes(attributeLocation);
+
+                // Return the attributes
+                return __hitObjectAttributes<attr_t>();
             }
         case glsl:
             {
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
-                // Load the attributes from the location
-                __glslGetAttributes(attributeLocation);
+                // Load the attributes from the location (EXT version)
+                __glslGetAttributesEXT(attributeLocation);
 
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
         case cuda: __intrinsic_asm "optixHitObjectGetAttribute<$TR>($0)";
-        case spirv:
+        case spvShaderInvocationReorderNV:
             {
                 __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
                 spirv_asm
@@ -21227,11 +23319,21 @@ struct HitObject
                 };
                 return *attr;
             }
+        case spirv:
+            {
+                __Addr<attr_t> attr = __allocHitObjectAttributes<attr_t>();
+                spirv_asm
+                {
+                    OpExtension "SPV_EXT_shader_invocation_reorder";
+                    OpCapability ShaderInvocationReorderEXT;
+                    OpHitObjectGetAttributesEXT &this $attr;
+                };
+                return *attr;
+            }
         }
     }
         /// Loads a root constant from the local root table referenced by the hit object. Valid if the hit object
         /// represents a hit or a miss. RootConstantOffsetInBytes must be a multiple of 4.
-    [__requiresNVAPI]
     [require(cuda_hlsl, ser_raygen_closesthit_miss)]
     uint LoadLocalRootTableConstant(uint RootConstantOffsetInBytes)
     {
@@ -21242,22 +23344,234 @@ struct HitObject
         }
     }
 
+    //
+    // DXR 1.3-only methods (not available in NVAPI/SPIRV/CUDA)
+    //
+
+        /// Returns the ray flags associated with the hit object. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    uint GetRayFlags()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayFlags";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$uint = OpHitObjectGetRayFlagsEXT &this;
+            };
+        }
+    }
+
+        /// Returns the parametric starting point (TMin) of the ray. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float GetRayTMin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayTMin";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float = OpHitObjectGetRayTMinEXT &this;
+            };
+        }
+    }
+
+        /// Returns the parametric ending point (T value at hit/miss). Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float GetRayTCurrent()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetRayTCurrent";
+        }
+    }
+
+        /// Returns the world-space ray origin. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 GetWorldRayOrigin()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldRayOrigin";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetWorldRayOriginEXT &this;
+            };
+        }
+    }
+
+        /// Returns the world-space ray direction. Valid if the hit object represents a hit or a miss.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 GetWorldRayDirection()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldRayDirection";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
+        case spvShaderInvocationReorderEXT:
+            return spirv_asm
+            {
+                OpExtension "SPV_EXT_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderEXT;
+                result:$$float3 = OpHitObjectGetWorldRayDirectionEXT &this;
+            };
+        }
+    }
+
+        /// Returns the 3x4 object-to-world transform matrix. Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float3x4 GetObjectToWorld3x4()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld3x4";
+        }
+    }
+
+        /// Returns the 4x3 object-to-world transform matrix (transposed). Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float4x3 GetObjectToWorld4x3()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetObjectToWorld4x3";
+        }
+    }
+
+        /// Returns the 3x4 world-to-object transform matrix. Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float3x4 GetWorldToObject3x4()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject3x4";
+        }
+    }
+
+        /// Returns the 4x3 world-to-object transform matrix (transposed). Valid if the hit object represents a hit.
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    float4x3 GetWorldToObject4x3()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".GetWorldToObject4x3";
+        }
+    }
+
+        /// Creates a HitObject representing a miss with specified ray flags.
+        /// DXR 1.3 and GL_EXT_shader_invocation_reorder - includes RayFlags parameter.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(spirv, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static HitObject MakeMiss(
+        uint RayFlags,
+        uint MissShaderIndex,
+        RayDesc Ray)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($3 = dx::HitObject::MakeMiss($0, $1, $2))";
+        case _GL_EXT_shader_invocation_reorder:
+            __glslMakeMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case spirv:
+            __spirvRecordMissEXT(__return_val, RayFlags, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        }
+    }
+
+        /// Creates a HitObject from a committed hit in a RayQuery.
+        /// The RayQuery must have a committed hit (COMMITTED_TRIANGLE_HIT or COMMITTED_PROCEDURAL_PRIMITIVE_HIT).
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen)]
+    __generic<let rayFlagsGeneric : RAY_FLAG>
+    static HitObject FromRayQuery(RayQuery<rayFlagsGeneric> Query)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($1 = dx::HitObject::FromRayQuery($0))";
+        }
+    }
+
+        /// Creates a HitObject from a committed hit in a RayQuery with custom hit attributes.
+        /// The RayQuery must have a committed procedural hit (COMMITTED_PROCEDURAL_PRIMITIVE_HIT).
+        /// CommittedCustomHitKind specifies the user-defined hit kind (must be >= HIT_KIND_USER_DEFINED_MIN).
+        /// DXR 1.3 only.
+    [ForceInline]
+    [require(hlsl, ser_dxr_raygen)]
+    __generic<let rayFlagsGeneric : RAY_FLAG, attr_t>
+    static HitObject FromRayQuery(
+        RayQuery<rayFlagsGeneric> Query,
+        uint CommittedCustomHitKind,
+        attr_t CommittedCustomAttribs)
+    {
+        __target_switch
+        {
+        case hlsl:
+            __intrinsic_asm "($3 = dx::HitObject::FromRayQuery($0, $1, $2))";
+        }
+    }
+
     ///
     /// !!!! Internal NVAPI HLSL impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void __hlslGetAttributesFromHitObject<T>(out T t)
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl_nvapi:
+            __intrinsic_asm "NvGetAttributesFromHitObject($0, $1)";
+        case hlsl:
+            // DXR 1.3 native path - use method call syntax
+            __intrinsic_asm ".GetAttributes";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslMakeHitWithRecordIndex<attr_t>(
         uint HitGroupRecordIndex,
         RaytracingAccelerationStructure AccelerationStructure,
@@ -21271,13 +23585,14 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHitWithRecordIndex";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
     [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
-    static void __hlslMakeHit<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    static void __hlslMakeHit_NVAPI<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
         uint InstanceIndex,
         uint GeometryIndex,
         uint PrimitiveIndex,
@@ -21290,12 +23605,30 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvMakeHit";
+        case hlsl_nvapi: __intrinsic_asm "NvMakeHit";
         }
     }
 
-    [__requiresNVAPI]
-    [require(hlsl, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    static void __hlslMakeHit_DXR<attr_t>(RaytracingAccelerationStructure AccelerationStructure,
+        uint InstanceIndex,
+        uint GeometryIndex,
+        uint PrimitiveIndex,
+        uint HitKind,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        RayDesc Ray,
+        attr_t attributes,
+        out HitObject hitObj)
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm "($9 = dx::HitObject::MakeHit($0, $1, $2, $3, $4, $5, $6, $7, $8))";
+        }
+    }
+
+    [require(nvapi, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     static void __hlslTraceRay<payload_t>(
         RaytracingAccelerationStructure AccelerationStructure,
         uint RayFlags,
@@ -21309,7 +23642,8 @@ struct HitObject
     {
         __target_switch
         {
-        case hlsl: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl_nvapi: __intrinsic_asm "NvTraceRayHitObject";
+        case hlsl: __intrinsic_asm "($8 = dx::HitObject::TraceRay($0, $1, $2, $3, $4, $5, $6, $7))";
         }
     }
 
@@ -21330,11 +23664,32 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordMissNV";
         }
     }
 
-    // "void hitObjectRecordMissNV(hitObjectNV, uint, vec3, float, vec3, float);"
+    // EXT version with RayFlags parameter
+    // "void hitObjectRecordMissEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float);"
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslMakeMissEXT(
+        out HitObject hitObj,
+        uint RayFlags,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax)
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectRecordMissEXT";
+        }
+    }
+
+    // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
@@ -21350,7 +23705,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissMotionNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordMissMotionNV";
         }
     }
 
@@ -21361,7 +23716,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordEmptyNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordEmptyNV";
         }
     }
 
@@ -21372,7 +23727,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
         }
     }
 
@@ -21383,7 +23738,19 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 __glslGetRayWorldDirectionEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
         }
     }
 
@@ -21394,7 +23761,19 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float3 __glslGetRayWorldOriginEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
         }
     }
 
@@ -21405,7 +23784,19 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float __glslGetTMaxEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
         }
     }
 
@@ -21416,7 +23807,19 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    float __glslGetTMinEXT()
+    {
+        __target_switch
+        {
+        case glsl: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
         }
     }
 
@@ -21440,7 +23843,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
         }
     }
 
@@ -21466,7 +23869,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexMotionNV";
         }
     }
 
@@ -21491,7 +23894,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitNV";
         }
     }
 
@@ -21518,7 +23921,7 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordHitMotionNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitMotionNV";
         }
     }
 
@@ -21530,12 +23933,26 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    void __glslGetAttributesEXT(int attributeLocation)
+    {
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -21553,12 +23970,507 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayNV";
+        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslTraceRayEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
+        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
+        }
+    }
+
+    // SPIR-V helpers - Function overloading for location-based (int) and data-based (payload_t) APIs
+
+    // NV data-based (for HLSL API)
+    [require(spirv, spvShaderInvocationReorderNV)]
+    static void __spirvTraceRayHitObjectNV<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectTraceRayNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &p;
+        };
+    }
+
+    // NV location-based (for GLSL API) - same name, different signature
+    [require(spirv, spvShaderInvocationReorderNV)]
+    static void __spirvTraceRayHitObjectNV(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpHitObjectTraceRayNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // EXT data-based (for HLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvTraceRayHitObjectEXT<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectTraceRayEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ &p;
+        };
+    }
+
+    // EXT location-based (for GLSL API) - same name as data-based, different signature
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvTraceRayHitObjectEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectTraceRayEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // SPIR-V motion ray helpers - Function overloading for location-based (int) and data-based (payload_t) APIs
+
+    // NV motion ray (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionNV)]
+    static void __spirvTraceMotionRayHitObjectNV<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        float CurrentTime,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &p;
+        };
+    }
+
+    // NV motion ray (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionNV)]
+    static void __spirvTraceMotionRayHitObjectNV(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderNV;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionNV
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $CurrentTime
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // EXT motion ray (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvTraceMotionRayHitObjectEXT<payload_t>(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint InstanceInclusionMask,
+        uint RayContributionToHitGroupIndex,
+        uint MultiplierForGeometryContributionToHitGroupIndex,
+        uint MissShaderIndex,
+        float3 origin,
+        float tmin,
+        float3 direction,
+        float tmax,
+        float CurrentTime,
+        inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $InstanceInclusionMask
+                /**/ $RayContributionToHitGroupIndex
+                /**/ $MultiplierForGeometryContributionToHitGroupIndex
+                /**/ $MissShaderIndex
+                /**/ $origin
+                /**/ $tmin
+                /**/ $direction
+                /**/ $tmax
+                /**/ $CurrentTime
+                /**/ &p;
+        };
+    }
+
+    // EXT motion ray (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvTraceMotionRayHitObjectEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure AccelerationStructure,
+        uint RayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float CurrentTime,
+        int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpHitObjectTraceRayMotionEXT
+                /**/ &hitObject
+                /**/ $AccelerationStructure
+                /**/ $RayFlags
+                /**/ $cullMask
+                /**/ $sbtRecordOffset
+                /**/ $sbtRecordStride
+                /**/ $missIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $CurrentTime
+                /**/ __rayPayloadFromLocation(payload)
+        };
+    }
+
+    // ============================================================================
+    // SPIRV EXT helpers for other SER operations (RecordMiss, RecordEmpty, etc.)
+    // These centralize SPIRV assembly to enable GLSL functions to delegate here.
+    // ============================================================================
+
+    // RecordMiss EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordMissEXT(
+        out HitObject hitObject,
+        uint rayFlags,
+        uint missShaderIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordMissEXT
+                /**/ &hitObject
+                /**/ $rayFlags
+                /**/ $missShaderIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax;
+        };
+    }
+
+    // RecordMissMotion EXT helper
+    [require(spirv, spvShaderInvocationReorderMotionEXT)]
+    static void __spirvRecordMissMotionEXT(
+        out HitObject hitObject,
+        uint rayFlags,
+        uint missShaderIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float currentTime)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_NV_ray_tracing_motion_blur";
+            OpCapability RayTracingMotionBlurNV;
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordMissMotionEXT
+                /**/ &hitObject
+                /**/ $rayFlags
+                /**/ $missShaderIndex
+                /**/ $origin
+                /**/ $Tmin
+                /**/ $direction
+                /**/ $Tmax
+                /**/ $currentTime;
+        };
+    }
+
+    // RecordEmpty EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordEmptyEXT(out HitObject hitObject)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordEmptyEXT &hitObject;
+        };
+    }
+
+    // ExecuteShader EXT helper (location-based for GLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvExecuteShaderEXT(HitObject hitObject, int payload)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectExecuteShaderEXT &hitObject __rayPayloadFromLocation(payload);
+        };
+    }
+
+    // ExecuteShader EXT helper (data-based for HLSL API)
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvExecuteShaderEXT<payload_t>(HitObject hitObject, inout payload_t p)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectExecuteShaderEXT &hitObject &p;
+        };
+    }
+
+    // SetShaderBindingTableRecordIndex EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvSetShaderTableIndexEXT(out HitObject hitObject, uint sbtRecordIndex)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectSetShaderBindingTableRecordIndexEXT &hitObject $sbtRecordIndex;
+        };
+    }
+
+    // RecordFromQuery EXT helper
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvRecordFromQueryEXT(out HitObject hitObject, RayQuery<0> rayQuery)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpHitObjectRecordFromQueryEXT &hitObject &rayQuery;
+        };
+    }
+
+    // ReorderThread EXT helpers
+
+    // With hint only
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHintEXT(uint coherenceHint, uint numCoherenceHintBitsFromLSB)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT $coherenceHint $numCoherenceHintBitsFromLSB;
+        };
+    }
+
+    // With hitObject only
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHitObjectEXT(HitObject hitObject)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &hitObject;
+        };
+    }
+
+    // With hitObject and hint
+    [require(spirv, spvShaderInvocationReorderEXT)]
+    static void __spirvReorderThreadWithHitObjectAndHintEXT(HitObject hitObject, uint coherenceHint, uint numCoherenceHintBitsFromLSB)
+    {
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &hitObject $coherenceHint $numCoherenceHintBitsFromLSB;
+        };
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
@@ -21578,7 +24490,34 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    static void __glslTraceMotionRayEXT(
+        out HitObject hitObject,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint rayFlags,
+        uint cullMask,
+        uint sbtRecordOffset,
+        uint sbtRecordStride,
+        uint missIndex,
+        float3 origin,
+        float Tmin,
+        float3 direction,
+        float Tmax,
+        float currentTime,
+        int payload)
+    {
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder_motion: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
@@ -21591,7 +24530,21 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectExecuteShaderNV";
+        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderNV";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslInvokeEXT(
+        HitObject hitObj,
+        int payload)
+    {
+        __target_switch
+        {
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
 };
@@ -21601,26 +24554,35 @@ struct HitObject
     /// Applications should set this to the lowest value required to represent all possible values in
     /// CoherenceHint. For best performance, all threads should provide the same value for
     /// NumCoherenceHintBits.
-    /// Where possible, reordering will also attempt to retain locality in the thread’s launch indices
+    /// Where possible, reordering will also attempt to retain locality in the thread's launch indices
     /// (DispatchRaysIndex in DXR).
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder";
-    case spirv:
+    case spvShaderInvocationReorderNV:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHintNV $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHintEXT $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -21641,24 +24603,33 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// groups, it will attempt to order threads by the value of their coherence hints. And within ranges
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
-    case spirv:
+    case spvShaderInvocationReorderNV:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
+        };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss $CoherenceHint $NumCoherenceHintBitsFromLSB;
         };
     }
 }
@@ -21669,25 +24640,69 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // ```
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
-[__requiresNVAPI]
 __glsl_extension(GL_EXT_ray_tracing)
 __glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
 {
     __target_switch
     {
-    case hlsl: __intrinsic_asm "NvReorderThread";
-    case glsl: __intrinsic_asm "reorderThreadNV";
+    case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
+    case glsl: __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder()";
-    case spirv:
+    case spvShaderInvocationReorderNV:
         spirv_asm
         {
             OpExtension "SPV_NV_shader_invocation_reorder";
             OpCapability ShaderInvocationReorderNV;
             OpReorderThreadWithHitObjectNV &HitOrMiss;
         };
+    case spirv:
+        spirv_asm
+        {
+            OpExtension "SPV_EXT_shader_invocation_reorder";
+            OpCapability ShaderInvocationReorderEXT;
+            OpReorderThreadWithHitObjectEXT &HitOrMiss;
+        };
+    }
+}
+
+// DXR 1.3 naming: MaybeReorderThread (alias for ReorderThread for DXR compatibility)
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a coherence hint value.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    }
+}
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a hit object and coherence hint.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
+    }
+}
+
+    /// DXR 1.3 MaybeReorderThread - reorders threads based on a hit object.
+[ForceInline]
+[require(hlsl, ser_dxr_raygen)]
+void MaybeReorderThread( HitObject HitOrMiss )
+{
+    __target_switch
+    {
+    case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     }
 }
 
@@ -21702,7 +24717,7 @@ __specialized_for_target(glsl)
 void __glslDebugBreak();
 
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl, breakpoint)]
+[require(cpp_cuda_glsl_hlsl_llvm, breakpoint)]
 void debugBreak()
 {
     __target_switch
@@ -21713,6 +24728,8 @@ void debugBreak()
     case glsl:
         __glslDebugBreak();
         return;
+    case llvm:
+        __intrinsic_asm "call void @llvm.debugtrap()";
     }
 }
 
@@ -21934,7 +24951,6 @@ func saturated_cooperation_using<A, B, C>(
 }
 
 
-${
 // The NVAPI operations are defined to take the space/register
 // indices of their texture and sampler parameters, rather than
 // taking the texture/sampler objects directly.
@@ -21946,7 +24962,6 @@ ${
 // have a built-in `interface` that all of the opaque resource
 // types conform to, so that we can define builtins that work
 // for any resource type.
-}
 
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>(_Texture<T,Shape,isArray,isMS,sampleCount,access,isShadow,isCombined,format> texture);
 __intrinsic_op($(kIROp_GetRegisterSpace)) uint __getRegisterSpace(SamplerState sampler);
@@ -21956,7 +24971,6 @@ __intrinsic_op($(kIROp_GetRegisterIndex)) uint __getRegisterIndex(SamplerState s
 
 //@public:
 
-${{{{
 //
 // Texture Footprint Queries
 //
@@ -21988,7 +25002,6 @@ ${{{{
 // data that is returned by the GLSL API via the
 // function reuslt.
 //
-}}}}
 
 [__NoSideEffect]
 [__requiresNVAPI]
@@ -22135,46 +25148,40 @@ typealias TextureFootprint2D = TextureFootprint<2>;
 ///@category stage_io
 typealias TextureFootprint3D = TextureFootprint<3>;
 
-${
 // We define the new operations via an `extension`
 // on the relevant texture type(s), rather than
 // further clutter the original type declarations.
-}
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let sampleCount:int, let isShadow:int, let format:int>
 extension _Texture<T,Shape,0,0,sampleCount,0,isShadow,0,format>
 {
-${
-// We introduce a few convenience type aliases here,
-// which both keep our declarations simpler and easier
-// to understand, but which might *also* be useful to
-// users of the standard module, so that they can write things
-// like `Texture2D.Footprint`, and also have auto-complete
-// help them find such members.
-//
-// TODO: The `Coords` type really ought to be something
-// defined on the base texture types, rather than via
-// this `extension`.
-}
+    // We introduce a few convenience type aliases here,
+    // which both keep our declarations simpler and easier
+    // to understand, but which might *also* be useful to
+    // users of the standard module, so that they can write things
+    // like `Texture2D.Footprint`, and also have auto-complete
+    // help them find such members.
+    //
+    // TODO: The `Coords` type really ought to be something
+    // defined on the base texture types, rather than via
+    // this `extension`.
+
     typealias Coords = vector<float, Shape.dimensions>;
     typealias Footprint = TextureFootprint<Shape.dimensions>;
     typealias __FootprintData = __TextureFootprintData<Shape.dimensions>;
     typealias FootprintGranularity = Footprint.Granularity;
 
-${
-// For the GLSL extension, the choice between the
-// coarse and fine level is modeled as a `bool`
-// parameter to the query operation(s). We define
-// the GLSL functions here as intrinsics, so that
-// we can refer to them later in the definitions
-// of our standard module operaitons; not just in glsl module.
-//
-// Note: despite the GLSL extension defining the `granularity`
-// member of the query result as having type `uint`, the
-// function signatures all take `int` parameters for the
-// granularity instead.
-//
-}
+    // For the GLSL extension, the choice between the
+    // coarse and fine level is modeled as a `bool`
+    // parameter to the query operation(s). We define
+    // the GLSL functions here as intrinsics, so that
+    // we can refer to them later in the definitions
+    // of our standard module operaitons; not just in glsl module.
+    //
+    // Note: despite the GLSL extension defining the `granularity`
+    // member of the query result as having type `uint`, the
+    // function signatures all take `int` parameters for the
+    // granularity instead.
 
     [__NoSideEffect]
     __glsl_version(450)
@@ -22322,9 +25329,8 @@ ${
     }
 
 
-${{{
     // Texture sampling with gradient is only available for 2D textures.
-}}}
+
     [__NoSideEffect]
     __glsl_version(450)
     __glsl_extension(GL_NV_shader_texture_footprint)
@@ -22386,12 +25392,11 @@ ${{{
             };
         }
     }
-${{{
+
     // End texture2D specific functions.
-}}}
 
 
-${{{{
+${
 // The NVAPI texture query operations encode the choice
 // between coarse and fine levels as part of the function
 // name, and so we are forced to match this convention
@@ -22423,7 +25428,7 @@ for(auto levelChoice : kLevelChoices)
 // with that parameter, since they have no equivalent in
 // the GLSL extension.
 //
-}}}}
+$}
 
     [__NoSideEffect]
     [__requiresNVAPI]
@@ -22505,24 +25510,21 @@ for(auto levelChoice : kLevelChoices)
         }
     }
 
-${
-// We now define the portable operations that will be officially
-// supported by the standard module. For each operation, we
-// need to provide both a version that maps to the GLSL extension,
-// and a version that uses the NVAPI functions.
-//
-// Some function variations are only available with one extension
-// or the other, so we try our best to only define them where
-// each is available.
-//
-// Note that these functions cannot be marked as [ForceInline] for now
-// because the texture resource may get removed after DCE, since the only
-// use of those resources are done through __GetRegisterIndex/Space, which is
-// replaced early with their binding slot in the compilation process.
-// Not inlining these function is a quick way to make sure the texture always
-// has live uses.
-//
-}
+    // We now define the portable operations that will be officially
+    // supported by the standard module. For each operation, we
+    // need to provide both a version that maps to the GLSL extension,
+    // and a version that uses the NVAPI functions.
+    //
+    // Some function variations are only available with one extension
+    // or the other, so we try our best to only define them where
+    // each is available.
+    //
+    // Note that these functions cannot be marked as [ForceInline] for now
+    // because the texture resource may get removed after DCE, since the only
+    // use of those resources are done through __GetRegisterIndex/Space, which is
+    // replaced early with their binding slot in the compilation process.
+    // Not inlining these function is a quick way to make sure the texture always
+    // has live uses.
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -22675,9 +25677,7 @@ ${
         }
     }
 
-${{{
     // TODO: Texture sampling with gradient is only available for 2D textures.
-}}}
 
     /// Query the footprint that would be accessed by a texture sampling operation.
     ///
@@ -22740,13 +25740,11 @@ ${{{
         }
     }
 
-${{{
     // TODO: end texture2D specific functions.
-}}}
 
-${{{{
-}
-}}}}
+${
+} // for(auto levelChoice : kLevelChoices)
+$}
 
 } // extension
 
@@ -22954,7 +25952,7 @@ extension _Texture<T, Shape, isArray, isMS, sampleCount, access, isShadow, isCom
     }
 }
 
-${{{{
+${
 struct DynamicResourceTypeInfo
 {
     const char* name;
@@ -22988,7 +25986,7 @@ for (auto type : kDynamicResourceCastableTypes) {
         sb << "__generic<T, L : IBufferDataLayout>\n";
     else if (strstr(typeName, "<T>"))
         sb << "__generic<T>\n";
-}}}}
+$}
 
 extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynamicKind)>
 {
@@ -23009,9 +26007,9 @@ extension $(typeName) : __IDynamicResourceCastable<__DynamicResourceKind.$(dynam
     }
 }
 
-${{{{
-}
-}}}}
+${
+} // for (auto type : kDynamicResourceCastableTypes) {
+$}
 
 
 /// Represents a bindless handle to a descriptor. A descriptor handle is always an ordinary data type and can be
@@ -23039,6 +26037,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     /// Constructor for uint64_t handles
     [ForceInline]
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __intrinsic_op($(kIROp_CastUInt64ToDescriptorHandle))
     __init(uint64_t handleValue);
 
@@ -23048,6 +26047,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this == (uint64_t)other;
         default:
             return all(__vectorEql((uint2)this, (uint2)other));
@@ -23060,6 +26060,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -23074,6 +26075,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -23096,6 +26098,7 @@ extension uint64_t
 {
     __intrinsic_op($(kIROp_CastDescriptorHandleToUInt64))
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
 }
 
@@ -23183,7 +26186,7 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
 
         switch(bindlessOptions)
         {
-${{{{
+${
 {
     static const struct
     {
@@ -23202,7 +26205,7 @@ ${{{{
 
         bindlessOptionIfElsePre << "case BindlessDescriptorOptions." << bindlessOption.option <<":\n{\n";
         bindlessOptionIfElsePost << "}\n";
-}}}}
+$}
     $(bindlessOptionIfElsePre.toString())
     switch(T.kind)
     {
@@ -23242,10 +26245,10 @@ ${{{{
         return __getDynamicResourceHeap<T>($(bindlessOption.enumType).Unknown)[((uint2)handleValue).x];
     }
     $(bindlessOptionIfElsePost.toString())
-${{{{
+${
     }
 }
-}}}}
+$}
     default:
     {
         static_assert(false, "Impossible to end up here unless something went very wrong");
@@ -23364,7 +26367,7 @@ enum CoopMatClampMode
 };
 
 
-${{{{
+${
 // SPIRV described that the max value for `Dim` is 5.
 //
 // https://github.khronos.org/SPIRV-Registry/extensions/NV/SPV_NV_tensor_addressing.html#OpTypeTensorLayoutNV
@@ -23380,7 +26383,7 @@ ${{{{
 // zero and less than or equal to 5.
 //
 const int kMaxCoopMatTensorDimension = 5;
-}}}}
+$}
 
 //
 // TensorLayout
@@ -23399,7 +26402,7 @@ struct TensorLayout
 };
 
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder dimParams;
@@ -23421,7 +26424,7 @@ ${{{{
             blockSizeParams << ", uint32_t blockSize" << j;
             blockSizeAsms << " $blockSize" << j;
         }
-}}}}
+$}
 
 
 extension<
@@ -23468,14 +26471,14 @@ extension<
     }
 
     [require(tensor_addressing)]
-    This ClampValue(CoopMatClampMode clampMode)
+    This ClampValue(int value)
     {
         __target_switch
         {
         case spirv:
             return spirv_asm
             {
-                result:$$This = OpTensorLayoutSetClampValueNV $this $clampMode;
+                result:$$This = OpTensorLayoutSetClampValueNV $this $value;
             };
         }
     }
@@ -23494,15 +26497,15 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 //
 // TensorView
 //
 
-${{{{
+${
     StringBuilder tensorViewStruct;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
     {
@@ -23511,7 +26514,7 @@ ${{{{
         // is explicitly set by the user or not.
         tensorViewStruct << ", let p" << j << " : uint32_t = 0xff";
     }
-}}}}
+$}
 
 __intrinsic_type($(kIROp_TensorAddressingTensorViewType))
 __generic<
@@ -23525,7 +26528,7 @@ struct TensorView
     __init();
 };
 
-${{{{
+${
     for (int iDim = 1; iDim < kMaxCoopMatTensorDimension; ++iDim)
     {
         StringBuilder tensorViewTypes;
@@ -23547,7 +26550,7 @@ ${{{{
         {
             tensorViewExtensions << ", 0xff";
         }
-}}}}
+$}
 
 [require(tensor_addressing)]
 extension<
@@ -23596,15 +26599,83 @@ extension<
     }
 };
 
-${{{{
+${
     } // iDim
-}}}}
+$}
 
 
 //
 // Cooperative Matrix type
 //
 
+//@public:
+/**
+Represents a cooperative matrix for efficient warp/subgroup-level matrix operations on GPU hardware.
+CoopMat enables high-performance matrix multiply-accumulate operations by distributing matrix
+fragments across threads within a warp or subgroup. This type leverages specialized hardware
+instructions such as CUDA's WMMA (Warp Matrix Multiply-Accumulate) or Vulkan cooperative
+matrix extensions.
+
+@param T The element type of the matrix. Must be a built-in arithmetic type.
+@param S The memory scope defining the cooperative group (e.g., device, workgroup, subgroup).
+@param M The number of rows in the matrix fragment.
+@param N The number of columns in the matrix fragment.
+@param R The matrix use specifier indicating whether this is a Matrix A, Matrix B, or accumulator matrix.
+
+@remarks
+The dimensions M and N must match hardware-supported fragment shapes. For CUDA WMMA,
+valid shape combinations are (where k is always 16):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16)
+- Shape m8n32k16:  Matrix A (8×16),  Matrix B (16×32), Accumulator (8×32)
+- Shape m32n8k16:  Matrix A (32×16), Matrix B (16×8),  Accumulator (32×8)
+
+Matrix A dimensions are (m×k), Matrix B dimensions are (k×n), and Accumulator dimensions are (m×n).
+For all CUDA WMMA shapes listed above:
+- Matrix A and B support: half, uint8, int8
+- Accumulator (Matrix C) supports: float, half, int
+
+All matrices involved in a multiply-accumulate operation must use the same shape combination.
+The actual physical layout and distribution of elements across threads is hardware-specific.
+
+When targeting Vulkan/SPIR-V, this type uses the SPV_KHR_cooperative_matrix extension (and optionally
+SPV_NV_cooperative_matrix2 for advanced features like transpose, reductions, and per-element operations).
+Valid shape combinations for Vulkan cooperative matrices (example device properties):
+
+With float16 elements (A/B/C element types):
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/half
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/half
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/half
+- Shape m16n16k16: Matrix A (16×16), Matrix B (16×16), Accumulator (16×16) - half/half/float
+- Shape m16n8k16:  Matrix A (16×16), Matrix B (16×8),  Accumulator (16×8)  - half/half/float
+- Shape m16n8k8:   Matrix A (16×8),  Matrix B (8×8),   Accumulator (16×8)  - half/half/float
+
+With 8-bit integer elements (A/B/C element types):
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - uint8/uint8/uint32
+- Shape m16n16k32: Matrix A (16×32), Matrix B (32×16), Accumulator (16×16) - int8/int8/int32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - uint8/uint8/uint32
+- Shape m16n8k32:  Matrix A (16×32), Matrix B (32×8),  Accumulator (16×8)  - int8/int8/int32
+
+Note: Vulkan's supported shapes are device-specific and can be queried at runtime using
+VkPhysicalDeviceCooperativeMatrixPropertiesKHR. The above list represents common configurations
+but may vary by GPU vendor and driver. The element distribution across threads in a subgroup
+may differ between CUDA and Vulkan implementations, so code using the subscript operator
+should only perform uniform operations for portability. If your code specifies a combination
+that is not supported by the device, the behavior is undefined.
+
+Additionally, while only `MemoryScope.Subgroup` (warp-level cooperation) is supported on CUDA,
+`MemoryScope.Workgroup` can be used when targeting Vulkan, allowing cooperation among threads
+within the entire workgroup. Whenever `Workgroup` scope is supported, it is recommended to use it
+instead of `Subgroup` scope for simplicity and performance.
+
+When using `MemoryScope.Workgroup`, Slang will emit SPIR-V code that uses the
+`SPV_NV_cooperative_matrix2` extension. A workgroup-scope cooperative
+matrix can use larger matrix shapes that are multiples of 16/32 depending on the target device.
+Workgroup-scope cooperative matrices requires a specific workgroup size setting (specified via
+`[numthreads]`). Use the Vulkan API to query the supported combinations of element type, matrix
+shape and workgroup size settings. 
+
+@category matrix_types
+*/
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
@@ -23622,12 +26693,15 @@ struct CoopMat
     // Initialization
     //
 
+    /// Default constructor. Creates an uninitialized cooperative matrix.
     [ForceInline]
     [require(cooperative_matrix)]
     __init()
     {
     }
 
+    /// Constructs a cooperative matrix and fills all elements with the specified value.
+    /// @param t The value to fill the matrix with.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(T t)
@@ -23635,6 +26709,9 @@ struct CoopMat
         this.fill(t);
     }
 
+    /// Constructs a cooperative matrix by copying and converting from another cooperative matrix.
+    /// @param U The element type of the source cooperative matrix.
+    /// @param other The source cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
@@ -23644,6 +26721,8 @@ struct CoopMat
         this.copyFrom(other);
     }
 
+    /// Copy constructor. Creates a cooperative matrix from another matrix of the same type.
+    /// @param x The cooperative matrix to copy from.
     [ForceInline]
     [require(cooperative_matrix)]
     __init(This x)
@@ -23651,7 +26730,8 @@ struct CoopMat
         this = x;
     }
 
-    // Required for `IArithmetic`.
+    /// Constructs a cooperative matrix from an integer value. Required for `IArithmetic` conformance.
+    /// @param i The integer value to convert to the element type and fill the matrix with.
     [ForceInline]
     [OverloadRank(-10)]
     [require(cooperative_matrix)]
@@ -23671,10 +26751,16 @@ struct CoopMat
     [require(cooperative_matrix)]
     void fill(T t)
     {
-        this = spirv_asm
+        __target_switch
         {
-            result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
-        };
+        case spirv:
+            this = spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+            };
+        case cuda:
+            __intrinsic_asm "($0)->fill($1)";
+        }
     }
 
     /// Copies the contents from another cooperative matrix into this matrix.
@@ -23687,14 +26773,20 @@ struct CoopMat
         U : __BuiltinArithmeticType
     >(CoopMat<U, S, M, N, R> other)
     {
-        if (__isFloat<T>() && __isInt<U>())
-            this = __int_to_float_cast<T>(other);
-        else if (__isInt<T>() && __isFloat<U>())
-            this = __float_to_int_cast<T>(other);
-        else if (__isFloat<T>() && __isFloat<U>())
-            this = __real_cast<T>(other);
-        else if (__isInt<T>() && __isInt<U>())
-            this = __int_cast<T>(other);
+        __target_switch
+        {
+        case spirv:
+            if (__isFloat<T>() && __isInt<U>())
+                this = __int_to_float_cast<T>(other);
+            else if (__isInt<T>() && __isFloat<U>())
+                this = __float_to_int_cast<T>(other);
+            else if (__isFloat<T>() && __isFloat<U>())
+                this = __real_cast<T>(other);
+            else if (__isInt<T>() && __isInt<U>())
+                this = __int_cast<T>(other);
+        case cuda:
+            __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
+        }
     }
 
     //
@@ -23710,7 +26802,12 @@ struct CoopMat
     [__NoSideEffect]
     Ref<T> __indexRef(int index);
 
-    /// Returns the count as an integer value.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
+    ///
+    /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     [__NoSideEffect]
@@ -23719,19 +26816,38 @@ struct CoopMat
         return GetLength();
     }
 
+    /// Subscript operator to access elements in the cooperative matrix.
+    /// The components of a cooperative matrix are spread cross the threads in its scope,
+    /// it's implementation-dependent manner. Therefore, Vulkan and CUDA could have different
+    /// distributions. The subscript operator only provides the access to the elements that
+    /// belong to the current thread, but the locations of those elements on the matrix is
+    /// unspecified. It indicates that user can only use this operator to perform uniform
+    /// operations.
     __subscript(int index) -> T
     {
         [__NoSideEffect]
         [nonmutating]
         get
         {
-            return __indexRead(index);
+            __target_switch
+            {
+            case spirv:
+                return __indexRead(index);
+            case cuda:
+                __intrinsic_asm "($0).get($1)";
+            }
         }
 
         [mutating]
         set
         {
-            __indexRef(index) = newValue;
+            __target_switch
+            {
+            case spirv:
+                __indexRef(index) = newValue;
+            case cuda:
+                __intrinsic_asm "($0)->set($1, $2)";
+            }
         }
     }
 
@@ -23739,19 +26855,33 @@ struct CoopMat
     // CoopMat operations
     //
 
-    /// Returns the number of elements for the current thread.
-    /// Depending on the number of threads for the given matrix, each
-    /// thread will get smaller length.
+    /// Returns the number of elements for accessible by the current thread.
+    /// The number of components accessible by current thread is implementation-dependent.
+    /// @return The number of elements accessible by the current thread.
+    ///
     ///
     /// @remarks The return value is unlikely to be same to M * N.
     [ForceInline]
     [require(cooperative_matrix)]
     static uint GetLength()
     {
-        return spirv_asm
+        __target_switch
         {
-            result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                result:$$uint = OpCooperativeMatrixLengthKHR $$CoopMat<T, S, M, N, R>;
+            };
+        case cuda:
+            This result;
+            return __getNumElementsPerThread(result);
+        }
+    }
+
+    [require(cuda_sm_8_0)]
+    internal static uint __getNumElementsPerThread(__ref This coopMat)
+    {
+        __intrinsic_asm "($0)->GetLength()";
     }
 
     /// Returns the number of rows in the matrix.
@@ -23770,6 +26900,8 @@ struct CoopMat
         return N;
     }
 
+    /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
     [require(cooperative_matrix_conversion)]
     CoopMat<T, S, N, M, CoopMatMatrixUse.MatrixB> Transpose()
     {
@@ -23781,6 +26913,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along rows using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions M×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRow<
         let RN : int
@@ -23794,6 +26931,11 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×N.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, N, CoopMatMatrixUse.MatrixAccumulator> ReduceColumn<
         let RM : int
@@ -23807,6 +26949,12 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix along both rows and columns using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param RM The number of rows in the resulting reduced matrix.
+    /// @param RN The number of columns in the resulting reduced matrix.
+    /// @param combineOp The binary function used to combine elements (e.g., addition, multiplication).
+    /// @return A reduced accumulator matrix with dimensions RM×RN.
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, RM, RN, CoopMatMatrixUse.MatrixAccumulator> ReduceRowAndColumn<
         let RM : int,
@@ -23821,6 +26969,10 @@ struct CoopMat
         };
     }
 
+    /// Reduces the matrix in 2×2 blocks using the specified combining operation.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param combineOp The binary function used to combine elements within each 2×2 block.
+    /// @return A reduced accumulator matrix with dimensions (M/2)×(N/2).
     [require(cooperative_matrix_reduction)]
     CoopMat<T, S, M / 2, N / 2, CoopMatMatrixUse.MatrixAccumulator> Reduce2x2(functype(T, T)->T combineOp)
     {
@@ -23832,6 +26984,10 @@ struct CoopMat
         };
     }
 
+    /// Applies a per-element operation to the cooperative matrix.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param mapOp A function that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     [require(cooperative_matrix_map_element)]
     This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
     {
@@ -23853,6 +27009,11 @@ struct CoopMat
         TFunc mapObj
     );
 
+    /// Applies a per-element operation to the cooperative matrix using a functor.
+    /// Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
+    /// @param TFunc The functor type implementing IFunc<T, uint32_t, uint32_t, T>.
+    /// @param mapOp A functor object that takes (row, column, element) and returns a new element value.
+    /// @return A new cooperative matrix with the operation applied to each element.
     This MapElement<
         TFunc : IFunc<T, uint32_t, uint32_t, T>
     >(TFunc mapOp)
@@ -23864,7 +27025,12 @@ struct CoopMat
     // Store
     //
 
-    [require(cooperative_matrix)]
+    /// Stores the cooperative matrix into a byte address buffer.
+    /// @param buffer The RWByteAddressBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or columns (for column major layout)
+    ///        and must be a multiple of 8 for __half element type or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
+    [require(cooperative_matrix, byteaddressbuffer)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(RWByteAddressBuffer buffer, uint element, uint stride)
@@ -23872,6 +27038,12 @@ struct CoopMat
         __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
     }
 
+    /// Stores the cooperative matrix into a structured buffer.
+    /// @param buffer The RWStructuredBuffer to store the matrix into.
+    /// @param element The starting element index in the buffer to store the matrix into.
+    /// @param stride The stride in elements between consecutive rows (for row major layout) or
+    ///        columns (for column major layout) and must be a multiple of 8 for __half element type
+    ///        or multiple of 4 for float element type. (i.e., multiple of 16 bytes in both cases)
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
@@ -23887,29 +27059,59 @@ struct CoopMat
     {
         let zero = 0;
         let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
     }
 
+    /// Stores the cooperative matrix into a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
-    [require(cooperative_matrix, vk_mem_model)]
+    /// Stores the cooperative matrix into a pointer buffer with coherent memory access.
+    /// Ensures memory writes are made available across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param buffer The pointer to the buffer to store the matrix into.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope across which the write should be made visible (e.g., Device, Workgroup).
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     void StoreCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -23924,6 +27126,12 @@ struct CoopMat
         };
     }
 
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
     [require(cooperative_matrix)]
     void Store<
@@ -23931,17 +27139,56 @@ struct CoopMat
         let V : int
     >(__ref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+        }
     }
 
     [ForceInline]
     [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+        }
+    }
+
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    [ForceInline]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -23959,6 +27206,38 @@ struct CoopMat
 
     [ForceInline]
     [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
+        }
+    }
+
+    /// Stores the cooperative matrix into a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to store the matrix into.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    [ForceInline]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -23980,13 +27259,13 @@ struct CoopMat
     // Load
     //
 
-${{{{
+${
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [__NoSideEffect]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix, byteaddressbuffer)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout
     >(
@@ -24008,18 +27287,33 @@ ${{{{
     {
         let zero = 0;
         let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %storagePointerType = OpTypePointer StorageBuffer $$T;
-            %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
+    /// Loads a cooperative matrix from a pointer buffer.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_matrix)]
@@ -24027,18 +27321,35 @@ ${{{{
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride)
     {
-        let alignment = 16;
-        return spirv_asm
+        __target_switch
         {
-            %pointer:$$T* = OpPtrAccessChain $buffer $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16;
+            return spirv_asm
+            {
+                %pointer:$$T* = OpPtrAccessChain $buffer $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+        }
     }
 
     // TODO: make this function an intrinsic and support all types via the single intrinsic
+    /// Loads a cooperative matrix from a pointer buffer with coherent memory access.
+    /// Ensures memory reads observe writes made visible across the specified memory scope. Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+    /// @param buffer The pointer to the buffer to load from.
+    /// @param element The starting element index in the buffer.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+    /// @return A cooperative matrix loaded from the buffer.
     [ForceInline]
     [__NoSideEffect]
-    [require(cooperative_matrix, vk_mem_model)]
+    [require(cooperative_matrix_spirv, vk_mem_model)]
     static This LoadCoherent<
         let matrixLayout : CoopMatMatrixLayout
     >(T* buffer, uint element, uint stride, constexpr MemoryScope memoryScope)
@@ -24053,6 +27364,13 @@ ${{{{
         };
     }
 
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
     [require(cooperative_matrix)]
     static This Load<
@@ -24060,17 +27378,57 @@ ${{{{
         let V : int
     >(__constref groupshared T[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$T;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$T;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+        }
     }
 
     [ForceInline]
     [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+        }
+    }
+
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the groupshared array (may differ from T).
+    /// @param V The size of the groupshared array.
+    /// @param data The groupshared array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared array.
+    [ForceInline]
+    [require(cooperative_matrix_spirv)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -24091,6 +27449,39 @@ ${{{{
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
+        }
+    }
+
+    /// Loads a cooperative matrix from a groupshared (workgroup) memory array of vectors.
+    /// Vulkan only.
+    /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+    /// @param U The element type of the vectors in the groupshared array.
+    /// @param V The size of the groupshared array.
+    /// @param L The length of each vector in the array.
+    /// @param data The groupshared vector array to load from.
+    /// @param element The starting element index in the array.
+    /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
+    /// @return A cooperative matrix loaded from the groupshared vector array.
+    [ForceInline]
+    [require(cooperative_matrix_spirv)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
         let V : int,
         let L : int
     >(__constref groupshared vector<U, L>[V] data, uint element, uint stride)
@@ -24108,21 +27499,38 @@ ${{{{
     // Arithmetic
     //
 
+    /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
     __intrinsic_op($(kIROp_Add))
     This add(This other);
 
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
     __intrinsic_op($(kIROp_Sub))
     This sub(This other);
 
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
     __intrinsic_op($(kIROp_Mul))
     This mul(This other);
 
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
     __intrinsic_op($(kIROp_Div))
     This div(This other);
 
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
     __intrinsic_op($(kIROp_Neg))
     This neg();
 
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
     This mod(This other)
     {
         This ret;
@@ -24137,6 +27545,9 @@ ${{{{
     // Equality and ordering
     //
 
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
     bool equals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24149,6 +27560,9 @@ ${{{{
         return true;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
     bool lessThan(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24165,6 +27579,9 @@ ${{{{
         return false;
     }
 
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
     bool lessThanOrEquals(This other)
     {
         for (int i = 0; i < GetLength(); i++)
@@ -24184,8 +27601,7 @@ ${{{{
     //
     // Load with TensorLayout and TensorView
     //
-
-${{{{
+${
     StringBuilder tensorViewTypes;
     StringBuilder tensorViewParams;
     for (int j = 0; j < kMaxCoopMatTensorDimension; ++j)
@@ -24193,10 +27609,126 @@ ${{{{
         tensorViewTypes << ", let p" << j << " : uint32_t = " << kMaxCoopMatTensorDimension;
         tensorViewParams << ", p" << j;
     }
+$}
+    // Pointer versions
+    //
 
+    /// Load a cooperative matrix from memory using tensor layout.
+    /// 
+    /// @param pointerIn Pointer to the memory location to load from. Address must be 16-byte aligned.
+    /// @param buffer The `ByteAddressBuffer` or [RW]`StructuredBuffer` to load from.
+    /// @param clippedValue A cooperative matrix value whose value will be used for clipped elements.
+    /// @param tensorLayout The tensor layout describing the memory layout.
+    /// @param tensorView The tensor view describing the sub-region to load.
+    /// @param decodeFunc The decoding function that converts data at a given coordinate to element type.
+    /// @remarks For correct results, keep tensorLayout slice extents fixed to the `CoopMat`
+    ///          tile shape. Do not shrink slices for tail tiles; rely on clamp mode to
+    ///          handle out-of-bounds. If a transpose is needed, use a `linalg.TensorView`
+    ///          permutation rather than reversing strides. Pointer alignment must remain
+    ///          16-byte aligned; prefer base pointer + layout slice over pointer shifting.
+    ///
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment None;
+        };
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    static This Load<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool,
+        P
+        $(tensorViewTypes)
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams) > tensorView)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment TensorView $tensorView;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment DecodeFunc $decodeFunc;
+        };
+    }
+
+    [require(cooperative_matrix_block_load)]
+    static This Load<
+        U,
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool,
+        P
+        $(tensorViewTypes)
+    >(
+        P* pointerIn,
+        This clippedValue,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView,
+        functype(U*, uint32_t[Dim], uint32_t[Dim]) -> T decodeFunc)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(pointerIn);
+        // https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpCooperativeMatrixLoadTensorNV
+        return spirv_asm
+        {
+            OpCapability CooperativeMatrixTensorAddressingNV;
+            OpCapability CooperativeMatrixBlockLoadsNV;
+            OpExtension "SPV_NV_cooperative_matrix2";
+            result:$$This = OpCooperativeMatrixLoadTensorNV $pointer $clippedValue $tensorLayout Aligned !alignment TensorView|DecodeFunc $tensorView $decodeFunc;
+        };
+    }
+
+    // RW-Buffer versions.
+${
     for (const char* RW : { "", "RW" })
     {
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
@@ -24245,7 +27777,7 @@ ${{{{
             result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
-
+    
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,
@@ -24427,9 +27959,9 @@ ${{{{
         };
     }
 
-${{{{
+${
     } // RW
-}}}}
+$}
 
     [require(cooperative_matrix_tensor_addressing)]
     void Store<
@@ -24465,6 +27997,29 @@ ${{{{
                 %storagePointerType = OpTypePointer StorageBuffer $$T;
                 %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
                 OpCooperativeMatrixStoreTensorNV %pointer $this $tensorLayout Aligned !alignment None;
+            };
+        }
+    }
+
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        P
+    >(
+        P* dest,
+        TensorLayout<Dim, ClampMode> tensorLayout)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(dest);
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment None;
             };
         }
     }
@@ -24515,16 +28070,89 @@ ${{{{
         }
     }
 
+    [require(cooperative_matrix_tensor_addressing)]
+    void Store<
+        let Dim : uint32_t,
+        let ClampMode : CoopMatClampMode,
+        let DimView : uint32_t,
+        let HasDimensions : bool
+        $(tensorViewTypes),
+        P
+    >(
+        P* dest,
+        TensorLayout<Dim, ClampMode> tensorLayout,
+        TensorView<DimView, HasDimensions $(tensorViewParams)> tensorView)
+    {
+        let alignment = 16U;
+        let pointer = Ptr<uint[]>(dest);
+        __target_switch
+        {
+        case spirv:
+            spirv_asm
+            {
+                OpCapability CooperativeMatrixTensorAddressingNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                OpCooperativeMatrixStoreTensorNV $pointer $this $tensorLayout Aligned !alignment TensorView $tensorView;
+            };
+        }
+    }
+
 } // struct CoopMat
 
+
+
+extension<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int> CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator>
+{
+    /// Convert cooperative matrix accumulator to another cooperative matrix with a different use, such as
+    /// `CoopMatMatrixUse.MatrixA` or `CoopMatMatrixUse.MatrixB`.
+    /// Available when targeting SPIR-V only, uses the `SPV_NV_cooperative_matrix2` extension.
+    ///
+    /// @param accu The accumulator `CoopMat` object to convert from.
+    /// @param T The element type of the cooperative matrix.
+    /// @param S The memory scope defining the cooperative group.
+    /// @param M The number of rows in the cooperative matrix.
+    /// @param N The number of columns in the cooperative matrix.
+    /// @param R1 The matrix use specifier to convert to (MatrixA or MatrixB).
+    [require(spvCooperativeMatrixConversionsNV)]
+    CoopMat<T, S, M, N, R1> convertUse<
+        let R1 : CoopMatMatrixUse>()
+    {
+        __target_switch
+        {
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability CooperativeMatrixConversionsNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                result:$$CoopMat<T, S, M, N, R1> = OpCooperativeMatrixConvertNV $this;
+            };
+        }
+    }
+}
 
 //
 // Convenience loading functions for cooperative matrices which infer the
 // element type for structured buffers, pointers and groupshared arrays.
 //
 
+/// Loads a cooperative matrix from a ByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The ByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24540,8 +28168,20 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from an RWByteAddressBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWByteAddressBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix)]
+[require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24557,6 +28197,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
 }
 
+/// Loads a cooperative matrix from a StructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The StructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24574,6 +28226,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from an RWStructuredBuffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The RWStructuredBuffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24591,6 +28255,18 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24608,8 +28284,22 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(buffer, element, stride);
 }
 
+/// Loads a cooperative matrix from a pointer buffer with coherent memory access. Vulkan only.
+/// Ensures memory reads observe writes made visible across the specified memory scope.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the buffer.
+/// @param buffer The pointer to the buffer to load from.
+/// @param element The starting element index in the buffer.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @param memoryScope The scope from which writes should be visible (e.g., Device, Workgroup).
+/// @return A cooperative matrix loaded from the buffer.
 [ForceInline]
-[require(cooperative_matrix, vk_mem_model)]
+[require(cooperative_matrix_spirv, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     T : __BuiltinArithmeticType,
     let S : MemoryScope,
@@ -24626,6 +28316,19 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
     return CoopMat<T, S, M, N, R>.LoadCoherent<matrixLayout>(buffer, element, stride, memoryScope);
 }
 
+/// Loads a cooperative matrix from a groupshared (workgroup) memory array.
+/// Convenience function that simplifies template argument resolution by inferring the element type.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
+/// @param U The size of the groupshared array.
+/// @param data The groupshared array to load from.
+/// @param element The starting element index in the array.
+/// @param stride The stride in elements between consecutive rows or columns.
+/// @return A cooperative matrix loaded from the groupshared array.
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
@@ -24693,41 +28396,28 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
     let R : CoopMatMatrixUse
 >(CoopMat<U,S,M,N,R> val);
 
-//
-// Cooperative Matrix multiplication with scalar
-//
 
-[require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
-    let S : MemoryScope,
-    let M : int,
-    let N : int,
-    let R : CoopMatMatrixUse
->(CoopMat<T, S, M, N, R> lhs, const T rhs)
-{
-    return spirv_asm
-    {
-        result:$$CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
-    };
-}
-
-[require(cooperative_matrix)]
-CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
-    let S : MemoryScope,
-    let M : int,
-    let N : int,
-    let R : CoopMatMatrixUse
->(const T lhs, CoopMat<T, S, M, N, R> rhs)
-{
-    return rhs * lhs;
-}
 
 //
 // Cooperative Matrix Multiply-Accumulate
 //
 
+/// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
+/// This is the fundamental operation for hardware-accelerated matrix multiplication.
+/// All threads in the warp/subgroup cooperate to compute the result.
+/// @param T The element type of the result accumulator matrix.
+/// @param saturatingAccumulation If true, uses saturating accumulation (clamps to representable range).
+/// @param U The element type of Matrix A.
+/// @param V The element type of Matrix B.
+/// @param W The element type of the input accumulator Matrix C.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in Matrix A and the result (shared dimension).
+/// @param K The number of columns in Matrix A and rows in Matrix B (reduction dimension).
+/// @param N The number of columns in Matrix B and the result (shared dimension).
+/// @param matA Matrix A with dimensions M×K (MatrixA use).
+/// @param matB Matrix B with dimensions K×N (MatrixB use).
+/// @param matC Accumulator matrix C with dimensions M×N to add to the product.
+/// @return Result accumulator matrix D = A * B + C with dimensions M×N.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     T : __BuiltinArithmeticType,
@@ -24744,33 +28434,61 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-    int operands = 0; // NoneKHR
-    if (__isSignedInt<U>())
+    __target_switch
     {
-        operands |= 0x01; // MatrixASignedComponentsKHR
-    }
-    if (__isSignedInt<V>())
-    {
-        operands |= 0x02; // MatrixBSignedComponentsKHR
-    }
-    if (__isSignedInt<W>())
-    {
-        operands |= 0x04; // MatrixCSignedComponentsKHR
-    }
-    if (__isSignedInt<T>())
-    {
-        operands |= 0x08; // MatrixResultSignedComponentsKHR
-    }
-    if (saturatingAccumulation)
-    {
-        operands |= 0x10; // SaturatingAccumulationKHR
-    }
+    case spirv:
+        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
+        int operands = 0; // NoneKHR
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x01; // MatrixASignedComponentsKHR
+        }
+        if (__isSignedInt<V>())
+        {
+            operands |= 0x02; // MatrixBSignedComponentsKHR
+        }
+        if (__isSignedInt<W>())
+        {
+            operands |= 0x04; // MatrixCSignedComponentsKHR
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08; // MatrixResultSignedComponentsKHR
+        }
+        if (saturatingAccumulation)
+        {
+            operands |= 0x10; // SaturatingAccumulationKHR
+        }
 
-    return spirv_asm
-    {
-        result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-    };
+        return spirv_asm
+        {
+            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
+        };
+    case cuda:
+        if (saturatingAccumulation)
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         true
+                                                        >($0, $1, $2))";
+        else
+            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
+                                                         $T0::ElementType,
+                                                         $T1::ElementType,
+                                                         $T2::ElementType,
+                                                         $TR::ElementType,
+                                                         $T0::m_M,
+                                                         $T0::m_N,
+                                                         $T0::m_K,
+                                                         false
+                                                        >($0, $1, $2))";
+
+    }
 }
 
 extension<
@@ -24802,6 +28520,62 @@ extension<
 
 } // namespace linalg
 
+//
+// Cooperative Matrix multiplication with scalar
+//
+
+/// Multiplies a cooperative matrix by a scalar value: CoopMat * scalar
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The cooperative matrix to multiply.
+/// @param rhs The scalar value to multiply each element by.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
+[require(cooperative_matrix)]
+linalg.CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse
+>(linalg.CoopMat<T, S, M, N, R> lhs, const T rhs)
+{
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm
+        {
+            result:$$linalg.CoopMat<T, S, M, N, R> = OpMatrixTimesScalar $lhs $rhs;
+        };
+    case cuda:
+        __intrinsic_asm "$0 * $1";
+    }
+}
+
+/// Multiplies a scalar value by a cooperative matrix: scalar * CoopMat
+/// Performs element-wise multiplication of each element in the matrix by the scalar.
+/// @param T The element type of the cooperative matrix.
+/// @param S The memory scope defining the cooperative group.
+/// @param M The number of rows in the matrix fragment.
+/// @param N The number of columns in the matrix fragment.
+/// @param R The matrix use specifier (MatrixA, MatrixB, or MatrixAccumulator).
+/// @param lhs The scalar value to multiply each element by.
+/// @param rhs The cooperative matrix to multiply.
+/// @return A new cooperative matrix with all elements multiplied by the scalar.
+[require(cooperative_matrix)]
+linalg.CoopMat<T, S, M, N, R> operator *<
+    T : __BuiltinArithmeticType,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : linalg.CoopMatMatrixUse
+>(const T lhs, linalg.CoopMat<T, S, M, N, R> rhs)
+{
+    return rhs * lhs;
+}
 
 //
 // Cooperative Vector
@@ -24822,7 +28596,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     __init()
     {
         this = CoopVec<T, N>(T(0));
@@ -24830,7 +28603,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     __init(T t)
     {
         this.fill(t);
@@ -24838,7 +28610,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     __init<U : __BuiltinArithmeticType>(CoopVec<U, N> other)
     {
@@ -24856,7 +28627,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [OverloadRank(-10)]
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     __init(int i)
     {
         this = CoopVec<T, N>(T(i));
@@ -24878,7 +28648,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [mutating]
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     void copyFrom<U : __BuiltinArithmeticType>(CoopVec<U,N> other)
     {
@@ -24886,8 +28655,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         {
         case hlsl:
             __intrinsic_asm "$0 = $1";
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".CopyFrom";
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecCvt<OptixCoopVec<$[0], $[1]>>(*($0))", T, N;
         default:
@@ -24906,7 +28673,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @param t The value to fill all elements with.
     [mutating]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     void fill(T t)
     {
         __target_switch
@@ -24919,8 +28685,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             };
         case hlsl:
              __intrinsic_asm "$0 = $1";
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Fill";
         default:
             for(int i = 0; i < N; ++i)
                 this[i] = t;
@@ -24937,7 +28701,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @param buffer The destination buffer to store the values into.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer where the data will be stored. Must be 16-byte aligned.
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     void store(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -24950,11 +28713,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
             };
         case hlsl:
-                __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
-        case hlsl_coopvec_poc:
-            for(int i = 0; i < N; ++i)
-                buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
-            return;
+            __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         default:
             for(int i = 0; i < N; ++i)
                 buffer.StoreByteOffset(byteOffset16ByteAligned + __elemToByteOffset<T>(i), this[i]);
@@ -25008,7 +28767,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     void store<let M : int>(__ref groupshared T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
         static_assert(N <= M, "The destination vector size is smaller than the input.");
@@ -25018,8 +28776,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             spirv_asm{
                 OpCooperativeVectorStoreNV &data $byteOffset16ByteAligned $this None;
             };
-        case hlsl_coopvec_poc:
-            this.__Store(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return;
         default:
             for(int i = 0; i < N; ++i)
@@ -25065,7 +28821,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the loaded values.
     [__NoSideEffect]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     static CoopVec<T, N> load(ByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
@@ -25078,7 +28833,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
         case hlsl:
-        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
@@ -25095,7 +28849,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     static CoopVec<T, N> load(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
     {
@@ -25108,7 +28861,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
             };
         case hlsl:
-        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
             return ret;
@@ -25125,7 +28877,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [__NoSideEffect]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> load(StructuredBuffer<T> buffer, int32_t byteOffset16ByteAligned = 0)
     {
         __target_switch
@@ -25196,7 +28947,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [ForceInline]
     [__NoSideEffect]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     static CoopVec<T, N> load<let M : int>(__constref groupshared const T[M] data, int32_t byteOffset16ByteAligned = 0)
     {
@@ -25208,7 +28958,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
                 result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV &data $byteOffset16ByteAligned None
             };
         case hlsl:
-        case hlsl_coopvec_poc:
             CoopVec<T, N> ret;
             ret.__Load(data, __byteToElemOffset<T>(byteOffset16ByteAligned));
             return ret;
@@ -25283,13 +29032,10 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         [__NoSideEffect]
         [nonmutating]
         [require(cooperative_vector)]
-        [require(hlsl_coopvec_poc)]
         get
         {
             __target_switch
             {
-            case hlsl_coopvec_poc:
-                __intrinsic_asm ".ReadFromIndex";
             default: return __indexRead(index);
             }
         }
@@ -25297,13 +29043,10 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         [ForceInline]
         [mutating]
         [require(cooperative_vector)]
-        [require(hlsl_coopvec_poc)]
         set
         {
             __target_switch
             {
-            case hlsl_coopvec_poc:
-                __intrinsic_asm ".WriteToIndex";
             default: __indexRef(index) = newValue;
             }
         }
@@ -25320,7 +29063,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @param t The scalar value to replicate across all elements.
     /// @return A new cooperative vector where each element equals the input value.
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     static CoopVec<T, N> replicate(T t)
     {
         CoopVec<T, N> ret;
@@ -25401,15 +29143,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [mutating]
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutAdd(This other)
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "$0 += $1";
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Add";
         }
     }
 
@@ -25419,7 +29158,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // TODO: Why is this ForceInline necessary for hlsl, dxc bug?
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     This add(This other)
     {
@@ -25427,10 +29165,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         {
         case hlsl:
             __intrinsic_asm "$0 + $1";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            ret.__mutAdd(other);
-            return ret;
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecAdd($0, $1)";
         default: return __pureAdd(other);
@@ -25442,13 +29176,11 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutSub(This other)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0 -= $1";
-        case hlsl_coopvec_poc: __intrinsic_asm ".Subtract";
         }
     }
 
@@ -25457,7 +29189,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the difference of the two vectors.
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     This sub(This other)
     {
@@ -25465,10 +29196,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         {
         case hlsl:
             __intrinsic_asm "$0 - $1";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            ret.__mutSub(other);
-            return ret;
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecSub($0, $1)";
         default: return __pureSub(other);
@@ -25480,13 +29207,11 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutMul(This other)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0 *= $1";
-        case hlsl_coopvec_poc: __intrinsic_asm ".Multiply";
         }
     }
 
@@ -25495,7 +29220,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the product of the two vectors.
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     This mul(This other)
     {
@@ -25503,10 +29227,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         {
         case hlsl:
             __intrinsic_asm "$0 * $1";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            ret.__mutMul(other);
-            return ret;
         case optix_coopvec:
             __intrinsic_asm "optixCoopVecMul($0, $1)";
         default: return __pureMul(other);
@@ -25518,13 +29238,11 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutDiv(This other)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0 /= $1";
-        case hlsl_coopvec_poc: __intrinsic_asm ".Divide";
         }
     }
 
@@ -25533,30 +29251,23 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the quotient of the two vectors.
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     This div(This other)
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "$0 / $1";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            ret.__mutDiv(other);
-            return ret;
         default: return __pureDiv(other);
         }
     }
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutMod(This other)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0 %= %1";
-        case hlsl_coopvec_poc: __intrinsic_asm ".Mod";
         }
     }
 
@@ -25565,17 +29276,12 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the remainder of the division between corresponding components.
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     This mod(This other)
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "$0 % $1";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            ret.__mutMod(other);
-            return ret;
         default:
             This ret;
             for(int i = 0; i < N; ++i)
@@ -25591,67 +29297,53 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     /// @return A new cooperative vector containing the negated values.
     //[ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     This neg()
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "-$0";
-        case hlsl_coopvec_poc:
-            This ret = this;
-            for(int i = 0; i < N; ++i)
-                ret[i] = -this[i];
-            return ret;
         default: return __pureNeg(this);
         }
     }
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutScalarMul(T t)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm "$0 *= $1";
-        case hlsl_coopvec_poc: __intrinsic_asm ".ScalarMultiply";
         }
     }
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutMin(This other)
     {
         __target_switch
         {
         case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Min";
         }
     }
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutMax(This other)
     {
         __target_switch
         {
         case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Max";
         }
     }
 
     [mutating]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     void __mutClamp(This minVal, This maxVal)
     {
         __target_switch
         {
         case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Clamp";
         }
     }
 
@@ -25662,30 +29354,24 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer)]
     void __Load(const ByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Load";
         }
     }
 
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __Load(const RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
     {
         __target_switch
         {
         case hlsl:
             __intrinsic_asm "$0 = $1.Load< vector<$[0], $[1]> >($2)", T, N;
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".Load";
         }
     }
 
@@ -25694,7 +29380,6 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
     // Careful, this takes the offset in elements
     [ForceInline]
     [require(hlsl)]
-    [require(hlsl_coopvec_poc_sm_6_9)]
     void __Load(__constref groupshared T buffer[M], uint elemOffset)
     {
         static_assert(N <= M, "The given groupshared array is smaller than the given CoopVec");
@@ -25705,36 +29390,30 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
             for(int i = 0; i < N; ++i)
                 this[i] = buffer[i + elemOffset];
             return;
-        case hlsl_coopvec_poc_sm_6_9:
-            __intrinsic_asm ".Load";
         }
     }
 
     [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __Store(RWByteAddressBuffer buffer, uint byteOffset, uint alignment = 0)
     {
         __target_switch
         {
         case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
         }
     }
 
     __generic<let M : int>
     [require(hlsl)]
-    [require(hlsl_coopvec_poc)]
     // Careful, this takes the offset in elements
     void __Store(__ref groupshared T buffer[M], uint elemOffset)
     {
         __target_switch
         {
         case hlsl: static_assert(false, "Not supported");
-        case hlsl_coopvec_poc: __intrinsic_asm ".Store";
         }
     }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -25744,11 +29423,10 @@ static const struct {
     {false, "ByteAddressBuffer"}
 };
 for(auto buffer : kByteAddressBufferCases) {
-}}}}
+$}
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
         $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
@@ -25771,15 +29449,12 @@ for(auto buffer : kByteAddressBufferCases) {
                 else
                     __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
             }
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".MatMul";
         }
     }
 
     [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    [require(hlsl_coopvec_poc, byteaddressbuffer_rw)]
     void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input, uint inputInterpretationHLSL,
         $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
@@ -25803,8 +29478,6 @@ for(auto buffer : kByteAddressBufferCases) {
                 else
                     __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
             }
-        case hlsl_coopvec_poc:
-            __intrinsic_asm ".MatMulAdd";
         }
     }
 
@@ -25823,7 +29496,6 @@ for(auto buffer : kByteAddressBufferCases) {
     /// values to use from the packed input.
     [mutating]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     void matMulAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
@@ -25889,7 +29561,6 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     void matMulAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
@@ -25919,7 +29590,6 @@ for(auto buffer : kByteAddressBufferCases) {
 
     [mutating]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     void matMulAddAccumPacked<U : __BuiltinArithmeticType, let PackedK : int>(
         CoopVec<U, PackedK> input,
@@ -26000,7 +29670,6 @@ for(auto buffer : kByteAddressBufferCases) {
     [mutating]
     [ForceInline]
     [require(cooperative_vector)]
-    [require(hlsl_coopvec_poc)]
     [require(optix_coopvec)]
     void matMulAddAccum<U : __BuiltinArithmeticType, let K : int>(
         CoopVec<U, K> input,
@@ -26053,9 +29722,9 @@ for(auto buffer : kByteAddressBufferCases) {
     }
 
 
-${{{{
+${
 }
-}}}}
+$}
 }
 
 __intrinsic_op($(kIROp_MakeCoopVectorFromValuePack))
@@ -26084,7 +29753,6 @@ CoopVec<T,N> __float_to_int_cast(CoopVec<U,N> val);
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 {
     __target_switch
@@ -26107,10 +29775,6 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
         }
     case hlsl:
         __intrinsic_asm "$0 * $1";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = lhs;
-        ret.__mutScalarMul(rhs);
-        return ret;
     default:
         for (int i = 0; i < N; ++i)
         {
@@ -26123,7 +29787,6 @@ CoopVec<T, N> operator *(CoopVec<T, N> lhs, const T rhs)
 __generic<T : __BuiltinArithmeticType, let N : int>
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> operator *(const T lhs, CoopVec<T, N> rhs)
 {
     return rhs * lhs;
@@ -26131,7 +29794,6 @@ CoopVec<T, N> operator *(const T lhs, CoopVec<T, N> rhs)
 
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
@@ -26144,10 +29806,6 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
         };
     case hlsl:
         __intrinsic_asm "min($0, $1)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutMin(y);
-        return ret;
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecMin($0, $1)";
     default:
@@ -26161,7 +29819,6 @@ CoopVec<T, N> min<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
@@ -26174,10 +29831,6 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
         };
     case hlsl:
         __intrinsic_asm "max($0, $1)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutMax(y);
-        return ret;
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecMax($0, $1)";
     default:
@@ -26190,7 +29843,6 @@ CoopVec<T, N> max<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, 
 
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> minVal, CoopVec<T, N> maxVal)
 {
     __target_switch
@@ -26202,10 +29854,6 @@ CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x
         };
     case hlsl:
         __intrinsic_asm "clamp($0, $1, $2)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutClamp(minVal, maxVal);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -26216,7 +29864,6 @@ CoopVec<T, N> clamp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x
 
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -26238,10 +29885,6 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
         }
     case hlsl:
         __intrinsic_asm "min($0, $1)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutMin(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -26253,7 +29896,6 @@ CoopVec<T, N> min<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> y)
 {
     __target_switch
@@ -26275,10 +29917,6 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
         }
     case hlsl:
         __intrinsic_asm "max($0, $1)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutMax(y);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -26289,7 +29927,6 @@ CoopVec<T, N> max<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVe
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, CoopVec<T, N> minVal, CoopVec<T, N> maxVal)
 {
     __target_switch
@@ -26311,10 +29948,6 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
         }
     case hlsl:
         __intrinsic_asm "clamp($0, $1, $2)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret = x;
-        ret.__mutClamp(minVal, maxVal);
-        return ret;
     default:
         CoopVec<T, N> ret;
         for(int i = 0; i < N; ++i)
@@ -26325,7 +29958,6 @@ CoopVec<T, N> clamp<T : __BuiltinIntegerType, let N : int>(CoopVec<T, N> x, Coop
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> edge, CoopVec<T, N> x)
 {
@@ -26333,11 +29965,6 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
     {
     case hlsl:
         __intrinsic_asm "step($0, $1)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = step(edge[i], x[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26355,18 +29982,12 @@ CoopVec<T, N> step<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> ed
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "exp($0)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = exp(x[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26382,18 +30003,12 @@ CoopVec<T, N> exp<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "log($0)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = log(x[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26409,7 +30024,6 @@ CoopVec<T, N> log<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> log2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
@@ -26427,7 +30041,6 @@ CoopVec<T, N> log2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
@@ -26445,7 +30058,6 @@ CoopVec<T, N> exp2<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 {
@@ -26453,11 +30065,6 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
     {
     case hlsl:
         __intrinsic_asm "tanh($0)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = tanh(x[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26475,18 +30082,12 @@ CoopVec<T, N> tanh<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> x)
 
 // [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yOverX)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "atan($0)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = atan(yOverX[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26503,7 +30104,6 @@ CoopVec<T, N> atan<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> yO
 // [ForceInline]
 [require(cooperative_vector)]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 [require(GL_ARB_gpu_shader5)]
 CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, CoopVec<T, N> b, CoopVec<T, N> c)
@@ -26515,11 +30115,6 @@ CoopVec<T, N> fma<T : __BuiltinFloatingPointType, let N : int>(CoopVec<T, N> a, 
     {
     case hlsl:
         __intrinsic_asm "mad($0, $1, $2)";
-    case hlsl_coopvec_poc:
-        CoopVec<T, N> ret;
-        for(int i = 0; i < N; ++i)
-            ret[i] = mad(a[i], b[i], c[i]);
-        return ret;
     case spirv:
         return spirv_asm
         {
@@ -26830,37 +30425,6 @@ uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
             static_assert(false, "unsupported componentType value");
         }
         return 0; // ComponentType::Invalid
-    case hlsl_coopvec_poc:
-        switch (componentType)
-        {
-        case CoopVecComponentType::Float16:
-            return 0;
-        case CoopVecComponentType::Float32:
-            return 1;
-        case CoopVecComponentType::UnsignedInt8:
-            return 2;
-        case CoopVecComponentType::UnsignedInt16:
-            return 3;
-        case CoopVecComponentType::UnsignedInt32:
-            return 4;
-        case CoopVecComponentType::SignedInt8:
-            return 5;
-        case CoopVecComponentType::SignedInt16:
-            return 6;
-        case CoopVecComponentType::SignedInt32:
-            return 7;
-        case CoopVecComponentType::SignedInt8Packed:
-            return 8;
-        case CoopVecComponentType::UnsignedInt8Packed:
-            return 9;
-        case CoopVecComponentType::FloatE4M3:
-            return 10;
-        case CoopVecComponentType::FloatE5M2:
-            return 11;
-        default:
-            static_assert(false, "unsupported componentType value");
-        }
-        return 32;
     }
 }
 
@@ -26901,7 +30465,7 @@ uint32_t __coopVecComponentTypeStride(CoopVecComponentType componentType)
     return 0xffffffff;
 }
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -26911,12 +30475,11 @@ static const struct {
     {false, "ByteAddressBuffer"},
 };
 for(auto buffer : kByteAddressBufferCases_) {
-}}}}
+$}
 
 // Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> __coopVecMatMulPacked_impl(
@@ -27075,7 +30638,6 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 // need it
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulPacked(
@@ -27131,7 +30693,6 @@ CoopVec<T, M> coopVecMatMulPacked(
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMul(
@@ -27163,7 +30724,6 @@ CoopVec<T, M> coopVecMatMul(
 // Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
@@ -27324,7 +30884,6 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
@@ -27373,7 +30932,6 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
 [ForceInline]
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType>
 CoopVec<T, M> coopVecMatMulAdd(
@@ -27412,10 +30970,10 @@ CoopVec<T, M> coopVecMatMulAdd(
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 /// Atomically accumulates the outer product of two cooperative vectors into a matrix. Given an M-element vector `a`, and an N-element vector `b`,
 /// compute the outer product of `a` and `b`, forming a M-row by N-col matrix. The elements in the matrix is then atomically accumulated
 /// to memory location represented by `matrix`.
@@ -27442,7 +31000,6 @@ if(buffer.isRW)
 /// }
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc_sm_6_9)]
 [require(optix_coopvec)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int>(
     CoopVec<T, M> a,
@@ -27460,8 +31017,6 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
-    case hlsl_coopvec_poc_sm_6_9:
-        __intrinsic_asm "$0.OuterProductAccumulate($1, $2, $3, $4, $5, $6)";
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
@@ -27540,7 +31095,6 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 ///     atomicAdd(dest[i], v[i]);
 /// ```
 [require(cooperative_vector)]
-[require(hlsl_coopvec_poc)]
 [require(optix_coopvec)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     CoopVec<T, N> v,
@@ -27552,8 +31106,6 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     {
     case hlsl:
         __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
-    case hlsl_coopvec_poc:
-        __intrinsic_asm "$0.ReduceSumAccumulate($1, $2)";
     case spirv:
         let bufferPtr = buffer.GetBufferPointer();
         spirv_asm
@@ -27574,12 +31126,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
-${{{{
+${
 static const struct {
     bool isRW;
     char const* type;
@@ -27589,7 +31141,7 @@ static const struct {
     {false, "StructuredBuffer<IgnoredBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
-}}}}
+$}
 
 // Internal implementation without static_assert; github issue 8620
 [ForceInline]
@@ -27804,10 +31356,10 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
 // Coop Vector accumulation
 //
 
-${{{{
+${
 if(buffer.isRW)
 {
-}}}}
+$}
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>(
     CoopVec<T, M> a,
@@ -27852,10 +31404,10 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     }
 }
 
-${{{{
+${
 } // if rw
 } // buffer type loop
-}}}}
+$}
 
 
 [require(spirv, cooperative_vector_training)]
@@ -28126,7 +31678,7 @@ typealias int8_t4_packed = uint;
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int16_t4 unpack_s8s16(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt16(packed);
@@ -28135,7 +31687,7 @@ int16_t4 unpack_s8s16(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint16(packed);
@@ -28144,7 +31696,7 @@ uint16_t4 unpack_u8u16(uint8_t4_packed packed)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int32_t4 unpack_s8s32(int8_t4_packed packed)
 {
     return unpackInt4x8ToInt32(packed);
@@ -28153,7 +31705,7 @@ int32_t4 unpack_s8s32(int8_t4_packed packed)
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 {
     return unpackUint4x8ToUint32(packed);
@@ -28162,7 +31714,7 @@ uint32_t4 unpack_u8u32(uint8_t4_packed packed)
 /// Pack a vector of 4 unsigned 32/16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -28171,7 +31723,7 @@ uint8_t4_packed pack_u8(uint32_t4 unpackedValue)
 /// Pack a vector of 4 signed 32/16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int8_t4_packed pack_s8(int32_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -28179,7 +31731,7 @@ int8_t4_packed pack_s8(int32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 {
     return packUint4x8(unpackedValue);
@@ -28187,7 +31739,7 @@ uint8_t4_packed pack_u8(uint16_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int8_t4_packed pack_s8(int16_t4 unpackedValue)
 {
     return packInt4x8(unpackedValue);
@@ -28197,7 +31749,7 @@ int8_t4_packed pack_s8(int16_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -28207,7 +31759,7 @@ uint8_t4_packed pack_clamp_u8(int32_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -28215,7 +31767,7 @@ int8_t4_packed pack_clamp_s8(int32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 {
     return packUint4x8Clamp(unpackedValue);
@@ -28223,7 +31775,7 @@ uint8_t4_packed pack_clamp_u8(int16_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int8_t4_packed pack_clamp_s8(int16_t4 unpackedValue)
 {
     return packInt4x8Clamp(unpackedValue);
@@ -28332,7 +31884,7 @@ uint __packInt2x16(int32_t2 unpackedValue)
 /// Unpack 4 unsigned 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 {
     __target_switch
@@ -28359,7 +31911,7 @@ uint32_t4 unpackUint4x8ToUint32(uint packedValue)
 /// Unpack 4 unsigned 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 {
     __target_switch
@@ -28385,7 +31937,7 @@ uint16_t4 unpackUint4x8ToUint16(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 32 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int32_t4 unpackInt4x8ToInt32(uint packedValue)
 {
     __target_switch
@@ -28412,7 +31964,7 @@ int32_t4 unpackInt4x8ToInt32(uint packedValue)
 /// Unpack 4 signed 8-bit values into a vector of 16 bit integers.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 int16_t4 unpackInt4x8ToInt16(uint packedValue)
 {
     __target_switch
@@ -28438,7 +31990,7 @@ int16_t4 unpackInt4x8ToInt16(uint packedValue)
 /// Pack a vector of 4 unsigned 32/16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUint4x8(uint32_t4 unpackedValue)
 {
     __target_switch
@@ -28455,7 +32007,7 @@ uint packUint4x8(uint32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUint4x8(uint16_t4 unpackedValue)
 {
     __target_switch
@@ -28469,7 +32021,7 @@ uint packUint4x8(uint16_t4 unpackedValue)
 /// Pack a vector of 4 signed 32/16 bit integers into a packed value of 4 8-bit integers, dropping unused bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packInt4x8(int32_t4 unpackedValue)
 {
     __target_switch
@@ -28483,7 +32035,7 @@ uint packInt4x8(int32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packInt4x8(int16_t4 unpackedValue)
 {
     __target_switch
@@ -28498,7 +32050,7 @@ uint packInt4x8(int16_t4 unpackedValue)
 /// clamping each value to the range [0, 255] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUint4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -28512,7 +32064,7 @@ uint packUint4x8Clamp(int32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUint4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -28527,7 +32079,7 @@ uint packUint4x8Clamp(int16_t4 unpackedValue)
 /// clamping each value to the range [-128, 127] to ensure it fits within 8 bits.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packInt4x8Clamp(int32_t4 unpackedValue)
 {
     __target_switch
@@ -28541,7 +32093,7 @@ uint packInt4x8Clamp(int32_t4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packInt4x8Clamp(int16_t4 unpackedValue)
 {
     __target_switch
@@ -28563,7 +32115,7 @@ uint packInt4x8Clamp(int16_t4 unpackedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 float4 unpackUnorm4x8ToFloat(uint packedValue)
 {
     __target_switch
@@ -28587,7 +32139,7 @@ float4 unpackUnorm4x8ToFloat(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 half4 unpackUnorm4x8ToHalf(uint packedValue)
 {
     __target_switch
@@ -28603,7 +32155,7 @@ half4 unpackUnorm4x8ToHalf(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 float4 unpackSnorm4x8ToFloat(uint packedValue)
 {
     __target_switch
@@ -28627,7 +32179,7 @@ float4 unpackSnorm4x8ToFloat(uint packedValue)
 /// floating-point value to generate a 4-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 half4 unpackSnorm4x8ToHalf(uint packedValue)
 {
     __target_switch
@@ -28643,7 +32195,7 @@ half4 unpackSnorm4x8ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 float2 unpackUnorm2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -28667,7 +32219,7 @@ float2 unpackUnorm2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 half2 unpackUnorm2x16ToHalf(uint packedValue)
 {
     __target_switch
@@ -28683,7 +32235,7 @@ half2 unpackUnorm2x16ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 float2 unpackSnorm2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -28707,7 +32259,7 @@ float2 unpackSnorm2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 half2 unpackSnorm2x16ToHalf(uint packedValue)
 {
     __target_switch
@@ -28723,7 +32275,7 @@ half2 unpackSnorm2x16ToHalf(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 float2 unpackHalf2x16ToFloat(uint packedValue)
 {
     __target_switch
@@ -28746,7 +32298,7 @@ float2 unpackHalf2x16ToFloat(uint packedValue)
 /// floating-point value to generate a 2-component vector.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 half2 unpackHalf2x16ToHalf(uint packedValue)
 {
     return half2(unpackHalf2x16ToFloat(packedValue));
@@ -28757,7 +32309,7 @@ half2 unpackHalf2x16ToHalf(uint packedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUnorm4x8(float4 unpackedValue)
 {
     __target_switch
@@ -28778,7 +32330,7 @@ uint packUnorm4x8(float4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUnorm4x8(half4 unpackedValue)
 {
     __target_switch
@@ -28794,7 +32346,7 @@ uint packUnorm4x8(half4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packSnorm4x8(float4 unpackedValue)
 {
     __target_switch
@@ -28815,7 +32367,7 @@ uint packSnorm4x8(float4 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packSnorm4x8(half4 unpackedValue)
 {
     __target_switch
@@ -28831,7 +32383,7 @@ uint packSnorm4x8(half4 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUnorm2x16(float2 unpackedValue)
 {
     __target_switch
@@ -28852,7 +32404,7 @@ uint packUnorm2x16(float2 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packUnorm2x16(half2 unpackedValue)
 {
     __target_switch
@@ -28868,7 +32420,7 @@ uint packUnorm2x16(half2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packSnorm2x16(float2 unpackedValue)
 {
     __target_switch
@@ -28889,7 +32441,7 @@ uint packSnorm2x16(float2 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packSnorm2x16(half2 unpackedValue)
 {
     __target_switch
@@ -28905,7 +32457,7 @@ uint packSnorm2x16(half2 unpackedValue)
 /// 32-bit unsigned integer.
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packHalf2x16(float2 unpackedValue)
 {
     __target_switch
@@ -28925,7 +32477,7 @@ uint packHalf2x16(float2 unpackedValue)
 
 [__readNone]
 [ForceInline]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl, pack_vector)]
+[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, pack_vector)]
 uint packHalf2x16(half2 unpackedValue)
 {
     return packHalf2x16(float2(unpackedValue));

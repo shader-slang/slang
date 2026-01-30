@@ -19,6 +19,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/LinkAllPasses.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/OptTable.h"
@@ -34,6 +35,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/TargetParser/Host.h"
 
 // Jit
 #include "llvm/ExecutionEngine/JITEventListener.h"
@@ -49,12 +51,14 @@
 
 #include "slang-com-helper.h"
 #include "slang-com-ptr.h"
+#include "slang-llvm-jit-shared-library.h"
 #include "slang.h"
 
 #include <compiler-core/slang-artifact-associated-impl.h>
 #include <compiler-core/slang-artifact-desc-util.h>
 #include <compiler-core/slang-downstream-compiler.h>
 #include <compiler-core/slang-slice-allocator.h>
+#include <compiler-core/slang-target-builtin-type-layout-info.h>
 #include <core/slang-com-object.h>
 #include <core/slang-hash.h>
 #include <core/slang-list.h>
@@ -169,68 +173,6 @@ public:
 
     Desc m_desc;
 };
-
-
-/* !!!!!!!!!!!!!!!!!!!!! LLVMJITSharedLibrary !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
-
-/* This implementation uses atomic ref counting to ensure the shared libraries lifetime can outlive
-the LLVMDownstreamCompileResult and the compilation that created it */
-class LLVMJITSharedLibrary : public ComBaseObject, public ISlangSharedLibrary
-{
-public:
-    // ISlangUnknown
-    SLANG_COM_BASE_IUNKNOWN_ALL
-
-    /// ICastable
-    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE;
-
-    // ISlangSharedLibrary impl
-    virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name)
-        SLANG_OVERRIDE;
-
-    LLVMJITSharedLibrary(std::unique_ptr<llvm::orc::LLJIT> jit)
-        : m_jit(std::move(jit))
-    {
-    }
-
-protected:
-    ISlangUnknown* getInterface(const SlangUUID& uuid);
-    void* getObject(const SlangUUID& uuid);
-
-    std::unique_ptr<llvm::orc::LLJIT> m_jit;
-};
-
-ISlangUnknown* LLVMJITSharedLibrary::getInterface(const SlangUUID& guid)
-{
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangCastable::getTypeGuid() ||
-        guid == ISlangSharedLibrary::getTypeGuid())
-    {
-        return static_cast<ISlangSharedLibrary*>(this);
-    }
-    return nullptr;
-}
-
-void* LLVMJITSharedLibrary::getObject(const SlangUUID& uuid)
-{
-    SLANG_UNUSED(uuid);
-    return nullptr;
-}
-
-void* LLVMJITSharedLibrary::castAs(const Guid& guid)
-{
-    if (auto ptr = getInterface(guid))
-    {
-        return ptr;
-    }
-    return getObject(guid);
-}
-
-void* LLVMJITSharedLibrary::findSymbolAddressByName(char const* name)
-{
-    auto fn = m_jit->lookup(name);
-    return fn ? (void*)fn.get().getValue() : nullptr;
-}
-
 
 static void _ensureSufficientStack() {}
 
@@ -427,6 +369,9 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     x(F64_sinh, sinh, double, (double)) \
     x(F64_cosh, cosh, double, (double)) \
     x(F64_tanh, tanh, double, (double)) \
+    x(F64_asinh, asinh, double, (double)) \
+    x(F64_acosh, acosh, double, (double)) \
+    x(F64_atanh, atanh, double, (double)) \
     x(F64_log2, log2, double, (double)) \
     x(F64_log, log, double, (double)) \
     x(F64_log10, log10, double, (double)) \
@@ -462,6 +407,9 @@ static uint64_t __stdcall _aulldiv(uint64_t a, uint64_t b)
     x(F32_sinh, sinhf, float, (float)) \
     x(F32_cosh, coshf, float, (float)) \
     x(F32_tanh, tanhf, float, (float)) \
+    x(F32_asinh, asinhf, float, (float)) \
+    x(F32_acosh, acoshf, float, (float)) \
+    x(F32_atanh, atanhf, float, (float)) \
     x(F32_log2, log2f, float, (float)) \
     x(F32_log, logf, float, (float)) \
     x(F32_log10, log10f, float, (float)) \
@@ -1115,4 +1063,27 @@ createLLVMDownstreamCompiler_V4(const SlangUUID& intfGuid, Slang::IDownstreamCom
     }
 
     return SLANG_E_NO_INTERFACE;
+}
+
+extern "C" SLANG_DLL_EXPORT SlangResult getLLVMTargetBuiltinTypeLayoutInfo_V1(
+    Slang::CharSlice targetTripleSlice,
+    Slang::TargetBuiltinTypeLayoutInfo* out)
+{
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+
+    std::string targetTripleStr;
+    if (targetTripleSlice.count != 0)
+        targetTripleStr = std::string(targetTripleSlice.begin(), targetTripleSlice.count);
+    else
+        targetTripleStr = llvm::sys::getDefaultTargetTriple();
+
+    llvm::Triple targetTriple(targetTripleStr);
+
+    unsigned pointerBits = targetTriple.getArchPointerBitWidth();
+
+    out->genericPointerSize = pointerBits / 8;
+
+    return SLANG_OK;
 }

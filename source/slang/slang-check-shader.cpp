@@ -661,8 +661,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 // If the entry point has an explicitly declared capability, then we
                 // will merge that with the target capability set before checking if
                 // there is an implicit upgrade.
-                targetCaps.nonDestructiveJoin(
-                    CapabilitySet{declaredCapsMod->declaredCapabilityRequirements});
+                targetCaps.nonDestructiveJoin(declaredCapsMod->declaredCapabilityRequirements);
             }
 
             // Only attempt to error if a specific profile or capability is requested
@@ -830,7 +829,7 @@ Name* getReflectionName(VarDeclBase* varDecl)
     return varDecl->getName();
 }
 
-Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamValueType(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
     auto paramType = getType(astBuilder, paramDeclRef);
     if (paramDeclRef.getDecl()->findModifier<NoDiffModifier>())
@@ -841,24 +840,33 @@ Type* getParamType(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
     return paramType;
 }
 
-Type* getParamTypeWithDirectionWrapper(ASTBuilder* astBuilder, DeclRef<VarDeclBase> paramDeclRef)
+Type* getParamTypeWithModeWrapper(ASTBuilder* astBuilder, DeclRef<ParamDecl> paramDeclRef)
 {
-    auto result = getParamType(astBuilder, paramDeclRef);
-    auto direction = getParameterDirection(paramDeclRef.getDecl());
-    switch (direction)
+    auto paramValueType = getParamValueType(astBuilder, paramDeclRef);
+    auto paramMode = getParamPassingMode(paramDeclRef.getDecl());
+    return getParamTypeWithModeWrapper(astBuilder, paramValueType, paramMode);
+}
+
+Type* getParamTypeWithModeWrapper(
+    ASTBuilder* astBuilder,
+    Type* paramValueType,
+    ParamPassingMode paramMode)
+{
+    switch (paramMode)
     {
     case ParamPassingMode::In:
-        return result;
+        return paramValueType;
     case ParamPassingMode::BorrowIn:
-        return astBuilder->getConstRefParamType(result);
+        return astBuilder->getConstRefParamType(paramValueType);
     case ParamPassingMode::Out:
-        return astBuilder->getOutParamType(result);
+        return astBuilder->getOutParamType(paramValueType);
     case ParamPassingMode::BorrowInOut:
-        return astBuilder->getBorrowInOutParamType(result);
+        return astBuilder->getBorrowInOutParamType(paramValueType);
     case ParamPassingMode::Ref:
-        return astBuilder->getRefParamType(result);
+        return astBuilder->getRefParamType(paramValueType);
     default:
-        return result;
+        SLANG_UNEXPECTED("unhandled parameter-passing mode");
+        UNREACHABLE_RETURN(paramValueType);
     }
 }
 
@@ -1573,6 +1581,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     Index& outConsumedArgCount,
     DiagnosticSink* sink)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     auto args = inArgs;
     auto argCount = inArgCount;
 
@@ -1627,9 +1637,33 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
                 genericArgs.add(specializationArg.expr);
                 continue;
             }
-            auto typeExpr = astBuilder->create<SharedTypeExpr>();
-            typeExpr->type = astBuilder->getTypeType((Type*)specializationArg.val);
-            genericArgs.add(typeExpr);
+            if (auto typeVal = as<Type>(specializationArg.val))
+            {
+                auto typeExpr = astBuilder->create<SharedTypeExpr>();
+                typeExpr->type = astBuilder->getTypeType(typeVal);
+                genericArgs.add(typeExpr);
+            }
+            else if (auto intVal = as<ConstantIntVal>(specializationArg.val))
+            {
+                if (intVal->getType() == astBuilder->getBoolType())
+                {
+                    auto intExpr = astBuilder->create<BoolLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue() != 0;
+                    genericArgs.add(intExpr);
+                }
+                else
+                {
+                    auto intExpr = astBuilder->create<IntegerLiteralExpr>();
+                    intExpr->type = intVal->getType();
+                    intExpr->value = intVal->getValue();
+                    genericArgs.add(intExpr);
+                }
+            }
+            else
+            {
+                sink->diagnose(SourceLoc(), Diagnostics::invalidFormOfSpecializationArg, ii + 1);
+            }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
         auto genExpr = astBuilder->create<VarExpr>();
@@ -1851,7 +1885,7 @@ Type* Linkage::specializeType(
         unspecializedType,
         SourceLoc());
 
-    assert(specializationParams.getCount() == argCount);
+    SLANG_ASSERT(specializationParams.getCount() == argCount);
 
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)

@@ -1645,6 +1645,7 @@ FIDDLE() namespace Slang
     {
         Val* val = nullptr;
         Expr* expr = nullptr;
+        String toString();
     };
     typedef List<SpecializationArg> SpecializationArgs;
 

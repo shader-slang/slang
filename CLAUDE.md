@@ -16,8 +16,6 @@ User-specific instructions for Slang:
 
 ## Build System and Common Commands
 
-**IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.
-
 ### Building the Project
 
 ```bash
@@ -35,6 +33,16 @@ cmake --build --preset release # Release binary
 # Build specific targets
 cmake --build --preset debug --target slangc
 cmake --build --preset debug --target slang-test
+```
+
+When building with `cmake --build`, redirect all of outputs to null-device.
+When the build failed, then, re-run the same command without the redirections.
+It is to avoid wasting the token usage of LLM.
+
+Example,
+```
+# Print the build logs only when the initial attempt failed.
+cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
 ```
 
 ### PR Workflow
@@ -112,6 +120,7 @@ slang-test must run from repository root
 - `examples/`: - Sample programs demonstrating Slang usage
 - `tests/`: - Comprehensive test suite
 - `docs/`: - Project documentation
+- `build/source/slang/fiddle/`: Generated code from FIDDLE macros (created during build)
 
 ### Compilation Model
 
@@ -150,14 +159,25 @@ slang-test must run from repository root
 
 ### Debugging tools
 
-#### slangc with `-dump-ir`
+#### slangc with `-dump-ir` options
 
-slangc with `-dump-ir` option is most efficient way to investigate problems that can be observed at IR level.
+slangc provides several options for dumping IR at different stages:
+
+**`-dump-ir`**: Dumps IR after every compilation pass. Most comprehensive but generates a lot of output.
+
+**`-dump-ir-before <pass-name>`**: Dumps IR only before the specified pass. Can be specified multiple times.
+
+**`-dump-ir-after <pass-name>`**: Dumps IR only after the specified pass. Can be specified multiple times.
 
 It will often require a use of `-target` and the most common combination is `-dump-ir -target spirv-asm`.
 When `-dump-ir` is used without `-target`, the compilation process may stop earlier than it should be.
 
-Since it dumps many lines, it will be good to store the result into a file for a further investigation.
+**Selective dumping tip**: When you know which pass is problematic, use `-dump-ir-before` and `-dump-ir-after` to reduce output:
+```bash
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+```
+This generates only 2 sections (BEFORE and AFTER), so saving directly to a file is more practical than using the split script.
+
 The dump prints multiple sections which of each is separated by `### ` header.
 Each section visualizes the IR state on multiple steps during the compilation.
 It is necessary to differentiate the information on one section from one section, because the issue might be observed at a specific section.
@@ -168,6 +188,41 @@ to string. You can then write that string to a temp file with `File::writeAllTex
 When checking the IR dump, look for type consistency or logical errors in the IR to locate the potential transformation
 pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
 type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
+
+#### extras/split-ir-dump.py
+
+The IR dump can be huge (thousands of lines with 70+ sections), making it difficult for LLMs and humans to analyze. Use `extras/split-ir-dump.py` to split the dump into separate files, one per compilation pass:
+
+```bash
+# Full dump: Recommended for initial investigation
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Selective dump for single pass: Save directly to file
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+
+# Selective dump for multiple passes: Use split script
+slangc.exe -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -dump-ir-before eliminateDeadCode -dump-ir-after eliminateDeadCode -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
+
+# Or save to file first
+slangc.exe -dump-ir -target spirv-asm -o tmp.spv test.slang > test.dump
+python extras/split-ir-dump.py test.dump
+```
+
+**IMPORTANT**: When using `-dump-ir` with targets like `spirv-asm`, always use `-o <file>` to redirect the compiled output. Otherwise, the SPIRV/CUDA code will be mixed with the IR dump on stdout.
+
+This creates a `dump-XXX/` directory with:
+- `000-INDEX.txt` - Overview of all sections
+- `001-LOWER-TO-IR.txt` - Initial IR generation
+- `002-AFTER-fixEntryPointCallsites.txt` - After first pass
+- ... (one file per pass)
+
+Use this to:
+- Binary search through passes to find where IR becomes invalid
+- Track how a specific value/instruction transforms through the pipeline
+- Compare before/after states of specific optimization passes
+- Provide focused context to LLMs for analysis
+
+See `extras/split-ir-dump.md` for complete documentation.
 
 #### InstTrace
 
@@ -202,6 +257,36 @@ By default, slang uses `-emit-spirv-directly` and slang emits from slang shader 
 When `-emit-spirv-via-glsl` is used, slang will translate the input slang shader to glsl and let glslang to generate spirv code.
 This can be useful when we want to generate a reference spirv code for a comparison.
 
+#### extras/repro-remix.sh - RTX Remix Shader Compatibility Testing
+
+The repository includes a script to reproduce RTX Remix shader compilation issues locally:
+
+```bash
+# Prerequisites: Build Slang in Debug first
+cmake.exe --preset default
+cmake.exe --build --preset debug
+
+# Run RTX Remix shader compilation test
+./extras/repro-remix.sh
+
+# Clean existing dxvk-remix clone and start fresh
+./extras/repro-remix.sh --clean
+```
+
+**What it does:**
+- Clones NVIDIA RTX Remix repository to `external/dxvk-remix/`
+- Comments out Slang in packman config to prevent overwriting
+- Replaces with your Debug build
+- Compiles all RTX Remix shaders with SPIRV validation enabled
+- Verifies shader compilation output
+
+**When to use:**
+- When RTX Remix nightly CI workflow fails
+- To test Slang changes against a large real-world shader codebase
+- To reproduce shader compilation issues before fixing them
+
+See `extras/repro-remix.md` for detailed documentation.
+
 ### IR System
 
 - Slang uses a custom SSA-based IR (not LLVM)
@@ -225,18 +310,98 @@ This can be useful when we want to generate a reference spirv code for a compari
 ### Generated files
 
 - The enum values starting with `kIROp_` are defined in a generated file, `build/source/slang/fiddle/slang-ir-insts-enum.h.fiddle`
+- `FIDDLE()` and `FIDDLE(...)` statements in AST node declarations indicate that additional source is generated and included from `build/source/slang/fiddle`, providing static type system and reflection metadata, visitor support, and serialization support.
 
 ### Git commit message
 
 - Don't mention Claude on the commit message
 
+### Debugging with slangpy repro steps
+
+When debugging slangpy compatibility issues or testing Slang changes against slangpy, follow these steps to build slangpy from source using your local Slang build.
+
+**Prerequisites:**
+- Python 3.10+ installed
+- Slang built in Debug or Release configuration
+- Git with submodules support
+
+#### Step 1: Build Slang
+
+```bash
+# From Slang repository root
+cmake --preset default
+cmake --build --preset debug    # or --preset release
+```
+
+#### Step 2: Clone slangpy Repository
+
+```bash
+# Clone with submodules (required for slangpy build)
+git clone --recursive https://github.com/shader-slang/slangpy.git external/slangpy
+```
+
+Read `external/slangpy/CLAUDE.md` for general information about the repo.
+
+#### Step 3: Build and Install slangpy with Local Slang
+
+On Windows:
+```bash
+cd external/slangpy
+SET CMAKE_ARGS=-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug
+python.exe -m pip install -e .
+```
+
+On Linux/macOS:
+```bash
+cd external/slangpy
+CMAKE_ARGS="-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug" python.exe -m pip install -e .
+```
+
+#### Step 4: Install Test Dependencies
+
+```bash
+# From external/slangpy directory
+python -m pip install -r requirements-dev.txt --user
+python -m pip install pytest-xdist --user
+```
+
+#### Step 5: Run Tests
+
+Write a test case under `external/slangpy/slangpy/tests` and run it with pytest.
+
+The following example is to run all of the existing slangpy tests:
+```bash
+# From external/slangpy directory
+python -m pytest slangpy/tests -ra -n auto --maxprocesses=3
+```
+
+#### Notes
+- Use `-DSGL_LOCAL_SLANG_BUILD_DIR=build/Release` for Release builds
+- The `-e` flag installs in editable mode, allowing you to modify slangpy source
+- Tests run in parallel with `-n auto` for faster execution
+- Some tests may skip if GPU hardware is not available
+
+#### Troubleshooting
+- If tests fail to find slangc, verify the `SLANG_BUILD_DIR` path is correct
+- If import fails, check that slangpy was installed: `python -c "import slangpy; print(slangpy.__file__)"`
+- For GPU-specific test failures, ensure drivers are up to date
+
 ## Cross-Platform Considerations
 
-**Supported Platforms**: Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
+**Supported Platforms**:
+Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
 
-**Platform Abstractions**: Use utilities in `source/core/` for file system, process management, platform detection
+**Platform Abstractions**:
+Use utilities in `source/core/` for file system, process management, platform detection
 
-**Graphics APIs**: Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
+**Graphics APIs**:
+Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
+
+**WSL on Windows**:
+When running under WSL environment, try to append `.exe` to the executables to avoid using Linux binaries
+- Use `cmake.exe` instead of `cmake`,
+- Use `python.exe` instead of `python`,
+- Use `gh.exe` instead of `gh` and so on.
 
 ## Additional documents
 

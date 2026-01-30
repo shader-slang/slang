@@ -5,57 +5,57 @@
 
 namespace Slang
 {
-UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
+
+Index findRegisterSpaceResourceInfo(IRVarLayout* layout);
+UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
 {
     HashSet<int> usedSpaces;
-    auto processVarLayout = [&](IRVarLayout* varLayout)
-    {
-        UInt spaceOffset = 0;
-        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
-        {
-            spaceOffset = spaceAttr->getOffset();
-        }
-        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-        {
-            auto kind = sizeAttr->getResourceKind();
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-            {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = spaceOffset + offsetAttr->getSpace();
-                usedSpaces.add((int)spaceIndex);
-            }
-        }
-    };
-
     for (auto inst : module->getGlobalInsts())
     {
-        if (as<IRGlobalParam>(inst))
+        if (auto varLayout = findVarLayout(inst))
         {
-            auto varLayout = findVarLayout(inst);
-            if (!varLayout)
-                continue;
-            processVarLayout(varLayout);
+            // Get container space (for ParameterBlocks etc.)
+            auto containerSpace = findRegisterSpaceResourceInfo(varLayout);
+            if (containerSpace >= 0)
+                usedSpaces.add((int)containerSpace);
 
-            auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
-            if (!paramGroupTypeLayout)
-                continue;
-            auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
-            if (!containerVarLayout)
-                continue;
-            processVarLayout(containerVarLayout);
+            // Get base offset for nested resources
+            UInt spaceOffset = 0;
+            if (auto spaceAttr =
+                    varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
+                spaceOffset = spaceAttr->getOffset();
+
+            // Get direct binding spaces
+            for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+            {
+                if (!ShaderBindingRange::isUsageTracked(sizeAttr->getResourceKind()))
+                    continue;
+                if (auto offsetAttr = varLayout->findOffsetAttr(sizeAttr->getResourceKind()))
+                    usedSpaces.add((int)(spaceOffset + offsetAttr->getSpace()));
+            }
         }
     }
 
     // Find next unused space index.
-    int index = targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    while (usedSpaces.contains(index))
+    int requestedIndex =
+        targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+    int availableIndex = requestedIndex;
+
+    while (usedSpaces.contains(availableIndex))
     {
-        index++;
+        availableIndex++;
     }
-    return index;
+
+    if (availableIndex != requestedIndex &&
+        targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+    {
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::requestedBindlessSpaceIndexUnavailable,
+            requestedIndex,
+            availableIndex);
+    }
+    return availableIndex;
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -77,10 +77,9 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     return varLayoutBuilder.build();
 }
 
-void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module);
+    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module, sink);
     List<IRInst*> workList;
     for (auto globalInst : module->getGlobalInsts())
     {

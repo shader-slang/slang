@@ -73,17 +73,18 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
         return UnownedStringSlice("uint");
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
-#if SLANG_PTR_IS_64
+
     case kIROp_IntPtrType:
-        return UnownedStringSlice("int64_t");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("int64_t");
+        else
+            return UnownedStringSlice("int");
+
     case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint64_t");
-#else
-    case kIROp_IntPtrType:
-        return UnownedStringSlice("int");
-    case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint");
-#endif
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("uint64_t");
+        else
+            return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
@@ -123,17 +124,17 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
     case kIROp_UInt64Type:
         return UnownedStringSlice("ulonglong");
 
-#if SLANG_PTR_IS_64
     case kIROp_IntPtrType:
-        return UnownedStringSlice("longlong");
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("longlong");
+        else
+            return UnownedStringSlice("int");
+
     case kIROp_UIntPtrType:
-        return UnownedStringSlice("ulonglong");
-#else
-    case kIROp_IntPtrType:
-        return UnownedStringSlice("int");
-    case kIROp_UIntPtrType:
-        return UnownedStringSlice("uint");
-#endif
+        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+            return UnownedStringSlice("ulonglong");
+        else
+            return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
         return UnownedStringSlice("__half");
@@ -191,7 +192,9 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
     SLANG_UNUSED(target);
 
     // The names CUDA produces are all compatible with 'C' (ie they aren't templated types)
-    SLANG_ASSERT(target == CodeGenTarget::CUDASource || target == CodeGenTarget::CSource);
+    SLANG_ASSERT(
+        target == CodeGenTarget::CUDASource || target == CodeGenTarget::CUDAHeader ||
+        target == CodeGenTarget::CSource);
 
     switch (type->getOp())
     {
@@ -238,6 +241,12 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         {
             out << "OptixTraversableHandle";
             return SLANG_OK;
+        }
+    case kIROp_CoopMatrixType:
+        {
+            // CUDA wmma require SM 7.5+
+            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
+            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
     default:
         {
@@ -717,6 +726,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1);\n");
             return true;
         }
+    case kIROp_SetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixSetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     default:
         return false;
     }
@@ -849,6 +869,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            StringBuilder typeSB;
+            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            m_writer->emit(typeSB);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
@@ -920,6 +950,15 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("((");
             emitType(inst->getDataType());
             m_writer->emit(")optixGetSbtDataPointer())");
+            return true;
+        }
+    case kIROp_GetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixGetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("()");
             return true;
         }
     case kIROp_DispatchKernel:
@@ -1033,24 +1072,6 @@ void CUDASourceEmitter::emitSimpleFuncImpl(IRFunc* func)
     CLikeSourceEmitter::emitSimpleFuncImpl(func);
 }
 
-void CUDASourceEmitter::emitSimpleValueImpl(IRInst* inst)
-{
-    // Make sure we convert float to half when emitting a half literal to avoid
-    // overload ambiguity errors from CUDA.
-    if (inst->getOp() == kIROp_FloatLit)
-    {
-        if (inst->getDataType()->getOp() == kIROp_HalfType)
-        {
-            m_writer->emit("__half(");
-            CLikeSourceEmitter::emitSimpleValueImpl(inst);
-            m_writer->emit(")");
-            return;
-        }
-    }
-    Super::emitSimpleValueImpl(inst);
-}
-
-
 void CUDASourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsetLayout)
 {
     Super::emitSemanticsImpl(inst, allowOffsetLayout);
@@ -1103,5 +1124,154 @@ void CUDASourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sink)
     _emitWitnessTableDefinitions();
 }
 
+static bool typeCheck(IROp op, uint32_t matrixUse)
+{
+    switch (matrixUse)
+    {
+    case 0: // matrixA
+    case 1: // matrixB
+        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType;
+    case 2: // accumulator
+        return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
+    }
+    return false;
+}
+
+static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
+{
+    switch (matrixUse)
+    {
+    case 0:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
+    case 1:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
+    case 2:
+        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
+    default:
+        return UnownedStringSlice();
+    }
+}
+
+struct FragmentShape
+{
+    int m, n, k;
+
+    bool isValid() const { return m > 0 && n > 0 && k > 0; }
+};
+
+/*
+ * Strict Shape Validation Strategy:
+ * Users must provide exact dimensions that match one of the allowed WMMA shapes:
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
+ *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
+ *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
+ *
+ * Note: k dimension is always 16 for all shapes.
+ */
+inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
+{
+    switch (matrixUse)
+    {
+    case 0: // Matrix A: row=m, col=k
+        {
+            // k must always be 16
+            if (col != 16)
+            {
+                return {0, 0, 0}; // Invalid
+            }
+            // Check exact m values
+            switch (row)
+            {
+            case 16:
+                return {16, 16, 16};
+            case 8:
+                return {8, 32, 16};
+            case 32:
+                return {32, 8, 16};
+            default:
+                return {0, 0, 0}; // Invalid
+            }
+        }
+    case 1: // Matrix B: row=k, col=n
+        {
+            // k must always be 16
+            if (row != 16)
+            {
+                return {0, 0, 0}; // Invalid
+            }
+            // Check exact n values
+            switch (col)
+            {
+            case 16:
+                return {16, 16, 16};
+            case 32:
+                return {8, 32, 16};
+            case 8:
+                return {32, 8, 16};
+            default:
+                return {0, 0, 0}; // Invalid
+            }
+        }
+    case 2: // Matrix C/D: row=m, col=n
+    default:
+        {
+            // Check exact (m, n) combinations
+            if (row == 16 && col == 16)
+                return {16, 16, 16};
+            else if (row == 8 && col == 32)
+                return {8, 32, 16};
+            else if (row == 32 && col == 8)
+                return {32, 8, 16};
+            else
+                return {0, 0, 0}; // Invalid
+        }
+    }
+}
+
+SlangResult CUDASourceEmitter::emitWMMAFragmentType(
+    IRCoopMatrixType* coopMatType,
+    StringBuilder& outStr)
+{
+    uint32_t rowCount = (uint32_t) static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    uint32_t colCount =
+        (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+
+    auto typeOp = coopMatType->getElementType()->getOp();
+    auto typeName = getBuiltinTypeName(typeOp);
+    // TODO: We should add a pass in IR to validate the coop matrix types, such that
+    // we can provide better diagnostic messages here.
+    if (!typeCheck(typeOp, matrixUse))
+    {
+        StringBuilder msg;
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::cooperativeMatrixUnsupportedElementType,
+            typeName,
+            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        SLANG_RELEASE_ASSERT(false);
+        return SLANG_FAIL;
+    }
+
+    outStr << "Slang_CUDA_WMMA::WmmaFragment<";
+
+    FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
+    if (!shape.isValid())
+    {
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::cooperativeMatrixInvalidShape,
+            rowCount,
+            colCount,
+            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        SLANG_RELEASE_ASSERT(false);
+        return SLANG_FAIL;
+    }
+
+    outStr << typeName << "," << shape.m << ", " << shape.n << ", " << shape.k << ", "
+           << getMatrixUseName(matrixUse) << ">";
+
+    return SLANG_OK;
+}
 
 } // namespace Slang

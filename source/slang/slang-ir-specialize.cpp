@@ -301,7 +301,7 @@ struct SpecializationContext
             {
                 IRUse* argUse = specializeInst->getArgOperand(ii);
                 auto originalArg = argUse->get();
-                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                IRInst* foldedArg = tryConstantFoldInst(module, targetProgram, originalArg);
                 if (foldedArg == originalArg)
                     continue;
 
@@ -879,7 +879,7 @@ struct SpecializationContext
                     {
                         if (auto table = as<IRWitnessTable>(instElement))
                         {
-                            if (auto satisfyingVal = findWitnessVal(table, requirementKey))
+                            if (auto satisfyingVal = findWitnessTableEntry(table, requirementKey))
                             {
                                 satisfyingValSet.add(satisfyingVal);
                                 return;
@@ -944,7 +944,9 @@ struct SpecializationContext
         IRInst* satisfyingVal = nullptr;
 
         if (witnessTable)
-            satisfyingVal = findWitnessVal(witnessTable, requirementKey);
+        {
+            satisfyingVal = findWitnessTableEntry(witnessTable, requirementKey);
+        }
         else
         {
             // If we are specializing ThisTypeWitness, the result of the specialization
@@ -997,34 +999,6 @@ struct SpecializationContext
             addToWorkList(user);
         }
         return instChanged;
-    }
-
-    // The above subroutine needed a way to look up
-    // the satisfying value for a given requirement
-    // key in a concrete witness table, so let's
-    // define that now.
-    //
-    IRInst* findWitnessVal(IRWitnessTable* witnessTable, IRInst* requirementKey)
-    {
-        // A witness table is basically just a container
-        // for key-value pairs, and so the best we can
-        // do for now is a naive linear search.
-        //
-        for (auto entry : witnessTable->getEntries())
-        {
-            if (requirementKey == entry->getRequirementKey())
-            {
-                return entry->getSatisfyingVal();
-            }
-        }
-
-        if (witnessTable->getConformanceType()->getOp() == kIROp_VoidType)
-        {
-            IRBuilder builder(module);
-            return builder.getVoidValue();
-        }
-
-        return nullptr;
     }
 
     template<typename TDict>
@@ -1270,11 +1244,12 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
+                applySparseConditionalConstantPropagationForGlobalScope(
+                    this->module,
+                    targetProgram,
+                    this->sink);
                 unrollLoopsInModule(targetProgram, module, sink);
-
-                // Sync our local dictionary with the one in the IR.
-                readSpecializationDictionaries();
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1293,7 +1268,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink);
+                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
                 }
             }
 
@@ -3142,8 +3117,8 @@ struct SpecializationContext
 };
 
 bool specializeModule(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink,
     SpecializationOptions options)
 {
@@ -3216,37 +3191,33 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
     // the function that is returned by the generic.
     //
     // The key difference is that in the static case, all generic parameters, and instructions
-    // in the generic's body are guaranteed to be "baked out" into concrete types or witness
-    // tables.
+    // in the generic's body are guaranteed to be "baked out" into concrete types or witness tables.
     //
-    // In the dynamic case, some generic parameters may turn into function parameters that
-    // accept a tag, and any lookup instructions might then have to be cloned into the function
-    // body.
+    // In the dynamic case, some generic parameters may turn into function parameters that accept a
+    // tag, and any lookup instructions might then have to be cloned into the function body.
     //
     // This is a slightly complex transformation that proceeds as follows:
     //
     // - Create an empty function that represents the final product.
     //
-    // - Add any dynamic parameters of the generic to the function's first block. Keep track of
-    // the
+    // - Add any dynamic parameters of the generic to the function's first block. Keep track of the
     //   first block for later. For now, we only treat `WitnessTableType` parameters that have
     //   `WitnessTableSet` arguments (with atleast 2 distinct elements) as dynamic. Each such
     //   parameter will get a corresponding parameter of `TagType(tableSet)`
     //
     // - Clone in the rest of the generic's body into the first block of the function.
-    //   The tricky part here is that we may have parameter types that depend on other
-    //   parameters. This is a pattern that is allowed in the generic, but not in functions.
+    //   The tricky part here is that we may have parameter types that depend on other parameters.
+    //   This is a pattern that is allowed in the generic, but not in functions.
     //
-    //   To handle this, we maintain two cloning environments, a regular `cloneEnv` that
-    //   registers the parameters, and a `staticCloneEnv` that is a child of `cloneEnv`, but
-    //   overrides the dynamic parameters with their static collection. The `staticCloneEnv` is
-    //   used to clone in the parameter and function types, while the `cloneEnv` is used for the
-    //   rest.
+    //   To handle this, we maintain two cloning environments, a regular `cloneEnv` that registers
+    //   the parameters, and a `staticCloneEnv` that is a child of `cloneEnv`, but overrides the
+    //   dynamic parameters with their static collection. The `staticCloneEnv` is used to clone in
+    //   the parameter and function types, while the `cloneEnv` is used for the rest.
     //
     // - When we reach the return value (i.e. the function inside the generic), we clone in the
     // parameters
-    //   of the function into the first block, and place them _after_ the parameters derived
-    //   from the generic. Then the rest of the inner function's first block is cloned in.
+    //   of the function into the first block, and place them _after_ the parameters derived from
+    //   the generic. Then the rest of the inner function's first block is cloned in.
     //
     // - All other blocks can be cloned in as usual.
     //
@@ -3401,6 +3372,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             loweredFunc->setFullType(
                 builder.getFuncType(funcTypeParams, loweredFuncType->getResultType()));
         }
+        else if (as<IRDebugFunction>(inst))
+        {
+            // Emit out into the global scope.
+            IRBuilder globalBuilder(builder.getModule());
+            globalBuilder.setInsertInto(builder.getModule());
+            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+        }
         else if (!as<IRReturn>(inst))
         {
             // Clone insts in the generic under two different environments:
@@ -3496,7 +3474,7 @@ IRInst* specializeGenericImpl(
 
         // We will iterate over the non-parameter ("ordinary")
         // instructions only, because parameters were dealt
-        // with explictly at an earlier point.
+        // with explicitly at an earlier point.
         //
         for (auto ii : bb->getOrdinaryInsts())
         {

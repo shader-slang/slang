@@ -336,96 +336,94 @@ struct InliningPassBase
     DebugInlineInfo emitCalleeDebugInlinedAt(IRCall* call, IRFunc* callee, IRBuilder& builder)
     {
         IRDebugLine* lastDebugLine = nullptr;
-        IRInst* newDebugInlinedAt = nullptr;
-        IRInst* callerDebugFunc = nullptr;
-        IRInst* calleeDebugFunc = nullptr;
 
         if (!callee->findDecoration<IRDebugLocationDecoration>())
         {
             return DebugInlineInfo();
         }
-        else
+
+        // Check if the call inst is part of an existing scope. If yes, then we restore
+        // that scope after the inlining of callee. This case can occur when we have out of
+        // order inlining. See forceinline-basic-block-inline-order.slang test for that use
+        // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
+        // that there's another function that was inlined. We don't want that scope. If the call
+        // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
+        // *before* we see a DebugNoScope
+        IRDebugScope* callDebugScope = nullptr;
+        builder.setInsertAfter(call);
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
         {
-            // Check if the call inst is part of an existing scope. If yes, then we restore
-            // that scope after the inlining of callee. This case can occur when we have out of
-            // order inlining. See forceinline-basic-block-inline-order.slang test for that use
-            // case. If we are travesing back the call inst and if we find a DebugNoScope, it means
-            // that there's another function that was inlined. We don't want that scope. If the call
-            // inst truly belongs to another DebugScope, then we should hit a DebugScope inst
-            // *before* we see a DebugNoScope
-            IRDebugScope* callDebugScope = nullptr;
-            builder.setInsertAfter(call);
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            if (as<IRDebugNoScope>(inst))
             {
-                if (as<IRDebugNoScope>(inst))
-                {
-                    break;
-                }
-                if (as<IRDebugScope>(inst))
-                {
-                    callDebugScope = as<IRDebugScope>(inst);
-                    builder.emitDebugScope(
-                        callDebugScope->getScope(),
-                        callDebugScope->getInlinedAt());
-                    break;
-                }
+                break;
             }
-            if (!callDebugScope)
+            if (as<IRDebugScope>(inst))
             {
-                builder.emitDebugNoScope();
+                callDebugScope = as<IRDebugScope>(inst);
+                builder.emitDebugScope(callDebugScope->getScope(), callDebugScope->getInlinedAt());
+                break;
             }
+        }
+        if (!callDebugScope)
+        {
+            builder.emitDebugNoScope();
+        }
 
-            IRDebugInlinedAt* callDebugInlinedAt = nullptr;
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        IRDebugInlinedAt* callDebugInlinedAt = nullptr;
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        {
+            if (as<IRDebugNoScope>(inst))
             {
-                if (as<IRDebugNoScope>(inst))
-                {
-                    break;
-                }
-                if (as<IRDebugInlinedAt>(inst))
-                {
-                    callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
-                    break;
-                }
+                break;
             }
-
-            // Find the last IRDebugLine to extract debug info.
-            for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+            if (as<IRDebugInlinedAt>(inst))
             {
-                if (auto debugLine = as<IRDebugLine>(inst))
-                {
-                    lastDebugLine = debugLine;
-                    break;
-                }
+                callDebugInlinedAt = as<IRDebugInlinedAt>(inst);
+                break;
             }
+        }
 
-            if (!lastDebugLine)
-                return DebugInlineInfo();
-
-            calleeDebugFunc = findExistingDebugFunc(callee);
-
-            // The caller func is the right lexical scope needed for nsight to show where
-            // the function is getting inlined inside.
-            auto callerFunc = getParentFunc(call);
-            callerDebugFunc = findExistingDebugFunc(callerFunc);
-
-            builder.setInsertBefore(call);
-
-            if (callerDebugFunc)
+        // Find the last IRDebugLine to extract debug info.
+        for (IRInst* inst = call->getPrevInst(); inst; inst = inst->getPrevInst())
+        {
+            if (auto debugLine = as<IRDebugLine>(inst))
             {
-                newDebugInlinedAt = builder.emitDebugInlinedAt(
+                lastDebugLine = debugLine;
+                break;
+            }
+        }
+
+        if (!lastDebugLine)
+            return DebugInlineInfo();
+
+        auto calleeDebugFunc = findExistingDebugFunc(callee);
+
+        // The caller func is the right lexical scope needed for nsight to show where
+        // the function is getting inlined inside.
+        if (auto callerFunc = getParentFunc(call))
+        {
+            // When `maybeAddDebugLocationDecoration()` failed to find the source
+            // location, IRDebugFuncDecoration is expected to be absent.
+            if (auto callerDebugFunc = findExistingDebugFunc(callerFunc))
+            {
+                builder.setInsertBefore(call);
+                auto newDebugInlinedAt = builder.emitDebugInlinedAt(
                     lastDebugLine->getLineStart(),
                     lastDebugLine->getColStart(),
                     lastDebugLine->getSource(),
                     callerDebugFunc,
                     callDebugInlinedAt);
 
-                if (newDebugInlinedAt)
-                {
-                    return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
-                }
+                return DebugInlineInfo{newDebugInlinedAt, calleeDebugFunc};
+            }
+            else
+            {
+                // It is more likely to be a bug when IRDebugLocationDecoration exists and
+                // IRDebugFuncDecoration doesn't exist.
+                SLANG_ASSERT(nullptr == callerFunc->findDecoration<IRDebugLocationDecoration>());
             }
         }
+
         return DebugInlineInfo();
     }
 
@@ -1287,7 +1285,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module)
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
     bool changed = true;
@@ -1295,7 +1293,7 @@ void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRM
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(nullptr, module, IRSimplificationOptions::getFast(targetProgram));
+        simplifyIR(module, nullptr, IRSimplificationOptions::getFast(targetProgram));
     }
 }
 

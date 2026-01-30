@@ -397,7 +397,7 @@ static SlangResult _parseArg(const char** ioCursor, UnownedStringSlice& outArg)
         case '\t':
             {
                 char const* argEnd = cursor;
-                assert(argBegin != argEnd);
+                SLANG_ASSERT(argBegin != argEnd);
 
                 outArg = UnownedStringSlice(argBegin, argEnd);
                 *ioCursor = cursor;
@@ -1208,12 +1208,18 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_GLSL:
     case SLANG_C_SOURCE:
     case SLANG_CPP_SOURCE:
+    case SLANG_CPP_HEADER:
     case SLANG_CPP_PYTORCH_BINDING:
     case SLANG_HOST_CPP_SOURCE:
     case SLANG_CUDA_SOURCE:
+    case SLANG_CUDA_HEADER:
     case SLANG_METAL:
     case SLANG_WGSL:
     case SLANG_HOST_VM:
+    case SLANG_HOST_LLVM_IR:
+    case SLANG_HOST_OBJECT_CODE:
+    case SLANG_SHADER_LLVM_IR:
+    case SLANG_OBJECT_CODE:
         {
             return 0;
         }
@@ -1378,6 +1384,11 @@ static SlangResult _extractRenderTestRequirements(
         target = SLANG_WGSL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
+        break;
+    case RenderApiType::LLVM:
+        target = SLANG_SHADER_HOST_CALLABLE;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+        passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 
@@ -1955,6 +1966,7 @@ static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStrin
     if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
         SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
+        fprintf(stderr, "Error: Unable to parse diagnostics for diagnostic test\n");
         return false;
     }
 
@@ -3139,19 +3151,27 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
 
     String actualOutput;
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    // Check if artifact is valid before trying to find diagnostics
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
     // If the actual compilation failed, then the output will be the summary
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileResult) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
-        actualOutput = _calcSummary(diagnostics);
+        // Generate summary from diagnostics if available
+        if (diagnostics)
+        {
+            actualOutput = _calcSummary(diagnostics);
+        }
+        else
+        {
+            // No diagnostics available, but compile failed
+            actualOutput = "Compile: Error\n";
+        }
     }
     else
     {
@@ -3941,7 +3961,7 @@ TestResult runComputeComparisonImpl(
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
-    return std::max(compileResult, bufferResult);
+    return TestReporter::combine(compileResult, bufferResult);
 }
 
 TestResult runSlangComputeComparisonTest(TestContext* context, TestInput& input)
@@ -4754,6 +4774,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedFileTests.add(fileTestInfo);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    context->getTestReporter()->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -4824,6 +4847,22 @@ static bool shouldRunTest(TestContext* context, String filePath)
         }
     }
 
+    // Check skip list - if any entry matches, skip the test
+    for (auto& skipEntry : context->options.skipList)
+    {
+        if (filePath.startsWith(skipEntry))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is skipped because it is found in the skip list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
     if (!context->options.testPrefixes.getCount())
     {
         return true;
@@ -4861,6 +4900,19 @@ template<typename F>
 void runTestsInParallel(TestContext* context, int count, const F& f)
 {
     auto originalReporter = context->getTestReporter();
+
+    // Pre-create test-server processes sequentially to avoid concurrent fork() issues.
+    // This eliminates the thundering herd problem when all threads start simultaneously.
+    if (context->options.defaultSpawnType == SpawnType::UseTestServer ||
+        context->options.defaultSpawnType == SpawnType::UseFullyIsolatedTestServer)
+    {
+        for (int threadId = 0; threadId < context->options.serverCount; threadId++)
+        {
+            context->setThreadIndex(threadId);
+            context->getOrCreateJSONRPCConnection();
+        }
+    }
+
     std::atomic<int> consumePtr;
     consumePtr = 0;
     auto threadFunc = [&](int threadId)
@@ -5136,6 +5188,9 @@ static SlangResult runUnitTestModule(
                 {
                     std::lock_guard lock(context->mutexFailedTests);
                     context->failedUnitTests.add(test.command);
+
+                    // Mark test as pending retry - it won't be counted in statistics yet
+                    reporter->addResult(TestResult::PendingRetry);
                 }
                 else
                 {
@@ -5496,6 +5551,10 @@ SlangResult innerMain(int argc, char** argv)
         else
         {
             // If there are too many failed tests, don't bother retrying.
+            printf(
+                "Too many failed tests for retry(%d) - setting all to failed\n",
+                (int)context.failedFileTests.getCount());
+            fflush(stdout);
             for (auto& test : context.failedFileTests)
             {
                 FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());

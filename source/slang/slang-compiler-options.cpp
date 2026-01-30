@@ -200,6 +200,8 @@ bool CompilerOptionSet::allowDuplicate(CompilerOptionName name)
     case CompilerOptionName::VulkanBindShift:
     case CompilerOptionName::VulkanBindShiftAll:
     case CompilerOptionName::TypeConformance:
+    case CompilerOptionName::DumpIRBefore:
+    case CompilerOptionName::DumpIRAfter:
         return true;
     }
     return false;
@@ -405,6 +407,10 @@ void applySettingsToDiagnosticSink(
                 element.stringValue.getUnownedSlice(),
                 Severity::Warning,
                 Severity::Error);
+    }
+    if (options.shouldEmitRichDiagnostics())
+    {
+        targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
     }
 }
 } // namespace Slang

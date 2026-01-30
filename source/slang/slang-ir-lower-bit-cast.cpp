@@ -1,8 +1,10 @@
 #include "slang-ir-lower-bit-cast.h"
 
+#include "slang-capability.h"
 #include "slang-ir-extract-value-from-type.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
 
 namespace Slang
@@ -74,7 +76,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
+                        getNaturalOffset(targetProgram->getTargetReq(), field, &fieldOffset) ==
                         SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
@@ -93,7 +95,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         arrayType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
@@ -119,7 +121,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         vectorType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -149,7 +151,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         elementType,
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -179,10 +181,6 @@ struct BitCastLoweringContext
         case kIROp_UIntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
-#if SLANG_PTR_IS_32
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 object = builder.emitCast(builder.getUIntType(), object);
@@ -192,16 +190,26 @@ struct BitCastLoweringContext
         case kIROp_DoubleType:
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
+            {
+                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
+                object = builder.emitCast(builder.getUInt64Type(), object);
+                return builder.emitBitCast(type, object);
+            }
+            break;
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-#endif
         case kIROp_RawPointerType:
         case kIROp_PtrType:
         case kIROp_FuncType:
             {
-                auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
-                object = builder.emitCast(builder.getUInt64Type(), object);
+                IRInst* object;
+                auto ptrSize = getPointerSize(targetProgram->getTargetReq());
+                object =
+                    extractValueAtOffset(builder, targetProgram, src, offset, uint32_t(ptrSize));
+                object = builder.emitCast(
+                    ptrSize == sizeof(uint64_t) ? (IRType*)builder.getUInt64Type()
+                                                : (IRType*)builder.getUIntType(),
+                    object);
                 return builder.emitBitCast(type, object);
             }
             break;
@@ -228,11 +236,25 @@ struct BitCastLoweringContext
         auto toType = inst->getDataType();
 
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
 
-        if (as<IRBasicType>(fromType) != nullptr && as<IRBasicType>(toType) != nullptr)
+        // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
+        bool isDirectSpirv = false;
+        bool isSpirv15OrLater = false;
+        if (auto targetReq = targetProgram->getTargetReq())
+        {
+            auto target = targetReq->getTarget();
+            isDirectSpirv =
+                (target == CodeGenTarget::SPIRV || target == CodeGenTarget::SPIRVAssembly) &&
+                targetProgram->shouldEmitSPIRVDirectly();
+            isSpirv15OrLater = targetReq->getTargetCaps().implies(CapabilityAtom::_spirv_1_5);
+        }
+
+        auto fromBasicType = as<IRBasicType>(fromType);
+        auto toBasicType = as<IRBasicType>(toType);
+        if (fromBasicType && toBasicType)
         {
             if (fromTypeSize.size != toTypeSize.size)
                 sink->diagnose(
@@ -245,6 +267,89 @@ struct BitCastLoweringContext
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
+
+        // Skip lowering bitcasts that can be directly handled by SPIR-V OpBitcast
+        // The SPIR-V spec requires that OpBitcast's operand and result have the same size and
+        // different types
+        if (isDirectSpirv && fromTypeSize.size == toTypeSize.size)
+        {
+            auto fromPtrType = as<IRPtrTypeBase>(fromType);
+            auto toPtrType = as<IRPtrTypeBase>(toType);
+
+            // OpBitcast can handle pointer <-> pointer bitcasts directly,
+            // but both pointers must have same storage class and different types.
+            if (fromPtrType && toPtrType &&
+                fromPtrType->getAddressSpace() == toPtrType->getAddressSpace() &&
+                !isTypeEqual(fromPtrType, toPtrType))
+            {
+                auto fromValueType = fromPtrType->getValueType();
+                auto toValueType = toPtrType->getValueType();
+
+                // Unwrap atomic pointers, as they are emitted as the same type as non-atomic
+                // pointers in SPIR-V, but have different types from non-atomic pointers in IR
+                auto fromUnwrappedType = as<IRAtomicType>(fromValueType)
+                                             ? as<IRAtomicType>(fromValueType)->getElementType()
+                                             : fromValueType;
+                auto toUnwrappedType = as<IRAtomicType>(toValueType)
+                                           ? as<IRAtomicType>(toValueType)->getElementType()
+                                           : toValueType;
+
+                // If the unwrapped types are different, we can use OpBitcast directly
+                if (!isTypeEqual(fromUnwrappedType, toUnwrappedType))
+                    return;
+            }
+
+            // OpBitcast can handle pointer -> scalar integer bitcasts directly
+            if (fromPtrType && toBasicType && isIntegralType(toType))
+                return;
+
+            // OpBitcast can handle scalar integer -> pointer bitcasts directly
+            if (fromBasicType && toPtrType && isIntegralType(fromType))
+                return;
+
+            auto fromVectorType = as<IRVectorType>(fromType);
+            auto toVectorType = as<IRVectorType>(toType);
+
+            // OpBitcast can handle pointer -> integer vector bitcasts directly,
+            // but those integers need to be 32-bit and SPIR-V 1.5+ is required
+            if (fromPtrType && toVectorType && isSpirv15OrLater)
+            {
+                auto elementType = toVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle integer vector -> pointer bitcasts directly,
+            // but those integers need to be 32-bit and SPIR-V 1.5+ is required
+            if (toPtrType && fromVectorType && isSpirv15OrLater)
+            {
+                auto elementType = fromVectorType->getElementType();
+                if (isIntegralType(elementType))
+                {
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
+                    if (intInfo.width == 32)
+                        return;
+                }
+            }
+
+            // OpBitcast can handle vector <-> scalar bitcasts directly
+            // OpBitcast can also handle vector <-> vector bitcasts directly,
+            // but only if the larger element count is an integer multiple of the smaller element
+            // count, and if the types are different (SPIR-V spec requires different operand/result
+            // types)
+            auto fromElementCount = getIRVectorElementSize(fromType);
+            auto toElementCount = getIRVectorElementSize(toType);
+            if ((fromVectorType || fromBasicType) && (toVectorType || toBasicType) &&
+                (fromElementCount % toElementCount == 0 ||
+                 toElementCount % fromElementCount == 0) &&
+                !isTypeEqual(fromType, toType))
+                return;
+        }
+
         // Ignore cases we cannot handle yet.
         if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
         {
@@ -277,7 +382,7 @@ struct BitCastLoweringContext
     }
 };
 
-void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerBitCast(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     BitCastLoweringContext context;
     context.module = module;

@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-util.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
@@ -276,8 +277,50 @@ struct PeepholeContext : InstPassBase
                 else
                     baseType = inst->getOperand(0)->getDataType();
 
+                // Special handling for DescriptorHandleType - its size/alignment is
+                // target-dependent
+                if (as<IRDescriptorHandleType>(baseType))
+                {
+                    bool useUint64 = targetProgram->getTargetReq()->getTargetCaps().implies(
+                        CapabilityAtom::spvBindlessTextureNV);
+
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+
+                    // Get the underlying type based on capability:
+                    // - With spvBindlessTextureNV: uint64_t
+                    // - Without: uint2
+                    IRType* underlyingType;
+                    if (useUint64)
+                    {
+                        underlyingType = builder.getUInt64Type();
+                    }
+                    else
+                    {
+                        auto uintType = builder.getUIntType();
+                        underlyingType = builder.getVectorType(uintType, 2);
+                    }
+
+                    IRSizeAndAlignment sizeAlign;
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            targetProgram->getTargetReq(),
+                            underlyingType,
+                            &sizeAlign)))
+                        break;
+
+                    IRIntegerValue value =
+                        (inst->getOp() == kIROp_AlignOf) ? sizeAlign.alignment : sizeAlign.size;
+
+                    auto resultVal = builder.getIntValue(inst->getDataType(), value);
+                    inst->replaceUsesWith(resultVal);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                    break;
+                }
+
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         baseType,
                         &sizeAlignment)))
                     break;
@@ -921,6 +964,73 @@ struct PeepholeContext : InstPassBase
                     maybeRemoveOldInst(inst);
                     changed = true;
                 }
+                else
+                {
+                    // Handle common BuiltinCast cases that need to be lowered before emit.
+                    // In particular, legalization for tessellation-factor builtins may require
+                    // reshaping between vector and array representations (e.g. float4 <->
+                    // float[4]).
+                    auto val = inst->getOperand(0);
+                    auto fromType = val->getDataType();
+                    auto toType = inst->getFullType();
+
+                    // vector -> array
+                    if (auto fromVec = as<IRVectorType>(fromType))
+                    {
+                        if (auto toArr = as<IRArrayTypeBase>(toType))
+                        {
+                            if (isTypeEqual(fromVec->getElementType(), toArr->getElementType()))
+                            {
+                                auto fromCountLit = as<IRIntLit>(fromVec->getElementCount());
+                                auto toCountLit = as<IRIntLit>(toArr->getElementCount());
+                                if (fromCountLit && toCountLit &&
+                                    fromCountLit->getValue() == toCountLit->getValue())
+                                {
+                                    List<IRInst*> elems;
+                                    auto count = (UInt)fromCountLit->getValue();
+                                    elems.setCount((Index)count);
+                                    for (UInt i = 0; i < count; ++i)
+                                    {
+                                        elems[(Index)i] = builder.emitElementExtract(val, i);
+                                    }
+                                    auto newInst =
+                                        builder.emitMakeArray(toType, count, elems.getBuffer());
+                                    inst->replaceUsesWith(newInst);
+                                    maybeRemoveOldInst(inst);
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                    // array -> vector
+                    else if (auto fromArr = as<IRArrayTypeBase>(fromType))
+                    {
+                        if (auto toVec = as<IRVectorType>(toType))
+                        {
+                            if (isTypeEqual(fromArr->getElementType(), toVec->getElementType()))
+                            {
+                                auto fromCountLit = as<IRIntLit>(fromArr->getElementCount());
+                                auto toCountLit = as<IRIntLit>(toVec->getElementCount());
+                                if (fromCountLit && toCountLit &&
+                                    fromCountLit->getValue() == toCountLit->getValue())
+                                {
+                                    List<IRInst*> elems;
+                                    auto count = (UInt)fromCountLit->getValue();
+                                    elems.setCount((Index)count);
+                                    for (UInt i = 0; i < count; ++i)
+                                    {
+                                        elems[(Index)i] = builder.emitElementExtract(val, i);
+                                    }
+                                    auto newInst =
+                                        builder.emitMakeVector(toType, count, elems.getBuffer());
+                                    inst->replaceUsesWith(newInst);
+                                    maybeRemoveOldInst(inst);
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
+                }
             }
             break;
         case kIROp_VectorReshape:
@@ -1199,7 +1309,7 @@ struct PeepholeContext : InstPassBase
                     auto type = inst->getOperand(0)->getDataType();
                     IRSizeAndAlignment sizeAlignment;
                     const auto res = getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         type,
                         &sizeAlignment);
                     if (!SLANG_SUCCEEDED(res))
@@ -1251,10 +1361,10 @@ struct PeepholeContext : InstPassBase
                         result = type->getOp() == kIROp_HalfType;
                         break;
                     case kIROp_IsUnsignedInt:
-                        result = isIntegralType(type) && !getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && !getIntTypeSigned(type);
                         break;
                     case kIROp_IsSignedInt:
-                        result = isIntegralType(type) && getIntTypeInfo(type).isSigned;
+                        result = isIntegralType(type) && getIntTypeSigned(type);
                         break;
                     case kIROp_IsVector:
                         result = as<IRVectorType>(type);
@@ -1415,7 +1525,7 @@ bool peepholeOptimizeGlobalScope(TargetProgram* target, IRModule* module)
 
 bool tryReplaceInstUsesWithSimplifiedValue(TargetProgram* target, IRModule* module, IRInst* inst)
 {
-    if (inst != tryConstantFoldInst(module, inst))
+    if (inst != tryConstantFoldInst(module, target, inst))
         return true;
 
     PeepholeContext context = PeepholeContext(inst->getModule());

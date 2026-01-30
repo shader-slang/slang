@@ -540,6 +540,7 @@ public:
     static IRWaveSizeDecoration* getComputeWaveSize(IRFunc* func, Int* outWaveSize);
 
 protected:
+    virtual bool shouldEmitOnlyHeader() { return false; }
     virtual void emitGlobalParamDefaultVal(IRGlobalParam* inst) { SLANG_UNUSED(inst); }
     virtual void emitPostDeclarationAttributesForType(IRInst* type) { SLANG_UNUSED(type); }
     virtual String getTargetBuiltinVarName(IRInst* inst, IRTargetBuiltinVarName builtinName);
@@ -638,6 +639,11 @@ protected:
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
+
+    /// Returns true if this target supports fall-through in switch statements.
+    /// Targets like HLSL (FXC) and WGSL don't support fall-through.
+    /// This is used by the restructure pass to decide whether to preserve fall-through.
+    virtual bool supportsSwitchFallThrough() { return true; }
 
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);
@@ -765,9 +771,6 @@ protected:
 
     // Rename entry point if target doesn't allow the name (e.g., 'main')
     virtual String maybeMakeEntryPointNameValid(String name, DiagnosticSink* sink);
-
-    // Indicates if we are emiting for DXC cooperative vector POC.
-    bool isCoopvecPoc = false;
 
     // Indicates if we are emiting for Optix cooperative vector.
     bool isOptixCoopVec = false;

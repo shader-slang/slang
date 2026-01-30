@@ -76,6 +76,11 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::SyntaxDecl)) != 0;
     }
+    else if (const auto fileDecl = as<FileDecl>(decl))
+    {
+        // FileDecls should never be discovered via name lookups.
+        return false;
+    }
     // default behavior is to assume a value declaration
     // (no overloading allowed)
 
@@ -956,7 +961,7 @@ static void _lookUpInScopes(
                 }
                 else
                 {
-                    assert(aggTypeDeclBaseRef.as<AggTypeDecl>());
+                    SLANG_ASSERT(aggTypeDeclBaseRef.as<AggTypeDecl>());
                     if (auto interfaceBase = as<InterfaceDecl>(aggTypeDeclBaseRef.getDecl()))
                     {
                         // When looking up inside an interface type, we are actually looking up

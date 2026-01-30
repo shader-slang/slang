@@ -32,6 +32,7 @@ class Layout;
 class Type;
 class Session;
 class Name;
+class TargetRequest;
 struct IRBuilder;
 struct IRFunc;
 struct IRGlobalValueWithCode;
@@ -526,6 +527,8 @@ enum class IRTypeLayoutRuleName
     D3DConstantBuffer,
     MetalParameterBlock,
     C,
+    CUDA,
+    LLVM,
     _Count,
 };
 
@@ -1001,7 +1004,11 @@ struct IntInfo
     bool operator==(const IntInfo& i) const { return width == i.width && isSigned == i.isSigned; }
 };
 
-IntInfo getIntTypeInfo(const IRType* intType);
+// The size of some integer types (IntPtr & UIntPtr) depend on the target.
+Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType);
+std::optional<Int> maybeGetIntTypeWidth(IRType* intType);
+bool getIntTypeSigned(IRType* intType);
+IntInfo getIntTypeInfo(TargetRequest* targetReq, IRType* intType);
 
 // left-inverse of getIntTypeInfo
 IROp getIntTypeOpFromInfo(const IntInfo info);
@@ -1054,6 +1061,7 @@ struct IRConstant : IRInst
     union ValueUnion
     {
         IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRUnsignedIntegerValue uintVal;
         IRFloatingPointValue floatVal;
         void* ptrVal;
 
@@ -1299,19 +1307,19 @@ struct IRBlock : IRInst
 
     struct SuccessorList
     {
-        SuccessorList(IRUse* begin, IRUse* end, UInt stride = 1)
+        SuccessorList(IRUse* begin, IRUse* end, Int stride = 1)
             : begin_(begin), end_(end), stride(stride)
         {
         }
         IRUse* begin_;
         IRUse* end_;
-        UInt stride;
+        Int stride;
 
         UInt getCount();
 
         struct Iterator
         {
-            Iterator(IRUse* use, UInt stride)
+            Iterator(IRUse* use, Int stride)
                 : use(use), stride(stride)
             {
             }
@@ -1325,11 +1333,13 @@ struct IRBlock : IRInst
             IREdge getEdge() const { return IREdge(use); }
 
             IRUse* use;
-            UInt stride;
+            Int stride;
         };
 
         Iterator begin() { return Iterator(begin_, stride); }
         Iterator end() { return Iterator(end_, stride); }
+
+        SuccessorList reverse() { return SuccessorList(end_ - stride, begin_ - stride, -stride); }
     };
 
     PredecessorList getPredecessors();
@@ -1454,7 +1464,7 @@ FIDDLE()
 struct IRHLSLStructuredBufferTypeBase : IRBuiltinGenericType
 {
     FIDDLE(baseInst())
-    IRType* getDataLayout() { return (IRType*)getOperand(1); }
+    IRType* getDataLayout() { return getOperandCount() > 1 ? (IRType*)getOperand(1) : nullptr; }
 };
 
 
@@ -1978,6 +1988,8 @@ public:
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
+    void removeInstFromConstantMap(IRInst* inst);
+
     void tryHoistInst(IRInst* inst);
 
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
@@ -2143,7 +2155,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 5;
+    const static UInt k_maxSupportedModuleVersion = 6;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

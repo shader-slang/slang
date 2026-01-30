@@ -88,7 +88,7 @@ static void replaceMatrixDividedByScalarWithMul(IRInst* inst)
     inst->transferDecorationsTo(newOp);
 }
 
-void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
+void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetProgram)
 {
     IRBuilder builder(inst);
     builder.setInsertBefore(inst);
@@ -109,7 +109,8 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
         if (auto shiftAmountVectorType = as<IRVectorType>(shiftAmountType))
         {
             IRType* shiftAmountElementType = shiftAmountVectorType->getElementType();
-            IntInfo opIntInfo = getIntTypeInfo(shiftAmountElementType);
+            IntInfo opIntInfo =
+                getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountElementType);
             if (opIntInfo.isSigned)
             {
                 opIntInfo.isSigned = false;
@@ -123,7 +124,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
         }
         else if (isIntegralType(shiftAmountType))
         {
-            IntInfo opIntInfo = getIntTypeInfo(shiftAmountType);
+            IntInfo opIntInfo = getIntTypeInfo(targetProgram->getTargetReq(), shiftAmountType);
             if (opIntInfo.isSigned)
             {
                 opIntInfo.isSigned = false;
@@ -140,7 +141,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
     {
         legalizeScalarOperandsToMatchComposite(inst);
     }
-    else if (isWGPUTarget(target))
+    else if (isWGPUTarget(targetProgram->getTargetReq()->getTarget()))
     {
         // WGSL does not support matrix division by scalar, convert it to multiplication.
         replaceMatrixDividedByScalarWithMul(inst);
@@ -158,8 +159,8 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
         // We're assuming that the cases where this is bad have already been caught by
         // common validation checks.
         IntInfo opIntInfo[2] = {
-            getIntTypeInfo(inst->getOperand(0)->getDataType()),
-            getIntTypeInfo(inst->getOperand(1)->getDataType())};
+            getIntTypeInfo(targetProgram->getTargetReq(), inst->getOperand(0)->getDataType()),
+            getIntTypeInfo(targetProgram->getTargetReq(), inst->getOperand(1)->getDataType())};
         bool isShift = inst->getOp() == kIROp_Lsh || inst->getOp() == kIROp_Rsh;
         bool signednessDiffers = opIntInfo[0].isSigned != opIntInfo[1].isSigned;
         if (!isShift && signednessDiffers)
@@ -174,7 +175,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, CodeGenTarget target)
     }
 }
 
-void legalizeLogicalAndOr(IRInst* inst)
+void legalizeLogicalAndOr(IRInst* inst, TargetProgram* targetProgram)
 {
     auto op = inst->getOp();
     if (op == kIROp_And || op == kIROp_Or)
@@ -298,8 +299,13 @@ void legalizeLogicalAndOr(IRInst* inst)
 
     for (auto child : inst->getModifiableChildren())
     {
-        legalizeLogicalAndOr(child);
+        legalizeLogicalAndOr(child, targetProgram);
     }
+}
+
+void legalizeLogicalAndOr(IRModule* module, TargetProgram* targetProgram)
+{
+    legalizeLogicalAndOr(module->getModuleInst(), targetProgram);
 }
 
 } // namespace Slang

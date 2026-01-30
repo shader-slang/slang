@@ -12,6 +12,7 @@
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -dx12 -output-using-type
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -output-using-type -render-feature double
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<double> outputBuffer;

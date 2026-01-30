@@ -163,6 +163,7 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
             if (!bestType)
             {
                 bestType = candidateType;
+                bestCost = conversionCost;
             }
             else
             {
@@ -183,7 +184,15 @@ Type* SemanticsVisitor::_tryJoinTypeWithInterface(
             }
         }
         if (bestType)
+        {
+            // Track the conversion cost for type promotion in the constraint system.
+            // This cost represents promoting a type (e.g., int -> float) to satisfy
+            // an interface constraint (e.g., __BuiltinFloatingPointType).
+            // This ensures that overload resolution prefers exact type matches over
+            // candidates that require type promotion.
+            constraints->typePromotionCost += bestCost;
             return bestType;
+        }
     }
 
     // If `interfaceType` represents some generic interface type, such as `IFoo<T>`, and `type`
@@ -697,19 +706,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         return substDeclRef;
     };
 
-    // TODO: STOPPED HERE: build up substitutions from parent generics.
     DeclRef<Decl*> substDeclRef;
     for (auto _genericDecl : genericDecls)
         for (auto constraintDecl : _genericDecl->getMembersOfType<GenericTypeConstraintDecl>())
         {
-            /*DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-                m_astBuilder
-                    ->getGenericAppDeclRef(
-                        _genericDecl->getDefaultDeclRef(),
-                        args[_genericDecl].getArrayView().arrayView,
-                        constraintDecl)
-                    .as<GenericTypeConstraintDecl>();
-            */
             auto constraintDeclRef =
                 getSubstDeclRef(constraintDecl).as<GenericTypeConstraintDecl>();
 
@@ -859,19 +859,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 outBaseCost += kConversionCost_UnconstraintGenericParam;
         }
 
+    // Add the accumulated type promotion cost from constraint solving.
+    // This includes costs from promoting types to satisfy interface constraints
+    // (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+    outBaseCost += system->typePromotionCost;
 
     DeclRef<Decl> substGenericDeclRef = getSubstDeclRef(genericDeclRef.getDecl()->inner);
-    /*
-    for (auto _genericDeclRef = genericDeclRef; _genericDeclRef;
-         _genericDeclRef = _genericDeclRef.getParent().as<GenericDecl>())
-    {
-        substGenericDeclRef = m_astBuilder->getGenericAppDeclRef(
-            _genericDeclRef,
-            args[_genericDeclRef.getDecl()].getArrayView().arrayView);
-    }
-    */
-
-
     return substGenericDeclRef;
 }
 
@@ -1104,15 +1097,88 @@ bool SemanticsVisitor::TryUnifyIntParam(
     }
 }
 
+bool SemanticsVisitor::TryUnifyFunctorByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    StructDecl* fstStructDecl,
+    FuncType* sndFuncType)
+{
+    // Here we just need to find an invocation method for our functor
+    // to perform unification with.
+    // We do not validate the validity of the functor at this step,
+    // we only need to perform a reasonable unification so that constraints
+    // can correctly solve.
+    FuncDecl* functorInvokeMethod =
+        as<FuncDecl>(fstStructDecl->findLastDirectMemberDeclOfName(getName("()")));
+    if (!functorInvokeMethod)
+        return false;
+
+    return TryUnifyFuncTypesByStructuralMatch(
+        constraints,
+        unifyCtx,
+        getFuncType(this->getASTBuilder(), functorInvokeMethod),
+        sndFuncType);
+}
+
+bool SemanticsVisitor::TryUnifyFuncTypesByStructuralMatch(
+    ConstraintSystem& constraints,
+    ValUnificationContext unifyCtx,
+    FuncType* fstFunType,
+    FuncType* sndFunType)
+{
+    const Index numParams = fstFunType->getParamCount();
+    if (numParams != sndFunType->getParamCount())
+        return false;
+    for (Index i = 0; i < numParams; ++i)
+    {
+        if (!TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                fstFunType->getParamTypeWithModeWrapper(i),
+                sndFunType->getParamTypeWithModeWrapper(i)))
+            return false;
+    }
+    return TryUnifyTypes(
+        constraints,
+        unifyCtx,
+        fstFunType->getResultType(),
+        sndFunType->getResultType());
+}
+
 bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     ConstraintSystem& constraints,
     ValUnificationContext unifyCtx,
     QualType fst,
     QualType snd)
 {
+    if (auto sndDeclRefType = as<DeclRefType>(snd))
+    {
+        auto sndDeclRef = sndDeclRefType->getDeclRef();
+
+        if (auto sndStructDecl = as<StructDecl>(sndDeclRef))
+        {
+            if (auto fstFunType = as<FuncType>(fst))
+                return TryUnifyFunctorByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    sndStructDecl.getDecl(),
+                    fstFunType);
+        }
+    }
+
     if (auto fstDeclRefType = as<DeclRefType>(fst))
     {
         auto fstDeclRef = fstDeclRefType->getDeclRef();
+
+        if (auto fstStructDecl = as<StructDecl>(fstDeclRef))
+        {
+            if (auto sndFunType = as<FuncType>(snd))
+                return TryUnifyFunctorByStructuralMatch(
+                    constraints,
+                    unifyCtx,
+                    fstStructDecl.getDecl(),
+                    sndFunType);
+        }
 
         if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             // if (typeParamDecl->parentDecl == constraints.genericDecl)
@@ -1180,23 +1246,11 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
     {
         if (auto sndFunType = as<FuncType>(snd))
         {
-            const Index numParams = fstFunType->getParamCount();
-            if (numParams != sndFunType->getParamCount())
-                return false;
-            for (Index i = 0; i < numParams; ++i)
-            {
-                if (!TryUnifyTypes(
-                        constraints,
-                        unifyCtx,
-                        fstFunType->getParamTypeWithDirectionWrapper(i),
-                        sndFunType->getParamTypeWithDirectionWrapper(i)))
-                    return false;
-            }
-            return TryUnifyTypes(
+            return TryUnifyFuncTypesByStructuralMatch(
                 constraints,
                 unifyCtx,
-                fstFunType->getResultType(),
-                sndFunType->getResultType());
+                fstFunType,
+                sndFunType);
         }
     }
     else if (auto expandType = as<ExpandType>(fst))

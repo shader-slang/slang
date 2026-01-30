@@ -1017,7 +1017,14 @@ class UIntSetVal : public Val
     Index getBitmaskCount() const { return getOperandCount(); }
 
     /// Get a specific bitmask operand as a constant integer value
-    ConstantIntVal* getBitmask(Index index) const { return as<ConstantIntVal>(getOperand(index)); }
+    ConstantIntVal* getBitmaskOperand(Index index) const
+    {
+        return as<ConstantIntVal>(getOperand(index));
+    }
+    UIntSet::Element getBitmask(Index index) const
+    {
+        return static_cast<UIntSet::Element>(getBitmaskOperand(index)->getValue());
+    }
 
     /// Get all bitmask operands as a view
     Val::OperandView<ConstantIntVal> getBitmasks() const
@@ -1033,7 +1040,6 @@ class UIntSetVal : public Val
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride() { return this; }
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 

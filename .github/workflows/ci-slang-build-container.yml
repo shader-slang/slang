@@ -1,0 +1,115 @@
+name: CI Container Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  # Uses nvidia/cuda container for CUDA support.
+  build:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      options: --user root
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Build Slang with CUDA
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "CUDA version: $(nvcc --version)"
+
+          # Set cmake_config for artifact preparation
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          # Configure with CUDA support, disable LLVM (not needed for GPU tests)
+          cmake --preset default --fresh \
+            -DSLANG_ENABLE_CUDA=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+
+          # Build
+          cmake --build --preset ${{ inputs.config }} -j$(nproc)
+
+          echo "Build complete. Checking CUDA support in render-test-tool:"
+          if ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null | grep -q cuda; then
+            echo "✅ render-test-tool has CUDA support!"
+          else
+            echo "⚠️ render-test-tool may not have CUDA linked"
+            ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null || true
+          fi
+
+      - name: Prepare artifacts for upload
+        run: |
+          # Create a staging directory for artifacts with config-specific subdirectory
+          mkdir -p "artifacts-staging/${cmake_config}"
+
+          # Copy artifacts from the specific configuration directory
+          if [ -d "build/${cmake_config}" ]; then
+            echo "Copying artifacts from build/${cmake_config} to artifacts-staging/${cmake_config}..."
+
+            # Copy bin directory excluding debug files
+            if [ -d "build/${cmake_config}/bin" ]; then
+              mkdir -p "artifacts-staging/${cmake_config}/bin"
+              find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
+
+              cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "No D3D12 directory (expected on Linux)"
+              cp -r "build/${cmake_config}/bin/optix" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/optix directory"
+            fi
+
+            # Copy everything from lib directory
+            if [ -d "build/${cmake_config}/lib" ]; then
+              cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
+            fi
+
+            # Copy share directory if it exists
+            if [ -d "build/${cmake_config}/share" ]; then
+              cp -r "build/${cmake_config}/share" "artifacts-staging/${cmake_config}/" || echo "Failed to copy share directory"
+            fi
+
+            # Copy include directory if it exists
+            if [ -d "build/${cmake_config}/include" ]; then
+              cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
+            fi
+
+            # Copy examples directory if it exists
+            if [ -d "build/examples" ]; then
+              cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
+            fi
+
+            echo "Artifacts staging directory contents:"
+            ls -laR artifacts-staging/
+          else
+            echo "Configuration directory build/${cmake_config} not found!"
+            echo "Available build directories:"
+            ls -la build/ || echo "No build directory found"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
+          path: artifacts-staging/
+          retention-days: 1

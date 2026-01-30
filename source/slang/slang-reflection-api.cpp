@@ -502,6 +502,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             // This is a reference to an entry point
             return SLANG_TYPE_KIND_STRUCT;
         }
+        else if (declRef.is<EnumDecl>())
+        {
+            return SLANG_TYPE_KIND_ENUM;
+        }
     }
     else if (const auto specializedType = as<ExistentialSpecializedType>(type))
     {
@@ -536,6 +540,10 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
                        MemberFilterStyle::Instance)
                 .getCount();
         }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            return (unsigned int)enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>().getCount();
+        }
     }
 
     return 0;
@@ -562,6 +570,12 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
                 MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
             return convert(fieldDeclRef);
+        }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            auto cases = enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>();
+            auto caseDecl = cases[index];
+            return convert(DeclRef(caseDecl));
         }
     }
 
@@ -607,8 +621,9 @@ SLANG_API size_t spReflectionType_GetSpecializedElementCount(
         }
     }
 
-    const auto isWithoutSize = isUnsized || elementCount->isLinkTimeVal();
-    return isWithoutSize ? 0 : (size_t)getIntVal(elementCount);
+    return isUnsized                       ? 0
+           : elementCount->isLinkTimeVal() ? SLANG_UNKNOWN_SIZE
+                                           : (size_t)getIntVal(elementCount);
 }
 
 SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionType* inType)
@@ -636,6 +651,18 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
         return convert(matrixType->getElementType());
+    }
+    else if (auto declRefType = as<DeclRefType>(type))
+    {
+        const auto& declRef = declRefType->getDeclRef();
+        if (auto enumDecl = declRef.as<EnumDecl>())
+        {
+            return convert(enumDecl.getDecl()->tagType);
+        }
+    }
+    else if (auto streamType = as<HLSLStreamOutputType>(type))
+    {
+        return convert(streamType->getElementType());
     }
 
     return nullptr;
@@ -1258,19 +1285,25 @@ SLANG_API SlangTypeKind spReflectionTypeLayout_getKind(SlangReflectionTypeLayout
 
 namespace
 {
-static size_t getReflectionSize(LayoutSize size)
+static size_t getReflectionOffset(LayoutOffset size)
 {
-    if (size.isFinite())
-        return size.getFiniteValue();
-
-    return SLANG_UNBOUNDED_SIZE;
+    if (size.isInvalid())
+        return SLANG_UNKNOWN_SIZE;
+    return size.getValidValue();
 }
 
-static int32_t getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
+static size_t getReflectionSize(LayoutSize size)
+{
+    if (size.isInfinite())
+        return SLANG_UNBOUNDED_SIZE;
+    return getReflectionOffset(size.getFiniteValue());
+}
+
+static LayoutOffset getAlignment(TypeLayout* typeLayout, SlangParameterCategory category)
 {
     if (category == SLANG_PARAMETER_CATEGORY_UNIFORM)
     {
-        return int32_t(typeLayout->uniformAlignment);
+        return typeLayout->uniformAlignment;
     }
     else
     {
@@ -1288,11 +1321,18 @@ static size_t getStride(TypeLayout* typeLayout, SlangParameterCategory category)
     if (size.isInfinite())
         return SLANG_UNBOUNDED_SIZE;
 
-    size_t finiteSize = size.getFiniteValue();
-    size_t alignment = getAlignment(typeLayout, category);
-    SLANG_ASSERT(alignment >= 1);
+    auto offset = size.getFiniteValue();
+    if (!offset.isValid())
+        return SLANG_UNKNOWN_SIZE;
+    size_t finiteSize = offset.getValidValue();
+    const auto alignment = getAlignment(typeLayout, category);
 
-    auto stride = (finiteSize + (alignment - 1)) & ~(alignment - 1);
+    if (alignment.isInvalid())
+        return SLANG_UNKNOWN_SIZE;
+
+    SLANG_ASSERT(alignment.compare(1) != std::partial_ordering::less);
+
+    auto stride = (finiteSize + (alignment.getValidValue() - 1)) & ~(alignment.getValidValue() - 1);
     return stride;
 }
 } // namespace
@@ -1331,7 +1371,9 @@ SLANG_API int32_t spReflectionTypeLayout_getAlignment(
     if (!typeLayout)
         return 0;
 
-    return getAlignment(typeLayout, category);
+    // We would like to use this but this function doesn't return size_t
+    // return getReflectionOffset(getAlignment(typeLayout, category));
+    return int32_t(getAlignment(typeLayout, category).getValidValueOr(0));
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
@@ -1348,6 +1390,49 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
     }
 
     return nullptr;
+}
+
+// Return true if the variable declaration's qualified name matches the given name slice.
+bool matchName(VarDeclBase* varDecl, UnownedStringSlice name)
+{
+    ShortList<UnownedStringSlice> nameParts;
+    // Split `name` by `.` or `::` into parts.
+    Index start = 0;
+    for (Index i = 0; i < name.getLength(); ++i)
+    {
+        if (name[i] == '.' || (name[i] == ':' && i + 1 < name.getLength() && name[i + 1] == ':'))
+        {
+            if (i > start)
+            {
+                nameParts.add(name.subString(start, i - start));
+            }
+            start = (name[i] == ':') ? i + 2 : i + 1;
+            if (name[i] == ':')
+                ++i; // Skip the next ':'
+        }
+    }
+    if (start >= name.getLength())
+        return false;
+
+    auto lastPart = name.tail(start);
+    if (getText(getReflectionName(varDecl)) != lastPart)
+        return false;
+
+    // If `name` is prefixed with qualifiers, continue matching parent declarations.
+    Decl* decl = varDecl;
+
+    for (Index i = nameParts.getCount() - 1; i >= 0; --i)
+    {
+        decl = getParentDecl(decl);
+        if (!decl)
+            return false;
+        auto part = nameParts[i];
+        if (getText(decl->getName()) != part)
+            return false;
+    }
+
+    // All name parts matched.
+    return true;
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
@@ -1368,7 +1453,7 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
         for (Index f = 0; f < fieldCount; ++f)
         {
             auto field = structTypeLayout->fields[f];
-            if (getReflectionName(field->getVariable())->text.getUnownedSlice() == name)
+            if (matchName(field->getVariable(), name))
                 return f;
         }
     }
@@ -1399,7 +1484,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
         {
         // We store the stride explicitly for the uniform case
         case SLANG_PARAMETER_CATEGORY_UNIFORM:
-            return arrayTypeLayout->uniformStride;
+            return getReflectionOffset(arrayTypeLayout->uniformStride);
 
         // For most other cases (resource registers), the "stride"
         // of an array is simply the number of resources (if any)
@@ -1426,7 +1511,7 @@ SLANG_API size_t spReflectionTypeLayout_GetElementStride(
             vectorTypeLayout->elementTypeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
         if (!resInfo)
             return 0;
-        return resInfo->count.getFiniteValue();
+        return getReflectionSize(resInfo->count);
     }
 
     return 0;
@@ -1466,6 +1551,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
         return convert(ptrTypeLayout->valueTypeLayout.Ptr());
+    }
+    else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
+    {
+        return convert(streamOutputTypeLayout->elementTypeLayout.Ptr());
     }
     return nullptr;
 }
@@ -1673,9 +1762,9 @@ struct ExtendedBindingRangePath : BindingRangePath
 };
 
 /// Calculate the offset for resources of the given `kind` in the `path`.
-Int _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
+LayoutOffset _calcIndexOffset(BindingRangePathLink* path, LayoutResourceKind kind)
 {
-    Int result = 0;
+    LayoutOffset result = 0;
     for (auto link = path; link; link = link->parent)
     {
         if (auto resInfo = link->var->FindResourceInfo(kind))
@@ -1962,12 +2051,12 @@ struct ExtendedTypeLayoutContext
             LayoutSize elementCount = LayoutSize::infinite();
             if (auto arrayType = as<ArrayExpressionType>(arrayTypeLayout->type))
             {
-                const auto isWithoutSize =
-                    arrayType->isUnsized() || arrayType->getElementCount()->isLinkTimeVal();
-                if (!isWithoutSize)
-                {
+                if (arrayType->isUnsized())
+                    elementCount = LayoutSize::infinite();
+                else if (arrayType->getElementCount()->isLinkTimeVal())
+                    elementCount = LayoutSize::invalid();
+                else
                     elementCount = LayoutSize::RawValue(getIntVal(arrayType->getElementCount()));
-                }
             }
             addRangesRec(elementTypeLayout, path, multiplier * elementCount);
             return;
@@ -2280,8 +2369,12 @@ struct ExtendedTypeLayoutContext
             // Note that we don't use resInfo.count here, as each
             // structuredBufferType is essentially a struct of 2 fields
             // (elements, counter) and not an array of length 2.
-            SLANG_ASSERT(resInfo.count != 2 || structuredBufferTypeLayout->counterVarLayout);
-            SLANG_ASSERT(resInfo.count != 1 || !structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(2)) != std::partial_ordering::equivalent ||
+                structuredBufferTypeLayout->counterVarLayout);
+            SLANG_ASSERT(
+                resInfo.count.compare(LayoutSize(1)) != std::partial_ordering::equivalent ||
+                !structuredBufferTypeLayout->counterVarLayout);
             descriptorRange.count = multiplier;
             descriptorRange.indexOffset = _calcIndexOffset(path.primary, resInfo.kind);
 
@@ -2578,8 +2671,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getBindingRangeBindingCount(
         return 0;
     auto& bindingRange = extTypeLayout->m_bindingRanges[index];
 
-    auto count = bindingRange.count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    return getReflectionSize(bindingRange.count);
 }
 
 #if 0
@@ -2787,7 +2879,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeIndexOf
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    return range.indexOffset;
+    return getReflectionOffset(range.indexOffset);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescriptorCount(
@@ -2813,8 +2905,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getDescriptorSetDescriptorRangeDescrip
         return 0;
     auto& range = descriptorSet->descriptorRanges[rangeIndex];
 
-    auto count = range.count;
-    return count.isFinite() ? count.getFiniteValue() : -1;
+    return getReflectionSize(range.count);
 }
 
 SLANG_API SlangBindingType spReflectionTypeLayout_getDescriptorSetDescriptorRangeType(
@@ -2914,7 +3005,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeSpaceOffset(
     if (subObjectRangeIndex >= extTypeLayout->m_subObjectRanges.getCount())
         return 0;
 
-    return extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset;
+    return getReflectionOffset(extTypeLayout->m_subObjectRanges[subObjectRangeIndex].spaceOffset);
 }
 
 SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_getSubObjectRangeOffset(
@@ -2998,7 +3089,7 @@ SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeObjectCount(SlangRefl
     if(!typeLayout) return 0;
 
     auto count = Slang::_findSubObjectRange(typeLayout, index).count;
-    return count.isFinite() ? SlangInt(count.getFiniteValue()) : -1;
+    return getReflectionSize(count);
 }
 
 SLANG_API SlangInt spReflectionTypeLayout_getSubObjectRangeBindingRangeIndex(SlangReflectionTypeLayout* inTypeLayout, SlangInt index)
@@ -3189,6 +3280,11 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     {
         return varDecl->initExpr != nullptr;
     }
+    if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal);
+        return constantVal != nullptr;
+    }
 
     return false;
 }
@@ -3203,6 +3299,63 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
         {
             *rs = constantVal->getValue();
             return 0;
+        }
+        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (int64_t)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (int64_t)floatLit->value;
+                return 0;
+            }
+        }
+    }
+    else if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        if (auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal))
+        {
+            *rs = constantVal->getValue();
+            return 0;
+        }
+    }
+
+    return SLANG_E_INVALID_ARG;
+}
+
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (auto cexpr = as<FloatingPointLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = (float)cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (float)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (float)floatLit->value;
+                return 0;
+            }
         }
     }
 
@@ -3274,7 +3427,7 @@ SLANG_API size_t spReflectionVariableLayout_GetOffset(
     if (!info)
         return 0;
 
-    return info->index;
+    return getReflectionOffset(info->index);
 }
 
 SLANG_API size_t spReflectionVariableLayout_GetSpace(
@@ -3294,7 +3447,7 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
         info = varLayout->FindResourceInfo(LayoutResourceKind(category));
     }
 
-    UInt space = 0;
+    LayoutOffset space = 0;
 
     // First, deal with any offset applied to the specific resource kind specified
     if (info)
@@ -3332,7 +3485,7 @@ SLANG_API size_t spReflectionVariableLayout_GetSpace(
     // There is no policy we can apply locally in this function that
     // will Just Work, so the best we can do is try to not lie.
 
-    return space;
+    return getReflectionOffset(space);
 }
 
 SLANG_API SlangImageFormat
@@ -3716,6 +3869,10 @@ SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
     else if (as<NamespaceDecl>(slangDecl))
     {
         return SLANG_DECL_KIND_NAMESPACE;
+    }
+    else if (as<EnumDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_ENUM;
     }
     else
         return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
@@ -4134,17 +4291,34 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
 
     SlangUInt sizeAlongAxis[3] = {1, 1, 1};
 
+    auto astBuilder = entryPointLayout->program->getLinkage()->getASTBuilder();
+    SLANG_AST_BUILDER_RAII(astBuilder);
+
     // First look for the HLSL case, where we have an attribute attached to the entry point function
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
         for (int i = 0; i < 3; ++i)
         {
-            if (auto cint =
-                    entryPointLayout->program->tryFoldIntVal(numThreadsAttribute->extents[i]))
+            if (!numThreadsAttribute->extents[i])
+            {
+                // If the size is specified by a specialization constant, its value is
+                // unknown right now, and we should return 0 to indicate this.
+                if (numThreadsAttribute->specConstExtents[i])
+                    sizeAlongAxis[i] = 0;
+                continue;
+            }
+            // Try to fold numThreadsAttribute->extents[i] into a ConstIntVal. If that
+            // failed, we should report the size as 0 to indicate that its value is not
+            // known yet.
+            sizeAlongAxis[i] = 0;
+            auto substExtent = as<IntVal>(numThreadsAttribute->extents[i]->substitute(
+                astBuilder,
+                SubstitutionSet(entryPointFunc)));
+            if (!substExtent)
+                continue;
+            if (auto cint = entryPointLayout->program->tryFoldIntVal(substExtent))
                 sizeAlongAxis[i] = (SlangUInt)cint->getValue();
-            else if (numThreadsAttribute->extents[i])
-                sizeAlongAxis[i] = 0;
         }
     }
 
@@ -4416,7 +4590,7 @@ SLANG_API SlangUInt spReflection_getGlobalConstantBufferBinding(SlangReflection*
     auto cb = program->parametersLayout->FindResourceInfo(LayoutResourceKind::ConstantBuffer);
     if (!cb)
         return 0;
-    return cb->index;
+    return getReflectionOffset(cb->index);
 }
 
 SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inProgram)
