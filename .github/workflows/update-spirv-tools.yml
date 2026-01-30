@@ -7,7 +7,7 @@ on:
 
 jobs:
   test-spirv-tot:
-    runs-on: windows-latest
+    runs-on: ["Windows", "self-hosted", "GCP-T4"]
     timeout-minutes: 120
 
     steps:
@@ -100,7 +100,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*SPIRV-Tools ToT Test Result*\nStatus: ${{ steps.parse.outputs.status == 'success' && ':green-check-mark: PASSED' || ':alert: FAILED' }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`\nPlatform: windows-latest"
+                    "text": "*SPIRV-Tools ToT Test Result*\nStatus: ${{ steps.parse.outputs.status == 'success' && ':green-check-mark: PASSED' || ':alert: FAILED' }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`\nPlatform: Windows self-hosted"
                   }
                 },
                 {
