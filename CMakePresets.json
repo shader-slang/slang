@@ -117,6 +117,45 @@
       "cacheVariables": {
         "SLANG_ENABLE_COVERAGE": true
       }
+    },
+    {
+      "name": "android-base",
+      "hidden": true,
+      "description": "Base Android build configuration using NDK toolchain",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
+        "ANDROID_PLATFORM": "android-31",
+        "SLANG_ENABLE_GFX": "OFF",
+        "SLANG_ENABLE_TESTS": "OFF",
+        "SLANG_ENABLE_SLANGD": "OFF",
+        "SLANG_ENABLE_REPLAYER": "OFF",
+        "SLANG_SLANG_LLVM_FLAVOR": "DISABLE",
+        "SLANG_ENABLE_EXAMPLES": "OFF",
+        "SLANG_ENABLE_XLIB": "OFF",
+        "SLANG_ENABLE_CUDA": "OFF",
+        "SLANG_ENABLE_OPTIX": "OFF",
+        "SLANG_ENABLE_NVAPI": "OFF",
+        "SLANG_ENABLE_AFTERMATH": "OFF"
+      }
+    },
+    {
+      "name": "android-arm64",
+      "description": "Android ARM64 (arm64-v8a) build",
+      "inherits": "android-base",
+      "binaryDir": "${sourceDir}/build-android-arm64-v8a",
+      "cacheVariables": {
+        "ANDROID_ABI": "arm64-v8a"
+      }
+    },
+    {
+      "name": "android-x86_64",
+      "description": "Android x86_64 build",
+      "inherits": "android-base",
+      "binaryDir": "${sourceDir}/build-android-x86_64",
+      "cacheVariables": {
+        "ANDROID_ABI": "x86_64"
+      }
     }
   ],
   "buildPresets": [
@@ -191,6 +230,36 @@
     {
       "name": "coverage",
       "configurePreset": "coverage",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "android-arm64-debug",
+      "configurePreset": "android-arm64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "android-arm64-release",
+      "configurePreset": "android-arm64",
+      "configuration": "Release"
+    },
+    {
+      "name": "android-arm64-releaseWithDebugInfo",
+      "configurePreset": "android-arm64",
+      "configuration": "RelWithDebInfo"
+    },
+    {
+      "name": "android-x86_64-debug",
+      "configurePreset": "android-x86_64",
+      "configuration": "Debug"
+    },
+    {
+      "name": "android-x86_64-release",
+      "configurePreset": "android-x86_64",
+      "configuration": "Release"
+    },
+    {
+      "name": "android-x86_64-releaseWithDebugInfo",
+      "configurePreset": "android-x86_64",
       "configuration": "RelWithDebInfo"
     }
   ],
