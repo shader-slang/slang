@@ -47,8 +47,10 @@ jobs:
           # Check if script succeeded
           if [ "${{ steps.update.outputs.exit_code }}" = "0" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
+            STATUS_MSG=":green-check-mark: SPIRV-Tools ToT test PASSED"
           else
             echo "status=failure" >> $GITHUB_OUTPUT
+            STATUS_MSG=":alert:\nSPIRV-Tools ToT test FAILED"
           fi
 
           # Extract commit info from script output
@@ -57,8 +59,15 @@ jobs:
           OLD_COMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
           NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
 
-          echo "old_spirv_commit=$OLD_COMMIT" >> $GITHUB_OUTPUT
-          echo "new_spirv_commit=$NEW_COMMIT" >> $GITHUB_OUTPUT
+          # Log extracted commits
+          echo "Extracted commits:"
+          echo "  OLD_COMMIT: '$OLD_COMMIT'"
+          echo "  NEW_COMMIT: '$NEW_COMMIT'"
+
+          # Set outputs
+          echo "old_spirv_commit=${OLD_COMMIT:-undetected}" >> $GITHUB_OUTPUT
+          echo "new_spirv_commit=${NEW_COMMIT:-undetected}" >> $GITHUB_OUTPUT
+          echo "status_msg=$STATUS_MSG" >> $GITHUB_OUTPUT
 
       - name: Upload logs
         if: always()
@@ -94,37 +103,7 @@ jobs:
         with:
           payload: |
             {
-              "text": "${{ steps.parse.outputs.status == 'success' && ':green-check-mark:' || ':alert:' }} SPIRV-Tools ToT Test ${{ steps.parse.outputs.status == 'success' && 'PASSED' || 'FAILED' }}",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*SPIRV-Tools ToT Test Result*\nStatus: ${{ steps.parse.outputs.status == 'success' && ':green-check-mark: PASSED' || ':alert: FAILED' }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`\nPlatform: Windows self-hosted"
-                  }
-                },
-                {
-                  "type": "actions",
-                  "elements": [
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "View Run"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    },
-                    {
-                      "type": "button",
-                      "text": {
-                        "type": "plain_text",
-                        "text": "Download Logs"
-                      },
-                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                    }
-                  ]
-                }
-              ]
+              "SPIRV-Tools-ToT-Test": "${{ steps.parse.outputs.status_msg }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`${{ steps.parse.outputs.status == 'failure' && format('\nRun: {0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) || '' }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SPIRV }}
