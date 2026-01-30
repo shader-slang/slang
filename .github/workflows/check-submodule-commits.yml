@@ -13,6 +13,8 @@ jobs:
   check-submodule-commits:
     runs-on: ubuntu-latest
     name: Verify submodule commits are on main branch
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout code
