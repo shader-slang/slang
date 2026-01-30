@@ -528,6 +528,12 @@ IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
         return builder.getTupleType(elementInfos);
     }
 
+    if (auto optionalType = as<IROptionalType>(type))
+    {
+        return builder.getOptionalType(
+            (IRType*)makeInfoForConcreteType(module, optionalType->getValueType()));
+    }
+
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
@@ -904,6 +910,20 @@ struct TypeFlowSpecializationContext
                     (IRType*)unionPropagationInfo(info1->getOperand(i), info2->getOperand(i)));
             }
             return builder.getTupleType(elementInfos);
+        }
+
+        if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
+            return info1;
+
+        if (as<IROptionalNoneType>(info1) && (as<IROptionalType>(info2)))
+            return info2;
+
+        if (as<IROptionalType>(info1) && as<IROptionalType>(info2))
+        {
+            // If both are optional types, union their value types
+            IRBuilder builder(module);
+            return builder.getOptionalType(
+                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)));
         }
 
         // For all other cases which are structured composites of sets,
@@ -2323,6 +2343,16 @@ struct TypeFlowSpecializationContext
             return makeTaggedUnionType(noneTableSet);
         }
 
+        // For non-existential optional types with non-concrete value types,
+        // we propagate the optional wrapper with an appropriate value info.
+        auto optionalType = as<IROptionalType>(inst->getDataType());
+        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        {
+            // Return an optional info wrapping the value type's info.
+            // Since this is 'none', we use the concrete value type info.
+            return builder.getOptionalNoneType();
+        }
+
         return none();
     }
 
@@ -2351,6 +2381,24 @@ struct TypeFlowSpecializationContext
                 SLANG_ASSERT(as<IRTaggedUnionType>(info));
                 return info;
             }
+
+            return none();
+        }
+
+        // For non-existential optional types with non-concrete value types,
+        // we wrap the value's info in an optional info.
+        auto optionalType = as<IROptionalType>(inst->getDataType());
+        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        {
+            IRBuilder builder(module);
+            if (auto valueInfo = tryGetInfo(context, inst->getValue()))
+            {
+                return builder.getOptionalType((IRType*)valueInfo);
+            }
+            else
+            {
+                return none();
+            }
         }
 
         return none();
@@ -2370,6 +2418,22 @@ struct TypeFlowSpecializationContext
                 return builder.getTaggedUnionType(
                     cast<IRWitnessTableSet>(filterNoneElements(taggedUnion->getWitnessTableSet())),
                     cast<IRTypeSet>(filterNoneElements(taggedUnion->getTypeSet())));
+            }
+
+            return none();
+        }
+
+        // For non-existential optional types with non-concrete value types,
+        // we extract the value's info from the optional info.
+        auto optionalType = as<IROptionalType>(inst->getOperand(0)->getDataType());
+        if (optionalType && !isConcreteType(optionalType->getValueType()))
+        {
+            if (auto info = tryGetInfo(context, inst->getOperand(0)))
+            {
+                if (auto optionalInfo = as<IROptionalType>(info))
+                {
+                    return optionalInfo->getValueType();
+                }
             }
         }
 
@@ -3506,6 +3570,40 @@ struct TypeFlowSpecializationContext
                     (IRType*)specializedElementType,
                     arrayType->getElementCount(),
                     getArrayStride(arrayType));
+            }
+            else
+                return nullptr;
+        }
+
+        if (auto tupleType = as<IRTupleType>(info))
+        {
+            IRBuilder builder(module);
+            List<IRType*> specializedElements;
+            bool anySpecialized = false;
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                if (auto specializedElementType = getLoweredType((IRType*)tupleType->getOperand(i)))
+                {
+                    specializedElements.add(specializedElementType);
+                    anySpecialized = true;
+                }
+                else
+                {
+                    specializedElements.add((IRType*)tupleType->getOperand(i));
+                }
+            }
+            if (anySpecialized)
+                return builder.getTupleType(specializedElements);
+            else
+                return nullptr;
+        }
+
+        if (auto optionalType = as<IROptionalType>(info))
+        {
+            IRBuilder builder(module);
+            if (auto specializedValueType = getLoweredType(optionalType->getValueType()))
+            {
+                return builder.getOptionalType((IRType*)specializedValueType);
             }
             else
                 return nullptr;
@@ -5312,7 +5410,7 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        return false;
+        return replaceType(context, inst);
     }
 
     bool specializeMakeOptionalValue(IRInst* context, IRMakeOptionalValue* inst)
@@ -5334,7 +5432,7 @@ struct TypeFlowSpecializationContext
             return true;
         }
 
-        return false;
+        return replaceType(context, inst);
     }
 
     bool specializeGetOptionalValue(IRInst* context, IRGetOptionalValue* inst)

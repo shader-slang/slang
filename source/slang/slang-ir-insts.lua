@@ -705,7 +705,14 @@ local insts = {
 				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
 				-- 
 				-- Operands are a TypeSet and a WitnessTableSet that represent the possibilities of the existential
-			} }
+			} },
+			{ OptionalNoneType = {
+				-- An element that represents an optional value known to be `none`
+				--
+				-- Used when propagating type information through optional values.
+				--
+				hoistable = true
+			} },
 		},
 	},
 	-- IRGlobalValueWithCode
@@ -2372,6 +2379,10 @@ local insts = {
 	{ BuiltinCast = { operands = { { "val" } } } },
 	{ bitCast = { operands = { { "val" } } } },
 	{ reinterpret = { operands = { { "val" } } } },
+	-- Reinterpret an optional type to another optional type.
+	-- This is lowered to an if-else block that checks hasValue and performs
+	-- a regular reinterpret on the inner value if present.
+	{ ReinterpretOptional = { operands = { { "val" } } } },
 	{ unmodified = { operands = { { "val" } } } },
 	{ outImplicitCast = { operands = { { "value" } } } },
 	{ inOutImplicitCast = { operands = { { "value" } } } },

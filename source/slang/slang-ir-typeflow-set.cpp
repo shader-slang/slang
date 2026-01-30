@@ -166,14 +166,7 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
         if (argTupleType != destTupleType)
         {
-            // Count the number of non-attribute operands
-            UInt argElementCount = 0;
-            for (UInt i = 0; i < argTupleType->getOperandCount(); i++)
-            {
-                if (as<IRAttr>(argTupleType->getOperand(i)))
-                    break;
-                argElementCount++;
-            }
+            UInt argElementCount = argTupleType->getOperandCount();
 
             List<IRInst*> upcastedElements;
             upcastedElements.setCount((Index)argElementCount);
@@ -188,6 +181,30 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
 
             return builder->emitMakeTuple(destTupleType, upcastedElements);
         }
+    }
+    else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // If both arg and dest are optionals, we need to upcast the value type.
+        //
+        auto argOptionalType = as<IROptionalType>(argInfo);
+        auto destOptionalType = as<IROptionalType>(destInfo);
+        auto argValueType = (IRType*)argOptionalType->getValueType();
+        auto destValueType = (IRType*)destOptionalType->getValueType();
+
+        if (argValueType != destValueType)
+        {
+            // We emit a ReinterpretOptional instruction that will be lowered
+            // later in lowerReinterpret to an if-else block with proper control flow.
+            //
+            return builder
+                ->emitIntrinsicInst((IRType*)destOptionalType, kIROp_ReinterpretOptional, 1, &arg);
+        }
+    }
+    else if (as<IROptionalNoneType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // Special case: upcasting from `none_t` to `optional<T>` means
+        // creating a `none` value.
+        return builder->emitMakeOptionalNone((IRType*)destInfo);
     }
 
     return arg; // Can use as-is.
