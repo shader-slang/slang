@@ -123,10 +123,7 @@ public:
         ISlangSharedLibrary** outSharedLibrary,
         slang::IBlob** outDiagnostics) SLANG_OVERRIDE
     {
-        return Super::getTargetHostCallable(
-            targetIndex,
-            outSharedLibrary,
-            outDiagnostics);
+        return Super::getTargetHostCallable(targetIndex, outSharedLibrary, outDiagnostics);
     }
 
     SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
