@@ -711,7 +711,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     {
                         for (const auto& pair : kVendorAlternatives)
                         {
-                            // If this atom is one of a known pair, check if user specified the other
+                            // If this atom is one of a known pair, check if user specified the
+                            // other
                             if (atom == CapabilityAtom(pair.first) &&
                                 (*maybeTargetCapSet).contains(UInt(pair.second)))
                             {
