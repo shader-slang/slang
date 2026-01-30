@@ -16,24 +16,21 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Add bash to PATH
-        shell: pwsh
-        run: |
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
-
-      - name: Set up MSVC dev tools
-        uses: ilammy/msvc-dev-cmd@v1
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: windows
+          compiler: cl
+          platform: x86_64
+          config: release
+          build-llvm: false
 
       - name: Add Python to PATH
         shell: pwsh
         run: |
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Python311"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Python311\\Scripts"
-          # Create python3 symlink if it doesn't exist (Windows has python.exe, not python3.exe)
-          if (-not (Test-Path "C:\\Python311\\python3.exe")) {
-            Copy-Item "C:\\Python311\\python.exe" "C:\\Python311\\python3.exe"
-          }
+          # Python is pre-installed on self-hosted runners at C:\Python311
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Python311"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Python311\Scripts"
 
       - name: Update SPIRV-Tools and run tests
         id: update
