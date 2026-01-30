@@ -702,40 +702,34 @@ struct AssignValsFromLayoutContext
         auto slangTypeLayout = dstCursor.getTypeLayout();
         if (!slangTypeLayout)
         {
-            // If the input line specified the name of the type
-            // to allocate, then we use it directly.
+            // If shader cursor doesn't provide the type layout,
+            // we will create one from typename. This is currently the case
+            // when we are indexing into an object whose containerType is StructuredBuffer.
             //
             auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
-            device->createShaderObject(
-                slangSession(),
+            slangTypeLayout = slangReflection()->getTypeLayout(
                 slangType,
-                dstCursor.m_containerType,
-                shaderObject.writeRef());
+                slang::LayoutRules::DefaultStructuredBuffer);
         }
-        else
+
+        // Create a shader object from the type layout, and fill it in with user
+        // provided data.
+        switch (slangTypeLayout->getKind())
         {
-            // if the user did not specify what type to allocate,
-            // then we will infer the type from the type of the
-            // value pointed to by `entryCursor`.
+        default:
+            break;
+
+        case slang::TypeReflection::Kind::ConstantBuffer:
+        case slang::TypeReflection::Kind::ParameterBlock:
+            // If the cursor is pointing at a constant buffer
+            // or parameter block, then we assume the user
+            // actually means to allocate an object based on
+            // the element type of the block.
             //
-            switch (slangTypeLayout->getKind())
-            {
-            default:
-                break;
-
-            case slang::TypeReflection::Kind::ConstantBuffer:
-            case slang::TypeReflection::Kind::ParameterBlock:
-                // If the cursor is pointing at a constant buffer
-                // or parameter block, then we assume the user
-                // actually means to allocate an object based on
-                // the element type of the block.
-                //
-                slangTypeLayout = slangTypeLayout->getElementTypeLayout();
-                break;
-            }
-            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
+            slangTypeLayout = slangTypeLayout->getElementTypeLayout();
+            break;
         }
-
+        device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();

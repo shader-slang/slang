@@ -2999,7 +2999,15 @@ TypeLayoutContext getInitialLayoutContextForTarget(
 
     if (rulesFamily)
     {
-        context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+        switch (rules)
+        {
+        case slang::LayoutRules::DefaultStructuredBuffer:
+            context.rules = rulesFamily->getStructuredBufferRules(targetReq->getOptionSet());
+            break;
+        default:
+            context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+            break;
+        }
     }
 
     return context;

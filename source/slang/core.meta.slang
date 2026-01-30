@@ -1616,6 +1616,11 @@ struct FloatE4M3 : IFloatingPointCoopElement
 {
     __intrinsic_op($(kIROp_CastIntToFloat))
     __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
 }
 
 /// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
@@ -1627,6 +1632,11 @@ struct FloatE5M2 : IFloatingPointCoopElement
 {
     __intrinsic_op($(kIROp_CastIntToFloat))
     __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
 }
 
 /// Represent a 16-bit floating point value with 8 bits of exponent and 7 bits of mantissa.
@@ -1638,22 +1648,27 @@ struct BFloat16 : IFloatingPointCoopElement
 {
     __intrinsic_op($(kIROp_CastIntToFloat))
     __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
 }
+
 
 extension<T:__BuiltinFloatingPointType> T
 {
     [OverloadRank(-5)]
     __intrinsic_op($(kIROp_FloatCast))
-    __generic<T:IFloatingPointCoopElement>
-    __init(T val);
-}
+    __init(FloatE4M3 val);
 
-extension<T:IFloatingPointCoopElement> T
-{
-    [OverloadRank(-10)]
+    [OverloadRank(-5)]
     __intrinsic_op($(kIROp_FloatCast))
-    __generic<T:__BuiltinFloatingPointType>
-    __init(T val);
+    __init(FloatE5M2 val);
+
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(BFloat16 val);
 }
 
 
