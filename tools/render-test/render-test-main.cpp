@@ -326,11 +326,8 @@ struct AssignValsFromLayoutContext
         default:
             break;
         }
-        size_t destSize = bufferSize;
-        if (auto destTypeLayout = dataCursor.getTypeLayout())
-            destSize = dataCursor.getTypeLayout()->getSize();
-        SLANG_RETURN_ON_FAIL(
-            dataCursor.setData(srcVal->bufferData.getBuffer(), Math::Min(destSize, bufferSize)));
+
+        SLANG_RETURN_ON_FAIL(dataCursor.setData(srcVal->bufferData.getBuffer(), bufferSize));
         return SLANG_OK;
     }
 
@@ -699,37 +696,43 @@ struct AssignValsFromLayoutContext
         auto typeName = srcVal->typeName;
         ComPtr<IShaderObject> shaderObject;
 
-        auto slangTypeLayout = dstCursor.getTypeLayout();
-        if (!slangTypeLayout)
+        if (typeName.getLength() != 0)
         {
-            // If shader cursor doesn't provide the type layout,
-            // we will create one from typename. This is currently the case
-            // when we are indexing into an object whose containerType is StructuredBuffer.
+            // If the input line specified the name of the type
+            // to allocate, then we use it directly.
             //
             auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
-            slangTypeLayout = slangReflection()->getTypeLayout(
+            device->createShaderObject(
+                slangSession(),
                 slangType,
-                slang::LayoutRules::DefaultStructuredBuffer);
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
-
-        // Create a shader object from the type layout, and fill it in with user
-        // provided data.
-        switch (slangTypeLayout->getKind())
+        else
         {
-        default:
-            break;
-
-        case slang::TypeReflection::Kind::ConstantBuffer:
-        case slang::TypeReflection::Kind::ParameterBlock:
-            // If the cursor is pointing at a constant buffer
-            // or parameter block, then we assume the user
-            // actually means to allocate an object based on
-            // the element type of the block.
+            // if the user did not specify what type to allocate,
+            // then we will infer the type from the type of the
+            // value pointed to by `entryCursor`.
             //
-            slangTypeLayout = slangTypeLayout->getElementTypeLayout();
-            break;
+            auto slangTypeLayout = dstCursor.getTypeLayout();
+            switch (slangTypeLayout->getKind())
+            {
+            default:
+                break;
+
+            case slang::TypeReflection::Kind::ConstantBuffer:
+            case slang::TypeReflection::Kind::ParameterBlock:
+                // If the cursor is pointing at a constant buffer
+                // or parameter block, then we assume the user
+                // actually means to allocate an object based on
+                // the element type of the block.
+                //
+                slangTypeLayout = slangTypeLayout->getElementTypeLayout();
+                break;
+            }
+            auto slangType = slangTypeLayout->getType();
+            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
         }
-        device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();

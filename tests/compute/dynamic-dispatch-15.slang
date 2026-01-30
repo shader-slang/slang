@@ -15,7 +15,7 @@ interface IInterface
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=gOutputBuffer
 RWStructuredBuffer<float> gOutputBuffer;
 
-//TEST_INPUT: set gObj = new StructuredBuffer<IInterface>{new FloatVal{1.0}, new Float4Val{{[2.0, 3.0, 4.0, 5.0]}}, new IntVal{6}, new Int4Val{[7,8,9,10]}};
+//TEST_INPUT: set gObj = new StructuredBuffer<IInterface>[new FloatVal{1.0}, new Float4Val{{[2.0, 3.0, 4.0, 5.0]}}, new IntVal{6}, new Int4Val{[7,8,9,10]}];
 RWStructuredBuffer<IInterface> gObj;
 
 [numthreads(1, 1, 1)]
@@ -34,11 +34,11 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     Float4Val cval;
     cval.val.val = float4(1,2,3,4);
     v[0] = cval;
-    
+
     Int4Val ival;
     ival.val = int4(2,3,4,5);
     v[1] = ival;
-    
+
     for (int i = 0; i < 2; i++)
     {
         result += v[i].run();
@@ -46,9 +46,8 @@ void computeMain(uint3       dispatchThreadID : SV_DispatchThreadID)
     gOutputBuffer[0] = result;
 }
 
-//TEST_INPUT: type_conformance FloatVal:IInterface=0
 // Type must be marked `public` to ensure it is visible in the generated DLL.
-struct FloatVal : IInterface
+export struct FloatVal : IInterface
 {
     float val;
     float run()
@@ -58,9 +57,7 @@ struct FloatVal : IInterface
 };
 interface ISomething{void g();}
 struct Float4Struct : ISomething { float4 val; void g() {} }
-
-//TEST_INPUT: type_conformance Float4Val:IInterface=1
-struct Float4Val : IInterface
+export struct Float4Val : IInterface
 {
     Float4Struct val;
     float run()
@@ -68,9 +65,7 @@ struct Float4Val : IInterface
         return val.val.x;
     }
 };
-
-//TEST_INPUT: type_conformance IntVal:IInterface=2
-struct IntVal : IInterface
+export struct IntVal : IInterface
 {
     int val;
     float run()
@@ -78,9 +73,7 @@ struct IntVal : IInterface
         return val;
     }
 };
-
-//TEST_INPUT: type_conformance Int4Val:IInterface=3
-struct Int4Val : IInterface
+export struct Int4Val : IInterface
 {
     int4 val;
     float run()
