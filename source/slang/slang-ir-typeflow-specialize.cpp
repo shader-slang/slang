@@ -3592,7 +3592,7 @@ struct TypeFlowSpecializationContext
                     specializedElements.add((IRType*)tupleType->getOperand(i));
                 }
             }
-            if (anySpecialized)
+            if (anySpecialized || tupleType->getOperandCount() == 0)
                 return builder.getTupleType(specializedElements);
             else
                 return nullptr;
