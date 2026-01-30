@@ -86,6 +86,7 @@ public:
     static IRTypeLayoutRules* getStd140();
     static IRTypeLayoutRules* getNatural();
     static IRTypeLayoutRules* getC();
+    static IRTypeLayoutRules* getCUDA();
     static IRTypeLayoutRules* getConstantBuffer();
     static IRTypeLayoutRules* getLLVM();
     static IRTypeLayoutRules* get(IRTypeLayoutRuleName name);

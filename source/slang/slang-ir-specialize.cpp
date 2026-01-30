@@ -1237,6 +1237,7 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
                 applySparseConditionalConstantPropagationForGlobalScope(
                     this->module,
                     targetProgram,

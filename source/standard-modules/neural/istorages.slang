@@ -1,5 +1,20 @@
 implementing neural;
 
+public enum LayoutType : uint32_t
+{
+    Linear = 0,
+}
+
+internal interface IStorageLayout
+{
+    internal static const LayoutType Layout;
+}
+
+public struct LinearLayout : IStorageLayout
+{
+    internal static const LayoutType Layout = LayoutType.Linear;
+}
+
 /**
 Storage interface for accessing neural network parameters.
 Provides an abstraction for reading/writing parameters from various storage backends
@@ -27,6 +42,18 @@ public interface IStorage<T> : IDifferentiablePtrType
     @return The value at the specified address.
     */
     public T read(Address address);
+
+    /**
+    Reads sequential 4 elements starting from the given address and packed into a uint4.
+    */
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType;
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType;
 
     /**
     Atomically adds a value to storage (for gradient accumulation).

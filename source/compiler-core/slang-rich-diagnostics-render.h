@@ -20,6 +20,7 @@ struct DiagnosticNote
 {
     String message;
     DiagnosticSpan span;
+    List<DiagnosticSpan> secondarySpans;
 };
 
 //

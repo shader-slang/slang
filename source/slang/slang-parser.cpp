@@ -1517,6 +1517,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     {
         // default case is a type parameter
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
+        parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
         if (AdvanceIf(parser, TokenType::Colon))
         {

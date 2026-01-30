@@ -3721,11 +3721,9 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
         return getNullPtrValue(type);
     case kIROp_OptionalType:
         {
-            auto inner =
-                emitDefaultConstruct(as<IROptionalType>(actualType)->getValueType(), fallback);
-            if (!inner)
-                return nullptr;
-            return emitMakeOptionalNone(type, inner);
+            // The Optional-type lowering pass synthesizes the placeholder payload,
+            // so we don't need to construct `inner` here.
+            return emitMakeOptionalNone(type);
         }
     case kIROp_TupleType:
         {
@@ -4247,9 +4245,9 @@ IRInst* IRBuilder::emitMakeOptionalValue(IRInst* optType, IRInst* value)
     return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalValue, 1, &value);
 }
 
-IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue)
+IRInst* IRBuilder::emitMakeOptionalNone(IRInst* optType)
 {
-    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 1, &defaultValue);
+    return emitIntrinsicInst((IRType*)optType, kIROp_MakeOptionalNone, 0, nullptr);
 }
 
 IRInst* IRBuilder::emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue)
@@ -8031,6 +8029,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
 
     addToWorkList(thisInst, other);
 
+    List<IRSetBase*> setsToUpdate;
     for (Index i = 0; i < workList.getCount(); i++)
     {
         auto workItem = workList[i];
@@ -8071,7 +8070,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             SLANG_ASSERT(uu->get() == thisInst);
 
             auto user = uu->getUser();
-            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
+            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable() || as<IRConstant>(user);
 
             // We want to de-duplicate WitnessTable but we don't really want to hoist them.
             bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
@@ -8083,43 +8082,17 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                     SLANG_ASSERT(user->getModule());
                     dedupContext = user->getModule()->getDeduplicationContext();
                 }
-                dedupContext->_removeGlobalNumberingEntry(user);
+                if (auto userConstant = as<IRConstant>(user))
+                    dedupContext->removeInstFromConstantMap(userConstant);
+                else
+                    dedupContext->_removeGlobalNumberingEntry(user);
             }
 
             // Swap this use over to use the other value.
             uu->usedValue = other;
 
-            bool userIsSetInst = as<IRSetBase>(uu->getUser()) != nullptr;
-            if (userIsSetInst)
-            {
-                // Set insts need their operands sorted
-                auto module = user->getModule();
-                SLANG_ASSERT(module);
-
-                List<IRInst*>& operands = *module->getContainerPool().getList<IRInst>();
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                    operands.add(user->getOperand(ii));
-
-                auto getUniqueId = [&](IRInst* inst) -> UInt
-                {
-                    auto uniqueIDMap = module->getUniqueIdMap();
-                    auto existingId = uniqueIDMap->tryGetValue(inst);
-                    if (existingId)
-                        return *existingId;
-
-                    auto id = uniqueIDMap->getCount();
-                    uniqueIDMap->add(inst, id);
-                    return (UInt)id;
-                };
-
-                operands.sort(
-                    [&](IRInst* a, IRInst* b) -> bool { return getUniqueId(a) < getUniqueId(b); });
-
-                for (UInt ii = 0; ii < user->getOperandCount(); ii++)
-                    user->getOperandUse(ii)->usedValue = operands[ii];
-
-                module->getContainerPool().free(&operands);
-            }
+            if (auto setBase = as<IRSetBase>(uu->getUser()))
+                setsToUpdate.add(setBase);
 
             // If `other` is hoistable, then we need to make sure `other` is hoisted
             // to a point before `user`, if it is not already so.
@@ -8130,18 +8103,41 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing
                 // value.
-                IRInst* existingVal = nullptr;
-                if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
-                        IRInstKey{user},
-                        existingVal))
+                if (auto userConstant = as<IRConstant>(user))
                 {
-                    // If existingVal has been replaced by something else, use that.
-                    dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
-                    addToWorkList(user, existingVal);
+                    // If the user is a constant, it should be deduplicated against the constant
+                    // map.
+                    IRConstant* existingConstant = nullptr;
+                    if (dedupContext->getConstantMap().tryGetValue(
+                            IRConstantKey{userConstant},
+                            existingConstant))
+                    {
+                        IRInst* existingVal = existingConstant;
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->getConstantMap()[IRConstantKey{userConstant}] = userConstant;
+                    }
                 }
                 else
                 {
-                    dedupContext->_addGlobalNumberingEntry(user);
+                    // Otherwise, check the global value numbering map for duplication after
+                    // replacing the use.
+                    IRInst* existingVal = nullptr;
+                    if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
+                            IRInstKey{user},
+                            existingVal))
+                    {
+                        // If existingVal has been replaced by something else, use that.
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->_addGlobalNumberingEntry(user);
+                    }
                 }
             }
 
@@ -8183,6 +8179,29 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
         thisInst->firstUse = nullptr;
 
         ff->debugValidate();
+    }
+
+    for (auto setInst : setsToUpdate)
+    {
+        auto module = setInst->getModule();
+        IRBuilder builder(module);
+
+        HashSet<IRInst*>& elements = *module->getContainerPool().getHashSet<IRInst>();
+
+        for (UInt i = 0; i < setInst->getOperandCount(); i++)
+            elements.add(setInst->getElement(i));
+
+        auto newSetInst = builder.getSet(setInst->getOp(), elements);
+        if (newSetInst != setInst)
+        {
+            // setInst was improperly ordered, so we need to replace its uses
+            // and then delete it.
+            //
+            setInst->replaceUsesWith(newSetInst);
+            setInst->removeAndDeallocate();
+        }
+
+        module->getContainerPool().free(&elements);
     }
 }
 
@@ -8370,7 +8389,7 @@ void IRInst::removeAndDeallocate()
         }
         else if (auto constInst = as<IRConstant>(this))
         {
-            module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{constInst});
+            module->getDeduplicationContext()->removeInstFromConstantMap(constInst);
         }
         module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         if (auto func = as<IRGlobalValueWithCode>(this))

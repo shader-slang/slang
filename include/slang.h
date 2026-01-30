@@ -1928,6 +1928,7 @@ public:                                                              \
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
         SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        SLANG_TYPE_KIND_ENUM,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1962,7 +1963,8 @@ public:                                                              \
         SLANG_DECL_KIND_MODULE,
         SLANG_DECL_KIND_GENERIC,
         SLANG_DECL_KIND_VARIABLE,
-        SLANG_DECL_KIND_NAMESPACE
+        SLANG_DECL_KIND_NAMESPACE,
+        SLANG_DECL_KIND_ENUM,
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2312,6 +2314,7 @@ struct TypeReflection
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
+        Enum = SLANG_TYPE_KIND_ENUM,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
@@ -3648,6 +3651,7 @@ struct DeclReflection
         Generic = SLANG_DECL_KIND_GENERIC,
         Variable = SLANG_DECL_KIND_VARIABLE,
         Namespace = SLANG_DECL_KIND_NAMESPACE,
+        Enum = SLANG_DECL_KIND_ENUM,
     };
 
     char const* getName() { return spReflectionDecl_getName((SlangReflectionDecl*)this); }

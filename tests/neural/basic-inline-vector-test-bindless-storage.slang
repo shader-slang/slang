@@ -62,10 +62,10 @@ uniform RWStructuredBuffer<float> parametersFloat;
 OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     Address address)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(address);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(address);
     return outputVec;
 }
 
@@ -74,10 +74,10 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     InputVector input,
     Address weightAddress,
     Address biasAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, Address, OutputVector>(weightAddress, biasAddress);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 
@@ -102,12 +102,12 @@ bool BasicTestWithoutBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, dRes);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
@@ -143,12 +143,12 @@ bool BasicTestWithBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, biasDiffPair, dOutput);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]

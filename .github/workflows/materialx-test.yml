@@ -36,7 +36,8 @@ jobs:
       - name: Download Slang Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+          # Linux uses containerized builds with a different artifact naming pattern
+          name: ${{ inputs.os == 'linux' && format('slang-tests-linux-x86_64-gcc-{0}', inputs.config) || format('slang-tests-{0}-{1}-{2}-{3}', inputs.os, inputs.platform, inputs.compiler, inputs.config) }}
           path: github_artifact
 
       - name: Setup Slang Path
@@ -103,7 +104,7 @@ jobs:
 
           cmake \
             -DMATERIALX_BUILD_PYTHON=ON \
-            -DMATERIALX_INSTALL_PYTHON=OFF \
+            -DMATERIALX_INSTALL_PYTHON=ON \
             -DMATERIALX_BUILD_VIEWER=OFF \
             -DMATERIALX_BUILD_GRAPH_EDITOR=OFF \
             -DMATERIALX_BUILD_TESTS=OFF \
@@ -138,18 +139,23 @@ jobs:
           echo "Generating Slang shaders from MaterialX test suite..."
 
           # Find all .mtlx files and generate shaders
-          MTLX_FILES=($(find "$MATERIALX_RESOURCES" -name "*.mtlx" -type f | sort))
+          # Use -printf to get paths relative to MATERIALX_RESOURCES (works cross-platform)
+          cd "$MATERIALX_RESOURCES"
+          MTLX_FILES=($(find . -name "*.mtlx" -type f | sed 's|^\./||' | sort))
           TOTAL_MTLX=${#MTLX_FILES[@]}
           echo "Found $TOTAL_MTLX MaterialX documents"
+
+          # Go back to work directory where generated-shaders will be created
+          cd "$WORK_DIR"
 
           SUCCESS_COUNT=0
           FAILED_COUNT=0
           SKIPPED_COUNT=0
           CURRENT=0
 
-          for MATERIAL_PATH in "${MTLX_FILES[@]}"; do
+          for RELATIVE_PATH in "${MTLX_FILES[@]}"; do
             CURRENT=$((CURRENT + 1))
-            RELATIVE_PATH="${MATERIAL_PATH#$MATERIALX_RESOURCES/}"
+            MATERIAL_PATH="$MATERIALX_RESOURCES/$RELATIVE_PATH"
             CATEGORY=$(dirname "$RELATIVE_PATH")
             CATEGORY_DIR="generated-shaders/$CATEGORY"
             mkdir -p "$CATEGORY_DIR"
@@ -166,7 +172,7 @@ jobs:
             ERROR_LOG=$(mktemp)
             if python3 "$GENERATESHADER" --target slang --outputPath "$CATEGORY_DIR" "$MATERIAL_PATH" > /dev/null 2>"$ERROR_LOG"; then
               # Check if shader was created
-              if find "$CATEGORY_DIR" -name "*.slang" -newer "$GENERATESHADER" 2>/dev/null | grep -q .; then
+              if find "$CATEGORY_DIR" -name "*.slang" -maxdepth 1 -type f 2>/dev/null | grep -q .; then
                 SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
                 echo "  -> OK"
               else

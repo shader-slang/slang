@@ -1281,6 +1281,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(legalizeEmptyArray, sink);
 
+    SLANG_PASS(legalizeVectorTypes, sink);
+
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
     // resource/existential type legalization, which remains disabled for CUDA.
@@ -1401,8 +1403,6 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
-
-    SLANG_PASS(legalizeVectorTypes, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,

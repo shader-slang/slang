@@ -43,7 +43,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -91,6 +91,11 @@ jobs:
           # Add Linux GPU expected failure list for CUDA builds (Tesla T4 driver limitations)
           if [[ "${{ inputs.artifact-suffix }}" == "-cuda" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+          fi
+
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
           # Execute slang-test with all arguments
@@ -174,7 +179,7 @@ jobs:
   # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:

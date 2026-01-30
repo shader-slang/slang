@@ -61,8 +61,6 @@ List<SemanticToken> getSemanticTokens(
 {
     auto manager = linkage->getSourceManager();
 
-    auto cbufferName = linkage->getNamePool()->getName(toSlice("ConstantBuffer"));
-
     List<SemanticToken> result;
     auto maybeInsertToken = [&](const SemanticToken& token)
     {
@@ -97,10 +95,9 @@ List<SemanticToken> getSemanticTokens(
             if (target->hasModifier<BuiltinTypeModifier>())
                 return;
             token.type = SemanticTokenType::Type;
-            if (name == cbufferName)
-            {
-                token.length = doc->getTokenLength(token.line, token.col);
-            }
+            token.length = doc->getTokenLength(token.line, token.col);
+            if (token.length == 0)
+                return;
         }
         else if (as<ConstructorDecl>(target))
         {
