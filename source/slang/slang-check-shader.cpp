@@ -57,6 +57,25 @@ static bool isValidThreadDispatchIDType(Type* type)
     }
 }
 
+// Check if two types are compatible for system value semantics.
+// This is stricter than canCoerce alone - it requires that both types have
+// the same "shape" (both scalars or both vectors) to prevent scalar-to-vector
+// promotions like uint -> float4.
+//
+// Returns true if 'type' is a valid type for a semantic that expects 'expectedType'.
+static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedType, Type* type)
+{
+    // Must be coercible
+    if (!visitor->canCoerce(expectedType, type, nullptr))
+        return false;
+    
+    // Both must have the same shape (both scalar or both vector)
+    bool expectedIsVector = as<VectorExpressionType>(expectedType) != nullptr;
+    bool typeIsVector = as<VectorExpressionType>(type) != nullptr;
+    
+    return expectedIsVector == typeIsVector;
+}
+
 // Look up a SemanticDecl by name in the given scope.
 // Semantic names in core.meta.slang are stored lowercase for case-insensitive matching.
 static SemanticDecl* lookUpSemanticDecl(
@@ -196,8 +215,10 @@ static void validateTypeSemantics(
                             continue;
                         }
                         
-                        // Check if type can be coerced to accessor type
-                        if (visitor->canCoerce(accessorType, type, nullptr))
+                        // Check if type is compatible with accessor type
+                        // Use strict semantic type compatibility (same shape: both scalar or both vector)
+                        // rather than canCoerce alone (which would allow uint -> float4 conversion)
+                        if (isSemanticTypeCompatible(visitor, accessorType, type))
                         {
                             foundMatchingAccessor = true;
                             break;
@@ -211,7 +232,7 @@ static void validateTypeSemantics(
                                 // Accessor has unsized array and type has any array - check element types
                                 if (accessorArrayType->isUnsized())
                                 {
-                                    if (visitor->canCoerce(accessorArrayType->getElementType(), typeArrayType->getElementType(), nullptr))
+                                    if (isSemanticTypeCompatible(visitor, accessorArrayType->getElementType(), typeArrayType->getElementType()))
                                     {
                                         foundMatchingAccessor = true;
                                         break;

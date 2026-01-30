@@ -4645,14 +4645,6 @@ semantic sv_vertexid
 {
     [require(vertex)]
     get : uint;
-
-    // Vertex output + fragment input enables passing vertex ID as a varying
-    // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
-    [require(vertex)]
-    set : uint;
-
-    [require(fragment)]
-    get : uint;
 }
 
 semantic sv_instanceid
@@ -4662,7 +4654,7 @@ semantic sv_instanceid
 
     // Vertex output + fragment input enables passing instance ID as a varying
     // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
-    // See tests/bugs/gh-3087.slang for an examples
+    // See tests/bugs/gh-3087.slang for an example
     [require(vertex)]
     set : uint;
 
