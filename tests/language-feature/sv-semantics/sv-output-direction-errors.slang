@@ -4,7 +4,7 @@
 
 // Test that output-only semantics error when used as input
 
-// CHECK: error 30703
+// CHECK: error 30702
 
 // SV_Depth is output-only in fragment, should error as input
 [shader("fragment")]

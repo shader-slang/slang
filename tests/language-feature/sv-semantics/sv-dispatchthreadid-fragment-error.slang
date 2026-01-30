@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main
 
-// CHECK: error 30703
+// CHECK: error 30702
 
 // Test that SV_DispatchThreadID is rejected in fragment shader (compute/mesh/amplification-only)
 

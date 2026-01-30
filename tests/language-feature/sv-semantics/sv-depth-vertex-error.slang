@@ -1,6 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main
 
-// CHECK: error 30703
+// CHECK: error 30702
 
 // Test that SV_Depth is rejected in vertex shader (fragment-only)
 

@@ -1832,11 +1832,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     30702,
     Error,
-    systemValueSemanticInvalidStage,
-    "system value semantic '$0' is not valid in '$1' shader stage")
-DIAGNOSTIC(
-    30703,
-    Error,
     systemValueSemanticInvalidDirection,
     "system value semantic '$0' cannot be used as $1 in '$2' shader stage")
 

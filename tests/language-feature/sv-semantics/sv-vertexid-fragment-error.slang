@@ -3,7 +3,7 @@
 // SV_VertexID is not supported in fragment shader.
 // (Note: SV_InstanceID IS supported in fragment - see commit 2407966e8)
 
-// CHECK: error 30703
+// CHECK: error 30702
 
 [shader("fragment")]
 float4 main(
