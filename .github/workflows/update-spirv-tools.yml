@@ -16,11 +16,27 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
+      - name: Set up MSVC dev tools
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
       - name: Update SPIRV-Tools and run tests
         id: update
         shell: bash
         run: |
+          set +e
           bash extras/update-spirv-tools.sh --test 2>&1 | tee spirv-update.log
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
         continue-on-error: true
 
       - name: Parse results
@@ -29,15 +45,15 @@ jobs:
         shell: bash
         run: |
           # Check if script succeeded
-          if [ ${PIPESTATUS[0]} -eq 0 ]; then
+          if [ "${{ steps.update.outputs.exit_code }}" = "0" ]; then
             echo "status=success" >> $GITHUB_OUTPUT
           else
             echo "status=failure" >> $GITHUB_OUTPUT
           fi
 
-          # Extract commit info
-          # OLD_SPIRV_COMMIT=<short-hash>
-          # NEW_SPIRV_COMMIT=<short-hash>
+          # Extract commit info from script output
+          # Script outputs: OLD_SPIRV_COMMIT=<short-hash>
+          #                 NEW_SPIRV_COMMIT=<short-hash>
           OLD_COMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
           NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
 
@@ -74,20 +90,17 @@ jobs:
 
       - name: Send Slack notification
         if: always()
-        uses: slackapi/slack-github-action@v1
+        uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
             {
-              "text": "${{ steps.parse.outputs.status == 'success' && '✅' || '⚠️' }} SPIRV-Tools ToT Test ${{ steps.parse.outputs.status == 'success' && 'PASSED' || 'FAILED' }}",
+              "text": "${{ steps.parse.outputs.status == 'success' && ':green-check-mark:' || ':alert:' }} SPIRV-Tools ToT Test ${{ steps.parse.outputs.status == 'success' && 'PASSED' || 'FAILED' }}",
               "blocks": [
                 {
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "*SPIRV-Tools ToT Test Result*\n
-                            Status: ${{ steps.parse.outputs.status == 'success' && '✅ PASSED' || '⚠️ FAILED' }}\n
-                            Update: `${{ steps.parse.outputs.old_spirv_commit }}` → `${{ steps.parse.outputs.new_spirv_commit }}`\n
-                            Platform: windows-latest"
+                    "text": "*SPIRV-Tools ToT Test Result*\nStatus: ${{ steps.parse.outputs.status == 'success' && ':green-check-mark: PASSED' || ':alert: FAILED' }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`\nPlatform: windows-latest"
                   }
                 },
                 {
