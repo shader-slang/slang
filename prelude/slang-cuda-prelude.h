@@ -2224,6 +2224,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
     return 31 - __clz(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_reversebits(uint32_t v)
+{
+    return __brev(v);
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 // Unary
@@ -2274,6 +2279,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
     return U32_firstbithigh(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_reversebits(int32_t v)
+{
+    return int32_t(U32_reversebits(uint32_t(v)));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2295,6 +2305,25 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbitlow(uint64_t v)
+{
+    // __ffs returns 1-based bit position or 0 if no bits set
+    // firstbitlow should return 0-based bit position or ~0u if no bits set
+    return v == 0 ? ~uint32_t(0) : (__ffsll(v) - 1u);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbithigh(uint64_t v)
+{
+    if (v == 0)
+        return ~uint32_t(0);
+    return 63 - __clzll(v);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_reversebits(uint64_t v)
+{
+    return __brevll(v);
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
@@ -2314,6 +2343,23 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbitlow(int64_t v)
+{
+    return U64_firstbitlow(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbithigh(int64_t v)
+{
+    if (v < 0)
+        v = ~v;
+    return U64_firstbithigh(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_reversebits(int64_t v)
+{
+    return int64_t(U64_reversebits(uint64_t(v)));
 }
 
 // ----------------------------- IPTR -----------------------------------------
@@ -3886,8 +3932,290 @@ static __forceinline__ __device__ void* getOptiXRayPayloadPtr()
     return unpackOptiXRayPayloadPointer(u0, u1);
 }
 
+// Maximum number of 32-bit registers for OptiX payload (32 registers = 128 bytes)
+static constexpr size_t kMaxOptiXPayloadRegisters = 32;
+
+// Helper to pack/unpack payload to/from registers for small payloads (<= 128 bytes)
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+struct PayloadRegisters
+{
+    uint32_t regs[N > 0 ? N : 1];
+
+    __forceinline__ __device__ void pack(const T& payload) { memcpy(regs, &payload, sizeof(T)); }
+
+    __forceinline__ __device__ void unpack(T& payload) { memcpy(&payload, regs, sizeof(T)); }
+};
+
+// Internal helper to call optixTrace with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraceWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTrace with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTrace(
+__forceinline__ __device__ void optixTrace(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3897,22 +4225,52 @@ __forceinline__ __device__ void* optixTrace(
     RayDesc Ray,
     T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTrace(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraceWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTrace(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 #if (OPTIX_VERSION >= 90000)
@@ -3981,8 +4339,276 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* O
 }
 #endif
 
+// Internal helper to call optixTraverse with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraverseWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTraverse with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3993,26 +4619,56 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTraverse(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -4024,22 +4680,52 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTraverse(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        RayTime,
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 #if (OPTIX_VERSION >= 80100)
@@ -4368,15 +5054,143 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 #endif
 
 #if (OPTIX_VERSION >= 80100)
+// Internal helper to call optixInvoke with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixInvokeWithRegs(PayloadRegisters<T, N>& pr)
+{
+    if constexpr (N == 0)
+    {
+        optixInvoke();
+    }
+    else if constexpr (N == 1)
+    {
+        optixInvoke(pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
     OptixTraversableHandle AccelerationStructure,
     OptixTraversableHandle* HitOrMiss,
-    T Payload)
+    T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixInvoke(r0, r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+        optixInvokeWithRegs<T>(pr);
+        // Read back updated payload registers
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixInvoke(r0, r1);
+    }
 }
 #endif
 
@@ -4404,6 +5218,13 @@ slangOptixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceId();
+}
+#endif
+
+#if (OPTIX_VERSION >= 80000)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTime(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTime();
 }
 #endif
 
@@ -4468,11 +5289,46 @@ slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ uint
-slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
+    OptixTraversableHandle* Obj,
+    uint sbtRecordIndex)
 {
-    optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return sbtRecordIndex;
+    optixHitObjectSetSbtRecordIndex(sbtRecordIndex);
+}
+#endif
+
+// HitObject transform matrix wrappers for SER (Shader Execution Reordering)
+// These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
+// Available in RG, CH, MS, CC, DC stages per OptiX documentation
+// Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
+// were added in OptiX 9.0 (not available in 8.0 or 8.1)
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetWorldToObject(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetWorldToObjectTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetObjectToWorld(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetObjectToWorldTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
 }
 #endif
 
@@ -5606,7 +6462,7 @@ struct IsSaturated<false>
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
-__device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
+__device__ inline void wmmaLoad(uint32_t* regs, const void* ptr, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, use>::value;
 
@@ -5671,7 +6527,7 @@ __device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, Layout layout>
-__device__ inline void wmmaStore(ElemT* ptr, const uint32_t* regs, int stride)
+__device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, MatrixUse::MatrixD>::value;
 
@@ -5767,9 +6623,12 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
+template<typename T, int M, int N, int K, MatrixUse R>
 struct WmmaFragment
 {
+    __device__ WmmaFragment() {}
+    __device__ WmmaFragment(T scalarValue) { fill(scalarValue); }
+
     typedef WmmaFragment<T, M, N, K, R> This;
     template<Layout layout>
     void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -5788,25 +6647,19 @@ struct WmmaFragment
     void __device__ fill(T value)
     {
         unsigned packed = Pack32Helper(value);
-
-        // Manually assign to prevent register coalescing
-        regs[0] = packed;
-        regs[1] = packed;
-        regs[2] = packed;
-        regs[3] = packed;
-        regs[4] = packed;
-        regs[5] = packed;
-        regs[6] = packed;
-        regs[7] = packed;
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        for (int i = 0; i < nregs; i++)
+        {
+            regs[i] = packed;
+        }
     }
 
     __device__ This operator*(T b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b);
         }
@@ -5815,11 +6668,10 @@ struct WmmaFragment
 
     __device__ This operator*(const This& b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b.get(i));
         }
@@ -5828,10 +6680,9 @@ struct WmmaFragment
 
     __device__ This operator/(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) / other.get(i));
         }
@@ -5840,10 +6691,9 @@ struct WmmaFragment
 
     __device__ This operator-(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) - other.get(i));
         }
@@ -5852,10 +6702,9 @@ struct WmmaFragment
 
     __device__ This operator-()
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, -get(i));
         }
@@ -5864,10 +6713,9 @@ struct WmmaFragment
 
     __device__ This operator+(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) + other.get(i));
         }
@@ -5876,10 +6724,9 @@ struct WmmaFragment
 
     __device__ This operator%(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) % other.get(i));
         }
@@ -5892,7 +6739,7 @@ struct WmmaFragment
         // If the data type is different, we need to copy element by element.
         // Since the shape of two matrices are the same, they have the same
         // number of elements.
-        for (int i = 0; i < elements_per_thread; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             set(i, static_cast<T>(other.get(i)));
         }
@@ -5904,13 +6751,14 @@ struct WmmaFragment
     //   - index 1: bits [8:15]  of regs[0]
     //   - index 2: bits [16:23] of regs[0]
     //   - index 3: bits [24:31] of regs[0]
-    //   - index 4: bits [0:7]   of regs[1], etc.
     __device__ T get(int index) const
     {
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            return *reinterpret_cast<const T*>(&regs[index]);
+            T v;
+            memcpy(&v, &regs[index], 4);
+            return v;
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5921,7 +6769,9 @@ struct WmmaFragment
             int bitOffset = elementOffset * 16;
             uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFFFF;
             uint16_t value16 = static_cast<uint16_t>(extracted);
-            return *reinterpret_cast<const T*>(&value16);
+            T v;
+            memcpy(&v, &value16, 2);
+            return v;
         }
         else if constexpr (sizeof(T) == 1)
         {
@@ -5942,7 +6792,7 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            regs[index] = *reinterpret_cast<const uint32_t*>(&value);
+            memcpy(&regs[index], &value, 4);
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5951,7 +6801,8 @@ struct WmmaFragment
             int elementOffset = index % 2;
             int bitOffset = elementOffset * 16;
             uint32_t mask = 0xFFFF;
-            uint16_t value16 = *reinterpret_cast<const uint16_t*>(&value);
+            uint16_t value16;
+            memcpy(&value16, &value, 2);
 
             // Clear the bits at the target position
             regs[regIndex] &= ~(mask << bitOffset);
@@ -5984,40 +6835,52 @@ struct WmmaFragment
         wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
+    template<Layout layout, typename U>
+    void __device__ Store(U* buffer, uint stride)
+    {
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+    }
+
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
-        WmmaFragment<T, M, N, K, R, layout> fragment;
+        WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
         wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-
+        fragment.m_layout = layout;
         return fragment;
     }
 
-    static __device__ uint32_t GetLength() { return This::elements_per_thread; }
+    template<Layout layout, typename U>
+    static This __device__ Load(U* buffer, uint stride)
+    {
+        WmmaFragment<T, M, N, K, R> fragment;
+
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        fragment.m_layout = layout;
+        return fragment;
+    }
+
+    static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
 
     // For referencing those template parameters outside the struct
     using ElementType = T;
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    static constexpr Layout m_layout = MatrixLayout;
+    Layout m_layout = Layout::RowMajor;
 
-    // Maximum registers needed across all fragment types and data types
-    static constexpr int MAX_REGS = 8;
-    unsigned regs[MAX_REGS] = {};
+    // Register Count requirement
+    static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
+    unsigned regs[RegsCount] = {};
 
-    static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
-                                                  : (R == MatrixUse::MatrixB) ? (K * N)
-                                                                              : (M * N);
-
-    static_assert(elements_per_warp % 32 == 0, "Total elements per warp must be divisible by 32");
-
-    static constexpr uint32_t elements_per_thread = elements_per_warp / 32;
-    static constexpr uint32_t bytes_per_thread = elements_per_thread * sizeof(T);
-    static constexpr uint32_t registers_per_thread = (bytes_per_thread + 3) / 4;
+    static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
 };
 
 // ====================================================================================
@@ -6486,12 +7349,10 @@ template<
     int M,
     int N,
     int K,
-    Layout layoutA,
-    Layout layoutB,
     bool saturatingAccumulation>
 WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
-    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA, layoutA> matA,
-    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB, layoutB> matB,
+    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA> matA,
+    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB> matB,
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     constexpr ShapeCombination shape = (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
@@ -6500,11 +7361,60 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(
-        matD,
-        matA,
-        matB,
-        matC);
+    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
+                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
+
+    switch (encodedLayout)
+    {
+    // 00011
+    case 0x3:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 00010
+    case 0x2:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0001
+    case 0x01:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0000
+    case 0x00:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    }
 
     return matD;
 }

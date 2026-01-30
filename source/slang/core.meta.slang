@@ -1696,7 +1696,7 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 
 struct Conditional<T, bool hasValue>
 {
-    internal T storage[hasValue];
+    internal vector<T, hasValue ? 1 : 0> storage;
 
     __implicit_conversion($(kConversionCost_ValToOptional))
     [__unsafeForceInlineEarly]
