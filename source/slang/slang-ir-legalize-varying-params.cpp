@@ -1117,15 +1117,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
-    // Get C++ size and alignment of a type using the existing layout infrastructure.
-    // Uses IRTypeLayoutRules::getC() which matches C/C++ struct layout rules.
+    // Get C++ size and alignment of a type using CUDA layout rules.
+    // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
+    // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
     bool getTypeCppSizeAndAlignment(IRType* type, IRBuilder* builder, int& outSize, int& outAlignment)
     {
         if (auto ptrValType = tryGetPointedToType(builder, type))
             type = ptrValType;
 
         IRSizeAndAlignment sizeAndAlign;
-        Result result = getSizeAndAlignment(nullptr, IRTypeLayoutRules::getC(), type, &sizeAndAlign);
+        Result result = getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
         if (SLANG_FAILED(result))
             return false;
 
