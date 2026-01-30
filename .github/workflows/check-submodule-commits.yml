@@ -21,6 +21,10 @@ jobs:
           fetch-depth: 0 # Need full history for git diff
           submodules: false # We'll init them selectively in the script
 
+      - name: Fetch base branch
+        run: |
+          git fetch origin ${{ github.base_ref }}
+
       - name: Run submodule commit check
         run: |
           bash extras/check-submodule-commits.sh origin/${{ github.base_ref }}

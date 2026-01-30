@@ -21,8 +21,9 @@ If your PR fails this check, update the submodule to point to a commit that exis
 ```bash
 cd external/<submodule-name>
 git fetch origin
-git checkout origin/main  # or origin/master
+git checkout origin/main  # or origin/master - this puts you in detached HEAD state
 cd ../..
+# The submodule is now pointing to a specific commit on main
 git add external/<submodule-name>
 git commit -m "Update <submodule-name> to commit on main branch"
 ```

@@ -74,8 +74,8 @@ while IFS= read -r line; do
       continue
     fi
     
-    # Extract the new commit hash
-    NEW_COMMIT=$(echo "$DIFF_OUTPUT" | grep "^+Subproject commit" | awk '{print $3}' || true)
+    # Extract the new commit hash (more robustly)
+    NEW_COMMIT=$(echo "$DIFF_OUTPUT" | sed -n 's/^+Subproject commit \([a-f0-9]\{40\}\)$/\1/p' || true)
     
     if [ -z "$NEW_COMMIT" ]; then
       # This might be a deletion or no actual commit change
@@ -86,8 +86,8 @@ while IFS= read -r line; do
     echo_info "Checking submodule: $submodule_path"
     echo_info "  New commit: $NEW_COMMIT"
     
-    # Initialize the submodule if needed
-    if [ ! -d "$submodule_path/.git" ]; then
+    # Initialize the submodule if needed (check for both .git file and directory)
+    if [ ! -e "$submodule_path/.git" ]; then
       echo_info "  Initializing submodule..."
       git submodule update --init "$submodule_path" > /dev/null 2>&1 || {
         echo_warning "  Failed to initialize submodule"
