@@ -253,10 +253,22 @@ if [ "$RUN_TESTS" = true ]; then
 
   log_info "Running test suite (this may take 10-30 minutes)..."
   export SLANG_RUN_SPIRV_VALIDATION=1
-  ./build/Release/bin/slang-test \
-    -expected-failure-list tests/expected-failure-github.txt \
-    -use-test-server \
-    -server-count 8
+  
+  # Use same exclude lists as CI
+  if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    # Windows
+    ./build/Release/bin/slang-test \
+      -expected-failure-list tests/expected-failure-github.txt \
+      -use-test-server \
+      -server-count 8
+  else
+    # Linux
+    ./build/Release/bin/slang-test \
+      -expected-failure-list tests/expected-failure-github.txt \
+      -expected-failure-list tests/expected-failure-linux-gpu.txt \
+      -use-test-server \
+      -server-count 8
+  fi
 
   if [ $? -ne 0 ]; then
     log_error "Tests failed"

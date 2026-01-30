@@ -7,30 +7,37 @@ on:
 
 jobs:
   test-spirv-tot:
-    runs-on: ["Windows", "self-hosted", "GCP-T4"]
+    runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 120
 
+    permissions:
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Setup
-        uses: ./.github/actions/common-setup
-        with:
-          os: windows
-          compiler: cl
-          platform: x86_64
-          config: release
-          build-llvm: false
-
-      - name: Add Python to PATH
-        shell: pwsh
-        run: |
-          # Python is pre-installed on self-hosted runners at C:\Python311
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\Python311"
-          Add-Content -Path $env:GITHUB_PATH -Value "C:\Python311\Scripts"
 
       - name: Update SPIRV-Tools and run tests
         id: update
@@ -65,8 +72,8 @@ jobs:
           echo "  NEW_COMMIT: '$NEW_COMMIT'"
 
           # Set outputs
-          echo "old_spirv_commit=${OLD_COMMIT:-undetected}" >> $GITHUB_OUTPUT
-          echo "new_spirv_commit=${NEW_COMMIT:-undetected}" >> $GITHUB_OUTPUT
+          echo "old_spirv_commit=${OLD_COMMIT:-unknown}" >> $GITHUB_OUTPUT
+          echo "new_spirv_commit=${NEW_COMMIT:-unknown}" >> $GITHUB_OUTPUT
           echo "status_msg=$STATUS_MSG" >> $GITHUB_OUTPUT
 
       - name: Upload logs
