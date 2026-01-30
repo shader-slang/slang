@@ -3151,27 +3151,19 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
+    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
+    {
+        return TestResult::Fail;
+    }
 
     String actualOutput;
 
-    // Check if artifact is valid before trying to find diagnostics
-    auto diagnostics =
-        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
+    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
     // If the actual compilation failed, then the output will be the summary
-    if (SLANG_FAILED(compileResult) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
+    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
     {
-        // Generate summary from diagnostics if available
-        if (diagnostics)
-        {
-            actualOutput = _calcSummary(diagnostics);
-        }
-        else
-        {
-            // No diagnostics available, but compile failed
-            actualOutput = "Compile: Error\n";
-        }
+        actualOutput = _calcSummary(diagnostics);
     }
     else
     {
