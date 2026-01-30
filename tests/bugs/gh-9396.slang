@@ -1,13 +1,10 @@
 // Test that @location attributes are correctly emitted when a struct is used
 // as both vertex shader output and fragment shader input.
 
-// This test requires whole-program compilation to trigger the bug
-// The wgsl-spirv-asm target triggers whole-program compilation
-// and tint will validate the WGSL output (failing on missing @location)
-
-//TEST:SIMPLE(filecheck=CHECK):-target wgsl-spirv-asm
-// CHECK: OpEntryPoint Vertex %vertexMain
-// CHECK: OpEntryPoint Fragment %fragmentMain
+//TEST:SIMPLE(filecheck=CHECK):-target wgsl
+// CHECK: @location(0) color_0
+// CHECK: @location(1) color_1
+// CHECK: @location(0) color_2
 
 struct VertexInput
 {
