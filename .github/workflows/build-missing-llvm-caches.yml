@@ -2,6 +2,12 @@ name: Build Missing LLVM Caches
 
 on:
   workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Force rebuild even if cache exists (for script changes)"
+        required: false
+        type: boolean
+        default: false
   schedule:
     # Run weekly on Sundays at 00:00 UTC to catch any new platforms or script changes
     - cron: "0 0 * * 0"
@@ -18,6 +24,8 @@ jobs:
       - name: Check for missing caches
         id: check
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Define all platform combinations that need LLVM
           # Format: os:compiler:platform:runs-on
@@ -29,6 +37,12 @@ jobs:
             "windows:cl:x86_64:windows-latest"
           )
 
+          # Get all existing LLVM caches
+          echo "Fetching existing LLVM caches..."
+          existing_caches=$(gh api repos/${{ github.repository }}/actions/caches --jq '.actions_caches[] | select(.key | startswith("llvm-")) | .key')
+          echo "Existing caches:"
+          echo "$existing_caches"
+
           # Build matrix JSON
           matrix_json='{"include":['
           first=true
@@ -36,21 +50,35 @@ jobs:
           for config in "${configs[@]}"; do
             IFS=':' read -r os compiler platform runs_on <<< "$config"
 
-            # Generate cache key
-            hash=$(sha256sum external/build-llvm.sh | cut -d' ' -f1)
-            cache_key="llvm-${os}-${compiler}-${platform}-${hash}"
+            # Generate cache key prefix (without hash)
+            cache_prefix="llvm-${os}-${compiler}-${platform}-"
 
-            echo "Checking for cache: $cache_key"
+            # Check if any cache exists for this platform
+            cache_exists=false
+            while IFS= read -r cache_key; do
+              if [[ "$cache_key" == "$cache_prefix"* ]]; then
+                cache_exists=true
+                echo "✅ Cache exists for ${os}-${compiler}-${platform}: $cache_key"
+                break
+              fi
+            done <<< "$existing_caches"
 
-            # Check if cache exists (using GitHub API would be better, but needs token setup)
-            # For now, we'll build all configs - they'll be fast if cache exists
-            if [ "$first" = true ]; then
-              first=false
-            else
-              matrix_json+=","
+            # If force_rebuild is true or no cache exists, add to matrix
+            if [[ "${{ inputs.force_rebuild }}" == "true" ]] || [[ "$cache_exists" == "false" ]]; then
+              if [[ "$cache_exists" == "false" ]]; then
+                echo "❌ No cache found for ${os}-${compiler}-${platform} - will build"
+              else
+                echo "🔄 Force rebuild requested for ${os}-${compiler}-${platform}"
+              fi
+
+              if [ "$first" = true ]; then
+                first=false
+              else
+                matrix_json+=","
+              fi
+
+              matrix_json+="{\"os\":\"$os\",\"compiler\":\"$compiler\",\"platform\":\"$platform\",\"runs-on\":\"$runs_on\"}"
             fi
-
-            matrix_json+="{\"os\":\"$os\",\"compiler\":\"$compiler\",\"platform\":\"$platform\",\"runs-on\":\"$runs_on\"}"
           done
 
           matrix_json+=']}'
@@ -116,15 +144,18 @@ jobs:
         if: matrix.os == 'windows'
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Try to restore existing cache
+      - name: Try to restore existing cache (unless force rebuild)
         id: cache-restore
+        if: inputs.force_rebuild != true
         uses: actions/cache/restore@v4
         with:
           path: build/llvm-project-install
           key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          restore-keys: |
+            llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-
 
-      - name: Build LLVM (if cache miss)
-        if: steps.cache-restore.outputs.cache-hit != 'true'
+      - name: Build LLVM (if cache miss or force rebuild)
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
         shell: bash
         run: |
           echo "🔨 Building LLVM for ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}"
@@ -135,7 +166,7 @@ jobs:
             --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
 
       - name: Verify LLVM build
-        if: steps.cache-restore.outputs.cache-hit != 'true'
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
         shell: bash
         run: |
           if [ ! -d "build/llvm-project-install" ]; then
@@ -148,7 +179,7 @@ jobs:
           du -sh build/llvm-project-install || true
 
       - name: Save LLVM cache
-        if: steps.cache-restore.outputs.cache-hit != 'true'
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: build/llvm-project-install
@@ -157,8 +188,12 @@ jobs:
       - name: Report status
         shell: bash
         run: |
-          if [ "${{ steps.cache-restore.outputs.cache-hit }}" == "true" ]; then
+          if [ "${{ inputs.force_rebuild }}" == "true" ]; then
+            echo "✅ LLVM rebuilt with force_rebuild flag"
+            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" == "true" ]; then
             echo "✅ Cache already existed - no rebuild needed"
+            echo "   Key: ${{ steps.cache-restore.outputs.cache-matched-key }}"
           else
             echo "✅ LLVM cache created successfully!"
             echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
