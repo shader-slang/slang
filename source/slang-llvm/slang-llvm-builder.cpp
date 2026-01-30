@@ -615,8 +615,35 @@ void LLVMBuilder::optimize()
     llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
     llvm::ModuleAnalysisManager moduleAnalysisManager;
 
+    bool kernelTarget = false;
+    switch (options.target)
+    {
+    case SLANG_SHADER_SHARED_LIBRARY:
+    case SLANG_SHADER_HOST_CALLABLE:
+    case SLANG_SHADER_LLVM_IR:
+    case SLANG_OBJECT_CODE:
+        kernelTarget = true;
+        break;
+    default:
+        kernelTarget = false;
+        break;
+    }
+
     llvm::PipelineTuningOptions pipelineTuningOptions = llvm::PipelineTuningOptions();
-    pipelineTuningOptions.SLPVectorization = true;
+
+
+    if (kernelTarget)
+    {
+        // Need to inline as much as possible to aid loop vectorization.
+        pipelineTuningOptions.InlinerThreshold = INT32_MAX;
+        // Empirically, SLP seems actively harmful on kernel targets. It
+        // probably interferes with loop vectorization.
+        pipelineTuningOptions.SLPVectorization = false;
+    }
+    else
+    {
+        pipelineTuningOptions.SLPVectorization = true;
+    }
 
     llvm::PassBuilder passBuilder(targetMachine, pipelineTuningOptions);
     passBuilder.registerModuleAnalyses(moduleAnalysisManager);
@@ -651,12 +678,8 @@ void LLVMBuilder::optimize()
     passBuilder.registerPipelineStartEPCallback(
         [&](llvm::ModulePassManager& modulePassManager, llvm::OptimizationLevel level)
         {
-            switch (options.target)
+            if (kernelTarget)
             {
-            case SLANG_SHADER_SHARED_LIBRARY:
-            case SLANG_SHADER_HOST_CALLABLE:
-            case SLANG_SHADER_LLVM_IR:
-            case SLANG_OBJECT_CODE:
                 // The scalarization pass allows re-vectorizing on the
                 // workgroup loop level, which is why we run it for all of the
                 // shader/kernel targets.
@@ -665,13 +688,13 @@ void LLVMBuilder::optimize()
                 // always have a loop for kernels.
                 if (level != llvm::OptimizationLevel::O0)
                     modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ScalarizerPass()));
-                break;
-            default:
+            }
+            else
+            {
                 // Non-kernel targets don't run scalarizer for now, because they
                 // are more reliant on the SLP vectorizer, which is abysmal at
                 // re-discovering vectorization opportunities. It would do more
                 // harm than good there.
-                break;
             }
         }
     );
