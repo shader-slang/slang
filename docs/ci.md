@@ -11,7 +11,10 @@ We have a CI check that ensures any submodule commit changes in a PR point to co
 - A submodule points to a commit that isn't on any branch
 - A submodule reference becomes invalid or hard to track
 
-The check is implemented in `extras/check-submodule-commits.sh` and runs automatically on PRs that modify files in `external/` or `.gitmodules`.
+The check is implemented in `extras/check-submodule-commits.sh` and runs automatically on PRs that modify:
+- Files in `external/` (submodule directories)
+- `.gitmodules` (submodule configuration)
+- The check script itself or its workflow file
 
 If your PR fails this check, update the submodule to point to a commit that exists on the main branch of the submodule repository:
 

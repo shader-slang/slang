@@ -95,42 +95,49 @@ while IFS= read -r line; do
       }
     fi
     
-    # Enter the submodule directory
-    cd "$submodule_path"
+    # Check the submodule in a subshell to avoid directory issues
+    (
+      cd "$submodule_path" || exit 1
+      
+      # Fetch the latest from origin to ensure we have up-to-date refs
+      echo_info "  Fetching latest refs from origin..."
+      git fetch origin --quiet 2>/dev/null || {
+        echo_warning "  Failed to fetch from origin, using cached refs"
+      }
+      
+      # Try to determine the default branch name (main or master)
+      DEFAULT_BRANCH=""
+      if git show-ref --verify --quiet refs/remotes/origin/main; then
+        DEFAULT_BRANCH="origin/main"
+      elif git show-ref --verify --quiet refs/remotes/origin/master; then
+        DEFAULT_BRANCH="origin/master"
+      else
+        echo_error "  Could not find origin/main or origin/master branch"
+        exit 2
+      fi
+      
+      echo_info "  Default branch: $DEFAULT_BRANCH"
+      
+      # Check if the commit is in the history of the default branch
+      if git merge-base --is-ancestor "$NEW_COMMIT" "$DEFAULT_BRANCH" 2>/dev/null; then
+        echo_success "  ✓ Commit $NEW_COMMIT is in the history of $DEFAULT_BRANCH"
+        exit 0
+      else
+        echo_error "  ✗ Commit $NEW_COMMIT is NOT in the history of $DEFAULT_BRANCH"
+        echo_error "  This commit may be from a user branch or not on any branch!"
+        echo_error "  Please update the submodule to point to a commit on the main branch."
+        exit 2
+      fi
+    )
     
-    # Fetch the latest from origin to ensure we have up-to-date refs
-    echo_info "  Fetching latest refs from origin..."
-    git fetch origin --quiet 2>/dev/null || {
-      echo_warning "  Failed to fetch from origin, using cached refs"
-    }
-    
-    # Try to determine the default branch name (main or master)
-    DEFAULT_BRANCH=""
-    if git show-ref --verify --quiet refs/remotes/origin/main; then
-      DEFAULT_BRANCH="origin/main"
-    elif git show-ref --verify --quiet refs/remotes/origin/master; then
-      DEFAULT_BRANCH="origin/master"
-    else
-      echo_error "  Could not find origin/main or origin/master branch"
-      cd - > /dev/null
-      ISSUES_FOUND=1
+    # Check subshell exit status
+    SUBSHELL_EXIT=$?
+    if [ $SUBSHELL_EXIT -eq 1 ]; then
+      echo_warning "  Failed to enter submodule directory"
       continue
-    fi
-    
-    echo_info "  Default branch: $DEFAULT_BRANCH"
-    
-    # Check if the commit is in the history of the default branch
-    if git merge-base --is-ancestor "$NEW_COMMIT" "$DEFAULT_BRANCH" 2>/dev/null; then
-      echo_success "  ✓ Commit $NEW_COMMIT is in the history of $DEFAULT_BRANCH"
-    else
-      echo_error "  ✗ Commit $NEW_COMMIT is NOT in the history of $DEFAULT_BRANCH"
-      echo_error "  This commit may be from a user branch or not on any branch!"
-      echo_error "  Please update the submodule to point to a commit on the main branch."
+    elif [ $SUBSHELL_EXIT -eq 2 ]; then
       ISSUES_FOUND=1
     fi
-    
-    # Return to repository root
-    cd - > /dev/null
     
   fi
 done < <(git submodule status)
