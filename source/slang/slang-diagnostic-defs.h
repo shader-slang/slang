@@ -1828,7 +1828,7 @@ DIAGNOSTIC(
     30701,
     Error,
     systemValueSemanticInvalidType,
-    "type '$0' is not valid for system value semantic '$1'")
+    "type '$0' is not valid for system value semantic '$1'; expected '$2'")
 DIAGNOSTIC(
     30702,
     Error,

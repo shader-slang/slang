@@ -712,7 +712,7 @@ class SemanticDecl : public ContainerDecl
     FIDDLE(...)
 };
 
-/// A typed getter accessor for a semantic declaration: "get <type>;"
+/// A typed getter accessor for a semantic declaration: "get : <type>;"
 FIDDLE()
 class SemanticGetterDecl : public Decl
 {
@@ -720,7 +720,7 @@ class SemanticGetterDecl : public Decl
     FIDDLE() TypeExp type;
 };
 
-/// A typed setter accessor for a semantic declaration: "set <type>;"
+/// A typed setter accessor for a semantic declaration: "set : <type>;"
 FIDDLE()
 class SemanticSetterDecl : public Decl
 {

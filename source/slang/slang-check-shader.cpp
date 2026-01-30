@@ -89,7 +89,7 @@ static SemanticDecl* lookUpSemanticDecl(
     // Lowercase the name for lookup (semantics in core.meta.slang are lowercase)
     String lowerName = semanticName.toLower();
     auto name = namePool->getName(lowerName);
-    auto lookupResult = lookUp(astBuilder, visitor, name, scope, LookupMask::Default);
+    auto lookupResult = lookUp(astBuilder, visitor, name, scope, LookupMask::Semantic);
     
     if (!lookupResult.isValid())
         return nullptr;
@@ -163,6 +163,7 @@ static void validateTypeSemantics(
                     // Look for matching accessor (getter for input, setter for output)
                     bool foundMatchingAccessor = false;
                     bool foundAccessorForDirection = false;
+                    List<Type*> validTypes;
                     
                     for (auto member : semanticDecl->getMembers())
                     {
@@ -231,6 +232,9 @@ static void validateTypeSemantics(
                                 }
                             }
                         }
+                        
+                        // Collect valid types for error message
+                        validTypes.add(accessorType);
                     }
                     
                     if (!foundAccessorForDirection)
@@ -248,14 +252,23 @@ static void validateTypeSemantics(
                     }
                     else if (!foundMatchingAccessor)
                     {
-                        // Type mismatch
+                        // Type mismatch - build string of valid types
+                        StringBuilder validTypesStr;
+                        for (Index validTypeIndex = 0; validTypeIndex < validTypes.getCount(); validTypeIndex++)
+                        {
+                            if (validTypeIndex > 0)
+                                validTypesStr << "' or '";
+                            validTypesStr << validTypes[validTypeIndex];
+                        }
+                        
                         diagnoseCapabilityErrors(
                             sink,
                             visitor->getOptionSet(),
                             loc,
                             Diagnostics::systemValueSemanticInvalidType,
                             type,
-                            baseName);
+                            baseName,
+                            validTypesStr);
                     }
                 }
             }
