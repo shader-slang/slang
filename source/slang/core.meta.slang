@@ -4488,18 +4488,36 @@ semantic sv_depth
 {
     [require(fragment)]
     set : float;
+
+    [require(fragment)]
+    set : Conditional<float, true>;
+
+    [require(fragment)]
+    set : Conditional<float, false>;
 }
 
 semantic sv_depthgreaterequal
 {
     [require(fragment)]
     set : float;
+
+    [require(fragment)]
+    set : Conditional<float, true>;
+
+    [require(fragment)]
+    set : Conditional<float, false>;
 }
 
 semantic sv_depthlessequal
 {
     [require(fragment)]
     set : float;
+
+    [require(fragment)]
+    set : Conditional<float, true>;
+
+    [require(fragment)]
+    set : Conditional<float, false>;
 }
 
 semantic sv_clipdistance
