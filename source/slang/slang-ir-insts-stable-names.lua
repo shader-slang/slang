@@ -719,5 +719,7 @@ return {
 	["Decoration.DisallowSpecializationWithExistentialsDecoration"] = 717,
 	["makeCoopMatrixFromScalar"] = 718,
 	["getOptiXPayloadRegister"] = 719,
-	["setOptiXPayloadRegister"] = 720
+	["setOptiXPayloadRegister"] = 720,
+	["Type.OptionalNoneType"] = 721,
+	["ReinterpretOptional"] = 722
 }

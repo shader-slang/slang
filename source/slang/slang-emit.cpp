@@ -1054,6 +1054,9 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
+        SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
+
+    if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
 
     if (requiredLoweringPassSet.nonVectorCompositeSelect)

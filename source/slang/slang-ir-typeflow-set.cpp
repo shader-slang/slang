@@ -129,6 +129,83 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         //
         return builder->emitPackAnyValue((IRType*)destInfo, arg);
     }
+    else if (as<IRArrayType>(argInfo) && as<IRArrayType>(destInfo))
+    {
+        // If both arg and dest are arrays, we need to upcast each element.
+        //
+        auto argArrayType = as<IRArrayType>(argInfo);
+        auto destArrayType = as<IRArrayType>(destInfo);
+        auto argElementType = argArrayType->getElementType();
+        auto destElementType = destArrayType->getElementType();
+
+        if (argElementType != destElementType)
+        {
+            auto arraySize = getIntVal(argArrayType->getElementCount());
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)arraySize);
+            for (IRIntegerValue i = 0; i < arraySize; i++)
+            {
+                auto argElement = builder->emitGetElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeArray(
+                destArrayType,
+                upcastedElements.getCount(),
+                upcastedElements.getBuffer());
+        }
+    }
+    else if (as<IRTupleType>(argInfo) && as<IRTupleType>(destInfo))
+    {
+        // If both arg and dest are tuples, we need to upcast each element.
+        //
+        auto argTupleType = as<IRTupleType>(argInfo);
+        auto destTupleType = as<IRTupleType>(destInfo);
+
+        if (argTupleType != destTupleType)
+        {
+            UInt argElementCount = argTupleType->getOperandCount();
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)argElementCount);
+            for (UInt i = 0; i < argElementCount; i++)
+            {
+                auto argElementType = (IRType*)argTupleType->getOperand(i);
+                auto destElementType = (IRType*)destTupleType->getOperand(i);
+                auto argElement = builder->emitGetTupleElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeTuple(destTupleType, upcastedElements);
+        }
+    }
+    else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // If both arg and dest are optionals, we need to upcast the value type.
+        //
+        auto argOptionalType = as<IROptionalType>(argInfo);
+        auto destOptionalType = as<IROptionalType>(destInfo);
+        auto argValueType = (IRType*)argOptionalType->getValueType();
+        auto destValueType = (IRType*)destOptionalType->getValueType();
+
+        if (argValueType != destValueType)
+        {
+            // We emit a ReinterpretOptional instruction that will be lowered
+            // later in lowerReinterpret to an if-else block with proper control flow.
+            //
+            return builder
+                ->emitIntrinsicInst((IRType*)destOptionalType, kIROp_ReinterpretOptional, 1, &arg);
+        }
+    }
+    else if (as<IROptionalNoneType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // Special case: upcasting from `none_t` to `optional<T>` means
+        // creating a `none` value.
+        return builder->emitMakeOptionalNone((IRType*)destInfo);
+    }
 
     return arg; // Can use as-is.
 }
