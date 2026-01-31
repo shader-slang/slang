@@ -288,7 +288,7 @@ static void validateSystemValueSemanticForType(
 static void validateSystemValueSemantic(
     SemanticsVisitor* visitor,
     DiagnosticSink* sink,
-    VarDeclBase* decl,
+    Decl* decl,
     Stage stage,
     SemanticDirection direction,
     Scope* scope)
@@ -296,20 +296,36 @@ static void validateSystemValueSemantic(
     if (!decl)
         return;
 
-    Type* type = decl->getType();
+    // Get the type from the declaration
+    Type* type = nullptr;
+    if (auto varDecl = as<VarDeclBase>(decl))
+        type = varDecl->getType();
+    else if (auto funcDecl = as<FuncDecl>(decl))
+        type = funcDecl->returnType.type;
+    else
+        return;
+
+    if (!type)
+        return;
+
+    // Unwrap Conditional<T, hasValue> to T before checking for wrapper types
+    type = unwrapConditionalType(type);
 
     // Mesh shader output types (OutputVertices, OutputPrimitives, OutputIndices) and
     // geometry shader stream types (PointStream, LineStream, TriangleStream) are
-    // implicitly outputs - they don't require the 'out' keyword
-    // They need to be unwrapped to the element type before validating semantics
+    // implicitly outputs - they don't require the 'out' keyword.
+    // They need to be unwrapped to the element type before validating semantics,
+    // and they could contain Conditional<T, hasValue> types, so we need to unwrap them again.
     if (auto meshOutputType = as<MeshOutputType>(type))
     {
-        type = meshOutputType->getElementType();
+        auto elementType = meshOutputType->getElementType();
+        type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
     }
     else if (auto streamOutputType = as<HLSLStreamOutputType>(type))
     {
-        type = streamOutputType->getElementType();
+        auto elementType = streamOutputType->getElementType();
+        type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;
     }
 
@@ -840,40 +856,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 }
             }
 
-            // Validate the return type semantic if present
-            if (auto returnSemantic = entryPointFuncDecl->findModifier<HLSLSimpleSemantic>())
-            {
-                validateSystemValueSemanticForType(
-                    &visitor,
-                    sink,
-                    entryPointFuncDecl->loc,
-                    returnType,
-                    returnSemantic,
-                    stage,
-                    SemanticDirection::Output,
-                    scope);
-            }
-
-            // If return type is a struct, also validate semantics on its fields
-            if (auto declRefType = as<DeclRefType>(returnType))
-            {
-                if (auto structDeclRef = declRefType->getDeclRef().as<StructDecl>())
-                {
-                    auto astBuilder = visitor.getASTBuilder();
-                    for (auto fieldDeclRef :
-                         getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
-                    {
-                        auto fieldDecl = fieldDeclRef.getDecl();
-                        validateSystemValueSemantic(
-                            &visitor,
-                            sink,
-                            fieldDecl,
-                            stage,
-                            SemanticDirection::Output,
-                            scope);
-                    }
-                }
-            }
+            // Validate the return type semantic
+            validateSystemValueSemantic(
+                &visitor,
+                sink,
+                entryPointFuncDecl,
+                stage,
+                SemanticDirection::Output,
+                scope);
         }
     }
 
