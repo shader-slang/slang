@@ -104,7 +104,7 @@ After EMSDK is activated, Slang needs to be built in a cross compiling setup:
 # Build generators.
 cmake --workflow --preset generators --fresh
 mkdir generators
-cmake --install build --prefix generators --component generators
+cmake --install build --config Release --prefix generators --component generators
 
 # Configure the build with emcmake.
 # emcmake is available only when emsdk_env setup the environment correctly.
@@ -152,7 +152,7 @@ Other build presets are also provided for both architectures:
 - `android-x86_64-debug`
 - `android-x86_64-releaseWithDebugInfo`
 
-> Note: Android presets disable some features to reduce dependencies, including GFX/tests/slangd/replayer, and LLVM/examples/xlib/CUDA/OptiX/NVAPI/Aftermath.
+> Note: Android presets disable some features to reduce dependencies, including GFX, tests, slangd, replayer, LLVM, examples, xlib, CUDA, OptiX, NVAPI, and Aftermath.
 
 ## Installing
 
