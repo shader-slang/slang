@@ -3,7 +3,7 @@
 ## Vector Types
 
 A `vector<T, N>` represents a vector of `N` elements of type `T` where:
-- `T` is a [fundamental scalar type](04-types-fundamental.md)
+- `T` is a [fundamental scalar type](types-fundamental.md)
 - `N` is a [specialization-time constant integer](TODO-Generics.md) in range [1, 4] denoting the number of elements.
 
 The default values for `T` and `N` are `float` and `4`. This is for backwards compatibility.
@@ -115,7 +115,7 @@ The alignment of a vector type is target-defined. The alignment of `vector<T, N>
 ## Matrix Types
 
 Type `matrix<T, R, C>` represents a `R`×`C` matrix of elements of type `T` where:
-- `T` is a [fundamental scalar type](04-types-fundamental.md)
+- `T` is a [fundamental scalar type](types-fundamental.md)
 - `R` is a [specialization-time constant integer](TODO-Generics.md) in range [1, 4] denoting the number of rows.
 - `C` is a [specialization-time constant integer](TODO-Generics.md) in range [1, 4] denoting the number of columns.
 
