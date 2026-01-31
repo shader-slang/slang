@@ -48,6 +48,59 @@
 namespace Slang
 {
 
+struct SimpleSemanticInfo
+{
+    String name;
+    UInt index;
+};
+
+static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
+{
+    auto composedName = semantic->name.getContent();
+
+    // look for a trailing sequence of decimal digits
+    // at the end of the composed name
+    UInt length = composedName.getLength();
+    UInt indexLoc = length;
+    while (indexLoc > 0)
+    {
+        auto c = composedName[indexLoc - 1];
+        if (c >= '0' && c <= '9')
+        {
+            indexLoc--;
+            continue;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    SimpleSemanticInfo info;
+
+    if (indexLoc == length)
+    {
+        // No index suffix
+        info.name = composedName;
+        info.index = 0;
+    }
+    else
+    {
+        // The name is everything before the digits
+        auto nameSlice = composedName.subString(0, indexLoc);
+        auto indexSlice = composedName.subString(indexLoc, length - indexLoc);
+        SLANG_ASSERT(indexSlice.getLength() > 0);
+        for (auto c : indexSlice)
+        {
+            SLANG_ASSERT(c >= '0' && c <= '9');
+        }
+
+        info.name = String(nameSlice);
+        info.index = stringToUInt(indexSlice);
+    }
+    return info;
+}
+
 // This file implements lowering of the Slang AST to a simpler SSA
 // intermediate representation.
 //
@@ -2590,7 +2643,11 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
-            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+            auto semanticInfo = decomposeSimpleSemantic(hlslSemantic);
+            builder->addSemanticDecoration(
+                inst,
+                semanticInfo.name.getUnownedSlice(),
+                (IRIntegerValue)semanticInfo.index);
         }
         else if (as<DynamicUniformModifier>(mod))
         {
