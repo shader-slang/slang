@@ -38,7 +38,6 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
-#include "slang-parameter-binding.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -48,6 +47,53 @@
 
 namespace Slang
 {
+
+struct SimpleSemanticInfo
+{
+    String name;
+    int index;
+};
+
+static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
+{
+    auto composedName = semantic->name.getContent();
+
+    // look for a trailing sequence of decimal digits
+    // at the end of the composed name
+    UInt length = composedName.getLength();
+    UInt indexLoc = length;
+    while (indexLoc > 0)
+    {
+        auto c = composedName[indexLoc - 1];
+        if (c >= '0' && c <= '9')
+        {
+            indexLoc--;
+            continue;
+        }
+        else
+        {
+            break;
+        }
+    }
+
+    SimpleSemanticInfo info;
+
+    if (indexLoc == length)
+    {
+        // No index suffix
+        info.name = composedName;
+        info.index = 0;
+    }
+    else
+    {
+        // The name is everything before the digits
+        String stringComposedName(composedName);
+
+        info.name = stringComposedName.subString(0, indexLoc);
+        info.index = strtol(stringComposedName.begin() + indexLoc, nullptr, 10);
+    }
+    return info;
+}
 
 // This file implements lowering of the Slang AST to a simpler SSA
 // intermediate representation.
