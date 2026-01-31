@@ -1096,6 +1096,89 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         addToWorkList(s);
     }
 
+    // Helper function to check if a pointer originates from a mesh shader output parameter
+    bool isMeshOutputPointer(IRInst* ptr)
+    {
+        // Trace back through the pointer chain to find the source
+        IRInst* current = ptr;
+        while (current)
+        {
+            switch (current->getOp())
+            {
+            case kIROp_MeshOutputRef:
+                // This is a direct reference to a mesh output element
+                return true;
+
+            case kIROp_GetElementPtr:
+            case kIROp_FieldAddress:
+                // Follow the base pointer
+                current = current->getOperand(0);
+                continue;
+
+            case kIROp_Param:
+                // Check if this parameter has mesh output decorations
+                {
+                    auto param = as<IRParam>(current);
+                    if (param->findDecorationImpl(kIROp_VerticesDecoration) ||
+                        param->findDecorationImpl(kIROp_IndicesDecoration) ||
+                        param->findDecorationImpl(kIROp_PrimitivesDecoration))
+                    {
+                        return true;
+                    }
+                }
+                return false;
+
+            case kIROp_GlobalParam:
+                // Check if this global parameter is a mesh output
+                // Mesh outputs are marked with GLPositionOutputDecoration or have specific import
+                // names
+                {
+                    auto globalParam = as<IRGlobalParam>(current);
+
+                    // Check for position output decoration
+                    if (globalParam->findDecoration<IRGLPositionOutputDecoration>())
+                        return true;
+
+                    // Check for import decorations that indicate mesh outputs
+                    if (auto importDecor = globalParam->findDecoration<IRImportDecoration>())
+                    {
+                        auto mangledName = importDecor->getMangledName();
+                        // gl_Position, gl_PrimitiveTriangleIndicesEXT, etc. are mesh outputs
+                        if (mangledName.startsWith(toSlice("gl_Position")) ||
+                            mangledName.startsWith(toSlice("gl_PrimitiveTriangleIndices")) ||
+                            mangledName.startsWith(toSlice("gl_PrimitiveLineIndices")) ||
+                            mangledName.startsWith(toSlice("gl_PrimitivePointIndices")))
+                        {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+
+            case kIROp_Var:
+            case kIROp_GlobalVar:
+                // Reached a variable that's not a mesh output
+                return false;
+
+            default:
+                // For other instructions, we can't determine the source
+                return false;
+            }
+        }
+        return false;
+    }
+
+    void processLoad(IRLoad* loadInst)
+    {
+        auto ptr = loadInst->getPtr();
+
+        // Check if we're loading from a mesh output
+        if (isMeshOutputPointer(ptr))
+        {
+            m_sink->diagnose(getDiagnosticPos(loadInst), Diagnostics::meshShaderOutputCannotBeRead);
+        }
+    }
+
     void processGetOffsetPtr(IRInst* offsetPtrInst)
     {
         auto ptrOperandType = as<IRPtrType>(offsetPtrInst->getOperand(0)->getDataType());
@@ -1821,6 +1904,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_MeshOutputSet:
                 processMeshOutputSet(cast<IRMeshOutputSet>(inst));
+                break;
+            case kIROp_Load:
+                processLoad(cast<IRLoad>(inst));
                 break;
             case kIROp_RWStructuredBufferLoad:
             case kIROp_StructuredBufferLoad:
