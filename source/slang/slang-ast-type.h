@@ -534,6 +534,15 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
 };
 
+// Conditional<T, hasValue> type - a compile-time conditional wrapper
+// that either holds a value of type T (if hasValue is true) or is empty.
+FIDDLE()
+class ConditionalType : public DeclRefType
+{
+    FIDDLE(...)
+    Type* getValueType();
+};
+
 FIDDLE()
 class AtomicType : public DeclRefType
 {

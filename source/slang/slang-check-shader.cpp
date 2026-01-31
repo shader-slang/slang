@@ -62,35 +62,9 @@ static bool isValidThreadDispatchIDType(Type* type)
 // returns the inner type T. Otherwise, returns the original type unchanged.
 static Type* unwrapConditionalType(Type* type)
 {
-    // Check if this is a DeclRefType referring to a struct
-    auto declRefType = as<DeclRefType>(type);
-    if (!declRefType)
-        return type;
-
-    // Check if it's a reference to a StructDecl
-    auto structDeclRef = isDeclRefTypeOf<StructDecl>(declRefType);
-    if (!structDeclRef)
-        return type;
-
-    auto structDecl = structDeclRef.getDecl();
-    if (!structDecl)
-        return type;
-
-    // Check if the struct name is "Conditional"
-    auto name = structDecl->nameAndLoc.name;
-    if (!name || name->text != "Conditional")
-        return type;
-
-    // Extract the first generic type argument (T)
-    auto args = findInnerMostGenericArgs(SubstitutionSet(declRefType->getDeclRef()));
-    if (args.getCount() == 0)
-        return type;
-
-    auto innerType = as<Type>(args[0]);
-    if (!innerType)
-        return type;
-
-    return innerType;
+    if (auto conditionalType = as<ConditionalType>(type))
+        return conditionalType->getValueType();
+    return type;
 }
 
 // Check if two types are compatible for system value semantics.
@@ -303,7 +277,7 @@ static void validateSystemValueSemanticForType(
             visitor->getOptionSet(),
             loc,
             Diagnostics::systemValueSemanticInvalidType,
-            type,
+            unwrapConditionalType(type),
             baseName,
             validTypesStr);
     }

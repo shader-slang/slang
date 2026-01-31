@@ -1694,6 +1694,7 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__magic_type(ConditionalType)
 struct Conditional<T, bool hasValue>
 {
     internal vector<T, hasValue ? 1 : 0> storage;
