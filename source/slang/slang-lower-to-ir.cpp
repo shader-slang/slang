@@ -90,6 +90,10 @@ static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
         String stringComposedName(composedName);
         auto indexSlice = stringComposedName.subString(indexLoc, length - indexLoc);
         SLANG_ASSERT(indexSlice.getLength() > 0);
+        for (auto c : indexSlice)
+        {
+            SLANG_ASSERT(c >= '0' && c <= '9');
+        }
 
         info.name = stringComposedName.subString(0, indexLoc);
         info.index = stringToUInt(indexSlice);
