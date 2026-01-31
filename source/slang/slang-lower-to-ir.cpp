@@ -90,7 +90,7 @@ static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
         String stringComposedName(composedName);
 
         info.name = stringComposedName.subString(0, indexLoc);
-        info.index = strtol(stringComposedName.begin() + indexLoc, nullptr, 10);
+        info.index = stringToInt(stringComposedName.subString(indexLoc, length - indexLoc));
     }
     return info;
 }
