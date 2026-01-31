@@ -88,9 +88,11 @@ static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
     {
         // The name is everything before the digits
         String stringComposedName(composedName);
+        auto indexSlice = stringComposedName.subString(indexLoc, length - indexLoc);
+        SLANG_ASSERT(indexSlice.getLength() > 0);
 
         info.name = stringComposedName.subString(0, indexLoc);
-        info.index = stringToUInt(stringComposedName.subString(indexLoc, length - indexLoc));
+        info.index = stringToUInt(indexSlice);
     }
     return info;
 }
