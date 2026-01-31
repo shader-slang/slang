@@ -511,6 +511,14 @@ public:
         return m_sharedASTBuilder->m_builtinTypes[Index(flavor)];
     }
 
+    DeclRef<EmptyDecl> emptyDecl{};
+    SLANG_FORCE_INLINE DeclRef<EmptyDecl> getDefaultEmptyDecl()
+    {
+        if (!emptyDecl)
+            emptyDecl = create<EmptyDecl>();
+        return emptyDecl;
+    }
+
     Type* getSpecializedBuiltinType(Type* typeParam, const char* magicTypeName);
     Type* getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const char* magicTypeName);
 

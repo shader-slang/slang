@@ -1939,9 +1939,16 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
     {
-        // When we fully support type coercion constraints, we should lower the witness into a
-        // function that does the conversion.
+        // For now we do not use the result of a `TypeCoercionWitness` in any senario, so this logic
+        // is stubbed-out
         return LoweredValInfo();
+
+        // auto declRef = val->getDeclRef();
+        //// If we have a `EmptyDecl` we encountered a unhandled `_coerce` senario.
+        // if (as<EmptyDecl>(declRef))
+        //     return LoweredValInfo();
+        // auto type = lowerType(context, getFuncType(getCurrentASTBuilder(), declRef));
+        // return emitDeclRef(context, declRef, type);
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)

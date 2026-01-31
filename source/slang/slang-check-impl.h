@@ -716,6 +716,33 @@ struct SharedSemanticsContext : public RefObject
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
 
+    struct IntrinsicOpConversionMethodKey
+    {
+        IROp irOp;
+        Type* fromType;
+        Type* toType;
+        bool isLValue;
+        HashCode getHashCode() const
+        {
+            return combineHash(
+                Slang::getHashCode(irOp),
+                Slang::getHashCode(fromType),
+                Slang::getHashCode(toType),
+                (HashCode32)isLValue);
+        }
+        bool operator==(const IntrinsicOpConversionMethodKey& other) const
+        {
+            return fromType == other.fromType && toType == other.toType &&
+                   isLValue == other.isLValue;
+        }
+        IntrinsicOpConversionMethodKey() = default;
+        IntrinsicOpConversionMethodKey(IROp irOp, QualType fromType, Type* toType)
+            : irOp(irOp), fromType(fromType), toType(toType), isLValue(fromType.isLeftValue)
+        {
+        }
+    };
+    Dictionary<IntrinsicOpConversionMethodKey, FuncDecl*> m_intrinsicOpConversionMethods;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -745,6 +772,10 @@ public:
             return m_linkage->isInLanguageServer();
         return false;
     }
+
+    /// Get (create if needed) a plain `FuncDecl` with a particular `IntrinsicOpModifier`
+    FuncDecl* getIntrinsicOpFunc(IROp irOp, Type* toType, QualType fromType);
+
     /// Get the list of extension declarations that appear to apply to `decl` in this context
     List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -1790,6 +1821,16 @@ public:
     /// when a conversion is being done "for real" so that diagnostics
     /// should be emitted on failure.
     ///
+    /// If `outItemUsedToConvert` is null or zero valid conversions are found
+    /// `outDeclRefUsedToConvert` will be set to a `EmptyDecl`.
+    ///
+    /// If `outItemUsedToConvert` is non-null and a conversion is found,
+    /// `outDeclRefUsedToConvert` will either be set to: (1) the function
+    /// used for the conversion; (2) a function assigned an IROp
+    /// which implements the (compiler-intrinsic) conversion `_coerce`
+    /// expects; (3) a `EmptyDecl` to signal that there is a compiler
+    /// intrinsic conversion happening but it is currently not handled.
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -1797,7 +1838,8 @@ public:
         QualType fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
-        ConversionCost* outCost);
+        ConversionCost* outCost,
+        DeclRef<Decl>* outItemUsedToConvert);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
