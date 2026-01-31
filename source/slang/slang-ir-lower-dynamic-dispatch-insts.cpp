@@ -883,6 +883,61 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         return builder->getAnyValueType(size);
     }
 
+    // Helper function to recursively check if a type or any of its fields are non-copyable
+    bool isNonCopyableTypeRecursive(IRType* type, HashSet<IRType*>& visited)
+    {
+        // Avoid infinite recursion for recursive types
+        if (visited.contains(type))
+            return false;
+
+        // Check if the type itself is marked non-copyable
+        auto resolvedType = getResolvedInstForDecorations(type);
+        if (resolvedType->findDecoration<IRNonCopyableTypeDecoration>())
+        {
+            return true;
+        }
+
+        // Check struct fields recursively
+        if (auto structType = as<IRStructType>(type))
+        {
+            visited.add(type);
+            for (auto field : structType->getFields())
+            {
+                if (isNonCopyableTypeRecursive(field->getFieldType(), visited))
+                {
+                    return true;
+                }
+            }
+            visited.remove(type);
+        }
+
+        // Check array element types
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            if (isNonCopyableTypeRecursive(arrayType->getElementType(), visited))
+            {
+                return true;
+            }
+        }
+
+        // Check tuple element types
+        if (auto tupleType = as<IRTupleTypeBase>(type))
+        {
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+            {
+                if (auto elementType = as<IRType>(tupleType->getOperand(i)))
+                {
+                    if (isNonCopyableTypeRecursive(elementType, visited))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     bool canTypeBeStored(IRType* concreteType)
     {
         if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
@@ -892,6 +947,15 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             {
                 return false;
             }
+        }
+
+        // Check if the type or any of its fields are non-copyable
+        // Dynamic dispatch requires packing/unpacking values into a tagged union,
+        // which requires copying. Non-copyable types cannot be copied by definition.
+        HashSet<IRType*> visited;
+        if (isNonCopyableTypeRecursive(concreteType, visited))
+        {
+            return false;
         }
 
         IRSizeAndAlignment sizeAndAlignment;
