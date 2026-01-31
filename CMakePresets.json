@@ -127,6 +127,7 @@
         "CMAKE_TOOLCHAIN_FILE": "$env{ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake",
         "ANDROID_PLATFORM": "android-31",
         "SLANG_ENABLE_GFX": "OFF",
+        "SLANG_ENABLE_SLANG_RHI": "OFF",
         "SLANG_ENABLE_TESTS": "OFF",
         "SLANG_ENABLE_SLANGD": "OFF",
         "SLANG_ENABLE_REPLAYER": "OFF",

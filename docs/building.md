@@ -152,7 +152,7 @@ Other build presets are also provided for both architectures:
 - `android-x86_64-debug`
 - `android-x86_64-releaseWithDebugInfo`
 
-> Note: Android presets disable some features to reduce dependencies, including GFX/tests/slangd/replayer, and LLVM/examples/xlib/CUDA/OptiX/NVAPI/Aftermath.
+> Note: Android presets disable some features to reduce dependencies, including GFX, tests, slangd, replayer, LLVM, examples, xlib, CUDA, OptiX, NVAPI, and Aftermath.
 
 ## Installing
 
