@@ -38,6 +38,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-parameter-binding.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -2590,7 +2591,11 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
-            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+            auto semanticInfo = decomposeSimpleSemantic(hlslSemantic);
+            builder->addSemanticDecoration(
+                inst,
+                semanticInfo.name.getUnownedSlice(),
+                semanticInfo.index);
         }
         else if (as<DynamicUniformModifier>(mod))
         {
