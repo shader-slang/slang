@@ -261,8 +261,9 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            // CUDA wmma require SM 7.5+
-            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
+            // CUDA cooperative matrix operations using MMA API require SM 8.0+ (Ampere)
+            // The m16n8k16 shape used by MMAMatrix requires SM 8.0 minimum
+            m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
             return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
     case kIROp_FloatE4M3Type:
@@ -1190,13 +1191,15 @@ struct FragmentShape
 };
 
 /*
- * Strict Shape Validation Strategy:
- * Users must provide exact dimensions that match one of the allowed WMMA shapes:
+ * WMMA Shape Validation (Legacy):
+ * Validates if dimensions match one of the allowed WMMA shapes (K must be 16):
  *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
  *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
  *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
  *
- * Note: k dimension is always 16 for all shapes.
+ * Note: This function is kept for potential future use (e.g., diagnostics or
+ * WMMA-specific optimizations), but type emission now always uses MMA API.
+ * Returns invalid shape (0,0,0) if the dimensions don't match WMMA requirements.
  */
 inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
 {
@@ -1286,23 +1289,32 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
         return SLANG_FAIL;
     }
 
-    outStr << "Slang_CUDA_WMMA::WmmaFragment<";
-
-    FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
-    if (!shape.isValid())
-    {
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::cooperativeMatrixInvalidShape,
-            rowCount,
-            colCount,
-            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
-        SLANG_RELEASE_ASSERT(false);
-        return SLANG_FAIL;
-    }
-
-    outStr << typeName << "," << shape.m << ", " << shape.n << ", " << shape.k << ", "
-           << getMatrixUseName(matrixUse) << ">";
+    // Always use MMA API: MMAMatrix<T, M, N, Layout>
+    // 
+    // Rationale: Type emission happens per-type, but operations (like coopMatMulAdd)
+    // involve multiple types together. If we mix WMMA and MMA types in the same operation,
+    // the intrinsics fail because:
+    // - WMMA types (WmmaFragment) don't have m_M, m_N static members
+    // - MMA types (MMAMatrix) have m_M, m_N static members
+    // - The intrinsic needs consistent member access across all operand types
+    //
+    // By always using MMA types, we ensure:
+    // 1. All types in an operation have consistent member structure
+    // 2. Operations can use the modern SLANG:CUDA_MMA:coopMatMulAdd intrinsics
+    // 3. Support for both traditional (16x16x16) and flexible (16x8x16) shapes
+    //
+    // The MMA API uses a simpler 3-parameter format (T, M, N, Layout):
+    // - No separate K dimension in the type (K is inferred from context)
+    // - No Use parameter (A/B/C distinction is handled by operation signatures)
+    // - Each matrix stores its actual dimensions: A is M×K, B is K×N, C/D is M×N
+    
+    outStr << "Slang_CUDA_MMA::MMAMatrix<";
+    outStr << typeName << ", ";
+    outStr << rowCount << ", " << colCount;
+    
+    // Layout: Default to RowMajor since IRCoopMatrixType doesn't store layout info
+    // TODO: Consider adding layout parameter to IRCoopMatrixType or inferring from usage
+    outStr << ", Slang_CUDA_MMA::Layout::RowMajor>";
 
     return SLANG_OK;
 }

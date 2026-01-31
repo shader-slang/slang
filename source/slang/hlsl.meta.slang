@@ -27094,9 +27094,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::RowMajor>($1, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::ColMajor>($1, $2, $3)";
         }
     }
 
@@ -27121,9 +27121,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::RowMajor>($1, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::ColMajor>($1, $2, $3)";
         }
     }
 
@@ -27175,9 +27175,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::RowMajor>(($1)->m_data, $2, $3)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, $2, $3)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::ColMajor>(($1)->m_data, $2, $3)";
         }
     }
 
@@ -27197,9 +27197,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::RowMajor>(($1)->m_data, 0, $2)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::ColMajor>(($1)->m_data, 0, $2)";
         }
     }
 
@@ -27245,9 +27245,9 @@ struct CoopMat
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::RowMajor>(($1), $2)";
             else
-                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
+                __intrinsic_asm "$0.Store<Slang_CUDA_MMA::Layout::ColMajor>(($1), $2)";
         }
     }
 
@@ -27322,9 +27322,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::RowMajor>($0, $1, $2)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::ColMajor>($0, $1, $2)";
         }
     }
 
@@ -27356,9 +27356,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::RowMajor>($0, $1, $2)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::ColMajor>($0, $1, $2)";
         }
     }
 
@@ -27414,9 +27414,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::RowMajor>(($0)->m_data, $1, $2)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data, $1, $2)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::ColMajor>(($0)->m_data, $1, $2)";
         }
     }
 
@@ -27436,9 +27436,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::RowMajor>($0, 0, $1)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::ColMajor>($0, 0, $1)";
         }
     }
 
@@ -27485,9 +27485,9 @@ $}
             };
         case cuda:
             if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::RowMajor>($0, $1)";
             else
-                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
+                __intrinsic_asm "$TR::Load<Slang_CUDA_MMA::Layout::ColMajor>($0, $1)";
         }
     }
 
@@ -28386,28 +28386,8 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
             result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
         };
     case cuda:
-        if (saturatingAccumulation)
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         true
-                                                        >($0, $1, $2))";
-        else
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         false
-                                                        >($0, $1, $2))";
+        // Use template argument deduction to avoid explicit template parameter issues
+        __intrinsic_asm "Slang_CUDA_MMA::coopMatMulAdd($0, $1, $2)";
 
     }
 }
