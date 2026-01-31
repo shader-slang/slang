@@ -5347,19 +5347,17 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
         auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
-        if (!as<ConstantIntVal>(elementCountVal))
+        size_t elementCount = (size_t)getIntVal(elementCountVal);
+        auto element = _createTypeLayout(context, elementType);
+        if (!as<ConstantIntVal>(elementCountVal) || elementCount == 0)
         {
-            // If the vector size is not a compile-time constant, fall back to default layout
-            auto element = _createTypeLayout(context, elementType);
+            // Fall back to default layout
             RefPtr<TypeLayout> typeLayout = new TypeLayout();
             typeLayout->type = type;
             typeLayout->rules = rules;
             return TypeLayoutResult(typeLayout, element.info);
         }
 
-        size_t elementCount = (size_t)getIntVal(elementCountVal);
-
-        auto element = _createTypeLayout(context, elementType);
 
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))
@@ -6066,7 +6064,8 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
         auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
-        if (!as<ConstantIntVal>(elementCountVal))
+        size_t elementCount = (size_t)getIntVal(elementCountVal);
+        if (!as<ConstantIntVal>(elementCountVal) || elementCount == 0)
         {
             // If the vector size is not a compile-time constant, we cannot
             // compute a fixed layout for it. Treat it as having zero size.
@@ -6076,8 +6075,6 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
             typeLayout->rules = rules;
             return typeLayout;
         }
-
-        size_t elementCount = (size_t)getIntVal(elementCountVal);
 
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))
