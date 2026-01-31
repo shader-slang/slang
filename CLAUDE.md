@@ -287,6 +287,26 @@ cmake.exe --build --preset debug
 
 See `extras/repro-remix.md` for detailed documentation.
 
+#### Updating SPIRV-Tools
+
+The repository includes automation for updating SPIRV-Tools:
+
+**Quick update**:
+```bash
+# Update to latest, test, and create PR
+./extras/update-spirv-tools.sh --test --create-pr
+
+# Update to specific commit (for bisection)
+./extras/update-spirv-tools.sh --commit abc123de --test
+```
+
+**Automated testing**: Weekly CI workflow tests against SPIRV-Tools main branch to catch breaking changes early (`.github/workflows/update-spirv-tools.yml`).
+
+See `docs/update_spirv.md` for complete documentation including:
+- Automated update process and script options
+- Manual update process
+- CI validation details
+
 ### IR System
 
 - Slang uses a custom SSA-based IR (not LLVM)

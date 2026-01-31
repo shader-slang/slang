@@ -3,11 +3,43 @@
 # Script to update SPIRV-Tools and SPIRV-Headers submodules
 # and regenerate the generated files for a PR.
 #
-# Usage: bash extras/update-spirv-tools.sh [commit-hash]
+# Usage: bash extras/update-spirv-tools.sh [OPTIONS] [commit-hash]
 #   commit-hash: Specific commit hash for SPIRV-Tools (default: origin/main)
+#
+# Options:
+#   --test        Run test suite after update (for CI)
+#   --create-pr   Create GitHub PR after successful update (requires gh CLI)
 #
 
 set -e
+
+# Show help message
+show_help() {
+  cat <<EOF
+Update SPIRV-Tools and SPIRV-Headers submodules
+
+Usage: $0 [OPTIONS] [commit-hash]
+
+This script automates the SPIRV-Tools update process documented in docs/update_spirv.md.
+
+Arguments:
+  commit-hash          Specific commit hash for SPIRV-Tools (default: origin/main)
+
+Options:
+  --test               Run test suite after update
+  --create-pr          Create GitHub PR after successful update
+  --help               Show this help message
+
+Examples:
+  $0                                    # Update to latest, create branch, stage changes
+  $0 abc123def                          # Update to specific commit
+  $0 --test                             # Update and run test suite (CI mode, no branch)
+  $0 --create-pr                        # Update and create PR (without tests)
+  $0 --test --create-pr                 # Full workflow: update, test, PR
+
+Reference: docs/update_spirv.md
+EOF
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -27,16 +59,64 @@ log_error() {
   echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Parse options
+RUN_TESTS=false
+CREATE_PR=false
+COMMIT_HASH=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+  --test)
+    RUN_TESTS=true
+    shift
+    ;;
+  --create-pr)
+    CREATE_PR=true
+    shift
+    ;;
+  --help)
+    show_help
+    exit 0
+    ;;
+  -*)
+    log_error "Unknown option: $1"
+    echo ""
+    show_help
+    exit 1
+    ;;
+  *)
+    COMMIT_HASH="$1"
+    shift
+    ;;
+  esac
+done
+
+# Default to origin/main if no commit specified
+COMMIT_HASH="${COMMIT_HASH:-origin/main}"
+
 # Check if we're in the repository root
 if [ ! -f "CMakeLists.txt" ] || [ ! -d "external/spirv-tools" ]; then
   log_error "This script must be run from the Slang repository root."
   exit 1
 fi
 
-COMMIT_HASH="${1:-origin/main}"
+# Check gh CLI if creating PR
+if [ "$CREATE_PR" = true ]; then
+  if ! command -v gh &>/dev/null; then
+    log_error "gh CLI not found but --create-pr was specified"
+    log_info "Install from https://cli.github.com/"
+    exit 1
+  fi
+fi
 
 log_info "Starting SPIRV update process..."
 log_info "SPIRV-Tools target: $COMMIT_HASH"
+
+# Capture current state for CI output and PR
+OLD_SPIRV_COMMIT=$(git -C external/spirv-tools rev-parse HEAD)
+OLD_SPIRV_SHORT=$(git -C external/spirv-tools rev-parse --short=8 HEAD)
+OLD_HEADERS_COMMIT=$(git -C external/spirv-headers rev-parse HEAD)
+OLD_HEADERS_SHORT=$(git -C external/spirv-headers rev-parse --short=8 HEAD)
 
 # Step 1: Synchronize and update submodules
 log_info "Synchronizing and updating submodules..."
@@ -58,6 +138,12 @@ fi
 # Extract last 6 characters of commit hash for branch suffix
 COMMIT_SUFFIX="${RESOLVED_COMMIT: -6}"
 BRANCH_NAME="update-spirv-${COMMIT_SUFFIX}"
+NEW_SPIRV_SHORT=$(git -C external/spirv-tools rev-parse --short=8 "$RESOLVED_COMMIT")
+
+# Output commit info for CI parsing
+log_info "Outputting commit info for CI parsing..."
+echo "OLD_SPIRV_COMMIT=$OLD_SPIRV_SHORT"
+echo "NEW_SPIRV_COMMIT=$NEW_SPIRV_SHORT"
 
 log_info "Resolved commit: $RESOLVED_COMMIT"
 log_info "Branch name: $BRANCH_NAME"
@@ -100,6 +186,8 @@ if [ -z "$SPIRV_HEADERS_REV" ]; then
   exit 1
 fi
 
+NEW_HEADERS_SHORT=$(git -C external/spirv-headers rev-parse --short=8 "$SPIRV_HEADERS_REV")
+
 log_info "SPIRV-Headers revision: $SPIRV_HEADERS_REV"
 log_info "Updating SPIRV-Headers submodule..."
 git -C external/spirv-headers fetch
@@ -137,21 +225,134 @@ git add external/spirv-tools-generated
 log_info "Current git status:"
 git status --short external/spirv-headers external/spirv-tools external/spirv-tools-generated
 
+# Step 9: Run tests if requested
+if [ "$RUN_TESTS" = true ]; then
+  log_info "=========================================="
+  log_info "Running test suite..."
+  log_info "=========================================="
+
+  # Clean build directory
+  log_info "Cleaning build directory..."
+  rm -rf build
+
+  # Detect platform and configure
+  log_info "Configuring build..."
+  if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    cmake --preset vs2022
+  else
+    cmake --preset default
+  fi
+
+  log_info "Building Release configuration..."
+  cmake --build --preset release
+
+  if [ $? -ne 0 ]; then
+    log_error "Slang build failed"
+    exit 1
+  fi
+
+  log_info "Running test suite (this may take 10-30 minutes)..."
+  export SLANG_RUN_SPIRV_VALIDATION=1
+  
+  # Use same exclude lists as CI
+  if [[ "$OSTYPE" == "msys" ]] || [[ "$OSTYPE" == "win32" ]]; then
+    # Windows
+    ./build/Release/bin/slang-test \
+      -expected-failure-list tests/expected-failure-github.txt \
+      -use-test-server \
+      -server-count 8
+  else
+    # Linux
+    ./build/Release/bin/slang-test \
+      -expected-failure-list tests/expected-failure-github.txt \
+      -expected-failure-list tests/expected-failure-linux-gpu.txt \
+      -use-test-server \
+      -server-count 8
+  fi
+
+  if [ $? -ne 0 ]; then
+    log_error "Tests failed"
+    exit 1
+  fi
+
+  log_info "Tests passed!"
+fi
+
+# Step 10: Create PR if requested
+if [ "$CREATE_PR" = true ]; then
+  log_info "=========================================="
+  log_info "Creating Pull Request..."
+  log_info "=========================================="
+
+  # Commit changes
+  log_info "Committing changes..."
+  if [ "$RUN_TESTS" = true ]; then
+    TEST_STATUS="Tests passed"
+  else
+    TEST_STATUS="Tests not run (manual testing required)"
+  fi
+
+  git commit -m "Update SPIRV-Tools to $NEW_SPIRV_SHORT
+
+- SPIRV-Tools: $OLD_SPIRV_SHORT -> $NEW_SPIRV_SHORT
+- SPIRV-Headers: $OLD_HEADERS_SHORT -> $NEW_HEADERS_SHORT
+- Generated files updated and validated
+- $TEST_STATUS"
+
+  # Push branch
+  log_info "Pushing branch to origin..."
+  git push -u origin "$BRANCH_NAME"
+
+  # Create PR body
+  if [ "$RUN_TESTS" = true ]; then
+    TEST_RESULTS="Test suite passed with SPIRV validation enabled"
+    SCRIPT_ARGS="--test --create-pr"
+  else
+    TEST_RESULTS="Tests not run locally before creating PR"
+    SCRIPT_ARGS="--create-pr"
+  fi
+
+  PR_BODY="## SPIRV-Tools Update
+
+**SPIRV-Tools**: [\`$OLD_SPIRV_SHORT\`](https://github.com/KhronosGroup/SPIRV-Tools/commit/$OLD_SPIRV_COMMIT) -> [\`$NEW_SPIRV_SHORT\`](https://github.com/KhronosGroup/SPIRV-Tools/commit/$RESOLVED_COMMIT)
+**SPIRV-Headers**: [\`$OLD_HEADERS_SHORT\`](https://github.com/KhronosGroup/SPIRV-Headers/commit/$OLD_HEADERS_COMMIT) -> [\`$NEW_HEADERS_SHORT\`](https://github.com/KhronosGroup/SPIRV-Headers/commit/$SPIRV_HEADERS_REV)
+
+### Changes
+[View SPIRV-Tools changes](https://github.com/KhronosGroup/SPIRV-Tools/compare/$OLD_SPIRV_COMMIT...$RESOLVED_COMMIT)
+
+### Test Results
+$TEST_RESULTS
+
+---
+Generated by \`extras/update-spirv-tools.sh $SCRIPT_ARGS\`"
+
+  # Create PR
+  log_info "Creating draft PR..."
+  gh pr create --title "Update SPIRV-Tools to $NEW_SPIRV_SHORT" \
+    --body "$PR_BODY" \
+    --draft
+
+  log_info "Pull request created successfully!"
+fi
+
 echo ""
 log_info "=========================================="
 log_info "SPIRV update preparation complete!"
 log_info "=========================================="
 echo ""
-log_info "Next steps:"
-echo "  1. Review the staged changes with: git diff --cached"
-echo "  2. Build and test Slang:"
-echo "     rm -rf build"
-echo "     cmake --preset vs2022  # or your preferred preset"
-echo "     cmake --build --preset release"
-echo "     export SLANG_RUN_SPIRV_VALIDATION=1"
-echo "     build/Release/bin/slang-test -use-test-server -server-count 8"
-echo "  3. Commit the changes:"
-echo "     git commit -m \"Update SPIRV-Tools and SPIRV-Headers to latest versions\""
-echo "  4. Push and create a PR:"
-echo "     git push origin $BRANCH_NAME"
-echo ""
+
+if [ "$RUN_TESTS" = false ] && [ "$CREATE_PR" = false ]; then
+  log_info "Next steps:"
+  echo "  1. Review the staged changes with: git diff --cached"
+  echo "  2. Build and test Slang:"
+  echo "     rm -rf build"
+  echo "     cmake --preset vs2022  # or your preferred preset"
+  echo "     cmake --build --preset release"
+  echo "     export SLANG_RUN_SPIRV_VALIDATION=1"
+  echo "     build/Release/bin/slang-test -use-test-server -server-count 8"
+  echo "  3. Commit the changes:"
+  echo "     git commit -m \"Update SPIRV-Tools and SPIRV-Headers to latest versions\""
+  echo "  4. Push and create a PR:"
+  echo "     git push origin $BRANCH_NAME"
+  echo ""
+fi
