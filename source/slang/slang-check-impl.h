@@ -746,17 +746,15 @@ public:
         return false;
     }
     /// Get the list of extension declarations that appear to apply to `decl` in this context
-    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
+    List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(Decl* decl);
 
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
-    void registerCandidateExtension(AggTypeDecl* typeDecl, ExtensionDecl* extDecl);
+    void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
 
-    bool isDifferentiableFunc(FunctionDeclBase* func);
-    bool isBackwardDifferentiableFunc(FunctionDeclBase* func);
     FunctionDifferentiableLevel _getFuncDifferentiableLevelImpl(
         FunctionDeclBase* func,
         int recurseLimit);
@@ -776,17 +774,24 @@ public:
         InheritanceCircularityInfo* next = nullptr;
     };
 
+    struct InheritanceContext
+    {
+        bool useSimpleInheritance = false;
+    };
+
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
     /// Get the processed inheritance information for `type`, including all its facets
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        InheritanceContext context = InheritanceContext());
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr);
+        InheritanceCircularityInfo* circularityInfo = nullptr,
+        InheritanceContext context = InheritanceContext());
 
     /// Prevent an unsupported case of
     /// ```
@@ -830,8 +835,8 @@ public:
     DeclRef<GenericDecl> getDependentGenericParent(DeclRef<Decl> declRef);
 
 private:
-    /// Mapping from type declarations to the known extensiosn that apply to them
-    Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> m_mapTypeDeclToCandidateExtensions;
+    /// Mapping from type declarations to the known extensions that apply to them
+    Dictionary<Decl*, RefPtr<CandidateExtensionList>> m_mapDeclToCandidateExtensions;
 
     /// Is the `m_mapTypeDeclToCandidateExtensions` dictionary valid and up to date?
     bool m_candidateExtensionListsBuilt = false;
@@ -858,12 +863,19 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
-    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
+    InheritanceInfo _calcInheritanceInfo(
+        Type* type,
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo);
+        InheritanceCircularityInfo* circularityInfo,
+        InheritanceContext context);
+
+    ExtensionDecl* synthesizeExtensionForFunctionBaseType(DeclRefType* funcAsDeclRefType);
 
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
@@ -1146,6 +1158,13 @@ public:
         return result;
     }
 
+    SemanticsContext allowDroppingDerivatives()
+    {
+        SemanticsContext result(*this);
+        result.m_allowDroppingDerivatives = true;
+        return result;
+    }
+
     SemanticsContext allowStaticReferenceToNonStaticMember()
     {
         SemanticsContext result(*this);
@@ -1160,6 +1179,11 @@ public:
         return result;
     }
 
+    TreatAsDifferentiableExpr* getTreatAsDifferentiableParentExpr()
+    {
+        return m_treatAsDifferentiableExpr;
+    }
+
     Decl* getDeclToExcludeFromLookup() { return m_declToExcludeFromLookup; }
 
     SemanticsContext excludeTransparentMembersFromLookup()
@@ -1170,6 +1194,8 @@ public:
     }
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
+
+    bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
 
     OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
 
@@ -1210,6 +1236,8 @@ protected:
     /// Whether or not we are in a `no_diff` environment (and therefore should treat the call to
     /// a non-differentiable function as differentiable and not issue a diagnostic).
     TreatAsDifferentiableExpr* m_treatAsDifferentiableExpr = nullptr;
+
+    bool m_allowDroppingDerivatives = false;
 
     ASTBuilder* m_astBuilder = nullptr;
 
@@ -1444,7 +1472,9 @@ public:
             return nullptr;
         return val->resolve();
     }
-    Type* resolveType(Type* type) { return (Type*)resolveVal(type); }
+
+    Type* resolveType(Type* type);
+
     DeclRef<Decl> resolveDeclRef(DeclRef<Decl> declRef);
 
     /// Attempt to "resolve" an overloaded `LookupResult` to only include the "best" results
@@ -1644,10 +1674,10 @@ public:
     // Auto-diff convenience functions for translating primal types to differential types.
     Type* _toDifferentialParamType(Type* primalType);
 
-    Type* getDifferentialPairType(Type* primalType);
+    Type* tryGetDifferentialPairType(Type* primalType);
 
     // Convert a function's original type to it's forward/backward diff'd type.
-    Type* getForwardDiffFuncType(FuncType* originalType);
+    Type* getForwardDiffFuncType(FuncType* originalType, QualType thisType);
     Type* getBackwardDiffFuncType(FuncType* originalType);
 
     /// Registers a type as conforming to IDifferentiable, along with a witness
@@ -1659,6 +1689,9 @@ public:
     // Construct the differential for 'type', if it exists.
     Type* getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc);
     Type* tryGetDifferentialType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialValueType(ASTBuilder* builder, Type* type);
+    Type* tryGetDifferentialPtrType(ASTBuilder* builder, Type* type);
+
 
     // Helper function to check if a struct can be used as its own differential type.
     bool canStructBeUsedAsSelfDifferentialType(AggTypeDecl* aggTypeDecl);
@@ -1904,7 +1937,7 @@ public:
 
     bool doesTypeSatisfyAssociatedTypeConstraintRequirement(
         Type* satisfyingType,
-        DeclRef<AssocTypeDecl> requiredAssociatedTypeDeclRef,
+        DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);
 
     bool doesTypeSatisfyAssociatedTypeRequirement(
@@ -2069,6 +2102,9 @@ public:
         RefPtr<WitnessTable> witnessTable,
         MethodWitnessSynthesisFailureDetails* outFailureDetails = nullptr);
 
+    /// Clone generic containers.
+    DeclRef<Decl> liftDeclFromGenericContainers(Decl* decl, SubstitutionSet& outSubst);
+
     enum SynthesisPattern
     {
         // Synthesized method inducts over all arguments.
@@ -2101,6 +2137,13 @@ public:
         RefPtr<WitnessTable> witnessTable,
         SynthesisPattern pattern);
 
+    /// AD 2.0 version of `trySynthesizeDifferentialMethodRequirementWitness`.
+    bool trySynthesizeDiffFuncRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<Decl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
+
     /// Attempt to synthesize an associated `Differential` type for a type that conforms to
     /// `IDifferentiable`.
     ///
@@ -2112,6 +2155,22 @@ public:
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeDifferentialPairAssociatedTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeForwardDiffFuncTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable);
+
+    bool trySynthesizeDiffContextTypeRequirementWitness(
+        ConformanceCheckingContext* context,
+        DeclRef<AssocTypeDecl> requirementDeclRef,
+        RefPtr<WitnessTable> witnessTable,
+        BuiltinRequirementKind requirementKind);
 
     /// Attempt to synthesize function requirements for enum types to make them conform to
     /// `ILogical`.
@@ -2386,6 +2445,35 @@ public:
     /// Determine what type `This` should refer to in an extension of `type`.
     Type* calcThisType(Type* type);
 
+    DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
+
+    FuncType* getCalculatedDiffFuncType(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* contextType = nullptr)
+    {
+        if (contextType)
+        {
+            Val* args[] = {
+                baseFuncAsType,
+                contextType,
+                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+            return as<FuncType>(
+                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        }
+        else
+        {
+            Val* args[] = {
+                baseFuncAsType,
+                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+            return as<FuncType>(
+                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+        }
+    }
+
+    Type* getForwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType);
+    Type* getBwdCallableBaseType(Type* baseType);
 
     //
 
@@ -2436,6 +2524,8 @@ public:
         ConversionCost typePromotionCost = kConversionCost_None;
     };
 
+    bool hasGeneric(ConstraintSystem& system, Decl* generic);
+
     Type* TryJoinVectorAndScalarType(
         ConstraintSystem* constraints,
         VectorExpressionType* vectorType,
@@ -2475,6 +2565,8 @@ public:
         Type* superType,
         IsSubTypeOptions isSubTypeOptions);
 
+    SubtypeWitness* getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef);
+
     bool isValidGenericConstraintType(Type* type);
 
     SubtypeWitness* isTypeDifferentiable(Type* type);
@@ -2504,7 +2596,9 @@ public:
 
     Expr* createCastToSuperTypeExpr(Type* toType, Expr* fromExpr, Val* witness);
 
-    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr);
+    // Handles special modifier cases. In general case, calls createModifierCastExpr.
+    Expr* createModifierCast(Type* toType, Type* fromType, Expr* fromExpr);
+    Expr* createModifierCastExpr(Type* toType, Expr* fromExpr); // General modifier cast expr.
 
     /// Does there exist an implicit conversion from `fromType` to `toType`?
     bool canConvertImplicitly(Type* toType, QualType fromType);
@@ -3152,6 +3246,9 @@ public:
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
 
+    Expr* visitFuncAsTypeExpr(FuncAsTypeExpr* expr);
+    Expr* visitFuncTypeOfExpr(FuncTypeOfExpr* expr);
+
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
     Expr* visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr);
@@ -3267,6 +3364,10 @@ struct SemanticsDeclVisitorBase : public SemanticsVisitor
 
     ConstructorDecl* createCtor(AggTypeDecl* decl, DeclVisibility ctorVisibility);
 };
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, FunctionDeclBase* funcDecl);
+
+QualType getTypeForThisExpr(SemanticsVisitor* visitor, DeclRef<FunctionDeclBase> funcDeclRef);
 
 bool isUnsizedArrayType(Type* type);
 

@@ -91,10 +91,6 @@ struct ReinterpretLoweringContext
 
 void lowerReinterpret(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    // Before processing reinterpret insts, ensure that existential types without
-    // user-defined sizes have inferred sizes where possible.
-    //
-
     ReinterpretLoweringContext context;
     context.module = module;
     context.targetProgram = target;

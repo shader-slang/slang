@@ -27,14 +27,14 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     {
         dpfloat dpx = dpfloat(-3.0, 2.0);
-        dpfloat res = __fwd_diff(diffAbs)(dpx);
+        dpfloat res = fwd_diff(diffAbs)(dpx);
         outputBuffer[0] = res.p;               // Expect: 3.000000
         outputBuffer[1] = res.d;               // Expect: -2.000000
     }
 
     {
         dpfloat3 dpx = dpfloat3(float3(2.f, -3.f, -1.f), float3(-2.f, 3.f, -1.f));
-        dpfloat3 res = __fwd_diff(diffAbs)(dpx);
+        dpfloat3 res = fwd_diff(diffAbs)(dpx);
         outputBuffer[2] = res.p[0];            // Expect: 2.000000
         outputBuffer[3] = res.d[0];            // Expect: -2.000000
         outputBuffer[4] = res.p[1];            // Expect: 3.000000
@@ -45,13 +45,13 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     {
         dpfloat dpx = dpfloat(-3.0, 0.0);
-        __bwd_diff(diffAbs)(dpx, 2.0);
+        bwd_diff(diffAbs)(dpx, 2.0);
         outputBuffer[8] = dpx.d; // Expect: -2.000000
     }
 
     {
         dpfloat3 dpx = dpfloat3(float3(2.f, -3.f, -1.f), float3(0.f, 0.f, 0.f));
-        __bwd_diff(diffAbs)(dpx, float3(1.f, 1.f, 1.f));        
+        bwd_diff(diffAbs)(dpx, float3(1.f, 1.f, 1.f));        
         outputBuffer[9] = dpx.d[0];  // Expect: 1.000000
         outputBuffer[10] = dpx.d[1]; // Expect: -1.000000
         outputBuffer[11] = dpx.d[2]; // Expect: -1.000000

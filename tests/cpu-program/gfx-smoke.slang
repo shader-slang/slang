@@ -2,6 +2,16 @@
 import gfx;
 import slang;
 
+uint8_t blob[4] = {0x00, 0x00, 0x00, 0x00};
+
+void* toPointer(uint8_t[] blob)
+{
+    __target_switch
+    {
+        case cpp: __intrinsic_asm "(void*)((const char*)($0))";
+    }
+}
+
 export __extern_cpp int main()
 {
     gfx.DeviceDesc deviceDesc = {};
@@ -31,7 +41,7 @@ export __extern_cpp int main()
             var input = buffer[sv_dispatchThreadID.x];
             buffer[sv_dispatchThreadID.x] = sv_dispatchThreadID.x;
         })";
-    programDesc.sourceData = s;
+    programDesc.sourceData = toPointer(blob);
     programDesc.sourceType = gfx.ShaderModuleSourceType.SlangSource;
     programDesc.sourceDataSize = s.length;
     programDesc.entryPointCount = 1;

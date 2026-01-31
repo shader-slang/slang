@@ -587,6 +587,7 @@ public:
             bool first = true;
             UInt count = 0;
             forEachInSet(
+                module,
                 witnessTableSet,
                 [&](IRInst* table)
                 {
@@ -619,6 +620,7 @@ public:
             bool first = true;
             UInt count = 0;
             forEachInSet(
+                module,
                 witnessTableSet,
                 [&](IRInst* table)
                 {
@@ -679,10 +681,11 @@ public:
         auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
         auto key = cast<IRStructKey>(dispatcher->getOperand(1));
 
-        IRBuilder builder(dispatcher->getModule());
+        IRBuilder builder(module);
 
         Dictionary<IRInst*, IRInst*> elements;
         forEachInSet(
+            module,
             witnessTableSet,
             [&](IRInst* table)
             {
@@ -754,14 +757,15 @@ public:
         Dictionary<IRInst*, IRInst*> elements;
         IRBuilder builder(dispatcher->getModule());
         forEachInSet(
+            module,
             witnessTableSet,
             [&](IRInst* table)
             {
                 auto generic =
                     cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
 
-                auto specializedFuncType =
-                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
+                auto specializedFuncType = (IRType*)specializeGeneric(
+                    cast<IRSpecialize>(builder.emitSpecializeInst(
                         builder.getTypeKind(),
                         generic->getDataType(),
                         specArgs.getCount(),
@@ -950,7 +954,11 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     {
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
-            [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
+            [&](IRUntaggedUnionType* inst)
+            {
+                if (inst->hasUses())
+                    return lowerUntaggedUnionType(inst);
+            });
 
         replaceNoneTypeElementWithVoidType();
     }
@@ -1005,6 +1013,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -1054,6 +1063,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -1494,9 +1504,10 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto tableSet = taggedUnion->getWitnessTableSet();
 
         if (taggedUnion->getTypeSet()->isSingleton())
-            return builder.getTupleType(List<IRType*>(
-                {(IRType*)builder.getSetTagType(tableSet),
-                 (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
+            return builder.getTupleType(
+                List<IRType*>(
+                    {(IRType*)builder.getSetTagType(tableSet),
+                     (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)builder.getSetTagType(tableSet), (IRType*)typeSet}));
@@ -2150,4 +2161,5 @@ bool lowerExistentials(IRModule* module, TargetProgram* targetProgram, Diagnosti
     context.processModule();
     return true;
 };
+
 }; // namespace Slang

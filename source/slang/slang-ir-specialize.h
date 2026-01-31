@@ -29,11 +29,6 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module);
 
-IRInst* specializeGeneric(IRSpecialize* specInst);
-
-// Specialize a generic with one or more arguments that are collections rather
-// than single concrete values.
-//
-IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst);
+IRInst* specializeGeneric(IRSpecialize* specializeInst);
 
 } // namespace Slang

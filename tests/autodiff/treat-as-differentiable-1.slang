@@ -9,20 +9,21 @@ RWStructuredBuffer<float> outputBuffer;
 
 interface IFoo
 {
-    [BackwardDifferentiable]
+    [Differentiable]
     float f(float v);
 }
 
 struct B : IFoo
 {
+    uint factor;
     [TreatAsDifferentiable]
     float f(float v)
     {
-        return v * v;
+        return factor * v;
     }
 }
 
-[BackwardDifferentiable]
+[Differentiable]
 float use(IFoo o, float x)
 {
     return o.f(x);
@@ -31,8 +32,8 @@ float use(IFoo o, float x)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    B b;
+    B b = {2};
     var p = diffPair(1.0);
-    __bwd_diff(use)(b, p, 1.0);
+    bwd_diff(use)(b, p, 1.0);
     outputBuffer[0] = p.d;
 }

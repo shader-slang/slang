@@ -370,6 +370,13 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE() TypeExp targetType;
 };
 
+/* An extension that applies to a function declaration
+class FunctionExtensionDecl : public CallableDecl
+{
+    SLANG_AST_CLASS(FunctionExtensionDecl)
+    Expr* targetFuncExpr;
+};*/
+
 enum class TypeTag
 {
     None = 0,
@@ -413,6 +420,14 @@ class StructDecl : public AggTypeDecl
 
     // We will use these auxiliary to help in synthesizing the member initialize constructor.
     Slang::HashSet<VarDeclBase*> m_membersVisibleInCtor;
+};
+
+FIDDLE()
+class SynthesizedStructDecl : public AggTypeDecl
+{
+    FIDDLE(...)
+    FIDDLE() List<Val*> operands;
+    FIDDLE() uint32_t irOp;
 };
 
 FIDDLE()
@@ -474,6 +489,14 @@ class ThisTypeDecl : public AggTypeDecl
 // An interface which other types can conform to
 FIDDLE()
 class InterfaceDecl : public AggTypeDecl
+{
+    FIDDLE(...)
+    ThisTypeDecl* getThisTypeDecl();
+};
+
+FIDDLE()
+// Function interface that functions can conform to
+class FunctionInterfaceDecl : public AggTypeDecl
 {
     FIDDLE(...)
     ThisTypeDecl* getThisTypeDecl();
@@ -610,6 +633,11 @@ class CallableDecl : public ContainerDecl
     // If this callable throws an error code, `errorType` is the type of the error code.
     FIDDLE() TypeExp errorType;
 
+    // Optional function expression type, which, if present, will be used to determine
+    // the return type and parameter types of the callable.
+    //
+    FIDDLE() TypeExp funcType;
+
     // Fields related to redeclaration, so that we
     // can support multiple specialized variations
     // of the "same" logical function.
@@ -634,6 +662,14 @@ class FunctionDeclBase : public CallableDecl
     FIDDLE(...)
     Stmt* body = nullptr;
 };
+
+FIDDLE()
+class FuncAliasDecl : public CallableDecl
+{
+    FIDDLE(...)
+    FIDDLE() DeclRef<CallableDecl> targetDeclRef;
+};
+
 
 // A constructor/initializer to create instances of a type
 FIDDLE()
@@ -710,6 +746,14 @@ class FuncDecl : public FunctionDeclBase
     FIDDLE(...)
 };
 
+FIDDLE()
+class SynthesizedFuncDecl : public FunctionDeclBase
+{
+    FIDDLE(...)
+    FIDDLE() List<Val*> operands;
+    FIDDLE() uint32_t irOp;
+};
+
 FIDDLE(abstract)
 class NamespaceDeclBase : public ContainerDecl
 {
@@ -767,7 +811,7 @@ class ModuleDecl : public NamespaceDeclBase
     ///
     /// This mapping is filled in during semantic checking, as `ExtensionDecl`s get checked.
     ///
-    FIDDLE() Dictionary<AggTypeDecl*, RefPtr<CandidateExtensionList>> mapTypeToCandidateExtensions;
+    FIDDLE() Dictionary<Decl*, RefPtr<CandidateExtensionList>> mapDeclToCandidateExtensions;
 
     /// Is this module using on-demand deserialization for its exports?
     ///
@@ -903,6 +947,13 @@ class GenericTypePackParamDecl : public GenericTypeParamDeclBase
     FIDDLE(...)
 };
 
+/*
+class GenericFuncTypeParamDecl : public GenericTypeParamDeclBase
+{
+    SLANG_AST_CLASS(GenericFuncTypeParamDecl)
+};
+*/
+
 // A constraint placed as part of a generic declaration
 FIDDLE()
 class GenericTypeConstraintDecl : public TypeConstraintDecl
@@ -980,42 +1031,6 @@ class AttributeDecl : public ContainerDecl
     FIDDLE(...)
     // What type of syntax node will be produced to represent this attribute.
     FIDDLE() SyntaxClass<NodeBase> syntaxClass;
-};
-
-// A synthesized decl used as a placeholder for a differentiable function requirement. This decl
-// will be a child of interface decl. This allows us to form an interface requirement key for the
-// derivative of an interface function. The synthesized `DerivativeRequirementDecl` will be a child
-// of the original function requirement decl after an interface type is checked.
-FIDDLE()
-class DerivativeRequirementDecl : public FunctionDeclBase
-{
-    FIDDLE(...)
-    // The original requirement decl.
-    FIDDLE() Decl* originalRequirementDecl = nullptr;
-
-    // Type to use for 'ThisType'
-    FIDDLE() Type* diffThisType;
-};
-
-// A reference to a synthesized decl representing a differentiable function requirement, this decl
-// will be a child in the orignal function.
-FIDDLE()
-class DerivativeRequirementReferenceDecl : public Decl
-{
-    FIDDLE(...)
-    FIDDLE() DerivativeRequirementDecl* referencedDecl;
-};
-
-FIDDLE()
-class ForwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class BackwardDerivativeRequirementDecl : public DerivativeRequirementDecl
-{
-    FIDDLE(...)
 };
 
 bool isInterfaceRequirement(Decl* decl);

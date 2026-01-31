@@ -45,6 +45,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     A a = {0.0};
     var p = diffPair(3.0, 0.0);
-    let rs = __bwd_diff(test)(a, p, 1.0);
+    let rs = bwd_diff(test)(a, p, 1.0);
     outputBuffer[0] = p.d;
 }

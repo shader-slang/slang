@@ -65,6 +65,49 @@ struct DeduplicateContext
     }
 };
 
+
+//
+// Helper struct to represent a parameter's direction and type component separately.
+// Useful for passes that need to reason about parameter directions (like `in`, `out`, `ref`, etc.)
+//
+struct ParameterDirectionInfo
+{
+    enum Kind
+    {
+        In,
+        BorrowIn,
+        Out,
+        BorrowInOut,
+        Ref
+    } kind;
+
+    // For Ref and BorrowInOut
+    AddressSpace addressSpace;
+
+    ParameterDirectionInfo(Kind kind, AddressSpace addressSpace = (AddressSpace)0)
+        : kind(kind), addressSpace(addressSpace)
+    {
+    }
+
+    ParameterDirectionInfo()
+        : kind(Kind::In), addressSpace((AddressSpace)0)
+    {
+    }
+
+    bool operator==(const ParameterDirectionInfo& other) const
+    {
+        return kind == other.kind && addressSpace == other.addressSpace;
+    }
+};
+
+
+// Split into direction and type
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType);
+
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type);
+
+bool isAnnotation(IRInst* inst);
+
 bool isPtrToClassType(IRInst* type);
 
 bool isPtrToArrayType(IRInst* type);
@@ -441,6 +484,10 @@ IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type);
 bool isSignedType(IRType* type);
 
 bool isIROpaqueType(IRType* type);
+
+IRInst* tryGetTranslation(IRModule* module, IRInst* inst);
+
+IRInst* registerTranslation(IRModule* module, IRInst* from, IRInst* to);
 
 // Returns true if the memory location pointed to by `ptrInst` is immutable.
 // An immutable location is the memory region that can't be modified by the user code.

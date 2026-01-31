@@ -445,6 +445,8 @@ struct IRAutoPyBindCudaDecoration : IRDecoration
     FIDDLE(leafInst())
 
     UnownedStringSlice getFunctionName() { return getFunctionNameOperand()->getStringSlice(); }
+    IRInst* getFwdDiffFuncOperand() { return getOperand(1); }
+    IRInst* getBwdDiffFuncOperand() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -531,12 +533,6 @@ struct IRAutoDiffOriginalValueDecoration : IRDecoration
 
 FIDDLE()
 struct IRForwardDerivativeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRPrimalSubstituteDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 };
@@ -660,15 +656,24 @@ struct IRDerivativeMemberDecoration : IRDecoration
     FIDDLE(leafInst())
 };
 
+
+FIDDLE()
+struct IRTranslateBase : public IRInst
+{
+    FIDDLE(baseInst())
+};
+
 // An instruction that replaces the function symbol
 // with it's derivative function.
+
 FIDDLE()
-struct IRForwardDifferentiate : IRInst
+struct IRForwardDifferentiate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
 };
+
 
 // An instruction that replaces the function symbol
 // with its backward derivative primal function.
@@ -677,7 +682,7 @@ struct IRForwardDifferentiate : IRInst
 // computations and returns the intermediates that will be used
 // by the actual backward derivative function.
 FIDDLE()
-struct IRBackwardDifferentiatePrimal : IRInst
+struct IRBackwardDifferentiatePrimal : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
@@ -689,23 +694,59 @@ struct IRBackwardDifferentiatePrimal : IRInst
 // It uses the intermediates computed in the bacward derivative primal function to perform the
 // actual backward derivative propagation.
 FIDDLE()
-struct IRBackwardDifferentiatePropagate : IRInst
+struct IRBackwardDifferentiatePropagate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
 };
 
+
+// AD 2.0 Internal Use Inst.
+FIDDLE()
+struct IRForwardDifferentiatePropagate : IRTranslateBase
+{
+    FIDDLE(leafInst())
+
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+};
+
 // An instruction that replaces the function symbol with its backward derivative function.
 // A backward derivative function is a concept that combines both passes of backward derivative
 // computation. This inst should only be produced by lower-to-ir, and will be replaced with calls to
 // the primal function followed by the propagate function in the auto-diff pass.
+
 FIDDLE()
-struct IRBackwardDifferentiate : IRInst
+struct IRBackwardDifferentiate : IRTranslateBase
 {
     FIDDLE(leafInst())
     // The base function for the call.
     IRUse base;
+    IRInst* getApplyFunc() { return getOperand(0); }
+    IRInst* getContextType() { return getOperand(1); }
+    IRInst* getBwdPropFunc() { return getOperand(2); }
+};
+
+FIDDLE()
+struct IRBackwardPrimalFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    FIDDLE(leafInst())
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
+};
+
+FIDDLE()
+struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
+{
+    FIDDLE(leafInst())
+    // The base function for the call.
+    IRUse base;
+    IRInst* getBaseFn() { return getOperand(0); }
+    IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
 };
 
 FIDDLE()
@@ -722,9 +763,12 @@ struct IRPrimalSubstitute : IRInst
 };
 
 FIDDLE()
-struct IRDifferentiableTypeAnnotation : IRInst
+struct IRAssociatedInstAnnotation : IRInst
 {
     FIDDLE(leafInst())
+    IRInst* getTarget() { return getOperand(0); }
+    IRIntegerValue getConformanceID() { return as<IRIntLit>(getOperand(1))->getValue(); }
+    IRInst* getInst() { return getOperand(2); }
 };
 
 FIDDLE()
@@ -2939,6 +2983,30 @@ struct IRUntaggedUnionType : IRType
     IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
 };
 
+FIDDLE()
+struct IRCompilerDictionaryValue : IRInst
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRCompilerDictionaryEntry : IRInst
+{
+    FIDDLE(leafInst())
+    IRInst* getValue()
+    {
+        for (auto child : getDecorationsAndChildren())
+        {
+            if (auto dictValue = as<IRCompilerDictionaryValue>(child))
+            {
+                return dictValue->getValue();
+            }
+        }
+
+        return nullptr;
+    }
+};
+
 // Generate struct definitions for all IR instructions not explicitly defined in this file
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-ir.h.lua")
@@ -3398,8 +3466,31 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitIntrinsicInst(getVoidType(), kIROp_IndexedFieldKey, 2, args);
     }
 
+    IRCompilerDictionaryEntry* _getCompilerDictionaryEntry(List<IRInst*> const& keys);
+
+    void addCompilerDictionaryEntry(
+        IRCompilerDictionary* dict,
+        IRInst* translationInst,
+        IRInst* resultInst);
+
+    IRCompilerDictionaryEntry* fetchCompilerDictionaryEntry(
+        IRCompilerDictionary* dict,
+        IRInst* translationInst);
+
+    void setCompilerDictionaryEntryValue(IRCompilerDictionaryEntry* entry, IRInst* valueInst);
+
+    IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
+
+    // Annotation helpers.
+    void addAnnotation(IRInst* target, ValAssociationKind kind, IRInst* value);
+    IRInst* tryLookupAnnotation(IRInst* target, ValAssociationKind kind);
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
+
+    IRWeakUse* getWeakUse(IRInst* inst)
+    {
+        return cast<IRWeakUse>(emitIntrinsicInst(nullptr, kIROp_WeakUse, 1, &inst));
+    }
 
     IRInst* emitDebugSource(
         UnownedStringSlice fileName,
@@ -3470,6 +3561,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitBackwardDifferentiateInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
+    IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
     IRInst* emitIsDifferentialNull(IRInst* value);
@@ -3492,7 +3584,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitMakeDifferentialPair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialValuePair(IRType* type, IRInst* primal, IRInst* differential);
     IRInst* emitMakeDifferentialPtrPair(IRType* type, IRInst* primal, IRInst* differential);
-    IRInst* emitMakeDifferentialPairUserCode(IRType* type, IRInst* primal, IRInst* differential);
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
@@ -3695,8 +3786,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitDifferentialValuePairGetPrimal(IRType* primalType, IRInst* diffPair);
     IRInst* emitDifferentialPtrPairGetPrimal(IRType* primalType, IRInst* diffPair);
 
-    IRInst* emitDifferentialPairGetDifferentialUserCode(IRType* diffType, IRInst* diffPair);
-    IRInst* emitDifferentialPairGetPrimalUserCode(IRInst* diffPair);
     IRInst* emitMakeVector(IRType* type, UInt argCount, IRInst* const* args);
     IRInst* emitMakeVectorFromScalar(IRType* type, IRInst* scalarValue);
     IRInst* emitMakeCompositeFromScalar(IRType* type, IRInst* scalarValue);
@@ -4208,9 +4297,18 @@ $(type_info.return_type) $(type_info.method_name)(
     {
         auto taggedUnionType = cast<IRTaggedUnionType>(taggedUnion->getDataType());
 
-        IRInst* typeSet = taggedUnionType->getTypeSet();
-        auto valueOfTypeSetType = cast<IRUntaggedUnionType>(
-            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &typeSet));
+        IRTypeSet* typeSet = taggedUnionType->getTypeSet();
+        IRType* valueOfTypeSetType = nullptr;
+        if (!typeSet->isSingleton())
+        {
+            IRInst* operand = typeSet;
+            valueOfTypeSetType = cast<IRUntaggedUnionType>(
+                emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &operand));
+        }
+        else
+        {
+            valueOfTypeSetType = (IRType*)typeSet->getElement(0);
+        }
 
         return cast<IRGetValueFromTaggedUnion>(
             emitIntrinsicInst(valueOfTypeSetType, kIROp_GetValueFromTaggedUnion, 1, &taggedUnion));
@@ -4635,6 +4733,16 @@ $(type_info.return_type) $(type_info.method_name)(
             getStringValue(prelude));
     }
 
+    void addAllowPreTranslationInliningDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_AllowPreTranslationInliningDecoration);
+    }
+
+    void addReturnValueContextFieldDecoration(IRInst* value)
+    {
+        addDecoration(value, kIROp_ReturnValueContextFieldDecoration);
+    }
+
     IRInst* getSemanticVersionValue(SemanticVersion const& value)
     {
         SemanticVersion::RawValue rawValue = value.getRawValue();
@@ -4728,39 +4836,9 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_AutoDiffOriginalValueDecoration, originalVal);
     }
 
-    void addForwardDifferentiableDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_ForwardDifferentiableDecoration);
-    }
-
-    void addBackwardDifferentiableDecoration(IRInst* value)
-    {
-        addDecoration(value, kIROp_BackwardDifferentiableDecoration);
-    }
-
-    void addForwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
-    {
-        addDecoration(value, kIROp_ForwardDerivativeDecoration, fwdFunc);
-    }
-
-    void addUserDefinedBackwardDerivativeDecoration(IRInst* value, IRInst* fwdFunc)
-    {
-        addDecoration(value, kIROp_UserDefinedBackwardDerivativeDecoration, fwdFunc);
-    }
-
-    void addBackwardDerivativePrimalDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativePrimalDecoration, jvpFn);
-    }
-
     void addBackwardDerivativePrimalReturnDecoration(IRInst* value, IRInst* retVal)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalReturnDecoration, retVal);
-    }
-
-    void addBackwardDerivativePropagateDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativePropagateDecoration, jvpFn);
     }
 
     void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
@@ -4768,19 +4846,9 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
     }
 
-    void addBackwardDerivativeIntermediateTypeDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativeIntermediateTypeDecoration, jvpFn);
-    }
-
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
-    }
-
-    void addPrimalSubstituteDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_PrimalSubstituteDecoration, jvpFn);
     }
 
     void addLoopCounterDecoration(IRInst* value)
@@ -4864,7 +4932,26 @@ $(type_info.return_type) $(type_info.method_name)(
 
     void addAutoPyBindCudaDecoration(IRInst* value, UnownedStringSlice const& functionName)
     {
-        addDecoration(value, kIROp_AutoPyBindCudaDecoration, getStringValue(functionName));
+        addDecoration(
+            value,
+            kIROp_AutoPyBindCudaDecoration,
+            getStringValue(functionName),
+            nullptr,
+            nullptr);
+    }
+
+    void addAutoPyBindCudaDecoration(
+        IRInst* value,
+        UnownedStringSlice const& functionName,
+        IRInst* fwdDiffFunc,
+        IRInst* bwdDiffFunc)
+    {
+        addDecoration(
+            value,
+            kIROp_AutoPyBindCudaDecoration,
+            getStringValue(functionName),
+            fwdDiffFunc,
+            bwdDiffFunc);
     }
 
     void addPyExportDecoration(IRInst* value, UnownedStringSlice const& exportName)
