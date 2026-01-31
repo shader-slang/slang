@@ -13215,8 +13215,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         if (translationUnit->getModuleDecl()->languageVersion >=
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
         {
-            // We do not allow specializing a generic function with an existential type.
-            addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
+            // We do not allow specializing a generic function with an existential type, in most contexts.
+            //
+            // This is done by adding a decoration because only the typeflow-specialize pass actually knows whether a marked specialization is legal.
+            addDecorationsForGenericsSpecializedWithExistentials(module);
         }
     }
 
