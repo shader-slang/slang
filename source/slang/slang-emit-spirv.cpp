@@ -3793,9 +3793,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // for them, we go through and fill them in with their bodies.
         //
         // Each loop inst results in a loop header block.
-        // We will defer the emit of the contents in loop header block
-        // until all Phi insts are emitted.
-        List<IRLoop*> pendingLoopInsts;
+        // We will emit the contents of loop header blocks immediately after
+        // emitting the Phi instructions for the loop's target block.
+        // This ensures debug line information appears in source order.
+        HashSet<IRLoop*> pendingLoopInsts;
         for (auto irBlock : irFunc->getBlocks())
         {
             // Note: because we already created the block above,
@@ -3815,6 +3816,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     emitPhi(spvBlock, irParam);
                 }
             }
+
+            // After emitting Phi nodes, check if this block is a loop's target block.
+            // If so, emit the loop header block contents now to maintain source order.
+            IRInst* loopInst = nullptr;
+            if (isLoopTargetBlock(irBlock, loopInst))
+            {
+                // Check if this loop is in our pending set
+                if (pendingLoopInsts.contains(as<IRLoop>(loopInst)))
+                {
+                    // Emit the loop header block contents now
+                    SpvInst* headerBlock = nullptr;
+                    m_mapIRInstToSpvInst.tryGetValue(loopInst, headerBlock);
+                    SLANG_ASSERT(headerBlock);
+                    emitLoopHeaderBlock(as<IRLoop>(loopInst), headerBlock);
+                    // Remove from pending set
+                    pendingLoopInsts.remove(as<IRLoop>(loopInst));
+                }
+            }
+
             for (auto irInst : irBlock->getOrdinaryInsts())
             {
                 // Any instructions local to the block will be emitted as children
@@ -3835,7 +3855,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        // Finally, we generate the body of loop header blocks.
+        // Emit any remaining loop header blocks that weren't emitted inline.
+        // This handles cases where the loop's target block comes before the loop instruction in the
+        // block list.
         for (auto loopInst : pendingLoopInsts)
         {
             SpvInst* headerBlock = nullptr;
