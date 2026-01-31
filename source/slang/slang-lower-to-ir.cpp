@@ -8815,6 +8815,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
     IGNORED_CASE(RequireCapabilityDecl)
+    IGNORED_CASE(SemanticDecl)
 
 #undef IGNORED_CASE
 
