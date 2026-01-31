@@ -90,7 +90,7 @@ static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
         String stringComposedName(composedName);
 
         info.name = stringComposedName.subString(0, indexLoc);
-        info.index = (UInt)stringToInt(stringComposedName.subString(indexLoc, length - indexLoc));
+        info.index = stringToUInt(stringComposedName.subString(indexLoc, length - indexLoc));
     }
     return info;
 }
@@ -2641,7 +2641,7 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             builder->addSemanticDecoration(
                 inst,
                 semanticInfo.name.getUnownedSlice(),
-                (int)semanticInfo.index);
+                (IRIntegerValue)semanticInfo.index);
         }
         else if (as<DynamicUniformModifier>(mod))
         {
