@@ -51,7 +51,7 @@ namespace Slang
 struct SimpleSemanticInfo
 {
     String name;
-    int index;
+    UInt index;
 };
 
 static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
@@ -90,7 +90,7 @@ static SimpleSemanticInfo decomposeSimpleSemantic(HLSLSimpleSemantic* semantic)
         String stringComposedName(composedName);
 
         info.name = stringComposedName.subString(0, indexLoc);
-        info.index = stringToInt(stringComposedName.subString(indexLoc, length - indexLoc));
+        info.index = (UInt)stringToInt(stringComposedName.subString(indexLoc, length - indexLoc));
     }
     return info;
 }
@@ -2641,7 +2641,7 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
             builder->addSemanticDecoration(
                 inst,
                 semanticInfo.name.getUnownedSlice(),
-                semanticInfo.index);
+                (int)semanticInfo.index);
         }
         else if (as<DynamicUniformModifier>(mod))
         {
