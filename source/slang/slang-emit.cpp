@@ -22,6 +22,7 @@
 #include "slang-emit-torch.h"
 #include "slang-emit-vm.h"
 #include "slang-emit-wgsl.h"
+#include "slang-emit-tsl.h"
 #include "slang-ir-any-value-inference.h"
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-autodiff.h"
@@ -1681,6 +1682,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSL:
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::TSL:
         {
             SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
@@ -2088,6 +2090,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
             // See https://github.com/gpuweb/gpuweb/issues/606.
             lineDirectiveMode = LineDirectiveMode::None;
             break;
+
+        case CodeGenTarget::TSL:
+            // TSL is JavaScript-based, doesn't support #line directives.
+            lineDirectiveMode = LineDirectiveMode::None;
+            break;
         }
     }
 
@@ -2158,6 +2165,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
         case SourceLanguage::WGSL:
             {
                 sourceEmitter = new WGSLSourceEmitter(desc);
+                break;
+            }
+        case SourceLanguage::TSL:
+            {
+                sourceEmitter = new TSLSourceEmitter(desc);
                 break;
             }
         default:

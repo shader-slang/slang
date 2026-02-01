@@ -2915,6 +2915,7 @@ LayoutRulesFamilyImpl* getDefaultLayoutRulesFamilyForTarget(TargetRequest* targe
     case CodeGenTarget::WGSL:
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
+    case CodeGenTarget::TSL:
         return &kWGSLLayoutRulesFamilyImpl;
 
     case CodeGenTarget::HostHostCallable:
