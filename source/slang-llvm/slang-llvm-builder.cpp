@@ -12,6 +12,7 @@
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
@@ -104,6 +105,7 @@ llvm::StringRef charSliceToLLVM(CharSlice slice)
 
 class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
 {
+public:
     LLVMBuilderOptions options;
 
     std::unique_ptr<llvm::LLVMContext> llvmContext;
@@ -170,7 +172,6 @@ class LLVMBuilder : public ComBaseObject, public ILLVMBuilder
     // LLVM IR.
     Dictionary<ExternalFunc, llvm::Function*> externalFuncs;
 
-public:
     typedef ComBaseObject Super;
 
     LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifact);
@@ -178,7 +179,8 @@ public:
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
 
-    void optimize();
+    void optimizeKernel(llvm::OptimizationLevel level);
+    void optimizeHost(llvm::OptimizationLevel level);
     void finalize();
 
     // This function inserts the given LLVM IR in the global scope.
@@ -191,8 +193,6 @@ public:
         Slice<LLVMInst*> args,
         Slice<bool> argIsSigned,
         List<LLVMInst*>& outArgs);
-
-    void annotateMemoryAccess(llvm::Instruction* inst);
 
     static void diagnosticHandler(const llvm::DiagnosticInfo* DI, void* context);
 
@@ -608,42 +608,111 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
     return artifact.detach();
 }
 
-void LLVMBuilder::optimize()
+struct KernelInstVisitor : llvm::InstVisitor<KernelInstVisitor>
 {
+    LLVMBuilder* builder;
+    KernelInstVisitor (LLVMBuilder* builder)
+    : builder(builder)
+    {
+    }
+
+    void visitLoadInst(llvm::LoadInst& inst)
+    {
+        inst.setMetadata(llvm::LLVMContext::MD_access_group, builder->wiParallelAccessGroup);
+    }
+
+    void visitStoreInst(llvm::StoreInst& inst)
+    {
+        inst.setMetadata(llvm::LLVMContext::MD_access_group, builder->wiParallelAccessGroup);
+    }
+
+    void visitFunction(llvm::Function& inst)
+    {
+        // Always inline all functions. They almost always do get inlined
+        // anyways, but not at the earliest opportunity. That can cause some
+        // passes to do unwanted transforms that eventually hamper
+        // LoopVectorizer.
+        inst.addFnAttr(llvm::Attribute::AttrKind::AlwaysInline);
+    }
+};
+
+void LLVMBuilder::optimizeKernel(llvm::OptimizationLevel level)
+{
+    KernelInstVisitor kernelizer(this);
+    kernelizer.visit(*llvmModule);
+
+    llvm::PipelineTuningOptions pipelineTuningOptions = llvm::PipelineTuningOptions();
+
+    // Empirically, SLP seems actively harmful on kernel targets. It
+    // probably interferes with loop vectorization.
+    pipelineTuningOptions.SLPVectorization = false;
+
     llvm::LoopAnalysisManager loopAnalysisManager;
     llvm::FunctionAnalysisManager functionAnalysisManager;
     llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
     llvm::ModuleAnalysisManager moduleAnalysisManager;
 
-    bool kernelTarget = false;
-    switch (options.target)
-    {
-    case SLANG_SHADER_SHARED_LIBRARY:
-    case SLANG_SHADER_HOST_CALLABLE:
-    case SLANG_SHADER_LLVM_IR:
-    case SLANG_OBJECT_CODE:
-        kernelTarget = true;
-        break;
-    default:
-        kernelTarget = false;
-        break;
-    }
+    llvm::PassInstrumentationCallbacks PIC;
+    llvm::PrintPassOptions PrintPassOpts;
+    PrintPassOpts.Verbose = true;
+    PrintPassOpts.SkipAnalyses = false;
+    PrintPassOpts.Indent = true;
+    llvm::StandardInstrumentations SI(*llvmContext, false, false, PrintPassOpts);
+    SI.registerCallbacks(PIC, &moduleAnalysisManager);
 
+    llvm::PassBuilder passBuilder(targetMachine, pipelineTuningOptions, {}, &PIC);
+    passBuilder.registerModuleAnalyses(moduleAnalysisManager);
+    passBuilder.registerCGSCCAnalyses(CGSCCAnalysisManager);
+    passBuilder.registerFunctionAnalyses(functionAnalysisManager);
+    passBuilder.registerLoopAnalyses(loopAnalysisManager);
+    passBuilder.crossRegisterProxies(
+        loopAnalysisManager,
+        functionAnalysisManager,
+        CGSCCAnalysisManager,
+        moduleAnalysisManager);
+
+    passBuilder.registerPipelineStartEPCallback(
+        [&](llvm::ModulePassManager& modulePassManager, llvm::OptimizationLevel level)
+        {
+            // The scalarization pass allows re-vectorizing on the workgroup
+            // loop level, which is why we run it for all of the shader/kernel
+            // targets. The loop vectorizer is far more reliable than SLP and we
+            // always have a loop for kernels.
+            llvm::ScalarizerPassOptions scalarizerOpts;
+            scalarizerOpts.ScalarizeLoadStore = true;
+            scalarizerOpts.ScalarizeVariableInsertExtract = true;
+            modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ScalarizerPass(scalarizerOpts)));
+        }
+    );
+
+    // Run the actual optimizations.
+    llvm::ModulePassManager modulePassManager = passBuilder.buildPerModuleDefaultPipeline(level);
+
+#if 0
+    // Dump enabled LLVM passes. If you're wondering if some specific pass runs
+    // and when it runs, check these out.
+    std::string out;
+    llvm::raw_string_ostream rso(out);
+    modulePassManager.printPipeline(rso, [&PIC](llvm::StringRef ClassName) {
+      auto PassName = PIC.getPassNameForClassName(ClassName);
+      return PassName.empty() ? ClassName : PassName;
+    });
+
+    printf("LLVM optimization passes: %s\n", out.c_str());
+#endif
+
+    modulePassManager.run(*llvmModule, moduleAnalysisManager);
+}
+
+void LLVMBuilder::optimizeHost(llvm::OptimizationLevel level)
+{
     llvm::PipelineTuningOptions pipelineTuningOptions = llvm::PipelineTuningOptions();
+    pipelineTuningOptions.SLPVectorization = true;
 
-
-    if (kernelTarget)
-    {
-        // Need to inline as much as possible to aid loop vectorization.
-        pipelineTuningOptions.InlinerThreshold = INT32_MAX;
-        // Empirically, SLP seems actively harmful on kernel targets. It
-        // probably interferes with loop vectorization.
-        pipelineTuningOptions.SLPVectorization = false;
-    }
-    else
-    {
-        pipelineTuningOptions.SLPVectorization = true;
-    }
+    llvm::LoopAnalysisManager loopAnalysisManager;
+    llvm::FunctionAnalysisManager functionAnalysisManager;
+    llvm::CGSCCAnalysisManager CGSCCAnalysisManager;
+    llvm::ModuleAnalysisManager moduleAnalysisManager;
 
     llvm::PassBuilder passBuilder(targetMachine, pipelineTuningOptions);
     passBuilder.registerModuleAnalyses(moduleAnalysisManager);
@@ -656,74 +725,8 @@ void LLVMBuilder::optimize()
         CGSCCAnalysisManager,
         moduleAnalysisManager);
 
-    llvm::OptimizationLevel llvmLevel = llvm::OptimizationLevel::O0;
-
-    switch (options.optLevel)
-    {
-    case SLANG_OPTIMIZATION_LEVEL_NONE:
-        llvmLevel = llvm::OptimizationLevel::O0;
-        break;
-    default:
-    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
-        llvmLevel = llvm::OptimizationLevel::O1;
-        break;
-    case SLANG_OPTIMIZATION_LEVEL_HIGH:
-        llvmLevel = llvm::OptimizationLevel::O2;
-        break;
-    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
-        llvmLevel = llvm::OptimizationLevel::O3;
-        break;
-    }
-
-    passBuilder.registerPipelineStartEPCallback(
-        [&](llvm::ModulePassManager& modulePassManager, llvm::OptimizationLevel level)
-        {
-            if (kernelTarget)
-            {
-                // The scalarization pass allows re-vectorizing on the
-                // workgroup loop level, which is why we run it for all of the
-                // shader/kernel targets.
-                //
-                // The loop vectorizer is far more reliable than SLP and we
-                // always have a loop for kernels.
-                if (level != llvm::OptimizationLevel::O0)
-                    modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(llvm::ScalarizerPass()));
-            }
-            else
-            {
-                // Non-kernel targets don't run scalarizer for now, because they
-                // are more reliant on the SLP vectorizer, which is abysmal at
-                // re-discovering vectorization opportunities. It would do more
-                // harm than good there.
-            }
-        }
-    );
-
-
     // Run the actual optimizations.
-    llvm::ModulePassManager modulePassManager =
-        passBuilder.buildPerModuleDefaultPipeline(llvmLevel);
-
-#if 0
-    // Dump enabled LLVM passes. If you're wondering if some specific pass runs
-    // and when it runs, check these out.
-
-    llvm::PassInstrumentationCallbacks PIC;
-    llvm::PrintPassOptions PrintPassOpts;
-    PrintPassOpts.Verbose = false;
-    PrintPassOpts.SkipAnalyses = true;
-    llvm::StandardInstrumentations SI(*llvmContext, false, false, PrintPassOpts);
-    SI.registerCallbacks(PIC, &moduleAnalysisManager);
-
-    std::string out;
-    llvm::raw_string_ostream rso(out);
-    modulePassManager.printPipeline(rso, [&PIC](llvm::StringRef ClassName) {
-      auto PassName = PIC.getPassNameForClassName(ClassName);
-      return PassName.empty() ? ClassName : PassName;
-    });
-
-    printf("LLVM optimization passes: %s\n", out.c_str());
-#endif
+    llvm::ModulePassManager modulePassManager = passBuilder.buildPerModuleDefaultPipeline(level);
 
     modulePassManager.run(*llvmModule, moduleAnalysisManager);
 }
@@ -757,14 +760,59 @@ void LLVMBuilder::finalize()
 
     llvm::verifyModule(*llvmModule, &llvm::errs());
 
-    // O0 is separately handled inside `optimize()`; we need to call it in
-    // any case to make sure that `ForceInline` functions get inlined.
-    optimize();
+    llvm::OptimizationLevel llvmLevel = llvm::OptimizationLevel::O0;
+
+    switch (options.optLevel)
+    {
+    case SLANG_OPTIMIZATION_LEVEL_NONE:
+        llvmLevel = llvm::OptimizationLevel::O0;
+        break;
+    default:
+    case SLANG_OPTIMIZATION_LEVEL_DEFAULT:
+        llvmLevel = llvm::OptimizationLevel::O1;
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_HIGH:
+        llvmLevel = llvm::OptimizationLevel::O2;
+        break;
+    case SLANG_OPTIMIZATION_LEVEL_MAXIMAL:
+        llvmLevel = llvm::OptimizationLevel::O3;
+        break;
+    }
+
+    // O0 is separately handled inside `optimizeKernel()`/`optimizeHost()`; we
+    // need to call them in any case to make sure that `ForceInline` functions
+    // get inlined.
+    //
+    // There are major differences in optimization between kernel/shader and
+    // host targets, mostly because kernel targets should get aggressively
+    // loop-vectorized.
+    switch (options.target)
+    {
+    case SLANG_SHADER_SHARED_LIBRARY:
+    case SLANG_SHADER_HOST_CALLABLE:
+    case SLANG_SHADER_LLVM_IR:
+    case SLANG_OBJECT_CODE:
+        optimizeKernel(llvmLevel);
+        break;
+    default:
+        optimizeHost(llvmLevel);
+        break;
+    }
 
     if (options.debugLevel != SLANG_DEBUG_INFO_LEVEL_NONE)
     {
         llvmDebugBuilder->finalize();
     }
+
+#if 0
+    // Dump final, optimized LLVM IR to stdout
+    // Check this if you want to see if some optimization was performed as you
+    // expected.
+    std::string out;
+    llvm::raw_string_ostream rso(out);
+    llvmModule->print(rso, nullptr);
+    printf("%s\n", out.c_str());
+#endif
 }
 
 void LLVMBuilder::emitGlobalLLVMIR(const std::string& textIR)
@@ -854,12 +902,6 @@ void LLVMBuilder::makeVariadicArgsCCompatible(
         }
         outArgs.add(llvmValue);
     }
-}
-
-void LLVMBuilder::annotateMemoryAccess(llvm::Instruction* inst)
-{
-    if (inst->mayReadOrWriteMemory())
-        inst->setMetadata(llvm::LLVMContext::MD_access_group, wiParallelAccessGroup);
 }
 
 void LLVMBuilder::diagnosticHandler(const llvm::DiagnosticInfo* DI, void* context)
@@ -1133,7 +1175,6 @@ LLVMInst* LLVMBuilder::emitStore(LLVMInst* value, LLVMInst* ptr, int64_t alignme
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
     auto inst = llvmBuilder->CreateAlignedStore(value, ptr, llvm::MaybeAlign(alignment), isVolatile);
-    annotateMemoryAccess(inst);
     return inst;
 }
 
@@ -1141,7 +1182,6 @@ LLVMInst* LLVMBuilder::emitLoad(LLVMType* type, LLVMInst* ptr, int64_t alignment
 {
     SLANG_ASSERT(ptr->getType()->isPointerTy());
     auto inst = llvmBuilder->CreateAlignedLoad(type, ptr, llvm::MaybeAlign(alignment), isVolatile);
-    annotateMemoryAccess(inst);
     return inst;
 }
 
@@ -2110,7 +2150,6 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
             uintType,
             inGroupPtr,
             llvm::Twine("inGroupID_").concat(axis));
-        annotateMemoryAccess(inGroupID);
 
         // Set the legal value range for group ID so that optimizations aren't
         // thwarted by overflows.
@@ -2128,7 +2167,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
             threadInput,
             outIndices,
             llvm::Twine("ptrOutGroupID_").concat(axis));
-        annotateMemoryAccess(llvmBuilder->CreateStore(inGroupID, outGroupPtr));
+        llvmBuilder->CreateStore(inGroupID, outGroupPtr);
 
         outIndices[1] = llvmBuilder->getInt32(1);
         threadID[i] = llvmBuilder->CreateGEP(
@@ -2192,9 +2231,9 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
     // z = (i / w / h)
     auto threadIDZ = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::UDiv, indexPhi, workGroupSize[1]);
 
-    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDX, threadID[0]));
-    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDY, threadID[1]));
-    annotateMemoryAccess(llvmBuilder->CreateStore(threadIDZ, threadID[2]));
+    llvmBuilder->CreateStore(threadIDX, threadID[0]);
+    llvmBuilder->CreateStore(threadIDY, threadID[1]);
+    llvmBuilder->CreateStore(threadIDZ, threadID[2]);
 
     // Do the call to the actual entry point function.
     llvm::Value* args[3] = {threadInput, dispatcher->getArg(1), dispatcher->getArg(2)};
