@@ -2233,7 +2233,7 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
     // y = (i / w) % h
     auto threadIDY = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::URem, divYZ, workGroupSize[1]);
     // z = (i / w / h)
-    auto threadIDZ = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::UDiv, indexPhi, workGroupSize[1]);
+    auto threadIDZ = llvmBuilder->CreateBinOp(llvm::Instruction::BinaryOps::UDiv, divYZ, workGroupSize[1]);
 
     llvmBuilder->CreateStore(threadIDX, threadID[0]);
     llvmBuilder->CreateStore(threadIDY, threadID[1]);
