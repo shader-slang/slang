@@ -805,6 +805,9 @@ struct LLVMEmitter
             getOptions().getStringOption(CompilerOptionName::LLVMCPU).getUnownedSlice();
         if (cpuOption.getLength() == 0)
             cpuOption = UnownedStringSlice("generic");
+        if (useJIT)
+            cpuOption = UnownedStringSlice("native");
+
         auto featOption =
             getOptions().getStringOption(CompilerOptionName::LLVMFeatures).getUnownedSlice();
 

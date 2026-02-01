@@ -469,6 +469,10 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
         return;
     }
 
+    llvm::StringRef cpuName = charSliceToLLVM(options.cpu);
+    if (cpuName == "native")
+        cpuName = llvm::sys::getHostCPUName();
+
     llvm::TargetOptions opt;
 
     opt.NoTrappingFPMath = 1;
@@ -517,7 +521,7 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
 
     targetMachine = target->createTargetMachine(
         targetTriple,
-        charSliceToLLVM(options.cpu),
+        cpuName,
         charSliceToLLVM(options.features),
         opt,
         llvm::Reloc::PIC_,
