@@ -105,10 +105,13 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
         BASE(Int8, 1);
         BASE(UInt8, 1);
+        BASE(FloatE5M2, 1);
+        BASE(FloatE4M3, 1);
 
         BASE(Int16, 2);
         BASE(UInt16, 2);
         BASE(Half, 2);
+        BASE(BFloat16, 2);
 
         BASE(Int, 4);
         BASE(UInt, 4);
@@ -623,6 +626,44 @@ struct CLayoutRules : IRTypeLayoutRules
     }
 };
 
+// CUDA layout rules extend C layout rules with CUDA-specific vector alignment.
+// CUDA vector types (float2, float3, float4, etc.) have special alignment requirements:
+// - vec2: 2 * element size (e.g., float2 is 8-byte aligned)
+// - vec3: element size (e.g., float3 is 4-byte aligned, NOT 12 or 16)
+// - vec4: 4 * element size (e.g., float4 is 16-byte aligned)
+// This matches CUDA C++ compiler behavior for native vector types like float4, int2, etc.
+struct CUDALayoutRules : CLayoutRules
+{
+    CUDALayoutRules() { ruleName = IRTypeLayoutRuleName::CUDA; }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count)
+    {
+        IRIntegerValue size = element.size * count;
+        IRIntegerValue alignment;
+
+        if (count == 3)
+        {
+            // vec3 has same alignment as element (e.g., float3 is 4-byte aligned)
+            alignment = element.alignment;
+        }
+        else
+        {
+            // vec2, vec4, etc. have power-of-2 alignment
+            // float2 -> 8-byte, float4 -> 16-byte, double2 -> 16-byte
+            alignment = element.alignment * count;
+        }
+
+        // CUDA caps vector alignment at 16 bytes (per vector_types.h)
+        // This ensures double4 and longlong4 use 16-byte alignment, not 32-byte
+        if (alignment > 16)
+            alignment = 16;
+
+        return IRSizeAndAlignment(size, (int)alignment);
+    }
+};
+
 struct ConstantBufferLayoutRules : IRTypeLayoutRules
 {
     ConstantBufferLayoutRules() { ruleName = IRTypeLayoutRuleName::D3DConstantBuffer; }
@@ -845,6 +886,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getC()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getCUDA()
+{
+    static CUDALayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getLLVM()
 {
     static LLVMLayoutRules rules;
@@ -870,6 +917,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getNatural();
     case IRTypeLayoutRuleName::C:
         return getC();
+    case IRTypeLayoutRuleName::CUDA:
+        return getCUDA();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:

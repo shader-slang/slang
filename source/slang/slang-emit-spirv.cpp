@@ -808,18 +808,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return opCode;
     }
 
-    SpvOp _arithmeticOpCodeConvert(IROp irOpCode, IRBasicType* basicType)
+    SpvOp _arithmeticOpCodeConvert(IROp irOpCode, IRType* basicType)
     {
         bool isFloatingPoint = false;
         bool isBool = false;
-        switch (basicType->getBaseType())
+        switch (basicType->getOp())
         {
-        case BaseType::Float:
-        case BaseType::Double:
-        case BaseType::Half:
+        case kIROp_FloatType:
+        case kIROp_HalfType:
+        case kIROp_DoubleType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             isFloatingPoint = true;
             break;
-        case BaseType::Bool:
+        case kIROp_BoolType:
             isBool = true;
             break;
         default:
@@ -2031,12 +2034,42 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_HalfType:
         case kIROp_FloatType:
         case kIROp_DoubleType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             {
                 const FloatInfo i = getFloatingTypeInfo(as<IRType>(inst));
                 if (inst->getOp() == kIROp_DoubleType)
                     requireSPIRVCapability(SpvCapabilityFloat64);
                 else if (inst->getOp() == kIROp_HalfType)
                     requireSPIRVCapability(SpvCapabilityFloat16);
+                SpvFPEncoding encoding = SpvFPEncodingMax;
+
+                switch (inst->getOp())
+                {
+                case kIROp_FloatE4M3Type:
+                    encoding = SpvFPEncodingFloat8E4M3EXT;
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_float8"));
+                    requireSPIRVCapability(SpvCapabilityFloat8EXT);
+                    break;
+                case kIROp_FloatE5M2Type:
+                    encoding = SpvFPEncodingFloat8E5M2EXT;
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_float8"));
+                    requireSPIRVCapability(SpvCapabilityFloat8EXT);
+                    break;
+                case kIROp_BFloat16Type:
+                    encoding = SpvFPEncodingBFloat16KHR;
+                    ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_bfloat16"));
+                    requireSPIRVCapability(SpvCapabilityBFloat16TypeKHR);
+                    break;
+                }
+                if (encoding != SpvFPEncodingMax)
+                {
+                    return emitOpTypeFloat(
+                        inst,
+                        SpvLiteralInteger::from32(int32_t(i.width)),
+                        encoding);
+                }
                 return emitOpTypeFloat(inst, SpvLiteralInteger::from32(int32_t(i.width)));
             }
         case kIROp_PtrType:
@@ -2214,6 +2247,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 IRBuilder builder(m_irModule);
                 auto coopMatType = static_cast<IRCoopMatrixType*>(inst);
+                auto elementType = coopMatType->getElementType();
+                switch (elementType->getOp())
+                {
+                case kIROp_FloatE4M3Type:
+                case kIROp_FloatE5M2Type:
+                    requireSPIRVCapability(SpvCapabilityFloat8CooperativeMatrixEXT);
+                    break;
+                case kIROp_BFloat16Type:
+                    requireSPIRVCapability(SpvCapabilityBFloat16CooperativeMatrixKHR);
+                    break;
+                }
                 return emitOpTypeCoopMat(
                     coopMatType,
                     coopMatType->getElementType(),
@@ -3551,11 +3595,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // [3.24. Function Control]
         //
-        // TODO: We should eventually support emitting the "function control"
-        // mask to include inline and other hint bits based on decorations
-        // set on `irFunc`.
+        // Check for inline-related decorations on the function and set the
+        // appropriate function control mask.
         //
         SpvFunctionControlMask spvFunctionControl = SpvFunctionControlMaskNone;
+        if (irFunc->findDecoration<IRNoInlineDecoration>())
+        {
+            spvFunctionControl = SpvFunctionControlDontInlineMask;
+        }
 
         // [3.32.9. Function Instructions]
         //
@@ -3630,11 +3677,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // [3.24. Function Control]
         //
-        // TODO: We should eventually support emitting the "function control"
-        // mask to include inline and other hint bits based on decorations
-        // set on `irFunc`.
+        // Check for inline-related decorations on the function and set the
+        // appropriate function control mask.
         //
         SpvFunctionControlMask spvFunctionControl = SpvFunctionControlMaskNone;
+        if (irFunc->findDecoration<IRNoInlineDecoration>())
+        {
+            spvFunctionControl = SpvFunctionControlDontInlineMask;
+        }
 
         // [3.32.9. Function Instructions]
         //
@@ -3949,7 +3999,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_AtomicAdd:
             return typeSelect(SpvOpAtomicIAdd, SpvOpAtomicIAdd, SpvOpAtomicFAddEXT);
         case kIROp_AtomicSub:
-            if (isFloatingType(getVectorElementType(atomicInst->getDataType())))
+            if (isFloatOrPackedFloatType(getVectorElementType(atomicInst->getDataType())))
                 outNegateOperand = true;
             return typeSelect(SpvOpAtomicISub, SpvOpAtomicISub, SpvOpAtomicFAddEXT);
         case kIROp_AtomicMin:
@@ -7073,7 +7123,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SpvSnippetEmitContext context;
         context.irResultType = inst->getDataType();
         context.resultType = ensureInst(inst->getFullType());
-        context.isResultTypeFloat = isFloatType(inst->getDataType());
+        context.isResultTypeFloat = isFloatOrPackedFloatType(inst->getDataType());
         context.isResultTypeSigned = isSignedType((IRType*)inst->getDataType());
         for (SlangUInt i = 0; i < inst->getArgCount(); i++)
         {
@@ -8041,18 +8091,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // We'd better give some diagnostics to at least point out which line in the shader is
         // wrong, so it can help the user or developers to locate the issue easier.
-        if (!isFloatingType(fromType))
+        if (!isFloatOrPackedFloatType(fromType))
         {
             m_sink->diagnose(inst, Diagnostics::internalCompilerError);
         }
 
-        if (!isFloatingType(toType))
+        if (!isFloatOrPackedFloatType(toType))
         {
             m_sink->diagnose(inst, Diagnostics::internalCompilerError);
         }
 
-        SLANG_ASSERT(isFloatingType(fromType));
-        SLANG_ASSERT(isFloatingType(toType));
         if (isTypeEqual(fromType, toType))
         {
             auto inner = ensureInst(inst->getOperand(0));
@@ -8080,7 +8128,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
         const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
 
-        SLANG_ASSERT(isFloatingType(toType));
+        SLANG_ASSERT(isFloatOrPackedFloatType(toType));
 
         if (isIntegralType(fromType))
         {
@@ -8124,7 +8172,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(!as<IRVectorType>(fromTypeV) == !as<IRVectorType>(toTypeV));
         const auto fromType = getVectorOrCoopMatrixElementType(fromTypeV);
         const auto toType = getVectorOrCoopMatrixElementType(toTypeV);
-        SLANG_ASSERT(isFloatingType(fromType));
+        SLANG_ASSERT(isFloatOrPackedFloatType(fromType));
 
         if (as<IRBoolType>(toType))
         {
@@ -8474,18 +8522,21 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             List<IRInst*>::makeRepeated(scalar, Index(numElems)));
     }
 
-    bool isFloatType(IRInst* type)
+    bool isFloatOrPackedFloatType(IRInst* type)
     {
         switch (type->getOp())
         {
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             return true;
         case kIROp_VectorType:
-            return isFloatType(as<IRVectorType>(type)->getElementType());
+            return isFloatOrPackedFloatType(as<IRVectorType>(type)->getElementType());
         case kIROp_MatrixType:
-            return isFloatType(as<IRMatrixType>(type)->getElementType());
+            return isFloatOrPackedFloatType(as<IRMatrixType>(type)->getElementType());
         default:
             return false;
         }
@@ -8685,13 +8736,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         ArrayView<IRInst*> operands)
     {
         IRType* elementType = getVectorOrCoopMatrixElementType(operands[0]->getDataType());
-        IRBasicType* basicType = as<IRBasicType>(elementType);
 
-        SpvOp opCode = _arithmeticOpCodeConvert(op, basicType);
+        SpvOp opCode = _arithmeticOpCodeConvert(op, elementType);
         if (opCode == SpvOpUndef)
             SLANG_ASSERT(!"unknown arithmetic opcode");
 
-        bool isFloatingPoint = (getTypeStyle(basicType->getBaseType()) == kIROp_FloatType);
+        bool isFloatingPoint = isFloatOrPackedFloatType(elementType);
 
         if (operandCount == 1)
         {
@@ -9390,13 +9440,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 builder.getIntValue(builder.getUIntType(), getIntVal(count)),
                 builder.getBoolValue(isSpvColMajor));
         }
-        else if (auto basicType = as<IRBasicType>(type))
+        else if (as<IRBasicType>(type) || as<IRPackedFloatType>(type))
         {
+            // Handle void type specially - it needs name "void" for debug info
+            if (type->getOp() == kIROp_VoidType)
+            {
+                return emitOpDebugTypeBasic(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    builder.getStringValue(UnownedStringSlice("void")),
+                    builder.getIntValue(builder.getUIntType(), 0),
+                    builder.getIntValue(builder.getUIntType(), 0), // Unspecified
+                    builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+            }
+
             IRSizeAndAlignment sizeAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, basicType, &sizeAlignment);
+            getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment);
             int spvEncoding = 0;
             StringBuilder sbName;
-            getTypeNameHint(sbName, basicType);
+            getTypeNameHint(sbName, type);
             switch (type->getOp())
             {
             case kIROp_IntType:
@@ -9416,6 +9480,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_FloatType:
             case kIROp_DoubleType:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
                 spvEncoding = 3; // Float
                 break;
             case kIROp_BoolType:

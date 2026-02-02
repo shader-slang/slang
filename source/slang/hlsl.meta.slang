@@ -9541,6 +9541,31 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
+
+BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return BFloat16(float(x[0]) * float(y[0]));
+    }
+    if (N == 0)
+    {
+        return BFloat16(0.0f);
+    }
+
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm {
+            OpCapability BFloat16DotProductKHR;
+            OpDot $$BFloat16 result $x $y
+        };
+    case cuda:
+        __intrinsic_asm "_slang_vector_dot";
+    }
+}
+
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -22797,12 +22822,13 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void SetShaderTableIndex(uint RecordIndex)
     {
         __target_switch
         {
-        case hlsl:
+        case ser_hlsl_native:
             __intrinsic_asm ".SetShaderTableIndex";
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         case _GL_EXT_shader_invocation_reorder:
@@ -26678,7 +26704,7 @@ shape and workgroup size settings.
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -26686,7 +26712,6 @@ __generic<
 >
 struct CoopMat
     : IArray<T>
-    , IArithmetic
 {
     //
     // Initialization
@@ -26714,7 +26739,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : __BuiltinArithmeticType
+        U : ICoopElement
     >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
@@ -26769,17 +26794,17 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : __BuiltinArithmeticType
+        U : ICoopElement
     >(CoopMat<U, S, M, N, R> other)
     {
         __target_switch
         {
         case spirv:
-            if (__isFloat<T>() && __isInt<U>())
+            if (__isCoopFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
-            else if (__isInt<T>() && __isFloat<U>())
+            else if (__isInt<T>() && __isCoopFloat<U>())
                 this = __float_to_int_cast<T>(other);
-            else if (__isFloat<T>() && __isFloat<U>())
+            else if (__isCoopFloat<T>() && __isCoopFloat<U>())
                 this = __real_cast<T>(other);
             else if (__isInt<T>() && __isInt<U>())
                 this = __int_cast<T>(other);
@@ -27495,109 +27520,6 @@ $}
     }
 
     //
-    // Arithmetic
-    //
-
-    /// Performs element-wise addition of two cooperative matrices.
-    /// @param other The cooperative matrix to add.
-    /// @return A new cooperative matrix containing the element-wise sum.
-    __intrinsic_op($(kIROp_Add))
-    This add(This other);
-
-    /// Performs element-wise subtraction of two cooperative matrices.
-    /// @param other The cooperative matrix to subtract.
-    /// @return A new cooperative matrix containing the element-wise difference.
-    __intrinsic_op($(kIROp_Sub))
-    This sub(This other);
-
-    /// Performs element-wise multiplication of two cooperative matrices.
-    /// @param other The cooperative matrix to multiply with.
-    /// @return A new cooperative matrix containing the element-wise product.
-    __intrinsic_op($(kIROp_Mul))
-    This mul(This other);
-
-    /// Performs element-wise division of two cooperative matrices.
-    /// @param other The cooperative matrix to divide by.
-    /// @return A new cooperative matrix containing the element-wise quotient.
-    __intrinsic_op($(kIROp_Div))
-    This div(This other);
-
-    /// Negates all elements in the cooperative matrix.
-    /// @return A new cooperative matrix with all elements negated.
-    __intrinsic_op($(kIROp_Neg))
-    This neg();
-
-    /// Performs element-wise modulo operation of two cooperative matrices.
-    /// @param other The cooperative matrix to compute modulo with.
-    /// @return A new cooperative matrix containing the element-wise remainder.
-    This mod(This other)
-    {
-        This ret;
-        for (int i = 0; i < GetLength(); ++i)
-        {
-            ret[i] = this[i] % other[i];
-        }
-        return ret;
-    }
-
-    //
-    // Equality and ordering
-    //
-
-    /// Tests if two cooperative matrices are equal by comparing all elements.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if all corresponding elements are equal, false otherwise.
-    bool equals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] != other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// Performs lexicographic comparison to test if this matrix is less than another.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if this matrix is lexicographically less than other, false otherwise.
-    bool lessThan(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
-    bool lessThanOrEquals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    //
     // Load with TensorLayout and TensorView
     //
 ${
@@ -28101,7 +28023,7 @@ $}
 
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int> CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator>
@@ -28153,7 +28075,7 @@ extension<
 [ForceInline]
 [require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28182,7 +28104,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28211,7 +28133,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28240,7 +28162,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28269,7 +28191,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28300,7 +28222,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix_spirv, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28331,7 +28253,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28354,8 +28276,8 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
 CoopMat<T,S,M,N,R> __int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28365,8 +28287,8 @@ CoopMat<T,S,M,N,R> __int_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
 CoopMat<T,S,M,N,R> __real_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28376,8 +28298,8 @@ CoopMat<T,S,M,N,R> __real_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
 CoopMat<T,S,M,N,R> __int_to_float_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28387,8 +28309,8 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
 CoopMat<T,S,M,N,R> __float_to_int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28419,11 +28341,11 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 /// @return Result accumulator matrix D = A * B + C with dimensions M×N.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let saturatingAccumulation : bool,
-    U : __BuiltinArithmeticType,
-    V : __BuiltinArithmeticType,
-    W : __BuiltinArithmeticType,
+    U : ICoopElement,
+    V : ICoopElement,
+    W : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let K : int,
@@ -28491,12 +28413,12 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
 }
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : linalg.CoopMatMatrixUse,
-    each Ts : __BuiltinArithmeticType
+    each Ts : ICoopElement
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
@@ -28515,7 +28437,119 @@ extension<
     {
         return __MapElement(this, mapOp.operator(), mapOp);
     }
-};
+} // struct CoopMat
+
+// IArithmetic implementation for CoopMat, where T is __BuiltinArithmeticType.
+// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3, FloatE5M2,
+// BFloat16 element types.
+extension<
+    T,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+> CoopMat<T,S,M,N,R> : IArithmetic
+    where T : __BuiltinArithmeticType
+{
+     /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
+    __intrinsic_op($(kIROp_Add))
+    This add(This other);
+
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
+    __intrinsic_op($(kIROp_Sub))
+    This sub(This other);
+
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
+    __intrinsic_op($(kIROp_Mul))
+    This mul(This other);
+
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
+    __intrinsic_op($(kIROp_Div))
+    This div(This other);
+
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
+    __intrinsic_op($(kIROp_Neg))
+    This neg();
+
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
+    This mod(This other)
+    {
+        This ret;
+        for (int i = 0; i < GetLength(); ++i)
+        {
+            ret[i] = this[i] % other[i];
+        }
+        return ret;
+    }
+
+    //
+    // Equality and ordering
+    //
+
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
+    bool equals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
+    bool lessThan(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
+    bool lessThanOrEquals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
 
 } // namespace linalg
 
@@ -28535,7 +28569,7 @@ extension<
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28566,7 +28600,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
