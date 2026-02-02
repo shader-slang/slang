@@ -8817,6 +8817,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_AssociatedInstAnnotation:
         if (getOperand(0)->getOp() == kIROp_Poison)
             return false;
+        else
+            return true;
 
     case kIROp_IsBool:
     case kIROp_IsFloat:
