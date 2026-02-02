@@ -22,7 +22,7 @@ into two categories:
 
 - A **simple type specifier** is a type expression that names a type but never declares one. Simple type
   specifiers are used in function parameter and return type declarations, modern variable declarations, type
-  constraints, and other places where the ability of declaring new types is not expected. Two main forms
+  constraints, and other places where the ability to declare new types is not expected. Two main forms
   exist:
   - *Simple type identifier specifier* based on a previously declared type, optionally with an array
     declaration and generic parameters.
@@ -30,19 +30,6 @@ into two categories:
 - A **type specifier** is a type expression that names a type, possibly by declaring it. A simple type
   specifier is a subset of the full type specifier. A type specifier is a part of the
   [variable declaration](declarations.md) syntax, which is used to declare variables, as the name suggests.
-
-A type is incomplete when it is declared but not defined. An incomplete type cannot be used to declare
-variables. An incomplete type other than `void` may be completed with a subsequent definition. For further
-information, see [declarations](declarations.md).
-
-A [type alias](#alias) is a name that refers to a previously declared type.
-
-
-> 📝 **Remark:** Unlike in C++, `const`, `inline`, `volatile`, and similar keywords are modifiers. This
-> restricts their allowed placement to the left of the type specifier. For example, `const int a = 5;` is a
-> valid variable declaration but `int const a = 5;` is not.
-
-## Type Specifiers {#specifier}
 
 ### Syntax
 
@@ -76,11 +63,11 @@ Full type specifier, possibly declaring a new type:
 #### Parameters
 
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
-- *`type-identifier`* is an identifier that names an existing type or a generic type. This may be, *e.g.*, a
-  [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
-  user-defined type such as a named [structure type](types-struct.md),
-  [interface type](types-interface.md), [enumeration type](types-enum.md), type alias, or a type
-  provided by a module.
+- *`type-identifier`* is an identifier that names an existing type or a generic type. For example, this may be
+  a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
+  user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
+  [enumeration type](types-enum.md), type alias, or a type provided by a module.
+
 - *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
 - *`constant-index-expr`* is an optional constant integral expression for an [array](types-array.md) type
   declaration.
@@ -88,14 +75,13 @@ Full type specifier, possibly declaring a new type:
 - *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
 - *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
 - *`enum-decl`* is an [enumeration (TODO)](types-enum.md) type declaration, possibly also defining the type.
-- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+
 
 ### Description
 
-A type specifier names a type and possibly also declares a new type.
-
-The named type is always a non-generic type. In case *`type-identifier`* specifies a generic type, generic
-parameters *`generic-params-decl`* must be provided to fully specialize the type.
+A type specifier names a type and possibly also declares a new type. The named type is always a non-generic
+type. If *`type-identifier`* specifies a generic type, generic parameters *`generic-params-decl`* must be
+provided to fully specialize the type.
 
 Simple type specifiers *`simple-type-spec`* only name types but never declare new types. Simple type
 specifiers are used in:
@@ -115,15 +101,21 @@ Declaration of new types is allowed in:
 - [extension](types-extension.md) members declaring nested types
 - [typedef](#alias) declarations
 
-> 📝 **Remark 1:** *`simple-type-spec`* is a syntactical subset of the full *`type-expr`*. The subset only
-> names a type but never declares one.
+> 📝 **Remark 1:** *`simple-type-spec`* is a syntactic subset of the full *`type-expr`*. The subset only names
+> a type but never declares one.
 
-> 📝 **Remark 2:** The combined nature of the type expression of naming and possibly declaring a type is a
-> side-effect of the C-style grammar for type declarations. This extends to traditional variable declarations
-> where a single declaration can declare a type and one or more variables. (TODO: link)
+> 📝 **Remark 2:** The dual nature of type expressions---naming and possibly declaring a type---is a side
+> effect of the C-style type expression grammar. This extends to traditional variable declarations where a
+> single declaration can declare a type and one or more variables. (TODO: link)
+
+> 📝 **Remark 3:** Unlike in C++, `const`, `inline`, `volatile`, and similar keywords are modifiers. This
+> restricts their allowed placement to the left of the type specifier. For example, `const int a = 5;` is a
+> valid variable declaration but `int const a = 5;` is not.
 
 
 ## Type Alias Declarations {#alias}
+
+A [type alias](#alias) is a name that refers to a previously declared type.
 
 ### Syntax
 
@@ -145,6 +137,13 @@ also allows declaring a new type.
 
 A generic type alias declaration declares a parameterized alias for a generic type. This is described in
 [Generics (TODO)](TODO).
+
+
+## Complete and Incomplete Types {#incomplete}
+
+A type is incomplete when it is declared but not defined. An incomplete type cannot be used to declare
+variables. An incomplete type other than `void` may be completed with a subsequent definition. For further
+information, see [declarations](declarations.md).
 
 
 ## Memory Layout
