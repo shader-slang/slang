@@ -26,7 +26,9 @@ InlineVector<float, 4> input = InlineVector<float, 4>({1.0, 2.0, 3.0, 4.0});
 StructuredBufferStorage<float> storage = StructuredBufferStorage<float>(weightsBuffer);
 
 // Perform linear transformation: output = W * input
-InlineVector<float, 2> output = input.eval<2, false>(storage, 0);
+uint weightAddress = 0;
+InlineVector<float, 2> output = input.linearTransform<StructuredBufferStorage<float>, InlineVector<float, 2>>(
+    storage, weightAddress);
 ```
 */
 [ExperimentalModule]
@@ -43,3 +45,8 @@ __include "shared-memory-pool";
 __include "hash-function";
 __include "permuto-encoder";
 __include "iencoder";
+// Frontend APIs built on the primitives above
+__include "iactivation";
+__include "activations";
+__include "ilayer";
+__include "layers";

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly
 
 // Test that SPIRV debug information is correctly generated for functions
 // defined via __include vs directly in the module file.

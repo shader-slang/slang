@@ -13,4 +13,6 @@ class DiagnosticSink;
 
 void lowerReinterpret(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
 
+void lowerReinterpretOptional(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
+
 } // namespace Slang

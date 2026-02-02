@@ -371,6 +371,7 @@ AttributeDecl* SemanticsVisitor::findOrSynthesizeAttributeDeclFromUserDefinedAtt
         paramDecl->nameAndLoc = varMember->nameAndLoc;
         paramDecl->type = varMember->type;
         paramDecl->loc = varMember->loc;
+        paramDecl->initExpr = varMember->initExpr;
         paramDecl->setCheckState(varMember->checkState.getState());
         attrDecl->addMember(paramDecl);
     }
