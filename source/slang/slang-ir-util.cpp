@@ -772,6 +772,15 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             sb << (UInt64)ptrLit->getValue();
         }
         break;
+    case kIROp_FloatE4M3Type:
+        sb << "FloatE4M3";
+        break;
+    case kIROp_FloatE5M2Type:
+        sb << "FloatE5M2";
+        break;
+    case kIROp_BFloat16Type:
+        sb << "BFloat16";
+        break;
     default:
         if (auto decor = type->findDecoration<IRNameHintDecoration>())
             sb << decor->getName();

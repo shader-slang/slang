@@ -581,6 +581,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             {
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
+            if (cudaTracker->isBfloat16Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableBfloat16;
+            }
+            if (cudaTracker->isFp8Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableFloat8;
+            }
         }
         else if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {

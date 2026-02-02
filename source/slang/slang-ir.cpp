@@ -7690,6 +7690,11 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
+bool isPackedFloatType(IRType* t)
+{
+    return as<IRPackedFloatType>(t) != nullptr;
+}
+
 Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType)
 {
     switch (intType->getOp())
@@ -7805,11 +7810,16 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType)
     switch (floatType->getOp())
     {
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
         return {16};
     case kIROp_FloatType:
         return {32};
     case kIROp_DoubleType:
         return {64};
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        return {8};
+
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
     }
@@ -8070,7 +8080,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
             SLANG_ASSERT(uu->get() == thisInst);
 
             auto user = uu->getUser();
-            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable();
+            bool userIsHoistable = getIROpInfo(user->getOp()).isHoistable() || as<IRConstant>(user);
 
             // We want to de-duplicate WitnessTable but we don't really want to hoist them.
             bool userNeedToBeHoisted = userIsHoistable && (user->getOp() != kIROp_WitnessTable);
@@ -8082,7 +8092,10 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                     SLANG_ASSERT(user->getModule());
                     dedupContext = user->getModule()->getDeduplicationContext();
                 }
-                dedupContext->_removeGlobalNumberingEntry(user);
+                if (auto userConstant = as<IRConstant>(user))
+                    dedupContext->removeInstFromConstantMap(userConstant);
+                else
+                    dedupContext->_removeGlobalNumberingEntry(user);
             }
 
             // Swap this use over to use the other value.
@@ -8100,18 +8113,41 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                 // Is the updated inst already exists in the global numbering map?
                 // If so, we need to continue work on replacing the updated inst with the existing
                 // value.
-                IRInst* existingVal = nullptr;
-                if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
-                        IRInstKey{user},
-                        existingVal))
+                if (auto userConstant = as<IRConstant>(user))
                 {
-                    // If existingVal has been replaced by something else, use that.
-                    dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
-                    addToWorkList(user, existingVal);
+                    // If the user is a constant, it should be deduplicated against the constant
+                    // map.
+                    IRConstant* existingConstant = nullptr;
+                    if (dedupContext->getConstantMap().tryGetValue(
+                            IRConstantKey{userConstant},
+                            existingConstant))
+                    {
+                        IRInst* existingVal = existingConstant;
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->getConstantMap()[IRConstantKey{userConstant}] = userConstant;
+                    }
                 }
                 else
                 {
-                    dedupContext->_addGlobalNumberingEntry(user);
+                    // Otherwise, check the global value numbering map for duplication after
+                    // replacing the use.
+                    IRInst* existingVal = nullptr;
+                    if (dedupContext->getGlobalValueNumberingMap().tryGetValue(
+                            IRInstKey{user},
+                            existingVal))
+                    {
+                        // If existingVal has been replaced by something else, use that.
+                        dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
+                        addToWorkList(user, existingVal);
+                    }
+                    else
+                    {
+                        dedupContext->_addGlobalNumberingEntry(user);
+                    }
                 }
             }
 
@@ -8363,7 +8399,7 @@ void IRInst::removeAndDeallocate()
         }
         else if (auto constInst = as<IRConstant>(this))
         {
-            module->getDeduplicationContext()->getConstantMap().remove(IRConstantKey{constInst});
+            module->getDeduplicationContext()->removeInstFromConstantMap(constInst);
         }
         module->getDeduplicationContext()->getInstReplacementMap().remove(this);
         if (auto func = as<IRGlobalValueWithCode>(this))
@@ -8656,6 +8692,16 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         return false;
 
     case kIROp_FRem:
+        return false;
+
+    case kIROp_IsBool:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsType:
         return false;
     }
     return true;

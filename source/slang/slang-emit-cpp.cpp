@@ -558,8 +558,7 @@ void CPPSourceEmitter::_emitAccess(
     case 1:
         {
             // Vector, row count is biggest
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.rowCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.rowCount);
             writer->emit(".");
             const int index = (row > col) ? row : col;
             writer->emit(elemNames[index]);
@@ -568,8 +567,7 @@ void CPPSourceEmitter::_emitAccess(
     case 2:
         {
             // Vector cols biggest dimension
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.colCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.colCount);
             writer->emit(".");
             const int index = (row > col) ? row : col;
             writer->emit(elemNames[index]);
@@ -578,8 +576,7 @@ void CPPSourceEmitter::_emitAccess(
     case 3:
         {
             // Matrix
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.colCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.colCount);
 
             writer->emit(".rows[");
             writer->emit(row);
@@ -1290,11 +1287,8 @@ void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* de
     }
 }
 
-const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(
-    BaseType baseType,
-    Index elemCount)
+const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(Index elemCount)
 {
-    SLANG_UNUSED(baseType);
     SLANG_UNUSED(elemCount);
 
     static const UnownedStringSlice elemNames[] = {
@@ -1310,11 +1304,7 @@ const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(
 const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(IRVectorType* vectorType)
 {
     Index elemCount = Index(getIntVal(vectorType->getElementCount()));
-
-    IRType* type = vectorType->getElementType()->getCanonicalType();
-    IRBasicType* basicType = as<IRBasicType>(type);
-    SLANG_ASSERT(basicType);
-    return getVectorElementNames(basicType->getBaseType(), elemCount);
+    return getVectorElementNames(elemCount);
 }
 
 bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)

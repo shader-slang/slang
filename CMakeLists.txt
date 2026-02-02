@@ -130,6 +130,12 @@ option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 
+option(
+    SLANG_STANDARD_MODULE_DEVELOP_BUILD
+    "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
+    ON
+)
+
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
