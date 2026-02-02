@@ -14,4 +14,6 @@ struct IRModule;
 
 void legalizeNonStructParameterToStructForHLSL(IRModule* module);
 
+void legalizeEmptyRayPayloadsForHLSL(IRModule* module);
+
 } // namespace Slang

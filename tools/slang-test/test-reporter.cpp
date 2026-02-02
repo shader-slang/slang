@@ -102,7 +102,17 @@ Result TestReporter::init(
 {
     m_outputMode = outputMode;
     m_isSubReporter = isSubReporter;
-    m_expectedFailureList = expectedFailureList;
+
+    // Deep copy the expected failure list to avoid sharing ref-counted
+    // StringRepresentation objects across threads (RefObject::referenceCount
+    // is not atomic, so concurrent addReference/releaseReference from
+    // multiple threads causes data races and heap corruption).
+    m_expectedFailureList.clear();
+    for (const auto& s : expectedFailureList)
+    {
+        m_expectedFailureList.add(String(s.getUnownedSlice()));
+    }
+
     return SLANG_OK;
 }
 

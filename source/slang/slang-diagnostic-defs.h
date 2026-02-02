@@ -1807,6 +1807,11 @@ DIAGNOSTIC(
     varWithoutTypeMustHaveInitializer,
     "a variable declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(
+    30621,
+    Error,
+    paramWithoutTypeMustHaveInitializer,
+    "a parameter declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(
     30622,
     Error,
     ambiguousDefaultInitializerForType,

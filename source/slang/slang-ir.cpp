@@ -5239,6 +5239,9 @@ IRInst* IRBuilder::emitElementExtract(IRType* type, IRInst* base, IRInst* index)
     if (base->getOp() == kIROp_MakeArrayFromElement)
         return base->getOperand(0);
 
+    if (as<IRTupleType>(base->getDataType()))
+        return emitGetTupleElement(type, base, index);
+
     auto inst = createInst<IRGetElement>(this, kIROp_GetElement, type, base, index);
 
     addInst(inst);
@@ -7802,6 +7805,11 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
+bool isPackedFloatType(IRType* t)
+{
+    return as<IRPackedFloatType>(t) != nullptr;
+}
+
 Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType)
 {
     switch (intType->getOp())
@@ -7917,11 +7925,16 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType)
     switch (floatType->getOp())
     {
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
         return {16};
     case kIROp_FloatType:
         return {32};
     case kIROp_DoubleType:
         return {64};
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        return {8};
+
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
     }
@@ -8804,6 +8817,16 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_AssociatedInstAnnotation:
         if (getOperand(0)->getOp() == kIROp_Poison)
             return false;
+
+    case kIROp_IsBool:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsType:
+        return false;
     }
     return true;
 }

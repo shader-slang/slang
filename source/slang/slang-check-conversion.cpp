@@ -2254,7 +2254,7 @@ bool SemanticsVisitor::canCoerce(
     // for basic types such as scalars and vectors.
     //
 
-    bool shouldAddToCache = false;
+    bool shouldAddToGlobalCache = false;
     ConversionCost cost;
     TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
 
@@ -2271,8 +2271,25 @@ bool SemanticsVisitor::canCoerce(
             return cost != kConversionCost_Impossible;
         }
         else
-            shouldAddToCache = true;
+            shouldAddToGlobalCache = true;
     }
+
+    // If this type pair isn't covered by the global cache, use
+    // the cache that is local to the module.
+    if (getShared()->m_typeConversionCostCache.tryGetValue(TypePair{toType, fromType.type}, cost))
+    {
+        if (outCost)
+            *outCost = cost;
+        return cost != kConversionCost_Impossible;
+    }
+
+
+    // Store "impossible" to conversion cost cache to prevent infinite recursion in case
+    // checking for coercion between toType and fromType requires checking itself again via
+    // extensions/overloads.
+    getShared()->m_typeConversionCostCache.add(
+        TypePair{toType, fromType.type},
+        kConversionCost_Impossible);
 
     // If there was no suitable entry in the cache,
     // then we fall back to the general-purpose
@@ -2283,16 +2300,22 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
+
     bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
 
     if (outCost)
         *outCost = cost;
 
-    if (shouldAddToCache)
+    if (!rs)
+        cost = kConversionCost_Impossible;
+    if (shouldAddToGlobalCache)
     {
-        if (!rs)
-            cost = kConversionCost_Impossible;
         typeCheckingCache->conversionCostCache[cacheKey] = cost;
+        getShared()->m_typeConversionCostCache.remove(TypePair{toType, fromType.type});
+    }
+    else
+    {
+        getShared()->m_typeConversionCostCache[TypePair{toType, fromType.type}] = cost;
     }
 
     return rs;
