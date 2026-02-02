@@ -749,12 +749,6 @@ struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
     IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
 };
 
-FIDDLE()
-struct IRIsDifferentialNull : IRInst
-{
-    FIDDLE(leafInst())
-};
-
 // Retrieves the primal substitution function for the given function.
 FIDDLE()
 struct IRPrimalSubstitute : IRInst
@@ -3564,7 +3558,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
-    IRInst* emitIsDifferentialNull(IRInst* value);
 
     IRInst* emitDispatchKernelInst(
         IRType* type,

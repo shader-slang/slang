@@ -459,22 +459,6 @@ void __requireTargetExtension(constexpr String preludeText);
 __intrinsic_op($(kIROp_StaticAssert))
 void static_assert(constexpr bool condition, NativeString errorMessage);
 
-/*
-interface IDiffPair<T : IDifferentiable> : IDifferentiable
-{
-    __init(T value, T.Differential differential);
-    T getPrimal();
-    T.Differential getDifferential();
-}
-
-interface IDiffPtrPair<T : IDifferentiablePtrType> : IDifferentiablePtrType
-{
-    __init(T value, T.Differential differential);
-    T getPrimal();
-    T.Differential getDifferential();
-}
-*/
-
 /// Represents a 'value' type that is differentiable for the purposes of automatic differentiation.
 ///
 /// See the auto-diff user guide section for an introduction to

@@ -370,13 +370,6 @@ class ExtensionDecl : public AggTypeDeclBase
     FIDDLE() TypeExp targetType;
 };
 
-/* An extension that applies to a function declaration
-class FunctionExtensionDecl : public CallableDecl
-{
-    SLANG_AST_CLASS(FunctionExtensionDecl)
-    Expr* targetFuncExpr;
-};*/
-
 enum class TypeTag
 {
     None = 0,
@@ -489,14 +482,6 @@ class ThisTypeDecl : public AggTypeDecl
 // An interface which other types can conform to
 FIDDLE()
 class InterfaceDecl : public AggTypeDecl
-{
-    FIDDLE(...)
-    ThisTypeDecl* getThisTypeDecl();
-};
-
-FIDDLE()
-// Function interface that functions can conform to
-class FunctionInterfaceDecl : public AggTypeDecl
 {
     FIDDLE(...)
     ThisTypeDecl* getThisTypeDecl();

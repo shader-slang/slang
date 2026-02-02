@@ -3865,24 +3865,6 @@ static NodeBase* parseInterfaceDecl(Parser* parser, void* /*userData*/)
         });
 }
 
-static NodeBase* parseFunctionInterfaceDecl(Parser* parser, void* /*userData*/)
-{
-    FunctionInterfaceDecl* decl = parser->astBuilder->create<FunctionInterfaceDecl>();
-    parser->FillPosition(decl);
-
-    decl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-    return parseOptGenericDecl(
-        parser,
-        [&](GenericDecl* genericParent)
-        {
-            // We allow for an inheritance clause on a `struct`
-            // so that it can conform to interfaces.
-            parseOptionalInheritanceClause(parser, decl);
-            maybeParseGenericConstraints(parser, genericParent);
-            parseDeclBody(parser, decl);
-            return decl;
-        });
-}
 
 static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
 {
@@ -9770,7 +9752,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__associatedfunc", parseAssocFunc),
     _makeParseDecl("type_param", parseGlobalGenericTypeParamDecl),
     _makeParseDecl("cbuffer", parseHLSLCBufferDecl),
-    _makeParseDecl("__function_interface", parseFunctionInterfaceDecl),
     _makeParseDecl("tbuffer", parseHLSLTBufferDecl),
     _makeParseDecl("__generic", parseGenericDecl),
     _makeParseDecl("__extension", parseExtensionDecl),

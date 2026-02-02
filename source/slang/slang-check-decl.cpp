@@ -8889,16 +8889,6 @@ bool SemanticsVisitor::checkConformance(
             // (type constraints) represent additional requirements.
             return true;
         }
-        if (auto genericApp = as<GenericAppDeclRef>(declRef.declRefBase))
-        {
-            // When the sub type is generic, we can't just make a direct declref to inheritanceDecl
-            // because it won't be lowered to a concrete type. Instead, we need to form a
-            // GenericAppDeclRef to represent a concrete type.
-            declRefForSubTypeWitness = m_astBuilder->getGenericAppDeclRef(
-                genericApp->getGenericDecl(),
-                genericApp->getArgs(),
-                inheritanceDecl);
-        }
         else if (auto interfaceDeclRef = declRef.as<InterfaceDecl>())
         {
             // HACK: Our semantics as they stand today are that an
@@ -12577,53 +12567,6 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         }
     }
 }
-
-// visitFunctionExtensionDecl
-/*void SemanticsDeclBasesVisitor::visitFunctionExtensionDecl(FunctionExtensionDecl* decl)
-{
-    Expr* funcExpr = decl->targetFuncExpr;
-
-    // Expect the funcExpr to be a member-expression.
-    auto memberExpr = as<MemberExpr>(funcExpr);
-    if (!memberExpr)
-    {
-        getSink()->diagnose(
-            decl,
-            Diagnostics::invalidFunctionExtensionExpectedFunctionDotOperator,
-            decl);
-        return;
-    }
-
-    auto baseExpr = memberExpr->baseExpression;
-    auto operatorName = memberExpr->name;
-
-    // Lookup the interface for the name
-    DeclRef<FunctionInterfaceDecl> interfaceDeclRef =
-        getShared()->getFunctionInterfaceForOperator(operatorName);
-    if (!interfaceDeclRef)
-    {
-        getSink()->diagnose(decl, Diagnostics::couldNotFindOperatorName, decl);
-        return;
-    }
-
-    // TODO: Need to perform overload resolution (same way as InvokeExpr(func.name, args))
-    if (as<OverloadedExpr>(baseExpr) || as<OverloadedExpr2>(baseExpr))
-    {
-        // temp error..
-        getSink()->diagnose(decl, Diagnostics::internalCompilerError, decl);
-        return;
-    }
-
-    // Check the base expression.
-    baseExpr = CheckTerm(baseExpr);
-    if (baseExpr->type && as<ErrorType>(baseExpr->type))
-    {
-        getSink()->diagnose(decl, Diagnostics::invalidFunctionExtensionBase, decl);
-        return;
-    }
-
-}
-*/
 
 void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
 {

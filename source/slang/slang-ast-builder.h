@@ -354,6 +354,8 @@ public:
             //   Lookup of a decl defined in an extension is to lookup directly.
             // - Member(Lookup(w, AssociatedType), TypeConstraintDecl) ==> Lookup(w,
             // TypeConstraintDecl)
+            // - Member(Lookup(w, SubscriptDecl), GetterDecl/SetterDecl) ==> Lookup(w,
+            // GetterDecl/SetterDecl)
             //   Type constraint of an associated type is defined directly in w.
 
             auto parentDeclKind = lookupDeclRef->getDecl()->astNodeType;
@@ -367,6 +369,17 @@ public:
                            lookupDeclRef->getWitness(),
                            memberDecl)
                     .template as<T>();
+            case ASTNodeType::SubscriptDecl:
+                if (memberDecl->astNodeType == ASTNodeType::GetterDecl ||
+                    memberDecl->astNodeType == ASTNodeType::SetterDecl)
+                {
+                    return getLookupDeclRef(
+                               lookupDeclRef->getLookupSource(),
+                               lookupDeclRef->getWitness(),
+                               memberDecl)
+                        .template as<T>();
+                }
+                break;
             default:
                 break;
             }

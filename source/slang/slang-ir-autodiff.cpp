@@ -353,7 +353,11 @@ IRFunc* DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
     auto bObj = builder.emitParam(sharedContext->differentiableInterfaceType);
 
     // Check if a.type == null_differential.type
-    auto aObjWitnessIsNull = builder.emitIsDifferentialNull(aObj);
+    auto aObjWitnessIsNull = builder.emitIsType(
+        builder.emitExtractExistentialType(aObj),
+        builder.emitExtractExistentialWitnessTable(aObj),
+        sharedContext->nullDifferentialStructType,
+        sharedContext->nullDifferentialWitness);
 
     // If aObjWitnessTable is null, return bObj.
     auto aObjWitnessIsNullBlock = builder.emitBlock();
@@ -364,7 +368,11 @@ IRFunc* DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
     builder.setInsertInto(aObjWitnessIsNotNullBlock);
 
     // Check if b.type == null_differential.type
-    auto bObjWitnessIsNull = builder.emitIsDifferentialNull(bObj);
+    auto bObjWitnessIsNull = builder.emitIsType(
+        builder.emitExtractExistentialType(bObj),
+        builder.emitExtractExistentialWitnessTable(bObj),
+        sharedContext->nullDifferentialStructType,
+        sharedContext->nullDifferentialWitness);
 
     // If bObjWitnessTable is null, return aObj.
     auto bObjWitnessIsNullBlock = builder.emitBlock();
@@ -1010,53 +1018,6 @@ void removeTypeAnnotations(IRModule* module)
     pass.processModule();
 }
 
-struct LowerNullCheckPass : InstPassBase
-{
-    LowerNullCheckPass(IRModule* module, AutoDiffSharedContext* context)
-        : InstPassBase(module), context(context)
-    {
-    }
-    void processModule()
-    {
-        List<IRInst*> nullCheckInsts;
-        processInstsOfType<IRIsDifferentialNull>(
-            kIROp_IsDifferentialNull,
-            [&](IRIsDifferentialNull* isDiffNullInst)
-            {
-                IRBuilder builder(module);
-                builder.setInsertBefore(isDiffNullInst);
-
-                // Extract existential type from the operand.
-                auto operand = isDiffNullInst->getBase();
-                auto operandConcreteWitness = builder.emitExtractExistentialWitnessTable(operand);
-                auto witnessID = builder.emitGetSequentialIDInst(operandConcreteWitness);
-
-                auto nullDiffWitnessTable = context->nullDifferentialWitness;
-                auto nullDiffWitnessID = builder.emitGetSequentialIDInst(nullDiffWitnessTable);
-
-                // Compare the concrete type with the null differential witness table.
-                auto isDiffNull = builder.emitEql(witnessID, nullDiffWitnessID);
-
-                isDiffNullInst->replaceUsesWith(isDiffNull);
-                nullCheckInsts.add(isDiffNullInst);
-            });
-
-        for (auto nullCheckInst : nullCheckInsts)
-        {
-            nullCheckInst->removeAndDeallocate();
-        }
-    }
-
-private:
-    AutoDiffSharedContext* context;
-};
-
-void lowerNullCheckInsts(IRModule* module, AutoDiffSharedContext* context)
-{
-    LowerNullCheckPass pass(module, context);
-    pass.processModule();
-}
-
 void releaseNullDifferentialType(AutoDiffSharedContext* context)
 {
     if (auto nullStruct = context->nullDifferentialStructType)
@@ -1122,8 +1083,6 @@ bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target)
     removeDetachInsts(module);
 
     removeTypeAnnotations(module);
-
-    lowerNullCheckInsts(module, &autodiffContext);
 
     stripNoDiffTypeAttribute(module);
 
