@@ -52,7 +52,20 @@ jobs:
             spirv-tools \
             glslang-tools \
             ca-certificates \
-            libzstd-dev
+            libzstd-dev \
+            clang-format-17 \
+            npm
+
+          # Install Python-based formatters
+          python3 -m pip install --user gersemi==0.21.0
+
+          # Install Node.js-based formatters
+          sudo npm install -g prettier@3
+
+          # Install shfmt (shell script formatter)
+          wget -q https://github.com/mvdan/sh/releases/download/v3.10.0/shfmt_v3.10.0_linux_amd64 -O /tmp/shfmt
+          sudo install /tmp/shfmt /usr/local/bin/shfmt
+          rm /tmp/shfmt
 
           # Install CMake 3.30 (required for CMakePresets.json version 6)
           wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
