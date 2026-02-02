@@ -2733,12 +2733,6 @@ static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
     return parseFuncAsTypeExpr(parser);
 }
 
-// parseFuncTypeOfExpr
-static NodeBase* parseFuncTypeOfExpr(Parser* parser, void* /* unused */)
-{
-    return parseFuncTypeOfExpr(parser);
-}
-
 static Expr* parseDispatchKernel(Parser* parser)
 {
     DispatchKernelExpr* dispatchExpr = parser->astBuilder->create<DispatchKernelExpr>();

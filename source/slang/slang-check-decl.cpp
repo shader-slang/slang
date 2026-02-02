@@ -3109,37 +3109,6 @@ void SemanticsVisitor::addVisibilityModifier(Decl* decl, DeclVisibility vis)
     }
 }
 
-bool SemanticsVisitor::trySynthesizeForwardDiffFuncTypeRequirementWitness(
-    ConformanceCheckingContext* context,
-    DeclRef<AssocTypeDecl> requirementDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    // Check that the conforming type is a decl-ref to a func-decl.
-    auto declRefType = as<DeclRefType>(context->conformingType);
-
-    if (!declRefType)
-        return false;
-
-    if (!declRefType->getDeclRef().as<FunctionDeclBase>())
-        return false;
-
-    auto funcDeclRef = declRefType->getDeclRef().as<FunctionDeclBase>();
-    FuncType* type =
-        as<FuncType>(getTypeForDeclRef(getASTBuilder(), funcDeclRef, funcDeclRef.getLoc()));
-
-    auto thisType = getTypeForThisExpr(this, funcDeclRef);
-
-    if (!type)
-        return false;
-
-    Type* resultType = getForwardDiffFuncType(type, thisType);
-
-    // Register the resulting type into witness table.
-    witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(resultType));
-
-    return true;
-}
-
 bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<AssocTypeDecl> requirementDeclRef,
@@ -3157,12 +3126,7 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
     // We currently support this type of synthesis only for extensions.
     SLANG_ASSERT(as<ExtensionDecl>(context->parentDecl));
     SLANG_ASSERT(requirementKind == BuiltinRequirementKind::BwdCallableContextType);
-    // if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
     synStructDecl->irOp = kIROp_BackwardDiffIntermediateContextType;
-    /*else if (requirementKind == BuiltinRequirementKind::FwdCallableContextType)
-        synStructDecl->irOp = kIROp_ForwardDerivativeContextType;
-    else
-        return false;*/
 
     // Put the synthesized struct in the same scope as the requirement.
     // This is technically improper since struct types shouldn't be defined
@@ -3177,12 +3141,8 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
     SubstitutionSet substSet;
     auto newSynStructDeclRef = liftDeclFromGenericContainers(synStructDecl, substSet);
 
-    // if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
     synStructDecl->nameAndLoc.name = getNamePool()->getName(
         "$__syn_BwdCallable_" + getMangledName(getCurrentASTBuilder(), targetFuncDeclRef));
-    // else if (requirementKind == BuiltinRequirementKind::FwdCallableContextType)
-    //     synStructDecl->nameAndLoc.name = getNamePool()->getName(
-    //         "$__syn_FwdCallable_" + getMangledName(getCurrentASTBuilder(), targetFuncDeclRef));
 
     // Substitute the target funcDeclRef to reference it from the
     // new generic context (if any)
@@ -3191,33 +3151,12 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         substituteDeclRef(substSet, getCurrentASTBuilder(), targetFuncDeclRef)
             .as<FunctionDeclBase>());
 
-    /*if (legacyBwdDiffFunc)
-    {
-        // If we are synthesizing using a legacy backward differentiation function,
-        // we will use that as the second operand.
-        synStructDecl->operands.add(substituteDeclRef(
-            substSet,
-            getCurrentASTBuilder(),
-            createDefaultSubstitutionsIfNeeded(
-                getCurrentASTBuilder(),
-                this,
-                legacyBwdDiffFunc->getDefaultDeclRef())));
-    }*/
-
     // Insert an InheritanceDecl for SynStruct : IBwdCallable<Self>
     auto ctxTypeInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
     ctxTypeInheritanceDecl->parentDecl = synStructDecl;
 
-    // if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
-    //{
     ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(
         DeclRefType::create(getCurrentASTBuilder(), as<DeclRefBase>(synStructDecl->operands[0])));
-    //}
-    /*else if (requirementKind == BuiltinRequirementKind::FwdCallableContextType)
-    {
-        ctxTypeInheritanceDecl->base.type = getCurrentASTBuilder()->getFwdCallableBaseType(
-            DeclRefType::create(getCurrentASTBuilder(), synStructDecl->operands[0]));
-    }*/
 
     synStructDecl->addDirectMemberDecl(ctxTypeInheritanceDecl);
 
@@ -7149,11 +7088,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             {
             case BuiltinRequirementKind::DifferentialType:
                 return trySynthesizeDifferentialAssociatedTypeRequirementWitness(
-                    context,
-                    requiredAssocTypeDeclRef,
-                    witnessTable);
-            case BuiltinRequirementKind::ForwardDerivativeFuncType:
-                return trySynthesizeForwardDiffFuncTypeRequirementWitness(
                     context,
                     requiredAssocTypeDeclRef,
                     witnessTable);
