@@ -23,7 +23,10 @@ def verbosePrintNoNewline(s):
 def printHelpAndExit():
     print('''Scans markdown files and checks for broken relative links
 
-Usage: check-markdown-relative-links.py <file> ...
+Usage: check-markdown-relative-links.py [options] <files>
+
+Options:
+-v      Verbose output
 ''')
     sys.exit(1)
 
@@ -64,6 +67,7 @@ def checkMarkDownLinks(srcFile):
                 try:
                     with open(dstFile) as file2:
                         if len(linkDstAnchor) > 0:
+                            verbosePrint("")
                             scanForAnchor(file2, anchorMatcher, dstFile, linkDstAnchor)
                 except FileNotFoundError:
                     errors = errors + 1
