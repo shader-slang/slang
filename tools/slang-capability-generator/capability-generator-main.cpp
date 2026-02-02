@@ -639,17 +639,11 @@ struct CapabilityDefParser
         {
             if (!m_mapNameToCapability.containsKey(alt.capabilityA))
             {
-                m_sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::undefinedIdentifier,
-                    alt.capabilityA);
+                m_sink->diagnose(SourceLoc(), Diagnostics::undefinedIdentifier, alt.capabilityA);
             }
             if (!m_mapNameToCapability.containsKey(alt.capabilityB))
             {
-                m_sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::undefinedIdentifier,
-                    alt.capabilityB);
+                m_sink->diagnose(SourceLoc(), Diagnostics::undefinedIdentifier, alt.capabilityB);
             }
         }
     }
@@ -1401,8 +1395,8 @@ SlangResult generateDefinitions(
     sbCpp << "static const CapabilityAlternativePair kCapabilityAlternatives[] = {\n";
     for (auto& alt : alternatives)
     {
-        sbCpp << "    { CapabilityName::" << alt.capabilityA << ", CapabilityName::" << alt.capabilityB
-              << " },\n";
+        sbCpp << "    { CapabilityName::" << alt.capabilityA
+              << ", CapabilityName::" << alt.capabilityB << " },\n";
     }
     // Add a sentinel/terminator entry if there are no alternatives to avoid empty array
     if (alternatives.getCount() == 0)
