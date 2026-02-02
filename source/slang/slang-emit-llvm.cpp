@@ -133,7 +133,10 @@ static IRType* getPtrOrBufferElementType(IRType* ptrOrBuffer)
         return ptrLikeType->getElementType();
     else if (auto ptrType = as<IRPtrTypeBase>(ptrOrBuffer))
         return ptrType->getValueType();
-    SLANG_ASSERT_FAILURE("Unexpected type for getPtrOrBufferElementType()");
+    StringBuilder sb;
+    getTypeNameHint(sb, ptrOrBuffer);
+    String testmsg = "Unexpected type for getPtrOrBufferElementType()" + sb.produceString();
+    SLANG_ASSERT_FAILURE(testmsg.getBuffer());
     return nullptr;
 }
 
@@ -1650,8 +1653,7 @@ struct LLVMEmitter
         FuncEpilogueCallback onReturn = _defaultOnReturnHandler)
     {
         LLVMInst* llvmInst = nullptr;
-        auto op = inst->getOp();
-        switch (op)
+        switch (inst->getOp())
         {
         case kIROp_IntLit:
         case kIROp_BoolLit:
@@ -2345,7 +2347,7 @@ struct LLVMEmitter
                     inst->getDataType(),
                     rules,
                     false,
-                    op == kIROp_StructuredBufferLoad);
+                    inst->getOp() == kIROp_StructuredBufferLoad);
             }
             break;
 
