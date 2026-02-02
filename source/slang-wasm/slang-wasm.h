@@ -456,9 +456,6 @@ public:
 
 LanguageServer* createLanguageServer();
 
-
 } // namespace lsp
-
-
 } // namespace wgsl
 } // namespace slang
