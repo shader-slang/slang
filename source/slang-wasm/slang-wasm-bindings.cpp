@@ -11,6 +11,11 @@ EMSCRIPTEN_BINDINGS(slang)
 
     function("getLastError", &slang::wgsl::getLastError);
 
+    function(
+        "getVersionString",
+        &slang::wgsl::getVersionString,
+        return_value_policy::take_ownership());
+
     function("getCompileTargets", &slang::wgsl::getCompileTargets);
 
     class_<slang::wgsl::GlobalSession>("GlobalSession")
