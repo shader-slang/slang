@@ -302,6 +302,15 @@ static bool isInternalDef(RefPtr<CapabilityDef> def)
     return def->name.startsWith("_");
 }
 
+// Represents a pair of capabilities that are functionally equivalent vendor alternatives.
+// Used to suppress spurious warnings when user specifies one variant but code uses the other.
+// Note: The relationship is symmetric - order of capabilityA/capabilityB does not matter.
+struct CapabilityAlternativePair
+{
+    String capabilityA;
+    String capabilityB;
+};
+
 struct CapabilityDefParser
 {
     CapabilityDefParser(Lexer* lexer, DiagnosticSink* sink, CapabilitySharedContext& sharedContext)
@@ -314,6 +323,7 @@ struct CapabilityDefParser
 
     Dictionary<String, CapabilityDef*> m_mapNameToCapability;
     List<RefPtr<CapabilityDef>> m_defs;
+    List<CapabilityAlternativePair> m_alternatives;
     CapabilitySharedContext& m_sharedContext;
 
     TokenReader m_tokenReader;
@@ -478,6 +488,30 @@ struct CapabilityDefParser
             {
                 def->flavor = CapabilityFlavor::Normal;
             }
+            else if (nextToken.getContent() == "alternative")
+            {
+                // Parse: alternative A ~ B;
+                Token firstToken;
+                SLANG_RETURN_ON_FAIL(
+                    readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, firstToken));
+
+                // Expect '~' as the separator
+                Token tildeToken;
+                SLANG_RETURN_ON_FAIL(
+                    readToken<AdvanceOptions::SkipComments>(TokenType::OpBitNot, tildeToken));
+
+                Token secondToken;
+                SLANG_RETURN_ON_FAIL(
+                    readToken<AdvanceOptions::SkipComments>(TokenType::Identifier, secondToken));
+
+                SLANG_RETURN_ON_FAIL(readToken<AdvanceOptions::SkipComments>(TokenType::Semicolon));
+
+                CapabilityAlternativePair pair;
+                pair.capabilityA = firstToken.getContent();
+                pair.capabilityB = secondToken.getContent();
+                m_alternatives.add(pair);
+                continue;
+            }
             else if (nextToken.type == TokenType::BlockComment)
             {
                 // Do not auto-document
@@ -594,7 +628,30 @@ struct CapabilityDefParser
             def->sourceLoc = nameToken.loc;
         }
         validateInternalAtomExternalAtomPair();
+        validateAlternativePairs();
         return SLANG_OK;
+    }
+
+    void validateAlternativePairs()
+    {
+        // Validate that all capabilities referenced in 'alternative' declarations exist
+        for (auto& alt : m_alternatives)
+        {
+            if (!m_mapNameToCapability.containsKey(alt.capabilityA))
+            {
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::undefinedIdentifier,
+                    alt.capabilityA);
+            }
+            if (!m_mapNameToCapability.containsKey(alt.capabilityB))
+            {
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::undefinedIdentifier,
+                    alt.capabilityB);
+            }
+        }
     }
 };
 
@@ -1102,6 +1159,7 @@ SlangResult generateDocumentation(
 SlangResult generateDefinitions(
     DiagnosticSink* sink,
     List<RefPtr<CapabilityDef>>& defs,
+    List<CapabilityAlternativePair>& alternatives,
     StringBuilder& sbHeader,
     StringBuilder& sbCpp)
 {
@@ -1329,6 +1387,32 @@ SlangResult generateDefinitions(
 
     sbCpp << "};\n";
 
+    // Generate vendor alternative pairs table
+    sbCpp << "\n// Vendor alternative pairs - capabilities that are functionally equivalent.\n";
+    sbCpp << "// Used to suppress spurious warnings when user specifies one variant but code uses "
+             "the other.\n";
+    sbCpp << "// Note: The relationship is symmetric - order of capabilityA/capabilityB does not "
+             "matter.\n";
+    sbCpp << "struct CapabilityAlternativePair\n";
+    sbCpp << "{\n";
+    sbCpp << "    CapabilityName capabilityA;\n";
+    sbCpp << "    CapabilityName capabilityB;\n";
+    sbCpp << "};\n";
+    sbCpp << "static const CapabilityAlternativePair kCapabilityAlternatives[] = {\n";
+    for (auto& alt : alternatives)
+    {
+        sbCpp << "    { CapabilityName::" << alt.capabilityA << ", CapabilityName::" << alt.capabilityB
+              << " },\n";
+    }
+    // Add a sentinel/terminator entry if there are no alternatives to avoid empty array
+    if (alternatives.getCount() == 0)
+    {
+        sbCpp << "    { CapabilityName::Invalid, CapabilityName::Invalid },\n";
+    }
+    sbCpp << "};\n";
+    sbCpp << "static const Index kCapabilityAlternativesCount = " << alternatives.getCount()
+          << ";\n";
+
     sbCpp << "void freeCapabilityDefs()\n"
           << "{\n"
           << "    for (auto& cap : kCapabilityArray) { cap = CapabilityAtomSet(); }\n"
@@ -1343,6 +1427,7 @@ SlangResult parseDefFile(
     DiagnosticSink* sink,
     String inputPath,
     List<RefPtr<CapabilityDef>>& outDefs,
+    List<CapabilityAlternativePair>& outAlternatives,
     CapabilitySharedContext& capabilitySharedContext)
 {
     auto sourceManager = sink->getSourceManager();
@@ -1360,6 +1445,7 @@ SlangResult parseDefFile(
 
     SLANG_RETURN_ON_FAIL(parser.parseDefs());
     outDefs = _Move(parser.m_defs);
+    outAlternatives = _Move(parser.m_alternatives);
     return SLANG_OK;
 }
 
@@ -1412,15 +1498,16 @@ int main(int argc, const char* const* argv)
     sourceManager.initialize(nullptr, OSFileSystem::getExtSingleton());
     DiagnosticSink sink(&sourceManager, nullptr);
     List<RefPtr<CapabilityDef>> defs;
+    List<CapabilityAlternativePair> alternatives;
     CapabilitySharedContext capabilitySharedContext;
-    if (SLANG_FAILED(parseDefFile(&sink, inPath, defs, capabilitySharedContext)))
+    if (SLANG_FAILED(parseDefFile(&sink, inPath, defs, alternatives, capabilitySharedContext)))
     {
         printDiagnostics(&sink);
         return 1;
     }
 
     StringBuilder sbHeader, sbCpp;
-    if (SLANG_FAILED(generateDefinitions(&sink, defs, sbHeader, sbCpp)))
+    if (SLANG_FAILED(generateDefinitions(&sink, defs, alternatives, sbHeader, sbCpp)))
     {
         printDiagnostics(&sink);
         return 1;

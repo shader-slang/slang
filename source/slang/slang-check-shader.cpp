@@ -687,46 +687,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 }
 
                 // Filter out alternative vendor atoms when user specified the alternative.
-                // Only filter known-equivalent pairs to avoid hiding important differences.
-                struct VendorAlternativePair
-                {
-                    CapabilityName first;
-                    CapabilityName second;
-                };
-                static const VendorAlternativePair kVendorAlternatives[] = {
-                    {CapabilityName::spvShaderInvocationReorderNV,
-                     CapabilityName::spvShaderInvocationReorderEXT},
-                    {CapabilityName::SPV_NV_shader_invocation_reorder,
-                     CapabilityName::SPV_EXT_shader_invocation_reorder},
-                    {CapabilityName::_GL_NV_shader_invocation_reorder,
-                     CapabilityName::_GL_EXT_shader_invocation_reorder},
-                };
-
+                // Only filter known-equivalent pairs (defined in capdef with 'alternative')
+                // to avoid hiding important differences.
                 CapabilityAtomSet filteredAddedAtoms{};
                 for (auto atom : addedAtoms.getElements<CapabilityAtom>())
                 {
-                    bool hasAlternativeInTarget = false;
-
-                    if (maybeTargetCapSet)
-                    {
-                        for (const auto& pair : kVendorAlternatives)
-                        {
-                            // If this atom is one of a known pair, check if user specified the
-                            // other
-                            if (atom == CapabilityAtom(pair.first) &&
-                                (*maybeTargetCapSet).contains(UInt(pair.second)))
-                            {
-                                hasAlternativeInTarget = true;
-                                break;
-                            }
-                            if (atom == CapabilityAtom(pair.second) &&
-                                (*maybeTargetCapSet).contains(UInt(pair.first)))
-                            {
-                                hasAlternativeInTarget = true;
-                                break;
-                            }
-                        }
-                    }
+                    bool hasAlternativeInTarget =
+                        maybeTargetCapSet &&
+                        hasAlternativeCapabilityInSet(atom, *maybeTargetCapSet);
 
                     if (!hasAlternativeInTarget)
                         filteredAddedAtoms.add(UInt(atom));

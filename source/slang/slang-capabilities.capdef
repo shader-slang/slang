@@ -37,6 +37,11 @@
 //         therefore is compatible with all `target` "key atoms"
 
 // - `alias`: this defines an alias and does not introduce actual atoms.
+//
+// - `alternative`: declares two capabilities as functionally equivalent vendor variants.
+//    Used for warning suppression when user specifies one vendor variant (e.g., EXT) but
+//    code uses the other (e.g., NV). Does not affect capability satisfaction or code generation.
+//    Syntax: alternative A ~ B;
 
 // How auto-doc works (automatic filling of `a3-02-reference-capability-atoms.md`):
 //
@@ -2564,3 +2569,22 @@ alias all = _sm_6_9 + hlsl_nvapi
           | spirv_1_5 + sm_6_9
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;
+
+// ============================================================================
+// Vendor Alternative Relationships
+// ============================================================================
+// These declare pairs of capabilities that are functionally equivalent vendor
+// variants (e.g., NV vs EXT versions of the same extension). Used to suppress
+// spurious warnings when user specifies one variant but code uses the other.
+//
+// Syntax: alternative A ~ B;
+// This means A and B are considered equivalent for warning-suppression purposes.
+
+// Shader Invocation Reorder (SER) - SPIRV capabilities
+alternative spvShaderInvocationReorderNV ~ spvShaderInvocationReorderEXT;
+
+// Shader Invocation Reorder (SER) - SPIRV extensions
+alternative SPV_NV_shader_invocation_reorder ~ SPV_EXT_shader_invocation_reorder;
+
+// Shader Invocation Reorder (SER) - GLSL extensions
+alternative _GL_NV_shader_invocation_reorder ~ _GL_EXT_shader_invocation_reorder;
