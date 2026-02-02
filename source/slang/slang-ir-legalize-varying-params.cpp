@@ -2358,7 +2358,7 @@ public:
         // Collect struct types used as return types before processing.
         // We should not remove semantic decorations from these structs
         // since they are needed for output variable binding (e.g., @location in WGSL).
-        // collectStructTypesUsedAsReturnType(entryPoints);
+        collectStructTypesUsedAsReturnType(entryPoints);
 
         for (auto entryPoint : entryPoints)
             legalizeEntryPoint(entryPoint);
