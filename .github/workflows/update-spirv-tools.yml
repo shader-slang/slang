@@ -42,6 +42,10 @@ jobs:
       - name: Update SPIRV-Tools and run tests
         id: update
         shell: bash
+        env:
+          # Fix for non-LTS Abseil: set install prefix to avoid system-wide install
+          # See: https://github.com/abseil/abseil-cpp/blob/master/CMake/README.md
+          CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/external/spirv-tools/build/install
         run: |
           bash extras/update-spirv-tools.sh --test 2>&1 | tee spirv-update.log
         continue-on-error: true
