@@ -138,6 +138,14 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     {
         return NaturalSize::makeFromBaseType(basicType->getBaseType());
     }
+    else if (as<BFloat16Type>(type))
+    {
+        return NaturalSize::make(2, 2);
+    }
+    else if (as<Fp8Type>(type))
+    {
+        return NaturalSize::make(1, 1);
+    }
     else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
     {
         // We can't know the size of pointer types at the AST level, as it is
