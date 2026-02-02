@@ -5,7 +5,7 @@
   target language, the device and its driver, and the declared extensions and the available capabilities.
 
 [Observable behavior](basics-behavior.md#observable)
-: Program behavior observable over the shader execution interface. The interface includes resource variables,
+: Program behavior observable over the execution interface. The interface includes resource variables,
   shared memory, and execution control.
 
 [Precisely defined behavior](basics-behavior.md#classification)
