@@ -29,6 +29,6 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module);
 
-IRInst* specializeGeneric(IRSpecialize* specializeInst);
+IRInst* specializeGeneric(IRSpecialize* specInst);
 
 } // namespace Slang

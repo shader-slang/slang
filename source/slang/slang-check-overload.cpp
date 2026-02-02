@@ -1043,8 +1043,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
-        SubtypeWitness* subTypeWitness = nullptr;
-        subTypeWitness = tryGetSubtypeWitness(sub, sup);
+        SubtypeWitness* subTypeWitness = tryGetSubtypeWitness(sub, sup);
 
         bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
         bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();

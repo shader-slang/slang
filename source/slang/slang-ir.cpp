@@ -2881,12 +2881,6 @@ IRTorchTensorType* IRBuilder::getTorchTensorType(IRType* elementType)
     return (IRTorchTensorType*)getType(kIROp_TorchTensorType, 1, (IRInst**)&elementType);
 }
 
-/*IRForwardDiffFuncType* IRBuilder::getForwardDiffFuncType(IRType* baseFuncType)
-{
-    return (
-        IRForwardDiffFuncType*)getType(kIROp_ForwardDiffFuncType, 1, (IRInst* const*)&baseFuncType);
-}*/
-
 IRBackwardDiffIntermediateContextType* IRBuilder::getBackwardDiffIntermediateContextType(
     IRInst* func)
 {

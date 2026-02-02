@@ -1548,28 +1548,6 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
             // Create a func-type-constraint and add it.
             auto paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
             parser->FillPosition(paramConstraint);
-
-            /*auto paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(paramDecl));
-
-            {
-                auto sharedTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                sharedTypeExpr->loc = paramDecl->loc;
-                sharedTypeExpr->base.type = paramType;
-                sharedTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
-
-                paramConstraint->sub = TypeExp(sharedTypeExpr);
-            }
-
-            {
-                auto sharedTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                sharedTypeExpr->loc = paramDecl->loc;
-                sharedTypeExpr->base.type = parser->astBuilder->getFunctionBaseType();
-                sharedTypeExpr->type =
-                    QualType(parser->astBuilder->getTypeType(sharedTypeExpr->base.type));
-                paramConstraint->sup = TypeExp(sharedTypeExpr);
-            }
-
-            AddMember(genericDecl, paramConstraint);*/
         }
         else
         {
@@ -2749,17 +2727,6 @@ static Expr* parseFuncAsTypeExpr(Parser* parser)
     return funcAsTypeExpr;
 }
 
-static Expr* parseFuncTypeOfExpr(Parser* parser)
-{
-    // Parse an expr of the form `__func_type_of(fn)`
-    FuncTypeOfExpr* funcTypeOfExpr = parser->astBuilder->create<FuncTypeOfExpr>();
-    parser->ReadToken(TokenType::LParent);
-    funcTypeOfExpr->base = parser->ParseExpression();
-    parser->ReadToken(TokenType::RParent);
-
-    return funcTypeOfExpr;
-}
-
 // parseFuncAsTypeExpr
 static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
 {
@@ -3027,11 +2994,6 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "__func_as_type"))
     {
         typeSpec.expr = parseFuncAsTypeExpr(parser);
-        return typeSpec;
-    }
-    else if (AdvanceIf(parser, "__func_type_of"))
-    {
-        typeSpec.expr = parseFuncTypeOfExpr(parser);
         return typeSpec;
     }
 
@@ -9890,7 +9852,6 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
     _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
-    _makeParseExpr("__func_type_of", parseFuncTypeOfExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),

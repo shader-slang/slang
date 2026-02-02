@@ -2127,7 +2127,7 @@ public:
         FixedFirstArg
     };
 
-    /// Attempt to synthesize `zero`, `dadd` & `dmul` methods for a type that conforms to
+    /// Attempt to synthesize `dzero` and `dadd` methods for a type that conforms to
     /// `IDifferentiable`.
     /// On success, installs the syntethesized functions and returns `true`.
     /// Otherwise, returns `false`.
@@ -2137,7 +2137,8 @@ public:
         RefPtr<WitnessTable> witnessTable,
         SynthesisPattern pattern);
 
-    /// AD 2.0 version of `trySynthesizeDifferentialMethodRequirementWitness`.
+    /// Attempt to synthesize `fwd_diff`, `bwd_diff`, `apply`, `get_val` and
+    /// other auto-diff related requirements.
     bool trySynthesizeDiffFuncRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<Decl> requirementDeclRef,
@@ -2152,16 +2153,6 @@ public:
     /// differential type, and returns `true`.
     /// Otherwise, returns `false`.
     bool trySynthesizeDifferentialAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<AssocTypeDecl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeDifferentialPairAssociatedTypeRequirementWitness(
-        ConformanceCheckingContext* context,
-        DeclRef<AssocTypeDecl> requirementDeclRef,
-        RefPtr<WitnessTable> witnessTable);
-
-    bool trySynthesizeForwardDiffFuncTypeRequirementWitness(
         ConformanceCheckingContext* context,
         DeclRef<AssocTypeDecl> requirementDeclRef,
         RefPtr<WitnessTable> witnessTable);

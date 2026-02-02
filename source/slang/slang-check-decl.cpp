@@ -326,22 +326,6 @@ struct SemanticsDeclAttributesVisitor : public SemanticsDeclVisitorBase,
 
     void visitStructDecl(StructDecl* structDecl);
 
-    /*
-    void visitFunctionDeclBase(FunctionDeclBase* decl);
-
-    void checkForwardDerivativeOfAttribute(
-        FunctionDeclBase* funcDecl,
-        ForwardDerivativeOfAttribute* attr);
-
-    void checkBackwardDerivativeOfAttribute(
-        FunctionDeclBase* funcDecl,
-        BackwardDerivativeOfAttribute* attr);
-
-    void checkPrimalSubstituteOfAttribute(
-        FunctionDeclBase* funcDecl,
-        PrimalSubstituteOfAttribute* attr);
-    */
-
     void checkVarDeclCommon(VarDeclBase* varDecl);
 
     void checkHLSLRegisterSemantic(VarDeclBase* varDecl, HLSLRegisterSemantic* registerSematnic);
@@ -518,8 +502,6 @@ struct SemanticsDeclBasesVisitor : public SemanticsDeclVisitorBase,
     void _validateExtensionDeclGenericParams(ExtensionDecl* decl);
 
     void visitExtensionDecl(ExtensionDecl* decl);
-
-    // void visitFunctionExtensionDecl(FunctionExtensionDecl* decl);
 };
 
 struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
@@ -529,8 +511,6 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
         : SemanticsDeclVisitorBase(outer)
     {
     }
-
-    void visitModuleDecl(ModuleDecl* moduleDecl) {}
 
     void visitDecl(Decl*) {}
     void visitDeclGroup(DeclGroup*) {}
@@ -3258,49 +3238,6 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
     return true;
 }
 
-
-bool SemanticsVisitor::trySynthesizeDifferentialPairAssociatedTypeRequirementWitness(
-    ConformanceCheckingContext* context,
-    DeclRef<AssocTypeDecl> requirementDeclRef,
-    RefPtr<WitnessTable> witnessTable)
-{
-    // We simply need to construct DifferentialPair<This>.
-    Type* diffPairType = tryGetDifferentialPairType(context->conformingType);
-    SLANG_ASSERT(
-        diffPairType); // If we are here, this must succeed. Otherwise something went wrong.
-
-    auto assocTypeDef = m_astBuilder->create<TypeDefDecl>();
-    assocTypeDef->nameAndLoc.name = getName("DifferentialPair");
-    assocTypeDef->type.type = diffPairType;
-    context->parentDecl->addMember(assocTypeDef);
-    assocTypeDef->setCheckState(DeclCheckState::DefinitionChecked);
-    auto visibility = getDeclVisibility(context->parentDecl);
-    addVisibilityModifier(assocTypeDef, visibility);
-
-
-    witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(diffPairType));
-    if (doesTypeSatisfyAssociatedTypeConstraintRequirement(
-            diffPairType,
-            requirementDeclRef,
-            witnessTable))
-    {
-
-        // Increase the epoch so that future calls to Type::getCanonicalType will return the
-        // up-to-date folded types.
-        m_astBuilder->incrementEpoch();
-        return true;
-    }
-    else
-    {
-        SLANG_UNEXPECTED(
-            "Should never happen.. DifferentialPair<T> should always satisfy the requirement.");
-        witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-    }
-
-    // Something went wrong.
-    return false;
-}
-
 bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<AssocTypeDecl> requirementDeclRef,
@@ -3765,14 +3702,6 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
-
-/* void SemanticsDeclHeaderVisitor::visitFuncTypeConstraintDecl(FuncTypeConstraintDecl* decl)
-{
-    CheckConstraintSubType(decl->sub);
-
-    if (!decl->sub.type)
-        decl->sub = TranslateTypeNodeForced(decl->sub);
-} */
 
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
@@ -4492,43 +4421,6 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
     // its body, this also means that all function bodies and the
     // declarations they contain should be fully checked.
 }
-
-/*
-void resolveCallableDecl(ASTBuilder* builder, CallableDecl* decl)
-{
-    // If our decl only has a func-type & no result type or
-    // parameters, then resolve the func-type and create &
-    // insert param-decls for the parameter types &
-    // set the resultType.
-    //
-    if (decl->funcType.type && !decl->returnType.type &&
-        decl->getMembersOfType<ParamDecl>().getCount() == 0)
-    {
-        auto funcType = as<FuncType>(decl->funcType.type->resolve());
-        if (!funcType)
-            return;
-
-        // Set the result type from the function type
-        decl->returnType.type = funcType->getResultType();
-
-        // Create and insert parameter declarations
-        Index paramCount = funcType->getParamCount();
-        for (Index i = 0; i < paramCount; i++)
-        {
-            auto paramType = funcType->getParamType(i);
-
-            auto paramDecl = builder->create<ParamDecl>();
-            paramDecl->parentDecl = decl;
-            paramDecl->type.type = paramType;
-
-            // Generate a name for the parameter (e.g., "arg0", "arg1", ...)
-            paramDecl->loc = decl->loc;
-
-            decl->members.add(paramDecl);
-        }
-    }
-}
-*/
 
 bool SemanticsVisitor::doesSignatureMatchRequirement(
     DeclRef<CallableDecl> satisfyingMemberDeclRef,
@@ -7189,8 +7081,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableGetValFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
-                // case BuiltinRequirementKind::FwdApplyFunc:
-                // case BuiltinRequirementKind::EvalAndFwdPropFunc:
                 return trySynthesizeDiffFuncRequirementWitness(
                     context,
                     requiredFuncDeclRef,
@@ -7259,12 +7149,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             {
             case BuiltinRequirementKind::DifferentialType:
                 return trySynthesizeDifferentialAssociatedTypeRequirementWitness(
-                    context,
-                    requiredAssocTypeDeclRef,
-                    witnessTable);
-            case BuiltinRequirementKind::DifferentialPairType:
-            case BuiltinRequirementKind::DifferentialPtrPairType:
-                return trySynthesizeDifferentialPairAssociatedTypeRequirementWitness(
                     context,
                     requiredAssocTypeDeclRef,
                     witnessTable);

@@ -108,7 +108,6 @@ struct SwizzledMatrixLValueInfo;
 struct CopiedValInfo;
 struct ExtractedExistentialValInfo;
 struct ImplicitCastLValueInfo;
-struct MetaEnumeratorInfo;
 
 // This type is our core representation of lowered values.
 // In the simple case, it just wraps an `IRInst*`.
@@ -151,10 +150,7 @@ struct LoweredValInfo
         ExtractedExistential,
 
         // The L-Value that is an implicit cast.
-        ImplicitCastedLValue,
-
-        // Metadata for enumerating conformees of abstract types
-        MetaEnumerator,
+        ImplicitCastedLValue
     };
 
     union
@@ -235,8 +231,6 @@ struct LoweredValInfo
 
     static LoweredValInfo implicitCastedLValue(ImplicitCastLValueInfo* extInfo);
 
-    static LoweredValInfo metaEnumerator(MetaEnumeratorInfo* extInfo);
-
     SwizzledLValueInfo* getSwizzledLValueInfo()
     {
         SLANG_ASSERT(flavor == Flavor::SwizzledLValue);
@@ -261,12 +255,6 @@ struct LoweredValInfo
     {
         SLANG_ASSERT(flavor == Flavor::ImplicitCastedLValue);
         return (ImplicitCastLValueInfo*)ext;
-    }
-
-    MetaEnumeratorInfo* getMetaEnumeratorInfo()
-    {
-        SLANG_ASSERT(flavor == Flavor::MetaEnumerator);
-        return (MetaEnumeratorInfo*)ext;
     }
 };
 
@@ -402,17 +390,6 @@ struct ImplicitCastLValueInfo : ExtendedValueInfo
     ParamPassingMode lValueType;
 };
 
-// Represents the result of a matrix swizzle operation in an l-value context.
-// The same non-contiguous and no-duplicate rules as above apply.
-struct MetaEnumeratorInfo : ExtendedValueInfo
-{
-    // The enumerator expression.
-    IRInst* val;
-
-    // The abstract type whose conformees are being iterated over.
-    IRType* enumeratorBase;
-};
-
 LoweredValInfo LoweredValInfo::boundMember(BoundMemberInfo* boundMemberInfo)
 {
     LoweredValInfo info;
@@ -465,14 +442,6 @@ LoweredValInfo LoweredValInfo::extractedExistential(ExtractedExistentialValInfo*
 {
     LoweredValInfo info;
     info.flavor = Flavor::ExtractedExistential;
-    info.ext = extInfo;
-    return info;
-}
-
-LoweredValInfo LoweredValInfo::metaEnumerator(MetaEnumeratorInfo* extInfo)
-{
-    LoweredValInfo info;
-    info.flavor = Flavor::MetaEnumerator;
     info.ext = extInfo;
     return info;
 }
@@ -653,29 +622,9 @@ struct IRGenContext
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
-    // Callback function to call when after lowering a type.
-    std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> lowerTypeCallback =
-        nullptr;
-
-    // Callback function to call when after lowering a value.
-    std::function<IRInst*(IRGenContext* context, DeclRefBase* val, IRInst* irVal)>
-        lowerDeclRefCallback = nullptr;
-
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
         : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
     {
-    }
-
-    void registerTypeCallback(
-        std::function<IRType*(IRGenContext* context, Type* type, IRType* irType)> callback)
-    {
-        lowerTypeCallback = callback;
-    }
-
-    void registerDeclRefCallback(
-        std::function<IRInst*(IRGenContext* context, DeclRefBase* val, IRInst* irVal)> callback)
-    {
-        lowerDeclRefCallback = callback;
     }
 
     void setGlobalValue(Decl* decl, LoweredValInfo value) { shared->setGlobalValue(decl, value); }
@@ -2651,9 +2600,6 @@ IRType* lowerType(IRGenContext* context, Type* type)
     visitor.context = context;
     IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
 
-    /*if (context->lowerTypeCallback && loweredType)
-        context->lowerTypeCallback(context, type, loweredType);
-    */
     lowerAssociatedVals(context, type, loweredType);
 
     return loweredType;
@@ -10202,7 +10148,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             subContextStorage.thisTypeWitness = outerContext->thisTypeWitness;
 
             subContextStorage.returnDestination = LoweredValInfo();
-            subContextStorage.lowerTypeCallback = nullptr;
             subContextStorage.catchHandler = nullptr;
             subContextStorage.funcDecl = nullptr;
         }
@@ -13685,11 +13630,6 @@ LoweredValInfo emitDeclRef(IRGenContext* context, DeclRef<Decl> declRef, IRType*
 {
     auto info = emitDeclRef(context, declRef.getDecl(), declRef.declRefBase, type);
 
-    /*
-    if (context->lowerDeclRefCallback && info.flavor == LoweredValInfo::Flavor::Simple)
-        context->lowerDeclRefCallback(context, declRef.declRefBase, getSimpleVal(context,
-    info));
-        */
     if (info.flavor == LoweredValInfo::Flavor::Simple)
     {
         lowerAssociatedVals(context, declRef.declRefBase, getSimpleVal(context, info));

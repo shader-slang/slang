@@ -803,15 +803,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto _genericDecl : genericDecls)
         for (auto constraintDecl : _genericDecl->getMembersOfType<TypeCoercionConstraintDecl>())
         {
-            /* DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-                 m_astBuilder
-                     ->getGenericAppDeclRef(
-                         _genericDecl->getDefaultDeclRef(), // TODO: This won't work if the generics
-                                                            // are dependent. Need to build up a
-                                                            // substitution for parent generics.
-                         args[_genericDecl].getArrayView().arrayView,
-                         constraintDecl)
-                     .as<TypeCoercionConstraintDecl>();*/
             auto constraintDeclRef =
                 getSubstDeclRef(constraintDecl).as<TypeCoercionConstraintDecl>();
 

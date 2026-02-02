@@ -684,17 +684,6 @@ class TypeCoercionWitness : public Witness
     Val* _resolveImplOverride();
 };
 
-/*
-class FuncTypeWitness : public Witness
-{
-    SLANG_AST_CLASS(FuncTypeWitness)
-
-    void _toTextOverride(StringBuilder& out);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-    Val* _resolveImplOverride();
-};
-*/
-
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so
 FIDDLE()

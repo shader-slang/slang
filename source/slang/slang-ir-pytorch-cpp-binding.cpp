@@ -1419,8 +1419,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 wrapperFunc->setFullType(func->getFullType());
 
-                // auto fwdDiffFunc =  //builder.emitForwardDifferentiateInst(func->getFullType(),
-                // func);
                 auto fwdDiffCall = builder.emitCallInst(
                     func->getResultType(),
                     autoBindDecoration->getFwdDiffFuncOperand(),
@@ -1487,8 +1485,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 wrapperFunc->setFullType(func->getFullType());
 
-                // auto bwdDiffFunc = builder.emitBackwardDifferentiateInst(func->getFullType(),
-                // func);
                 auto bwdDiffCall = builder.emitCallInst(
                     func->getResultType(),
                     autoBindDecoration->getBwdDiffFuncOperand(),

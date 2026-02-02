@@ -81,17 +81,6 @@ SubtypeWitness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBas
     auto funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
     auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
     {
-        // TODO: This should really just be part of the sub-typing system.
-        //
-        // Right now a NoDiff type still returns a valid witness with tryGetSubtypeWitness
-        // which seems wrong.
-        //
-        if (auto modifiedType = as<ModifiedType>(type))
-        {
-            if (modifiedType->findModifier<NoDiffModifierVal>())
-                return nullptr;
-        }
-
         auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
 
         if (!witness)
@@ -216,9 +205,6 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // For subtype testing, we are only interested in
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
-        //
-        // TODO: resolve() is a workaround for cases where unknown-witness shows up even after
-        // resolution
         //
         auto facetType = facet->getType()->resolve();
         if (!facetType)
