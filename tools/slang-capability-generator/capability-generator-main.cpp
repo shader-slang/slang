@@ -1398,11 +1398,6 @@ SlangResult generateDefinitions(
         sbCpp << "    { CapabilityName::" << alt.capabilityA
               << ", CapabilityName::" << alt.capabilityB << " },\n";
     }
-    // Add a sentinel/terminator entry if there are no alternatives to avoid empty array
-    if (alternatives.getCount() == 0)
-    {
-        sbCpp << "    { CapabilityName::Invalid, CapabilityName::Invalid },\n";
-    }
     sbCpp << "};\n";
     sbCpp << "static const Index kCapabilityAlternativesCount = " << alternatives.getCount()
           << ";\n";
