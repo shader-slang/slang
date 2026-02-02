@@ -1,14 +1,20 @@
 # Types
 
-The types in the Slang language consist of the following categories:
-
+Slang types:
 * [Fundamental Types](types-fundamental.md)
 * [Vector and Matrix Types](types-vector-and-matrix.md)
 * [Structures](types-struct.md)
+  * [Extensions](types-extension.md)
+* [Array Types](types-array.md)
 * [Interfaces](types-interface.md)
-* [Extensions](types-extension.md)
-* [Array types](types-array.md)
-* [Opaque types](types-opaque.md)
+* [Special Types](types-special.md)
+
+Other topics:
+* [Type Traits](types-traits.md)
+* [Type Attributes](types-attributes.md)
+
+
+## Type Specifiers {#specifier}
 
 A [type specifier](#specifier) names a type. Type specifiers are used in variable declarations, function
 parameter and return type declarations, and elsewhere where a type is required. Type specifiers are divided
@@ -156,15 +162,16 @@ arrays:
 * The size of a structure type is unknown if it has a non-static data member with unknown size.
 
 The use of types with unknown size is restricted as follows:
-* A type with unknown size cannot be used as the element type of an array
-* A type with unknown size can only be used as the last field of a structure type
+* A type with unknown size cannot be used as the element type of an array.
+* A type with unknown size can only be used as the last field of a structure type.
 * A type with unknown size cannot be used as a generic argument to specialize a user-defined type, function,
   etc. Specific built-in generic types/functions may support unknown-size types, and this will be documented
   on the specific type/function.
 * A type with unknown size cannot be instantiated as a variable.
 
-> 📝 **Remark:** Unknown size is different from unspecified or target-specified size. [Opaque types](types-opaque.md)
-> have target-specified sizes, sizes of [structures](types-struct.md) and [arrays](types-array.md) are subject to
-> target-specific alignment rules, and certain [fundamental types](types-fundamental.md) such as
-> `bool` have target-specified size. Unspecified-sized types are not subject to the restrictions of
-> unknown-sized types.
+> 📝 **Remark:** Unknown size is different from unspecified or target-specified size. Many
+> [special types](types-special.md) have target-specified sizes; sizes of [structures](types-struct.md) and
+> [arrays](types-array.md) are subject to target-specific alignment rules; and certain
+> [fundamental types](types-fundamental.md) such as `bool` have target-specified sizes. Types with unspecified
+> or target-specified sizes are not subject to the restrictions of types with unknown sizes, although they may
+> have other restrictions.
