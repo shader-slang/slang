@@ -411,6 +411,9 @@ public:
     SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) override;
     SLANG_NO_THROW SlangResult SLANG_MCALL generateJITLibrary(IArtifact** outArtifact) override;
+
+    SLANG_NO_THROW void SLANG_MCALL setPointerDereferenceable(LLVMInst* ptr, uint64_t bytes) override;
+    SLANG_NO_THROW void SLANG_MCALL setLoadInvariant(LLVMInst* load) override;
 };
 
 LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifact)
@@ -2031,6 +2034,26 @@ void LLVMBuilder::emitDebugValue(LLVMDebugNode* debugVar, LLVMInst* value)
     debugInfo.attached = true;
 }
 
+void LLVMBuilder::setPointerDereferenceable(LLVMInst* ptr, uint64_t bytes)
+{
+    if (isa<llvm::Argument>(ptr))
+    {
+        cast<llvm::Argument>(ptr)->addAttr(llvm::Attribute::getWithDereferenceableBytes(*llvmContext, bytes));
+    }
+    else if (isa<llvm::LoadInst>(ptr))
+    {
+        auto derefSize = llvm::ConstantAsMetadata::get(llvmBuilder->getInt64(bytes));
+        auto derefMD = llvm::MDNode::getDistinct(*llvmContext, {derefSize});
+        cast<llvm::LoadInst>(ptr)->setMetadata(llvm::LLVMContext::MD_dereferenceable, derefMD);
+    }
+}
+
+void LLVMBuilder::setLoadInvariant(LLVMInst* load)
+{
+    auto emptyMD = llvm::MDNode::getDistinct(*llvmContext, {});
+    cast<llvm::LoadInst>(load)->setMetadata(llvm::LLVMContext::MD_invariant_load, emptyMD);
+}
+
 LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, CharSlice content)
 {
     auto llvmFunc = llvm::cast<llvm::Function>(func);
@@ -2095,8 +2118,13 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
         groupName,
         *llvmModule);
 
+    // Set metadata for arguments.
     for (auto& arg : dispatcher->args())
         arg.addAttr(llvm::Attribute::NoAlias);
+
+    size_t varyingInputSize = sizeof(uint32_t) * 6;
+    setPointerDereferenceable(dispatcher->getArg(0), varyingInputSize);
+    setPointerDereferenceable(llvm::cast<llvm::Function>(entryPointFunc)->getArg(0), varyingInputSize);
 
     llvm::BasicBlock* entryBlock = llvm::BasicBlock::Create(*llvmContext, "entry", dispatcher);
     llvmBuilder->SetInsertPoint(entryBlock);
@@ -2490,7 +2518,7 @@ SlangResult LLVMBuilder::generateJITLibrary(IArtifact** outArtifact)
 
 } // namespace slang_llvm
 
-extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V2(
+extern "C" SLANG_DLL_EXPORT SlangResult createLLVMBuilder_V3(
     const SlangUUID& intfGuid,
     Slang::ILLVMBuilder** out,
     Slang::LLVMBuilderOptions options,
