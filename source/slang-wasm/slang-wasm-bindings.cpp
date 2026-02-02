@@ -11,10 +11,7 @@ EMSCRIPTEN_BINDINGS(slang)
 
     function("getLastError", &slang::wgsl::getLastError);
 
-    function(
-        "getVersionString",
-        &slang::wgsl::getVersionString,
-        return_value_policy::take_ownership());
+    function("getVersionString", &slang::wgsl::getVersionString);
 
     function("getCompileTargets", &slang::wgsl::getCompileTargets);
 
