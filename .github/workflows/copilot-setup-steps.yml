@@ -56,8 +56,8 @@ jobs:
             clang-format-17 \
             npm
 
-          # Install Python-based formatters
-          python3 -m pip install --user gersemi==0.21.0
+          # Install Python-based formatters (use --break-system-packages for GitHub Actions)
+          python3 -m pip install --break-system-packages gersemi==0.21.0
 
           # Install Node.js-based formatters
           sudo npm install -g prettier@3

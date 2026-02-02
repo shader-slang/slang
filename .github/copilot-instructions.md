@@ -29,11 +29,13 @@ If you need to install these tools locally:
 
 ```bash
 sudo apt-get install clang-format-17 npm
-python3 -m pip install --user gersemi==0.21.0
+python3 -m pip install gersemi==0.21.0
 sudo npm install -g prettier@3
 wget https://github.com/mvdan/sh/releases/download/v3.10.0/shfmt_v3.10.0_linux_amd64 -O /tmp/shfmt
 sudo install /tmp/shfmt /usr/local/bin/shfmt
 ```
+
+Note: If pip install fails with externally-managed-environment error, use `--break-system-packages` flag or create a virtual environment.
 
 **macOS (Homebrew):**
 
