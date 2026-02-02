@@ -337,7 +337,9 @@ cmake --build --preset debug    # or --preset release
 
 ```bash
 # Clone with submodules (required for slangpy build)
-git clone --recursive https://github.com/shader-slang/slangpy.git external/slangpy
+git clone https://github.com/shader-slang/slangpy.git external/slangpy
+cd external/slangpy
+git submodule update --init --recursive
 ```
 
 Read `external/slangpy/CLAUDE.md` for general information about the repo.
@@ -354,7 +356,13 @@ python.exe -m pip install -e .
 On Linux/macOS:
 ```bash
 cd external/slangpy
-CMAKE_ARGS="-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug" python.exe -m pip install -e .
+CMAKE_ARGS="-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug" python -m pip install -e .
+```
+
+On Windows WSL:
+```bash
+cd external/slangpy
+WSLENV+=:CMAKE_ARGS CMAKE_ARGS='-DSGL_LOCAL_SLANG=ON -DSGL_LOCAL_SLANG_DIR=../.. -DSGL_LOCAL_SLANG_BUILD_DIR=build/Debug' python.exe -m pip install -e .
 ```
 
 #### Step 4: Install Test Dependencies
@@ -373,6 +381,7 @@ The following example is to run all of the existing slangpy tests:
 ```bash
 # From external/slangpy directory
 python -m pytest slangpy/tests -ra -n auto --maxprocesses=3
+python tools/ci.py unit-test-python
 ```
 
 #### Notes

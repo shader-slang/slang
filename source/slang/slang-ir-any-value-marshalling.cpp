@@ -210,6 +210,9 @@ struct AnyValueMarshallingContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
         case kIROp_EnumType:
@@ -408,12 +411,13 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (!isIntegralType(dataType))
                         {
                             srcVal =
                                 builder->emitBitCast(builder->getType(kIROp_UInt16Type), srcVal);
@@ -450,9 +454,15 @@ struct AnyValueMarshallingContext
                 }
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
                 if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcVal = builder->emitLoad(concreteVar);
+                    if (!isIntegralType(dataType))
+                    {
+                        srcVal = builder->emitBitCast(builder->getType(kIROp_UInt8Type), srcVal);
+                    }
                     srcVal = builder->emitCast(builder->getType(kIROp_UIntType), srcVal);
                     auto dstAddr = builder->emitFieldAddress(
                         uintPtrType,
@@ -775,6 +785,7 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -806,7 +817,7 @@ struct AnyValueMarshallingContext
                         {
                             srcVal = builder->emitCast(builder->getType(kIROp_UInt16Type), srcVal);
                         }
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (dataType != srcVal->getDataType())
                         {
                             srcVal = builder->emitBitCast(dataType, srcVal);
                         }
@@ -817,6 +828,8 @@ struct AnyValueMarshallingContext
                 }
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
                 if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcAddr = builder->emitFieldAddress(
@@ -836,6 +849,10 @@ struct AnyValueMarshallingContext
                     else
                     {
                         srcVal = builder->emitCast(builder->getType(kIROp_UInt8Type), srcVal);
+                    }
+                    if (dataType != srcVal->getDataType())
+                    {
+                        srcVal = builder->emitBitCast(dataType, srcVal);
                     }
                     builder->emitStore(concreteVar, srcVal);
                 }

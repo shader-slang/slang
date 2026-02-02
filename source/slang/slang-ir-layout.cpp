@@ -105,10 +105,13 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
         BASE(Int8, 1);
         BASE(UInt8, 1);
+        BASE(FloatE5M2, 1);
+        BASE(FloatE4M3, 1);
 
         BASE(Int16, 2);
         BASE(UInt16, 2);
         BASE(Half, 2);
+        BASE(BFloat16, 2);
 
         BASE(Int, 4);
         BASE(UInt, 4);

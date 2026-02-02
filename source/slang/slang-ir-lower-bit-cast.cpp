@@ -171,6 +171,7 @@ struct BitCastLoweringContext
         case kIROp_HalfType:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
+        case kIROp_BFloat16Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
                 object = builder.emitCast(builder.getUInt16Type(), object);
@@ -215,6 +216,8 @@ struct BitCastLoweringContext
             break;
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
                 object = builder.emitCast(builder.getUInt8Type(), object);

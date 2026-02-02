@@ -32,6 +32,14 @@
 #include <cuda_fp16.h>
 #endif
 
+#ifdef SLANG_CUDA_ENABLE_FP8
+#include <cuda_fp8.h>
+#endif
+
+#ifdef SLANG_CUDA_ENABLE_BF16
+#include <cuda_bf16.h>
+#endif
+
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
 #endif
@@ -351,6 +359,60 @@ struct __align__(4) __half4
 };
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+
+// Add the other vector bfloat16 types
+struct __nv_bfloat161
+{
+    __nv_bfloat16 x;
+};
+struct __nv_bfloat163
+{
+    __nv_bfloat16 x, y, z;
+};
+struct __nv_bfloat164
+{
+    __nv_bfloat16 x, y, z, w;
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+
+// Add the other vector fp8 types
+struct __nv_fp8_e4m31
+{
+    __nv_fp8_e4m3 x;
+};
+struct __nv_fp8_e4m32
+{
+    __nv_fp8_e4m3 x, y;
+};
+struct __nv_fp8_e4m33
+{
+    __nv_fp8_e4m3 x, y, z;
+};
+struct __nv_fp8_e4m34
+{
+    __nv_fp8_e4m3 x, y, z, w;
+};
+struct __nv_fp8_e5m21
+{
+    __nv_fp8_e5m2 x;
+};
+struct __nv_fp8_e5m22
+{
+    __nv_fp8_e5m2 x, y;
+};
+struct __nv_fp8_e5m23
+{
+    __nv_fp8_e5m2 x, y, z;
+};
+struct __nv_fp8_e5m24
+{
+    __nv_fp8_e5m2 x, y, z, w;
+};
+#endif
+
 #define SLANG_VECTOR_GET_ELEMENT(T)                                                   \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##1 x, int index) \
     {                                                                                 \
@@ -412,6 +474,49 @@ SLANG_VECTOR_GET_ELEMENT_PTR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_VECTOR_GET_ELEMENT(__half)
 SLANG_VECTOR_GET_ELEMENT_PTR(__half)
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_VECTOR_GET_ELEMENT(__nv_bfloat16)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_bfloat16)
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat162 v0, __nv_bfloat162 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 2; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat163 v0, __nv_bfloat163 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 3; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat164 v0, __nv_bfloat164 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 4; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
 #define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
@@ -554,6 +659,15 @@ SLANG_MAKE_VECTOR(ulonglong)
 SLANG_MAKE_VECTOR(__half)
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR(__nv_bfloat16)
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR(__nv_fp8_e5m2)
+#endif
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
 {
     return bool1{x};
@@ -635,6 +749,30 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 }
 #endif
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+{
+    return __nv_bfloat16{x};
+}
+#endif
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+{
+    return __nv_fp8_e4m3{x};
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+{
+    return __nv_fp8_e5m2{x};
+}
+#endif
+#endif
 
 #define SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(Fn, T, N)                                            \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##N Fn(T##N* address, T##N val)                           \
@@ -700,6 +838,14 @@ GET_VECTOR_TYPE_IMPL_N(double)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+GET_VECTOR_TYPE_IMPL_N(__nv_bfloat16)
+#endif
+#if SLANG_CUDA_ENABLE_FP8
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e4m3)
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e5m2)
+#endif
+
 template<typename T, int n>
 using Vector = typename GetVectorTypeImpl<T, n>::type;
 
@@ -6299,6 +6445,27 @@ struct PtxTypeName<half>
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+struct PtxTypeName<__nv_fp8_e4m3>
+{
+    static constexpr const char name[] = "f8e4m3";
+};
+template<>
+struct PtxTypeName<__nv_fp8_e5m2>
+{
+    static constexpr const char name[] = "f8e5m2";
+};
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PtxTypeName<__nv_bfloat16>
+{
+    static constexpr const char name[] = "bf16";
+};
+#endif
+
 template<>
 struct PtxTypeName<float>
 {
@@ -6349,6 +6516,30 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
     static constexpr int value = 4;
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+// bfloat16 - 8 regs for A/B, 4 regs for C/D
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+{
+    static constexpr int value = 4;
+};
+#endif // #if SLANG_CUDA_ENABLE_BF16
 
 // Float (f32) - 8 regs for C/D only
 template<int M, int N, int K>
@@ -6437,6 +6628,71 @@ struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 1;
 };
+
+#if SLANG_CUDA_ENABLE_FP8
+// fp8 - same as u8
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+#endif
 
 
 // ====================================================================================

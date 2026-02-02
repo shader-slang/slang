@@ -2181,6 +2181,8 @@ public:                                                              \
     {
         SLANG_LAYOUT_RULES_DEFAULT,
         SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+        SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+        SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
@@ -3448,6 +3450,8 @@ enum class LayoutRules : SlangLayoutRulesIntegral
 {
     Default = SLANG_LAYOUT_RULES_DEFAULT,
     MetalArgumentBufferTier2 = SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+    DefaultStructuredBuffer = SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+    DefaultConstantBuffer = SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
 };
 
 typedef struct ShaderReflection ProgramLayout;

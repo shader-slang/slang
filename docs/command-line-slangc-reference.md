@@ -1291,6 +1291,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
+* `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
+* `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1305,6 +1307,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvSparseResidency` 
 * `spvImageFootprintNV` 
 * `spvMinLod` 
+* `spvFloat8EXT` 
+* `spvBFloat16KHR` 
 * `spvFragmentShaderPixelInterlockEXT` 
 * `spvFragmentBarycentricKHR` 
 * `spvFragmentFullyCoveredEXT` 
