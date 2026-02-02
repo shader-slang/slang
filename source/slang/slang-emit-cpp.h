@@ -90,7 +90,7 @@ protected:
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
 
-    const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
+    const UnownedStringSlice* getVectorElementNames(Index elemCount);
 
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);
