@@ -554,7 +554,7 @@ static void validateVectorOrMatrixElementType(
     const DiagnosticInfo& disallowedElementTypeEncountered,
     TargetRequest* targetRequest)
 {
-    if (!isFloatingType(elementType))
+    if (!isFloatingType(elementType) && !isPackedFloatType(elementType))
     {
         if (isIntegralType(elementType))
         {
@@ -593,7 +593,8 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
 
     // 1-vectors are supported and are legalized/transformed properly when targetting unsupported
     // backends.
-    const IRIntegerValue minCount = 1;
+    // 0-vectors are used internally to represent conditional varying values.
+    const IRIntegerValue minCount = 0;
     const IRIntegerValue maxCount = 4;
     if ((elementCount < minCount) || (elementCount > maxCount))
     {

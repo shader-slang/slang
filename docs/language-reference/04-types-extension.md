@@ -1,22 +1,50 @@
 # Type Extension
 
+## Syntax
+
+[Struct extension](#struct) declaration:
+> **`'extension'`** *`type-expr`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> **`'{'`** *`member-list`* **`'}'`**
+
+[Generic struct extension](#generic-struct) declaration:
+> **`'extension'`** *`generic-params-decl`* *`type-expr`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*]<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'where'`** *`where-clause`*)\*<br>
+> **`'{'`** *`member-list`* **`'}'`**
+
+### Parameters
+
+- *`type-expr`* is the type to extend.
+- *`generic-params-decl`* are the generic parameters for a [generic struct extension](#generic-struct).
+- *`bases-clause`* is an optional list of [interface](04-types-interface) conformance specifications to be added.
+- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+- *`member-list`* is a list of struct members to be added. A member is one of:
+  - *`var-decl`* is a member static variable declaration. See [Variables (TODO)](TODO)
+  - *`type-decl`* is a nested [type declaration](04-types).
+  - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
+  - *`constructor-decl`* is a [constructor declaration](04-types-struct#constructor).
+  - *`property-decl`* is a [property declaration](04-types-struct#property).
+  - *`subscript-op-decl`* is a [subscript operator declaration](04-types-struct#subscript-op).
+  - *`function-call-op-decl`* is a [function call operator declaration](04-types-struct#function-call-op).
+
+
+## Description
+
 An existing `struct` type or a set of `struct` types can be extended with one or more `extension`
 declarations. An `extension` may be used to add static data members, member functions, constructors,
 properties, subscript operators, and function call operators to an existing type. An `extension` may not
 change the data layout of a `struct`, that is, it cannot be used to append non-static data members.
 
-> Remark. An interface type itself cannot be extended. This would add new requirements to all conforming types
-> in which case all the conforming types would require matching extensions.
+> 📝 **Remark:** An [interface](04-types-interface) type cannot be extended. This would add new requirements
+> to all conforming types, which would invalidate existing conformances.
 
-## Struct Extension
+## Struct Extension {#struct}
 
 A previously defined `struct` can be extended using an `extension` declaration. The declaration appends new
-members in the `struct` definition.
+members to the `struct` definition.
 
-A struct with a non-`static` unknown-length array member may not be extended with non-`static` data members.
-
-Example:
-
+**Example 1:**
 ```hlsl
 struct ExampleStruct
 {
@@ -40,8 +68,7 @@ extension ExampleStruct
 
 An extension can also be used to provide interface requirements to a struct.
 
-Example:
-
+**Example 2:**
 ```hlsl
 interface IReq
 {
@@ -69,15 +96,47 @@ void main(uint3 id : SV_DispatchThreadID)
 }
 ```
 
+And finally, an extension can add new interface conformances to a struct:
 
-## Generic Struct Extension
+**Example 3:**
+```hlsl
+interface IReq
+{
+    int requiredFunc();
+}
+
+struct TestClass
+{
+}
+
+extension TestClass : IReq
+{
+    int requiredFunc()
+    {
+        return 42;
+    }
+}
+
+[shader("compute")]
+void main(uint3 id : SV_DispatchThreadID)
+{
+    IReq obj = TestClass();
+
+    obj.requiredFunc();
+}
+```
+
+> ⚠️ **Warning:** When an extension and the base structure contain a member with the same signature, it is
+> currently undefined which member is effective. ([Issue #9660](https://github.com/shader-slang/slang/issues/9660))
+
+
+## Generic Struct Extension {#generic-struct}
 
 All structs conforming to an interface may be extended using a generic extension declaration. The generic
 extension declaration adds new members to all conforming types. In case there are multiple declarations with
 the same signature, the one in the concrete type takes precedence.
 
-Example
-
+**Example:**
 ```hlsl
 interface IBase
 {

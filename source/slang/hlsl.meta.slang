@@ -5437,7 +5437,7 @@ When generating code for other targets, this parameter is ignored and has no eff
 __generic<T, L:IBufferDataLayout=DefaultDataLayout>
 __magic_type(HLSLStructuredBufferType)
 __intrinsic_type($(kIROp_HLSLStructuredBufferType))
-struct StructuredBuffer
+struct StructuredBuffer : IArray<T>
 {
 
     /// Get the dimensions of the buffer.
@@ -6629,7 +6629,7 @@ When generating code for other targets, this parameter is ignored and has no eff
  @see `StructuredBuffer`, `AppendStructuredBuffer`, `ConsumeStructuredBuffer`
  @category buffer_types
 **/
-struct $(item.name)
+struct $(item.name) : IRWArray<T>
 {
     /// Decrements the object's hidden counter.
     /// @return The post-decremented counter value.
@@ -9541,6 +9541,31 @@ T dot(vector<T, N> x, vector<T, N> y)
     }
 }
 
+
+BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
+{
+    // Handle 1-vector case explicitly since many backends don't support it natively
+    if (N == 1)
+    {
+        return BFloat16(float(x[0]) * float(y[0]));
+    }
+    if (N == 0)
+    {
+        return BFloat16(0.0f);
+    }
+
+    __target_switch
+    {
+    case spirv:
+        return spirv_asm {
+            OpCapability BFloat16DotProductKHR;
+            OpDot $$BFloat16 result $x $y
+        };
+    case cuda:
+        __intrinsic_asm "_slang_vector_dot";
+    }
+}
+
 __generic<T : __BuiltinIntegerType, let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, sm_4_0_version)]
@@ -10253,7 +10278,7 @@ vector<T,N> faceforward(vector<T,N> n, vector<T,N> i, vector<T,N> ng)
 }
 
 // Helper functions for Metal target
-internal int __metal_clz(int value)
+internal T __metal_clz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -10261,15 +10286,7 @@ internal int __metal_clz(int value)
     }
 }
 
-internal uint __metal_clz(uint value)
-{
-    __target_switch
-    {
-    case metal: __intrinsic_asm "clz";
-    }
-}
-
-internal int __metal_ctz(int value)
+internal T __metal_ctz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
@@ -10277,43 +10294,35 @@ internal int __metal_ctz(int value)
     }
 }
 
-internal uint __metal_ctz(uint value)
+internal T __llvm_ctlz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case metal: __intrinsic_asm "ctz";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.ctlz($0, i1 1)";
     }
 }
 
-internal int __llvm_ctlz(int value)
+internal T __llvm_cttz<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
-    case llvm: __intrinsic_asm "%result = call i32 @llvm.ctlz($0, i1 1)";
+    case llvm: __intrinsic_asm "%result = call $TR @llvm.cttz($0, i1 1)";
     }
 }
 
-internal uint __llvm_ctlz(uint value)
+internal T __wgsl_firstLeadingBit<T>(T value)
 {
     __target_switch
     {
-    case llvm: __intrinsic_asm "%result = call i32 @llvm.ctlz($0, i1 1)";
+    case wgsl: __intrinsic_asm "firstLeadingBit";
     }
 }
 
-internal int __llvm_cttz(int value)
+internal T __wgsl_firstTrailingBit<T>(T value)
 {
     __target_switch
     {
-    case llvm: __intrinsic_asm "%result = call i32 @llvm.cttz($0, i1 1)";
-    }
-}
-
-internal uint __llvm_cttz(uint value)
-{
-    __target_switch
-    {
-    case llvm: __intrinsic_asm "%result = call i32 @llvm.cttz($0, i1 1)";
+    case wgsl: __intrinsic_asm "firstTrailingBit";
     }
 }
 
@@ -10329,101 +10338,104 @@ internal uint __llvm_cttz(uint value)
 /// @category bitops Bit operation functions
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-int firstbithigh(int value)
+uint firstbithigh<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_firstbithigh($0)";
     case cuda: __intrinsic_asm "$P_firstbithigh($0)";
-    case glsl: __intrinsic_asm "findMSB";
+    case glsl:
+        __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
     case metal:
         {
-            if ((int)value < 0)
+            if (__isSignedInt<T>() && value < T(0))
                 value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __metal_clz(value);
+            if (value == T(0))
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__metal_clz(value));
         }
-    case spirv: return spirv_asm {
-        OpExtInst $$int result glsl450 FindSMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+    case spirv:
+        if (T is int)
+        {
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindSMsb $value
+            };
+        }
+        else if (T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $value
+            };
+        }
+        else if (T is int8_t || T is int16_t)
+        {
+            int value32 = __intCast<int>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindSMsb $value32
+            };
+        }
+        else if (T is uint8_t || T is uint16_t)
+        {
+            uint value32 = __intCast<uint>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $value32
+            };
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            if (__isSignedInt<T>() && value < T(0))
+                val = ~val;
+
+            uint2 halves = __asuint2(val);
+            uint highestBitHalf = halves.y != 0 ? halves.y : halves.x;
+            uint count = spirv_asm {
+                OpExtInst $$uint result glsl450 FindUMsb $highestBitHalf
+            };
+
+            if (count == ~0u)
+                return uint(-1);
+
+            if (halves.y != 0)
+                count += 32;
+            return count;
+        }
+    case wgsl: return __intCast<uint>(__wgsl_firstLeadingBit(value));
     case llvm:
         {
-            if ((int)value < 0)
+            if (__isSignedInt<T>() && value < T(0))
                 value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __llvm_ctlz(value);
+            if (value == T(0))
+                return uint(-1);
+            return sizeof(T)*8u - 1u - __intCast<uint>(__llvm_ctlz(value));
         }
     }
 }
 
-__generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<int, N> firstbithigh(vector<int, N> value)
+vector<uint, N> firstbithigh<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findMSB";
     case hlsl: __intrinsic_asm "firstbithigh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<int, N> result glsl450 FindSMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
-    default:
-        VECTOR_MAP_UNARY(int, N, firstbithigh, value);
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-uint firstbithigh(uint value)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_firstbithigh($0)";
-    case cuda: __intrinsic_asm "$P_firstbithigh($0)";
-    case glsl: __intrinsic_asm "findMSB";
-    case hlsl: __intrinsic_asm "firstbithigh";
-    case metal:
+    case spirv:
+        if (T is int)
         {
-            if ((int)value < 0)
-                value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __metal_clz(value);
+            return spirv_asm {
+                OpExtInst $$vector<uint, N> result glsl450 FindSMsb $value
+            };
         }
-    case spirv: return spirv_asm {
-        OpExtInst $$uint result glsl450 FindUMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
-    case llvm:
+        else if (T is uint)
         {
-            if ((int)value < 0)
-                value = ~value;
-            if (value == 0)
-                return ~0u;
-            return 31 - __llvm_ctlz(value);
+            return spirv_asm {
+                OpExtInst $$vector<uint, N> result glsl450 FindUMsb $value
+            };
         }
-    }
-}
-
-__generic<let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<uint,N> firstbithigh(vector<uint,N> value)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "findMSB";
-    case hlsl: __intrinsic_asm "firstbithigh";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<uint,N> result glsl450 FindUMsb $value
-    };
-    case wgsl: __intrinsic_asm "firstLeadingBit";
+        else VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
+    case wgsl: return vector<uint, N>(__wgsl_firstLeadingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbithigh, value);
     }
@@ -10437,73 +10449,71 @@ vector<uint,N> firstbithigh(vector<uint,N> value)
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-int firstbitlow(int value)
+uint firstbitlow<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case cpp: __intrinsic_asm "$P_firstbitlow($0)";
     case cuda: __intrinsic_asm "$P_firstbitlow($0)";
-    case glsl: __intrinsic_asm "findLSB";
+    case glsl:
+        if (T is int64_t || T is uint64_t)
+            __requireTargetExtension("GL_EXT_shader_explicit_arithmetic_types_int64");
+        __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: return (value==0) ? -1 : __metal_ctz(value);
-    case spirv: return spirv_asm {
-        OpExtInst $$int result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
-    case llvm: return value == 0 ? -1 : __llvm_cttz(value);
+    case metal: return (value == T(0)) ? uint(-1) : __intCast<uint>(__metal_ctz(value));
+    case spirv:
+        if (T is int || T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $value
+            };
+        }
+        else if (T is int8_t || T is int16_t || T is uint8_t || T is uint16_t)
+        {
+            uint value32 = __intCast<uint>(value);
+            return spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $value
+            };
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            uint2 halves = __asuint2(val);
+            uint lowestBitHalf = halves.x != 0 ? halves.x : halves.y;
+            uint count = spirv_asm {
+                OpExtInst $$uint result glsl450 FindILsb $lowestBitHalf
+            };
+
+            if (count == ~0u)
+                return uint(-1);
+
+            if (halves.x == 0)
+                count += 32;
+
+            return count;
+        }
+    case wgsl: return __intCast<uint>(__wgsl_firstTrailingBit(value));
+    case llvm: return value == T(0) ? uint(-1) : __intCast<uint>(__llvm_cttz(value));
     }
 }
 
-__generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<int,N> firstbitlow(vector<int,N> value)
+vector<uint,N> firstbitlow<T : __BuiltinIntegerType, let N : int>(vector<T,N> value)
 {
     __target_switch
     {
     case glsl: __intrinsic_asm "findLSB";
     case hlsl: __intrinsic_asm "firstbitlow";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<int,N> result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
-    default:
-        VECTOR_MAP_UNARY(int, N, firstbitlow, value);
-    }
-}
-
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-uint firstbitlow(uint value)
-{
-    __target_switch
-    {
-    case cpp: __intrinsic_asm "$P_firstbitlow($0)";
-    case cuda: __intrinsic_asm "$P_firstbitlow($0)";
-    case glsl: __intrinsic_asm "findLSB";
-    case hlsl: __intrinsic_asm "firstbitlow";
-    case metal: return (value==0) ? -1 : __metal_ctz(value);
-    case spirv: return spirv_asm {
-        OpExtInst $$uint result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
-    case llvm: return value == 0 ? -1 : __llvm_cttz(value);
-    }
-}
-
-__generic<let N : int>
-[__readNone]
-[require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<uint,N> firstbitlow(vector<uint,N> value)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "findLSB";
-    case hlsl: __intrinsic_asm "firstbitlow";
-    case spirv: return spirv_asm {
-        OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
-    };
-    case wgsl: __intrinsic_asm "firstTrailingBit";
+    case spirv:
+        if (T is int || T is uint)
+        {
+            return spirv_asm {
+                OpExtInst $$vector<uint,N> result glsl450 FindILsb $value
+            };
+        }
+        else VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
+    case wgsl: return vector<uint, N>(__wgsl_firstTrailingBit(value));
     default:
         VECTOR_MAP_UNARY(uint, N, firstbitlow, value);
     }
@@ -13802,41 +13812,60 @@ T refract(T i, T n, T eta)
 /// @category bitops
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-uint reversebits(uint value)
+T reversebits<T : __BuiltinIntegerType>(T value)
 {
     __target_switch
     {
     case hlsl:
         __intrinsic_asm "reversebits";
     case glsl:
-        __intrinsic_asm "bitfieldReverse";
+        if (T is int64_t || T is uint64_t)
+            __intrinsic_asm "pack64(bitfieldReverse(unpack32($0)).yx)";
+        else
+            __intrinsic_asm "bitfieldReverse";
     case cuda:
     case cpp:
         __intrinsic_asm "$P_reversebits($0)";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$uint result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$T result $value};
+        else if (T is int8_t || T is uint8_t || T is int16_t || T is uint16_t)
+        {
+            uint val = __intCast<uint>(value);
+            uint reversed = spirv_asm {OpBitReverse $$uint result $val};
+            return T(reversed >> (32 - sizeof(T) * 8));
+        }
+        else
+        {
+            uint64_t val = __intCast<uint64_t>(value);
+            uint2 halves = __asuint2(val);
+            halves.x = spirv_asm {OpBitReverse $$uint result $halves.x};
+            halves.y = spirv_asm {OpBitReverse $$uint result $halves.y};
+            return T(__asuint64(halves.yx));
+        }
     case wgsl: __intrinsic_asm "reverseBits";
     case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
 }
 
-__generic<let N : int>
 [__readNone]
 [require(cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm, shader5_sm_5_0)]
-vector<uint, N> reversebits(vector<uint, N> value)
+vector<T, N> reversebits<T : __BuiltinIntegerType, let N : int>(vector<T, N> value)
 {
     __target_switch
     {
     default:
-        VECTOR_MAP_UNARY(uint, N, reversebits, value);
+        VECTOR_MAP_UNARY(T, N, reversebits, value);
     case glsl:
         __intrinsic_asm "bitfieldReverse";
     case metal:
         __intrinsic_asm "reverse_bits";
     case spirv:
-        return spirv_asm {OpBitReverse $$vector<uint, N> result $value};
+        if (T is int || T is uint)
+            return spirv_asm {OpBitReverse $$vector<T, N> result $value};
+        else VECTOR_MAP_UNARY(T, N, reversebits, value);
     case wgsl: __intrinsic_asm "reverseBits";
     case llvm: __intrinsic_asm "%result = call $TR @llvm.bitreverse($0)";
     }
@@ -22793,12 +22822,13 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(hlsl, ser_dxr_raygen_closesthit_miss)]
     void SetShaderTableIndex(uint RecordIndex)
     {
         __target_switch
         {
-        case hlsl:
+        case ser_hlsl_native:
             __intrinsic_asm ".SetShaderTableIndex";
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         case _GL_EXT_shader_invocation_reorder:
@@ -26032,6 +26062,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
     /// Constructor for uint64_t handles
     [ForceInline]
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __intrinsic_op($(kIROp_CastUInt64ToDescriptorHandle))
     __init(uint64_t handleValue);
 
@@ -26041,6 +26072,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this == (uint64_t)other;
         default:
             return all(__vectorEql((uint2)this, (uint2)other));
@@ -26053,6 +26085,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this < (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -26067,6 +26100,7 @@ struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
         __target_switch
         {
         case spvBindlessTextureNV:
+        case cuda:
             return (uint64_t)this <= (uint64_t)other;
         default:
             let vthis = ((uint2)this);
@@ -26089,6 +26123,7 @@ extension uint64_t
 {
     __intrinsic_op($(kIROp_CastDescriptorHandleToUInt64))
     [require(spvBindlessTextureNV)]
+    [require(cuda)]
     __init<T:IOpaqueDescriptor>(DescriptorHandle<T> bindless);
 }
 
@@ -26669,7 +26704,7 @@ shape and workgroup size settings.
 __intrinsic_type($(kIROp_CoopMatrixType))
 [require(cooperative_matrix)]
 __generic<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -26677,7 +26712,6 @@ __generic<
 >
 struct CoopMat
     : IArray<T>
-    , IArithmetic
 {
     //
     // Initialization
@@ -26705,7 +26739,7 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : __BuiltinArithmeticType
+        U : ICoopElement
     >(CoopMat<U, S, M, N, R> other)
     {
         this.copyFrom(other);
@@ -26760,17 +26794,17 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : __BuiltinArithmeticType
+        U : ICoopElement
     >(CoopMat<U, S, M, N, R> other)
     {
         __target_switch
         {
         case spirv:
-            if (__isFloat<T>() && __isInt<U>())
+            if (__isCoopFloat<T>() && __isInt<U>())
                 this = __int_to_float_cast<T>(other);
-            else if (__isInt<T>() && __isFloat<U>())
+            else if (__isInt<T>() && __isCoopFloat<U>())
                 this = __float_to_int_cast<T>(other);
-            else if (__isFloat<T>() && __isFloat<U>())
+            else if (__isCoopFloat<T>() && __isCoopFloat<U>())
                 this = __real_cast<T>(other);
             else if (__isInt<T>() && __isInt<U>())
                 this = __int_cast<T>(other);
@@ -27147,6 +27181,28 @@ struct CoopMat
         }
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data, 0, $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data, 0, $2)";
+        }
+    }
+
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
@@ -27172,6 +27228,29 @@ struct CoopMat
         };
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    void Store<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                OpCooperativeMatrixStoreKHR $data $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1), $2)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1), $2)";
+        }
+    }
+
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array of vectors.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
@@ -27182,7 +27261,7 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix)]
+    [require(cooperative_matrix_spirv)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
@@ -27341,6 +27420,28 @@ $}
         }
     }
 
+    [ForceInline]
+    [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+    >(Ptr<T, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, 0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, 0, $1)";
+        }
+    }
+
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
     /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
@@ -27365,6 +27466,29 @@ $}
             %pointer:%workgroupPointerType = OpAccessChain &data $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
         };
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    static This Load<
+        let matrixLayout : CoopMatMatrixLayout,
+        U,
+    >(Ptr<U, Access::ReadWrite, AddressSpace::GroupShared> data, uint stride)
+    {
+        __target_switch
+        {
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR $data $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>($0, $1)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>($0, $1)";
+        }
     }
 
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array of vectors.
@@ -27393,109 +27517,6 @@ $}
             %pointer:%workgroupPointerType = OpAccessChain &data $element;
             result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
         };
-    }
-
-    //
-    // Arithmetic
-    //
-
-    /// Performs element-wise addition of two cooperative matrices.
-    /// @param other The cooperative matrix to add.
-    /// @return A new cooperative matrix containing the element-wise sum.
-    __intrinsic_op($(kIROp_Add))
-    This add(This other);
-
-    /// Performs element-wise subtraction of two cooperative matrices.
-    /// @param other The cooperative matrix to subtract.
-    /// @return A new cooperative matrix containing the element-wise difference.
-    __intrinsic_op($(kIROp_Sub))
-    This sub(This other);
-
-    /// Performs element-wise multiplication of two cooperative matrices.
-    /// @param other The cooperative matrix to multiply with.
-    /// @return A new cooperative matrix containing the element-wise product.
-    __intrinsic_op($(kIROp_Mul))
-    This mul(This other);
-
-    /// Performs element-wise division of two cooperative matrices.
-    /// @param other The cooperative matrix to divide by.
-    /// @return A new cooperative matrix containing the element-wise quotient.
-    __intrinsic_op($(kIROp_Div))
-    This div(This other);
-
-    /// Negates all elements in the cooperative matrix.
-    /// @return A new cooperative matrix with all elements negated.
-    __intrinsic_op($(kIROp_Neg))
-    This neg();
-
-    /// Performs element-wise modulo operation of two cooperative matrices.
-    /// @param other The cooperative matrix to compute modulo with.
-    /// @return A new cooperative matrix containing the element-wise remainder.
-    This mod(This other)
-    {
-        This ret;
-        for (int i = 0; i < GetLength(); ++i)
-        {
-            ret[i] = this[i] % other[i];
-        }
-        return ret;
-    }
-
-    //
-    // Equality and ordering
-    //
-
-    /// Tests if two cooperative matrices are equal by comparing all elements.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if all corresponding elements are equal, false otherwise.
-    bool equals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] != other[i])
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// Performs lexicographic comparison to test if this matrix is less than another.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if this matrix is lexicographically less than other, false otherwise.
-    bool lessThan(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return false;
-    }
-
-    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
-    /// @param other The cooperative matrix to compare with.
-    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
-    bool lessThanOrEquals(This other)
-    {
-        for (int i = 0; i < GetLength(); i++)
-        {
-            if (this[i] < other[i])
-            {
-                return true;
-            }
-            else if (this[i] > other[i])
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     //
@@ -27553,9 +27574,9 @@ $}
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes),
+        let HasDimensions : bool,
         P
+        $(tensorViewTypes)
     >(
         P* pointerIn,
         This clippedValue,
@@ -27602,9 +27623,9 @@ $}
         let Dim : uint32_t,
         let ClampMode : CoopMatClampMode,
         let DimView : uint32_t,
-        let HasDimensions : bool
-        $(tensorViewTypes),
+        let HasDimensions : bool,
         P
+        $(tensorViewTypes)
     >(
         P* pointerIn,
         This clippedValue,
@@ -28002,7 +28023,7 @@ $}
 
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int> CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator>
@@ -28054,7 +28075,7 @@ extension<
 [ForceInline]
 [require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28083,7 +28104,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix, byteaddressbuffer)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28112,7 +28133,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28141,7 +28162,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28170,7 +28191,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28201,7 +28222,7 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [ForceInline]
 [require(cooperative_matrix_spirv, vk_mem_model)]
 CoopMat<T, S, M, N, R> coopMatLoadCoherent<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28232,7 +28253,7 @@ CoopMat<T, S, M, N, R> coopMatLoadCoherent<
 [ForceInline]
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, R> coopMatLoad<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28255,8 +28276,8 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
 CoopMat<T,S,M,N,R> __int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28266,8 +28287,8 @@ CoopMat<T,S,M,N,R> __int_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
 CoopMat<T,S,M,N,R> __real_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28277,8 +28298,8 @@ CoopMat<T,S,M,N,R> __real_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
 CoopMat<T,S,M,N,R> __int_to_float_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28288,8 +28309,8 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
 CoopMat<T,S,M,N,R> __float_to_int_cast<
-    T : __BuiltinArithmeticType,
-    U : __BuiltinArithmeticType,
+    T : ICoopElement,
+    U : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28320,11 +28341,11 @@ CoopMat<T,S,M,N,R> __float_to_int_cast<
 /// @return Result accumulator matrix D = A * B + C with dimensions M×N.
 [require(cooperative_matrix)]
 CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let saturatingAccumulation : bool,
-    U : __BuiltinArithmeticType,
-    V : __BuiltinArithmeticType,
-    W : __BuiltinArithmeticType,
+    U : ICoopElement,
+    V : ICoopElement,
+    W : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let K : int,
@@ -28374,8 +28395,6 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T0::m_M,
                                                          $T0::m_N,
                                                          $T0::m_K,
-                                                         $T0::m_layout,
-                                                         $T1::m_layout,
                                                          true
                                                         >($0, $1, $2))";
         else
@@ -28387,8 +28406,6 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
                                                          $T0::m_M,
                                                          $T0::m_N,
                                                          $T0::m_K,
-                                                         $T0::m_layout,
-                                                         $T1::m_layout,
                                                          false
                                                         >($0, $1, $2))";
 
@@ -28396,12 +28413,12 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
 }
 
 extension<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
     let R : linalg.CoopMatMatrixUse,
-    each Ts : __BuiltinArithmeticType
+    each Ts : ICoopElement
 > Tuple<linalg.CoopMat<T, S, M, N, R>, expand linalg.CoopMat<each Ts, S, M, N, R>>
 {
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))
@@ -28420,7 +28437,119 @@ extension<
     {
         return __MapElement(this, mapOp.operator(), mapOp);
     }
-};
+} // struct CoopMat
+
+// IArithmetic implementation for CoopMat, where T is __BuiltinArithmeticType.
+// Note that arithmetic operations are not allowed on CoopMat with FloatE4M3, FloatE5M2,
+// BFloat16 element types.
+extension<
+    T,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+> CoopMat<T,S,M,N,R> : IArithmetic
+    where T : __BuiltinArithmeticType
+{
+     /// Performs element-wise addition of two cooperative matrices.
+    /// @param other The cooperative matrix to add.
+    /// @return A new cooperative matrix containing the element-wise sum.
+    __intrinsic_op($(kIROp_Add))
+    This add(This other);
+
+    /// Performs element-wise subtraction of two cooperative matrices.
+    /// @param other The cooperative matrix to subtract.
+    /// @return A new cooperative matrix containing the element-wise difference.
+    __intrinsic_op($(kIROp_Sub))
+    This sub(This other);
+
+    /// Performs element-wise multiplication of two cooperative matrices.
+    /// @param other The cooperative matrix to multiply with.
+    /// @return A new cooperative matrix containing the element-wise product.
+    __intrinsic_op($(kIROp_Mul))
+    This mul(This other);
+
+    /// Performs element-wise division of two cooperative matrices.
+    /// @param other The cooperative matrix to divide by.
+    /// @return A new cooperative matrix containing the element-wise quotient.
+    __intrinsic_op($(kIROp_Div))
+    This div(This other);
+
+    /// Negates all elements in the cooperative matrix.
+    /// @return A new cooperative matrix with all elements negated.
+    __intrinsic_op($(kIROp_Neg))
+    This neg();
+
+    /// Performs element-wise modulo operation of two cooperative matrices.
+    /// @param other The cooperative matrix to compute modulo with.
+    /// @return A new cooperative matrix containing the element-wise remainder.
+    This mod(This other)
+    {
+        This ret;
+        for (int i = 0; i < GetLength(); ++i)
+        {
+            ret[i] = this[i] % other[i];
+        }
+        return ret;
+    }
+
+    //
+    // Equality and ordering
+    //
+
+    /// Tests if two cooperative matrices are equal by comparing all elements.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if all corresponding elements are equal, false otherwise.
+    bool equals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] != other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than other, false otherwise.
+    bool lessThan(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /// Performs lexicographic comparison to test if this matrix is less than or equal to another.
+    /// @param other The cooperative matrix to compare with.
+    /// @return True if this matrix is lexicographically less than or equal to other, false otherwise.
+    bool lessThanOrEquals(This other)
+    {
+        for (int i = 0; i < GetLength(); i++)
+        {
+            if (this[i] < other[i])
+            {
+                return true;
+            }
+            else if (this[i] > other[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
 
 } // namespace linalg
 
@@ -28440,7 +28569,7 @@ extension<
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,
@@ -28471,7 +28600,7 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 /// @return A new cooperative matrix with all elements multiplied by the scalar.
 [require(cooperative_matrix)]
 linalg.CoopMat<T, S, M, N, R> operator *<
-    T : __BuiltinArithmeticType,
+    T : ICoopElement,
     let S : MemoryScope,
     let M : int,
     let N : int,

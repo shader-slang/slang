@@ -8,6 +8,18 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -mtl -shaderobj
 
+// Verify HLSL output preserves case grouping structure for SM 6.0
+//TEST:SIMPLE(filecheck=CHECK-HLSL): -target hlsl -profile cs_6_0 -entry computeMain -stage compute
+
+// CHECK-HLSL: case int(0):
+// CHECK-HLSL-NOT: break
+// CHECK-HLSL: case int(1):
+// CHECK-HLSL: case int(2):
+// CHECK-HLSL-NOT: break
+// CHECK-HLSL: case int(3):
+// CHECK-HLSL-NOT: break
+// CHECK-HLSL: case int(4):
+
 // CHECK:      64
 // CHECK-NEXT: 65
 // CHECK-NEXT: CA
