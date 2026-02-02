@@ -225,7 +225,7 @@ emscripten::val Session::createCompositeComponentType(emscripten::val components
         for (size_t i = 0U; i < componentsArray.size(); i++)
         {
             auto componentVal = componentsArray[i];
-            if (componentVal.instanceof(emscripten::val::module_property("ComponentType")))
+            if (componentVal.instanceof (emscripten::val::module_property("ComponentType")))
             {
                 auto componentType = componentVal.as<ComponentType>();
                 nativeComponents.push_back(componentType.interface());
