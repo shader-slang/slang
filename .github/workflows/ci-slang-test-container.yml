@@ -327,3 +327,22 @@ jobs:
             #   -n 0                  Rerun the tests sequentially
             python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
           fi
+
+      - name: Run slang neural integration tests
+        run: |
+          export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          echo "Running neural module integration tests..."
+          # These tests live in the slang repo and test neural module functionality via slangpy
+          if python3 -m pytest tests/integration/slangpy/neural/ -ra -v
+          then
+            echo "All neural integration tests passed."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some neural integration tests failed. Re-running failed tests..."
+            echo "========================================"
+            echo ""
+            python3 -m pytest tests/integration/slangpy/neural/ -ra -v --lf
+          fi
