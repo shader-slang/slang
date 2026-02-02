@@ -2999,7 +2999,15 @@ TypeLayoutContext getInitialLayoutContextForTarget(
 
     if (rulesFamily)
     {
-        context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+        switch (rules)
+        {
+        case slang::LayoutRules::DefaultStructuredBuffer:
+            context.rules = rulesFamily->getStructuredBufferRules(targetReq->getOptionSet());
+            break;
+        default:
+            context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+            break;
+        }
     }
 
     return context;
@@ -5338,6 +5346,20 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(basicType->getBaseType(), context),
+            type,
+            rules);
+    }
+    else if (auto fp8Type = as<Fp8Type>(type))
+    {
+        return createSimpleTypeLayout(
+            rules->GetScalarLayout(BaseType::UInt8, context),
+            type,
+            rules);
+    }
+    else if (auto bf168Type = as<BFloat16Type>(type))
+    {
+        return createSimpleTypeLayout(
+            rules->GetScalarLayout(BaseType::UInt16, context),
             type,
             rules);
     }

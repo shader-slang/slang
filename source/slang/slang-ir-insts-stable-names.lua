@@ -720,6 +720,10 @@ return {
 	["makeCoopMatrixFromScalar"] = 718,
 	["getOptiXPayloadRegister"] = 719,
 	["setOptiXPayloadRegister"] = 720,
-	["Type.OptionalNoneType"] = 721,
-	["ReinterpretOptional"] = 722
+	["Type.PackedFloatType.FloatE4M3Type"] = 721,
+	["Type.PackedFloatType.FloatE5M2Type"] = 722,
+	["Type.PackedFloatType.BFloat16Type"] = 723,
+	["IsCoopFloat"] = 724,
+	["Type.OptionalNoneType"] = 725,
+	["ReinterpretOptional"] = 726,
 }

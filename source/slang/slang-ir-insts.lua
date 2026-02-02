@@ -47,6 +47,15 @@ local insts = {
 					{ NativeString = { struct_name = "NativeStringType" } },
 				},
 			},
+			-- Additional restricted (storage-only) floating point type.
+			{
+				PackedFloatType = {
+					hoistable = true,
+					{ FloatE4M3Type = {struct_name="FloatE4M3Type"} },
+					{ FloatE5M2Type = {struct_name="FloatE5M2Type"} },
+					{ BFloat16Type = {struct_name="BFloat16Type"} },
+				},
+			},
 			{ CapabilitySet = { struct_name = "CapabilitySetType", hoistable = true } },
 			{ DynamicType = { hoistable = true } },
 			{ AnyValueType = { operands = { { "size" } }, hoistable = true } },
@@ -2435,6 +2444,8 @@ local insts = {
 	{ IsInt = { operands = { { "value" } } } },
 	{ IsBool = { operands = { { "value" } } } },
 	{ IsFloat = { operands = { { "value" } } } },
+	-- Check whether an operand's type is floating point type or packed floating point type (fp8,bf16)
+	{ IsCoopFloat = {operands = { { "value" } } } },
 	{ IsHalf = { operands = { { "value" } } } },
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },
