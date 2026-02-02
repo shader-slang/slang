@@ -988,14 +988,16 @@ struct DefaultVaryingLayoutRulesImpl : DefaultLayoutRulesImpl
         return SimpleLayoutInfo(getKind(), 1);
     }
 
-    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t) override
+    SimpleLayoutInfo GetVectorLayout(BaseType elementType, SimpleLayoutInfo, size_t elementCount)
+        override
     {
         SLANG_UNUSED(elementType);
         // Vectors take up one slot by default
+        // takes 0 slots if elementCount is 0
         //
         // TODO: some platforms may decide that vectors of `double` need
         // special handling
-        return SimpleLayoutInfo(getKind(), 1);
+        return SimpleLayoutInfo(getKind(), elementCount == 0 ? 0 : 1);
     }
 };
 
@@ -2997,7 +2999,15 @@ TypeLayoutContext getInitialLayoutContextForTarget(
 
     if (rulesFamily)
     {
-        context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+        switch (rules)
+        {
+        case slang::LayoutRules::DefaultStructuredBuffer:
+            context.rules = rulesFamily->getStructuredBufferRules(targetReq->getOptionSet());
+            break;
+        default:
+            context.rules = rulesFamily->getConstantBufferRules(targetReq->getOptionSet(), nullptr);
+            break;
+        }
     }
 
     return context;
@@ -5339,11 +5349,37 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (auto fp8Type = as<Fp8Type>(type))
+    {
+        return createSimpleTypeLayout(
+            rules->GetScalarLayout(BaseType::UInt8, context),
+            type,
+            rules);
+    }
+    else if (auto bf168Type = as<BFloat16Type>(type))
+    {
+        return createSimpleTypeLayout(
+            rules->GetScalarLayout(BaseType::UInt16, context),
+            type,
+            rules);
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount =
-            (size_t)getIntVal(context.tryResolveLinkTimeVal(vecType->getElementCount()));
+
+        // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
+        auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
+        if (!as<ConstantIntVal>(elementCountVal))
+        {
+            // If the vector size is not a compile-time constant, fall back to default layout
+            auto element = _createTypeLayout(context, elementType);
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+            return TypeLayoutResult(typeLayout, element.info);
+        }
+
+        size_t elementCount = (size_t)getIntVal(elementCountVal);
 
         auto element = _createTypeLayout(context, elementType);
 
@@ -6049,7 +6085,21 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
-        size_t elementCount = (size_t)getIntVal(vecType->getElementCount());
+
+        // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
+        auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
+        if (!as<ConstantIntVal>(elementCountVal))
+        {
+            // If the vector size is not a compile-time constant, we cannot
+            // compute a fixed layout for it. Treat it as having zero size.
+            // This will be handled later during IR legalization.
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+            return typeLayout;
+        }
+
+        size_t elementCount = (size_t)getIntVal(elementCountVal);
 
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))

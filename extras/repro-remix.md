@@ -188,7 +188,6 @@ The script closely matches the CI workflow, with these minor differences:
 
 - First run takes ~15-20 minutes (packman download + shader compilation)
 - Subsequent runs are faster if packman cache exists (~10-15 minutes)
-- The `external/dxvk-remix` clone uses `--depth 1` (shallow) to save space
 - Packman downloads ~340MB to `C:\packman-repo` (persisted across runs)
 - Debug builds include more symbols for debugging but run slower than Release
 

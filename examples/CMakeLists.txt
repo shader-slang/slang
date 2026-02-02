@@ -130,6 +130,10 @@ if(SLANG_ENABLE_EXAMPLES AND SLANG_ENABLE_SLANG_RHI)
         add_subdirectory(nv-aftermath-example)
     endif()
 
+    if(TARGET slang-llvm)
+        add_subdirectory(cpu-shader-llvm)
+    endif()
+
     if(SLANG_ENABLE_SLANG_RHI)
         add_subdirectory(mlp-training)
         add_subdirectory(mlp-training-coopvec)

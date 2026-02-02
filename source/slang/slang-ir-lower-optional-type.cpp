@@ -169,8 +169,12 @@ struct OptionalTypeLoweringContext
         auto info = getLoweredOptionalType(builder, inst->getDataType());
         if (info->loweredType != info->valueType)
         {
+            // Synthesize a default-constructed placeholder for the payload.
+            // The payload is semantically irrelevant when hasValue == false,
+            // but we need a well-formed value to satisfy the struct layout.
+            auto defaultVal = builder->emitDefaultConstruct(info->valueType);
             List<IRInst*> operands;
-            operands.add(inst->getDefaultValue());
+            operands.add(defaultVal);
             operands.add(builder->getBoolValue(false));
             auto makeStruct = builder->emitMakeStruct(info->loweredType, operands);
             inst->replaceUsesWith(makeStruct);

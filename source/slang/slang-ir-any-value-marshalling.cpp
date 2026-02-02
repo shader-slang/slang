@@ -2,12 +2,13 @@
 
 #include "../core/slang-math.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
-#include "slang-ir.h"
 #include "slang-legalize-types.h"
 
 namespace Slang
 {
+
 // This is a subpass of generics lowering IR transformation.
 // This pass generates packing/unpacking functions for `AnyValue`s,
 // and replaces all `IRPackAnyValue` and `IRUnpackAnyValue` with calls to these
@@ -115,6 +116,8 @@ struct AnyValueMarshallingContext
         uint32_t intraFieldOffset;
         IRType* uintPtrType;
         IRInst* anyValueVar;
+        TargetProgram* targetProgram;
+
         // Defines what to do with basic typed data elements.
         virtual void marshalBasicType(
             IRBuilder* builder,
@@ -125,6 +128,16 @@ struct AnyValueMarshallingContext
             IRBuilder* builder,
             IRType* dataType,
             IRInst* concreteTypedVar) = 0;
+
+        // Defines what to do with DescriptorHandle types.
+        // For non-bindless targets, uses CastDescriptorHandleToUInt2.
+        // For bindless targets, marshals based on actual byte size.
+        virtual void marshalDescriptorHandle(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteTypedVar,
+            bool isBindless,
+            IRIntegerValue sizeInBytes) = 0;
 
         void ensureOffsetAt4ByteBoundary()
         {
@@ -197,6 +210,9 @@ struct AnyValueMarshallingContext
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
         case kIROp_PtrType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             context->marshalBasicType(builder, dataType, concreteTypedVar);
             break;
         case kIROp_EnumType:
@@ -297,6 +313,27 @@ struct AnyValueMarshallingContext
                 }
                 break;
             }
+        case kIROp_DescriptorHandleType:
+            {
+                // DescriptorHandle<T> representation depends on target:
+                // - Non-bindless (HLSL, GLSL/SPIRV): uint2 (8 bytes)
+                // - Bindless (CUDA, CPU, Metal): same as T (variable size)
+                auto targetReq = context->targetProgram->getTargetReq();
+                bool bindless = areResourceTypesBindlessOnTarget(targetReq);
+
+                IRSizeAndAlignment sizeAndAlign;
+                auto result = getNaturalSizeAndAlignment(targetReq, dataType, &sizeAndAlign);
+
+                IRIntegerValue size = 8; // Default to 8 bytes for non-bindless
+                if (SLANG_SUCCEEDED(result) && sizeAndAlign.size > 0)
+                {
+                    size = sizeAndAlign.size;
+                }
+
+                context
+                    ->marshalDescriptorHandle(builder, dataType, concreteTypedVar, bindless, size);
+                break;
+            }
         default:
             if (isResourceType(dataType))
             {
@@ -374,12 +411,13 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                     {
                         auto srcVal = builder->emitLoad(concreteVar);
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (!isIntegralType(dataType))
                         {
                             srcVal =
                                 builder->emitBitCast(builder->getType(kIROp_UInt16Type), srcVal);
@@ -416,9 +454,15 @@ struct AnyValueMarshallingContext
                 }
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
                 if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcVal = builder->emitLoad(concreteVar);
+                    if (!isIntegralType(dataType))
+                    {
+                        srcVal = builder->emitBitCast(builder->getType(kIROp_UInt8Type), srcVal);
+                    }
                     srcVal = builder->emitCast(builder->getType(kIROp_UIntType), srcVal);
                     auto dstAddr = builder->emitFieldAddress(
                         uintPtrType,
@@ -551,6 +595,83 @@ struct AnyValueMarshallingContext
                 advanceOffset(8);
             }
         }
+
+        // pack: DescriptorHandle -> AnyValue
+        virtual void marshalDescriptorHandle(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteVar,
+            bool isBindless,
+            IRIntegerValue sizeInBytes) override
+        {
+            ensureOffsetAt4ByteBoundary();
+
+            if (!isBindless)
+            {
+                // Non-bindless targets: Use CastDescriptorHandleToUInt2
+                // This has proper lowering support in GLSL/SPIRV/HLSL emitters
+                if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcVal = builder->emitLoad(concreteVar);
+                    auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+
+                    // Use the explicit IR cast op instead of bitcast
+                    auto uint2Val = builder->emitIntrinsicInst(
+                        uint2Type,
+                        kIROp_CastDescriptorHandleToUInt2,
+                        1,
+                        &srcVal);
+
+                    auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
+                    auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
+
+                    auto dstAddr1 = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    builder->emitStore(dstAddr1, lowBits);
+
+                    auto dstAddr2 = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset + 1]);
+                    builder->emitStore(dstAddr2, highBits);
+                }
+                advanceOffset(8);
+            }
+            else
+            {
+                // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
+                // Marshal as raw bytes based on actual size (8 or 16 bytes)
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
+                SLANG_UNUSED(dataType);
+
+                auto srcVal = builder->emitLoad(concreteVar);
+
+                // sizeInBytes should be either 8 or 16
+                const IRIntegerValue numFieldsNeeded = (sizeInBytes + 3) / 4;
+                SLANG_ASSERT(numFieldsNeeded == 2 || numFieldsNeeded == 4);
+
+                if (fieldOffset + numFieldsNeeded <=
+                    static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto uintVectorType =
+                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                    auto uintVectorVal = builder->emitBitCast(uintVectorType, srcVal);
+
+                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                    {
+                        auto bits = builder->emitElementExtract(uintVectorVal, i);
+                        auto dstAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + i]);
+                        builder->emitStore(dstAddr, bits);
+                    }
+                }
+                advanceOffset((uint32_t)sizeInBytes);
+            }
+        }
     };
 
     IRFunc* generatePackingFunc(IRType* type, IRAnyValueType* anyValueType)
@@ -596,6 +717,7 @@ struct AnyValueMarshallingContext
         context.fieldOffset = context.intraFieldOffset = 0;
         context.uintPtrType = builder.getPtrType(builder.getUIntType());
         context.anyValueVar = resultVar;
+        context.targetProgram = targetProgram;
         emitMarshallingCode(&builder, &context, concreteTypedVar);
 
         auto load = builder.emitLoad(resultVar);
@@ -663,6 +785,7 @@ struct AnyValueMarshallingContext
             case kIROp_Int16Type:
             case kIROp_UInt16Type:
             case kIROp_HalfType:
+            case kIROp_BFloat16Type:
                 {
                     ensureOffsetAt2ByteBoundary();
                     if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
@@ -694,7 +817,7 @@ struct AnyValueMarshallingContext
                         {
                             srcVal = builder->emitCast(builder->getType(kIROp_UInt16Type), srcVal);
                         }
-                        if (dataType->getOp() == kIROp_HalfType)
+                        if (dataType != srcVal->getDataType())
                         {
                             srcVal = builder->emitBitCast(dataType, srcVal);
                         }
@@ -705,6 +828,8 @@ struct AnyValueMarshallingContext
                 }
             case kIROp_Int8Type:
             case kIROp_UInt8Type:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
                 if (fieldOffset < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
                 {
                     auto srcAddr = builder->emitFieldAddress(
@@ -724,6 +849,10 @@ struct AnyValueMarshallingContext
                     else
                     {
                         srcVal = builder->emitCast(builder->getType(kIROp_UInt8Type), srcVal);
+                    }
+                    if (dataType != srcVal->getDataType())
+                    {
+                        srcVal = builder->emitBitCast(dataType, srcVal);
                     }
                     builder->emitStore(concreteVar, srcVal);
                 }
@@ -836,6 +965,84 @@ struct AnyValueMarshallingContext
                 advanceOffset(8);
             }
         }
+
+        // unpack: AnyValue -> DescriptorHandle
+        virtual void marshalDescriptorHandle(
+            IRBuilder* builder,
+            IRType* dataType,
+            IRInst* concreteVar,
+            bool isBindless,
+            IRIntegerValue sizeInBytes) override
+        {
+            ensureOffsetAt4ByteBoundary();
+
+            if (!isBindless)
+            {
+                // Non-bindless targets: Use CastUInt2ToDescriptorHandle
+                if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset]);
+                    auto lowBits = builder->emitLoad(srcAddr);
+
+                    auto srcAddr1 = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset + 1]);
+                    auto highBits = builder->emitLoad(srcAddr1);
+
+                    // Build uint2 from components
+                    auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
+                    IRInst* components[2] = {lowBits, highBits};
+                    auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
+
+                    // Use the explicit IR cast op instead of bitcast
+                    auto result = builder->emitIntrinsicInst(
+                        dataType,
+                        kIROp_CastUInt2ToDescriptorHandle,
+                        1,
+                        &uint2Val);
+
+                    builder->emitStore(concreteVar, result);
+                }
+                advanceOffset(8);
+            }
+            else
+            {
+                // Bindless targets (CUDA, CPU, Metal): DescriptorHandle is a native type
+                // Unmarshal from raw bytes based on actual size (8 or 16 bytes)
+                // Use uint2 instead of uint64 to avoid Int64 capability requirement
+
+                // sizeInBytes should be either 8 or 16
+                const IRIntegerValue numFieldsNeeded = (sizeInBytes + 3) / 4;
+                SLANG_ASSERT(numFieldsNeeded == 2 || numFieldsNeeded == 4);
+
+                if (fieldOffset + numFieldsNeeded <=
+                    static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+                {
+                    auto uintVectorType =
+                        builder->getVectorType(builder->getUIntType(), numFieldsNeeded);
+                    IRInst* components[4]; // max 4 uints needed
+
+                    for (IRIntegerValue i = 0; i < numFieldsNeeded; i++)
+                    {
+                        auto srcAddr = builder->emitFieldAddress(
+                            uintPtrType,
+                            anyValueVar,
+                            anyValInfo->fieldKeys[fieldOffset + i]);
+                        components[i] = builder->emitLoad(srcAddr);
+                    }
+
+                    auto uintVecVal =
+                        builder->emitMakeVector(uintVectorType, numFieldsNeeded, components);
+                    auto result = builder->emitBitCast(dataType, uintVecVal);
+                    builder->emitStore(concreteVar, result);
+                }
+                advanceOffset((uint32_t)sizeInBytes);
+            }
+        }
     };
 
     IRFunc* generateUnpackingFunc(IRType* type, IRAnyValueType* anyValueType)
@@ -867,6 +1074,7 @@ struct AnyValueMarshallingContext
         context.fieldOffset = context.intraFieldOffset = 0;
         context.uintPtrType = builder.getPtrType(builder.getUIntType());
         context.anyValueVar = anyValueVar;
+        context.targetProgram = targetProgram;
         emitMarshallingCode(&builder, &context, resultVar);
         auto load = builder.emitLoad(resultVar);
         builder.emitReturn(load);
@@ -980,125 +1188,28 @@ SlangInt alignUp(SlangInt x, SlangInt alignment)
     return (x + alignment - 1) / alignment * alignment;
 }
 
-SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset, TargetProgram* program)
+SlangInt _getAnyValueSizeRaw(IRType* type, TargetRequest* targetReq, SlangInt offset)
 {
+    // Try to get size and alignment from the layout system.
+    IRSizeAndAlignment sizeAndAlignment;
+
+    if (SLANG_SUCCEEDED(getSizeAndAlignment(
+            targetReq,
+            IRTypeLayoutRules::getNatural(),
+            type,
+            &sizeAndAlignment)))
+    {
+        // Check for valid size (not indeterminate and non-negative)
+        if (sizeAndAlignment.size != IRSizeAndAlignment::kIndeterminateSize &&
+            sizeAndAlignment.size >= 0)
+        {
+            return alignUp(offset, sizeAndAlignment.alignment) + sizeAndAlignment.size;
+        }
+    }
+
+    // Handle special cases not covered by the layout system
     switch (type->getOp())
     {
-    case kIROp_IntType:
-    case kIROp_FloatType:
-    case kIROp_UIntType:
-    case kIROp_BoolType:
-        return alignUp(offset, 4) + 4;
-    case kIROp_UInt64Type:
-    case kIROp_Int64Type:
-    case kIROp_DoubleType:
-        return alignUp(offset, 8) + 8;
-    case kIROp_PtrType:
-    case kIROp_IntPtrType:
-    case kIROp_UIntPtrType:
-        {
-            auto ptrSize = getPointerSize(program->getTargetReq());
-            return alignUp(offset, ptrSize) + ptrSize;
-        }
-    case kIROp_Int16Type:
-    case kIROp_UInt16Type:
-    case kIROp_HalfType:
-        return alignUp(offset, 2) + 2;
-    case kIROp_UInt8Type:
-    case kIROp_Int8Type:
-        return offset + 1;
-    case kIROp_EnumType:
-        {
-            auto enumType = static_cast<IREnumType*>(type);
-            auto tagType = enumType->getTagType();
-            return _getAnyValueSizeRaw(tagType, offset, program);
-        }
-    case kIROp_VectorType:
-        {
-            auto vectorType = static_cast<IRVectorType*>(type);
-            auto elementType = vectorType->getElementType();
-            auto elementCount = getIntVal(vectorType->getElementCount());
-            for (IRIntegerValue i = 0; i < elementCount; i++)
-            {
-                offset = _getAnyValueSizeRaw(elementType, offset, program);
-                if (offset < 0)
-                    return offset;
-            }
-            return offset;
-        }
-    case kIROp_MatrixType:
-        {
-            auto matrixType = static_cast<IRMatrixType*>(type);
-            auto elementType = matrixType->getElementType();
-            auto colCount = getIntVal(matrixType->getColumnCount());
-            auto rowCount = getIntVal(matrixType->getRowCount());
-            for (IRIntegerValue i = 0; i < rowCount; i++)
-            {
-                for (IRIntegerValue j = 0; j < colCount; j++)
-                {
-                    offset = _getAnyValueSizeRaw(elementType, offset, program);
-                    if (offset < 0)
-                        return offset;
-                }
-            }
-            return offset;
-        }
-    case kIROp_StructType:
-        {
-            auto structType = cast<IRStructType>(type);
-            for (auto field : structType->getFields())
-            {
-                offset = _getAnyValueSizeRaw(field->getFieldType(), offset, program);
-                if (offset < 0)
-                    return offset;
-            }
-            return offset;
-        }
-    case kIROp_ArrayType:
-        {
-            auto arrayType = cast<IRArrayType>(type);
-            for (IRIntegerValue i = 0; i < getIntVal(arrayType->getElementCount()); i++)
-            {
-                offset = _getAnyValueSizeRaw(arrayType->getElementType(), offset, program);
-                if (offset < 0)
-                    return offset;
-            }
-            return offset;
-        }
-    case kIROp_AnyValueType:
-        {
-            auto anyValueType = cast<IRAnyValueType>(type);
-            return alignUp(offset, 4) + (SlangInt)getIntVal(anyValueType->getSize());
-        }
-    case kIROp_TupleType:
-        {
-            auto tupleType = cast<IRTupleType>(type);
-            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
-            {
-                auto elementType = tupleType->getOperand(i);
-                offset = _getAnyValueSizeRaw((IRType*)elementType, offset, program);
-                if (offset < 0)
-                    return offset;
-            }
-            return offset;
-        }
-    case kIROp_WitnessTableType:
-    case kIROp_WitnessTableIDType:
-    case kIROp_RTTIHandleType:
-        {
-            return alignUp(offset, 4) + kRTTIHandleSize;
-        }
-    case kIROp_SetTagType:
-        {
-            return alignUp(offset, 4) + 4;
-        }
-    case kIROp_InterfaceType:
-        {
-            auto interfaceType = cast<IRInterfaceType>(type);
-            auto size = getInterfaceAnyValueSize(interfaceType, interfaceType->sourceLoc);
-            size += kRTTIHeaderSize;
-            return alignUp(offset, 4) + alignUp((SlangInt)size, 4);
-        }
     case kIROp_AssociatedType:
         {
             auto associatedType = cast<IRAssociatedType>(type);
@@ -1106,7 +1217,7 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset, TargetProgram* progr
             for (UInt i = 0; i < associatedType->getOperandCount(); i++)
                 maxSize = Math::Max(
                     maxSize,
-                    _getAnyValueSizeRaw((IRType*)associatedType->getOperand(i), offset, program));
+                    _getAnyValueSizeRaw((IRType*)associatedType->getOperand(i), targetReq, offset));
             return maxSize;
         }
     case kIROp_ThisType:
@@ -1169,17 +1280,13 @@ SlangInt _getAnyValueSizeRaw(IRType* type, SlangInt offset, TargetProgram* progr
         return alignUp(offset, 4) + 8;
 
     default:
-        if (isResourceType(type))
-        {
-            return alignUp(offset, 4) + 8;
-        }
         return -1;
     }
 }
 
-SlangInt getAnyValueSize(IRType* type, TargetProgram* program)
+SlangInt getAnyValueSize(IRType* type, TargetRequest* targetReq)
 {
-    auto rawSize = _getAnyValueSizeRaw(type, 0, program);
+    auto rawSize = _getAnyValueSizeRaw(type, targetReq, 0);
     if (rawSize < 0)
         return rawSize;
     return alignUp(rawSize, 4);
