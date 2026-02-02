@@ -220,7 +220,7 @@ emscripten::val Session::createCompositeComponentType(emscripten::val components
         for (size_t i = 0U; i < componentsArray.size(); i++)
         {
             auto componentVal = componentsArray[i];
-            if (componentVal.instanceof (emscripten::val::module_property("ComponentType")))
+            if (componentVal.instanceof(emscripten::val::module_property("ComponentType")))
             {
                 auto componentType = componentVal.as<ComponentType>();
                 nativeComponents.push_back(componentType.interface());
@@ -972,6 +972,11 @@ std::optional<std::vector<lsp::Diagnostics>> LanguageServer::getDiagnostics(std:
 LanguageServer* createLanguageServer()
 {
     return new LanguageServer();
+}
+
+std::string getVersionString()
+{
+    return std::string(spGetBuildTagString());
 }
 
 } // namespace lsp

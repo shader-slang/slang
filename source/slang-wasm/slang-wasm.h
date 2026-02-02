@@ -453,6 +453,9 @@ public:
 };
 
 LanguageServer* createLanguageServer();
+
+std::string getVersionString();
+
 } // namespace lsp
 
 } // namespace wgsl
