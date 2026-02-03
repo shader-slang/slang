@@ -5,8 +5,10 @@
 #include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-signal.h"
+#if TODO_REPLAY_SYSTEM
 #include "../slang-record-replay/record/slang-global-session.h"
 #include "../slang-record-replay/util/record-utility.h"
+#endif
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
@@ -245,6 +247,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
     }
 
+#if TODO_REPLAY_SYSTEM
     // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
     if (SlangRecord::isRecordLayerEnabled())
     {
@@ -254,6 +257,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         *outGlobalSession = result.detach();
     }
     else
+#endif
     {
         *outGlobalSession = globalSession.detach();
     }
