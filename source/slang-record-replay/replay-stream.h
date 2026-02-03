@@ -276,4 +276,4 @@ private:
     mutable std::ofstream m_mirrorFile;
 };
 
-} // namespace rhi::replay
+} // namespace SlangRecord
