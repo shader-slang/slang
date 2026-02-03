@@ -1,11 +1,15 @@
 #include "../../source/core/slang-io.h"
 
 #include <memory>
+#include <stdio.h>
+
+// TODO: Replace with new record-replay implementation
+#if TODO_REPLAY_SYSTEM
 #include <replay/json-consumer.h>
 #include <replay/recordFile-processor.h>
 #include <replay/replay-consumer.h>
 #include <replay/slang-decoder.h>
-#include <stdio.h>
+#endif
 
 struct Options
 {
@@ -75,6 +79,8 @@ int main(int argc, char* argv[])
 {
     Options options = parseOption(argc, argv);
 
+    // TODO: Replace with new record-replay implementation
+#if TODO_REPLAY_SYSTEM
     SlangRecord::RecordFileProcessor recordFileProcessor(options.recordFileName);
 
     Slang::String jsonPath = Slang::Path::replaceExt(options.recordFileName, "json");
@@ -102,5 +108,8 @@ int main(int argc, char* argv[])
             break;
         }
     }
+#endif
+
+    printf("slang-replay: record-replay system not yet implemented\n");
     return 0;
 }
