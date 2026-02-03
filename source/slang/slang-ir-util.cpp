@@ -2790,6 +2790,8 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     case kIROp_Geq:
     case kIROp_Less:
     case kIROp_Greater:
+    case kIROp_And:
+    case kIROp_Or:
         {
             IRInst* operand1;
             IRInst* operand2;
