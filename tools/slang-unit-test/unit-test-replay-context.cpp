@@ -219,31 +219,122 @@ SLANG_UNIT_TEST(replayContextBlob)
 }
 
 // =============================================================================
-// Object Handles
+// Object Handles (via interface recording)
 // =============================================================================
 
 SLANG_UNIT_TEST(replayContextHandle)
 {
     SLANG_UNUSED(unitTestContext);
 
-    auto testHandle = [](uint64_t handle)
-    {
-        ReplayContext writer;
-        writer.setMode(Mode::Record);
-        writer.recordHandle(RecordFlag::None, handle);
+    // This test emulates a real-world scenario:
+    // 1. RECORD: An API call creates a blob and outputs it, then later inputs it
+    // 2. PLAYBACK: A new blob is created, and when the 2nd input occurs,
+    //    the system correctly identifies it by handle and provides the new blob
+    
+    // === RECORDING PHASE ===
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+    
+    // Simulate: API creates a blob and returns it as output (e.g., getCompileResult)
+    Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create("original data", 13);
+    ISlangBlob* outputBlob = recordedBlob.get();
+    writer.record(RecordFlag::Output, outputBlob);  // Registers blob with handle 1, records handle
+    
+    // Simulate: Same blob is passed as input to another call (e.g., writeToFile)
+    ISlangBlob* inputBlob = recordedBlob.get();
+    writer.record(RecordFlag::Input, inputBlob);  // Looks up handle for blob, records handle
+    
+    // Verify recording produced data
+    SLANG_CHECK(writer.getStream().getSize() > 0);
+    
+    // === PLAYBACK PHASE ===
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    
+    // During playback, a NEW blob is created (simulating the real API being called)
+    Slang::ComPtr<ISlangBlob> playbackBlob = Slang::RawBlob::create("playback data", 13);
+    
+    // Playback: First call outputs the blob - we register the new blob with the handle
+    ISlangBlob* playbackOutput = playbackBlob.get();
+    reader.record(RecordFlag::Output, playbackOutput);  // Reads handle, verifies/registers
+    
+    // Playback: Second call inputs the blob - should resolve to our new blob
+    ISlangBlob* playbackInput = nullptr;
+    reader.record(RecordFlag::Input, playbackInput);  // Reads handle, looks up object
+    
+    // The input should resolve to our playback blob (same pointer)
+    SLANG_CHECK(playbackInput == playbackBlob.get());
+}
 
-        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
+{
+    SLANG_UNUSED(unitTestContext);
 
-        uint64_t readHandle = 0;
-        reader.recordHandle(RecordFlag::None, readHandle);
+    // Test with multiple blobs to ensure handle tracking works correctly
+    
+    // === RECORDING PHASE ===
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+    
+    // Create and output two different blobs
+    Slang::ComPtr<ISlangBlob> blob1 = Slang::RawBlob::create("blob one", 8);
+    Slang::ComPtr<ISlangBlob> blob2 = Slang::RawBlob::create("blob two", 8);
+    
+    ISlangBlob* out1 = blob1.get();
+    ISlangBlob* out2 = blob2.get();
+    writer.record(RecordFlag::Output, out1);  // Handle 1
+    writer.record(RecordFlag::Output, out2);  // Handle 2
+    
+    // Now input them in reverse order
+    ISlangBlob* in2 = blob2.get();
+    ISlangBlob* in1 = blob1.get();
+    writer.record(RecordFlag::Input, in2);
+    writer.record(RecordFlag::Input, in1);
+    
+    // === PLAYBACK PHASE ===
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    
+    // Create new blobs for playback
+    Slang::ComPtr<ISlangBlob> newBlob1 = Slang::RawBlob::create("new one!", 8);
+    Slang::ComPtr<ISlangBlob> newBlob2 = Slang::RawBlob::create("new two!", 8);
+    
+    // Playback outputs
+    ISlangBlob* playOut1 = newBlob1.get();
+    ISlangBlob* playOut2 = newBlob2.get();
+    reader.record(RecordFlag::Output, playOut1);
+    reader.record(RecordFlag::Output, playOut2);
+    
+    // Playback inputs (reverse order, matching recording)
+    ISlangBlob* playIn2 = nullptr;
+    ISlangBlob* playIn1 = nullptr;
+    reader.record(RecordFlag::Input, playIn2);
+    reader.record(RecordFlag::Input, playIn1);
+    
+    // Verify correct blob resolution
+    SLANG_CHECK(playIn1 == newBlob1.get());
+    SLANG_CHECK(playIn2 == newBlob2.get());
+}
 
-        return handle == readHandle;
-    };
+SLANG_UNIT_TEST(replayContextHandleNull)
+{
+    SLANG_UNUSED(unitTestContext);
 
-    SLANG_CHECK(testHandle(0));
-    SLANG_CHECK(testHandle(1));
-    SLANG_CHECK(testHandle(0xDEADBEEFCAFEBABEULL));
-    SLANG_CHECK(testHandle(UINT64_MAX));
+    // Test that null pointers are handled correctly
+    
+    // === RECORDING PHASE ===
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+    
+    ISlangBlob* nullBlob = nullptr;
+    writer.record(RecordFlag::Input, nullBlob);
+    
+    // === PLAYBACK PHASE ===
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    
+    ISlangBlob* readBlob = reinterpret_cast<ISlangBlob*>(0xDEADBEEF);  // Non-null sentinel
+    reader.record(RecordFlag::Input, readBlob);
+    
+    // Should be null after playback
+    SLANG_CHECK(readBlob == nullptr);
 }
 
 // =============================================================================
@@ -430,13 +521,13 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     float writeFloat = 3.14f;
     const char* writeStr = "Hello";
     bool writeBool = true;
-    uint64_t writeHandle = 0xDEADBEEF;
+    double writeDouble = 2.71828;
 
     writer.record(RecordFlag::None, writeInt);
     writer.record(RecordFlag::None, writeFloat);
     writer.record(RecordFlag::None, writeStr);
     writer.record(RecordFlag::None, writeBool);
-    writer.recordHandle(RecordFlag::None, writeHandle);
+    writer.record(RecordFlag::None, writeDouble);
 
     // Read them back
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
@@ -445,19 +536,19 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     float readFloat = 0.0f;
     const char* readStr = nullptr;
     bool readBool = false;
-    uint64_t readHandle = 0;
+    double readDouble = 0.0;
 
     reader.record(RecordFlag::None, readInt);
     reader.record(RecordFlag::None, readFloat);
     reader.record(RecordFlag::None, readStr);
     reader.record(RecordFlag::None, readBool);
-    reader.recordHandle(RecordFlag::None, readHandle);
+    reader.record(RecordFlag::None, readDouble);
 
     SLANG_CHECK(writeInt == readInt);
     SLANG_CHECK(writeFloat == readFloat);
     SLANG_CHECK(strcmp(writeStr, readStr) == 0);
     SLANG_CHECK(writeBool == readBool);
-    SLANG_CHECK(writeHandle == readHandle);
+    SLANG_CHECK(writeDouble == readDouble);
 }
 
 // =============================================================================

@@ -521,4 +521,68 @@ void ReplayContext::record(RecordFlag flags, SlangGlobalSessionDesc& value)
     for (int i = 0; i < 16; ++i) record(flags, value.reserved[i]);
 }
 
+// =============================================================================
+// COM Interface record() overloads - each delegates to recordInterfaceImpl
+// =============================================================================
+
+void ReplayContext::record(RecordFlag flags, ISlangBlob*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, ISlangFileSystem*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, ISlangFileSystemExt*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, ISlangMutableFileSystem*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, ISlangSharedLibrary*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::IGlobalSession*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::ISession*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::IModule*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::IComponentType*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::IEntryPoint*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::ITypeConformance*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::ICompileRequest*& obj)
+{
+    recordInterfaceImpl(flags, obj);
+}
+
 } // namespace SlangRecord

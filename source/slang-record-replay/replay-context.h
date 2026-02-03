@@ -202,26 +202,6 @@ public:
     template<typename T, typename CountT>
     void recordArray(RecordFlag flags, const T*& arr, CountT& count);
 
-    // Object handles (COM interface pointers mapped to IDs)
-    void recordHandle(RecordFlag flags, uint64_t& handleId);
-
-    /// Record a COM interface pointer.
-    /// During recording:
-    /// - Input: looks up handle (throws UntrackedInterfaceException if not registered)
-    /// - Output: registers object and assigns handle
-    /// During playback:
-    /// - Input: looks up object by handle
-    /// - Output: verifies handle matches (object should already be registered)
-    /// 
-    /// Special case: ISlangBlob passed as input may contain user data and is recorded inline.
-    template<typename T>
-    void recordInterface(RecordFlag flags, T*& obj);
-
-    /// Register an interface that was just created.
-    /// Call this after creating an object to track it.
-    /// Returns the assigned handle.
-    uint64_t registerInterface(ISlangUnknown* obj);
-
     /// Register a proxy-implementation pair.
     /// Call this when wrapping an implementation with a proxy.
     void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
@@ -229,15 +209,6 @@ public:
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
     ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
-
-    /// Check if an object is registered.
-    bool isInterfaceRegistered(ISlangUnknown* obj) const;
-
-    /// Get handle for an object (throws if not registered).
-    uint64_t getHandleForInterface(ISlangUnknown* obj) const;
-
-    /// Get object for a handle (throws if not registered).
-    ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
 
     // Enum types - record as int32_t
     template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
@@ -278,6 +249,20 @@ public:
     void record(RecordFlag flags, slang::SpecializationArg& value);
     void record(RecordFlag flags, SlangGlobalSessionDesc& value);
 
+    // COM interface pointers - handle tracking is done internally
+    void record(RecordFlag flags, ISlangBlob*& obj);
+    void record(RecordFlag flags, ISlangFileSystem*& obj);
+    void record(RecordFlag flags, ISlangFileSystemExt*& obj);
+    void record(RecordFlag flags, ISlangMutableFileSystem*& obj);
+    void record(RecordFlag flags, ISlangSharedLibrary*& obj);
+    void record(RecordFlag flags, slang::IGlobalSession*& obj);
+    void record(RecordFlag flags, slang::ISession*& obj);
+    void record(RecordFlag flags, slang::IModule*& obj);
+    void record(RecordFlag flags, slang::IComponentType*& obj);
+    void record(RecordFlag flags, slang::IEntryPoint*& obj);
+    void record(RecordFlag flags, slang::ITypeConformance*& obj);
+    void record(RecordFlag flags, slang::ICompileRequest*& obj);
+
 private:
     void recordRaw(RecordFlag flags, void* data, size_t size);
     void recordTypeId(TypeId id);
@@ -285,6 +270,25 @@ private:
     TypeId readTypeId();
     TypeId readTypeIdFromReference();
     void expectTypeId(TypeId expected);
+
+    // Object handles (COM interface pointers mapped to IDs)
+    void recordHandle(RecordFlag flags, uint64_t& handleId);
+
+    /// Record a COM interface pointer (internal implementation).
+    template<typename T>
+    void recordInterfaceImpl(RecordFlag flags, T*& obj);
+
+    /// Register an interface that was just created.
+    uint64_t registerInterface(ISlangUnknown* obj);
+
+    /// Check if an object is registered.
+    bool isInterfaceRegistered(ISlangUnknown* obj) const;
+
+    /// Get handle for an object (throws if not registered).
+    uint64_t getHandleForInterface(ISlangUnknown* obj) const;
+
+    /// Get object for a handle (throws if not registered).
+    ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
 
     std::recursive_mutex m_mutex;
     ReplayStream m_stream;          ///< Main stream for record/playback
@@ -351,7 +355,7 @@ void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 }
 
 template<typename T>
-void ReplayContext::recordInterface(RecordFlag flags, T*& obj)
+void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 {
     if (m_mode == Mode::Idle) return;
 
@@ -415,24 +419,9 @@ void ReplayContext::recordInterface(RecordFlag flags, T*& obj)
         }
         else if (isOutput)
         {
-            // Read handle - object should already be registered via registerInterface
-            uint64_t handle = kNullHandle;
+            // Output: register object and record handle
+            uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
             recordHandle(flags, handle);
-
-            if (handle != kNullHandle)
-            {
-                // Verify object is registered with this handle
-                ISlangUnknown** found = m_handleToObject.tryGetValue(handle);
-                if (!found)
-                {
-                    throw HandleNotFoundException(handle);
-                }
-                obj = static_cast<T*>(*found);
-            }
-            else
-            {
-                obj = nullptr;
-            }
         }
     }
 }
