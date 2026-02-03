@@ -152,6 +152,10 @@ public:
     /// Returns true if this is a reading stream.
     bool isReading() const { return m_isReading; }
 
+    /// Set the stream to reading or writing mode.
+    /// This allows reusing a buffer for both writing and reading.
+    void setReading(bool reading) { m_isReading = reading; }
+
     /// Returns true if the stream has reached the end.
     bool atEnd() const { return m_position >= size_t(m_buffer.getCount()); }
 

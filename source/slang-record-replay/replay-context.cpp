@@ -136,10 +136,10 @@ void ReplayContext::switchToPlayback()
     m_implToProxy.clear();
     m_currentThisHandle = kNullHandle;
 
-
-    // Reset stream to 0
-    m_mode = Mode::Playback;
+    // Switch stream to reading mode and reset position to 0
+    m_stream.setReading(true);
     m_stream.seek(0);
+    m_mode = Mode::Playback;
 }
 
 void ReplayContext::switchToSync()
