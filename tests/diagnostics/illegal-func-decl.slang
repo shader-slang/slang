@@ -30,13 +30,13 @@ extern float libraryFunction2(inout float a, in float b, float c);   // valid: '
 export float libraryFunction3(float a);         // valid: 'in' is the default is not specified
 #endif
 
-[shader("compute")]
-[numthreads(1, 1, 1)]
-void main(out float4 col : SV_Target0, bool isFrontHit)
+[shader("fragment")]
+float4 main(bool isFrontHit) : SV_Target0
 {
     float a = 5;
     float b = 7;
     float c = 7;
+    float4 col = float4(0, 0, 0, 0);
 
 #ifdef TEST1
     col.x = libraryFunction(a);
@@ -53,6 +53,8 @@ void main(out float4 col : SV_Target0, bool isFrontHit)
 #ifdef TEST4
     col.w = libraryFunction3(a);
 #endif
+
+    return col;
 }
 
 

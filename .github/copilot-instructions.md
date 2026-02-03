@@ -12,14 +12,43 @@ Detailed build instructions can be found in docs/building.md
 
 ## Formatting
 
-DO THIS BEFORE COMMITING YOUR CHANGES:
-    RUN `./extras/formatting.sh` to format your changes first!!
+DO THIS BEFORE COMMITTING YOUR CHANGES:
+RUN `./extras/formatting.sh` to format your changes first!!
 Your PR needs to be formatted according to our coding style.
+
+The formatting script requires these tools:
+
+- **clang-format** 17-18 (for C++ files)
+- **gersemi** 0.21-0.22 (for CMake files)
+- **prettier** 3+ (for YAML/JSON/Markdown files)
+- **shfmt** 3+ (for shell scripts)
+
+If you need to install these tools locally:
+
+**Ubuntu/Debian:**
+
+```bash
+sudo apt-get install clang-format-17 npm
+python3 -m pip install gersemi==0.21.0
+sudo npm install -g prettier@3
+wget https://github.com/mvdan/sh/releases/download/v3.10.0/shfmt_v3.10.0_linux_amd64 -O /tmp/shfmt
+sudo install /tmp/shfmt /usr/local/bin/shfmt
+```
+
+Note: If pip install fails with externally-managed-environment error, use `--break-system-packages` flag or create a virtual environment.
+
+**macOS (Homebrew):**
+
+```bash
+brew install clang-format gersemi prettier shfmt
+```
+
+You can also use `./extras/formatting.sh --check-only` to verify formatting without modifying files.
 
 ## Labeling your PR
 
 All PRs needs to be labeled as either "pr: non-breaking" or "pr: breaking".
-Add the "pr: breaking" label to  your PR if you are introducing public API changes that breaks ABI compabibility,
+Add the "pr: breaking" label to your PR if you are introducing public API changes that breaks ABI compabibility,
 or you are introducing changes to the Slang language that will cause the compiler to error out on existing Slang code.
 It is rare for a PR to be a breaking change.
 
@@ -49,9 +78,10 @@ by writing the following as the first line of your test shader:
 ```
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
 ```
+
 See `tests/language-feature/lambda/lambda-0.slang` for a full example.
 
-Or you can craft your test to run with `slangi`  (byte-code interpreter), such as:
+Or you can craft your test to run with `slangi` (byte-code interpreter), such as:
 
 ```
 //TEST:INTERPRET(filecheck=CHECK):

@@ -9442,6 +9442,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         else if (as<IRBasicType>(type) || as<IRPackedFloatType>(type))
         {
+            // Handle void type specially - it needs name "void" for debug info
+            if (type->getOp() == kIROp_VoidType)
+            {
+                return emitOpDebugTypeBasic(
+                    getSection(SpvLogicalSectionID::ConstantsAndTypes),
+                    nullptr,
+                    m_voidType,
+                    getNonSemanticDebugInfoExtInst(),
+                    builder.getStringValue(UnownedStringSlice("void")),
+                    builder.getIntValue(builder.getUIntType(), 0),
+                    builder.getIntValue(builder.getUIntType(), 0), // Unspecified
+                    builder.getIntValue(builder.getUIntType(), kUnknownPhysicalLayout));
+            }
+
             IRSizeAndAlignment sizeAlignment;
             getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment);
             int spvEncoding = 0;
