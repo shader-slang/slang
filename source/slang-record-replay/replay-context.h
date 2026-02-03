@@ -98,15 +98,15 @@ enum class TypeId : uint8_t
     String = 0x10, Blob = 0x11, Array = 0x12, ObjectHandle = 0x13, Null = 0x14,
 };
 
-const char* getTypeIdName(TypeId id);
+SLANG_API const char* getTypeIdName(TypeId id);
 
 /// Exception thrown when type mismatch occurs during deserialization.
 class TypeMismatchException : public Slang::Exception
 {
 public:
-    TypeMismatchException(TypeId expected, TypeId actual);
-    TypeId getExpected() const { return m_expected; }
-    TypeId getActual() const { return m_actual; }
+    SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
+    SLANG_API TypeId getExpected() const { return m_expected; }
+    SLANG_API TypeId getActual() const { return m_actual; }
 private:
     TypeId m_expected, m_actual;
 };
@@ -115,9 +115,9 @@ private:
 class DataMismatchException : public Slang::Exception
 {
 public:
-    DataMismatchException(size_t offset, size_t size);
-    size_t getOffset() const { return m_offset; }
-    size_t getSize() const { return m_size; }
+    SLANG_API DataMismatchException(size_t offset, size_t size);
+    SLANG_API size_t getOffset() const { return m_offset; }
+    SLANG_API size_t getSize() const { return m_size; }
 private:
     size_t m_offset, m_size;
 };
@@ -136,70 +136,70 @@ class ReplayContext
 public:
     /// Get the global singleton instance (for recording).
     /// Thread-safe. The singleton starts in Idle or Record mode based on env var.
-    static ReplayContext& get();
+    SLANG_API static ReplayContext& get();
 
     /// Create an idle context.
     /// Will switch to Record mode if SLANG_RECORD_LAYER=1 is set.
-    ReplayContext();
+    SLANG_API ReplayContext();
 
     /// Create a playback context from existing data.
-    ReplayContext(const void* data, size_t size);
+    SLANG_API ReplayContext(const void* data, size_t size);
 
     /// Create a sync context that records while verifying against reference data.
-    ReplayContext(const void* referenceData, size_t referenceSize, bool syncMode);
+    SLANG_API ReplayContext(const void* referenceData, size_t referenceSize, bool syncMode);
 
     /// Get the current operating mode.
-    Mode getMode() const { return m_mode; }
+    SLANG_API Mode getMode() const { return m_mode; }
 
     /// Check if the context is active (not Idle).
-    bool isActive() const { return m_mode != Mode::Idle; }
+    SLANG_API bool isActive() const { return m_mode != Mode::Idle; }
 
     /// Set the operating mode.
-    void setMode(Mode mode) { m_mode = mode; }
+    SLANG_API void setMode(Mode mode) { m_mode = mode; }
 
     /// Convenience methods for common mode checks.
-    bool isIdle() const { return m_mode == Mode::Idle; }
-    bool isRecording() const { return m_mode == Mode::Record; }
-    bool isSyncing() const { return m_mode == Mode::Sync; }
-    bool isPlayback() const { return m_mode == Mode::Playback; }
+    SLANG_API bool isIdle() const { return m_mode == Mode::Idle; }
+    SLANG_API bool isRecording() const { return m_mode == Mode::Record; }
+    SLANG_API bool isSyncing() const { return m_mode == Mode::Sync; }
+    SLANG_API bool isPlayback() const { return m_mode == Mode::Playback; }
 
     /// Enable recording (sets mode to Record if currently Idle).
-    void enable() { if (m_mode == Mode::Idle) m_mode = Mode::Record; }
+    SLANG_API void enable() { if (m_mode == Mode::Idle) m_mode = Mode::Record; }
 
     /// Disable recording (sets mode to Idle).
-    void disable() { m_mode = Mode::Idle; }
+    SLANG_API void disable() { m_mode = Mode::Idle; }
 
     /// Legacy compatibility - maps to Record/Playback modes.
-    bool isReading() const { return m_mode == Mode::Playback; }
-    bool isWriting() const { return m_mode == Mode::Record || m_mode == Mode::Sync; }
+    SLANG_API bool isReading() const { return m_mode == Mode::Playback; }
+    SLANG_API bool isWriting() const { return m_mode == Mode::Record || m_mode == Mode::Sync; }
 
-    ReplayStream& getStream() { return m_stream; }
-    const ReplayStream& getStream() const { return m_stream; }
-    MemoryArena& getArena() { return m_arena; }
+    SLANG_API ReplayStream& getStream() { return m_stream; }
+    SLANG_API const ReplayStream& getStream() const { return m_stream; }
+    SLANG_API MemoryArena& getArena() { return m_arena; }
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
-    std::unique_lock<std::recursive_mutex> lock() { return std::unique_lock<std::recursive_mutex>(m_mutex); }
+    SLANG_API std::unique_lock<std::recursive_mutex> lock() { return std::unique_lock<std::recursive_mutex>(m_mutex); }
 
     /// Reset the context to initial state (clears streams and arena, mode becomes Idle).
-    void reset();
+    SLANG_API void reset();
 
     // Basic types
-    void record(RecordFlag flags, int8_t& value);
-    void record(RecordFlag flags, int16_t& value);
-    void record(RecordFlag flags, int32_t& value);
-    void record(RecordFlag flags, int64_t& value);
-    void record(RecordFlag flags, uint8_t& value);
-    void record(RecordFlag flags, uint16_t& value);
-    void record(RecordFlag flags, uint32_t& value);
-    void record(RecordFlag flags, uint64_t& value);
-    void record(RecordFlag flags, float& value);
-    void record(RecordFlag flags, double& value);
-    void record(RecordFlag flags, bool& value);
-    void record(RecordFlag flags, const char*& str);
+    SLANG_API void record(RecordFlag flags, int8_t& value);
+    SLANG_API void record(RecordFlag flags, int16_t& value);
+    SLANG_API void record(RecordFlag flags, int32_t& value);
+    SLANG_API void record(RecordFlag flags, int64_t& value);
+    SLANG_API void record(RecordFlag flags, uint8_t& value);
+    SLANG_API void record(RecordFlag flags, uint16_t& value);
+    SLANG_API void record(RecordFlag flags, uint32_t& value);
+    SLANG_API void record(RecordFlag flags, uint64_t& value);
+    SLANG_API void record(RecordFlag flags, float& value);
+    SLANG_API void record(RecordFlag flags, double& value);
+    SLANG_API void record(RecordFlag flags, bool& value);
+    SLANG_API void record(RecordFlag flags, const char*& str);
 
     // Blob data (void* + size)
-    void recordBlob(RecordFlag flags, const void*& data, size_t& size);
+    SLANG_API void recordBlob(RecordFlag flags, const void*& data, size_t& size);
 
     // Arrays with count - calls record() on each element
     template<typename T, typename CountT>
@@ -221,7 +221,7 @@ public:
 
     /// Begin recording a static/free function call.
     /// Records only the function signature.
-    void beginStaticCall(const char* signature)
+    SLANG_API void beginStaticCall(const char* signature)
     {
         if (!isActive())
             return;
@@ -230,72 +230,72 @@ public:
 
     /// Register a proxy-implementation pair.
     /// Call this when wrapping an implementation with a proxy.
-    void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
+    SLANG_API void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
 
     /// Register an interface object and get its handle.
     /// Used when creating proxy objects to register them for handle tracking.
-    uint64_t registerInterface(ISlangUnknown* obj);
+    SLANG_API uint64_t registerInterface(ISlangUnknown* obj);
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
-    ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
+    SLANG_API ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
 
     // Enum types - record as int32_t
     template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
 
     // Slang enum types
-    void record(RecordFlag flags, SlangSeverity& value);
-    void record(RecordFlag flags, SlangBindableResourceType& value);
-    void record(RecordFlag flags, SlangCompileTarget& value);
-    void record(RecordFlag flags, SlangContainerFormat& value);
-    void record(RecordFlag flags, SlangPassThrough& value);
-    void record(RecordFlag flags, SlangArchiveType& value);
-    void record(RecordFlag flags, SlangFloatingPointMode& value);
-    void record(RecordFlag flags, SlangFpDenormalMode& value);
-    void record(RecordFlag flags, SlangLineDirectiveMode& value);
-    void record(RecordFlag flags, SlangSourceLanguage& value);
-    void record(RecordFlag flags, SlangProfileID& value);
-    void record(RecordFlag flags, SlangCapabilityID& value);
-    void record(RecordFlag flags, SlangMatrixLayoutMode& value);
-    void record(RecordFlag flags, SlangStage& value);
-    void record(RecordFlag flags, SlangDebugInfoLevel& value);
-    void record(RecordFlag flags, SlangDebugInfoFormat& value);
-    void record(RecordFlag flags, SlangOptimizationLevel& value);
-    void record(RecordFlag flags, SlangEmitSpirvMethod& value);
-    void record(RecordFlag flags, slang::CompilerOptionName& value);
-    void record(RecordFlag flags, slang::CompilerOptionValueKind& value);
-    void record(RecordFlag flags, slang::ContainerType& value);
-    void record(RecordFlag flags, slang::SpecializationArg::Kind& value);
-    void record(RecordFlag flags, SlangLanguageVersion& value);
-    void record(RecordFlag flags, slang::BuiltinModuleName& value);
+    SLANG_API void record(RecordFlag flags, SlangSeverity& value);
+    SLANG_API void record(RecordFlag flags, SlangBindableResourceType& value);
+    SLANG_API void record(RecordFlag flags, SlangCompileTarget& value);
+    SLANG_API void record(RecordFlag flags, SlangContainerFormat& value);
+    SLANG_API void record(RecordFlag flags, SlangPassThrough& value);
+    SLANG_API void record(RecordFlag flags, SlangArchiveType& value);
+    SLANG_API void record(RecordFlag flags, SlangFloatingPointMode& value);
+    SLANG_API void record(RecordFlag flags, SlangFpDenormalMode& value);
+    SLANG_API void record(RecordFlag flags, SlangLineDirectiveMode& value);
+    SLANG_API void record(RecordFlag flags, SlangSourceLanguage& value);
+    SLANG_API void record(RecordFlag flags, SlangProfileID& value);
+    SLANG_API void record(RecordFlag flags, SlangCapabilityID& value);
+    SLANG_API void record(RecordFlag flags, SlangMatrixLayoutMode& value);
+    SLANG_API void record(RecordFlag flags, SlangStage& value);
+    SLANG_API void record(RecordFlag flags, SlangDebugInfoLevel& value);
+    SLANG_API void record(RecordFlag flags, SlangDebugInfoFormat& value);
+    SLANG_API void record(RecordFlag flags, SlangOptimizationLevel& value);
+    SLANG_API void record(RecordFlag flags, SlangEmitSpirvMethod& value);
+    SLANG_API void record(RecordFlag flags, slang::CompilerOptionName& value);
+    SLANG_API void record(RecordFlag flags, slang::CompilerOptionValueKind& value);
+    SLANG_API void record(RecordFlag flags, slang::ContainerType& value);
+    SLANG_API void record(RecordFlag flags, slang::SpecializationArg::Kind& value);
+    SLANG_API void record(RecordFlag flags, SlangLanguageVersion& value);
+    SLANG_API void record(RecordFlag flags, slang::BuiltinModuleName& value);
 
     // POD and complex structs
-    void record(RecordFlag flags, SlangUUID& value);
-    void record(RecordFlag flags, slang::CompilerOptionValue& value);
-    void record(RecordFlag flags, slang::CompilerOptionEntry& value);
-    void record(RecordFlag flags, slang::PreprocessorMacroDesc& value);
-    void record(RecordFlag flags, slang::TargetDesc& value);
-    void record(RecordFlag flags, slang::SessionDesc& value);
-    void record(RecordFlag flags, slang::SpecializationArg& value);
-    void record(RecordFlag flags, SlangGlobalSessionDesc& value);
+    SLANG_API void record(RecordFlag flags, SlangUUID& value);
+    SLANG_API void record(RecordFlag flags, slang::CompilerOptionValue& value);
+    SLANG_API void record(RecordFlag flags, slang::CompilerOptionEntry& value);
+    SLANG_API void record(RecordFlag flags, slang::PreprocessorMacroDesc& value);
+    SLANG_API void record(RecordFlag flags, slang::TargetDesc& value);
+    SLANG_API void record(RecordFlag flags, slang::SessionDesc& value);
+    SLANG_API void record(RecordFlag flags, slang::SpecializationArg& value);
+    SLANG_API void record(RecordFlag flags, SlangGlobalSessionDesc& value);
 
     // COM interface pointers - handle tracking is done internally
-    void record(RecordFlag flags, ISlangBlob*& obj);
-    void record(RecordFlag flags, ISlangFileSystem*& obj);
-    void record(RecordFlag flags, ISlangFileSystemExt*& obj);
-    void record(RecordFlag flags, ISlangMutableFileSystem*& obj);
-    void record(RecordFlag flags, ISlangSharedLibrary*& obj);
-    void record(RecordFlag flags, slang::IGlobalSession*& obj);
-    void record(RecordFlag flags, slang::ISession*& obj);
-    void record(RecordFlag flags, slang::IModule*& obj);
-    void record(RecordFlag flags, slang::IComponentType*& obj);
-    void record(RecordFlag flags, slang::IEntryPoint*& obj);
-    void record(RecordFlag flags, slang::ITypeConformance*& obj);
-    void record(RecordFlag flags, slang::ICompileRequest*& obj);
+    SLANG_API void record(RecordFlag flags, ISlangBlob*& obj);
+    SLANG_API void record(RecordFlag flags, ISlangFileSystem*& obj);
+    SLANG_API void record(RecordFlag flags, ISlangFileSystemExt*& obj);
+    SLANG_API void record(RecordFlag flags, ISlangMutableFileSystem*& obj);
+    SLANG_API void record(RecordFlag flags, ISlangSharedLibrary*& obj);
+    SLANG_API void record(RecordFlag flags, slang::IGlobalSession*& obj);
+    SLANG_API void record(RecordFlag flags, slang::ISession*& obj);
+    SLANG_API void record(RecordFlag flags, slang::IModule*& obj);
+    SLANG_API void record(RecordFlag flags, slang::IComponentType*& obj);
+    SLANG_API void record(RecordFlag flags, slang::IEntryPoint*& obj);
+    SLANG_API void record(RecordFlag flags, slang::ITypeConformance*& obj);
+    SLANG_API void record(RecordFlag flags, slang::ICompileRequest*& obj);
 
     // Object handles (COM interface pointers mapped to IDs)
     // Public for testing purposes
-    void recordHandle(RecordFlag flags, uint64_t& handleId);
+    SLANG_API void recordHandle(RecordFlag flags, uint64_t& handleId);
 
 private:
     void recordRaw(RecordFlag flags, void* data, size_t size);
@@ -310,13 +310,13 @@ private:
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
 
     /// Check if an object is registered.
-    bool isInterfaceRegistered(ISlangUnknown* obj) const;
+    SLANG_API bool isInterfaceRegistered(ISlangUnknown* obj) const;
 
     /// Get handle for an object (throws if not registered).
-    uint64_t getHandleForInterface(ISlangUnknown* obj) const;
+    SLANG_API uint64_t getHandleForInterface(ISlangUnknown* obj) const;
 
     /// Get object for a handle (throws if not registered).
-    ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
+    SLANG_API ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
 
     std::recursive_mutex m_mutex;
     ReplayStream m_stream;          ///< Main stream for record/playback
@@ -345,22 +345,22 @@ public:
 
     /// Register a playback handler for a function signature.
     /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
-    void registerHandler(const char* signature, PlaybackHandler handler);
+    SLANG_API void registerHandler(const char* signature, PlaybackHandler handler);
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.
     /// Returns true if a call was executed, false if at end of stream.
-    bool executeNextCall();
+    SLANG_API bool executeNextCall();
 
     /// Execute all recorded calls until end of stream.
-    void executeAll();
+    SLANG_API void executeAll();
 
     /// Check if there are more calls to execute.
-    bool hasMoreCalls() const { return !m_stream.atEnd(); }
+    SLANG_API bool hasMoreCalls() const { return !m_stream.atEnd(); }
 
     /// Get the 'this' handle for the current call being executed.
     /// Only valid within a playback handler.
-    uint64_t getCurrentThisHandle() const { return m_currentThisHandle; }
+    SLANG_API uint64_t getCurrentThisHandle() const { return m_currentThisHandle; }
 
     /// Get the 'this' pointer for the current call, cast to the given type.
     /// Only valid within a playback handler.

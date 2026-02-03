@@ -2,9 +2,8 @@
 // Unit tests for the ReplayContext serializer - validates round-trip serialization
 
 // Include cpp files directly to access internal symbols not exported from slang DLL
-#include "../../source/slang-record-replay/replay-context.cpp"
-#include "../../source/slang-record-replay/proxy/proxy-base.cpp"
-
+#include "../../source/slang-record-replay/replay-context.h"
+#include "../../source/slang-record-replay/proxy/proxy-base.h"
 #include "../../source/slang-record-replay/proxy/proxy-global-session.h"
 
 #include "unit-test/slang-unit-test.h"
