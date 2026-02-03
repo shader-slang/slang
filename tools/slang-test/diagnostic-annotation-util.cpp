@@ -7,7 +7,7 @@ namespace Slang
 {
 
 // Internal structures
-struct Diagnostic
+struct ParsedDiagnostic
 {
     String errorCode; // e.g., "E20101"
     String severity;  // e.g., "warning", "error"
@@ -45,19 +45,19 @@ static SlangResult parseAnnotations(
 
 static SlangResult parseMachineReadableDiagnostics(
     const UnownedStringSlice& output,
-    List<Diagnostic>& outDiagnostics);
+    List<ParsedDiagnostic>& outDiagnostics);
 
 // Helper to generate suggested annotations for a group of diagnostics
 static void generateSuggestedAnnotations(
     StringBuilder& sb,
-    const List<const Diagnostic*>& diagnostics,
+    const List<const ParsedDiagnostic*>& diagnostics,
     int lineNumber,
     const UnownedStringSlice& prefix,
     const List<UnownedStringSlice>& sourceLines);
 
 static bool checkAnnotations(
     const List<Annotation>& annotations,
-    const List<Diagnostic>& diagnostics,
+    const List<ParsedDiagnostic>& diagnostics,
     const UnownedStringSlice& prefix,
     const List<UnownedStringSlice>& sourceLines,
     bool exhaustive,
@@ -234,7 +234,7 @@ static SlangResult parseAnnotations(
 
 static SlangResult parseMachineReadableDiagnostics(
     const UnownedStringSlice& output,
-    List<Diagnostic>& outDiagnostics)
+    List<ParsedDiagnostic>& outDiagnostics)
 {
     outDiagnostics.clear();
 
@@ -254,7 +254,7 @@ static SlangResult parseMachineReadableDiagnostics(
 
         if (parts.getCount() >= 8 && parts[0].startsWith(UnownedStringSlice::fromLiteral("E")))
         {
-            Diagnostic diag;
+            ParsedDiagnostic diag;
             diag.errorCode = String(parts[0]);
             diag.severity = String(parts[1]);
             diag.filename = String(parts[2]);
@@ -289,7 +289,7 @@ static SlangResult parseMachineReadableDiagnostics(
 // Helper to generate suggested annotations for a group of diagnostics
 static void generateSuggestedAnnotations(
     StringBuilder& sb,
-    const List<const Diagnostic*>& diagnostics,
+    const List<const ParsedDiagnostic*>& diagnostics,
     int lineNumber,
     const UnownedStringSlice& prefix,
     const List<UnownedStringSlice>& sourceLines)
@@ -379,7 +379,7 @@ static void generateSuggestedAnnotations(
 
 static bool checkAnnotations(
     const List<Annotation>& annotations,
-    const List<Diagnostic>& diagnostics,
+    const List<ParsedDiagnostic>& diagnostics,
     const UnownedStringSlice& prefix,
     const List<UnownedStringSlice>& sourceLines,
     bool exhaustive,
@@ -484,13 +484,13 @@ static bool checkAnnotations(
 
                     // Group diagnostics by line and generate suggestions
                     sb << "\n  Suggested position-based annotations you can copy:\n";
-                    Dictionary<int, List<const Diagnostic*>> diagsByLine;
+                    Dictionary<int, List<const ParsedDiagnostic*>> diagsByLine;
                     for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
                     {
                         const auto& diag = diagnostics[diagIdx];
                         if (!diagsByLine.containsKey(diag.beginLine))
                         {
-                            diagsByLine.add(diag.beginLine, List<const Diagnostic*>());
+                            diagsByLine.add(diag.beginLine, List<const ParsedDiagnostic*>());
                         }
                         diagsByLine[diag.beginLine].add(&diag);
                     }
@@ -639,7 +639,7 @@ static bool checkAnnotations(
                     sb << "\n  Suggested annotations you can copy:\n";
 
                     // Collect diagnostics on this line
-                    List<const Diagnostic*> diagsOnLine;
+                    List<const ParsedDiagnostic*> diagsOnLine;
                     for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
                     {
                         const auto& diag = diagnostics[diagIdx];
@@ -665,7 +665,7 @@ static bool checkAnnotations(
     // In exhaustive mode, check for diagnostics that weren't matched by any annotation
     if (exhaustive)
     {
-        List<const Diagnostic*> unmatchedDiagnostics;
+        List<const ParsedDiagnostic*> unmatchedDiagnostics;
         for (Index i = 0; i < diagnostics.getCount(); ++i)
         {
             if (!diagnosticMatched[i])
@@ -681,12 +681,12 @@ static bool checkAnnotations(
                << " diagnostic(s) without annotations:\n";
 
             // Group by line
-            Dictionary<int, List<const Diagnostic*>> diagsByLine;
+            Dictionary<int, List<const ParsedDiagnostic*>> diagsByLine;
             for (const auto* diag : unmatchedDiagnostics)
             {
                 if (!diagsByLine.containsKey(diag->beginLine))
                 {
-                    diagsByLine.add(diag->beginLine, List<const Diagnostic*>());
+                    diagsByLine.add(diag->beginLine, List<const ParsedDiagnostic*>());
                 }
                 diagsByLine[diag->beginLine].add(diag);
             }
@@ -740,7 +740,7 @@ bool DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
     }
 
     // Parse machine-readable diagnostics from output
-    List<Diagnostic> diagnostics;
+    List<ParsedDiagnostic> diagnostics;
     if (SLANG_FAILED(parseMachineReadableDiagnostics(machineReadableOutput, diagnostics)))
     {
         outErrorMessage = "Failed to parse machine-readable diagnostic output";
