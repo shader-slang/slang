@@ -280,10 +280,10 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 **`--category <quick|full|smoke>`** (default: `quick`)
 
-#### `quick` - Fast CPU Tests ⚡
+#### `quick` - Fast Tests ⚡
 
-**Duration**: ~5-10 minutes
-**GPU Required**: No
+**Duration**: ~5-10 minutes without GPU, ~10-20 minutes with GPU
+**GPU Required**: No (automatically skips GPU APIs if no GPU detected)
 
 ```bash
 ./extras/docker-test.sh --category quick
@@ -292,16 +292,23 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 **What it runs**:
 
 - Core language feature tests
-- CPU compute tests (using `-cpu` flag)
 - Parser and semantic analysis tests
 - Basic code generation tests
+- Compute tests (CPU or GPU depending on availability)
+- Quick Vulkan/CUDA tests (if GPU available)
+
+**Behavior**:
+
+- **With GPU**: Runs quick subset of tests including GPU APIs
+- **Without GPU**: Automatically adds `-api +cpu` to skip GPU tests
+- Use `--no-gpu` to force CPU-only mode even with GPU present
 
 **When to use**:
 
 - Quick validation after changes
-- Development without GPU
 - Pre-commit testing
 - Fast feedback loop
+- Development with or without GPU
 
 #### `full` - Complete CI Test Suite 🚀
 

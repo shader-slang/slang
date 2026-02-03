@@ -216,10 +216,15 @@ log_info "Configuring test parameters..."
 SLANG_TEST_ARGS=""
 case "$CATEGORY" in
 quick)
-  # Quick CPU tests, no GPU required
-  log_info "Test category: QUICK (fast CPU tests)"
+  # Quick tests, optionally with CPU-only mode
+  log_info "Test category: QUICK (quick tests)"
   SLANG_TEST_ARGS="-category quick"
-  NO_GPU=true # Force CPU mode for quick tests
+
+  # If no GPU, automatically skip GPU APIs
+  if [ "$HAS_GPU" = false ] && [ "$NO_GPU" = false ]; then
+    log_info "No GPU detected, will skip GPU-specific APIs"
+    NO_GPU=true
+  fi
   ;;
 full)
   # Full CI test suite
@@ -247,6 +252,12 @@ smoke)
   exit 1
   ;;
 esac
+
+# Add API restrictions for CPU-only mode
+if [ "$NO_GPU" = true ]; then
+  log_info "CPU-only mode: Skipping GPU APIs (Vulkan, CUDA, D3D)"
+  SLANG_TEST_ARGS="$SLANG_TEST_ARGS -api +cpu"
+fi
 
 # Add test server configuration
 SLANG_TEST_ARGS="$SLANG_TEST_ARGS -use-test-server -server-count $SERVER_COUNT"
