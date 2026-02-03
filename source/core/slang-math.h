@@ -354,9 +354,12 @@ inline unsigned int FloatToFloatE5M2(float val)
 
 inline float FloatE4M3ToFloat(unsigned int input)
 {
-    if (input == 0x7F || input == 0xFF)
-        return NAN;
     unsigned int sign = (input & 0x80) << 24;
+    if (input == 0x7F || input == 0xFF)
+    {
+        // Preserve the sign bit when converting NaN encodings.
+        return IntAsFloat(sign | 0x7FC00000);
+    }
     unsigned int exp = (input & 0x78) >> 3;
     unsigned int mant = (input & 0x07);
 
