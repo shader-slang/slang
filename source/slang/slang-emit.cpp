@@ -2617,25 +2617,34 @@ static const char* getSpirvTargetEnvName(TargetRequest* targetReq)
 {
     auto targetCaps = targetReq->getTargetCaps();
 
+    // Return Vulkan environment names to enable Vulkan-specific validation rules.
+    // The returned string matches the keys in kSpirvTargetInfos in slang-glslang.cpp.
+    // Mapping from SPIR-V version to equivalent Vulkan environment:
+    //   vk1.0         -> SPIR-V 1.0
+    //   vk1.1         -> SPIR-V 1.3 (also covers 1.1, 1.2)
+    //   vk1.1_spirv1.4 -> SPIR-V 1.4
+    //   vk1.2         -> SPIR-V 1.5
+    //   vk1.3         -> SPIR-V 1.6
+
     // Check from highest to lowest SPIR-V version
     if (targetCaps.implies(CapabilityAtom::_spirv_1_6))
-        return "1.6";
+        return "vk1.3";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_5))
-        return "1.5";
+        return "vk1.2";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_4))
-        return "1.4";
+        return "vk1.1_spirv1.4";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_3))
-        return "1.3";
+        return "vk1.1";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_2))
-        return "1.2";
+        return "vk1.1";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_1))
-        return "1.1";
+        return "vk1.1";
     if (targetCaps.implies(CapabilityAtom::_spirv_1_0))
-        return "1.0";
+        return "vk1.0";
 
-    // Default to 1.5 if no specific version is implied
+    // Default to vk1.2 (SPIR-V 1.5) if no specific version is implied
     // This matches the default in slang-target.cpp
-    return "1.5";
+    return "vk1.2";
 }
 
 // Helper function to create an artifact from IR used internally by
