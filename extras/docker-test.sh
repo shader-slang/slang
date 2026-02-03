@@ -252,10 +252,12 @@ smoke)
   ;;
 esac
 
-# Note: No need to exclude GPU categories manually - slang-test will auto-detect
-# available APIs. Without GPU passthrough, GPU APIs won't be available.
+# In CPU-only mode, exclude GPU test categories
+# Note: Even without GPU passthrough, the container has Vulkan libraries installed,
+# so slang-test might still try to run Vulkan tests. We explicitly exclude GPU categories.
 if [ "$NO_GPU" = true ]; then
-  log_info "CPU-only mode: slang-test will auto-detect only CPU is available"
+  log_info "CPU-only mode: Excluding GPU test categories"
+  SLANG_TEST_ARGS="$SLANG_TEST_ARGS -exclude vulkan -exclude cuda -exclude optix -exclude render"
 fi
 
 # Add test server configuration
