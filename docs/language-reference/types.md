@@ -3,7 +3,7 @@
 Slang types:
 * [Fundamental Types](types-fundamental.md)
 * [Vector and Matrix Types](types-vector-and-matrix.md)
-* [Structures](types-struct.md)
+* [Structures](types-struct.md) and [Classes](types-class.md)
   * [Extensions](types-extension.md)
 * [Array Types](types-array.md)
 * [Interfaces](types-interface.md)
@@ -67,10 +67,9 @@ Full type specifier, possibly declaring a new type:
   a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
   user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
   [enumeration type](types-enum.md), type alias, or a type provided by a module.
-
 - *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
-- *`constant-index-expr`* is an optional constant integral expression for an [array](types-array.md) type
-  declaration.
+- **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
+  optional constant integral expression specifying the dimension length.
 - *`param-list`* is a function parameter list. See [function parameter list (TODO)](TODO).
 - *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
 - *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
