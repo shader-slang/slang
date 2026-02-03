@@ -156,14 +156,14 @@ SLANG_UNIT_TEST(replayContextString)
 
     auto testString = [](const char* str)
     {
-        ReplayContext writer;
-        writer.setMode(Mode::Record);
-        writer.record(RecordFlag::None, str);
+        ReplayContext::get().setMode(Mode::Record);
+        ReplayContext::get().record(RecordFlag::None, str);
 
-        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+        ReplayContext::get().setMode(Mode::Playback);
+        ReplayContext::get().getStream().seek(0);
 
         const char* readStr = nullptr;
-        reader.record(RecordFlag::None, readStr);
+        ReplayContext::get().record(RecordFlag::None, readStr);
 
         if (str == nullptr)
             return readStr == nullptr;

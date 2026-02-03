@@ -148,6 +148,9 @@ public:
     /// Create a sync context that records while verifying against reference data.
     SLANG_API ReplayContext(const void* referenceData, size_t referenceSize, bool syncMode);
 
+    /// Destructor - must be in DLL to properly free Dictionary memory.
+    SLANG_API ~ReplayContext();
+
     /// Get the current operating mode.
     SLANG_API Mode getMode() const { return m_mode; }
 

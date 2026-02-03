@@ -10,6 +10,8 @@ namespace SlangRecord {
 
 bool isRecordLayerRequested()
 {
+    return false;
+    /*
     Slang::StringBuilder envValue;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
             Slang::UnownedStringSlice("SLANG_RECORD_LAYER"), envValue)))
@@ -20,6 +22,7 @@ bool isRecordLayerRequested()
     {
         return false;
     }
+        */
 }
 
 // =============================================================================
@@ -97,6 +100,13 @@ ReplayContext::ReplayContext(const void* referenceData, size_t referenceSize, bo
     , m_mode(syncMode ? Mode::Sync : Mode::Record)
 {
     SLANG_UNUSED(syncMode);
+}
+
+ReplayContext::~ReplayContext()
+{
+    // Destructor must be defined in DLL to properly free Dictionary memory.
+    // The compiler will generate calls to ~Dictionary() for each member,
+    // and this ensures they run in the DLL's allocator context.
 }
 
 void ReplayContext::reset()
