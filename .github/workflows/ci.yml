@@ -281,13 +281,9 @@ jobs:
   test-slangpy-linux-release:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
-    uses: ./.github/workflows/ci-slangpy-tests.yml
+    uses: ./.github/workflows/ci-slangpy-tests-container.yml
     with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
       config: release
-      runs-on: '["Linux", "self-hosted", "GPU"]'
 
   check-ci:
     needs:
