@@ -138,26 +138,7 @@ fi
 log_success "Docker is available"
 
 # ============================================================================
-# Step 2: Check GPU availability (informational only)
-# ============================================================================
-
-log_info "Checking for NVIDIA GPU..."
-
-if command -v nvidia-smi &>/dev/null; then
-  if nvidia-smi &>/dev/null; then
-    GPU_INFO=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || echo "unknown")
-    log_success "NVIDIA GPU detected: $GPU_INFO"
-  else
-    log_warning "nvidia-smi found but failed to run (driver issue?)"
-    log_warning "GPU features may not be available in the container"
-  fi
-else
-  log_warning "No NVIDIA GPU detected (nvidia-smi not found)"
-  log_info "Build will proceed without GPU acceleration"
-fi
-
-# ============================================================================
-# Step 3: Validate configuration
+# Step 2: Validate configuration
 # ============================================================================
 
 log_info "Validating configuration..."
@@ -186,7 +167,7 @@ log_info "Build configuration: $CMAKE_CONFIG"
 log_info "Build directory: $BUILD_DIR"
 
 # ============================================================================
-# Step 4: Setup LLVM configuration
+# Step 3: Setup LLVM configuration
 # ============================================================================
 
 log_info "Configuring LLVM backend mode: $LLVM_MODE"
@@ -234,7 +215,7 @@ cached)
 esac
 
 # ============================================================================
-# Step 5: Clean build directory if requested
+# Step 4: Clean build directory if requested
 # ============================================================================
 
 if [ "$CLEAN" = true ]; then
@@ -248,7 +229,7 @@ if [ "$CLEAN" = true ]; then
 fi
 
 # ============================================================================
-# Step 6: Pull container image
+# Step 5: Pull container image
 # ============================================================================
 
 if [ "$NO_PULL" = true ]; then
@@ -265,7 +246,7 @@ else
 fi
 
 # ============================================================================
-# Step 7: Build Slang in container
+# Step 6: Build Slang in container
 # ============================================================================
 
 log_info "Starting build in container..."

@@ -185,25 +185,30 @@ log_success "Found build artifacts in: $BIN_DIR"
 # Step 3: Check GPU availability
 # ============================================================================
 
-log_info "Checking for NVIDIA GPU..."
-
 HAS_GPU=false
-if command -v nvidia-smi &>/dev/null; then
-  if nvidia-smi &>/dev/null; then
-    HAS_GPU=true
-    GPU_INFO=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || echo "unknown")
-    log_success "NVIDIA GPU detected: $GPU_INFO"
-  else
-    log_warning "nvidia-smi found but failed to run (driver issue?)"
-  fi
-else
-  log_warning "No NVIDIA GPU detected (nvidia-smi not found)"
-fi
 
-# Auto-enable --no-gpu if no GPU detected
-if [ "$HAS_GPU" = false ] && [ "$NO_GPU" = false ]; then
-  log_warning "Automatically enabling --no-gpu mode (no GPU available)"
-  NO_GPU=true
+if [ "$NO_GPU" = true ]; then
+  log_info "CPU-only mode requested (--no-gpu), skipping GPU detection"
+else
+  log_info "Checking for NVIDIA GPU..."
+
+  if command -v nvidia-smi &>/dev/null; then
+    if nvidia-smi &>/dev/null; then
+      HAS_GPU=true
+      GPU_INFO=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || echo "unknown")
+      log_success "NVIDIA GPU detected: $GPU_INFO"
+    else
+      log_warning "nvidia-smi found but failed to run (driver issue?)"
+    fi
+  else
+    log_warning "No NVIDIA GPU detected (nvidia-smi not found)"
+  fi
+
+  # Auto-enable --no-gpu if no GPU detected
+  if [ "$HAS_GPU" = false ]; then
+    log_warning "Automatically enabling --no-gpu mode (no GPU available)"
+    NO_GPU=true
+  fi
 fi
 
 # ============================================================================
@@ -216,15 +221,9 @@ log_info "Configuring test parameters..."
 SLANG_TEST_ARGS=""
 case "$CATEGORY" in
 quick)
-  # Quick tests, optionally with CPU-only mode
+  # Quick tests
   log_info "Test category: QUICK (quick tests)"
   SLANG_TEST_ARGS="-category quick"
-
-  # If no GPU, automatically skip GPU APIs
-  if [ "$HAS_GPU" = false ] && [ "$NO_GPU" = false ]; then
-    log_info "No GPU detected, will skip GPU-specific APIs"
-    NO_GPU=true
-  fi
   ;;
 full)
   # Full CI test suite
@@ -235,9 +234,9 @@ full)
     -skip-reference-image-generation \
     -ignore-abort-msg"
 
-  if [ "$HAS_GPU" = false ]; then
-    log_error "Full tests require a GPU, but none was detected"
-    log_info "Use --category quick for CPU-only tests"
+  if [ "$NO_GPU" = true ]; then
+    log_error "Full tests require a GPU, but --no-gpu was specified"
+    log_info "Remove --no-gpu flag or use --category quick for CPU-only tests"
     exit 1
   fi
   ;;
@@ -253,10 +252,10 @@ smoke)
   ;;
 esac
 
-# Add API restrictions for CPU-only mode
+# Note: No need to exclude GPU categories manually - slang-test will auto-detect
+# available APIs. Without GPU passthrough, GPU APIs won't be available.
 if [ "$NO_GPU" = true ]; then
-  log_info "CPU-only mode: Skipping GPU APIs (Vulkan, CUDA, D3D)"
-  SLANG_TEST_ARGS="$SLANG_TEST_ARGS -api +cpu"
+  log_info "CPU-only mode: slang-test will auto-detect only CPU is available"
 fi
 
 # Add test server configuration
@@ -280,7 +279,10 @@ log_info "Test server count: $SERVER_COUNT"
 # ============================================================================
 
 GPU_DOCKER_ARGS=""
-if [ "$NO_GPU" = false ]; then
+
+if [ "$NO_GPU" = true ]; then
+  log_info "CPU-only mode: Skipping GPU device mounts"
+else
   log_info "Configuring GPU device mounts..."
 
   # Check for Vulkan ICD files
@@ -317,8 +319,6 @@ if [ "$NO_GPU" = false ]; then
   fi
 
   log_success "GPU device mounts configured"
-else
-  log_info "Running in CPU-only mode (--no-gpu or no GPU detected)"
 fi
 
 # ============================================================================
