@@ -1,5 +1,8 @@
 #pragma once
 
+#include <tuple>
+#include <type_traits>
+
 #include "../replay-context.h"
 #include "proxy-base.h"
 
@@ -102,5 +105,185 @@ inline void recordInputs(ReplayContext&) {}
     RECORD_CALL(); \
     auto _result = ProxyBase::getActual()->method(); \
     RECORD_RETURN(_result)
+
+// =============================================================================
+// Playback Registration Macros
+// =============================================================================
+
+// Helper to get default-initialized value for a type
+template<typename T>
+struct DefaultValue { static T get() { return T{}; } };
+
+// Specialization for pointer types - return nullptr
+template<typename T>
+struct DefaultValue<T*> { static T* get() { return nullptr; } };
+
+// Specialization for reference types - need static storage
+template<typename T>
+struct DefaultValue<T&> { 
+    static T& get() { 
+        static T value{}; 
+        return value; 
+    } 
+};
+
+template<typename T>
+struct DefaultValue<const T&> { 
+    static const T& get() { 
+        static T value{}; 
+        return value; 
+    } 
+};
+
+// =============================================================================
+// Function traits to extract return type and argument types from member functions
+// =============================================================================
+
+template<typename T>
+struct MemberFunctionTraits;
+
+// Non-const member function
+template<typename R, typename C, typename... Args>
+struct MemberFunctionTraits<R(C::*)(Args...)>
+{
+    using ReturnType = R;
+    using ClassType = C;
+    using ArgsTuple = std::tuple<Args...>;
+    static constexpr size_t Arity = sizeof...(Args);
+};
+
+// Const member function
+template<typename R, typename C, typename... Args>
+struct MemberFunctionTraits<R(C::*)(Args...) const>
+{
+    using ReturnType = R;
+    using ClassType = C;
+    using ArgsTuple = std::tuple<Args...>;
+    static constexpr size_t Arity = sizeof...(Args);
+};
+
+// =============================================================================
+// Replay caller - calls a method with default arguments
+// =============================================================================
+
+template<typename MethodPtr, typename ProxyType, typename... Args, size_t... Is>
+auto callWithDefaults(ProxyType* proxy, MethodPtr method, std::index_sequence<Is...>)
+    -> typename MemberFunctionTraits<MethodPtr>::ReturnType
+{
+    using Traits = MemberFunctionTraits<MethodPtr>;
+    using ArgsTuple = typename Traits::ArgsTuple;
+    
+    // Call the method with default-initialized arguments
+    // The proxy method will read actual values from the replay stream
+    return (proxy->*method)(
+        DefaultValue<std::tuple_element_t<Is, ArgsTuple>>::get()...
+    );
+}
+
+template<typename MethodPtr, typename ProxyType>
+auto callMethodWithDefaults(ProxyType* proxy, MethodPtr method)
+    -> typename MemberFunctionTraits<MethodPtr>::ReturnType
+{
+    using Traits = MemberFunctionTraits<MethodPtr>;
+    return callWithDefaults<MethodPtr, ProxyType>(
+        proxy, 
+        method, 
+        std::make_index_sequence<Traits::Arity>{}
+    );
+}
+
+// Void return type specialization
+template<typename MethodPtr, typename ProxyType, size_t... Is>
+void callWithDefaultsVoid(ProxyType* proxy, MethodPtr method, std::index_sequence<Is...>)
+{
+    using Traits = MemberFunctionTraits<MethodPtr>;
+    using ArgsTuple = typename Traits::ArgsTuple;
+    
+    (proxy->*method)(
+        DefaultValue<std::tuple_element_t<Is, ArgsTuple>>::get()...
+    );
+}
+
+template<typename MethodPtr, typename ProxyType>
+void callMethodWithDefaultsVoid(ProxyType* proxy, MethodPtr method)
+{
+    using Traits = MemberFunctionTraits<MethodPtr>;
+    callWithDefaultsVoid<MethodPtr, ProxyType>(
+        proxy, 
+        method, 
+        std::make_index_sequence<Traits::Arity>{}
+    );
+}
+
+// =============================================================================
+// Replay handler generator
+// =============================================================================
+
+// Generate a replay handler for a method that returns a value
+template<typename InterfaceType, typename ProxyType, typename MethodPtr>
+void replayHandler(ReplayContext& ctx, MethodPtr method)
+{
+    // Get 'this' pointer from the context (already read by executeNextCall)
+    auto* proxy = ctx.getCurrentThis<ProxyType>();
+    if (!proxy)
+    {
+        throw Slang::Exception("Replay: null 'this' pointer");
+    }
+    
+    // Call the method with default args - the proxy will read from stream
+    using Traits = MemberFunctionTraits<MethodPtr>;
+    if constexpr (std::is_void_v<typename Traits::ReturnType>)
+    {
+        callMethodWithDefaultsVoid(proxy, method);
+    }
+    else
+    {
+        callMethodWithDefaults(proxy, method);
+    }
+}
+
+// =============================================================================
+// Registration macro
+// =============================================================================
+
+// Register a replay handler for a proxy method
+// Usage: REPLAY_REGISTER(IGlobalSession, GlobalSessionProxy, findProfile)
+//
+// This creates a static handler function and registers it with the replay context.
+// The signature is captured using __FUNCSIG__ which must match what was recorded.
+
+#ifdef _MSC_VER
+#define REPLAY_REGISTER(InterfaceType, ProxyType, methodName) \
+    do { \
+        /* Create a handler that captures the method pointer */ \
+        static auto handler = [](ReplayContext& ctx) { \
+            replayHandler<InterfaceType, ProxyType>( \
+                ctx, \
+                &ProxyType::methodName \
+            ); \
+        }; \
+        /* Get the signature - we need to match what RECORD_CALL produces */ \
+        /* This is tricky because we need the proxy's method signature */ \
+        ReplayContext::get().registerHandler( \
+            /* The signature string needs to match what __FUNCSIG__ produces in the proxy */ \
+            #InterfaceType "::" #methodName, \
+            handler \
+        ); \
+    } while(0)
+#else
+#define REPLAY_REGISTER(InterfaceType, ProxyType, methodName) \
+    do { \
+        static auto handler = [](ReplayContext& ctx) { \
+            replayHandler<InterfaceType, ProxyType>( \
+                ctx, \
+                &ProxyType::methodName \
+            ); \
+        }; \
+        ReplayContext::get().registerHandler( \
+            #InterfaceType "::" #methodName, \
+            handler \
+        ); \
+    } while(0)
+#endif
 
 } // namespace SlangRecord

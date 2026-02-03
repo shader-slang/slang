@@ -293,6 +293,10 @@ public:
     void record(RecordFlag flags, slang::ITypeConformance*& obj);
     void record(RecordFlag flags, slang::ICompileRequest*& obj);
 
+    // Object handles (COM interface pointers mapped to IDs)
+    // Public for testing purposes
+    void recordHandle(RecordFlag flags, uint64_t& handleId);
+
 private:
     void recordRaw(RecordFlag flags, void* data, size_t size);
     void recordTypeId(TypeId id);
@@ -300,9 +304,6 @@ private:
     TypeId readTypeId();
     TypeId readTypeIdFromReference();
     void expectTypeId(TypeId expected);
-
-    // Object handles (COM interface pointers mapped to IDs)
-    void recordHandle(RecordFlag flags, uint64_t& handleId);
 
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
@@ -332,6 +333,51 @@ private:
     // Proxy tracking: maps proxies to implementations and back
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // ==========================================================================
+    // Playback Dispatcher
+    // ==========================================================================
+public:
+    /// Function type for registered playback handlers.
+    /// The handler is called in playback mode and should call the appropriate
+    /// record() methods to read arguments from the stream, then execute the call.
+    using PlaybackHandler = void(*)(ReplayContext& ctx);
+
+    /// Register a playback handler for a function signature.
+    /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
+    void registerHandler(const char* signature, PlaybackHandler handler);
+
+    /// Execute the next recorded call from the stream.
+    /// Reads the function signature, looks up the handler, and calls it.
+    /// Returns true if a call was executed, false if at end of stream.
+    bool executeNextCall();
+
+    /// Execute all recorded calls until end of stream.
+    void executeAll();
+
+    /// Check if there are more calls to execute.
+    bool hasMoreCalls() const { return !m_stream.atEnd(); }
+
+    /// Get the 'this' handle for the current call being executed.
+    /// Only valid within a playback handler.
+    uint64_t getCurrentThisHandle() const { return m_currentThisHandle; }
+
+    /// Get the 'this' pointer for the current call, cast to the given type.
+    /// Only valid within a playback handler.
+    template<typename T>
+    T* getCurrentThis()
+    {
+        if (m_currentThisHandle == kNullHandle)
+            return nullptr;
+        return static_cast<T*>(getInterfaceForHandle(m_currentThisHandle));
+    }
+
+private:
+    // Map from function signature to handler
+    Dictionary<String, PlaybackHandler> m_handlers;
+    
+    // Current 'this' handle during playback execution
+    uint64_t m_currentThisHandle = kNullHandle;
 };
 
 // Template implementations

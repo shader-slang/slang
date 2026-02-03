@@ -110,6 +110,8 @@ void ReplayContext::reset()
     m_nextHandle = kFirstValidHandle;
     m_proxyToImpl.clear();
     m_implToProxy.clear();
+    m_currentThisHandle = kNullHandle;
+    // Note: m_handlers is intentionally NOT cleared - they're typically registered once
 }
 
 uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
@@ -583,6 +585,67 @@ void ReplayContext::record(RecordFlag flags, slang::ITypeConformance*& obj)
 void ReplayContext::record(RecordFlag flags, slang::ICompileRequest*& obj)
 {
     recordInterfaceImpl(flags, obj);
+}
+
+// =============================================================================
+// Playback Dispatcher
+// =============================================================================
+
+void ReplayContext::registerHandler(const char* signature, PlaybackHandler handler)
+{
+    m_handlers[String(signature)] = handler;
+}
+
+bool ReplayContext::executeNextCall()
+{
+    if (m_mode != Mode::Playback)
+        return false;
+
+    if (m_stream.atEnd())
+        return false;
+
+    // Read the function signature
+    const char* signature = nullptr;
+    record(RecordFlag::Input, signature);
+
+    if (signature == nullptr)
+        return false;
+
+    // Look up the handler
+    PlaybackHandler* handler = m_handlers.tryGetValue(String(signature));
+    if (!handler)
+    {
+        throw Slang::Exception(
+            String("No handler registered for function: ") + signature);
+    }
+
+    // Read the 'this' pointer handle (recorded by beginCall)
+    uint64_t thisHandle = kNullHandle;
+    TypeId typeId = readTypeId();
+    if (typeId == TypeId::ObjectHandle)
+    {
+        m_stream.read(&thisHandle, sizeof(thisHandle));
+    }
+    else
+    {
+        throw TypeMismatchException(TypeId::ObjectHandle, typeId);
+    }
+
+    // Store the current 'this' handle for the handler to use
+    m_currentThisHandle = thisHandle;
+
+    // Call the handler - it will read the remaining arguments from the stream
+    (*handler)(*this);
+
+    return true;
+}
+
+void ReplayContext::executeAll()
+{
+    while (executeNextCall())
+    {
+        // Continue until end of stream or error
+    }
 }
 
 } // namespace SlangRecord
