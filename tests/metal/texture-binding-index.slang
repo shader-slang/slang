@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal
-//TEST:REFLECTION(filecheck=REFLECT): -stage compute -entry computeMain  -target metal
+// TEST:SIMPLE(filecheck=METAL): -stage compute -entry computeMain -target metal
+// TEST:REFLECTION(filecheck=REFLECT): -stage compute -entry computeMain  -target metal
 
 // ------------------------
 Sampler2D sampler;

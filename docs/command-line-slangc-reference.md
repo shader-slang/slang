@@ -983,6 +983,11 @@ Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output 
 Enable loop inversion in the code-gen optimization. Default is off 
 
 
+<a id="whole-program"></a>
+### -whole-program
+Generate code for all entry points in a single output (library mode). 
+
+
 
 <a id="Deprecated"></a>
 ## Deprecated

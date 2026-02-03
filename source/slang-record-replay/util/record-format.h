@@ -61,6 +61,7 @@ enum IComponentTypeMethodId : uint16_t
     getTargetCompileResult = 0x0016,
     getEntryPointCompileResult = 0x0017,
     queryInterface = 0x0018,
+    getTargetHostCallable = 0x0019,
 };
 
 enum ApiCallId : uint32_t
@@ -225,6 +226,8 @@ enum ApiCallId : uint32_t
         makeApiCallId(Class_IComponentType2, IComponentTypeMethodId::getTargetCompileResult),
     IComponentType2_getEntryPointCompileResult =
         makeApiCallId(Class_IComponentType2, IComponentTypeMethodId::getEntryPointCompileResult),
+    ITypeConformance_getTargetHostCallable =
+        makeApiCallId(Class_ITypeConformance, IComponentTypeMethodId::getTargetHostCallable),
 };
 
 struct FunctionHeader

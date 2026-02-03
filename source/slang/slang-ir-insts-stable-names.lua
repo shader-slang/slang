@@ -724,4 +724,6 @@ return {
 	["Type.PackedFloatType.FloatE5M2Type"] = 722,
 	["Type.PackedFloatType.BFloat16Type"] = 723,
 	["IsCoopFloat"] = 724,
+	["Type.OptionalNoneType"] = 725,
+	["ReinterpretOptional"] = 726,
 }

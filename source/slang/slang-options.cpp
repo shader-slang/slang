@@ -1042,6 +1042,10 @@ void initCommandOptions(CommandOptions& options)
          "-loop-inversion",
          nullptr,
          "Enable loop inversion in the code-gen optimization. Default is off"},
+        {OptionKind::GenerateWholeProgram,
+         "-whole-program",
+         nullptr,
+         "Generate code for all entry points in a single output (library mode)."},
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
@@ -2765,6 +2769,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ForceCLayout:
             {
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
+                break;
+            }
+        case OptionKind::GenerateWholeProgram:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
                 break;
             }
         case OptionKind::EnableEffectAnnotations:
