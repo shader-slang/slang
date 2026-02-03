@@ -17,18 +17,23 @@ using namespace SlangRecord;
 // Helper: Round-trip test template
 // Writes a value, creates a reader, reads it back, and compares
 // =============================================================================
+// quick access to global context
+inline ReplayContext& ctx()
+{
+    return ReplayContext::get();
+}
 
 template<typename T>
 static bool roundTripValue(T writeValue, T& readValue)
 {
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    writer.record(RecordFlag::None, writeValue);
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, writeValue);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    reader.record(RecordFlag::None, readValue);
+    ctx().setMode(Mode::Playback);
+    ctx().getStream().seek(0);
+    ctx().record(RecordFlag::None, readValue);
 
-    return reader.getStream().atEnd();
+    return ctx().getStream().atEnd();
 }
 
 template<typename T>
@@ -38,6 +43,8 @@ static bool roundTripCheck(T value)
     roundTripValue(value, readValue);
     return readValue == value;
 }
+
+
 
 // =============================================================================
 // Basic Integer Types
@@ -156,14 +163,14 @@ SLANG_UNIT_TEST(replayContextString)
 
     auto testString = [](const char* str)
     {
-        ReplayContext::get().setMode(Mode::Record);
-        ReplayContext::get().record(RecordFlag::None, str);
+        ctx().setMode(Mode::Record);
+        ctx().record(RecordFlag::None, str);
 
-        ReplayContext::get().setMode(Mode::Playback);
-        ReplayContext::get().getStream().seek(0);
+        ctx().setMode(Mode::Playback);
+        ctx().getStream().seek(0);
 
         const char* readStr = nullptr;
-        ReplayContext::get().record(RecordFlag::None, readStr);
+        ctx().record(RecordFlag::None, readStr);
 
         if (str == nullptr)
             return readStr == nullptr;
@@ -1526,7 +1533,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     // 4. replayHandler gets 'this' via getCurrentThis and calls proxy->add(default, default)
     // 5. Proxy's add method uses RECORD_* macros which read from stream in Playback mode
     
-    // But wait - the proxy's RECORD_CALL uses ReplayContext::get() singleton, not 'player'
+    // But wait - the proxy's RECORD_CALL uses ctx() singleton, not 'player'
     // We need to test differently - verify the template infrastructure compiles and works
     
     // For this test, just verify the handler dispatch works
