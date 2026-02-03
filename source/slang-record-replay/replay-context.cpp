@@ -142,6 +142,25 @@ void ReplayContext::switchToPlayback()
     m_stream.seek(0);
 }
 
+void ReplayContext::switchToSync()
+{
+    // Copy recorded data to reference stream for comparison
+    m_referenceStream = ReplayStream(m_stream.getData(), m_stream.getSize());
+    
+    // Clear local state
+    m_arena.reset();
+    m_objectToHandle.clear();
+    m_handleToObject.clear();
+    m_nextHandle = kFirstValidHandle;
+    m_proxyToImpl.clear();
+    m_implToProxy.clear();
+    m_currentThisHandle = kNullHandle;
+
+    // Reset main stream for new recording that will be verified against reference
+    m_stream.reset();
+    m_mode = Mode::Sync;
+}
+
 uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
 {
     if (obj == nullptr)

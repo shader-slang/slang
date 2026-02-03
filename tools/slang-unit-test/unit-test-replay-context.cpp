@@ -196,15 +196,15 @@ SLANG_UNIT_TEST(replayContextBlob)
 
     auto testBlob = [](const void* data, size_t size)
     {
-        ReplayContext writer;
-        writer.setMode(Mode::Record);
-        writer.recordBlob(RecordFlag::None, data, size);
+        ctx().reset();
+        ctx().setMode(Mode::Record);
+        ctx().recordBlob(RecordFlag::None, data, size);
 
-        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+        ctx().switchToPlayback();
 
         const void* readData = nullptr;
         size_t readSize = 0;
-        reader.recordBlob(RecordFlag::None, readData, readSize);
+        ctx().recordBlob(RecordFlag::None, readData, readSize);
 
         if (size != readSize)
             return false;
@@ -238,34 +238,34 @@ SLANG_UNIT_TEST(replayContextHandle)
     //    the system correctly identifies it by handle and provides the new blob
     
     // === RECORDING PHASE ===
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
     
     // Simulate: API creates a blob and returns it as output (e.g., getCompileResult)
     Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create("original data", 13);
     ISlangBlob* outputBlob = recordedBlob.get();
-    writer.record(RecordFlag::Output, outputBlob);  // Registers blob with handle 1, records handle
+    ctx().record(RecordFlag::Output, outputBlob);  // Registers blob with handle 1, records handle
     
     // Simulate: Same blob is passed as input to another call (e.g., writeToFile)
     ISlangBlob* inputBlob = recordedBlob.get();
-    writer.record(RecordFlag::Input, inputBlob);  // Looks up handle for blob, records handle
+    ctx().record(RecordFlag::Input, inputBlob);  // Looks up handle for blob, records handle
     
     // Verify recording produced data
-    SLANG_CHECK(writer.getStream().getSize() > 0);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
     
     // === PLAYBACK PHASE ===
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
     
     // During playback, a NEW blob is created (simulating the real API being called)
     Slang::ComPtr<ISlangBlob> playbackBlob = Slang::RawBlob::create("playback data", 13);
     
     // Playback: First call outputs the blob - we register the new blob with the handle
     ISlangBlob* playbackOutput = playbackBlob.get();
-    reader.record(RecordFlag::Output, playbackOutput);  // Reads handle, verifies/registers
+    ctx().record(RecordFlag::Output, playbackOutput);  // Reads handle, verifies/registers
     
     // Playback: Second call inputs the blob - should resolve to our new blob
     ISlangBlob* playbackInput = nullptr;
-    reader.record(RecordFlag::Input, playbackInput);  // Reads handle, looks up object
+    ctx().record(RecordFlag::Input, playbackInput);  // Reads handle, looks up object
     
     // The input should resolve to our playback blob (same pointer)
     SLANG_CHECK(playbackInput == playbackBlob.get());
@@ -278,8 +278,8 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     // Test with multiple blobs to ensure handle tracking works correctly
     
     // === RECORDING PHASE ===
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
     
     // Create and output two different blobs
     Slang::ComPtr<ISlangBlob> blob1 = Slang::RawBlob::create("blob one", 8);
@@ -287,17 +287,17 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     
     ISlangBlob* out1 = blob1.get();
     ISlangBlob* out2 = blob2.get();
-    writer.record(RecordFlag::Output, out1);  // Handle 1
-    writer.record(RecordFlag::Output, out2);  // Handle 2
+    ctx().record(RecordFlag::Output, out1);  // Handle 1
+    ctx().record(RecordFlag::Output, out2);  // Handle 2
     
     // Now input them in reverse order
     ISlangBlob* in2 = blob2.get();
     ISlangBlob* in1 = blob1.get();
-    writer.record(RecordFlag::Input, in2);
-    writer.record(RecordFlag::Input, in1);
+    ctx().record(RecordFlag::Input, in2);
+    ctx().record(RecordFlag::Input, in1);
     
     // === PLAYBACK PHASE ===
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
     
     // Create new blobs for playback
     Slang::ComPtr<ISlangBlob> newBlob1 = Slang::RawBlob::create("new one!", 8);
@@ -306,14 +306,14 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     // Playback outputs
     ISlangBlob* playOut1 = newBlob1.get();
     ISlangBlob* playOut2 = newBlob2.get();
-    reader.record(RecordFlag::Output, playOut1);
-    reader.record(RecordFlag::Output, playOut2);
+    ctx().record(RecordFlag::Output, playOut1);
+    ctx().record(RecordFlag::Output, playOut2);
     
     // Playback inputs (reverse order, matching recording)
     ISlangBlob* playIn2 = nullptr;
     ISlangBlob* playIn1 = nullptr;
-    reader.record(RecordFlag::Input, playIn2);
-    reader.record(RecordFlag::Input, playIn1);
+    ctx().record(RecordFlag::Input, playIn2);
+    ctx().record(RecordFlag::Input, playIn1);
     
     // Verify correct blob resolution
     SLANG_CHECK(playIn1 == newBlob1.get());
@@ -327,17 +327,17 @@ SLANG_UNIT_TEST(replayContextHandleNull)
     // Test that null pointers are handled correctly
     
     // === RECORDING PHASE ===
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
     
     ISlangBlob* nullBlob = nullptr;
-    writer.record(RecordFlag::Input, nullBlob);
+    ctx().record(RecordFlag::Input, nullBlob);
     
     // === PLAYBACK PHASE ===
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
     
     ISlangBlob* readBlob = reinterpret_cast<ISlangBlob*>(0xDEADBEEF);  // Non-null sentinel
-    reader.record(RecordFlag::Input, readBlob);
+    ctx().record(RecordFlag::Input, readBlob);
     
     // Should be null after playback
     SLANG_CHECK(readBlob == nullptr);
@@ -355,25 +355,25 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
     size_t testDataSize = strlen(testData) + 1;  // Include null terminator
 
     // === RECORDING PHASE ===
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     // Create a user-provided blob that is NOT registered/tracked
     Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* inputBlob = userBlob.get();
     
     // Record it as input - since it's not tracked, it should serialize inline
-    writer.record(RecordFlag::Input, inputBlob);
+    ctx().record(RecordFlag::Input, inputBlob);
 
     // Verify recording produced data
-    SLANG_CHECK(writer.getStream().getSize() > 0);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
 
     // === PLAYBACK PHASE ===
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     // During playback, the blob should be reconstructed from the serialized data
     ISlangBlob* readBlob = nullptr;
-    reader.record(RecordFlag::Input, readBlob);
+    ctx().record(RecordFlag::Input, readBlob);
 
     // Verify the blob was created
     SLANG_CHECK(readBlob != nullptr);
@@ -398,39 +398,39 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
     size_t testDataSize = strlen(testData) + 1;
 
     // === RECORDING PHASE ===
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     // User provides blob as input (untracked -> inline)
     Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* inputBlob = userBlob.get();
-    writer.record(RecordFlag::Input, inputBlob);
+    ctx().record(RecordFlag::Input, inputBlob);
 
     // API stores it and later returns it as output (now it gets tracked)
     ISlangBlob* outputBlob = userBlob.get();
-    writer.record(RecordFlag::Output, outputBlob);
+    ctx().record(RecordFlag::Output, outputBlob);
 
     // Later, it's passed as input again (should use handle, not inline)
     ISlangBlob* inputAgain = userBlob.get();
-    writer.record(RecordFlag::Input, inputAgain);
+    ctx().record(RecordFlag::Input, inputAgain);
 
     // === PLAYBACK PHASE ===
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     // First: read inline blob
     ISlangBlob* readInline = nullptr;
-    reader.record(RecordFlag::Input, readInline);
+    ctx().record(RecordFlag::Input, readInline);
     SLANG_CHECK(readInline != nullptr);
     SLANG_CHECK(readInline->getBufferSize() == testDataSize);
 
     // Second: output registers a blob (simulating API creating/returning it)
     // In real usage, playback would provide its own blob here
     ISlangBlob* playbackOutput = readInline;  // Use the reconstructed blob
-    reader.record(RecordFlag::Output, playbackOutput);
+    ctx().record(RecordFlag::Output, playbackOutput);
 
     // Third: input should resolve to the registered blob
     ISlangBlob* readAgain = nullptr;
-    reader.record(RecordFlag::Input, readAgain);
+    ctx().record(RecordFlag::Input, readAgain);
     SLANG_CHECK(readAgain == readInline);
 
     // Clean up
@@ -500,12 +500,12 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
     SlangUUID writeValue = {0x12345678, 0x1234, 0x5678, {0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78}};
     SlangUUID readValue = {};
 
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    writer.record(RecordFlag::None, writeValue);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, writeValue);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    reader.record(RecordFlag::None, readValue);
+    ctx().switchToPlayback();
+    ctx().record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.data1 == readValue.data1);
     SLANG_CHECK(writeValue.data2 == readValue.data2);
@@ -529,14 +529,14 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
     writeValue.stringValue0 = "test0";
     writeValue.stringValue1 = "test1";
 
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    writer.record(RecordFlag::None, writeValue);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, writeValue);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     slang::CompilerOptionValue readValue = {};
-    reader.record(RecordFlag::None, readValue);
+    ctx().record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.kind == readValue.kind);
     SLANG_CHECK(writeValue.intValue0 == readValue.intValue0);
@@ -557,14 +557,14 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
     writeValue.name = "MY_MACRO";
     writeValue.value = "123";
 
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    writer.record(RecordFlag::None, writeValue);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, writeValue);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     slang::PreprocessorMacroDesc readValue = {};
-    reader.record(RecordFlag::None, readValue);
+    ctx().record(RecordFlag::None, readValue);
 
     SLANG_CHECK(strcmp(writeValue.name, readValue.name) == 0);
     SLANG_CHECK(strcmp(writeValue.value, readValue.value) == 0);
@@ -589,14 +589,14 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
     writeValue.compilerOptionEntries = nullptr;
     writeValue.compilerOptionEntryCount = 0;
 
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    writer.record(RecordFlag::None, writeValue);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    ctx().record(RecordFlag::None, writeValue);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     slang::TargetDesc readValue = {};
-    reader.record(RecordFlag::None, readValue);
+    ctx().record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.structureSize == readValue.structureSize);
     SLANG_CHECK(writeValue.format == readValue.format);
@@ -614,8 +614,8 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     SLANG_UNUSED(unitTestContext);
 
     // Write multiple values of different types
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t writeInt = 42;
     float writeFloat = 3.14f;
@@ -623,14 +623,14 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     bool writeBool = true;
     double writeDouble = 2.71828;
 
-    writer.record(RecordFlag::None, writeInt);
-    writer.record(RecordFlag::None, writeFloat);
-    writer.record(RecordFlag::None, writeStr);
-    writer.record(RecordFlag::None, writeBool);
-    writer.record(RecordFlag::None, writeDouble);
+    ctx().record(RecordFlag::None, writeInt);
+    ctx().record(RecordFlag::None, writeFloat);
+    ctx().record(RecordFlag::None, writeStr);
+    ctx().record(RecordFlag::None, writeBool);
+    ctx().record(RecordFlag::None, writeDouble);
 
     // Read them back
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     int32_t readInt = 0;
     float readFloat = 0.0f;
@@ -638,11 +638,11 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     bool readBool = false;
     double readDouble = 0.0;
 
-    reader.record(RecordFlag::None, readInt);
-    reader.record(RecordFlag::None, readFloat);
-    reader.record(RecordFlag::None, readStr);
-    reader.record(RecordFlag::None, readBool);
-    reader.record(RecordFlag::None, readDouble);
+    ctx().record(RecordFlag::None, readInt);
+    ctx().record(RecordFlag::None, readFloat);
+    ctx().record(RecordFlag::None, readStr);
+    ctx().record(RecordFlag::None, readBool);
+    ctx().record(RecordFlag::None, readDouble);
 
     SLANG_CHECK(writeInt == readInt);
     SLANG_CHECK(writeFloat == readFloat);
@@ -660,18 +660,18 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     SLANG_UNUSED(unitTestContext);
 
     // Write an int32, try to read a string - should throw
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
     int32_t writeInt = 42;
-    writer.record(RecordFlag::None, writeInt);
+    ctx().record(RecordFlag::None, writeInt);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    ctx().switchToPlayback();
 
     bool caughtException = false;
     try
     {
         const char* readStr = nullptr;
-        reader.record(RecordFlag::None, readStr);
+        ctx().record(RecordFlag::None, readStr);
     }
     catch (const TypeMismatchException& e)
     {
@@ -691,17 +691,17 @@ SLANG_UNIT_TEST(replayContextStreamState)
     SLANG_UNUSED(unitTestContext);
 
     // Test isReading/isWriting
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
-    SLANG_CHECK(writer.isWriting());
-    SLANG_CHECK(!writer.isReading());
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().isWriting());
+    SLANG_CHECK(!ctx().isReading());
 
     int32_t value = 42;
-    writer.record(RecordFlag::None, value);
+    ctx().record(RecordFlag::None, value);
 
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    SLANG_CHECK(reader.isReading());
-    SLANG_CHECK(!reader.isWriting());
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isReading());
+    SLANG_CHECK(!ctx().isWriting());
 }
 
 // =============================================================================
@@ -769,22 +769,22 @@ SLANG_UNIT_TEST(replayContextIdleMode)
     SLANG_UNUSED(unitTestContext);
 
     // In Idle mode, record operations should be no-ops
-    ReplayContext ctx;
-    SLANG_CHECK(ctx.getMode() == Mode::Idle);
-    SLANG_CHECK(ctx.isIdle());
-    SLANG_CHECK(!ctx.isActive());
+    ctx().reset();
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
+    SLANG_CHECK(ctx().isIdle());
+    SLANG_CHECK(!ctx().isActive());
 
     // Recording should not write anything
     int32_t value = 42;
-    ctx.record(RecordFlag::None, value);
-    SLANG_CHECK(ctx.getStream().getSize() == 0);
+    ctx().record(RecordFlag::None, value);
+    SLANG_CHECK(ctx().getStream().getSize() == 0);
 
     // Multiple records should still produce no data
     float f = 3.14f;
     const char* str = "hello";
-    ctx.record(RecordFlag::None, f);
-    ctx.record(RecordFlag::None, str);
-    SLANG_CHECK(ctx.getStream().getSize() == 0);
+    ctx().record(RecordFlag::None, f);
+    ctx().record(RecordFlag::None, str);
+    SLANG_CHECK(ctx().getStream().getSize() == 0);
 }
 
 SLANG_UNIT_TEST(replayContextRecordMode)
@@ -792,21 +792,21 @@ SLANG_UNIT_TEST(replayContextRecordMode)
     SLANG_UNUSED(unitTestContext);
 
     // In Record mode, data should be written to stream
-    ReplayContext ctx;
-    ctx.setMode(Mode::Record);
-    SLANG_CHECK(ctx.getMode() == Mode::Record);
-    SLANG_CHECK(ctx.isRecording());
-    SLANG_CHECK(ctx.isActive());
-    SLANG_CHECK(ctx.isWriting());
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().getMode() == Mode::Record);
+    SLANG_CHECK(ctx().isRecording());
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(ctx().isWriting());
 
     int32_t value = 42;
-    ctx.record(RecordFlag::None, value);
-    SLANG_CHECK(ctx.getStream().getSize() > 0);
+    ctx().record(RecordFlag::None, value);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
 
     // Verify data was written correctly by reading it back
-    ReplayContext reader(ctx.getStream().getData(), ctx.getStream().getSize());
+    ctx().switchToPlayback();
     int32_t readValue = 0;
-    reader.record(RecordFlag::None, readValue);
+    ctx().record(RecordFlag::None, readValue);
     SLANG_CHECK(readValue == 42);
 }
 
@@ -815,31 +815,31 @@ SLANG_UNIT_TEST(replayContextPlaybackMode)
     SLANG_UNUSED(unitTestContext);
 
     // First record some data
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t writeInt = 123;
     float writeFloat = 2.5f;
     const char* writeStr = "test";
 
-    writer.record(RecordFlag::None, writeInt);
-    writer.record(RecordFlag::None, writeFloat);
-    writer.record(RecordFlag::None, writeStr);
+    ctx().record(RecordFlag::None, writeInt);
+    ctx().record(RecordFlag::None, writeFloat);
+    ctx().record(RecordFlag::None, writeStr);
 
-    // Create playback context and read data
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    SLANG_CHECK(reader.getMode() == Mode::Playback);
-    SLANG_CHECK(reader.isPlayback());
-    SLANG_CHECK(reader.isActive());
-    SLANG_CHECK(reader.isReading());
+    // Switch to playback and read data
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().getMode() == Mode::Playback);
+    SLANG_CHECK(ctx().isPlayback());
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(ctx().isReading());
 
     int32_t readInt = 0;
     float readFloat = 0.0f;
     const char* readStr = nullptr;
 
-    reader.record(RecordFlag::None, readInt);
-    reader.record(RecordFlag::None, readFloat);
-    reader.record(RecordFlag::None, readStr);
+    ctx().record(RecordFlag::None, readInt);
+    ctx().record(RecordFlag::None, readFloat);
+    ctx().record(RecordFlag::None, readStr);
 
     SLANG_CHECK(readInt == 123);
     SLANG_CHECK(readFloat == 2.5f);
@@ -851,20 +851,20 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
     SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
-    ReplayContext reference;
-    reference.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t val1 = 100;
     int32_t val2 = 200;
-    reference.record(RecordFlag::None, val1);
-    reference.record(RecordFlag::None, val2);
+    ctx().record(RecordFlag::None, val1);
+    ctx().record(RecordFlag::None, val2);
 
-    // Create sync context with reference data
-    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
-    SLANG_CHECK(sync.getMode() == Mode::Sync);
-    SLANG_CHECK(sync.isSyncing());
-    SLANG_CHECK(sync.isActive());
-    SLANG_CHECK(sync.isWriting());
+    // Switch to sync mode - reset position and set mode
+    ctx().switchToSync();
+    SLANG_CHECK(ctx().getMode() == Mode::Sync);
+    SLANG_CHECK(ctx().isSyncing());
+    SLANG_CHECK(ctx().isActive());
+    SLANG_CHECK(ctx().isWriting());
 
     // Record the same values - should succeed
     int32_t syncVal1 = 100;
@@ -872,8 +872,8 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
     bool noException = true;
     try
     {
-        sync.record(RecordFlag::None, syncVal1);
-        sync.record(RecordFlag::None, syncVal2);
+        ctx().record(RecordFlag::None, syncVal1);
+        ctx().record(RecordFlag::None, syncVal2);
     }
     catch (const DataMismatchException&)
     {
@@ -887,21 +887,21 @@ SLANG_UNIT_TEST(replayContextSyncModeMismatch)
     SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
-    ReplayContext reference;
-    reference.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t val = 100;
-    reference.record(RecordFlag::None, val);
+    ctx().record(RecordFlag::None, val);
 
-    // Create sync context with reference data
-    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
+    // Switch to sync mode
+    ctx().switchToSync();
 
     // Record a different value - should throw
     int32_t differentVal = 999;
     bool caughtException = false;
     try
     {
-        sync.record(RecordFlag::None, differentVal);
+        ctx().record(RecordFlag::None, differentVal);
     }
     catch (const DataMismatchException& e)
     {
@@ -916,20 +916,20 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
     SLANG_UNUSED(unitTestContext);
 
     // Record data with Output flag
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t inputVal = 42;
     int32_t outputVal = 100;
-    writer.record(RecordFlag::Input, inputVal);
-    writer.record(RecordFlag::Output, outputVal);
+    ctx().record(RecordFlag::Input, inputVal);
+    ctx().record(RecordFlag::Output, outputVal);
 
-    // Create playback context
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    // Switch to playback
+    ctx().switchToPlayback();
 
     // For inputs, we read the value from the stream (user provides 0, gets 42)
     int32_t readInput = 0;
-    reader.record(RecordFlag::Input, readInput);
+    ctx().record(RecordFlag::Input, readInput);
     SLANG_CHECK(readInput == 42);
 
     // For outputs, user provides the expected value. Playback verifies it matches
@@ -938,7 +938,7 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
     bool noException = true;
     try
     {
-        reader.record(RecordFlag::Output, expectedOutput);
+        ctx().record(RecordFlag::Output, expectedOutput);
     }
     catch (const DataMismatchException&)
     {
@@ -953,21 +953,21 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
     SLANG_UNUSED(unitTestContext);
 
     // Record an output value
-    ReplayContext writer;
-    writer.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t outputVal = 100;
-    writer.record(RecordFlag::Output, outputVal);
+    ctx().record(RecordFlag::Output, outputVal);
 
-    // Create playback context
-    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    // Switch to playback
+    ctx().switchToPlayback();
 
     // User provides wrong expected value - should throw
     int32_t wrongExpected = 999; // User says "I expect 999" but recorded was 100
     bool caughtException = false;
     try
     {
-        reader.record(RecordFlag::Output, wrongExpected);
+        ctx().record(RecordFlag::Output, wrongExpected);
     }
     catch (const DataMismatchException& e)
     {
@@ -981,47 +981,47 @@ SLANG_UNIT_TEST(replayContextModeTransitions)
 {
     SLANG_UNUSED(unitTestContext);
 
-    ReplayContext ctx;
-    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+    ctx().reset();
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
 
     // Test setMode transitions
-    ctx.setMode(Mode::Record);
-    SLANG_CHECK(ctx.getMode() == Mode::Record);
-    SLANG_CHECK(ctx.isRecording());
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().getMode() == Mode::Record);
+    SLANG_CHECK(ctx().isRecording());
 
-    ctx.setMode(Mode::Idle);
-    SLANG_CHECK(ctx.getMode() == Mode::Idle);
-    SLANG_CHECK(ctx.isIdle());
+    ctx().setMode(Mode::Idle);
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
+    SLANG_CHECK(ctx().isIdle());
 
     // Test enable() convenience method
-    ctx.enable();
-    SLANG_CHECK(ctx.getMode() == Mode::Record);
+    ctx().enable();
+    SLANG_CHECK(ctx().getMode() == Mode::Record);
 
     // Test disable() convenience method
-    ctx.disable();
-    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+    ctx().disable();
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
 
     // enable() should only work from Idle
-    ctx.setMode(Mode::Playback);
-    ctx.enable(); // Should not change from Playback
-    SLANG_CHECK(ctx.getMode() == Mode::Playback);
+    ctx().setMode(Mode::Playback);
+    ctx().enable(); // Should not change from Playback
+    SLANG_CHECK(ctx().getMode() == Mode::Playback);
 }
 
 SLANG_UNIT_TEST(replayContextReset)
 {
     SLANG_UNUSED(unitTestContext);
 
-    ReplayContext ctx;
-    ctx.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t value = 42;
-    ctx.record(RecordFlag::None, value);
-    SLANG_CHECK(ctx.getStream().getSize() > 0);
+    ctx().record(RecordFlag::None, value);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
 
     // Reset should clear everything
-    ctx.reset();
-    SLANG_CHECK(ctx.getMode() == Mode::Idle);
-    SLANG_CHECK(ctx.getStream().getSize() == 0);
+    ctx().reset();
+    SLANG_CHECK(ctx().getMode() == Mode::Idle);
+    SLANG_CHECK(ctx().getStream().getSize() == 0);
 }
 
 SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
@@ -1029,26 +1029,26 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
     SLANG_UNUSED(unitTestContext);
 
     // Record reference data
-    ReplayContext reference;
-    reference.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     int32_t val = 42;
-    reference.record(RecordFlag::None, val);
+    ctx().record(RecordFlag::None, val);
 
-    // Create sync context
-    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
+    // Switch to sync mode
+    ctx().switchToSync();
 
     // Sync mode should write to its own stream too
     int32_t syncVal = 42;
-    sync.record(RecordFlag::None, syncVal);
+    ctx().record(RecordFlag::None, syncVal);
 
     // Verify sync context wrote to its stream
-    SLANG_CHECK(sync.getStream().getSize() > 0);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
 
     // The written data should be readable
-    ReplayContext reader(sync.getStream().getData(), sync.getStream().getSize());
+    ctx().switchToPlayback();
     int32_t readVal = 0;
-    reader.record(RecordFlag::None, readVal);
+    ctx().record(RecordFlag::None, readVal);
     SLANG_CHECK(readVal == 42);
 }
 
@@ -1110,34 +1110,34 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     // 3. String (profile name "sm_5_0") - TypeId::String (0x10), length, bytes
     // 4. Int32 (return value - profileId) - TypeId::Int32 (0x03), int32 value
 
-    ReplayContext reader(data, size);
+    dllCtx.switchToPlayback();
 
     // Read function signature
     const char* signature = nullptr;
-    reader.record(RecordFlag::Input, signature);
+    dllCtx.record(RecordFlag::Input, signature);
     SLANG_CHECK(signature != nullptr);
     // The signature should contain "findProfile"
     SLANG_CHECK(strstr(signature, "findProfile") != nullptr);
 
     // Read 'this' pointer handle - check TypeId then read uint64
-    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
     uint64_t thisHandle = 0;
-    reader.getStream().read(&thisHandle, sizeof(thisHandle));
+    dllCtx.getStream().read(&thisHandle, sizeof(thisHandle));
     SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
 
     // Read profile name
     const char* profileName = nullptr;
-    reader.record(RecordFlag::Input, profileName);
+    dllCtx.record(RecordFlag::Input, profileName);
     SLANG_CHECK(profileName != nullptr);
     SLANG_CHECK(strcmp(profileName, "sm_5_0") == 0);
 
     // Read return value (SlangProfileID recorded as int32)
     int32_t returnedProfileId = 0;
-    reader.record(RecordFlag::None, returnedProfileId);
+    dllCtx.record(RecordFlag::None, returnedProfileId);
     SLANG_CHECK(returnedProfileId == static_cast<int32_t>(profileId));
 
     // Should have consumed all data
-    SLANG_CHECK(reader.getStream().atEnd());
+    SLANG_CHECK(dllCtx.getStream().atEnd());
 
     // Clean up
     globalSession = nullptr;
@@ -1183,41 +1183,41 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     // 4. ObjectHandle (output session)
     // 5. Int32 (return value - SlangResult)
 
-    ReplayContext reader(data, size);
+    dllCtx.switchToPlayback();
 
     // Read function signature
     const char* signature = nullptr;
-    reader.record(RecordFlag::Input, signature);
+    dllCtx.record(RecordFlag::Input, signature);
     SLANG_CHECK(signature != nullptr);
     SLANG_CHECK(strstr(signature, "createSession") != nullptr);
 
     // Read 'this' pointer handle
-    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
     uint64_t thisHandle = 0;
-    reader.getStream().read(&thisHandle, sizeof(thisHandle));
+    dllCtx.getStream().read(&thisHandle, sizeof(thisHandle));
     SLANG_CHECK(thisHandle >= kFirstValidHandle);
 
     // Read SessionDesc
     slang::SessionDesc readDesc = {};
-    reader.record(RecordFlag::Input, readDesc);
+    dllCtx.record(RecordFlag::Input, readDesc);
     // Verify it matches what we passed (empty desc)
     SLANG_CHECK(readDesc.targetCount == 0);
     SLANG_CHECK(readDesc.searchPathCount == 0);
 
     // Read output session handle
-    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
     uint64_t sessionHandle = 0;
-    reader.getStream().read(&sessionHandle, sizeof(sessionHandle));
+    dllCtx.getStream().read(&sessionHandle, sizeof(sessionHandle));
     SLANG_CHECK(sessionHandle >= kFirstValidHandle);
     SLANG_CHECK(sessionHandle != thisHandle); // Different object
 
     // Read return value (SlangResult is int32)
     int32_t result = 0;
-    reader.record(RecordFlag::None, result);
+    dllCtx.record(RecordFlag::None, result);
     SLANG_CHECK(result == SLANG_OK);
 
     // Should have consumed all data
-    SLANG_CHECK(reader.getStream().atEnd());
+    SLANG_CHECK(dllCtx.getStream().atEnd());
 
 
     // Clean up
@@ -1265,12 +1265,12 @@ SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
 
     // First, record a call - we'll manually construct the stream format
     // Format: signature (string), thisHandle (ObjectHandle), input args..., return value
-    ReplayContext recorder;
-    recorder.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     // Record signature
     const char* signature = "findProfile_test_signature";
-    recorder.record(RecordFlag::Input, signature);
+    ctx().record(RecordFlag::Input, signature);
 
     // Record 'this' pointer as a handle - use a blob as a tracked object since we can record those
     // Actually, let's just write the handle bytes directly since recorder is in Record mode
@@ -1278,40 +1278,41 @@ SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
     
     // Create a fake blob to use as "this"
     Slang::ComPtr<ISlangBlob> fakeBlob = Slang::RawBlob::create("fake", 4);
-    uint64_t thisHandle = recorder.registerInterface(fakeBlob.get());
+    uint64_t thisHandle = ctx().registerInterface(fakeBlob.get());
+    SLANG_UNUSED(thisHandle);
     
     // Write the handle directly (ObjectHandle TypeId + handle value)
     ISlangBlob* blobPtr = fakeBlob.get();
-    recorder.record(RecordFlag::Input, blobPtr);
+    ctx().record(RecordFlag::Input, blobPtr);
 
     // Record the profile name input
     const char* profileName = "sm_6_0";
-    recorder.record(RecordFlag::Input, profileName);
+    ctx().record(RecordFlag::Input, profileName);
 
     // Record return value
     int32_t profileId = 42;
-    recorder.record(RecordFlag::ReturnValue, profileId);
+    ctx().record(RecordFlag::ReturnValue, profileId);
 
     // Now set up playback
-    ReplayContext player(recorder.getStream().getData(), recorder.getStream().getSize());
+    ctx().switchToPlayback();
     
     // Register the handler
-    player.registerHandler("findProfile_test_signature", playbackFindProfile);
+    ctx().registerHandler("findProfile_test_signature", playbackFindProfile);
 
     // Also need to register the fake object so getCurrentThis works
     // Use the same handle value for consistency
-    player.registerInterface(fakeBlob.get());
+    ctx().registerInterface(fakeBlob.get());
 
     // Execute the call
-    bool executed = player.executeNextCall();
+    bool executed = ctx().executeNextCall();
     SLANG_CHECK(executed);
     SLANG_CHECK(s_playbackCallCount == 1);
     SLANG_CHECK(s_lastProfileName != nullptr);
     SLANG_CHECK(strcmp(s_lastProfileName, "sm_6_0") == 0);
 
     // No more calls
-    SLANG_CHECK(!player.hasMoreCalls());
-    SLANG_CHECK(!player.executeNextCall());
+    SLANG_CHECK(!ctx().hasMoreCalls());
+    SLANG_CHECK(!ctx().executeNextCall());
 }
 
 SLANG_UNIT_TEST(replayContextPlaybackMultipleCalls)
@@ -1321,36 +1322,36 @@ SLANG_UNIT_TEST(replayContextPlaybackMultipleCalls)
     s_playbackCallCount = 0;
 
     // Record multiple calls
-    ReplayContext recorder;
-    recorder.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
 
     Slang::ComPtr<ISlangBlob> fakeBlob = Slang::RawBlob::create("fake", 4);
-    recorder.registerInterface(fakeBlob.get());
+    ctx().registerInterface(fakeBlob.get());
 
     for (int i = 0; i < 3; i++)
     {
         const char* sig = "findProfile_test_signature";
-        recorder.record(RecordFlag::Input, sig);
+        ctx().record(RecordFlag::Input, sig);
         
         ISlangBlob* blobPtr = fakeBlob.get();
-        recorder.record(RecordFlag::Input, blobPtr);
+        ctx().record(RecordFlag::Input, blobPtr);
         
         const char* name = "sm_5_0";
-        recorder.record(RecordFlag::Input, name);
+        ctx().record(RecordFlag::Input, name);
         
         int32_t result = 10 + i;
-        recorder.record(RecordFlag::ReturnValue, result);
+        ctx().record(RecordFlag::ReturnValue, result);
     }
 
     // Playback all
-    ReplayContext player(recorder.getStream().getData(), recorder.getStream().getSize());
-    player.registerHandler("findProfile_test_signature", playbackFindProfile);
-    player.registerInterface(fakeBlob.get());
+    ctx().switchToPlayback();
+    ctx().registerHandler("findProfile_test_signature", playbackFindProfile);
+    ctx().registerInterface(fakeBlob.get());
 
-    player.executeAll();
+    ctx().executeAll();
 
     SLANG_CHECK(s_playbackCallCount == 3);
-    SLANG_CHECK(!player.hasMoreCalls());
+    SLANG_CHECK(!ctx().hasMoreCalls());
 }
 
 // =============================================================================
@@ -1487,44 +1488,43 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     Slang::ComPtr<ITestCalculator> proxyPtr(proxy);
 
     // Build a recorded stream manually with known signatures
-    ReplayContext recorder;
-    recorder.setMode(Mode::Record);
+    ctx().reset();
+    ctx().setMode(Mode::Record);
     
     // Register the proxy and get its handle
-    uint64_t proxyHandle = recorder.registerInterface(proxyPtr.get());
+    uint64_t proxyHandle = ctx().registerInterface(proxyPtr.get());
     SLANG_CHECK(proxyHandle >= kFirstValidHandle);
 
     // Record a call manually with a simple signature we control
     const char* addSignature = "TestCalculator::add";
-    recorder.record(RecordFlag::Input, addSignature);  // signature
+    ctx().record(RecordFlag::Input, addSignature);  // signature
     
     // Record 'this' handle with proper TypeId (what beginCall does via recordHandle)
-    recorder.recordHandle(RecordFlag::Input, proxyHandle);
+    ctx().recordHandle(RecordFlag::Input, proxyHandle);
     
     int32_t arg_a = 10;
     int32_t arg_b = 20;
-    recorder.record(RecordFlag::Input, arg_a);
-    recorder.record(RecordFlag::Input, arg_b);
+    ctx().record(RecordFlag::Input, arg_a);
+    ctx().record(RecordFlag::Input, arg_b);
     
     int32_t returnVal = 30;
-    recorder.record(RecordFlag::ReturnValue, returnVal);
+    ctx().record(RecordFlag::ReturnValue, returnVal);
 
     // Verify we recorded something
-    auto& stream = recorder.getStream();
-    SLANG_CHECK(stream.getSize() > 0);
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
 
-    // Now create playback context with this recorded data
-    ReplayContext player(stream.getData(), stream.getSize());
-    player.registerInterface(proxyPtr.get());  // Same handle value
+    // Switch to playback
+    ctx().switchToPlayback();
+    ctx().registerInterface(proxyPtr.get());  // Same handle value
     
     // Register a handler using the replayHandler template (what REPLAY_REGISTER does internally)
-    auto addHandler = [](ReplayContext& ctx) {
+    auto addHandler = [](ReplayContext& ctxRef) {
         SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
-            ctx,
+            ctxRef,
             &TestCalculatorProxy::add
         );
     };
-    player.registerHandler(addSignature, addHandler);
+    ctx().registerHandler(addSignature, addHandler);
 
     // Execute playback - this should:
     // 1. Read signature "TestCalculator::add"
@@ -1537,7 +1537,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     // We need to test differently - verify the template infrastructure compiles and works
     
     // For this test, just verify the handler dispatch works
-    bool executed = player.executeNextCall();
+    bool executed = ctx().executeNextCall();
     SLANG_CHECK(executed);
     
     // In this test, the proxy's add() was called with default args (0, 0)
@@ -1545,7 +1545,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     SLANG_CHECK(s_testCalcAddCalls == 1);
     
     // No more calls
-    SLANG_CHECK(!player.hasMoreCalls());
+    SLANG_CHECK(!ctx().hasMoreCalls());
 }
 
 // Test the MemberFunctionTraits template

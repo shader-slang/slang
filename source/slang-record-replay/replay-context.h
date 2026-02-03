@@ -191,6 +191,10 @@ public:
     /// keeping the stream data present so we can replay what's just happened
     SLANG_API void switchToPlayback();
 
+    /// Switch to sync mode, copying recorded data to reference stream and resetting
+    /// for verification pass
+    SLANG_API void switchToSync();
+
     // Basic types
     SLANG_API void record(RecordFlag flags, int8_t& value);
     SLANG_API void record(RecordFlag flags, int16_t& value);
