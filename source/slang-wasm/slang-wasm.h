@@ -39,6 +39,8 @@ namespace slang
 namespace wgsl
 {
 
+std::string getVersionString();
+
 class TypeLayoutReflection;
 class TypeReflection;
 class VariableLayoutReflection;
@@ -453,7 +455,7 @@ public:
 };
 
 LanguageServer* createLanguageServer();
-} // namespace lsp
 
+} // namespace lsp
 } // namespace wgsl
 } // namespace slang
