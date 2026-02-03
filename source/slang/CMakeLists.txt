@@ -123,6 +123,7 @@ set(SLANG_LOOKUP_GENERATED_SOURCE
 )
 set(SLANG_RECORD_REPLAY_SYSTEM
     "${slang_SOURCE_DIR}/source/slang-record-replay/record"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
     "${slang_SOURCE_DIR}/source/slang-record-replay/util"
 )
 

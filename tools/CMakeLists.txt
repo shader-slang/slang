@@ -420,6 +420,7 @@ if(SLANG_ENABLE_REPLAYER)
         EXECUTABLE
         EXTRA_SOURCE_DIRS
             ${slang_SOURCE_DIR}/source/slang-record-replay/replay
+            ${slang_SOURCE_DIR}/source/slang-record-replay/proxy
             ${slang_SOURCE_DIR}/source/slang-record-replay/util
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
