@@ -254,6 +254,41 @@ jobs:
       config: release
       runs-on: '["windows-latest"]'
 
+  # SlangPy tests (separate workflow for slangpy-based testing)
+  # Run on pull requests and release builds with GPU support
+  test-slangpy-windows-release:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-slangpy-tests.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+
+  test-slangpy-macos-release:
+    needs: [filter, build-macos-release-clang-aarch64]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-slangpy-tests.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+
+  test-slangpy-linux-release:
+    needs: [filter, build-linux-release-gcc-x86_64]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-slangpy-tests.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["Linux", "self-hosted", "GPU"]'
+
   check-ci:
     needs:
       [
