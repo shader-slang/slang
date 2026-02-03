@@ -93,5 +93,5 @@ RUN echo "=== Installed Tools ===" && \
 
 # Set labels for identification
 LABEL org.opencontainers.image.source=https://github.com/shader-slang/slang
-LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 12.5.1"
+LABEL org.opencontainers.image.description="Slang Linux GPU CI container with CUDA 13.0.1"
 LABEL org.opencontainers.image.licenses=MIT
