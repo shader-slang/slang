@@ -1050,6 +1050,17 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 // Integration Test: Record actual API calls and verify exact bytes
 // =============================================================================
 
+// NOTE: These integration tests use the DLL's global ReplayContext (accessed via
+// slang_getReplayContext()) rather than the local copy created by including
+// replay-context.cpp. This is important because proxy wrapping and handle
+// registration happens in the DLL's context.
+
+// Helper to get the DLL's ReplayContext
+static ReplayContext& getDllContext()
+{
+    return *static_cast<ReplayContext*>(slang_getReplayContext());
+}
+
 // Helper to read a TypeId byte from the stream
 static TypeId readTypeIdFromStream(ReplayStream& stream)
 {
@@ -1062,10 +1073,12 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 {
     SLANG_UNUSED(unitTestContext);
 
-    // Save and set up recording
-    bool wasActive = slang_isRecordLayerEnabled();
-    slang_enableRecordLayer(true);
-    slang_clearRecordLayer();
+    // Save and set up recording using DLL's context
+    auto& dllCtx = getDllContext();
+    bool wasActive = dllCtx.isActive();
+    dllCtx.enable();
+    dllCtx.reset();
+    dllCtx.setMode(Mode::Record); // Restore record mode after reset
 
     // Create a global session
     Slang::ComPtr<slang::IGlobalSession> globalSession;
@@ -1077,10 +1090,9 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     SlangProfileID profileId = globalSession->findProfile("sm_5_0");
     SLANG_CHECK(profileId != SLANG_PROFILE_UNKNOWN);
 
-    // Get the recorded data
-    const void* data = nullptr;
-    size_t size = 0;
-    slang_getRecordLayerData(&data, &size);
+    // Get the recorded data from DLL's context
+    const void* data = dllCtx.getStream().getData();
+    size_t size = dllCtx.getStream().getSize();
 
     SLANG_CHECK(data != nullptr);
     SLANG_CHECK(size > 0);
@@ -1123,18 +1135,21 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 
     // Clean up
     globalSession = nullptr;
-    slang_clearRecordLayer();
-    slang_enableRecordLayer(wasActive);
+    dllCtx.reset();
+    if (!wasActive)
+        dllCtx.disable();
 }
 
 SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
 {
     SLANG_UNUSED(unitTestContext);
 
-    // Save and set up recording
-    bool wasActive = slang_isRecordLayerEnabled();
-    slang_enableRecordLayer(true);
-    slang_clearRecordLayer();
+    // Save and set up recording using DLL's context
+    auto& dllCtx = getDllContext();
+    bool wasActive = dllCtx.isActive();
+    dllCtx.enable();
+    dllCtx.reset();
+    dllCtx.setMode(Mode::Record); // Restore record mode after reset
 
     // Create a global session
     Slang::ComPtr<slang::IGlobalSession> globalSession;
@@ -1147,10 +1162,9 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     Slang::ComPtr<slang::ISession> session;
     SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
 
-    // Get the recorded data
-    const void* data = nullptr;
-    size_t size = 0;
-    slang_getRecordLayerData(&data, &size);
+    // Get the recorded data from DLL's context
+    const void* data = dllCtx.getStream().getData();
+    size_t size = dllCtx.getStream().getSize();
 
     SLANG_CHECK(data != nullptr);
     SLANG_CHECK(size > 0);
@@ -1202,7 +1216,8 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     // Clean up
     session = nullptr;
     globalSession = nullptr;
-    slang_clearRecordLayer();
-    slang_enableRecordLayer(wasActive);
+    dllCtx.reset();
+    if (!wasActive)
+        dllCtx.disable();
 }
 

@@ -320,6 +320,11 @@ SLANG_API void slang_clearRecordLayer()
     ctx.setMode(mode);
 }
 
+SLANG_API void* slang_getReplayContext()
+{
+    return &SlangRecord::ReplayContext::get();
+}
+
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession)

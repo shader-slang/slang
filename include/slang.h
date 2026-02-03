@@ -5030,6 +5030,14 @@ SLANG_EXTERN_C SLANG_API void slang_getRecordLayerData(const void** outData, siz
  */
 SLANG_EXTERN_C SLANG_API void slang_clearRecordLayer();
 
+/* Get a pointer to the internal ReplayContext for testing purposes.
+   This returns the actual singleton used by the DLL, not a copy.
+   @return Opaque pointer to the ReplayContext. Cast to SlangRecord::ReplayContext* to use.
+   
+   NOTE: This is for internal testing only and should not be used in production code.
+ */
+SLANG_EXTERN_C SLANG_API void* slang_getReplayContext();
+
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
