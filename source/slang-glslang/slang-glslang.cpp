@@ -162,17 +162,9 @@ static void validationMessageConsumer(
     }
 }
 
-// Validate the given SPIRV-ASM instructions.
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+// Internal helper to validate SPIR-V with a specific target environment.
+static bool _validateSPIRVWithEnv(const uint32_t* contents, int contentsSize, spv_target_env target_env)
 {
-    spv_target_env target_env = SPV_ENV_VULKAN_1_4;
-
     spvtools::ValidatorOptions options;
     options.SetScalarBlockLayout(true);
     options.SetFriendlyNames(true);
@@ -181,6 +173,19 @@ extern "C"
     tools.SetMessageConsumer(validationMessageConsumer);
 
     return tools.Validate(contents, contentsSize, options);
+}
+
+// Validate the given SPIRV-ASM instructions (legacy function, uses default Vulkan 1.4 environment).
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+{
+    // Keep backward compatibility with the original hardcoded environment
+    return _validateSPIRVWithEnv(contents, contentsSize, SPV_ENV_VULKAN_1_4);
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
@@ -628,6 +633,10 @@ static const SPRIVTargetInfo kSpirvTargetInfos[] = {
     {"1.4", SPV_ENV_UNIVERSAL_1_4},
     {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4},
     {"1.5", SPV_ENV_UNIVERSAL_1_5},
+    {"vk1.2", SPV_ENV_VULKAN_1_2},
+    {"1.6", SPV_ENV_UNIVERSAL_1_6},
+    {"vk1.3", SPV_ENV_VULKAN_1_3},
+    {"vk1.4", SPV_ENV_VULKAN_1_4},
 };
 
 static int _findTargetIndex(const char* name)
@@ -643,6 +652,34 @@ static int _findTargetIndex(const char* name)
         }
     }
     return -1;
+}
+
+// Validate the given SPIRV-ASM instructions with a specific target environment.
+// spirvTargetEnvName can be a SPIRV version like "1.5", "1.6" or a Vulkan environment like "vk1.2", "vk1.3".
+// If spirvTargetEnvName is null or unrecognized, uses SPV_ENV_UNIVERSAL_1_5 as default.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        bool glslang_validateSPIRVWithEnv(
+            const uint32_t* contents,
+            int contentsSize,
+            const char* spirvTargetEnvName)
+{
+    spv_target_env target_env = SPV_ENV_VULKAN_1_4; // Default
+
+    if (spirvTargetEnvName != nullptr)
+    {
+        int targetIndex = _findTargetIndex(spirvTargetEnvName);
+        if (targetIndex >= 0)
+        {
+            target_env = kSpirvTargetInfos[targetIndex].targetEnv;
+        }
+    }
+
+    return _validateSPIRVWithEnv(contents, contentsSize, target_env);
 }
 
 static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)

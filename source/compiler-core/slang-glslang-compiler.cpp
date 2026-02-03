@@ -49,6 +49,9 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    validateWithTargetEnv(const uint32_t* contents, int contentsSize, const char* spirvTargetEnvName)
+        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
         const uint32_t* contents,
@@ -75,6 +78,7 @@ protected:
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
+    glslang_ValidateSPIRVWithEnvFunc m_validateWithEnv = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
@@ -90,6 +94,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
+    m_validateWithEnv =
+        (glslang_ValidateSPIRVWithEnvFunc)library->findFuncByName("glslang_validateSPIRVWithEnv");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
@@ -321,6 +327,25 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
         return SLANG_OK;
     }
     return SLANG_FAIL;
+}
+
+SlangResult GlslangDownstreamCompiler::validateWithTargetEnv(
+    const uint32_t* contents,
+    int contentsSize,
+    const char* spirvTargetEnvName)
+{
+    // Prefer the new function that accepts target env
+    if (m_validateWithEnv != nullptr)
+    {
+        if (m_validateWithEnv(contents, contentsSize, spirvTargetEnvName))
+        {
+            return SLANG_OK;
+        }
+        return SLANG_FAIL;
+    }
+
+    // Fall back to the old function if new one is not available
+    return validate(contents, contentsSize);
 }
 
 SlangResult GlslangDownstreamCompiler::disassembleWithResult(

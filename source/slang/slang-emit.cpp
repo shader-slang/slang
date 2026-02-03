@@ -2610,6 +2610,34 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     return false;
 }
 
+// Helper function to get the SPIR-V target environment name from the target capabilities.
+// Returns a string that can be passed to glslang_validateSPIRVWithEnv.
+// The returned string matches the target environment names in kSpirvTargetInfos in slang-glslang.cpp.
+static const char* getSpirvTargetEnvName(TargetRequest* targetReq)
+{
+    auto targetCaps = targetReq->getTargetCaps();
+
+    // Check from highest to lowest SPIR-V version
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_6))
+        return "1.6";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_5))
+        return "1.5";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_4))
+        return "1.4";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_3))
+        return "1.3";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_2))
+        return "1.2";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_1))
+        return "1.1";
+    if (targetCaps.implies(CapabilityAtom::_spirv_1_0))
+        return "1.0";
+
+    // Default to 1.5 if no specific version is implied
+    // This matches the default in slang-target.cpp
+    return "1.5";
+}
+
 // Helper function to create an artifact from IR used internally by
 // emitSPIRVForEntryPointsDirectly.
 static SlangResult createArtifactFromIR(
@@ -2709,8 +2737,11 @@ static SlangResult createArtifactFromIR(
 
         if (shouldRunSPIRVValidation(codeGenContext))
         {
-            if (SLANG_FAILED(
-                    compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
+            const char* spirvTargetEnvName = getSpirvTargetEnvName(targetRequest);
+            if (SLANG_FAILED(compiler->validateWithTargetEnv(
+                    (uint32_t*)spirv.getBuffer(),
+                    int(spirv.getCount() / 4),
+                    spirvTargetEnvName)))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnoseWithoutSourceView(
