@@ -1,15 +1,19 @@
 #ifndef SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 #define SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 
+#include "proxy-base.h"
+
 #include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
-namespace SlangProxy
+namespace SlangRecord
 {
 using namespace Slang;
 
-class MutableFileSystemProxy : public ISlangMutableFileSystem, public RefObject
+class MutableFileSystemProxy : public ISlangMutableFileSystem,
+                               public RefObject,
+                               public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(
@@ -17,6 +21,11 @@ public:
         0x5c6d,
         0x8e3f,
         {0xc0, 0xb1, 0xac, 0x7d, 0x6e, 0x5f, 0x40, 0xd1})
+
+    explicit MutableFileSystemProxy(ISlangMutableFileSystem* actual)
+        : ProxyBase(actual)
+    {
+    }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     ISlangUnknown* getInterface(const Guid& guid);
@@ -128,6 +137,6 @@ public:
     }
 };
 
-} // namespace SlangProxy
+} // namespace SlangRecord
 
 #endif // SLANG_PROXY_MUTABLE_FILE_SYSTEM_H

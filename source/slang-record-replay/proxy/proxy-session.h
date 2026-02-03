@@ -1,15 +1,17 @@
 #ifndef SLANG_PROXY_SESSION_H
 #define SLANG_PROXY_SESSION_H
 
+#include "proxy-base.h"
+
 #include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
-namespace SlangProxy
+namespace SlangRecord
 {
 using namespace Slang;
 
-class SessionProxy : public slang::ISession, public RefObject
+class SessionProxy : public slang::ISession, public RefObject, public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(
@@ -17,6 +19,11 @@ public:
         0x7e8f,
         0xa051,
         {0xe2, 0xd3, 0xce, 0x9f, 0x80, 0x71, 0x62, 0xf3})
+
+    explicit SessionProxy(slang::ISession* actual)
+        : ProxyBase(actual)
+    {
+    }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     ISlangUnknown* getInterface(const Guid& guid);
@@ -227,6 +234,6 @@ public:
     }
 };
 
-} // namespace SlangProxy
+} // namespace SlangRecord
 
 #endif // SLANG_PROXY_SESSION_H

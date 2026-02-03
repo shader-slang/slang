@@ -1,15 +1,19 @@
 #ifndef SLANG_PROXY_COMPILE_RESULT_H
 #define SLANG_PROXY_COMPILE_RESULT_H
 
+#include "proxy-base.h"
+
 #include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
-namespace SlangProxy
+namespace SlangRecord
 {
 using namespace Slang;
 
-class CompileResultProxy : public slang::ICompileResult, public RefObject
+class CompileResultProxy : public slang::ICompileResult,
+                           public RefObject,
+                           public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(
@@ -17,6 +21,11 @@ public:
         0x3a4b,
         0x6c1d,
         {0xae, 0x9f, 0x8a, 0x5b, 0x4c, 0x3d, 0x2e, 0xbf})
+
+    explicit CompileResultProxy(slang::ICompileResult* actual)
+        : ProxyBase(actual)
+    {
+    }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     ISlangUnknown* getInterface(const Guid& guid);
@@ -48,6 +57,6 @@ public:
     }
 };
 
-} // namespace SlangProxy
+} // namespace SlangRecord
 
 #endif // SLANG_PROXY_COMPILE_RESULT_H

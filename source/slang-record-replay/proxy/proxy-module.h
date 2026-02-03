@@ -1,18 +1,21 @@
 #ifndef SLANG_PROXY_MODULE_H
 #define SLANG_PROXY_MODULE_H
 
+#include "proxy-base.h"
+
 #include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
-namespace SlangProxy
+namespace SlangRecord
 {
 using namespace Slang;
 
 class ModuleProxy : public slang::IModule,
                     public slang::IComponentType2,
                     public slang::IModulePrecompileService_Experimental,
-                    public RefObject
+                    public RefObject,
+                    public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(
@@ -20,6 +23,11 @@ public:
         0x9fb1,
         0xc273,
         {0x04, 0xf5, 0xe0, 0xb1, 0xa2, 0x93, 0x84, 0x15})
+
+    explicit ModuleProxy(slang::IModule* actual)
+        : ProxyBase(actual)
+    {
+    }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
     ISlangUnknown* getInterface(const Guid& guid);
@@ -277,7 +285,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
         int targetIndex,
         ISlangSharedLibrary** outSharedLibrary,
-        slang::IBlob** outDiagnostics) override
+        slang::IBlob** outDiagnostics = 0) override
     {
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outSharedLibrary);
@@ -322,6 +330,6 @@ public:
     }
 };
 
-} // namespace SlangProxy
+} // namespace SlangRecord
 
 #endif // SLANG_PROXY_MODULE_H
