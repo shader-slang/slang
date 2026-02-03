@@ -242,6 +242,13 @@ jobs:
           # Copy library files
           if [[ "${{ inputs.os }}" == "windows" ]]; then
             cp -v "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+            # Copy standard modules directory (contains neural module)
+            STD_MODULE_DIR=$(find "$bin_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+            if [[ -n "$STD_MODULE_DIR" ]]; then
+              echo "Copying standard modules from: $STD_MODULE_DIR"
+              cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+            fi
           else
 
             # This is kind of awkward because the version numbers might be
@@ -266,6 +273,13 @@ jobs:
 
             # Copy the rest of the library files
             cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+            # Copy standard modules directory (contains neural module)
+            STD_MODULE_DIR=$(find "$lib_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+            if [[ -n "$STD_MODULE_DIR" ]]; then
+              echo "Copying standard modules from: $STD_MODULE_DIR"
+              cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+            fi
           fi
 
           echo "Listing files in slangpy directory..."
