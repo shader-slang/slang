@@ -259,6 +259,11 @@ esac
 if [ "$NO_GPU" = true ]; then
   log_info "CPU-only mode: Restricting to CPU API only and skipping API detection"
   SLANG_TEST_ARGS="$SLANG_TEST_ARGS -api cpu -skip-api-detection"
+
+  # Add no-GPU expected failure list
+  if [ -f "tests/expected-failure-no-gpu.txt" ]; then
+    SLANG_TEST_ARGS="$SLANG_TEST_ARGS -expected-failure-list tests/expected-failure-no-gpu.txt"
+  fi
 fi
 
 # Add test server configuration

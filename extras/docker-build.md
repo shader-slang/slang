@@ -300,9 +300,11 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 **Behavior**:
 
 - **With GPU**: Runs quick subset of tests including GPU APIs (Vulkan, CUDA)
-- **Without GPU** (`--no-gpu`): Uses `-api cpu` to restrict to CPU-only tests
+- **Without GPU** (`--no-gpu`):
+  - Uses `-api cpu -skip-api-detection` to restrict to CPU-only tests
+  - Applies `tests/expected-failure-no-gpu.txt` for known GPU-dependent failures
 
-**Note**: The container has Vulkan libraries installed, so we explicitly restrict to CPU API in CPU-only mode to prevent slang-test from attempting GPU tests (Vulkan, CUDA, D3D).
+**Note**: The container has Vulkan libraries installed, so we explicitly restrict to CPU API and skip API detection in CPU-only mode to prevent GPU initialization attempts.
 
 **When to use**:
 
