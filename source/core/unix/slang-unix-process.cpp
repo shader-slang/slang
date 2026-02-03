@@ -4,6 +4,7 @@
 #include "../slang-process.h"
 #include "../slang-string-escape-util.h"
 #include "../slang-string-util.h"
+#include "../slang-test-diagnostics.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,12 +24,71 @@
 #include <signal.h>
 #endif
 
+#include <chrono>
+#include <mutex>
 #include <time.h>
 
 extern char** environ;
 
 namespace Slang
 {
+
+// Helper function to read pipe buffer information on Linux
+static void logPipeBufferInfo(int fd, const char* operation)
+{
+#ifdef __linux__
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/self/fdinfo/%d", fd);
+
+    FILE* f = fopen(path, "r");
+    if (f)
+    {
+        char line[256];
+        int pipeSize = 0;
+        int pipeBytes = 0;
+
+        while (fgets(line, sizeof(line), f))
+        {
+            if (strncmp(line, "pipe-buf-size:", 14) == 0)
+            {
+                sscanf(line + 14, "%d", &pipeSize);
+            }
+            else if (strncmp(line, "pipe-buf-usage:", 15) == 0)
+            {
+                sscanf(line + 15, "%d", &pipeBytes);
+            }
+        }
+        fclose(f);
+
+        if (pipeSize > 0)
+        {
+            float fillPercent = (float)pipeBytes * 100.0f / (float)pipeSize;
+            fprintf(
+                stderr,
+                "[PIPE-BUFFER] %s fd=%d: %d/%d bytes (%.1f%% full)\n",
+                operation,
+                fd,
+                pipeBytes,
+                pipeSize,
+                fillPercent);
+
+            // Warn if buffer is getting full
+            if (fillPercent > 75.0f)
+            {
+                fprintf(
+                    stderr,
+                    "[PIPE-WARNING] Buffer nearly full on fd=%d: %.1f%%\n",
+                    fd,
+                    fillPercent);
+            }
+        }
+    }
+#else
+    // Buffer info not available on non-Linux platforms
+    (void)fd;
+    (void)operation;
+#endif
+}
 
 class UnixProcess : public Process
 {
@@ -38,6 +98,7 @@ public:
     virtual bool waitForTermination(Int timeInMs) SLANG_OVERRIDE;
     virtual void terminate(int32_t returnValue) SLANG_OVERRIDE;
     virtual void kill(int32_t returnValue) SLANG_OVERRIDE;
+    uint32_t getProcessId() const { return uint32_t(m_pid); }
 
     UnixProcess(pid_t pid, Stream* const* streams);
 
@@ -251,6 +312,8 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
         return SLANG_OK;
     }
 
+    auto startTime = std::chrono::steady_clock::now();
+
     // Check if it's hung up.
     pollfd pollInfo;
 
@@ -296,6 +359,36 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
         outReadBytes = size_t(count);
 
+        // Log pipe read operation if debug enabled
+        if (isDiagnosticEnabled("pipe") && count > 0)
+        {
+            auto endTime = std::chrono::steady_clock::now();
+            auto durationMs =
+                std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() /
+                1000.0;
+            fprintf(
+                stderr,
+                "[PIPE-READ] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
+                m_fd,
+                length,
+                count,
+                durationMs,
+                (unsigned long)pthread_self());
+
+            // Log pipe buffer status on Linux
+            logPipeBufferInfo(m_fd, "READ");
+
+            // Warn if read took more than 50ms
+            if (durationMs > 50.0)
+            {
+                fprintf(
+                    stderr,
+                    "[PIPE-WARNING] Slow pipe read on fd=%d: %.3fms\n",
+                    m_fd,
+                    durationMs);
+            }
+        }
+
         // If no bytes were wanted, then there could still be bytes in the pipe
         // before a HUP. So don't fall through to check for HUP.
         //
@@ -338,6 +431,8 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         return SLANG_FAIL;
     }
 
+    auto startTime = std::chrono::steady_clock::now();
+
     pollfd pollInfo;
 
     pollInfo.fd = m_fd;
@@ -362,6 +457,60 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
     }
 
     const ssize_t writeResult = ::write(m_fd, buffer, length);
+
+    // Log pipe write operation if debug enabled
+    if (isDiagnosticEnabled("pipe"))
+    {
+        auto endTime = std::chrono::steady_clock::now();
+        auto durationMs =
+            std::chrono::duration_cast<std::chrono::microseconds>(endTime - startTime).count() /
+            1000.0;
+
+        if (writeResult >= 0)
+        {
+            fprintf(
+                stderr,
+                "[PIPE-WRITE] fd=%d requested=%zu actual=%zd duration=%.3fms (thread=%lu)\n",
+                m_fd,
+                length,
+                writeResult,
+                durationMs,
+                (unsigned long)pthread_self());
+
+            // Log pipe buffer status on Linux
+            logPipeBufferInfo(m_fd, "WRITE");
+
+            // Warn if write took more than 50ms or didn't complete fully
+            if (durationMs > 50.0)
+            {
+                fprintf(
+                    stderr,
+                    "[PIPE-WARNING] Slow pipe write on fd=%d: %.3fms\n",
+                    m_fd,
+                    durationMs);
+            }
+            if (size_t(writeResult) != length)
+            {
+                fprintf(
+                    stderr,
+                    "[PIPE-WARNING] Partial write on fd=%d: %zd/%zu bytes (errno=%d)\n",
+                    m_fd,
+                    writeResult,
+                    length,
+                    errno);
+            }
+        }
+        else
+        {
+            fprintf(
+                stderr,
+                "[PIPE-ERROR] Write failed on fd=%d: errno=%d duration=%.3fms (thread=%lu)\n",
+                m_fd,
+                errno,
+                durationMs,
+                (unsigned long)pthread_self());
+        }
+    }
 
     if (writeResult < 0 || size_t(writeResult) != length)
     {
