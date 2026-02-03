@@ -589,7 +589,8 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         codeStr = "0" + codeStr;
 
     // Helper lambda to output a span in the machine-readable format
-    auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message) {
+    auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
+    {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
 
