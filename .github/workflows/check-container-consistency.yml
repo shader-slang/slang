@@ -1,0 +1,60 @@
+name: Check Container Image Consistency
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/*-container.yml"
+      - ".github/workflows/check-container-consistency.yml"
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/*-container.yml"
+      - ".github/workflows/check-container-consistency.yml"
+
+jobs:
+  check-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check container image consistency
+        run: |
+          echo "Checking container image consistency across workflows..."
+          echo ""
+
+          # Extract all container images from workflow files
+          images=$(grep -h "image: ghcr.io/shader-slang/slang-linux-gpu-ci" \
+            .github/workflows/*-container.yml 2>/dev/null \
+            | sed 's/.*image: //' \
+            | sed 's/^[[:space:]]*//' \
+            | sort -u)
+
+          if [ -z "$images" ]; then
+            echo "⚠️  No container images found in workflow files"
+            exit 0
+          fi
+
+          # Count unique images
+          count=$(echo "$images" | wc -l)
+
+          echo "Found container image references:"
+          echo "$images"
+          echo ""
+          echo "Unique images: $count"
+          echo ""
+
+          if [ "$count" -ne 1 ]; then
+            echo "❌ Error: Found $count different container images!"
+            echo ""
+            echo "All containerized workflows must use the same image version."
+            echo "Please update all workflow files to use the same container image."
+            echo ""
+            echo "Files to check:"
+            grep -l "ghcr.io/shader-slang/slang-linux-gpu-ci" .github/workflows/*-container.yml 2>/dev/null || true
+            echo ""
+            echo "Run this command to find all references:"
+            echo "  grep -n 'ghcr.io/shader-slang/slang-linux-gpu-ci' .github/workflows/*-container.yml"
+            exit 1
+          fi
+
+          echo "✅ All container images are consistent: $images"
