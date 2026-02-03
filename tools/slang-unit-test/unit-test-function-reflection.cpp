@@ -31,7 +31,7 @@ SLANG_UNIT_TEST(functionReflection)
         [Differentiable]
         float ordinaryFunc(no_diff float x, int y) { return x + y; }
 
-        float4 fragMain(float4 pos:SV_Position) : SV_Position
+        float4 fragMain(float4 pos:SV_Position) : SV_Target
         {
             return pos;
         }
