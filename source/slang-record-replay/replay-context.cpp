@@ -57,6 +57,13 @@ TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
 {
 }
 
+DataMismatchException::DataMismatchException(size_t offset, size_t size)
+    : std::runtime_error(std::string("Data mismatch at offset ") + 
+                         std::to_string(offset) + " (size " + std::to_string(size) + " bytes)")
+    , m_offset(offset), m_size(size)
+{
+}
+
 // =============================================================================
 // ReplayContext construction and low-level helpers
 // =============================================================================
@@ -69,34 +76,104 @@ ReplayContext& ReplayContext::get()
 
 ReplayContext::ReplayContext()
     : m_stream()
+    , m_referenceStream()
     , m_arena(4096)
-    , m_isActive(isRecordLayerRequested())
+    , m_mode(isRecordLayerRequested() ? Mode::Record : Mode::Idle)
 {
 }
 
 ReplayContext::ReplayContext(const void* data, size_t size)
     : m_stream(data, size)
+    , m_referenceStream()
     , m_arena(4096)
-    , m_isActive(true)  // Reading contexts are always active
+    , m_mode(Mode::Playback)
 {
+}
+
+ReplayContext::ReplayContext(const void* referenceData, size_t referenceSize, bool syncMode)
+    : m_stream()
+    , m_referenceStream(referenceData, referenceSize)
+    , m_arena(4096)
+    , m_mode(syncMode ? Mode::Sync : Mode::Record)
+{
+    SLANG_UNUSED(syncMode);
 }
 
 void ReplayContext::reset()
 {
     m_stream.reset();
+    m_referenceStream.reset();
     m_arena.reset();
+    m_mode = Mode::Idle;
 }
 
-void ReplayContext::serializeRaw(void* data, size_t size)
+void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
-    if (isWriting()) m_stream.write(data, size);
-    else m_stream.read(data, size);
+    switch (m_mode)
+    {
+    case Mode::Idle:
+        // No-op in idle mode
+        break;
+        
+    case Mode::Record:
+        // Write data to stream
+        m_stream.write(data, size);
+        break;
+        
+    case Mode::Sync:
+        {
+            // Write data to stream
+            m_stream.write(data, size);
+            
+            // Compare against reference stream using reusable buffer
+            size_t offset = m_referenceStream.getPosition();
+            if (m_compareBuffer.size() < size)
+                m_compareBuffer.resize(size);
+            m_referenceStream.read(m_compareBuffer.data(), size);
+            
+            if (memcmp(data, m_compareBuffer.data(), size) != 0)
+            {
+                throw DataMismatchException(offset, size);
+            }
+        }
+        break;
+        
+    case Mode::Playback:
+        // Read data from stream
+        m_stream.read(data, size);
+        
+        // For output parameters and return values, verify against reference
+        if (hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue))
+        {
+            // Compare the read data against reference stream
+            size_t offset = m_referenceStream.getPosition();
+            if (m_compareBuffer.size() < size)
+                m_compareBuffer.resize(size);
+            m_referenceStream.read(m_compareBuffer.data(), size);
+            
+            if (memcmp(data, m_compareBuffer.data(), size) != 0)
+            {
+                throw DataMismatchException(offset, size);
+            }
+        }
+        break;
+    }
 }
 
-void ReplayContext::serializeTypeId(TypeId id)
+void ReplayContext::recordTypeId(TypeId id)
 {
-    if (isWriting()) writeTypeId(id);
-    else expectTypeId(id);
+    switch (m_mode)
+    {
+    case Mode::Idle:
+        break;
+    case Mode::Record:
+    case Mode::Sync:
+        writeTypeId(id);
+        break;
+    case Mode::Playback:
+        expectTypeId(id);
+        break;
+    }
 }
 
 void ReplayContext::writeTypeId(TypeId id)
@@ -123,29 +200,29 @@ void ReplayContext::expectTypeId(TypeId expected)
 // Basic types - integer, floating-point, boolean
 // =============================================================================
 
-void ReplayContext::serialize(int8_t& value)   { serializeTypeId(TypeId::Int8);   serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(int16_t& value)  { serializeTypeId(TypeId::Int16);  serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(int32_t& value)  { serializeTypeId(TypeId::Int32);  serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(int64_t& value)  { serializeTypeId(TypeId::Int64);  serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(uint8_t& value)  { serializeTypeId(TypeId::UInt8);  serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(uint16_t& value) { serializeTypeId(TypeId::UInt16); serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(uint32_t& value) { serializeTypeId(TypeId::UInt32); serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(uint64_t& value) { serializeTypeId(TypeId::UInt64); serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(float& value)    { serializeTypeId(TypeId::Float32); serializeRaw(&value, sizeof(value)); }
-void ReplayContext::serialize(double& value)   { serializeTypeId(TypeId::Float64); serializeRaw(&value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, int8_t& value)   { recordTypeId(TypeId::Int8);   recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, int16_t& value)  { recordTypeId(TypeId::Int16);  recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, int32_t& value)  { recordTypeId(TypeId::Int32);  recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, int64_t& value)  { recordTypeId(TypeId::Int64);  recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, uint8_t& value)  { recordTypeId(TypeId::UInt8);  recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, uint16_t& value) { recordTypeId(TypeId::UInt16); recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, uint32_t& value) { recordTypeId(TypeId::UInt32); recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, uint64_t& value) { recordTypeId(TypeId::UInt64); recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, float& value)    { recordTypeId(TypeId::Float32); recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, double& value)   { recordTypeId(TypeId::Float64); recordRaw(flags, &value, sizeof(value)); }
 
-void ReplayContext::serialize(bool& value)
+void ReplayContext::record(RecordFlag flags, bool& value)
 {
-    serializeTypeId(TypeId::Bool);
-    if (isWriting()) { uint8_t v = value ? 1 : 0; serializeRaw(&v, sizeof(v)); }
-    else { uint8_t v; serializeRaw(&v, sizeof(v)); value = (v != 0); }
+    recordTypeId(TypeId::Bool);
+    if (isWriting()) { uint8_t v = value ? 1 : 0; recordRaw(flags, &v, sizeof(v)); }
+    else { uint8_t v; recordRaw(flags, &v, sizeof(v)); value = (v != 0); }
 }
 
 // =============================================================================
 // Strings
 // =============================================================================
 
-void ReplayContext::serialize(const char*& str)
+void ReplayContext::record(RecordFlag flags, const char*& str)
 {
     if (isWriting())
     {
@@ -154,8 +231,8 @@ void ReplayContext::serialize(const char*& str)
         {
             writeTypeId(TypeId::String);
             uint32_t length = static_cast<uint32_t>(strlen(str));
-            m_stream.write(&length, sizeof(length));
-            if (length > 0) m_stream.write(str, length);
+            recordRaw(flags, &length, sizeof(length));
+            if (length > 0) recordRaw(flags, const_cast<char*>(str), length);
         }
     }
     else
@@ -165,9 +242,9 @@ void ReplayContext::serialize(const char*& str)
         else if (typeId == TypeId::String)
         {
             uint32_t length;
-            m_stream.read(&length, sizeof(length));
+            recordRaw(flags, &length, sizeof(length));
             char* buf = m_arena.allocateArray<char>(length + 1);
-            if (length > 0) m_stream.read(buf, length);
+            if (length > 0) recordRaw(flags, buf, length);
             buf[length] = '\0';
             str = buf;
         }
@@ -179,167 +256,167 @@ void ReplayContext::serialize(const char*& str)
 // Blob and Handle
 // =============================================================================
 
-void ReplayContext::serializeBlob(const void*& data, size_t& size)
+void ReplayContext::recordBlob(RecordFlag flags, const void*& data, size_t& size)
 {
     if (isWriting())
     {
         writeTypeId(TypeId::Blob);
         uint64_t blobSize = static_cast<uint64_t>(size);
-        m_stream.write(&blobSize, sizeof(blobSize));
-        if (size > 0 && data != nullptr) m_stream.write(data, size);
+        recordRaw(flags, &blobSize, sizeof(blobSize));
+        if (size > 0 && data != nullptr) recordRaw(flags, const_cast<void*>(data), size);
     }
     else
     {
         expectTypeId(TypeId::Blob);
         uint64_t blobSize;
-        m_stream.read(&blobSize, sizeof(blobSize));
+        recordRaw(flags, &blobSize, sizeof(blobSize));
         size = static_cast<size_t>(blobSize);
         if (size > 0)
         {
             void* buf = m_arena.allocate(size);
-            m_stream.read(buf, size);
+            recordRaw(flags, buf, size);
             data = buf;
         }
         else { data = nullptr; }
     }
 }
 
-void ReplayContext::serializeHandle(uint64_t& handleId)
+void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 {
-    serializeTypeId(TypeId::ObjectHandle);
-    serializeRaw(&handleId, sizeof(handleId));
+    recordTypeId(TypeId::ObjectHandle);
+    recordRaw(flags, &handleId, sizeof(handleId));
 }
 
 // =============================================================================
-// Slang enum types - all use serializeEnum
+// Slang enum types - all use recordEnum
 // =============================================================================
 
-void ReplayContext::serialize(SlangSeverity& value)              { serializeEnum(value); }
-void ReplayContext::serialize(SlangBindableResourceType& value)  { serializeEnum(value); }
-void ReplayContext::serialize(SlangCompileTarget& value)         { serializeEnum(value); }
-void ReplayContext::serialize(SlangContainerFormat& value)       { serializeEnum(value); }
-void ReplayContext::serialize(SlangPassThrough& value)           { serializeEnum(value); }
-void ReplayContext::serialize(SlangArchiveType& value)           { serializeEnum(value); }
-void ReplayContext::serialize(SlangFloatingPointMode& value)     { serializeEnum(value); }
-void ReplayContext::serialize(SlangFpDenormalMode& value)        { serializeEnum(value); }
-void ReplayContext::serialize(SlangLineDirectiveMode& value)     { serializeEnum(value); }
-void ReplayContext::serialize(SlangSourceLanguage& value)        { serializeEnum(value); }
-void ReplayContext::serialize(SlangProfileID& value)             { serializeEnum(value); }
-void ReplayContext::serialize(SlangCapabilityID& value)          { serializeEnum(value); }
-void ReplayContext::serialize(SlangMatrixLayoutMode& value)      { serializeEnum(value); }
-void ReplayContext::serialize(SlangStage& value)                 { serializeEnum(value); }
-void ReplayContext::serialize(SlangDebugInfoLevel& value)        { serializeEnum(value); }
-void ReplayContext::serialize(SlangDebugInfoFormat& value)       { serializeEnum(value); }
-void ReplayContext::serialize(SlangOptimizationLevel& value)     { serializeEnum(value); }
-void ReplayContext::serialize(SlangEmitSpirvMethod& value)       { serializeEnum(value); }
-void ReplayContext::serialize(slang::CompilerOptionName& value)  { serializeEnum(value); }
-void ReplayContext::serialize(slang::CompilerOptionValueKind& value) { serializeEnum(value); }
-void ReplayContext::serialize(slang::ContainerType& value)       { serializeEnum(value); }
-void ReplayContext::serialize(slang::SpecializationArg::Kind& value) { serializeEnum(value); }
-void ReplayContext::serialize(SlangLanguageVersion& value)       { serializeEnum(value); }
-void ReplayContext::serialize(slang::BuiltinModuleName& value)   { serializeEnum(value); }
+void ReplayContext::record(RecordFlag flags, SlangSeverity& value)              { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangBindableResourceType& value)  { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangCompileTarget& value)         { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangContainerFormat& value)       { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangPassThrough& value)           { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangArchiveType& value)           { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangFloatingPointMode& value)     { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangFpDenormalMode& value)        { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangLineDirectiveMode& value)     { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangSourceLanguage& value)        { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangProfileID& value)             { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangCapabilityID& value)          { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangMatrixLayoutMode& value)      { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangStage& value)                 { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangDebugInfoLevel& value)        { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangDebugInfoFormat& value)       { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangOptimizationLevel& value)     { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangEmitSpirvMethod& value)       { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionName& value)  { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionValueKind& value) { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, slang::ContainerType& value)       { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, slang::SpecializationArg::Kind& value) { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangLanguageVersion& value)       { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, slang::BuiltinModuleName& value)   { recordEnum(flags, value); }
 
 // =============================================================================
 // POD and complex structs
 // =============================================================================
 
-void ReplayContext::serialize(SlangUUID& value)
+void ReplayContext::record(RecordFlag flags, SlangUUID& value)
 {
-    serialize(value.data1);
-    serialize(value.data2);
-    serialize(value.data3);
-    for (int i = 0; i < 8; ++i) serialize(value.data4[i]);
+    record(flags, value.data1);
+    record(flags, value.data2);
+    record(flags, value.data3);
+    for (int i = 0; i < 8; ++i) record(flags, value.data4[i]);
 }
 
-void ReplayContext::serialize(slang::CompilerOptionValue& value)
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionValue& value)
 {
-    serialize(value.kind);
-    serialize(value.intValue0);
-    serialize(value.intValue1);
-    serialize(value.stringValue0);
-    serialize(value.stringValue1);
+    record(flags, value.kind);
+    record(flags, value.intValue0);
+    record(flags, value.intValue1);
+    record(flags, value.stringValue0);
+    record(flags, value.stringValue1);
 }
 
-void ReplayContext::serialize(slang::CompilerOptionEntry& value)
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionEntry& value)
 {
-    serialize(value.name);
-    serialize(value.value);
+    record(flags, value.name);
+    record(flags, value.value);
 }
 
-void ReplayContext::serialize(slang::PreprocessorMacroDesc& value)
+void ReplayContext::record(RecordFlag flags, slang::PreprocessorMacroDesc& value)
 {
-    serialize(value.name);
-    serialize(value.value);
+    record(flags, value.name);
+    record(flags, value.value);
 }
 
-void ReplayContext::serialize(slang::TargetDesc& value)
+void ReplayContext::record(RecordFlag flags, slang::TargetDesc& value)
 {
     uint64_t structureSize = value.structureSize;
-    serialize(structureSize);
+    record(flags, structureSize);
     if (isReading()) value.structureSize = static_cast<size_t>(structureSize);
 
-    serialize(value.format);
-    serialize(value.profile);
-    serialize(value.flags);
-    serialize(value.floatingPointMode);
-    serialize(value.lineDirectiveMode);
-    serialize(value.forceGLSLScalarBufferLayout);
-    serializeArray(value.compilerOptionEntries, value.compilerOptionEntryCount);
+    record(flags, value.format);
+    record(flags, value.profile);
+    record(flags, value.flags);
+    record(flags, value.floatingPointMode);
+    record(flags, value.lineDirectiveMode);
+    record(flags, value.forceGLSLScalarBufferLayout);
+    recordArray(flags, value.compilerOptionEntries, value.compilerOptionEntryCount);
 }
 
-void ReplayContext::serialize(slang::SessionDesc& value)
+void ReplayContext::record(RecordFlag flags, slang::SessionDesc& value)
 {
     uint64_t structureSize = value.structureSize;
-    serialize(structureSize);
+    record(flags, structureSize);
     if (isReading()) value.structureSize = static_cast<size_t>(structureSize);
 
-    serializeArray(value.targets, value.targetCount);
-    serialize(value.flags);
-    serialize(value.defaultMatrixLayoutMode);
-    serializeArray(value.searchPaths, value.searchPathCount);
-    serializeArray(value.preprocessorMacros, value.preprocessorMacroCount);
+    recordArray(flags, value.targets, value.targetCount);
+    record(flags, value.flags);
+    record(flags, value.defaultMatrixLayoutMode);
+    recordArray(flags, value.searchPaths, value.searchPathCount);
+    recordArray(flags, value.preprocessorMacros, value.preprocessorMacroCount);
 
-    // fileSystem is handled specially - serialize as null handle for now
+    // fileSystem is handled specially - record as null handle for now
     uint64_t fileSystemHandle = 0;
-    serializeHandle(fileSystemHandle);
+    recordHandle(flags, fileSystemHandle);
     if (isReading()) value.fileSystem = nullptr;
 
-    serialize(value.enableEffectAnnotations);
-    serialize(value.allowGLSLSyntax);
+    record(flags, value.enableEffectAnnotations);
+    record(flags, value.allowGLSLSyntax);
 
     const slang::CompilerOptionEntry* entries = value.compilerOptionEntries;
-    serializeArray(entries, value.compilerOptionEntryCount);
+    recordArray(flags, entries, value.compilerOptionEntryCount);
     if (isReading()) value.compilerOptionEntries = const_cast<slang::CompilerOptionEntry*>(entries);
 
-    serialize(value.skipSPIRVValidation);
+    record(flags, value.skipSPIRVValidation);
 }
 
-void ReplayContext::serialize(slang::SpecializationArg& value)
+void ReplayContext::record(RecordFlag flags, slang::SpecializationArg& value)
 {
-    serialize(value.kind);
+    record(flags, value.kind);
     switch (value.kind)
     {
     case slang::SpecializationArg::Kind::Unknown: break;
     case slang::SpecializationArg::Kind::Type:
     {
         uint64_t typeHandle = 0;
-        serializeHandle(typeHandle);
+        recordHandle(flags, typeHandle);
         if (isReading()) value.type = nullptr;
         break;
     }
     case slang::SpecializationArg::Kind::Expr:
-        serialize(value.expr);
+        record(flags, value.expr);
         break;
     }
 }
 
-void ReplayContext::serialize(SlangGlobalSessionDesc& value)
+void ReplayContext::record(RecordFlag flags, SlangGlobalSessionDesc& value)
 {
-    serialize(value.structureSize);
-    serialize(value.apiVersion);
-    serialize(value.minLanguageVersion);
-    serialize(value.enableGLSL);
-    for (int i = 0; i < 16; ++i) serialize(value.reserved[i]);
+    record(flags, value.structureSize);
+    record(flags, value.apiVersion);
+    record(flags, value.minLanguageVersion);
+    record(flags, value.enableGLSL);
+    for (int i = 0; i < 16; ++i) record(flags, value.reserved[i]);
 }
 
 } // namespace SlangRecord

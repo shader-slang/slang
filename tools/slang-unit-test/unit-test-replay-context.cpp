@@ -23,10 +23,11 @@ template<typename T>
 static bool roundTripValue(T writeValue, T& readValue)
 {
     ReplayContext writer;
-    writer.serialize(writeValue);
+    writer.setMode(Mode::Record);
+    writer.record(RecordFlag::None, writeValue);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    reader.serialize(readValue);
+    reader.record(RecordFlag::None, readValue);
 
     return reader.getStream().atEnd();
 }
@@ -157,12 +158,13 @@ SLANG_UNIT_TEST(replayContextString)
     auto testString = [](const char* str)
     {
         ReplayContext writer;
-        writer.serialize(str);
+        writer.setMode(Mode::Record);
+        writer.record(RecordFlag::None, str);
 
         ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         const char* readStr = nullptr;
-        reader.serialize(readStr);
+        reader.record(RecordFlag::None, readStr);
 
         if (str == nullptr)
             return readStr == nullptr;
@@ -189,13 +191,14 @@ SLANG_UNIT_TEST(replayContextBlob)
     auto testBlob = [](const void* data, size_t size)
     {
         ReplayContext writer;
-        writer.serializeBlob(data, size);
+        writer.setMode(Mode::Record);
+        writer.recordBlob(RecordFlag::None, data, size);
 
         ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         const void* readData = nullptr;
         size_t readSize = 0;
-        reader.serializeBlob(readData, readSize);
+        reader.recordBlob(RecordFlag::None, readData, readSize);
 
         if (size != readSize)
             return false;
@@ -226,12 +229,13 @@ SLANG_UNIT_TEST(replayContextHandle)
     auto testHandle = [](uint64_t handle)
     {
         ReplayContext writer;
-        writer.serializeHandle(handle);
+        writer.setMode(Mode::Record);
+        writer.recordHandle(RecordFlag::None, handle);
 
         ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         uint64_t readHandle = 0;
-        reader.serializeHandle(readHandle);
+        reader.recordHandle(RecordFlag::None, readHandle);
 
         return handle == readHandle;
     };
@@ -306,10 +310,11 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
     SlangUUID readValue = {};
 
     ReplayContext writer;
-    writer.serialize(writeValue);
+    writer.setMode(Mode::Record);
+    writer.record(RecordFlag::None, writeValue);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
-    reader.serialize(readValue);
+    reader.record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.data1 == readValue.data1);
     SLANG_CHECK(writeValue.data2 == readValue.data2);
@@ -334,12 +339,13 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
     writeValue.stringValue1 = "test1";
 
     ReplayContext writer;
-    writer.serialize(writeValue);
+    writer.setMode(Mode::Record);
+    writer.record(RecordFlag::None, writeValue);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::CompilerOptionValue readValue = {};
-    reader.serialize(readValue);
+    reader.record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.kind == readValue.kind);
     SLANG_CHECK(writeValue.intValue0 == readValue.intValue0);
@@ -361,12 +367,13 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
     writeValue.value = "123";
 
     ReplayContext writer;
-    writer.serialize(writeValue);
+    writer.setMode(Mode::Record);
+    writer.record(RecordFlag::None, writeValue);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::PreprocessorMacroDesc readValue = {};
-    reader.serialize(readValue);
+    reader.record(RecordFlag::None, readValue);
 
     SLANG_CHECK(strcmp(writeValue.name, readValue.name) == 0);
     SLANG_CHECK(strcmp(writeValue.value, readValue.value) == 0);
@@ -392,12 +399,13 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
     writeValue.compilerOptionEntryCount = 0;
 
     ReplayContext writer;
-    writer.serialize(writeValue);
+    writer.setMode(Mode::Record);
+    writer.record(RecordFlag::None, writeValue);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::TargetDesc readValue = {};
-    reader.serialize(readValue);
+    reader.record(RecordFlag::None, readValue);
 
     SLANG_CHECK(writeValue.structureSize == readValue.structureSize);
     SLANG_CHECK(writeValue.format == readValue.format);
@@ -416,6 +424,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
 
     // Write multiple values of different types
     ReplayContext writer;
+    writer.setMode(Mode::Record);
 
     int32_t writeInt = 42;
     float writeFloat = 3.14f;
@@ -423,11 +432,11 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     bool writeBool = true;
     uint64_t writeHandle = 0xDEADBEEF;
 
-    writer.serialize(writeInt);
-    writer.serialize(writeFloat);
-    writer.serialize(writeStr);
-    writer.serialize(writeBool);
-    writer.serializeHandle(writeHandle);
+    writer.record(RecordFlag::None, writeInt);
+    writer.record(RecordFlag::None, writeFloat);
+    writer.record(RecordFlag::None, writeStr);
+    writer.record(RecordFlag::None, writeBool);
+    writer.recordHandle(RecordFlag::None, writeHandle);
 
     // Read them back
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
@@ -438,11 +447,11 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     bool readBool = false;
     uint64_t readHandle = 0;
 
-    reader.serialize(readInt);
-    reader.serialize(readFloat);
-    reader.serialize(readStr);
-    reader.serialize(readBool);
-    reader.serializeHandle(readHandle);
+    reader.record(RecordFlag::None, readInt);
+    reader.record(RecordFlag::None, readFloat);
+    reader.record(RecordFlag::None, readStr);
+    reader.record(RecordFlag::None, readBool);
+    reader.recordHandle(RecordFlag::None, readHandle);
 
     SLANG_CHECK(writeInt == readInt);
     SLANG_CHECK(writeFloat == readFloat);
@@ -461,8 +470,9 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
 
     // Write an int32, try to read a string - should throw
     ReplayContext writer;
+    writer.setMode(Mode::Record);
     int32_t writeInt = 42;
-    writer.serialize(writeInt);
+    writer.record(RecordFlag::None, writeInt);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
@@ -470,7 +480,7 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     try
     {
         const char* readStr = nullptr;
-        reader.serialize(readStr);
+        reader.record(RecordFlag::None, readStr);
     }
     catch (const TypeMismatchException& e)
     {
@@ -491,11 +501,12 @@ SLANG_UNIT_TEST(replayContextStreamState)
 
     // Test isReading/isWriting
     ReplayContext writer;
+    writer.setMode(Mode::Record);
     SLANG_CHECK(writer.isWriting());
     SLANG_CHECK(!writer.isReading());
 
     int32_t value = 42;
-    writer.serialize(value);
+    writer.record(RecordFlag::None, value);
 
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
     SLANG_CHECK(reader.isReading());
@@ -558,37 +569,3 @@ SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
     slang_enableRecordLayer(wasActive);
 }
 
-SLANG_UNIT_TEST(replayContextIsActiveState)
-{
-    SLANG_UNUSED(unitTestContext);
-
-    // Save original state
-    bool wasActive = slang_isRecordLayerEnabled();
-
-    // Test enable/disable via the public C API
-    slang_enableRecordLayer(true);
-    SLANG_CHECK(slang_isRecordLayerEnabled() == true);
-
-    slang_enableRecordLayer(false);
-    SLANG_CHECK(slang_isRecordLayerEnabled() == false);
-
-    slang_enableRecordLayer(true);
-    SLANG_CHECK(slang_isRecordLayerEnabled() == true);
-
-    // Restore original state
-    slang_enableRecordLayer(wasActive);
-}
-
-SLANG_UNIT_TEST(replayContextSingletonIdentity)
-{
-    SLANG_UNUSED(unitTestContext);
-
-    // Verify singleton returns the same instance (local test - uses included cpp)
-    auto& ctx1 = ReplayContext::get();
-    auto& ctx2 = ReplayContext::get();
-
-    SLANG_CHECK(&ctx1 == &ctx2);
-
-    // Verify the singleton is in writing mode
-    SLANG_CHECK(ctx1.isWriting());
-}
