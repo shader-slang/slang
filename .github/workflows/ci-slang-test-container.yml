@@ -295,6 +295,13 @@ jobs:
           echo "Copying new slang libraries..."
           cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
+          # Copy standard modules directory (contains neural module)
+          STD_MODULE_DIR=$(find "$lib_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+          if [[ -n "$STD_MODULE_DIR" ]]; then
+            echo "Copying standard modules from: $STD_MODULE_DIR"
+            cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+          fi
+
           # Create symlink for the old library version that slangpy extension was linked against
           echo "Creating symlink for slangpy compatibility..."
           ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
