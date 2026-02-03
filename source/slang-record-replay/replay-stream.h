@@ -153,6 +153,14 @@ public:
     /// Returns true if the stream has reached the end.
     bool atEnd() const { return m_position >= m_buffer.size(); }
 
+    /// Reset the stream to initial empty writing state.
+    void reset()
+    {
+        m_buffer.clear();
+        m_position = 0;
+        m_isReading = false;
+    }
+
     // =========================================================================
     // Direct Memory Access
     // =========================================================================

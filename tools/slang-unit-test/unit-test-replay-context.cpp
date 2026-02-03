@@ -1,9 +1,7 @@
 // unit-test-replay-context.cpp
 // Unit tests for the ReplayContext serializer - validates round-trip serialization
 
-// Include the implementation directly since ReplayContext is an internal class
-// not exported from the slang DLL. This is a common pattern for unit testing
-// internal components.
+// Is this cleaner than exporting everything just for unit tests??
 #include "../../source/slang-record-replay/replay-context.cpp"
 
 #include "unit-test/slang-unit-test.h"
@@ -21,16 +19,13 @@ using namespace SlangRecord;
 template<typename T>
 static bool roundTripValue(T writeValue, T& readValue)
 {
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     writer.serialize(writeValue);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
     reader.serialize(readValue);
 
-    return !readStream.atEnd() || readStream.getPosition() == writeStream.getSize();
+    return reader.getStream().atEnd();
 }
 
 template<typename T>
@@ -158,13 +153,10 @@ SLANG_UNIT_TEST(replayContextString)
 
     auto testString = [](const char* str)
     {
-        ReplayStream writeStream;
-        ReplayContext writer(&writeStream);
+        ReplayContext writer;
         writer.serialize(str);
 
-        ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-        MemoryArena arena(4096);
-        ReplayContext reader(&readStream, &arena);
+        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         const char* readStr = nullptr;
         reader.serialize(readStr);
@@ -193,13 +185,10 @@ SLANG_UNIT_TEST(replayContextBlob)
 
     auto testBlob = [](const void* data, size_t size)
     {
-        ReplayStream writeStream;
-        ReplayContext writer(&writeStream);
+        ReplayContext writer;
         writer.serializeBlob(data, size);
 
-        ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-        MemoryArena arena(4096);
-        ReplayContext reader(&readStream, &arena);
+        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         const void* readData = nullptr;
         size_t readSize = 0;
@@ -233,13 +222,10 @@ SLANG_UNIT_TEST(replayContextHandle)
 
     auto testHandle = [](uint64_t handle)
     {
-        ReplayStream writeStream;
-        ReplayContext writer(&writeStream);
+        ReplayContext writer;
         writer.serializeHandle(handle);
 
-        ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-        MemoryArena arena(4096);
-        ReplayContext reader(&readStream, &arena);
+        ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
         uint64_t readHandle = 0;
         reader.serializeHandle(readHandle);
@@ -316,13 +302,10 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
     SlangUUID writeValue = {0x12345678, 0x1234, 0x5678, {0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78}};
     SlangUUID readValue = {};
 
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     writer.serialize(writeValue);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
     reader.serialize(readValue);
 
     SLANG_CHECK(writeValue.data1 == readValue.data1);
@@ -347,13 +330,10 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
     writeValue.stringValue0 = "test0";
     writeValue.stringValue1 = "test1";
 
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     writer.serialize(writeValue);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::CompilerOptionValue readValue = {};
     reader.serialize(readValue);
@@ -377,13 +357,10 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
     writeValue.name = "MY_MACRO";
     writeValue.value = "123";
 
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     writer.serialize(writeValue);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::PreprocessorMacroDesc readValue = {};
     reader.serialize(readValue);
@@ -411,13 +388,10 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
     writeValue.compilerOptionEntries = nullptr;
     writeValue.compilerOptionEntryCount = 0;
 
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     writer.serialize(writeValue);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     slang::TargetDesc readValue = {};
     reader.serialize(readValue);
@@ -438,8 +412,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     SLANG_UNUSED(unitTestContext);
 
     // Write multiple values of different types
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
 
     int32_t writeInt = 42;
     float writeFloat = 3.14f;
@@ -454,9 +427,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
     writer.serializeHandle(writeHandle);
 
     // Read them back
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     int32_t readInt = 0;
     float readFloat = 0.0f;
@@ -486,14 +457,11 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
     SLANG_UNUSED(unitTestContext);
 
     // Write an int32, try to read a string - should throw
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     int32_t writeInt = 42;
     writer.serialize(writeInt);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
 
     bool caughtException = false;
     try
@@ -519,17 +487,14 @@ SLANG_UNIT_TEST(replayContextStreamState)
     SLANG_UNUSED(unitTestContext);
 
     // Test isReading/isWriting
-    ReplayStream writeStream;
-    ReplayContext writer(&writeStream);
+    ReplayContext writer;
     SLANG_CHECK(writer.isWriting());
     SLANG_CHECK(!writer.isReading());
 
     int32_t value = 42;
     writer.serialize(value);
 
-    ReplayStream readStream(writeStream.getData(), writeStream.getSize());
-    MemoryArena arena(4096);
-    ReplayContext reader(&readStream, &arena);
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
     SLANG_CHECK(reader.isReading());
     SLANG_CHECK(!reader.isWriting());
 }

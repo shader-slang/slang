@@ -1,6 +1,26 @@
 #include "replay-context.h"
 
+#include "../core/slang-platform.h"
+
 namespace SlangRecord {
+
+// =============================================================================
+// Environment variable check
+// =============================================================================
+
+bool isRecordLayerRequested()
+{
+    Slang::StringBuilder envValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice("SLANG_RECORD_LAYER"), envValue)))
+    {
+        return (envValue == "1") ? 1 : 0;
+    }
+    else
+    {
+        return false;
+    }
+}
 
 // =============================================================================
 // TypeId helpers
@@ -41,15 +61,36 @@ TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
 // ReplayContext construction and low-level helpers
 // =============================================================================
 
-ReplayContext::ReplayContext(ReplayStream* stream, MemoryArena* arena)
-    : m_stream(stream), m_arena(arena)
+ReplayContext& ReplayContext::get()
 {
+    static ReplayContext s_instance;
+    return s_instance;
+}
+
+ReplayContext::ReplayContext()
+    : m_stream()
+    , m_arena(4096)
+    , m_isActive(isRecordLayerRequested())
+{
+}
+
+ReplayContext::ReplayContext(const void* data, size_t size)
+    : m_stream(data, size)
+    , m_arena(4096)
+    , m_isActive(true)  // Reading contexts are always active
+{
+}
+
+void ReplayContext::reset()
+{
+    m_stream.reset();
+    m_arena.reset();
 }
 
 void ReplayContext::serializeRaw(void* data, size_t size)
 {
-    if (isWriting()) m_stream->write(data, size);
-    else m_stream->read(data, size);
+    if (isWriting()) m_stream.write(data, size);
+    else m_stream.read(data, size);
 }
 
 void ReplayContext::serializeTypeId(TypeId id)
@@ -61,13 +102,13 @@ void ReplayContext::serializeTypeId(TypeId id)
 void ReplayContext::writeTypeId(TypeId id)
 {
     uint8_t v = static_cast<uint8_t>(id);
-    m_stream->write(&v, sizeof(v));
+    m_stream.write(&v, sizeof(v));
 }
 
 TypeId ReplayContext::readTypeId()
 {
     uint8_t v;
-    m_stream->read(&v, sizeof(v));
+    m_stream.read(&v, sizeof(v));
     return static_cast<TypeId>(v);
 }
 
@@ -113,8 +154,8 @@ void ReplayContext::serialize(const char*& str)
         {
             writeTypeId(TypeId::String);
             uint32_t length = static_cast<uint32_t>(strlen(str));
-            m_stream->write(&length, sizeof(length));
-            if (length > 0) m_stream->write(str, length);
+            m_stream.write(&length, sizeof(length));
+            if (length > 0) m_stream.write(str, length);
         }
     }
     else
@@ -123,11 +164,10 @@ void ReplayContext::serialize(const char*& str)
         if (typeId == TypeId::Null) { str = nullptr; }
         else if (typeId == TypeId::String)
         {
-            if (!m_arena) throw std::runtime_error("MemoryArena required for reading strings");
             uint32_t length;
-            m_stream->read(&length, sizeof(length));
-            char* buf = m_arena->allocateArray<char>(length + 1);
-            if (length > 0) m_stream->read(buf, length);
+            m_stream.read(&length, sizeof(length));
+            char* buf = m_arena.allocateArray<char>(length + 1);
+            if (length > 0) m_stream.read(buf, length);
             buf[length] = '\0';
             str = buf;
         }
@@ -145,20 +185,19 @@ void ReplayContext::serializeBlob(const void*& data, size_t& size)
     {
         writeTypeId(TypeId::Blob);
         uint64_t blobSize = static_cast<uint64_t>(size);
-        m_stream->write(&blobSize, sizeof(blobSize));
-        if (size > 0 && data != nullptr) m_stream->write(data, size);
+        m_stream.write(&blobSize, sizeof(blobSize));
+        if (size > 0 && data != nullptr) m_stream.write(data, size);
     }
     else
     {
         expectTypeId(TypeId::Blob);
-        if (!m_arena) throw std::runtime_error("MemoryArena required for reading blobs");
         uint64_t blobSize;
-        m_stream->read(&blobSize, sizeof(blobSize));
+        m_stream.read(&blobSize, sizeof(blobSize));
         size = static_cast<size_t>(blobSize);
         if (size > 0)
         {
-            void* buf = m_arena->allocate(size);
-            m_stream->read(buf, size);
+            void* buf = m_arena.allocate(size);
+            m_stream.read(buf, size);
             data = buf;
         }
         else { data = nullptr; }
