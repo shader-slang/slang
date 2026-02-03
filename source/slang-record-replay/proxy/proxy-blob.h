@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 
-#include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -11,7 +10,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class BlobProxy : public ISlangBlob, public RefObject, public ProxyBase
+class BlobProxy : public ISlangBlob, public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(

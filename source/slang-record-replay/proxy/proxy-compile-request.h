@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 
-#include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang-deprecated.h"
 #include "slang.h"
@@ -12,9 +11,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class CompileRequestProxy : public slang::ICompileRequest,
-                            public RefObject,
-                            public ProxyBase
+class CompileRequestProxy : public slang::ICompileRequest, public ProxyBase
 {
 public:
     SLANG_COM_INTERFACE(

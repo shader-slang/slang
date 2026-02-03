@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 
-#include "../../core/slang-smart-pointer.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -14,7 +13,6 @@ using namespace Slang;
 class ModuleProxy : public slang::IModule,
                     public slang::IComponentType2,
                     public slang::IModulePrecompileService_Experimental,
-                    public RefObject,
                     public ProxyBase
 {
 public:
