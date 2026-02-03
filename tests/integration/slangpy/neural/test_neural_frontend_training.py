@@ -31,14 +31,21 @@ def _get_device_with_native_neural(device_type: spy.DeviceType) -> spy.Device:
 
     # Use pre-built neural module from slang (not compiled from source)
     # The neural module is built as part of slang-neural-module target
-    # Enable experimental features since neural is an experimental module
-    compiler_options = spy.SlangCompilerOptions(
-        {
-            "include_paths": [test_dir, SLANG_PATH],
-            "debug_info": spy.SlangDebugInfoLevel.standard,
-            "enable_experimental_features": True,
-        }
-    )
+    # Try to enable experimental features (required for neural module)
+    compiler_options_dict = {
+        "include_paths": [test_dir, SLANG_PATH],
+        "debug_info": spy.SlangDebugInfoLevel.standard,
+    }
+    
+    try:
+        # Try with experimental features enabled (newer slangpy)
+        compiler_options_dict["enable_experimental_features"] = True
+        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
+    except (RuntimeError, TypeError):
+        # Fall back without experimental features (older slangpy)
+        del compiler_options_dict["enable_experimental_features"]
+        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
+        pytest.skip("slangpy version does not support enable_experimental_features (required for neural module)")
 
     return spy.Device(
         type=device_type,
