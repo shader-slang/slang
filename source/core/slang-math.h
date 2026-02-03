@@ -283,7 +283,7 @@ inline unsigned int FloatToFloatE4M3(float val)
     // Range limits for E4M3 (Bias 7)
     // Max finite: 448.0f
     if (abs_val > 0x43E00000)
-        return sign | 0x7F; // Saturate to NaN or Max Finite
+        return sign | 0x7F; // Saturate to NaN
     // Underflow / Subnormal
     if (abs_val < 0x38800000)
         return sign;
