@@ -1,7 +1,8 @@
 #pragma once
 
 #include "replay-stream.h"
-#include "handle-tracker.h"
+#include "../core/slang-dictionary.h"
+#include "../core/slang-list.h"
 #include "../core/slang-memory-arena.h"
 
 #include <slang.h>
@@ -9,14 +10,45 @@
 #include <cstdint>
 #include <cstring>
 #include <mutex>
-#include <stdexcept>
-#include <string>
-#include <unordered_map>
-#include <vector>
 
 namespace SlangRecord {
 
+using Slang::Dictionary;
+using Slang::List;
 using Slang::MemoryArena;
+using Slang::String;
+
+/// Handle constants for interface tracking.
+constexpr uint64_t kNullHandle = 0;
+constexpr uint64_t kFirstValidHandle = 1;
+
+/// Exception thrown when trying to record an untracked interface.
+class UntrackedInterfaceException : public Slang::Exception
+{
+public:
+    UntrackedInterfaceException(ISlangUnknown* obj)
+        : Slang::Exception("Attempted to record untracked interface")
+        , m_object(obj)
+    {
+    }
+    ISlangUnknown* getObject() const { return m_object; }
+private:
+    ISlangUnknown* m_object;
+};
+
+/// Exception thrown when a handle is not found during playback.
+class HandleNotFoundException : public Slang::Exception
+{
+public:
+    HandleNotFoundException(uint64_t handle)
+        : Slang::Exception(String("Handle not found: ") + String(handle))
+        , m_handle(handle)
+    {
+    }
+    uint64_t getHandle() const { return m_handle; }
+private:
+    uint64_t m_handle;
+};
 
 /// Operating mode for the replay system.
 enum class Mode : uint8_t
@@ -66,7 +98,7 @@ enum class TypeId : uint8_t
 const char* getTypeIdName(TypeId id);
 
 /// Exception thrown when type mismatch occurs during deserialization.
-class TypeMismatchException : public std::runtime_error
+class TypeMismatchException : public Slang::Exception
 {
 public:
     TypeMismatchException(TypeId expected, TypeId actual);
@@ -77,7 +109,7 @@ private:
 };
 
 /// Exception thrown when data mismatch occurs during sync mode verification.
-class DataMismatchException : public std::runtime_error
+class DataMismatchException : public Slang::Exception
 {
 public:
     DataMismatchException(size_t offset, size_t size);
@@ -259,16 +291,16 @@ private:
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     Mode m_mode;
-    std::vector<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
+    List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
 
     // Handle tracking: maps objects to handles and back
-    std::unordered_map<ISlangUnknown*, uint64_t> m_objectToHandle;
-    std::unordered_map<uint64_t, ISlangUnknown*> m_handleToObject;
+    Dictionary<ISlangUnknown*, uint64_t> m_objectToHandle;
+    Dictionary<uint64_t, ISlangUnknown*> m_handleToObject;
     uint64_t m_nextHandle = kFirstValidHandle;
 
     // Proxy tracking: maps proxies to implementations and back
-    std::unordered_map<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
-    std::unordered_map<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+    Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
+    Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
 };
 
 // Template implementations
@@ -390,12 +422,12 @@ void ReplayContext::recordInterface(RecordFlag flags, T*& obj)
             if (handle != kNullHandle)
             {
                 // Verify object is registered with this handle
-                auto it = m_handleToObject.find(handle);
-                if (it == m_handleToObject.end())
+                ISlangUnknown** found = m_handleToObject.tryGetValue(handle);
+                if (!found)
                 {
                     throw HandleNotFoundException(handle);
                 }
-                obj = static_cast<T*>(it->second);
+                obj = static_cast<T*>(*found);
             }
             else
             {

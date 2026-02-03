@@ -51,15 +51,15 @@ const char* getTypeIdName(TypeId id)
 }
 
 TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
-    : std::runtime_error(std::string("Type mismatch: expected ") + 
-                         getTypeIdName(expected) + ", got " + getTypeIdName(actual))
+    : Slang::Exception(Slang::String("Type mismatch: expected ") + 
+                       getTypeIdName(expected) + ", got " + getTypeIdName(actual))
     , m_expected(expected), m_actual(actual)
 {
 }
 
 DataMismatchException::DataMismatchException(size_t offset, size_t size)
-    : std::runtime_error(std::string("Data mismatch at offset ") + 
-                         std::to_string(offset) + " (size " + std::to_string(size) + " bytes)")
+    : Slang::Exception(Slang::String("Data mismatch at offset ") + 
+                       Slang::String(offset) + " (size " + Slang::String(size) + " bytes)")
     , m_offset(offset), m_size(size)
 {
 }
@@ -118,9 +118,9 @@ uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
         return kNullHandle;
 
     // Check if already registered
-    auto it = m_objectToHandle.find(obj);
-    if (it != m_objectToHandle.end())
-        return it->second;
+    uint64_t* existingHandle = m_objectToHandle.tryGetValue(obj);
+    if (existingHandle)
+        return *existingHandle;
 
     // Assign new handle
     uint64_t handle = m_nextHandle++;
@@ -143,18 +143,18 @@ ISlangUnknown* ReplayContext::getExistingProxy(ISlangUnknown* implementation)
     if (implementation == nullptr)
         return nullptr;
 
-    auto it = m_implToProxy.find(implementation);
-    if (it == m_implToProxy.end())
+    ISlangUnknown** proxy = m_implToProxy.tryGetValue(implementation);
+    if (!proxy)
         return nullptr;
 
-    return it->second;
+    return *proxy;
 }
 
 bool ReplayContext::isInterfaceRegistered(ISlangUnknown* obj) const
 {
     if (obj == nullptr)
         return true; // null is always "registered" as kNullHandle
-    return m_objectToHandle.find(obj) != m_objectToHandle.end();
+    return m_objectToHandle.containsKey(obj);
 }
 
 uint64_t ReplayContext::getHandleForInterface(ISlangUnknown* obj) const
@@ -162,11 +162,11 @@ uint64_t ReplayContext::getHandleForInterface(ISlangUnknown* obj) const
     if (obj == nullptr)
         return kNullHandle;
 
-    auto it = m_objectToHandle.find(obj);
-    if (it == m_objectToHandle.end())
+    const uint64_t* handle = m_objectToHandle.tryGetValue(obj);
+    if (!handle)
         throw UntrackedInterfaceException(obj);
 
-    return it->second;
+    return *handle;
 }
 
 ISlangUnknown* ReplayContext::getInterfaceForHandle(uint64_t handle) const
@@ -174,11 +174,11 @@ ISlangUnknown* ReplayContext::getInterfaceForHandle(uint64_t handle) const
     if (handle == kNullHandle)
         return nullptr;
 
-    auto it = m_handleToObject.find(handle);
-    if (it == m_handleToObject.end())
+    ISlangUnknown* const* obj = m_handleToObject.tryGetValue(handle);
+    if (!obj)
         throw HandleNotFoundException(handle);
 
-    return it->second;
+    return *obj;
 }
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
@@ -201,11 +201,11 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
             
             // Compare against reference stream using reusable buffer
             size_t offset = m_referenceStream.getPosition();
-            if (m_compareBuffer.size() < size)
-                m_compareBuffer.resize(size);
-            m_referenceStream.read(m_compareBuffer.data(), size);
+            if (size_t(m_compareBuffer.getCount()) < size)
+                m_compareBuffer.setCount(Slang::Index(size));
+            m_referenceStream.read(m_compareBuffer.getBuffer(), size);
             
-            if (memcmp(data, m_compareBuffer.data(), size) != 0)
+            if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
                 throw DataMismatchException(offset, size);
             }
@@ -219,16 +219,16 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
         if (hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue))
         {
             // Save the user-provided expected value
-            if (m_compareBuffer.size() < size)
-                m_compareBuffer.resize(size);
-            memcpy(m_compareBuffer.data(), data, size);
+            if (size_t(m_compareBuffer.getCount()) < size)
+                m_compareBuffer.setCount(Slang::Index(size));
+            memcpy(m_compareBuffer.getBuffer(), data, size);
             
             // Read the recorded value from stream
             size_t offset = m_stream.getPosition();
             m_stream.read(data, size);
             
             // Compare: recorded value (now in data) vs expected value (in buffer)
-            if (memcmp(data, m_compareBuffer.data(), size) != 0)
+            if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
                 throw DataMismatchException(offset, size);
             }

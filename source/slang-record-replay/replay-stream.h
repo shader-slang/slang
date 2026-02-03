@@ -1,14 +1,26 @@
 #pragma once
 
+#include "../core/slang-exception.h"
+#include "../core/slang-io.h"
+#include "../core/slang-list.h"
+#include "../core/slang-stream.h"
+#include "../core/slang-string.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <fstream>
-#include <stdexcept>
-#include <string>
-#include <vector>
 
 namespace SlangRecord {
+
+using Slang::File;
+using Slang::FileAccess;
+using Slang::FileMode;
+using Slang::FileShare;
+using Slang::FileStream;
+using Slang::List;
+using Slang::RefPtr;
+using Slang::SeekOrigin;
+using Slang::String;
 
 /// A simple memory-backed stream for replay data.
 ///
@@ -42,34 +54,25 @@ public:
     {
         if (data && size > 0)
         {
-            m_buffer.resize(size);
-            std::memcpy(m_buffer.data(), data, size);
+            m_buffer.setCount(size);
+            std::memcpy(m_buffer.getBuffer(), data, size);
         }
     }
 
     /// Create a reading stream by loading entire file into memory.
     /// @param path Path to the file to load.
     /// @return The stream with file contents.
-    /// @throws std::runtime_error if file cannot be opened or read.
+    /// @throws Slang::Exception if file cannot be opened or read.
     static ReplayStream loadFromFile(const char* path)
     {
-        std::ifstream file(path, std::ios::binary | std::ios::ate);
-        if (!file.is_open())
-            throw std::runtime_error(std::string("Failed to open file for reading: ") + path);
-
-        size_t size = static_cast<size_t>(file.tellg());
-        file.seekg(0, std::ios::beg);
+        List<unsigned char> contents;
+        SlangResult result = File::readAllBytes(String(path), contents);
+        if (SLANG_FAILED(result))
+            throw Slang::Exception(String("Failed to open file for reading: ") + path);
 
         ReplayStream stream;
         stream.m_isReading = true;
-        stream.m_buffer.resize(size);
-
-        if (size > 0)
-        {
-            file.read(reinterpret_cast<char*>(stream.m_buffer.data()), size);
-            if (!file)
-                throw std::runtime_error(std::string("Failed to read file: ") + path);
-        }
+        stream.m_buffer = Slang::_Move(contents);
 
         return stream;
     }
@@ -83,8 +86,7 @@ public:
     ~ReplayStream()
     {
         // Close mirror file if open
-        if (m_mirrorFile.is_open())
-            m_mirrorFile.close();
+        closeMirrorFile();
     }
 
     // =========================================================================
@@ -94,40 +96,40 @@ public:
     /// Write data to the stream.
     /// @param data Pointer to the data to write.
     /// @param size Number of bytes to write.
-    /// @throws std::runtime_error if this is a reading stream.
+    /// @throws Slang::Exception if this is a reading stream.
     void write(const void* data, size_t size)
     {
         if (m_isReading)
-            throw std::runtime_error("Cannot write to a reading stream");
+            throw Slang::Exception("Cannot write to a reading stream");
 
         size_t newSize = m_position + size;
-        if (newSize > m_buffer.size())
-            m_buffer.resize(newSize);
+        if (newSize > size_t(m_buffer.getCount()))
+            m_buffer.setCount(Slang::Index(newSize));
 
-        std::memcpy(m_buffer.data() + m_position, data, size);
+        std::memcpy(m_buffer.getBuffer() + m_position, data, size);
         m_position += size;
 
         // Mirror to file if enabled
-        if (m_mirrorFile.is_open())
+        if (m_mirrorFile)
         {
-            m_mirrorFile.write(static_cast<const char*>(data), size);
-            m_mirrorFile.flush(); // Ensure data is written immediately
+            m_mirrorFile->write(data, size);
+            m_mirrorFile->flush(); // Ensure data is written immediately
         }
     }
 
     /// Read data from the stream.
     /// @param data Buffer to read into.
     /// @param size Number of bytes to read.
-    /// @throws std::runtime_error if this is a writing stream or read past end.
+    /// @throws Slang::Exception if this is a writing stream or read past end.
     void read(void* data, size_t size)
     {
         if (!m_isReading)
-            throw std::runtime_error("Cannot read from a writing stream");
+            throw Slang::Exception("Cannot read from a writing stream");
 
-        if (m_position + size > m_buffer.size())
-            throw std::runtime_error("Read past end of stream");
+        if (m_position + size > size_t(m_buffer.getCount()))
+            throw Slang::Exception("Read past end of stream");
 
-        std::memcpy(data, m_buffer.data() + m_position, size);
+        std::memcpy(data, m_buffer.getBuffer() + m_position, size);
         m_position += size;
     }
 
@@ -139,7 +141,7 @@ public:
     size_t getPosition() const { return m_position; }
 
     /// Get the total size of the data in the stream.
-    size_t getSize() const { return m_buffer.size(); }
+    size_t getSize() const { return size_t(m_buffer.getCount()); }
 
     /// Seek to an absolute position.
     void seek(size_t position) { m_position = position; }
@@ -151,7 +153,7 @@ public:
     bool isReading() const { return m_isReading; }
 
     /// Returns true if the stream has reached the end.
-    bool atEnd() const { return m_position >= m_buffer.size(); }
+    bool atEnd() const { return m_position >= size_t(m_buffer.getCount()); }
 
     /// Reset the stream to initial empty writing state.
     void reset()
@@ -167,10 +169,10 @@ public:
 
     /// Get a pointer to the underlying buffer data.
     /// This is always valid, even for writing streams.
-    const uint8_t* getData() const { return m_buffer.data(); }
+    const uint8_t* getData() const { return m_buffer.getBuffer(); }
 
     /// Get the raw buffer (for testing/debugging).
-    const std::vector<uint8_t>& getBuffer() const { return m_buffer; }
+    const List<uint8_t>& getBuffer() const { return m_buffer; }
 
     /// Compare bytes at a given range with another buffer.
     /// @param offset Offset into this stream's buffer.
@@ -179,9 +181,9 @@ public:
     /// @return true if the bytes match, false otherwise.
     bool compareBytes(size_t offset, const void* data, size_t size) const
     {
-        if (offset + size > m_buffer.size())
+        if (offset + size > size_t(m_buffer.getCount()))
             return false;
-        return std::memcmp(m_buffer.data() + offset, data, size) == 0;
+        return std::memcmp(m_buffer.getBuffer() + offset, data, size) == 0;
     }
 
     /// Compare a range of this stream against another stream.
@@ -191,22 +193,22 @@ public:
     /// @return true if the bytes match, false otherwise.
     bool compareBytes(size_t offset, const ReplayStream& other, size_t size) const
     {
-        if (offset + size > m_buffer.size())
+        if (offset + size > size_t(m_buffer.getCount()))
             return false;
-        if (offset + size > other.m_buffer.size())
+        if (offset + size > size_t(other.m_buffer.getCount()))
             return false;
-        return std::memcmp(m_buffer.data() + offset, other.m_buffer.data() + offset, size) == 0;
+        return std::memcmp(m_buffer.getBuffer() + offset, other.m_buffer.getBuffer() + offset, size) == 0;
     }
 
     /// Get a byte at a specific offset (for sync comparison).
     /// @param offset Offset into the buffer.
     /// @return The byte at that offset.
-    /// @throws std::out_of_range if offset is past end.
+    /// @throws Slang::Exception if offset is past end.
     uint8_t getByte(size_t offset) const
     {
-        if (offset >= m_buffer.size())
-            throw std::out_of_range("Offset past end of stream");
-        return m_buffer[offset];
+        if (offset >= size_t(m_buffer.getCount()))
+            throw Slang::Exception("Offset past end of stream");
+        return m_buffer[Slang::Index(offset)];
     }
 
     // =========================================================================
@@ -216,49 +218,55 @@ public:
     /// Set a mirror file for crash-safe capture.
     /// All subsequent writes will be immediately written to this file as well.
     /// @param path Path to the mirror file.
-    /// @throws std::runtime_error if file cannot be opened.
+    /// @throws Slang::Exception if file cannot be opened.
     void setMirrorFile(const char* path)
     {
-        if (m_mirrorFile.is_open())
-            m_mirrorFile.close();
+        closeMirrorFile();
 
-        m_mirrorFile.open(path, std::ios::binary | std::ios::out | std::ios::trunc);
-        if (!m_mirrorFile.is_open())
-            throw std::runtime_error(std::string("Failed to open mirror file: ") + path);
+        m_mirrorFile = new FileStream();
+        SlangResult result = m_mirrorFile->init(
+            String(path),
+            FileMode::Create,
+            FileAccess::Write,
+            FileShare::ReadWrite);
+        if (SLANG_FAILED(result))
+        {
+            m_mirrorFile = nullptr;
+            throw Slang::Exception(String("Failed to open mirror file: ") + path);
+        }
 
         // Write any existing data to the file
-        if (!m_buffer.empty())
+        if (m_buffer.getCount() > 0)
         {
-            m_mirrorFile.write(reinterpret_cast<const char*>(m_buffer.data()), m_buffer.size());
-            m_mirrorFile.flush();
+            m_mirrorFile->write(m_buffer.getBuffer(), m_buffer.getCount());
+            m_mirrorFile->flush();
         }
     }
 
     /// Save all data to a file.
     /// @param path Path to the file to write.
-    /// @throws std::runtime_error if file cannot be opened or written.
+    /// @throws Slang::Exception if file cannot be opened or written.
     void saveToFile(const char* path) const
     {
-        std::ofstream file(path, std::ios::binary | std::ios::out | std::ios::trunc);
-        if (!file.is_open())
-            throw std::runtime_error(std::string("Failed to open file for writing: ") + path);
-
-        if (!m_buffer.empty())
-        {
-            file.write(reinterpret_cast<const char*>(m_buffer.data()), m_buffer.size());
-            if (!file)
-                throw std::runtime_error(std::string("Failed to write to file: ") + path);
-        }
+        SlangResult result = File::writeAllBytes(
+            String(path),
+            m_buffer.getBuffer(),
+            m_buffer.getCount());
+        if (SLANG_FAILED(result))
+            throw Slang::Exception(String("Failed to write to file: ") + path);
     }
 
     /// Check if a mirror file is currently active.
-    bool hasMirrorFile() const { return m_mirrorFile.is_open(); }
+    bool hasMirrorFile() const { return m_mirrorFile != nullptr; }
 
     /// Close the mirror file (data remains in memory).
     void closeMirrorFile()
     {
-        if (m_mirrorFile.is_open())
-            m_mirrorFile.close();
+        if (m_mirrorFile)
+        {
+            m_mirrorFile->close();
+            m_mirrorFile = nullptr;
+        }
     }
 
     // =========================================================================
@@ -267,7 +275,7 @@ public:
 
     /// Create a reading stream from this stream's data.
     /// Makes a copy of the current data.
-    ReplayStream createReader() const { return ReplayStream(m_buffer.data(), m_buffer.size()); }
+    ReplayStream createReader() const { return ReplayStream(m_buffer.getBuffer(), m_buffer.getCount()); }
 
     /// Clear the stream and reset to writing mode.
     void clear()
@@ -278,10 +286,10 @@ public:
     }
 
 private:
-    std::vector<uint8_t> m_buffer;
+    List<uint8_t> m_buffer;
     size_t m_position = 0;
     bool m_isReading = false;
-    mutable std::ofstream m_mirrorFile;
+    mutable RefPtr<FileStream> m_mirrorFile;
 };
 
 } // namespace SlangRecord
