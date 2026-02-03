@@ -651,6 +651,10 @@ bool ReplayContext::executeNextCall()
     if (m_stream.atEnd())
         return false;
 
+    // Read the stream position so we can peak at the signature + type id
+    // before handing it off to the handler.
+    uint64_t streamPos = m_stream.getPosition();
+
     // Read the function signature
     const char* signature = nullptr;
     record(RecordFlag::Input, signature);
@@ -680,6 +684,9 @@ bool ReplayContext::executeNextCall()
 
     // Store the current 'this' handle for the handler to use
     m_currentThisHandle = thisHandle;
+
+    // Seek back to the start of the command before calling the handler.
+    m_stream.seek(streamPos);
 
     // Call the handler - it will read the remaining arguments from the stream
     (*handler)(*this);

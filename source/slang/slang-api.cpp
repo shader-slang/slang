@@ -246,7 +246,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
     }
 
     // Wrap in proxy if record/replay is active
-    /*if (SlangRecord::ReplayContext::get().isActive())
+    if (SlangRecord::ReplayContext::get().isActive())
     {
         auto* wrapped = SlangRecord::wrapObject(globalSession.get());
         if (wrapped)
@@ -259,7 +259,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
             *outGlobalSession = globalSession.detach();
         }
     }
-    else*/
+    else
     {
         *outGlobalSession = globalSession.detach();
     }
