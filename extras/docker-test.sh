@@ -20,9 +20,9 @@
 #   --help                      Show this help message
 #
 # Test Categories:
-#   quick - Fast CPU tests, no GPU required (~5-10 min)
-#   full  - Complete CI test suite with GPU (~30-60 min)
-#   smoke - Minimal sanity checks (~1-2 min)
+#   quick - Fast tests, no GPU required
+#   full  - Complete CI test suite with GPU
+#   smoke - Minimal sanity checks
 #
 # Examples:
 #   ./extras/docker-test.sh

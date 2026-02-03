@@ -250,7 +250,6 @@ fi
 # ============================================================================
 
 log_info "Starting build in container..."
-log_info "This may take 2-10 minutes depending on your system and LLVM mode"
 
 start_time=$(date +%s)
 

@@ -91,13 +91,13 @@ The Slang project uses self-hosted Linux GPU runners with a custom Docker contai
 ### Run Tests
 
 ```bash
-# Run quick CPU tests (no GPU required, ~5-10 min)
+# Run quick CPU tests (no GPU required)
 ./extras/docker-test.sh --category quick
 
 # Run specific test file
 ./extras/docker-test.sh tests/language-feature/lambda/lambda-0.slang
 
-# Run full CI test suite (requires GPU, ~30-60 min)
+# Run full CI test suite (requires GPU)
 ./extras/docker-test.sh --category full
 ```
 
@@ -173,7 +173,6 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 ### `disable` (Default) ⚡ Fastest
 
-**Build time**: ~2-5 minutes
 **Best for**: Local development, GPU testing, quick iteration
 
 ```bash
@@ -202,7 +201,6 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 ### `fetch` 📦 Recommended for Full Features
 
-**Build time**: ~3-6 minutes (first build downloads binary)
 **Best for**: Full-featured local builds with LLVM support
 
 ```bash
@@ -237,11 +235,10 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 ### `cached` 🔧 Advanced
 
-**Build time**: ~2-5 minutes (after LLVM built)
 **Best for**: LLVM backend development
 
 ```bash
-# First, build LLVM (20-40 minutes, one-time)
+# First, build LLVM (one-time)
 ./external/build-llvm.sh --install-prefix $(pwd)/build/llvm-project-install
 
 # Then use it in container builds
@@ -263,8 +260,8 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 **Cons**:
 
-- Requires building LLVM first (20-40 min)
-- Extra 5-10GB disk space for LLVM build
+- Requires building LLVM first (significant time investment)
+- Extra disk space for LLVM build (several GB)
 - Manual LLVM version management
 
 **When to use**:
@@ -282,7 +279,6 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 #### `quick` - Fast Tests ⚡
 
-**Duration**: ~5-10 minutes without GPU, ~10-20 minutes with GPU
 **GPU Required**: No (automatically skips GPU APIs if no GPU detected)
 
 ```bash
@@ -315,7 +311,6 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 #### `full` - Complete CI Test Suite 🚀
 
-**Duration**: ~30-60 minutes
 **GPU Required**: Yes
 
 ```bash
@@ -345,7 +340,6 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
 #### `smoke` - Minimal Sanity Checks 💨
 
-**Duration**: ~1-2 minutes
 **GPU Required**: No
 
 ```bash
@@ -568,7 +562,7 @@ ls -la /usr/share/glvnd/egl_vendor.d/10_nvidia.json
 **Solution**:
 
 ```bash
-# Build LLVM locally (20-40 minutes)
+# Build LLVM locally
 ./external/build-llvm.sh --install-prefix $(pwd)/build/llvm-project-install
 
 # Wait for completion, then try again
@@ -680,7 +674,7 @@ docker run --rm \
 For `--llvm cached` mode:
 
 ```bash
-# Build LLVM (one-time, 20-40 minutes)
+# Build LLVM (one-time)
 ./external/build-llvm.sh \
   --install-prefix $(pwd)/build/llvm-project-install \
   --repo "https://github.com/llvm/llvm-project"
