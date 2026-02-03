@@ -1108,7 +1108,8 @@ typedef uint32_t SlangSizeT;
 
         ReportDynamicDispatchSites, // bool
 
-        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output (implies EnableRichDiagnostics)
+        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
+                                          // (implies EnableRichDiagnostics)
 
         CountOf,
     };

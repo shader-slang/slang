@@ -576,13 +576,12 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(
-    SourceManager* sm,
-    const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
-    // Format: E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+    // Format:
+    // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
     // Get the primary span location information
     HumaneSourceLoc beginLoc = sm->getHumaneLoc(diag.primarySpan.range.begin);

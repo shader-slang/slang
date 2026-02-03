@@ -25,8 +25,8 @@
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
 #include "../render-test/slang-support.h"
-#include "directory-util.h"
 #include "diagnostic-annotation-util.h"
+#include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "slangc-tool.h"
@@ -96,10 +96,7 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("diag", prefix);
     }
-    bool isNonExhaustiveDiagTest() const
-    {
-        return commandOptions.containsKey("non-exhaustive");
-    }
+    bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
     Type type = Type::Normal;
 

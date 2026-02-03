@@ -535,7 +535,8 @@ static bool checkAnnotations(
                         diag.endCol == annotation.columnEnd)
                     {
                         columnMatched = true;
-                        UnownedStringSlice expected = annotation.expectedSubstring.getUnownedSlice();
+                        UnownedStringSlice expected =
+                            annotation.expectedSubstring.getUnownedSlice();
 
                         // Check message, severity, errorCode, or "severity errorCode"
                         bool matches = false;
@@ -748,7 +749,13 @@ bool DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
 
     // Check if all annotations match diagnostics
     List<String> missingAnnotations;
-    if (!checkAnnotations(annotations, diagnostics, prefix, sourceLines, exhaustive, missingAnnotations))
+    if (!checkAnnotations(
+            annotations,
+            diagnostics,
+            prefix,
+            sourceLines,
+            exhaustive,
+            missingAnnotations))
     {
         // Build error message
         StringBuilder sb;
