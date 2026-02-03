@@ -99,7 +99,7 @@ void handleAssert(char const* message)
     g_lastSignalMessage = _getMessage(type, message);
 
     // Can be useful to enable during debug when problem is on CI
-    if (false)
+    if (true)
     {
         printf("%s\n", g_lastSignalMessage.getBuffer());
     }

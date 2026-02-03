@@ -26,6 +26,7 @@
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
 #include "../render-test/slang-support.h"
 #include "directory-util.h"
+#include "diagnostic-annotation-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
 #include "slangc-tool.h"
@@ -90,6 +91,10 @@ struct TestOptions
     bool getFileCheckBufferPrefix(String& prefix) const
     {
         return commandOptions.tryGetValue("filecheck-buffer", prefix);
+    }
+    bool getDiagTestPrefix(String& prefix) const
+    {
+        return commandOptions.tryGetValue("diag", prefix);
     }
 
     Type type = Type::Normal;
@@ -817,6 +822,66 @@ static TestResult _fileCheckTest(
         coloredOutput);
 }
 
+//
+// Check diagnostic annotations in the source file
+//
+static TestResult _diagnosticAnnotationTest(
+    TestContext& context,
+    const String& sourceFilePath,
+    const String& diagPrefix,
+    const String& outputToCheck)
+{
+    auto& testReporter = *context.getTestReporter();
+
+    // Read the source file to get annotations
+    String sourceText;
+    if (SLANG_FAILED(File::readAllText(sourceFilePath, sourceText)))
+    {
+        testReporter.messageFormat(
+            TestMessageType::RunError,
+            "Failed to read source file for diagnostic annotations: '%s'",
+            sourceFilePath.getBuffer());
+        return TestResult::Fail;
+    }
+
+    // Parse annotations from source
+    List<String> annotations;
+    if (SLANG_FAILED(DiagnosticAnnotationUtil::parseAnnotations(
+            sourceText.getUnownedSlice(),
+            diagPrefix.getUnownedSlice(),
+            annotations)))
+    {
+        testReporter.message(
+            TestMessageType::RunError,
+            "Failed to parse diagnostic annotations");
+        return TestResult::Fail;
+    }
+
+    // Check if all annotations are present in output
+    List<String> missingAnnotations;
+    if (!DiagnosticAnnotationUtil::checkAnnotations(
+            annotations,
+            outputToCheck.getUnownedSlice(),
+            missingAnnotations))
+    {
+        // Report missing annotations
+        StringBuilder errorMsg;
+        errorMsg << "Diagnostic annotation check failed. Missing expected substrings:\n";
+        for (const auto& missing : missingAnnotations)
+        {
+            errorMsg << "  //" << diagPrefix << " " << missing << "\n";
+        }
+        testReporter.message(TestMessageType::TestFailure, errorMsg.getBuffer());
+        return TestResult::Fail;
+    }
+
+    testReporter.messageFormat(
+        TestMessageType::Info,
+        "All %d diagnostic annotation(s) matched",
+        int(annotations.getCount()));
+    return TestResult::Pass;
+}
+
 template<typename Compare>
 static TestResult _fileComparisonTest(
     TestContext& context,
@@ -859,7 +924,7 @@ static bool _areLinesEqual(const String& a, const String& e)
     return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());
 }
 
-// Either run FileCheck over the result, or read and compare with a .expected file
+// Either run diagnostic annotation check, FileCheck, or compare with a .expected file
 // On a comparison failure, dump the difference
 // On any failure, write a .actual file.
 template<typename Compare = decltype(_areLinesEqual)>
@@ -871,17 +936,28 @@ static TestResult _validateOutput(
     const char* defaultExpectedContent = nullptr,
     const Compare compare = _areLinesEqual)
 {
-    String fileCheckPrefix;
-    const TestResult result =
-        input.testOptions->getFileCheckPrefix(fileCheckPrefix)
-            ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
-            : _fileComparisonTest(
-                  *context,
-                  input,
-                  defaultExpectedContent,
-                  ".expected",
-                  actualOutput,
-                  compare);
+    TestResult result = TestResult::Fail;
+
+    // Check for diagnostic annotations first
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        result = _diagnosticAnnotationTest(*context, input.filePath, diagPrefix, actualOutput);
+    }
+    else
+    {
+        // Fall back to filecheck or file comparison
+        String fileCheckPrefix;
+        result = input.testOptions->getFileCheckPrefix(fileCheckPrefix)
+                     ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
+                     : _fileComparisonTest(
+                           *context,
+                           input,
+                           defaultExpectedContent,
+                           ".expected",
+                           actualOutput,
+                           compare);
+    }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
