@@ -252,12 +252,13 @@ smoke)
   ;;
 esac
 
-# In CPU-only mode, restrict to CPU API only
+# In CPU-only mode, restrict to CPU API only and skip API detection
 # Note: Even without GPU passthrough, the container has Vulkan libraries installed,
-# so slang-test might detect GPU APIs as available. We explicitly restrict to CPU only.
+# so slang-test might detect GPU APIs as available. We explicitly restrict to CPU only
+# and skip the detection phase to avoid attempting GPU initialization.
 if [ "$NO_GPU" = true ]; then
-  log_info "CPU-only mode: Restricting to CPU API only"
-  SLANG_TEST_ARGS="$SLANG_TEST_ARGS -api cpu"
+  log_info "CPU-only mode: Restricting to CPU API only and skipping API detection"
+  SLANG_TEST_ARGS="$SLANG_TEST_ARGS -api cpu -skip-api-detection"
 fi
 
 # Add test server configuration
@@ -346,6 +347,7 @@ fi
 
 log_info "Starting tests in container..."
 log_info "Test configuration: $CMAKE_CONFIG ($CATEGORY)"
+log_info "Test arguments: $SLANG_TEST_ARGS"
 
 start_time=$(date +%s)
 
