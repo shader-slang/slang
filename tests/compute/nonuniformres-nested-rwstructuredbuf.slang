@@ -3,8 +3,12 @@
 //TEST:SIMPLE(filecheck=CHECK2):-target spirv -entry main -stage compute -emit-spirv-via-glsl
 //TEST:SIMPLE(filecheck=CHECK3):-target spirv -entry main -stage compute -emit-spirv-directly
 //TEST:SIMPLE(filecheck=CHECK4):-target cuda -entry main -stage compute -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK5):-target spirv -entry main -stage compute -emit-spirv-directly
 
 RWStructuredBuffer<int> buffer[];
+
+[vk::binding(1, 0)]
+__DynamicResource<__DynamicResourceKind.General> dynBuffers[];
 
 [numthreads(8, 1, 1)]
 void main(uint3 dispatchThreadID: SV_DispatchThreadID)
@@ -35,4 +39,15 @@ void main(uint3 dispatchThreadID: SV_DispatchThreadID)
 
     RWStructuredBuffer<int> buffer2 = buffer[int(NonUniformResourceIndex(uint(float(dispatchThreadID.x))))];
     buffer2[0] = 1;
+
+    // CHECK5: OpDecorate %[[VAR1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK5: OpDecorate %[[VAR2:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK5: OpDecorate %[[VAR3:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK5: %[[VAR1]] = OpCopyObject %uint %{{.*}}
+    // CHECK5: %[[VAR2]] = OpAccessChain %_ptr_StorageBuffer___DynamicResource %dynBuffers %[[VAR1]]
+    // CHECK5: %[[VAR3]] = OpLoad %__DynamicResource %[[VAR2]]
+    // CHECK5: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer {{.*}} %[[VAR3]]
+    RWStructuredBuffer<int> buffer3 =
+        dynBuffers[NonUniformResourceIndex(dispatchThreadID.x)].asOpaqueDescriptor<RWStructuredBuffer<int>>();
+    buffer3[0] = 1;
 }

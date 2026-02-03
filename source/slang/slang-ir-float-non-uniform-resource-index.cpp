@@ -171,7 +171,8 @@ void processNonUniformResourceIndex(
         // in the Physical Storage buffer address space.
         auto operand = inst->getOperand(0);
         auto type = operand->getDataType();
-        if (isResourceType(type) || isPointerToResourceType(type))
+        if (isResourceType(type) || isPointerToResourceType(type) ||
+            as<IRDynamicResourceType>(unwrapArray(type)))
         {
             IRBuilder builder(operand);
             builder.addSPIRVNonUniformResourceDecoration(operand);
