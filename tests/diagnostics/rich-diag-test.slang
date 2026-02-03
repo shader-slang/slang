@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=foo):
 
-// Test that use of empty statement after an `if` leads to an warning.
+// Test that use of empty statement after an `if` leads to a warning.
 
 struct S {};
 
