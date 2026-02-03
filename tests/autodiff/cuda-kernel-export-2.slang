@@ -23,7 +23,7 @@ float lambdaGGX(const float alphaSqr, const float cosTheta)
 [CudaDeviceExport]
 void lambdaGGX_bwd(inout DifferentialPair<float> alphaSqr, inout DifferentialPair<float> cosTheta, const float d_out)
 {
-    __bwd_diff(lambdaGGX)(alphaSqr, cosTheta, d_out);
+    bwd_diff(lambdaGGX)(alphaSqr, cosTheta, d_out);
 }
 
 //////////////////////////////////////////////////////////////////////////

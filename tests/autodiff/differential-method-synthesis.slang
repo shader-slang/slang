@@ -44,6 +44,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         dpA dpa = dpA(a, b);
         outputBuffer[0] = __fwd_diff(f)(dpa).d.b.x;         // Expect: 0
         outputBuffer[1] = A.dadd(b, b).b.x;                 // Expect: 0.4
-        outputBuffer[2] = A.dmul<float>(2.0, b).b.x;        // Expect: 0.4
     }
 } 

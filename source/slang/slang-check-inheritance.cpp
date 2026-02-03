@@ -9,14 +9,19 @@ namespace Slang
 {
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // We cache the computed inheritance information for types,
     // and re-use that information whenever possible.
 
     // DeclRefTypes will have their inheritance info cached in m_mapDeclRefToInheritanceInfo.
     if (auto declRefType = as<DeclRefType>(type))
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            context);
 
     // Non ordinary types are cached on m_mapTypeToInheritanceInfo.
     if (auto found = m_mapTypeToInheritanceInfo.tryGetValue(type))
@@ -31,7 +36,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     //
     m_mapTypeToInheritanceInfo[type] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(type, circularityInfo);
+    auto info = _calcInheritanceInfo(type, circularityInfo, context);
     m_mapTypeToInheritanceInfo[type] = info;
 
     return info;
@@ -39,7 +44,8 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
 
 InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     DeclRef<ExtensionDecl> const& extension,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     if (_checkForCircularityInExtensionTargetType(extension.getDecl(), circularityInfo))
     {
@@ -55,7 +61,7 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     // routine with an optional `Type` parameter.
     //
     InheritanceCircularityInfo newCircularityInfo(extension.getDecl(), circularityInfo);
-    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo);
+    return _getInheritanceInfo(extension, nullptr, &newCircularityInfo, context);
 }
 
 bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
@@ -77,7 +83,8 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
 InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // Just as with `Type`s, we cache and re-use the inheritance
     // information that has been computed for a `DeclRef` whenever
@@ -95,7 +102,7 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     //
     m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
-    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
+    auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo, context);
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
     getSession()->m_typeDictionarySize = Math::Max(
@@ -155,7 +162,8 @@ DeclRef<GenericDecl> SharedSemanticsContext::getDependentGenericParent(DeclRef<D
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     DeclRef<Decl> declRef,
     Type* selfType,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // This method is the main engine for computing linearized inheritance
     // lists for types and `extension` declarations.
@@ -310,7 +318,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // If we know the type has a facet represented by `extensionTargetDeclRef`, we can consider
     // all extensions on this decl to see if they apply to the type.
     //
-    auto considerExtension = [&](DeclRef<AggTypeDecl> extensionTargetDeclRef,
+    auto considerExtension = [&](DeclRef<Decl> extensionTargetDeclRef,
                                  Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitness)
     {
         bool result = false;
@@ -361,13 +369,15 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     auto currentDeclRef = declRef;
     for (; currentDeclRef;)
     {
-        if (auto aggTypeDeclBaseRef = currentDeclRef.as<AggTypeDeclBase>())
+        if (currentDeclRef.as<AggTypeDeclBase>() || currentDeclRef.as<CallableDecl>())
         {
+            auto containerDeclRef = currentDeclRef.as<ContainerDecl>();
+
             // In the case where we have an aggregate type or `extension`
             // declaration, we can use the explicit list of direct bases.
             //
             for (auto typeConstraintDeclRef :
-                 getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), aggTypeDeclBaseRef))
+                 getMembersOfType<TypeConstraintDecl>(_getASTBuilder(), containerDeclRef))
             {
                 // Note: In certain cases something takes the *syntactic* form of an inheritance
                 // clause, but it is not actually something that should be treated as implying
@@ -379,6 +389,27 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 //
                 if (typeConstraintDeclRef.getDecl()->hasModifier<IgnoreForLookupModifier>())
                     continue;
+
+                Type* subTypeForWitness = selfType;
+                if (auto interfaceDeclRef = containerDeclRef.as<InterfaceDecl>())
+                {
+                    // If we're dealing with an interface decl, we'll need to
+                    // represent the constraint as a lookup on the 'this' type of the
+                    // interface.
+                    //
+
+                    typeConstraintDeclRef = substituteDeclRef(
+                                                SubstitutionSet(declRef),
+                                                astBuilder,
+                                                visitor.getRequirementAsLookedUpDecl(
+                                                    astBuilder,
+                                                    typeConstraintDeclRef.getDecl()))
+                                                .as<TypeConstraintDecl>();
+                    subTypeForWitness = substituteType(
+                        SubstitutionSet(declRef),
+                        astBuilder,
+                        visitor.calcThisType(interfaceDeclRef));
+                }
 
                 // The only case we will ever see a GenericTypeConstraintDecl inside a AggTypeDecl
                 // is when AggTypeDecl is a associatedtype decl. In this case, we will only lookup
@@ -417,13 +448,14 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 //
                 auto baseType = getSup(astBuilder, typeConstraintDeclRef);
                 auto satisfyingWitness = astBuilder->getDeclaredSubtypeWitness(
-                    selfType,
+                    subTypeForWitness,
                     baseType,
                     typeConstraintDeclRef);
 
                 addDirectBaseType(baseType, satisfyingWitness);
             }
         }
+
         if (currentDeclRef.as<AssocTypeDecl>())
         {
             // If the current type is an associated type, continue inspecting the base/parent of the
@@ -495,6 +527,12 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
 
             if (!sub.type)
                 sub = visitor.TranslateTypeNodeForced(sub);
+
+            // Canonicalize the constraint declRef to make sure we have a full reference to it.
+            constraintDeclRef =
+                createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
+                    .as<GenericTypeConstraintDecl>();
+
             auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented
@@ -543,6 +581,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     {
         considerExtension(directAggTypeDeclRef, nullptr);
     }
+    if (auto directFuncDeclRef = declRef.as<FunctionDeclBase>())
+    {
+        considerExtension(directFuncDeclRef, nullptr);
+    }
     if (!declRef.as<ExtensionDecl>())
     {
         HashSet<Type*> supTypesConsideredForExtensionApplication;
@@ -560,16 +602,41 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
                     {
-                        SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
-                        transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
-                            baseFacet->subtypeWitness,
-                            facet->subtypeWitness);
-                        additionalSubtypeWitnesses.addIfNotExists(
-                            facet->origin.type,
-                            transitiveWitness);
-                        if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                        // TODO: De-duplicate the logic in the two branches.
+                        if (auto baseInterfaceDeclRef =
+                                baseFacet->origin.declRef.as<InterfaceDecl>())
                         {
-                            supTypeWorkList.add(interfaceDeclRef);
+                            auto thisTypeDecl = baseInterfaceDeclRef.getDecl()->getThisTypeDecl();
+                            auto lookupSubstitution = SubstitutionSet(
+                                _getASTBuilder()->getLookupDeclRef(
+                                    baseFacet->subtypeWitness,
+                                    thisTypeDecl));
+                            auto transitiveWitness =
+                                as<SubtypeWitness>(baseFacet->subtypeWitness->substitute(
+                                    _getASTBuilder(),
+                                    lookupSubstitution));
+                            additionalSubtypeWitnesses.addIfNotExists(
+                                facet->origin.type,
+                                transitiveWitness);
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            {
+                                supTypeWorkList.add(interfaceDeclRef);
+                            }
+                        }
+                        else
+                        {
+                            SubtypeWitness* transitiveWitness = baseFacet->subtypeWitness;
+                            transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
+                                baseFacet->subtypeWitness,
+                                facet->subtypeWitness);
+
+                            additionalSubtypeWitnesses.addIfNotExists(
+                                facet->origin.type,
+                                transitiveWitness);
+                            if (supTypesConsideredForExtensionApplication.add(facet->origin.type))
+                            {
+                                supTypeWorkList.add(interfaceDeclRef);
+                            }
                         }
                     }
                 }
@@ -823,18 +890,34 @@ void SharedSemanticsContext::_mergeFacetLists(
             //
             auto indirectFacet = new (arena) Facet::Impl();
 
+            // Look through the heads of all the lists to see if we can find a matching
+            // facet with a lower level of indirection.
+            //
+            // We want to prioritize the most direct facet possible, to minimize the levels of
+            // indirection in the final linearization.
+            //
+            Facet::DirectnessVal baseDirectness =
+                Facet::DirectnessVal(foundFacet.getImpl()->directness);
+            for (auto base : bases)
+            {
+                Facet headFacet = base->facets.getHead();
+                if (originsMatch(foundFacet, headFacet))
+                {
+                    if (Facet::DirectnessVal(headFacet.getImpl()->directness) < baseDirectness)
+                    {
+                        foundFacet = headFacet;
+                        foundBase = base;
+                        baseDirectness = Facet::DirectnessVal(headFacet.getImpl()->directness);
+                    }
+                }
+            }
+
             // We will initialize the fresh facet to a copy of the state of the
             // `foundFacet`, albeit with a higher level of indirection.
             //
-            // TODO: In principle we could search through  all of the lists to
-            // find the one with a facet matching `foundFacet` with minimum
-            // indirection, so that our measure of indirection is always
-            // as small as possible for any given facet.
-            //
             *indirectFacet = *(foundFacet.getImpl());
             indirectFacet->next = nullptr;
-            indirectFacet->directness =
-                Facet::Directness(Facet::DirectnessVal(indirectFacet->directness) + 1);
+            indirectFacet->directness = Facet::Directness(baseDirectness + 1);
 
             // When using this facet for subtype tests, or when looking
             // up member through this facet, we will need a witness
@@ -867,25 +950,53 @@ void SharedSemanticsContext::_mergeFacetLists(
             auto baseType = selfIsSubtypeOfBase->getSup();
             auto facetType = baseIsSubtypeOfFacet->getSup();
 
-            if (selfType && baseType && facetType)
+            if (as<TypeEqualityWitness>(baseIsSubtypeOfFacet))
             {
-                auto selfDeclRef = isDeclRefTypeOf<StructDecl>(selfType);
-                auto baseDeclRef = isDeclRefTypeOf<StructDecl>(baseType);
-                auto facetDeclRef = isDeclRefTypeOf<InterfaceDecl>(facetType);
-
-                // Only skip if we have struct->struct->interface
-                // and the struct->struct witness is not the identity witness
-                shouldSkipTransitiveWitness = selfDeclRef && baseDeclRef && facetDeclRef &&
-                                              !isTypeEqualityWitness(selfIsSubtypeOfBase);
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfBase);
+                ioMergedFacets.add(indirectFacet);
             }
-
-            if (!shouldSkipTransitiveWitness)
+            else if (isTypeEqualityWitness(selfIsSubtypeOfBase))
             {
-                auto selfIsSubtypeOfFacet = _getASTBuilder()->getTransitiveSubtypeWitness(
-                    selfIsSubtypeOfBase,
-                    baseIsSubtypeOfFacet);
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), baseIsSubtypeOfFacet);
+                ioMergedFacets.add(indirectFacet);
+            }
+            else if (
+                isDeclRefTypeOf<StructDecl>(baseType) && isDeclRefTypeOf<InterfaceDecl>(facetType))
+            {
+                if (isDeclRefTypeOf<StructDecl>(selfType))
+                {
+                    // Do nothing. This facet will not be accepted since
+                    // conformance and inheritance cannot be mixed.
+                    // i.e. (struct Child : struct Parent) and (struct Parent : interface IFoo)
+                    // does not imply (struct Child : interface IFoo)
+                    //
+                }
+                else
+                {
+                    // Shouldn't really have a non-struct inherit from a struct...
+                    SLANG_UNEXPECTED("Unexpected witness structure");
+                }
+            }
+            else if (
+                isDeclRefTypeOf<InterfaceDecl>(baseType) &&
+                isDeclRefTypeOf<InterfaceDecl>(facetType))
+            {
+                // (class | struct | interface) -> interface -> interface
+                // can use the base' witness, with a substitution of self for 'this-type'
+                //
+                auto thisTypeDecl =
+                    as<InterfaceDecl>(as<DeclRefType>(baseType)->getDeclRef().getDecl())
+                        ->getThisTypeDecl();
+                auto lookupSubstitution = SubstitutionSet(
+                    _getASTBuilder()->getLookupDeclRef(selfIsSubtypeOfBase, thisTypeDecl));
 
-                indirectFacet->setSubtypeWitness(_getASTBuilder(), selfIsSubtypeOfFacet);
+                // Substitute 'selfIsSubtypeOfBase' witness in place of the `thisTypeWitness` for
+                // the base
+                //
+                indirectFacet->setSubtypeWitness(
+                    _getASTBuilder(),
+                    as<SubtypeWitness>(
+                        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution)));
 
                 ioMergedFacets.add(indirectFacet);
             }
@@ -1073,7 +1184,8 @@ bool FacetList::containsMatchFor(Facet facet) const
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     Type* type,
-    InheritanceCircularityInfo* circularityInfo)
+    InheritanceCircularityInfo* circularityInfo,
+    InheritanceContext context)
 {
     // The majority of the interesting for for computing linearized
     // inheritance information arises for `DeclRef`s, but we still
@@ -1088,14 +1200,19 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // bottleneck through the logic that gets shared between
         // type and `extension` declarations.
         //
-        return _getInheritanceInfo(declRefType->getDeclRef(), declRefType, circularityInfo);
+        return _getInheritanceInfo(
+            declRefType->getDeclRef(),
+            declRefType,
+            circularityInfo,
+            context);
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(type))
     {
         return _getInheritanceInfo(
             extractExistentialType->getThisTypeDeclRef(),
             extractExistentialType,
-            circularityInfo);
+            circularityInfo,
+            context);
     }
     else if (auto conjunctionType = as<AndType>(type))
     {
@@ -1210,7 +1327,66 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
-        return _calcInheritanceInfo(modifiedType->getBase(), circularityInfo);
+        auto baseInheritanceInfo =
+            _calcInheritanceInfo(modifiedType->getBase(), circularityInfo, context);
+
+        if (modifiedType->findModifier<NoDiffModifierVal>())
+        {
+            // Create a filtered facet list that excludes facets whose
+            // origin matches the `IDifferentiable` or `IDifferentiablePtrType`
+            // interface types.
+            //
+            SemanticsVisitor visitor(this);
+            auto directFacet = new (arena) Facet::Impl(
+                astBuilder,
+                Facet::Kind::Type,
+                Facet::Directness::Self,
+                DeclRef<Decl>(),
+                type,
+                visitor.createTypeEqualityWitness(type));
+
+            auto diffInterfaceDecl = astBuilder->getDifferentiableInterfaceDecl().getDecl();
+            auto diffRefInterfaceDecl = astBuilder->getDifferentiableRefInterfaceDecl().getDecl();
+
+            Facet tail = directFacet;
+            for (auto facet : baseInheritanceInfo.facets)
+            {
+                // Skip self facet from base - we already have our own self facet
+                if (facet->directness == Facet::Directness::Self)
+                    continue;
+
+                // Check if this facet corresponds to IDifferentiable or IDifferentiablePtrType
+                bool shouldExclude = false;
+                if (auto interfaceDeclRef = facet->origin.declRef.as<InterfaceDecl>())
+                {
+                    auto interfaceDecl = interfaceDeclRef.getDecl();
+                    if (interfaceDecl == diffInterfaceDecl || interfaceDecl == diffRefInterfaceDecl)
+                    {
+                        shouldExclude = true;
+                    }
+                }
+
+                if (shouldExclude)
+                    continue;
+
+                // Copy the facet with updated structure
+                auto newFacet = new (arena) Facet::Impl(
+                    astBuilder,
+                    facet->kind,
+                    facet->directness,
+                    facet->origin.declRef,
+                    facet->origin.type,
+                    facet->subtypeWitness);
+                tail->next = newFacet;
+                tail = newFacet;
+            }
+
+            InheritanceInfo info;
+            info.facets = FacetList(directFacet);
+            return info;
+        }
+
+        return baseInheritanceInfo;
     }
     else
     {

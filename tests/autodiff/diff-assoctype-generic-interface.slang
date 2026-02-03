@@ -66,7 +66,7 @@ struct FooImpl1: IFoo<8>
     }
 }
 
-/*
+
 // There's a slight issue with dynamic dispatch over generic interfaces. Uncomment after that is fixed.
 
 struct FooImpl2: IFoo<8>
@@ -83,15 +83,15 @@ struct FooImpl2: IFoo<8>
         return GetterImpl({x, x+5, x+7, x+9, x+11, x+13, x+15, x+17});
     }
 }
-*/
+
 
 IFoo<8> getFoo(uint id)
 {
-    /*if (id == 0)
+    if (id == 0)
         return FooImpl1();
     else
-        return FooImpl2();*/
-    return FooImpl1();
+        return FooImpl2();
+    //return FooImpl1();
 }
 
 [Differentiable]
@@ -102,11 +102,12 @@ float doThing(uint id)
 }
 
 [shader("compute")]
+[numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = doThing(0); // CHECK: 2.0
-    outputBuffer[1] = doThing(1); // CHECK: 4.0
+    outputBuffer[1] = doThing(1); // CHECK: 8.0
 
     outputBuffer[2] = fwd_diff(doThing)(0).d; // CHECK: 3.0
-    outputBuffer[3] = fwd_diff(doThing)(1).d; // CHECK: 3.0
+    outputBuffer[3] = fwd_diff(doThing)(1).d; // CHECK: 6.0
 }

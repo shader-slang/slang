@@ -39,7 +39,6 @@
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-detect-uninitialized-resources.h"
-#include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
@@ -116,6 +115,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-translate.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -247,6 +247,21 @@ static void reportCheckpointIntermediates(
         IRSizeAndAlignment structSize;
         getNaturalSizeAndAlignment(targetReq, structType, &structSize);
 
+        for (auto field : structType->getFields())
+        {
+            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
+            {
+                // Remove the size of the return value context field from the struct size
+                // TODO: Does this account for alignment & padding properly?
+                //
+                IRType* fieldType = field->getFieldType();
+                IRSizeAndAlignment fieldSize;
+                getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
+                structSize.size -= fieldSize.size;
+                break;
+            }
+        }
+
         // Reporting happens before empty structs are optimized out
         // and we still want to keep the checkpointing decorations,
         // so we end up needing to check for non-zero-ness
@@ -263,6 +278,9 @@ static void reportCheckpointIntermediates(
 
         for (auto field : structType->getFields())
         {
+            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
+                continue;
+
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
             getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
@@ -300,6 +318,9 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+        result.autodiff = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -355,7 +376,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
-    case kIROp_MakeDifferentialPairUserCode:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -673,6 +693,306 @@ String getBuildIdentifierString(ComponentType* component)
     return sb.produceString();
 }
 
+static IRWitnessTableType* findExpectedWitnessTableType(
+    IRInterfaceType* interfaceType,
+    IRStructKey* requirementKey)
+{
+    for (auto ii = 0; ii < interfaceType->getOperandCount(); ++ii)
+    {
+        if (auto entry = as<IRInterfaceRequirementEntry>(interfaceType->getOperand(ii)))
+        {
+            if (entry->getRequirementKey() == requirementKey)
+            {
+                // Retrieve the satisfying value and return its type cast to IRWitnessTableType.
+                IRInst* satisfyingVal = entry->getRequirementVal();
+                return cast<IRWitnessTableType>(satisfyingVal);
+            }
+        }
+    }
+    return nullptr;
+}
+
+static void fixupSpecializedWitnessTables(TargetProgram* targetProgram, IRModule* irModule)
+{
+    // Use a worklist to handle recursively created witness tables
+    List<IRWitnessTable*> worklist;
+    HashSet<IRWitnessTable*> processed;
+
+    // Add all existing witness tables to the worklist
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (auto witnessTable = as<IRWitnessTable>(inst))
+        {
+            worklist.add(witnessTable);
+        }
+    }
+
+    while (worklist.getCount() > 0)
+    {
+        auto witnessTable = worklist.getLast();
+        worklist.removeLast();
+
+        if (processed.contains(witnessTable))
+            continue;
+        processed.add(witnessTable);
+
+        // Extract the interface type from the witness table's data type
+        auto witnessTableType = as<IRWitnessTableType>(witnessTable->getDataType());
+        if (!witnessTableType)
+            continue;
+
+        auto interfaceType = witnessTableType->getConformanceType();
+        if (!interfaceType)
+            continue;
+
+        // Check each entry and fix up any witness table entries that have mismatched types
+        for (auto entry : witnessTable->getEntries())
+        {
+            if (auto witnessTableEntry = as<IRWitnessTableEntry>(entry))
+            {
+                auto entryVal = witnessTableEntry->getSatisfyingVal();
+                if (auto entryWitnessTable = as<IRWitnessTable>(entryVal))
+                {
+                    auto entryWitnessTableType =
+                        as<IRWitnessTableType>(entryWitnessTable->getDataType());
+                    if (!entryWitnessTableType)
+                        continue;
+
+                    // Find the expected witness table type in the interface
+                    auto entryKey = witnessTableEntry->getRequirementKey();
+                    auto expectedWitnessTableType =
+                        as<IRWitnessTableType>(findExpectedWitnessTableType(
+                            as<IRInterfaceType>(interfaceType),
+                            as<IRStructKey>(entryKey)));
+
+                    if (expectedWitnessTableType &&
+                        entryWitnessTableType != expectedWitnessTableType)
+                    {
+                        // Create a replacement witness table with the correct type
+                        IRBuilder builder(irModule);
+                        builder.setInsertBefore(witnessTable);
+
+                        IRCloneEnv cloneEnv;
+                        IRWitnessTable* newWitnessTable = builder.createWitnessTable(
+                            (IRType*)expectedWitnessTableType->getConformanceType(),
+                            entryWitnessTable->getConcreteType());
+                        /*auto newTable =
+                            as<IRWitnessTable>(cloneInst(&cloneEnv, &builder, entryWitnessTable));*/
+                        // Copy all the entries from the old witness table
+                        cloneInstDecorationsAndChildren(
+                            &cloneEnv,
+                            builder.getModule(),
+                            entryWitnessTable,
+                            newWitnessTable);
+
+                        // Add the fixed witness table to the worklist for recursive processing
+                        worklist.add(newWitnessTable);
+
+                        // Replace the entry value with the fixed witness table
+                        builder.replaceOperand(&witnessTableEntry->satisfyingVal, newWitnessTable);
+                    }
+                }
+            }
+        }
+    }
+}
+
+static void fixupLookupWitnessTypes(TargetProgram* targetProgram, IRModule* irModule)
+{
+    // Collect all LookupWitness instructions that return WitnessTableType
+    List<IRLookupWitnessMethod*> lookupWitnessInsts;
+
+    for (auto inst : irModule->getGlobalInsts())
+    {
+        if (auto func = as<IRFunc>(inst))
+        {
+            for (auto block : func->getBlocks())
+            {
+                for (auto childInst : block->getChildren())
+                {
+                    if (auto lookupWitness = as<IRLookupWitnessMethod>(childInst))
+                    {
+                        // Only add if it returns WitnessTableType
+                        if (as<IRWitnessTableType>(lookupWitness->getDataType()))
+                        {
+                            lookupWitnessInsts.add(lookupWitness);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Process each LookupWitness instruction
+    for (auto lookupWitness : lookupWitnessInsts)
+    {
+        // Build the chain of LookupWitness instructions from root to this instruction
+        List<IRLookupWitnessMethod*> lookupChain;
+        IRInst* currentInst = lookupWitness;
+
+        while (currentInst)
+        {
+            if (auto lookupWitnessInst = as<IRLookupWitnessMethod>(currentInst))
+            {
+                lookupChain.add(lookupWitnessInst);
+                currentInst = lookupWitnessInst->getWitnessTable();
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        // Find the root ExtractExistentialWitnessTable
+        IRExtractExistentialWitnessTable* rootExtract =
+            as<IRExtractExistentialWitnessTable>(currentInst);
+        if (!rootExtract)
+            continue;
+
+        // Get the initial interface type from the existential type
+        auto existentialType = rootExtract->getDataType();
+        IRInterfaceType* interfaceType = nullptr;
+
+        if (auto witnessTableType = as<IRWitnessTableType>(existentialType))
+            interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+
+        if (!interfaceType)
+            continue;
+
+        // Process the chain in reverse order (from root to leaf)
+        for (int i = lookupChain.getCount() - 1; i >= 0; i--)
+        {
+            auto currentLookup = lookupChain[i];
+
+            // Find the expected witness table type for this lookup's requirement key
+            auto requirementKey = currentLookup->getRequirementKey();
+            auto expectedWitnessTableType =
+                findExpectedWitnessTableType(interfaceType, cast<IRStructKey>(requirementKey));
+
+            if (expectedWitnessTableType)
+            {
+                // Check if the current type matches the expected type
+                auto currentWitnessTableType = as<IRWitnessTableType>(currentLookup->getDataType());
+                if (currentWitnessTableType != expectedWitnessTableType)
+                {
+                    // Replace the instruction's type with the expected type
+                    currentLookup->setFullType(expectedWitnessTableType);
+                }
+
+                // Update the interface type for the next lookup in the chain
+                interfaceType = as<IRInterfaceType>(expectedWitnessTableType->getConformanceType());
+            }
+        }
+    }
+}
+
+// Lower DiffTypeInfo instructions to MakeTuple.
+// DiffTypeInfo is a hoistable instruction that holds witness tables for differential type info.
+// After specialization, it can be safely converted to a regular MakeTuple.
+void lowerDiffTypeInfoInsts(IRModule* module)
+{
+    List<IRInst*> instsToReplace;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->getOp() == kIROp_DiffTypeInfo)
+        {
+            instsToReplace.add(globalInst);
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto inst : instsToReplace)
+    {
+        builder.setInsertBefore(inst);
+        List<IRInst*> args;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            args.add(inst->getOperand(i));
+        }
+        auto tuple =
+            builder.emitMakeTuple(inst->getFullType(), (UInt)args.getCount(), args.getBuffer());
+        inst->replaceUsesWith(tuple);
+        inst->removeAndDeallocate();
+    }
+}
+
+void lowerSumVectorMatrixInsts(IRModule* module)
+{
+    struct LowerSumVectorMatrixPass : InstPassBase
+    {
+        LowerSumVectorMatrixPass(IRModule* module)
+            : InstPassBase(module)
+        {
+        }
+        void processModule()
+        {
+            processInstsOfType<IRSumVectorElements>(
+                kIROp_SumVectorElements,
+                [&](IRSumVectorElements* sumInst)
+                {
+                    auto vectorOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto vectorType = as<IRVectorType>(vectorOperand->getDataType());
+                    auto vectorSize = as<IRIntLit>(vectorType->getElementCount())->getValue();
+                    auto vectorElemType = vectorType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < vectorSize; ii++)
+                    {
+                        auto element =
+                            builder.emitElementExtract(vectorOperand, builder.getIntValue(ii));
+                        if (ii == 0)
+                            result = element;
+                        else
+                            result = builder.emitAdd(vectorElemType, result, element);
+                    }
+
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+
+            processInstsOfType<IRSumMatrixElements>(
+                kIROp_SumMatrixElements,
+                [&](IRSumMatrixElements* sumInst)
+                {
+                    auto matrixOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto matrixType = as<IRMatrixType>(matrixOperand->getDataType());
+                    auto matrixColCount = as<IRIntLit>(matrixType->getColumnCount())->getValue();
+                    auto matrixRowCount = as<IRIntLit>(matrixType->getRowCount())->getValue();
+                    auto matrixElemType = matrixType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < matrixRowCount; ii++)
+                    {
+                        for (auto jj = 0; jj < matrixColCount; jj++)
+                        {
+                            auto element = builder.emitElementExtract(
+                                builder.emitElementExtract(matrixOperand, builder.getIntValue(ii)),
+                                builder.getIntValue(jj));
+                            if (ii == 0 && jj == 0)
+                                result = element;
+                            else
+                                result = builder.emitAdd(matrixElemType, result, element);
+                        }
+                    }
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+        }
+    };
+
+    LowerSumVectorMatrixPass pass(module);
+    pass.processModule();
+}
+
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -883,6 +1203,12 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
 
+    // Lower enum types early since enums and enum casts may appear in
+    // specialization & not resolving them here would block specialization.
+    //
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
+
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -944,81 +1270,15 @@ Result linkAndOptimizeIR(
     // the relevant specialization transformations are handled in a
     // single pass that looks for all simplification opportunities.
     //
-    // TODO: We also need to extend this pass so that it will "expose"
-    // existential values that are nested inside of other types,
-    // so that the simplifications can be applied.
-    //
-    // TODO: This pass is *also* likely to be the place where we
-    // perform specialization of functions based on parameter
-    // values that need to be compile-time constants.
-    //
-    // Specialization passes and auto-diff passes runs in an iterative loop
-    // since each pass can enable the other pass to progress further.
-    for (;;)
+
+    initializeTranslationDictionary(irModule);
+
+    if (!codeGenContext->isSpecializationDisabled())
     {
-        bool changed = false;
-        if (!codeGenContext->isSpecializationDisabled())
-        {
-            // Pre-autodiff, we will attempt to specialize as much as possible.
-            //
-            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly due to
-            // missing information, so we defer that to after the auto-dff step.
-            //
-            SpecializationOptions specOptions;
-            specOptions.lowerWitnessLookups = false;
-            specOptions.reportDynamicDispatchSites =
-                codeGenContext->shouldReportDynamicDispatchSites();
-            changed |=
-                SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
-        }
-
-        if (codeGenContext->getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
-        if (changed)
-        {
-            SLANG_PASS(
-                applySparseConditionalConstantPropagation,
-                targetProgram,
-                codeGenContext->getSink());
-        }
-        validateIRModuleIfEnabled(codeGenContext, irModule);
-
-        // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-        // since we may be missing out cases prevented by the functions that we just
-        // specialzied.
-        SLANG_PASS(performMandatoryEarlyInlining, nullptr);
-        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
-
-        // Unroll loops.
-        if (!fastIRSimplificationOptions.minimalOptimization)
-        {
-            if (codeGenContext->getSink()->getErrorCount() == 0)
-            {
-                if (!SLANG_PASS(unrollLoopsInModule, targetProgram, codeGenContext->getSink()))
-                    return SLANG_FAIL;
-            }
-        }
-
-        // Few of our targets support higher order functions, and
-        // we don't have the backend code to emit higher order functions for those
-        // which do.
-        // Specialize away these parameters
-        // TODO: We should implement a proper defunctionalization pass
-        if (requiredLoweringPassSet.higherOrderFunc)
-            changed |= SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
-
-        if (requiredLoweringPassSet.autodiff)
-        {
-            {
-                auto validationScope = enableIRValidationScope();
-                changed |=
-                    SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
-            }
-        }
-
-        if (!changed)
-            break;
+        SpecializationOptions specOptions;
+        specOptions.lowerWitnessLookups = true;
+        specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
+        SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
     // Report checkpointing information
@@ -1028,24 +1288,14 @@ Result linkAndOptimizeIR(
         reportCheckpointIntermediates(codeGenContext, sink, irModule);
     }
 
-    // Finalization is always run so AD-related instructions can be removed,
-    // even if the AD pass itself is not run.
-    //
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
-    // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
-    // lowering.
-    //
-    if (!codeGenContext->isSpecializationDisabled())
-    {
-        SpecializationOptions specOptions;
-        specOptions.lowerWitnessLookups = true;
-        specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
-        SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
-    }
-
     SLANG_PASS(finalizeSpecialization);
+
+    // Lower DiffTypeInfo instructions to MakeTuple.
+    // This must happen after specialization since DiffTypeInfo is hoistable.
+    lowerDiffTypeInfoInsts(irModule);
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
@@ -1148,7 +1398,14 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
+    // If we have any witness tables that are marked as `KeepAlive`,
+    // but are not used for dynamic dispatch, unpin them so we don't
+    // do unnecessary work to lower them.
+    //
     SLANG_PASS(unpinWitnessTables);
+
+    SLANG_PASS(lowerSumVectorMatrixInsts);
+
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
@@ -1186,9 +1443,33 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     SLANG_PASS(lowerTuples, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // get rid of weak-use insts and any dictionaries in the
+    // module inst.
+    //
+    // -- put into a pass --
+    List<IRInst*> weakUseInsts;
+    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
+    {
+        if (insts->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(insts);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+
+    clearTranslationDictionary(irModule);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1948,6 +2229,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL, codeGenContext);
     }
 
+    // Required for AD 2.0 which can create empty types.
+    // TODO: Maybe make this conditional (only touch the optimizable types).
+    // to make it more narrowly scoped.
+    //
+    SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level
@@ -2299,10 +2586,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 

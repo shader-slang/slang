@@ -68,14 +68,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         var p = diffPair(3.0);
 
-        __bwd_diff(run)(0, p, 0.5, 1.0f);
+        bwd_diff(run)(0, p, 0.5, 1.0f);
         outputBuffer[0] = p.d; // A.calc, expect 3
     }
 
     {
         var p = diffPair(3.0);
 
-        __bwd_diff(run)(1, p, 1.5, 1.0f);
+        bwd_diff(run)(1, p, 1.5, 1.0f);
         outputBuffer[1] = p.d; // B.calc, expect 40.5
     }
 }

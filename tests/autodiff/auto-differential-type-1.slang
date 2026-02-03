@@ -13,6 +13,7 @@ struct A : IDifferentiable
     float y;
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dzero()
     {
         Differential b = {0.0, float.dzero()};
@@ -20,17 +21,10 @@ struct A : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         Differential o = {a.x + b.x, 0.0};
-        return o;
-    }
-
-    [__unsafeForceInlineEarly]
-    __generic<T : __BuiltinRealType>
-    static Differential dmul(T a, Differential b)
-    {
-        Differential o = { __realCast<float, T>(a * __realCast<T, float>(b.x)), 0.0};
         return o;
     }
 };
@@ -56,6 +50,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
         dpA dpa = dpA(a, b);
 
-        outputBuffer[0] = __fwd_diff(f)(dpa).d.x;                    // Expect: 1
+        outputBuffer[0] = fwd_diff(f)(dpa).d.x;                    // Expect: 1
     }
 }

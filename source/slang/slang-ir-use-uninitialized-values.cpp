@@ -120,26 +120,6 @@ static bool isAliasable(IRInst* inst)
     return false;
 }
 
-static bool isDifferentiableFunc(IRInst* func)
-{
-    for (auto decor = func->getFirstDecoration(); decor; decor = decor->getNextDecoration())
-    {
-        switch (decor->getOp())
-        {
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_ForwardDifferentiableDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_BackwardDifferentiableDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-            return true;
-        default:
-            break;
-        }
-    }
-
-    return false;
-}
-
 // The `upper` field contains the struct that the type is
 // is contained in. It is used to check for empty structs.
 static bool canIgnoreType(IRType* type, IRType* upper)
@@ -230,11 +210,7 @@ static InstructionUsageType getCallUsageType(IRCall* call, IRInst* inst)
     IRFuncType* ftype = nullptr;
     if (auto spec = as<IRSpecialize>(callee))
         ftn = as<IRFunc>(getResolvedInstForDecorations(spec));
-
-    // Differentiable functions are mostly ignored, treated as having inout parameters
-    else if (as<IRForwardDifferentiate>(callee))
-        return Store;
-    else if (as<IRBackwardDifferentiate>(callee))
+    else if (as<IRTranslateBase>(callee))
         return Store;
 
     else if (auto wit = as<IRLookupWitnessMethod>(callee))
@@ -590,11 +566,6 @@ static void checkParameterAsOut(
 
 static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 {
-    // Differentiable functions will generate undefined values
-    // strictly so that they can be set in a differentiable way
-    if (isDifferentiableFunc(func))
-        return;
-
     auto firstBlock = func->getFirstBlock();
     if (!firstBlock)
         return;

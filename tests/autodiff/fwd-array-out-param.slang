@@ -11,7 +11,7 @@ struct D : IDifferentiable
     float m;
 }
 
-[ForwardDifferentiable]
+[Differentiable]
 float f(D d, int i, out D outArray[1][2])
 {
     outArray[0][0].m = d.n;
@@ -33,7 +33,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     D tmp[1][2] = { { { 1.0, 1.0 }, { 1.0, 1.0 } } };
     DifferentialPair<D[2][1]> dOut = diffPair(tmp);
-    var result = __fwd_diff(f)(dpd, 1, dOut).d;
+    var result = fwd_diff(f)(dpd, 1, dOut).d;
 
     // dOut.d has type D[2][1].Differential. Verify that it can coerce to D.Differential[2][1].
     D.Differential darrCopy[1][2] = dOut.d;

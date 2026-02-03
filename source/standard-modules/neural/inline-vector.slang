@@ -75,6 +75,7 @@ public struct InlineVector<T, int N> : IVector<T>
     }
 
     // Linear transformation without bias
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
@@ -105,6 +106,7 @@ public struct InlineVector<T, int N> : IVector<T>
     }
 
     // Linear transformation with bias
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
@@ -155,9 +157,8 @@ public struct InlineVector<T, int N> : IVector<T>
             // N is the column count of the weight matrix.
             for (int i = 0; i < N; i++)
             {
-                // On the transpose, we just perform linear combination of each row for the cache friendly.
                 Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i + j * N);
-                T.Differential prod = T.Differential.dmul(dWeightStorage.p.read(elementOffset), dy);
+                T.Differential prod = __realCast<T.Differential, T>(dWeightStorage.p.read(elementOffset)) * dy;
                 d[i] = T.Differential.dadd(d[i], prod);
             }
         }
@@ -174,7 +175,8 @@ public struct InlineVector<T, int N> : IVector<T>
             {
                 let x = dthis.p[col];
                 let elementOffset = Storage.getOffset(rowOffset, col);
-                T.Differential prod = T.Differential.dmul(x, dy);
+                //T.Differential prod = T.Differential.dmul(x, dy);
+                T.Differential prod = __realCast<T.Differential, T>(x) * dy;
                 dWeightStorage.d.atomicAdd(elementOffset, prod);
             }
         }
@@ -209,6 +211,7 @@ public struct InlineVector<T, int N> : IVector<T>
     }
 
     // Linear transformation without bias (Bindless storage)
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
@@ -235,6 +238,7 @@ public struct InlineVector<T, int N> : IVector<T>
     }
 
     // Linear transformation with bias (Bindless storage)
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress,
@@ -274,7 +278,7 @@ public struct InlineVector<T, int N> : IVector<T>
             [ForceUnroll]
             for (int i = 0; i < N; i++)
             {
-                T.Differential prod = T.Differential.dmul(dparameters.p[i + j * N], dy);
+                T.Differential prod = __realCast<T.Differential, T>(dparameters.p[i + j * N]) * dy;
                 d[i] = T.Differential.dadd(d[i], prod);
             }
         }
@@ -290,7 +294,7 @@ public struct InlineVector<T, int N> : IVector<T>
             for (int col = 0; col < N; col++)
             {
                 let x = dthis.p[col];
-                T.Differential prod = T.Differential.dmul(x, dy);
+                T.Differential prod = __realCast<T.Differential, T>(x) * dy;
                 rowAddr.atomicAdd(col, prod);
             }
         }

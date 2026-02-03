@@ -54,17 +54,17 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     A.Differential ad;
     ad.x = 1.0;
 
-    let rs = __fwd_diff(f)(a, dpfloat(3.0, 1.0));
+    let rs = fwd_diff(f)(a, dpfloat(3.0, 1.0));
     outputBuffer[0] = rs.p; // Expect: 13.0
     outputBuffer[1] = rs.d; // Expect: 6.0
 
-    let rs2 = __fwd_diff(f2)(a, dpfloat(3.0, 1.0));
+    let rs2 = fwd_diff(f2)(a, dpfloat(3.0, 1.0));
     outputBuffer[2] = rs2.p; // Expect: 13.0
     outputBuffer[3] = rs2.d; // Expect: 6.0
 
     // By calling A.getVal directly, we will invoke the implementation
     // that differentiates the `this` argument.
-    let rs3 = __fwd_diff(f3)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
+    let rs3 = fwd_diff(f3)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
     outputBuffer[4] = rs3.p; // Expect: 13.0
     outputBuffer[5] = rs3.d; // Expect: 10.0
 }

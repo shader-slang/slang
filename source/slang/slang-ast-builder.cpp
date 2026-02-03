@@ -461,6 +461,36 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
 Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
 {
     auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
@@ -665,6 +695,24 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
+Type* ASTBuilder::getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness)
+{
+    Val* args[] = {baseType, diffTypeInfoWitness};
+    return getSpecializedBuiltinType(makeArrayView(args), "FwdDiffFuncType");
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getDiffTypeInfoInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DiffTypeInfoInterfaceType", nullptr));
+    return declRef;
+}
+
+Type* ASTBuilder::getDiffTypeInfoInterfaceType()
+{
+    return DeclRefType::create(this, getDiffTypeInfoInterfaceDecl());
+}
+
 DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(
     Type* valueType,
     Witness* diffRefTypeWitness)
@@ -678,6 +726,13 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =
         DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
+    return declRef;
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getFunctionBaseInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("FunctionBaseType", nullptr));
     return declRef;
 }
 
@@ -728,6 +783,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 Type* ASTBuilder::getDifferentiableInterfaceType()
 {
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
+}
+
+Type* ASTBuilder::getFunctionBaseType()
+{
+    return DeclRefType::create(this, getFunctionBaseInterfaceDecl());
 }
 
 Type* ASTBuilder::getDifferentiableRefInterfaceType()
@@ -827,8 +887,8 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 TupleType* ASTBuilder::getTupleType(ArrayView<Type*> types)
 {
     // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl,
-    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we can
-    // use that directly.
+    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we
+    // can use that directly.
     if (types.getCount() == 1)
     {
         if (isTypePack(types[0]))
@@ -958,18 +1018,18 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
-    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+
+    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
+    {
+        return aIsSubtypeOfBWitness;
+    }
+
+    if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
     {
         if (declAIsSubtypeOfBWitness->isEquality())
             return bIsSubtypeOfCWitness;
     }
 
-    // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
-    //
-    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
-    {
-        return aIsSubtypeOfBWitness;
-    }
     else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
     {
         if (declBIsSubtypeOfCWitness->isEquality())
@@ -1050,9 +1110,9 @@ top:
             indexOfCInConjunction);
     }
 
-    // If left hand is a TypePackSubtypeWitness, then we should also return a TypePackSubtypeWitness
-    // where each witness in the pack is the transitive subtype witness of the corresponding
-    // witness in the original pack.
+    // If left hand is a TypePackSubtypeWitness, then we should also return a
+    // TypePackSubtypeWitness where each witness in the pack is the transitive subtype witness
+    // of the corresponding witness in the original pack.
     //
     if (auto witnessPack = as<TypePackSubtypeWitness>(aIsSubtypeOfBWitness))
     {
@@ -1076,8 +1136,9 @@ top:
         return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
     }
 
-    // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the
-    // transitive lookup on `each T`, and then form a new ExpandSubtypeWitness with the result.
+    // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform
+    // the transitive lookup on `each T`, and then form a new ExpandSubtypeWitness with the
+    // result.
     //
     if (auto declaredWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
     {
@@ -1095,6 +1156,28 @@ top:
             }
         }
     }
+
+    /*
+    if (auto aIsDeclaredSubtypeOfB = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        if (auto bIsDeclaredSubtypeOfC = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
+        {
+            auto subType = aIsDeclaredSubtypeOfB->getSub();
+            auto midType = aIsDeclaredSubtypeOfB->getSup();
+            auto supType = bIsDeclaredSubtypeOfC->getSup();
+
+            if (as<DeclRefType>(midType) && as<DeclRefType>(supType))
+            {
+                auto midTypeDeclRef = as<DeclRefType>(midType)->getDeclRef();
+                auto supTypeDeclRef = as<DeclRefType>(supType)->getDeclRef();
+                if (midTypeDeclRef.as<InterfaceDecl>() && supTypeDeclRef.as<InterfaceDecl>())
+                {
+                    auto lookupDeclRef = getLookupDeclRef(aIsDeclaredSubtypeOfB->get
+                }
+            }
+        }
+    }
+    */
 
     // If none of the above special cases applied, then we are just going to create
     // a `TransitiveSubtypeWitness` directly.

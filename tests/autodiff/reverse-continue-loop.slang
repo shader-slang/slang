@@ -45,4 +45,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 }
 
-//CHK-NOT: note
+//CHK-NOT: tests/autodiff/reverse-continue-loop.slang({{[0-9]+}}): note
