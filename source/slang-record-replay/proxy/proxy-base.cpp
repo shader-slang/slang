@@ -12,6 +12,7 @@
 #include "proxy-session.h"
 #include "proxy-shared-library.h"
 #include "proxy-type-conformance.h"
+#include "../replay-context.h"
 
 namespace SlangRecord
 {
@@ -28,6 +29,16 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         ProxyT* proxy = new ProxyT(queried.get());
         obj->release();
         proxy->addRef();
+        
+        // Register the proxy with the ReplayContext so it can be tracked as a handle
+        auto& ctx = ReplayContext::get();
+        if (ctx.isActive())
+        {
+            ISlangUnknown* proxyUnknown = static_cast<ISlangUnknown*>(static_cast<T*>(proxy));
+            ctx.registerInterface(proxyUnknown);
+            ctx.registerProxy(proxyUnknown, queried.get());
+        }
+        
         return static_cast<ISlangUnknown*>(static_cast<T*>(proxy));
     }
     return nullptr;

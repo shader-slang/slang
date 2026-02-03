@@ -301,6 +301,25 @@ SLANG_API bool slang_isRecordLayerEnabled()
     return SlangRecord::ReplayContext::get().isActive();
 }
 
+SLANG_API void slang_getRecordLayerData(const void** outData, size_t* outSize)
+{
+    auto& ctx = SlangRecord::ReplayContext::get();
+    auto& stream = ctx.getStream();
+    if (outData)
+        *outData = stream.getData();
+    if (outSize)
+        *outSize = stream.getSize();
+}
+
+SLANG_API void slang_clearRecordLayer()
+{
+    auto& ctx = SlangRecord::ReplayContext::get();
+    // Preserve the current mode when clearing
+    auto mode = ctx.getMode();
+    ctx.reset();
+    ctx.setMode(mode);
+}
+
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession)

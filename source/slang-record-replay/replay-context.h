@@ -1,6 +1,7 @@
 #pragma once
 
 #include "replay-stream.h"
+#include "../core/slang-blob.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-list.h"
 #include "../core/slang-memory-arena.h"
@@ -19,8 +20,10 @@ using Slang::MemoryArena;
 using Slang::String;
 
 /// Handle constants for interface tracking.
-constexpr uint64_t kNullHandle = 0;
-constexpr uint64_t kFirstValidHandle = 1;
+/// Handles 0-255 are reserved for special meanings.
+constexpr uint64_t kNullHandle = 0;          ///< Null pointer
+constexpr uint64_t kInlineBlobHandle = 1;    ///< User-provided blob serialized inline
+constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
 
 /// Exception thrown when trying to record an untracked interface.
 class UntrackedInterfaceException : public Slang::Exception
@@ -202,9 +205,36 @@ public:
     template<typename T, typename CountT>
     void recordArray(RecordFlag flags, const T*& arr, CountT& count);
 
+    /// Begin recording a method call.
+    /// Records the function signature and 'this' pointer as a tracked handle.
+    template<typename T>
+    void beginCall(const char* signature, T* thisPtr)
+    {
+        if (!isActive())
+            return;
+        // Record the signature as a string
+        record(RecordFlag::Input, signature);
+        // Record the 'this' pointer as a handle - cast to ISlangUnknown* for tracking
+        ISlangUnknown* obj = static_cast<ISlangUnknown*>(thisPtr);
+        recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, obj);
+    }
+
+    /// Begin recording a static/free function call.
+    /// Records only the function signature.
+    void beginStaticCall(const char* signature)
+    {
+        if (!isActive())
+            return;
+        record(RecordFlag::Input, signature);
+    }
+
     /// Register a proxy-implementation pair.
     /// Call this when wrapping an implementation with a proxy.
     void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
+
+    /// Register an interface object and get its handle.
+    /// Used when creating proxy objects to register them for handle tracking.
+    uint64_t registerInterface(ISlangUnknown* obj);
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
@@ -277,9 +307,6 @@ private:
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
-
-    /// Register an interface that was just created.
-    uint64_t registerInterface(ISlangUnknown* obj);
 
     /// Check if an object is registered.
     bool isInterfaceRegistered(ISlangUnknown* obj) const;
@@ -367,15 +394,22 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
         // Recording mode
         if (isInput)
         {
-            // Input: look up handle for existing object
+            // Handle null
+            if (obj == nullptr)
+            {
+                uint64_t handle = kNullHandle;
+                recordHandle(flags, handle);
+                return;
+            }
+
             // Special case: ISlangBlob may be user-provided data
             if (auto blob = dynamic_cast<ISlangBlob*>(static_cast<ISlangUnknown*>(obj)))
             {
                 // Record blob contents inline if not already tracked
                 if (!isInterfaceRegistered(blob))
                 {
-                    // Write a special "inline blob" marker (handle 0 with data following)
-                    uint64_t handle = kNullHandle;
+                    // Write inline blob marker
+                    uint64_t handle = kInlineBlobHandle;
                     recordHandle(flags, handle);
                     
                     // Record blob data
@@ -386,7 +420,7 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
                 }
             }
 
-            // Normal case: look up handle
+            // Normal case: look up handle for tracked object
             uint64_t handle = getHandleForInterface(static_cast<ISlangUnknown*>(obj));
             recordHandle(flags, handle);
         }
@@ -402,15 +436,24 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
         // Playback mode
         if (isInput)
         {
-            // Read handle and look up object
+            // Read handle
             uint64_t handle = kNullHandle;
             recordHandle(flags, handle);
 
             if (handle == kNullHandle)
             {
-                // Could be null or inline blob
-                // For now, assume null
                 obj = nullptr;
+            }
+            else if (handle == kInlineBlobHandle)
+            {
+                // Read inline blob data and create a new blob
+                const void* data = nullptr;
+                size_t size = 0;
+                recordBlob(flags, data, size);
+                
+                // Create a RawBlob from the data (arena-allocated during recordBlob)
+                Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data, size);
+                obj = static_cast<T*>(static_cast<ISlangUnknown*>(blob.detach()));
             }
             else
             {

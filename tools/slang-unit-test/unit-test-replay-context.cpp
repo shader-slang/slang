@@ -337,6 +337,100 @@ SLANG_UNIT_TEST(replayContextHandleNull)
     SLANG_CHECK(readBlob == nullptr);
 }
 
+SLANG_UNIT_TEST(replayContextInlineBlob)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Test inline blob serialization - when a user-provided blob (not tracked)
+    // is passed as input, its data should be serialized inline and reconstructed
+    // during playback.
+
+    const char* testData = "Hello, inline blob world!";
+    size_t testDataSize = strlen(testData) + 1;  // Include null terminator
+
+    // === RECORDING PHASE ===
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+
+    // Create a user-provided blob that is NOT registered/tracked
+    Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
+    ISlangBlob* inputBlob = userBlob.get();
+    
+    // Record it as input - since it's not tracked, it should serialize inline
+    writer.record(RecordFlag::Input, inputBlob);
+
+    // Verify recording produced data
+    SLANG_CHECK(writer.getStream().getSize() > 0);
+
+    // === PLAYBACK PHASE ===
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+
+    // During playback, the blob should be reconstructed from the serialized data
+    ISlangBlob* readBlob = nullptr;
+    reader.record(RecordFlag::Input, readBlob);
+
+    // Verify the blob was created
+    SLANG_CHECK(readBlob != nullptr);
+    
+    // Verify the data matches
+    SLANG_CHECK(readBlob->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(readBlob->getBufferPointer(), testData, testDataSize) == 0);
+
+    // Clean up - the blob was detached so we own it
+    readBlob->release();
+}
+
+SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Test that an inline blob can later be output (registered) and input again
+    // This simulates: user passes blob as input, API stores it internally,
+    // then later returns the same blob as output
+
+    const char* testData = "Inline then tracked";
+    size_t testDataSize = strlen(testData) + 1;
+
+    // === RECORDING PHASE ===
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+
+    // User provides blob as input (untracked -> inline)
+    Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
+    ISlangBlob* inputBlob = userBlob.get();
+    writer.record(RecordFlag::Input, inputBlob);
+
+    // API stores it and later returns it as output (now it gets tracked)
+    ISlangBlob* outputBlob = userBlob.get();
+    writer.record(RecordFlag::Output, outputBlob);
+
+    // Later, it's passed as input again (should use handle, not inline)
+    ISlangBlob* inputAgain = userBlob.get();
+    writer.record(RecordFlag::Input, inputAgain);
+
+    // === PLAYBACK PHASE ===
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+
+    // First: read inline blob
+    ISlangBlob* readInline = nullptr;
+    reader.record(RecordFlag::Input, readInline);
+    SLANG_CHECK(readInline != nullptr);
+    SLANG_CHECK(readInline->getBufferSize() == testDataSize);
+
+    // Second: output registers a blob (simulating API creating/returning it)
+    // In real usage, playback would provide its own blob here
+    ISlangBlob* playbackOutput = readInline;  // Use the reconstructed blob
+    reader.record(RecordFlag::Output, playbackOutput);
+
+    // Third: input should resolve to the registered blob
+    ISlangBlob* readAgain = nullptr;
+    reader.record(RecordFlag::Input, readAgain);
+    SLANG_CHECK(readAgain == readInline);
+
+    // Clean up
+    readInline->release();
+}
+
 // =============================================================================
 // Slang Enums
 // =============================================================================
@@ -951,3 +1045,164 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
     reader.record(RecordFlag::None, readVal);
     SLANG_CHECK(readVal == 42);
 }
+
+// =============================================================================
+// Integration Test: Record actual API calls and verify exact bytes
+// =============================================================================
+
+// Helper to read a TypeId byte from the stream
+static TypeId readTypeIdFromStream(ReplayStream& stream)
+{
+    uint8_t byte = 0;
+    stream.read(&byte, 1);
+    return static_cast<TypeId>(byte);
+}
+
+SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Save and set up recording
+    bool wasActive = slang_isRecordLayerEnabled();
+    slang_enableRecordLayer(true);
+    slang_clearRecordLayer();
+
+    // Create a global session
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
+
+    // Call findProfile to generate a recorded call
+    SlangProfileID profileId = globalSession->findProfile("sm_5_0");
+    SLANG_CHECK(profileId != SLANG_PROFILE_UNKNOWN);
+
+    // Get the recorded data
+    const void* data = nullptr;
+    size_t size = 0;
+    slang_getRecordLayerData(&data, &size);
+
+    SLANG_CHECK(data != nullptr);
+    SLANG_CHECK(size > 0);
+
+    // Parse the recorded data to verify the structure
+    // Expected format for findProfile call:
+    // 1. String (function signature) - TypeId::String (0x10), length, bytes
+    // 2. ObjectHandle (this pointer) - TypeId::ObjectHandle (0x13), uint64 handle
+    // 3. String (profile name "sm_5_0") - TypeId::String (0x10), length, bytes
+    // 4. Int32 (return value - profileId) - TypeId::Int32 (0x03), int32 value
+
+    ReplayContext reader(data, size);
+
+    // Read function signature
+    const char* signature = nullptr;
+    reader.record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
+    // The signature should contain "findProfile"
+    SLANG_CHECK(strstr(signature, "findProfile") != nullptr);
+
+    // Read 'this' pointer handle - check TypeId then read uint64
+    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    uint64_t thisHandle = 0;
+    reader.getStream().read(&thisHandle, sizeof(thisHandle));
+    SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
+
+    // Read profile name
+    const char* profileName = nullptr;
+    reader.record(RecordFlag::Input, profileName);
+    SLANG_CHECK(profileName != nullptr);
+    SLANG_CHECK(strcmp(profileName, "sm_5_0") == 0);
+
+    // Read return value (SlangProfileID recorded as int32)
+    int32_t returnedProfileId = 0;
+    reader.record(RecordFlag::None, returnedProfileId);
+    SLANG_CHECK(returnedProfileId == static_cast<int32_t>(profileId));
+
+    // Should have consumed all data
+    SLANG_CHECK(reader.getStream().atEnd());
+
+    // Clean up
+    globalSession = nullptr;
+    slang_clearRecordLayer();
+    slang_enableRecordLayer(wasActive);
+}
+
+SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Save and set up recording
+    bool wasActive = slang_isRecordLayerEnabled();
+    slang_enableRecordLayer(true);
+    slang_clearRecordLayer();
+
+    // Create a global session
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, globalSession.writeRef())));
+
+    // Create a session
+    slang::SessionDesc sessionDesc = {};
+    Slang::ComPtr<slang::ISession> session;
+    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    // Get the recorded data
+    const void* data = nullptr;
+    size_t size = 0;
+    slang_getRecordLayerData(&data, &size);
+
+    SLANG_CHECK(data != nullptr);
+    SLANG_CHECK(size > 0);
+
+    // Parse the recorded data
+    // Expected format for createSession call:
+    // 1. String (function signature)
+    // 2. ObjectHandle (this pointer)
+    // 3. SessionDesc (complex struct)
+    // 4. ObjectHandle (output session)
+    // 5. Int32 (return value - SlangResult)
+
+    ReplayContext reader(data, size);
+
+    // Read function signature
+    const char* signature = nullptr;
+    reader.record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
+    SLANG_CHECK(strstr(signature, "createSession") != nullptr);
+
+    // Read 'this' pointer handle
+    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    uint64_t thisHandle = 0;
+    reader.getStream().read(&thisHandle, sizeof(thisHandle));
+    SLANG_CHECK(thisHandle >= kFirstValidHandle);
+
+    // Read SessionDesc
+    slang::SessionDesc readDesc = {};
+    reader.record(RecordFlag::Input, readDesc);
+    // Verify it matches what we passed (empty desc)
+    SLANG_CHECK(readDesc.targetCount == 0);
+    SLANG_CHECK(readDesc.searchPathCount == 0);
+
+    // Read output session handle
+    SLANG_CHECK(readTypeIdFromStream(reader.getStream()) == TypeId::ObjectHandle);
+    uint64_t sessionHandle = 0;
+    reader.getStream().read(&sessionHandle, sizeof(sessionHandle));
+    SLANG_CHECK(sessionHandle >= kFirstValidHandle);
+    SLANG_CHECK(sessionHandle != thisHandle); // Different object
+
+    // Read return value (SlangResult is int32)
+    int32_t result = 0;
+    reader.record(RecordFlag::None, result);
+    SLANG_CHECK(result == SLANG_OK);
+
+    // Should have consumed all data
+    SLANG_CHECK(reader.getStream().atEnd());
+
+    // Clean up
+    session = nullptr;
+    globalSession = nullptr;
+    slang_clearRecordLayer();
+    slang_enableRecordLayer(wasActive);
+}
+

@@ -2,6 +2,7 @@
 #define SLANG_PROXY_GLOBAL_SESSION_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang.h"
@@ -28,16 +29,55 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
     {
-        SLANG_UNUSED(desc);
-        SLANG_UNUSED(outSession);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::createSession");
+        // Uses pretty function name to extract type and function and create a scoped object that:
+        // - use a scoped mutex to lock the replay context (by getting its mutex)
+        // - record the type/function (this will need to be added to the replace context (eg 'beginCall'))
+        RECORD_CALL();
+
+        // Records 'desc' as an input
+        RECORD_INPUT(desc);
+
+        // Call create session
+        auto result = getActual<slang::IGlobalSession>()->createSession(desc, outSession);
+
+        // wraps outSession, and records 'outSession' as an output
+        // Note: this may need an extra set of 'record' functions added, or just a dereference
+        // Note: we could do the wrapping inside serialize - this may be cleaner
+        RECORD_OUTPUT(outSession);
+
+        // Records the result and returns it
+        RECORD_RETURN(result);
     }
+
+    /*
+    // We could wrap up createSession in an even simpler way as it fits a very standard pattern
+    // of taking a set of arguments and returning a single output. It would basically just expand
+    // to the above version.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
+    {
+        // Single macro that performs the full logic shown above.
+        RECORD_CALL_OUTPUT_OBJECT(slang::IGlobalSession, createSession, desc, outSession);
+    }
+    */
 
     virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(char const* name) override
     {
-        SLANG_UNUSED(name);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::findProfile");
+        RECORD_CALL();
+        RECORD_INPUT(name);
+        auto result = getActual<slang::IGlobalSession>()->findProfile(name);
+        RECORD_RETURN(result);
     }
+
+    /*
+    // Another standard pattern is a function that just takes some arguments and returns
+    // a value. This could also be wrapped in a single macro.
+    virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(char const* name) override
+    {
+        RECORD_CALL_RETURN(slang::IGlobalSession, findProfile, name);
+    }
+    */
+
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     setDownstreamCompilerPath(SlangPassThrough passThrough, char const* path) override

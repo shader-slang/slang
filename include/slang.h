@@ -5017,6 +5017,19 @@ SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
  */
 SLANG_EXTERN_C SLANG_API bool slang_isRecordLayerEnabled();
 
+/* Get the recorded data from the record layer as a blob.
+   Returns the start pointer and size of the recorded stream.
+   The data remains valid until the next record layer operation or slang_clearRecordLayer is called.
+   @param outData (out) Pointer to the start of the recorded data.
+   @param outSize (out) Size of the recorded data in bytes.
+ */
+SLANG_EXTERN_C SLANG_API void slang_getRecordLayerData(const void** outData, size_t* outSize);
+
+/* Clear the recorded data in the record layer, resetting it to empty state.
+   The record layer remains enabled/disabled as it was.
+ */
+SLANG_EXTERN_C SLANG_API void slang_clearRecordLayer();
+
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
