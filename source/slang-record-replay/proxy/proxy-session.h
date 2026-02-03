@@ -25,7 +25,7 @@ public:
     }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
-    ISlangUnknown* getInterface(const Guid& guid);
+    SLANG_PROXY_GET_INTERFACE(slang::ISession)
 
     // ISession
     virtual SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override

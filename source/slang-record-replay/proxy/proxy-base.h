@@ -10,6 +10,11 @@ using namespace Slang;
 
 /// Base class for all proxy types that wrap Slang COM interfaces.
 /// Holds a ref-counted pointer to the underlying object.
+///
+/// Derived classes must inherit from their interface FIRST, then from ProxyBase.
+/// Example: class BlobProxy : public ISlangBlob, public ProxyBase
+///
+/// This allows getInterface() to cast 'this' to ISlangUnknown* via the interface.
 class ProxyBase : public RefObject
 {
 public:
@@ -27,6 +32,17 @@ public:
 protected:
     Slang::ComPtr<ISlangUnknown> m_actual;
 };
+
+/// Macro to implement getInterface for proxy classes.
+/// Must be used in classes that inherit from an interface first, then ProxyBase.
+/// The InterfaceType should be the primary interface the proxy implements.
+#define SLANG_PROXY_GET_INTERFACE(InterfaceType)                                     \
+    ISlangUnknown* getInterface(const Guid& guid)                                    \
+    {                                                                                \
+        if (m_actual->queryInterface(guid, nullptr) == SLANG_OK)                     \
+            return static_cast<InterfaceType*>(this);                                \
+        return nullptr;                                                              \
+    }
 
 /// Wrap a Slang COM interface pointer in its corresponding proxy type.
 /// Returns nullptr if the object cannot be wrapped (unknown type).

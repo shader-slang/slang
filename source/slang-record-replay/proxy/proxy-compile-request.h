@@ -26,7 +26,7 @@ public:
     }
 
     SLANG_REF_OBJECT_IUNKNOWN_ALL
-    ISlangUnknown* getInterface(const Guid& guid);
+    SLANG_PROXY_GET_INTERFACE(slang::ICompileRequest)
 
     // ICompileRequest
     virtual SLANG_NO_THROW void SLANG_MCALL setFileSystem(ISlangFileSystem* fileSystem) override
