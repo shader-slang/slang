@@ -3,14 +3,10 @@
 
 #include "proxy-base.h"
 
-#include "slang-com-helper.h"
-#include "slang.h"
-
 namespace SlangRecord
 {
-using namespace Slang;
 
-class MutableFileSystemProxy : public ISlangMutableFileSystem, public ProxyBase
+class MutableFileSystemProxy : public ProxyBase<ISlangMutableFileSystem>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -23,9 +19,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(ISlangMutableFileSystem)
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override

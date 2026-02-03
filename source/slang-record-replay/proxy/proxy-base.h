@@ -8,14 +8,15 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-/// Base class for all proxy types that wrap Slang COM interfaces.
-/// Holds a ref-counted pointer to the underlying object.
+/// Variadic template base class for proxy types that wrap Slang COM interfaces.
+/// Handles ref-counting and queryInterface automatically.
 ///
-/// Derived classes must inherit from their interface FIRST, then from ProxyBase.
-/// Example: class BlobProxy : public ISlangBlob, public ProxyBase
+/// Usage:
+///   class BlobProxy : public ProxyBase<ISlangBlob>
+///   class ModuleProxy : public ProxyBase<slang::IModule, slang::IComponentType2, ...>
 ///
-/// This allows getInterface() to cast 'this' to ISlangUnknown* via the interface.
-class ProxyBase : public RefObject
+template<typename TFirstInterface, typename... TRestInterfaces>
+class ProxyBase : public TFirstInterface, public TRestInterfaces..., public RefObject
 {
 public:
     explicit ProxyBase(ISlangUnknown* actual)
@@ -23,37 +24,48 @@ public:
     {
     }
 
+    // ISlangUnknown implementation
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        return (uint32_t)RefObject::addReference();
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        return (uint32_t)RefObject::releaseReference();
+    }
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        // Delegate to the underlying object to check if it supports the interface
+        if (m_actual->queryInterface(uuid, nullptr) == SLANG_OK)
+        {
+            addRef();
+            // Cast through TFirstInterface to avoid ambiguity with multiple inheritance
+            *outObject = static_cast<TFirstInterface*>(this);
+            return SLANG_OK;
+        }
+        if (outObject)
+            *outObject = nullptr;
+        return SLANG_E_NO_INTERFACE;
+    }
+
+    /// Get the underlying actual object, cast to the requested interface type.
     template<typename T>
     T* getActual() const
     {
-        return static_cast<T*>(m_actual.get());
+        return dynamic_cast<T*>(m_actual.get());
     }
 
 protected:
     Slang::ComPtr<ISlangUnknown> m_actual;
 };
 
-/// Macro to implement getInterface for proxy classes.
-/// Must be used in classes that inherit from an interface first, then ProxyBase.
-/// The InterfaceType should be the primary interface the proxy implements.
-#define SLANG_PROXY_GET_INTERFACE(InterfaceType)                                     \
-    ISlangUnknown* getInterface(const Guid& guid)                                    \
-    {                                                                                \
-        if (m_actual->queryInterface(guid, nullptr) == SLANG_OK)                     \
-            return static_cast<InterfaceType*>(this);                                \
-        return nullptr;                                                              \
-    }
-
 /// Wrap a Slang COM interface pointer in its corresponding proxy type.
 /// Returns nullptr if the object cannot be wrapped (unknown type).
 /// The returned pointer is ref-counted and must be released by the caller.
 ISlangUnknown* wrapObject(ISlangUnknown* obj);
 
-/// Helper template for wrapping with automatic type casting.
-template<typename T>
-T* wrap(T* obj)
-{
-    return static_cast<T*>(wrapObject(obj));
-}
 
 } // namespace SlangRecord

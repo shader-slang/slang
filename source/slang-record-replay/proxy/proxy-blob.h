@@ -3,14 +3,10 @@
 
 #include "proxy-base.h"
 
-#include "slang-com-helper.h"
-#include "slang.h"
-
 namespace SlangRecord
 {
-using namespace Slang;
 
-class BlobProxy : public ISlangBlob, public ProxyBase
+class BlobProxy : public ProxyBase<ISlangBlob>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -24,17 +20,14 @@ public:
     {
     }
 
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(ISlangBlob)
-
     virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() override
     {
-        SLANG_UNIMPLEMENTED_X("BlobProxy::getBufferPointer");
+        return getActual<ISlangBlob>()->getBufferPointer();
     }
 
     virtual SLANG_NO_THROW size_t SLANG_MCALL getBufferSize() override
     {
-        SLANG_UNIMPLEMENTED_X("BlobProxy::getBufferSize");
+        return getActual<ISlangBlob>()->getBufferSize();
     }
 };
 

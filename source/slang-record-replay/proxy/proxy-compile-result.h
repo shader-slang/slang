@@ -10,7 +10,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class CompileResultProxy : public slang::ICompileResult, public ProxyBase
+class CompileResultProxy : public ProxyBase<slang::ICompileResult>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -23,9 +23,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(slang::ICompileResult)
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override

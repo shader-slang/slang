@@ -3,14 +3,10 @@
 
 #include "proxy-base.h"
 
-#include "slang-com-helper.h"
-#include "slang.h"
-
 namespace SlangRecord
 {
-using namespace Slang;
 
-class SessionProxy : public slang::ISession, public ProxyBase
+class SessionProxy : public ProxyBase<slang::ISession>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -23,9 +19,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(slang::ISession)
 
     // ISession
     virtual SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override

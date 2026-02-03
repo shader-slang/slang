@@ -10,7 +10,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class GlobalSessionProxy : public slang::IGlobalSession, public ProxyBase
+class GlobalSessionProxy : public ProxyBase<slang::IGlobalSession>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -23,9 +23,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(slang::IGlobalSession)
 
     // IGlobalSession
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

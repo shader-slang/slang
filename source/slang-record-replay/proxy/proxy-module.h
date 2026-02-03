@@ -10,10 +10,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class ModuleProxy : public slang::IModule,
-                    public slang::IComponentType2,
-                    public slang::IModulePrecompileService_Experimental,
-                    public ProxyBase
+class ModuleProxy : public ProxyBase<slang::IModule, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -26,9 +23,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(slang::IModule)
 
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override

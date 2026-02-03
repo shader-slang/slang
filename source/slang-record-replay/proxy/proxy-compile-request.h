@@ -11,7 +11,7 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class CompileRequestProxy : public slang::ICompileRequest, public ProxyBase
+class CompileRequestProxy : public ProxyBase<slang::ICompileRequest>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -24,9 +24,6 @@ public:
         : ProxyBase(actual)
     {
     }
-
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
-    SLANG_PROXY_GET_INTERFACE(slang::ICompileRequest)
 
     // ICompileRequest
     virtual SLANG_NO_THROW void SLANG_MCALL setFileSystem(ISlangFileSystem* fileSystem) override
