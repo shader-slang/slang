@@ -26,6 +26,8 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         // Use static_cast to T* first (the interface), then to ISlangUnknown*
         // to avoid ambiguity from multiple inheritance
         ProxyT* proxy = new ProxyT(queried.get());
+        obj->release();
+        proxy->addRef();
         return static_cast<ISlangUnknown*>(static_cast<T*>(proxy));
     }
     return nullptr;

@@ -5,10 +5,8 @@
 #include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-signal.h"
-#if TODO_REPLAY_SYSTEM
-#include "../slang-record-replay/record/slang-global-session.h"
-#include "../slang-record-replay/util/record-utility.h"
-#endif
+#include "../slang-record-replay/proxy/proxy-base.h"
+#include "../slang-record-replay/replay-context.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
@@ -247,17 +245,21 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
     }
 
-#if TODO_REPLAY_SYSTEM
-    // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
-    if (SlangRecord::isRecordLayerEnabled())
+    // Wrap in proxy if record/replay is active
+    if (SlangRecord::ReplayContext::get().isActive())
     {
-        SlangRecord::GlobalSessionRecorder* globalSessionRecorder =
-            new SlangRecord::GlobalSessionRecorder(desc, globalSession.detach());
-        Slang::ComPtr<SlangRecord::GlobalSessionRecorder> result(globalSessionRecorder);
-        *outGlobalSession = result.detach();
+        auto* wrapped = SlangRecord::wrapObject(globalSession.get());
+        if (wrapped)
+        {
+            globalSession.detach();  // Release ownership from ComPtr
+            *outGlobalSession = static_cast<slang::IGlobalSession*>(wrapped);
+        }
+        else
+        {
+            *outGlobalSession = globalSession.detach();
+        }
     }
     else
-#endif
     {
         *outGlobalSession = globalSession.detach();
     }
@@ -284,6 +286,19 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+}
+
+SLANG_API void slang_enableRecordLayer(bool enable)
+{
+    if (enable)
+        SlangRecord::ReplayContext::get().enable();
+    else
+        SlangRecord::ReplayContext::get().disable();
+}
+
+SLANG_API bool slang_isRecordLayerEnabled()
+{
+    return SlangRecord::ReplayContext::get().isActive();
 }
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(

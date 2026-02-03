@@ -1,8 +1,11 @@
 // unit-test-replay-context.cpp
 // Unit tests for the ReplayContext serializer - validates round-trip serialization
 
-// Is this cleaner than exporting everything just for unit tests??
+// Include cpp files directly to access internal symbols not exported from slang DLL
 #include "../../source/slang-record-replay/replay-context.cpp"
+#include "../../source/slang-record-replay/proxy/proxy-base.cpp"
+
+#include "../../source/slang-record-replay/proxy/proxy-global-session.h"
 
 #include "unit-test/slang-unit-test.h"
 
@@ -497,4 +500,95 @@ SLANG_UNIT_TEST(replayContextStreamState)
     ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
     SLANG_CHECK(reader.isReading());
     SLANG_CHECK(!reader.isWriting());
+}
+
+// =============================================================================
+// Proxy Wrapping Tests
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Save original state using the public C API
+    bool wasActive = slang_isRecordLayerEnabled();
+
+    // Enable replay context via the public C API
+    slang_enableRecordLayer(true);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == true);
+
+    // Create a global session via the public API
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
+    SLANG_CHECK(globalSession != nullptr);
+
+    // The session should be wrapped - verify by checking it's a GlobalSessionProxy
+    // and has the correct ref count.
+    SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) != nullptr);
+    SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get())->debugGetReferenceCount() == 1);
+
+    // Restore original state
+    slang_enableRecordLayer(wasActive);
+}
+
+SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Save original state using the public C API
+    bool wasActive = slang_isRecordLayerEnabled();
+
+    // Disable replay context via the public C API
+    slang_enableRecordLayer(false);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == false);
+
+    // Create a global session via the public API
+    Slang::ComPtr<slang::IGlobalSession> globalSession;
+    SlangGlobalSessionDesc desc = {};
+    desc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
+    SLANG_CHECK(globalSession != nullptr);
+
+    // The session should NOT be wrapped
+    SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) == nullptr);
+
+    // Restore original state
+    slang_enableRecordLayer(wasActive);
+}
+
+SLANG_UNIT_TEST(replayContextIsActiveState)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Save original state
+    bool wasActive = slang_isRecordLayerEnabled();
+
+    // Test enable/disable via the public C API
+    slang_enableRecordLayer(true);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == true);
+
+    slang_enableRecordLayer(false);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == false);
+
+    slang_enableRecordLayer(true);
+    SLANG_CHECK(slang_isRecordLayerEnabled() == true);
+
+    // Restore original state
+    slang_enableRecordLayer(wasActive);
+}
+
+SLANG_UNIT_TEST(replayContextSingletonIdentity)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Verify singleton returns the same instance (local test - uses included cpp)
+    auto& ctx1 = ReplayContext::get();
+    auto& ctx2 = ReplayContext::get();
+
+    SLANG_CHECK(&ctx1 == &ctx2);
+
+    // Verify the singleton is in writing mode
+    SLANG_CHECK(ctx1.isWriting());
 }

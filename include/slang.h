@@ -5007,6 +5007,16 @@ SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
  */
 SLANG_EXTERN_C SLANG_API void slang_shutdown();
 
+/* Enable or disable the record layer for API call recording.
+   When enabled, API calls are captured for later replay.
+   The record layer can also be enabled by setting the SLANG_RECORD_LAYER=1 environment variable.
+ */
+SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
+
+/* Check if the record layer is currently enabled.
+ */
+SLANG_EXTERN_C SLANG_API bool slang_isRecordLayerEnabled();
+
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
