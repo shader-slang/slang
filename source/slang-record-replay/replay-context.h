@@ -1,6 +1,7 @@
 #pragma once
 
 #include "replay-stream.h"
+#include "handle-tracker.h"
 #include "../core/slang-memory-arena.h"
 
 #include <slang.h>
@@ -10,6 +11,7 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace SlangRecord {
@@ -171,6 +173,40 @@ public:
     // Object handles (COM interface pointers mapped to IDs)
     void recordHandle(RecordFlag flags, uint64_t& handleId);
 
+    /// Record a COM interface pointer.
+    /// During recording:
+    /// - Input: looks up handle (throws UntrackedInterfaceException if not registered)
+    /// - Output: registers object and assigns handle
+    /// During playback:
+    /// - Input: looks up object by handle
+    /// - Output: verifies handle matches (object should already be registered)
+    /// 
+    /// Special case: ISlangBlob passed as input may contain user data and is recorded inline.
+    template<typename T>
+    void recordInterface(RecordFlag flags, T*& obj);
+
+    /// Register an interface that was just created.
+    /// Call this after creating an object to track it.
+    /// Returns the assigned handle.
+    uint64_t registerInterface(ISlangUnknown* obj);
+
+    /// Register a proxy-implementation pair.
+    /// Call this when wrapping an implementation with a proxy.
+    void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
+
+    /// Get or create a proxy for an implementation.
+    /// If a proxy already exists, returns it. Otherwise returns nullptr.
+    ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
+
+    /// Check if an object is registered.
+    bool isInterfaceRegistered(ISlangUnknown* obj) const;
+
+    /// Get handle for an object (throws if not registered).
+    uint64_t getHandleForInterface(ISlangUnknown* obj) const;
+
+    /// Get object for a handle (throws if not registered).
+    ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
+
     // Enum types - record as int32_t
     template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
 
@@ -224,6 +260,15 @@ private:
     MemoryArena m_arena;
     Mode m_mode;
     std::vector<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
+
+    // Handle tracking: maps objects to handles and back
+    std::unordered_map<ISlangUnknown*, uint64_t> m_objectToHandle;
+    std::unordered_map<uint64_t, ISlangUnknown*> m_handleToObject;
+    uint64_t m_nextHandle = kFirstValidHandle;
+
+    // Proxy tracking: maps proxies to implementations and back
+    std::unordered_map<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
+    std::unordered_map<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
 };
 
 // Template implementations
@@ -271,6 +316,93 @@ void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
     record(flags, v);
     if (isReading())
         value = static_cast<EnumT>(v);
+}
+
+template<typename T>
+void ReplayContext::recordInterface(RecordFlag flags, T*& obj)
+{
+    if (m_mode == Mode::Idle) return;
+
+    bool isInput = hasFlag(flags, RecordFlag::Input) || hasFlag(flags, RecordFlag::ThisPtr);
+    bool isOutput = hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue);
+
+    if (isWriting())
+    {
+        // Recording mode
+        if (isInput)
+        {
+            // Input: look up handle for existing object
+            // Special case: ISlangBlob may be user-provided data
+            if (auto blob = dynamic_cast<ISlangBlob*>(static_cast<ISlangUnknown*>(obj)))
+            {
+                // Record blob contents inline if not already tracked
+                if (!isInterfaceRegistered(blob))
+                {
+                    // Write a special "inline blob" marker (handle 0 with data following)
+                    uint64_t handle = kNullHandle;
+                    recordHandle(flags, handle);
+                    
+                    // Record blob data
+                    const void* data = blob->getBufferPointer();
+                    size_t size = blob->getBufferSize();
+                    recordBlob(flags, data, size);
+                    return;
+                }
+            }
+
+            // Normal case: look up handle
+            uint64_t handle = getHandleForInterface(static_cast<ISlangUnknown*>(obj));
+            recordHandle(flags, handle);
+        }
+        else if (isOutput)
+        {
+            // Output: register object and record handle
+            uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
+            recordHandle(flags, handle);
+        }
+    }
+    else
+    {
+        // Playback mode
+        if (isInput)
+        {
+            // Read handle and look up object
+            uint64_t handle = kNullHandle;
+            recordHandle(flags, handle);
+
+            if (handle == kNullHandle)
+            {
+                // Could be null or inline blob
+                // For now, assume null
+                obj = nullptr;
+            }
+            else
+            {
+                obj = static_cast<T*>(getInterfaceForHandle(handle));
+            }
+        }
+        else if (isOutput)
+        {
+            // Read handle - object should already be registered via registerInterface
+            uint64_t handle = kNullHandle;
+            recordHandle(flags, handle);
+
+            if (handle != kNullHandle)
+            {
+                // Verify object is registered with this handle
+                auto it = m_handleToObject.find(handle);
+                if (it == m_handleToObject.end())
+                {
+                    throw HandleNotFoundException(handle);
+                }
+                obj = static_cast<T*>(it->second);
+            }
+            else
+            {
+                obj = nullptr;
+            }
+        }
+    }
 }
 
 } // namespace SlangRecord

@@ -105,6 +105,80 @@ void ReplayContext::reset()
     m_referenceStream.reset();
     m_arena.reset();
     m_mode = Mode::Idle;
+    m_objectToHandle.clear();
+    m_handleToObject.clear();
+    m_nextHandle = kFirstValidHandle;
+    m_proxyToImpl.clear();
+    m_implToProxy.clear();
+}
+
+uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
+{
+    if (obj == nullptr)
+        return kNullHandle;
+
+    // Check if already registered
+    auto it = m_objectToHandle.find(obj);
+    if (it != m_objectToHandle.end())
+        return it->second;
+
+    // Assign new handle
+    uint64_t handle = m_nextHandle++;
+    m_objectToHandle[obj] = handle;
+    m_handleToObject[handle] = obj;
+    return handle;
+}
+
+void ReplayContext::registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation)
+{
+    if (proxy == nullptr || implementation == nullptr)
+        return;
+
+    m_proxyToImpl[proxy] = implementation;
+    m_implToProxy[implementation] = proxy;
+}
+
+ISlangUnknown* ReplayContext::getExistingProxy(ISlangUnknown* implementation)
+{
+    if (implementation == nullptr)
+        return nullptr;
+
+    auto it = m_implToProxy.find(implementation);
+    if (it == m_implToProxy.end())
+        return nullptr;
+
+    return it->second;
+}
+
+bool ReplayContext::isInterfaceRegistered(ISlangUnknown* obj) const
+{
+    if (obj == nullptr)
+        return true; // null is always "registered" as kNullHandle
+    return m_objectToHandle.find(obj) != m_objectToHandle.end();
+}
+
+uint64_t ReplayContext::getHandleForInterface(ISlangUnknown* obj) const
+{
+    if (obj == nullptr)
+        return kNullHandle;
+
+    auto it = m_objectToHandle.find(obj);
+    if (it == m_objectToHandle.end())
+        throw UntrackedInterfaceException(obj);
+
+    return it->second;
+}
+
+ISlangUnknown* ReplayContext::getInterfaceForHandle(uint64_t handle) const
+{
+    if (handle == kNullHandle)
+        return nullptr;
+
+    auto it = m_handleToObject.find(handle);
+    if (it == m_handleToObject.end())
+        throw HandleNotFoundException(handle);
+
+    return it->second;
 }
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
