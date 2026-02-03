@@ -569,3 +569,294 @@ SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
     slang_enableRecordLayer(wasActive);
 }
 
+// =============================================================================
+// Mode Tests
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextIdleMode)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // In Idle mode, record operations should be no-ops
+    ReplayContext ctx;
+    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+    SLANG_CHECK(ctx.isIdle());
+    SLANG_CHECK(!ctx.isActive());
+
+    // Recording should not write anything
+    int32_t value = 42;
+    ctx.record(RecordFlag::None, value);
+    SLANG_CHECK(ctx.getStream().getSize() == 0);
+
+    // Multiple records should still produce no data
+    float f = 3.14f;
+    const char* str = "hello";
+    ctx.record(RecordFlag::None, f);
+    ctx.record(RecordFlag::None, str);
+    SLANG_CHECK(ctx.getStream().getSize() == 0);
+}
+
+SLANG_UNIT_TEST(replayContextRecordMode)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // In Record mode, data should be written to stream
+    ReplayContext ctx;
+    ctx.setMode(Mode::Record);
+    SLANG_CHECK(ctx.getMode() == Mode::Record);
+    SLANG_CHECK(ctx.isRecording());
+    SLANG_CHECK(ctx.isActive());
+    SLANG_CHECK(ctx.isWriting());
+
+    int32_t value = 42;
+    ctx.record(RecordFlag::None, value);
+    SLANG_CHECK(ctx.getStream().getSize() > 0);
+
+    // Verify data was written correctly by reading it back
+    ReplayContext reader(ctx.getStream().getData(), ctx.getStream().getSize());
+    int32_t readValue = 0;
+    reader.record(RecordFlag::None, readValue);
+    SLANG_CHECK(readValue == 42);
+}
+
+SLANG_UNIT_TEST(replayContextPlaybackMode)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // First record some data
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+
+    int32_t writeInt = 123;
+    float writeFloat = 2.5f;
+    const char* writeStr = "test";
+
+    writer.record(RecordFlag::None, writeInt);
+    writer.record(RecordFlag::None, writeFloat);
+    writer.record(RecordFlag::None, writeStr);
+
+    // Create playback context and read data
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+    SLANG_CHECK(reader.getMode() == Mode::Playback);
+    SLANG_CHECK(reader.isPlayback());
+    SLANG_CHECK(reader.isActive());
+    SLANG_CHECK(reader.isReading());
+
+    int32_t readInt = 0;
+    float readFloat = 0.0f;
+    const char* readStr = nullptr;
+
+    reader.record(RecordFlag::None, readInt);
+    reader.record(RecordFlag::None, readFloat);
+    reader.record(RecordFlag::None, readStr);
+
+    SLANG_CHECK(readInt == 123);
+    SLANG_CHECK(readFloat == 2.5f);
+    SLANG_CHECK(strcmp(readStr, "test") == 0);
+}
+
+SLANG_UNIT_TEST(replayContextSyncModeMatching)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // First, record reference data
+    ReplayContext reference;
+    reference.setMode(Mode::Record);
+
+    int32_t val1 = 100;
+    int32_t val2 = 200;
+    reference.record(RecordFlag::None, val1);
+    reference.record(RecordFlag::None, val2);
+
+    // Create sync context with reference data
+    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
+    SLANG_CHECK(sync.getMode() == Mode::Sync);
+    SLANG_CHECK(sync.isSyncing());
+    SLANG_CHECK(sync.isActive());
+    SLANG_CHECK(sync.isWriting());
+
+    // Record the same values - should succeed
+    int32_t syncVal1 = 100;
+    int32_t syncVal2 = 200;
+    bool noException = true;
+    try
+    {
+        sync.record(RecordFlag::None, syncVal1);
+        sync.record(RecordFlag::None, syncVal2);
+    }
+    catch (const DataMismatchException&)
+    {
+        noException = false;
+    }
+    SLANG_CHECK(noException);
+}
+
+SLANG_UNIT_TEST(replayContextSyncModeMismatch)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // First, record reference data
+    ReplayContext reference;
+    reference.setMode(Mode::Record);
+
+    int32_t val = 100;
+    reference.record(RecordFlag::None, val);
+
+    // Create sync context with reference data
+    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
+
+    // Record a different value - should throw
+    int32_t differentVal = 999;
+    bool caughtException = false;
+    try
+    {
+        sync.record(RecordFlag::None, differentVal);
+    }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = true;
+        SLANG_CHECK(e.getSize() == sizeof(int32_t));
+    }
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Record data with Output flag
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+
+    int32_t inputVal = 42;
+    int32_t outputVal = 100;
+    writer.record(RecordFlag::Input, inputVal);
+    writer.record(RecordFlag::Output, outputVal);
+
+    // Create playback context
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+
+    // For inputs, we read the value from the stream (user provides 0, gets 42)
+    int32_t readInput = 0;
+    reader.record(RecordFlag::Input, readInput);
+    SLANG_CHECK(readInput == 42);
+
+    // For outputs, user provides the expected value. Playback verifies it matches
+    // the recorded value. If they match, no exception is thrown.
+    int32_t expectedOutput = 100; // User says "I expect output to be 100"
+    bool noException = true;
+    try
+    {
+        reader.record(RecordFlag::Output, expectedOutput);
+    }
+    catch (const DataMismatchException&)
+    {
+        noException = false;
+    }
+    SLANG_CHECK(noException);
+    SLANG_CHECK(expectedOutput == 100); // Value unchanged since it matched
+}
+
+SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Record an output value
+    ReplayContext writer;
+    writer.setMode(Mode::Record);
+
+    int32_t outputVal = 100;
+    writer.record(RecordFlag::Output, outputVal);
+
+    // Create playback context
+    ReplayContext reader(writer.getStream().getData(), writer.getStream().getSize());
+
+    // User provides wrong expected value - should throw
+    int32_t wrongExpected = 999; // User says "I expect 999" but recorded was 100
+    bool caughtException = false;
+    try
+    {
+        reader.record(RecordFlag::Output, wrongExpected);
+    }
+    catch (const DataMismatchException& e)
+    {
+        caughtException = true;
+        SLANG_CHECK(e.getSize() == sizeof(int32_t));
+    }
+    SLANG_CHECK(caughtException);
+}
+
+SLANG_UNIT_TEST(replayContextModeTransitions)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    ReplayContext ctx;
+    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+
+    // Test setMode transitions
+    ctx.setMode(Mode::Record);
+    SLANG_CHECK(ctx.getMode() == Mode::Record);
+    SLANG_CHECK(ctx.isRecording());
+
+    ctx.setMode(Mode::Idle);
+    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+    SLANG_CHECK(ctx.isIdle());
+
+    // Test enable() convenience method
+    ctx.enable();
+    SLANG_CHECK(ctx.getMode() == Mode::Record);
+
+    // Test disable() convenience method
+    ctx.disable();
+    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+
+    // enable() should only work from Idle
+    ctx.setMode(Mode::Playback);
+    ctx.enable(); // Should not change from Playback
+    SLANG_CHECK(ctx.getMode() == Mode::Playback);
+}
+
+SLANG_UNIT_TEST(replayContextReset)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    ReplayContext ctx;
+    ctx.setMode(Mode::Record);
+
+    int32_t value = 42;
+    ctx.record(RecordFlag::None, value);
+    SLANG_CHECK(ctx.getStream().getSize() > 0);
+
+    // Reset should clear everything
+    ctx.reset();
+    SLANG_CHECK(ctx.getMode() == Mode::Idle);
+    SLANG_CHECK(ctx.getStream().getSize() == 0);
+}
+
+SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Record reference data
+    ReplayContext reference;
+    reference.setMode(Mode::Record);
+
+    int32_t val = 42;
+    reference.record(RecordFlag::None, val);
+
+    // Create sync context
+    ReplayContext sync(reference.getStream().getData(), reference.getStream().getSize(), true);
+
+    // Sync mode should write to its own stream too
+    int32_t syncVal = 42;
+    sync.record(RecordFlag::None, syncVal);
+
+    // Verify sync context wrote to its stream
+    SLANG_CHECK(sync.getStream().getSize() > 0);
+
+    // The written data should be readable
+    ReplayContext reader(sync.getStream().getData(), sync.getStream().getSize());
+    int32_t readVal = 0;
+    reader.record(RecordFlag::None, readVal);
+    SLANG_CHECK(readVal == 42);
+}

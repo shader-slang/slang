@@ -139,22 +139,30 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
         break;
         
     case Mode::Playback:
-        // Read data from stream
-        m_stream.read(data, size);
-        
-        // For output parameters and return values, verify against reference
+        // For output parameters and return values, the user has provided
+        // what they expect the output to be. We read the recorded value
+        // and compare it against the user's expected value.
         if (hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue))
         {
-            // Compare the read data against reference stream
-            size_t offset = m_referenceStream.getPosition();
+            // Save the user-provided expected value
             if (m_compareBuffer.size() < size)
                 m_compareBuffer.resize(size);
-            m_referenceStream.read(m_compareBuffer.data(), size);
+            memcpy(m_compareBuffer.data(), data, size);
             
+            // Read the recorded value from stream
+            size_t offset = m_stream.getPosition();
+            m_stream.read(data, size);
+            
+            // Compare: recorded value (now in data) vs expected value (in buffer)
             if (memcmp(data, m_compareBuffer.data(), size) != 0)
             {
                 throw DataMismatchException(offset, size);
             }
+        }
+        else
+        {
+            // For inputs, just read from stream
+            m_stream.read(data, size);
         }
         break;
     }
@@ -167,8 +175,17 @@ void ReplayContext::recordTypeId(TypeId id)
     case Mode::Idle:
         break;
     case Mode::Record:
-    case Mode::Sync:
         writeTypeId(id);
+        break;
+    case Mode::Sync:
+        {
+            // Write to main stream
+            writeTypeId(id);
+            // Verify against reference stream
+            TypeId refId = readTypeIdFromReference();
+            if (refId != id)
+                throw TypeMismatchException(refId, id);
+        }
         break;
     case Mode::Playback:
         expectTypeId(id);
@@ -186,6 +203,13 @@ TypeId ReplayContext::readTypeId()
 {
     uint8_t v;
     m_stream.read(&v, sizeof(v));
+    return static_cast<TypeId>(v);
+}
+
+TypeId ReplayContext::readTypeIdFromReference()
+{
+    uint8_t v;
+    m_referenceStream.read(&v, sizeof(v));
     return static_cast<TypeId>(v);
 }
 
@@ -213,6 +237,7 @@ void ReplayContext::record(RecordFlag flags, double& value)   { recordTypeId(Typ
 
 void ReplayContext::record(RecordFlag flags, bool& value)
 {
+    if (m_mode == Mode::Idle) return;
     recordTypeId(TypeId::Bool);
     if (isWriting()) { uint8_t v = value ? 1 : 0; recordRaw(flags, &v, sizeof(v)); }
     else { uint8_t v; recordRaw(flags, &v, sizeof(v)); value = (v != 0); }
@@ -224,12 +249,13 @@ void ReplayContext::record(RecordFlag flags, bool& value)
 
 void ReplayContext::record(RecordFlag flags, const char*& str)
 {
+    if (m_mode == Mode::Idle) return;
     if (isWriting())
     {
-        if (str == nullptr) { writeTypeId(TypeId::Null); }
+        if (str == nullptr) { recordTypeId(TypeId::Null); }
         else
         {
-            writeTypeId(TypeId::String);
+            recordTypeId(TypeId::String);
             uint32_t length = static_cast<uint32_t>(strlen(str));
             recordRaw(flags, &length, sizeof(length));
             if (length > 0) recordRaw(flags, const_cast<char*>(str), length);
@@ -258,9 +284,10 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
 
 void ReplayContext::recordBlob(RecordFlag flags, const void*& data, size_t& size)
 {
+    if (m_mode == Mode::Idle) return;
     if (isWriting())
     {
-        writeTypeId(TypeId::Blob);
+        recordTypeId(TypeId::Blob);
         uint64_t blobSize = static_cast<uint64_t>(size);
         recordRaw(flags, &blobSize, sizeof(blobSize));
         if (size > 0 && data != nullptr) recordRaw(flags, const_cast<void*>(data), size);
@@ -283,6 +310,7 @@ void ReplayContext::recordBlob(RecordFlag flags, const void*& data, size_t& size
 
 void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 {
+    if (m_mode == Mode::Idle) return;
     recordTypeId(TypeId::ObjectHandle);
     recordRaw(flags, &handleId, sizeof(handleId));
 }

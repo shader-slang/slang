@@ -215,6 +215,7 @@ private:
     void recordTypeId(TypeId id);
     void writeTypeId(TypeId id);
     TypeId readTypeId();
+    TypeId readTypeIdFromReference();
     void expectTypeId(TypeId expected);
 
     std::recursive_mutex m_mutex;
@@ -230,10 +231,10 @@ private:
 template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 {
-    SLANG_UNUSED(flags); // TODO: Use flags for replay verification
+    if (m_mode == Mode::Idle) return;
     if (isWriting())
     {
-        writeTypeId(TypeId::Array);
+        recordTypeId(TypeId::Array);
         uint64_t arrayCount = static_cast<uint64_t>(count);
         record(flags, arrayCount);
         for (uint64_t i = 0; i < arrayCount; ++i)
@@ -265,6 +266,7 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 template<typename EnumT>
 void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 {
+    if (m_mode == Mode::Idle) return;
     int32_t v = static_cast<int32_t>(value);
     record(flags, v);
     if (isReading())
