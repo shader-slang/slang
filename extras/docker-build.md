@@ -78,14 +78,14 @@ The Slang project uses self-hosted Linux GPU runners with a custom Docker contai
 ### Build Slang
 
 ```bash
-# Build in Debug configuration (fastest, no LLVM)
+# Build in Debug configuration (with LLVM, downloads prebuilt)
 ./extras/docker-build.sh
+
+# Build without LLVM (fastest, matches GPU CI)
+./extras/docker-build.sh --llvm disable
 
 # Build in Release configuration
 ./extras/docker-build.sh --config release
-
-# Build with LLVM support (downloads prebuilt)
-./extras/docker-build.sh --llvm fetch
 ```
 
 ### Run Tests
@@ -118,7 +118,7 @@ Example:
 
 ### LLVM Backend Mode
 
-**`--llvm <disable|fetch|cached>`** (default: `disable`)
+**`--llvm <disable|fetch|cached>`** (default: `fetch`)
 
 See [LLVM Backend Options](#llvm-backend-options) for details.
 
@@ -171,9 +171,9 @@ Needed for:
 
 Slang supports multiple LLVM backend configurations. Choose based on your needs:
 
-### `disable` (Default) ⚡ Fastest
+### `fetch` (Default) 📦 Recommended
 
-**Best for**: Local development, GPU testing, quick iteration
+**Best for**: Full-featured local builds with LLVM support
 
 ```bash
 ./extras/docker-build.sh --llvm disable
@@ -199,12 +199,8 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 - Debugging compilation issues
 - Quick iteration cycles
 
-### `fetch` 📦 Recommended for Full Features
-
-**Best for**: Full-featured local builds with LLVM support
-
 ```bash
-./extras/docker-build.sh --llvm fetch
+./extras/docker-build.sh  # fetch is the default
 ```
 
 **How it works**:
@@ -219,19 +215,55 @@ Slang supports multiple LLVM backend configurations. Choose based on your needs:
 - Fast after first download
 - Automatic version matching
 - No manual LLVM build needed
+- Matches documentation default (`FETCH_BINARY_IF_POSSIBLE`)
 
 **Cons**:
 
 - Requires internet connection on first use
 - GitHub API rate limits (use `--github-token` to avoid)
 - Binary may not be available for all platforms
+- Falls back to DISABLE if binary unavailable
 
 **When to use**:
 
+- Default for most development (recommended)
 - Need LLVM target support
 - Testing LLVM IR generation
 - Working on LLVM-based optimizations
 - Want full feature parity with release builds
+
+### `disable` ⚡ Fastest
+
+**Best for**: Quick iteration, GPU testing
+
+```bash
+./extras/docker-build.sh --llvm disable
+```
+
+**How it works**:
+
+- No LLVM components built or fetched
+- Matches GPU CI container configuration
+
+**Pros**:
+
+- Fastest builds
+- No network access needed
+- Minimal dependencies
+- Matches GPU CI configuration
+
+**Cons**:
+
+- No LLVM target support
+- Cannot generate LLVM IR
+- Cannot use LLVM-based optimizations
+
+**When to use**:
+
+- Quick iteration cycles
+- Testing non-LLVM targets (SPIRV, HLSL, etc.)
+- Debugging compilation issues
+- Matching GPU CI environment
 
 ### `cached` 🔧 Advanced
 

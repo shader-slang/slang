@@ -13,15 +13,15 @@
 #
 # Options:
 #   --config <debug|release>        Build configuration (default: debug)
-#   --llvm <disable|fetch|cached>   LLVM backend mode (default: disable)
+#   --llvm <disable|fetch|cached>   LLVM backend mode (default: fetch)
 #   --clean                         Remove build directory before building
 #   --no-pull                       Skip pulling container image (use local)
 #   --github-token <token>          GitHub token for API access
 #   --help                          Show this help message
 #
 # LLVM Modes:
+#   fetch   - Download prebuilt slang-llvm from GitHub releases (default)
 #   disable - No LLVM backend, fastest builds (matches GPU CI)
-#   fetch   - Download prebuilt slang-llvm from GitHub releases
 #   cached  - Use host's pre-built LLVM at build/llvm-project-install/
 #
 # Examples:
@@ -43,7 +43,7 @@ NC='\033[0m' # No Color
 
 # Script options with defaults
 CONFIG="debug"
-LLVM_MODE="disable"
+LLVM_MODE="fetch"
 CLEAN=false
 NO_PULL=false
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
