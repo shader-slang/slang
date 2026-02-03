@@ -1,5 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK):-target spirv -entry main -stage compute -g2 -emit-spirv-directly -O0
 
+// Test that unused variables & functions aren't removed when debug info is enabled.
+
 void TestFunc()
 {
     float2x3 m = float2x3(
