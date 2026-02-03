@@ -309,7 +309,7 @@ inline unsigned int FloatToFloatE4M3(float val)
     }
 
     if (e8 >= 15)
-        return sign | 0x7E; // Clamp to max finite (448)
+        return sign | 0x7E; // Clamp to max finite (448.0f, 0x43E00000)
     return sign | (e8 << 3) | m8;
 }
 
