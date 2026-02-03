@@ -187,6 +187,10 @@ public:
     /// Reset the context to initial state (clears streams and arena, mode becomes Idle).
     SLANG_API void reset();
 
+    /// Switch to play mode, clearing all local state and resetting stream to 0, but
+    /// keeping the stream data present so we can replay what's just happened
+    SLANG_API void switchToPlayback();
+
     // Basic types
     SLANG_API void record(RecordFlag flags, int8_t& value);
     SLANG_API void record(RecordFlag flags, int16_t& value);

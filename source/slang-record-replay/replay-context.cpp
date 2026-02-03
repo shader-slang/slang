@@ -124,6 +124,24 @@ void ReplayContext::reset()
     // Note: m_handlers is intentionally NOT cleared - they're typically registered once
 }
 
+void ReplayContext::switchToPlayback()
+{
+    // Clear all local state
+    m_referenceStream.reset();
+    m_arena.reset();
+    m_objectToHandle.clear();
+    m_handleToObject.clear();
+    m_nextHandle = kFirstValidHandle;
+    m_proxyToImpl.clear();
+    m_implToProxy.clear();
+    m_currentThisHandle = kNullHandle;
+
+
+    // Reset stream to 0
+    m_mode = Mode::Playback;
+    m_stream.seek(0);
+}
+
 uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
 {
     if (obj == nullptr)

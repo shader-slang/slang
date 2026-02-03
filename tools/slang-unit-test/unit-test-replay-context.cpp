@@ -26,11 +26,11 @@ inline ReplayContext& ctx()
 template<typename T>
 static bool roundTripValue(T writeValue, T& readValue)
 {
+    ctx().reset();
     ctx().setMode(Mode::Record);
     ctx().record(RecordFlag::None, writeValue);
 
-    ctx().setMode(Mode::Playback);
-    ctx().getStream().seek(0);
+    ctx().switchToPlayback();
     ctx().record(RecordFlag::None, readValue);
 
     return ctx().getStream().atEnd();
@@ -163,11 +163,11 @@ SLANG_UNIT_TEST(replayContextString)
 
     auto testString = [](const char* str)
     {
+        ctx().reset();
         ctx().setMode(Mode::Record);
         ctx().record(RecordFlag::None, str);
 
-        ctx().setMode(Mode::Playback);
-        ctx().getStream().seek(0);
+        ctx().switchToPlayback();
 
         const char* readStr = nullptr;
         ctx().record(RecordFlag::None, readStr);
