@@ -2264,6 +2264,13 @@ public:
 
     void checkAggTypeConformance(AggTypeDecl* decl);
 
+    void checkGenericConstraintConformances(GenericDecl* genericDecl);
+
+    void _fillInGenericConstraintWitnessTableForInheritance(
+        Type* subType,
+        Type* interfaceType,
+        WitnessTable* witnessTable);
+
     bool isIntegerBaseType(BaseType baseType);
 
     /// Is `type` a scalar integer type.

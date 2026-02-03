@@ -221,6 +221,14 @@ RequirementWitness getUnspecializedLookupRec(
         {
             witnessTable = inheritanceDeclRef.getDecl()->witnessTable;
         }
+        else if (
+            auto constraintDeclRef =
+                declaredSubtypeWitness->getDeclRef().as<GenericTypeConstraintDecl>())
+        {
+            // For generic type constraints, we also have a witness table that stores
+            // canonical paths for diamond conformance patterns.
+            witnessTable = constraintDeclRef.getDecl()->witnessTable;
+        }
 
         RequirementWitness requirementWitness;
         if (witnessTable && witnessTable->getRequirementDictionary().tryGetValue(
@@ -292,6 +300,12 @@ RequirementWitness specializeLookedUpRec(
             auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
         {
             return lookedUpVal.specialize(astBuilder, SubstitutionSet(inheritanceDeclRef));
+        }
+        else if (
+            auto constraintDeclRef =
+                declaredSubtypeWitness->getDeclRef().as<GenericTypeConstraintDecl>())
+        {
+            return lookedUpVal.specialize(astBuilder, SubstitutionSet(constraintDeclRef));
         }
 
         /* */

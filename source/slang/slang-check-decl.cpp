@@ -3906,6 +3906,14 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
 
         checkExtensionConformance(extensionDecl);
     }
+
+    // Build witness tables for generic type constraints to establish canonical
+    // inheritance paths for diamond conformance patterns.
+    //
+    void visitGenericDecl(GenericDecl* genericDecl)
+    {
+        checkGenericConstraintConformances(genericDecl);
+    }
 };
 
 // Check that types used as `Differential` type use themselves as their own `Differential` type.
@@ -8983,6 +8991,125 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
     // Insert overridable candidates at the front of the list, so they are preferred over
     // the completion results from checking ordinary type exprs.
     contentAssistInfo.completionSuggestions.candidateItems.insertRange(0, candidateItems);
+}
+
+// Helper function to recursively fill in witness table entries for inheritance requirements
+// on generic type constraints. This establishes canonical paths for diamond conformance patterns.
+void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
+    Type* subType,
+    Type* interfaceType,
+    WitnessTable* witnessTable)
+{
+    auto interfaceDeclRefType = as<DeclRefType>(interfaceType);
+    if (!interfaceDeclRefType)
+        return;
+
+    auto interfaceDecl = interfaceDeclRefType->getDeclRef().as<InterfaceDecl>();
+    if (!interfaceDecl)
+        return;
+
+    // For each inheritance requirement in the interface,
+    // determine the canonical path from subType to that inherited interface.
+    for (auto inheritanceDecl : interfaceDecl.getDecl()->getMembersOfType<InheritanceDecl>())
+    {
+        auto reqType = inheritanceDecl->base.type;
+        if (!reqType)
+            continue;
+
+        // Try to get the witness that shows subType conforms to reqType
+        auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
+        if (!subIsReqWitness)
+            continue;
+
+        // Determine if this is the canonical path.
+        // If the witness is a LookupDeclRef that points to the same inheritance decl
+        // we're currently processing, then this is the canonical/critical path.
+        bool isCriticalPath = false;
+        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subIsReqWitness))
+        {
+            if (auto lookupDeclRef =
+                    as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+            {
+                if (lookupDeclRef->getDecl() == inheritanceDecl)
+                {
+                    isCriticalPath = true;
+                }
+            }
+        }
+
+        // If this is the critical/canonical path, we need to create a nested witness
+        // table and recursively check for nested inheritance requirements.
+        // If this is NOT the critical path, we store a reference to the canonical
+        // witness so that lookups can be redirected.
+        if (isCriticalPath)
+        {
+            // Create a nested witness table for this inheritance requirement
+            RefPtr<WitnessTable> nestedWitnessTable = new WitnessTable();
+            nestedWitnessTable->witnessedType = subType;
+            nestedWitnessTable->baseType = reqType;
+
+            witnessTable->add(inheritanceDecl, RequirementWitness(nestedWitnessTable));
+
+            // Recursively fill in the nested witness table
+            _fillInGenericConstraintWitnessTableForInheritance(
+                subType,
+                reqType,
+                nestedWitnessTable);
+        }
+        else
+        {
+            witnessTable->add(inheritanceDecl, RequirementWitness(subIsReqWitness));
+        }
+    }
+}
+
+void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDecl)
+{
+    // For each generic type constraint like `T : IFoo` where `IFoo` is an interface,
+    // we need to build a witness table that establishes canonical inheritance paths
+    // for diamond conformance patterns.
+    //
+    // This is similar to what we do in `findWitnessForInterfaceRequirement` when
+    // handling `InheritanceDecl` requirements, but here we apply it to generic
+    // type constraints.
+
+    for (auto constraintDecl : genericDecl->getMembersOfType<GenericTypeConstraintDecl>())
+    {
+        // Skip equality constraints
+        if (constraintDecl->isEqualityConstraint)
+            continue;
+
+        auto subType = constraintDecl->sub.type;
+        auto superType = constraintDecl->sup.type;
+
+        if (!subType || !superType)
+            continue;
+
+        // We only care about constraints where the super-type is an interface
+        auto superDeclRefType = as<DeclRefType>(superType);
+        if (!superDeclRefType)
+            continue;
+
+        auto superInterfaceDecl = superDeclRefType->getDeclRef().as<InterfaceDecl>();
+        if (!superInterfaceDecl)
+            continue;
+
+        // Create a witness table for this constraint
+        RefPtr<WitnessTable> constraintWitnessTable = constraintDecl->witnessTable;
+        if (!constraintWitnessTable)
+        {
+            constraintWitnessTable = new WitnessTable();
+            constraintWitnessTable->witnessedType = subType;
+            constraintWitnessTable->baseType = superType;
+            constraintDecl->witnessTable = constraintWitnessTable;
+        }
+
+        // Recursively fill in the witness table for inheritance requirements
+        _fillInGenericConstraintWitnessTableForInheritance(
+            subType,
+            superType,
+            constraintWitnessTable);
+    }
 }
 
 void SemanticsDeclBasesVisitor::_validateCrossModuleInheritance(

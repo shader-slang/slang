@@ -956,6 +956,11 @@ class GenericTypeConstraintDecl : public TypeConstraintDecl
 
     FIDDLE() bool isEqualityConstraint = false;
 
+    // After checking, this dictionary will map members required by the
+    // super-type interface to their witnesses. This is used to store
+    // canonical inheritance paths for diamond conformance patterns.
+    FIDDLE() RefPtr<WitnessTable> witnessTable;
+
     // Overrides should be public so base classes can access
     const TypeExp& _getSupOverride() const { return sup; }
 };
