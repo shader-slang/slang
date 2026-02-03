@@ -2,6 +2,11 @@
 # setup the standard module configuration
 #
 
+# Option to enable/disable neural module build (can be disabled if it breaks CI)
+# TODO: there is release CI break, so we add this flag to disable the neural module build for now.
+# Issue: https://github.com/shader-slang/slang/issues/9864 is opened to track this.
+option(SLANG_ENABLE_NEURAL_MODULE "Build the neural standard module" ON)
+
 #
 # Neural module configuration
 # SLANG_STANDARD_MODULE_DIR_NAME is the output directory name for all the standard modules, currently there is only neural module
@@ -40,4 +45,6 @@ add_custom_target(
 set_target_properties(generate_standard_module_config_header PROPERTIES FOLDER "generated")
 
 # Build the neural module
-add_subdirectory(neural)
+if(SLANG_ENABLE_NEURAL_MODULE)
+    add_subdirectory(neural)
+endif()
