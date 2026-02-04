@@ -100,11 +100,32 @@ grep -rn "functionName" source/
 - Run on all targets: `-cpu`, `-cuda`, `-vk`, `-hlsl`, `-metal`, `-wgsl`
 - Cover variable positions: local, parameter, return, struct field, array element, global
 
+### Writing Test Comments
+
+Write comments that explain the **semantic restriction or behavior**, not test mechanics.
+
+**Don't** (formulaic/clumsy):
+```slang
+// Test: Verify that X produces error 33180.
+// Gap: "Some coverage gap name from internal docs"
+```
+
+**Do** (natural/explanatory):
+```slang
+// Extension methods require compile-time type resolution, which is
+// incompatible with dynamic dispatch where types are resolved at runtime.
+```
+
+Guidelines:
+- Explain *why* the behavior exists, not *what* error code it produces
+- Use complete sentences in natural language
+- Skip internal tracking terms like "Gap:", "Test:", "Coverage:"
+- Include error codes only when users might search for them
+
 ### Compute Test Template
 
 ```slang
-// Test: [specific behavior]
-// Gap: [which gap this addresses]
+// Brief explanation of what semantic behavior this test validates.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -shaderobj
@@ -128,8 +149,8 @@ void computeMain() {
 ### Diagnostic Test Template
 
 ```slang
-// Test: [what error should occur]
-// Gap: [which gap this addresses]
+// Brief explanation of why this code pattern is invalid and what
+// semantic constraint it violates.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
