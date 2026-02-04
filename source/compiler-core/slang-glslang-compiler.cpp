@@ -48,9 +48,10 @@ public:
         SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    validateWithTargetVersion(const uint32_t* contents, int contentsSize, const DownstreamCompileOptions::CapabilityVersion& spirvCapVersion)
-        SLANG_OVERRIDE;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validateWithTargetVersion(
+        const uint32_t* contents,
+        int contentsSize,
+        const DownstreamCompileOptions::CapabilityVersion& spirvCapVersion) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL disassembleWithResult(
@@ -94,8 +95,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
-    m_validateWithVersion =
-        (glslang_ValidateSPIRVWithEnvFunc)library->findFuncByName("glslang_validateSPIRVWithVersion");
+    m_validateWithVersion = (glslang_ValidateSPIRVWithEnvFunc)library->findFuncByName(
+        "glslang_validateSPIRVWithVersion");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
@@ -342,7 +343,7 @@ SlangResult GlslangDownstreamCompiler::validateWithTargetVersion(
         spirvVersion.major = spirvCapVersion.version.m_major;
         spirvVersion.minor = spirvCapVersion.version.m_minor;
         spirvVersion.patch = spirvCapVersion.version.m_patch;
-        
+
         if (m_validateWithVersion(contents, contentsSize, spirvVersion))
         {
             return SLANG_OK;
@@ -525,12 +526,13 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
 #else
     String libraryName = String("slang-glslang-") + SLANG_VERSION_NUMERIC;
 #endif
-    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
-        path,
-        loader,
-        nullptr,
-        libraryName.getBuffer(),
-        library));
+    SLANG_RETURN_ON_FAIL(
+        DownstreamCompilerUtil::loadSharedLibrary(
+            path,
+            loader,
+            nullptr,
+            libraryName.getBuffer(),
+            library));
 
     SLANG_ASSERT(library);
     if (!library)

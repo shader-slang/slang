@@ -360,8 +360,10 @@ public:
     /// @param contentsSize The size of the SPIR-V binary in 32-bit words.
     /// @param spirvCapVersion The SPIR-V capability version containing the target version.
     /// @return SLANG_OK if validation succeeded, SLANG_FAIL otherwise.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    validateWithTargetVersion(const uint32_t* contents, int contentsSize, const CapabilityVersion& capVersion)
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validateWithTargetVersion(
+        const uint32_t* contents,
+        int contentsSize,
+        const CapabilityVersion& capVersion)
     {
         // Default implementation falls back to validate without env for backward compatibility
         SLANG_UNUSED(capVersion);

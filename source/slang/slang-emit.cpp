@@ -2299,10 +2299,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
@@ -2733,7 +2734,7 @@ static SlangResult createArtifactFromIR(
                 artifact = _Move(linkedArtifact);
             }
         }
-    
+
         // Set the required SPIR-V capability version based on target request
         DownstreamCompileOptions::CapabilityVersion spirvCapVersion;
         spirvCapVersion.kind = DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV;
@@ -2761,7 +2762,8 @@ static SlangResult createArtifactFromIR(
 
         List<DownstreamCompileOptions::CapabilityVersion> requiredCapabilityVersions;
         requiredCapabilityVersions.add(spirvCapVersion);
-        downstreamOptions.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);
+        downstreamOptions.requiredCapabilityVersions =
+            SliceUtil::asSlice(requiredCapabilityVersions);
         switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
             CompilerOptionName::Optimization))
         {
