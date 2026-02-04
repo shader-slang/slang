@@ -38,6 +38,9 @@ public:
         RECORD_INPUT(desc);
 
         // Call create session
+        slang::ISession* sessionPtr;
+        if(!outSession)
+            outSession = &sessionPtr;
         auto result = getActual<slang::IGlobalSession>()->createSession(desc, outSession);
 
         // wraps outSession, and records 'outSession' as an output
