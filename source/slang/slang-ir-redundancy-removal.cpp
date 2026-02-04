@@ -231,8 +231,8 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                         continue; // check the next use
                     }
 
-                    // Check dominance for this use site. loadPtr's definition must dominate all use sites.
-                    // If loadPtr is defined inside a conditional branch but destPtr is used
+                    // Check dominance for this use site. loadPtr's definition must dominate all use
+                    // sites. If loadPtr is defined inside a conditional branch but destPtr is used
                     // outside that branch, replacing destPtr with loadPtr would be invalid.
                     if (loadPtrBlock)
                     {
