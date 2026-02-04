@@ -283,6 +283,7 @@ static SlangResult _parseSimpleLdInfo(
 }
 
 // Pattern: file:(.text+0x0):message (object file section errors)
+// Handles: test-link.c:(.text+0xa):undefined reference to `thing'
 static SlangResult _parseTextSectionError(
     SliceAllocator& allocator,
     const UnownedStringSlice& line,
@@ -301,11 +302,16 @@ static SlangResult _parseTextSectionError(
 
     const auto text = split[2].trim();
 
+    // Check if this is a link error (contains "undefined reference")
+    // This helps distinguish actual link errors from other (.text section messages
+    bool isLinkError = text.indexOf(UnownedStringSlice(GCCPatternStrings::UNDEFINED_REF)) != -1;
+
     outDiagnostic.filePath = allocator.allocate(split[0]);
     outDiagnostic.location.line = 0;
     outDiagnostic.location.column = 0;
     outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
-    outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    outDiagnostic.stage =
+        isLinkError ? ArtifactDiagnostic::Stage::Link : ArtifactDiagnostic::Stage::Compile;
     outDiagnostic.text = allocator.allocate(text);
     outLineParseResult = LineParseResult::Single;
 
