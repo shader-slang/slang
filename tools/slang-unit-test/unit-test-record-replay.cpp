@@ -277,17 +277,17 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
 
 SLANG_UNIT_TEST(RecordReplay_cpu_hello_world)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0x12f60833457a6bc0)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0xabfe93eecdeb3442)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_triangle)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0xaef92317e836182e)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0x95bcefba99d4508d)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_ray_tracing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x11bb3358f0b5d9c5)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0xe31a5f4c7e51ee66)));
 }
 
 // This causes a Windows Graphics driver crash.
@@ -301,12 +301,12 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 
 SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x7614c54e1d6975ed)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x5f152cf84552b634)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_gpu_printing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x555b34e510258c8e)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x3c8ef95e2fb331bb)));
 }
 
 #if 0
