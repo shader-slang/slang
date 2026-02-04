@@ -52,7 +52,9 @@ public:
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
     {
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getSpecializationParamCount");
+        RECORD_CALL();
+        SlangInt result = getActual<slang::IComponentType>()->getSpecializationParamCount();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
@@ -61,11 +63,26 @@ public:
         ISlangBlob** outCode,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outCode);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getEntryPointCode");
+        RECORD_CALL();
+        RECORD_INPUT(entryPointIndex);
+        RECORD_INPUT(targetIndex);
+
+        ISlangBlob* codePtr = nullptr;
+        if (!outCode)
+            outCode = &codePtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IComponentType>()->getEntryPointCode(
+            entryPointIndex,
+            targetIndex,
+            outCode,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outCode);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(

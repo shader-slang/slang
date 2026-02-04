@@ -24,7 +24,9 @@ public:
     // ISession
     virtual SLANG_NO_THROW slang::IGlobalSession* SLANG_MCALL getGlobalSession() override
     {
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getGlobalSession");
+        RECORD_CALL();
+        slang::IGlobalSession* result = getActual<slang::ISession>()->getGlobalSession();
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL

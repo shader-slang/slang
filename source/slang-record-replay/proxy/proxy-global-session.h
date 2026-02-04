@@ -243,9 +243,19 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
     {
-        SLANG_UNUSED(outTotalTime);
-        SLANG_UNUSED(outDownstreamTime);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getCompilerElapsedTime");
+        RECORD_CALL();
+        
+        double totalTime = 0.0;
+        double downstreamTime = 0.0;
+        if (!outTotalTime)
+            outTotalTime = &totalTime;
+        if (!outDownstreamTime)
+            outDownstreamTime = &downstreamTime;
+
+        getActual<slang::IGlobalSession>()->getCompilerElapsedTime(outTotalTime, outDownstreamTime);
+
+        RECORD_INPUT(*outTotalTime);
+        RECORD_INPUT(*outDownstreamTime);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
