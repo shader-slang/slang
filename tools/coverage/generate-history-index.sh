@@ -98,7 +98,7 @@ cat >>"${HISTORY_DIR}/index.html" <<'EOF'
         <tr>
             <th>Date</th>
             <th>Commit</th>
-            <th>🐧 Linux</th>
+            <th>🐧 Linux GPU</th>
             <th>🍎 macOS</th>
         </tr>
 EOF

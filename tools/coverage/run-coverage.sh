@@ -98,7 +98,31 @@ else
   # Merge coverage data
   echo
   echo "Merging coverage data..."
-  $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+
+  # Try to merge all profraw files, but filter out corrupt ones if merge fails
+  if ! $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata 2>&1 | tee /tmp/merge-output.txt; then
+    echo "Warning: Initial merge failed, checking for corrupt profraw files..."
+
+    # Find and remove corrupt profraw files
+    corrupt_files=()
+    for profraw in "$COVERAGE_DIR"/slang-test-*.profraw; do
+      if ! $LLVM_PROFDATA show "$profraw" >/dev/null 2>&1; then
+        echo "  Skipping corrupt file: $(basename "$profraw")"
+        corrupt_files+=("$profraw")
+        rm -f "$profraw"
+      fi
+    done
+
+    if [ ${#corrupt_files[@]} -gt 0 ]; then
+      echo "Removed ${#corrupt_files[@]} corrupt profraw file(s)"
+      echo "Retrying merge with remaining files..."
+      $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+    else
+      echo "Error: No corrupt files found, but merge still failed"
+      cat /tmp/merge-output.txt
+      exit 1
+    fi
+  fi
 fi
 
 # Generate summary report
