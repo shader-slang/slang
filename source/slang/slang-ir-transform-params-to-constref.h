@@ -9,4 +9,7 @@ class DiagnosticSink;
 
 SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink);
 
+SlangResult translateEntryPointInParamToBorrow(IRModule* module, DiagnosticSink* sink);
+
+
 } // namespace Slang
