@@ -97,6 +97,7 @@ struct TransformParamsToConstRefContext
                                 auto fieldExtract = as<IRFieldExtract>(userInst);
                                 builder.setInsertBefore(fieldExtract);
                                 auto fieldAddr = builder.emitFieldAddress(
+                                    builder.getPtrType(userInst->getDataType()),
                                     loadInst->getPtr(),
                                     fieldExtract->getField());
                                 auto loadFieldAddr = as<IRLoad>(builder.emitLoad(fieldAddr));
@@ -120,6 +121,7 @@ struct TransformParamsToConstRefContext
                                 auto getElement = as<IRGetElement>(userInst);
                                 builder.setInsertBefore(getElement);
                                 auto getElementPtr = builder.emitElementAddress(
+                                    builder.getPtrType(userInst->getDataType()),
                                     loadInst->getPtr(),
                                     getElement->getIndex());
                                 auto loadElementPtr = as<IRLoad>(builder.emitLoad(getElementPtr));
