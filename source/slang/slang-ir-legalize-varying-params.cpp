@@ -4002,11 +4002,43 @@ protected:
             }
         case SystemValueSemanticName::Target:
             {
-                result.systemValueName =
-                    (StringBuilder()
-                     << "color(" << (semanticIndex.getLength() != 0 ? semanticIndex : toSlice("0"))
-                     << ")")
-                        .produceString();
+                // For dual-source blend support: check for vk::location and vk::index
+                int location = semanticIndex.getLength() != 0 ? stringToInt(semanticIndex) : 0;
+                int index = 0;
+                
+                // Check if this field has layout information with space (index) data
+                if (parentVar)
+                {
+                    // First check for glslLocation decoration to get the correct location
+                    if (auto glslLocationDecor = parentVar->findDecoration<IRGLSLLocationDecoration>())
+                    {
+                        location = (int)getIntVal(glslLocationDecor->getLocation());
+                    }
+                    
+                    // Look for layout with space information (vk::index)
+                    if (auto varLayout = findVarLayout(parentVar))
+                    {
+                        // Check each offset attribute to find one with space information
+                        for (auto offsetAttr : varLayout->getOffsetAttrs())
+                        {
+                            // Space information represents the vk::index value
+                            if (offsetAttr->getSpace() != 0)
+                            {
+                                index = (int)offsetAttr->getSpace();
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // Generate Metal color attribute with location and optional index
+                StringBuilder sb;
+                sb << "color(" << location << ")";
+                if (index != 0)
+                {
+                    sb << ", index(" << index << ")";
+                }
+                result.systemValueName = sb.produceString();
                 result.permittedTypes = permittedTypes_sv_target;
 
                 break;
