@@ -62,11 +62,21 @@ public:
         slang::IComponentType** outCompositeComponentType,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(componentTypes);
-        SLANG_UNUSED(componentTypeCount);
-        SLANG_UNUSED(outCompositeComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::createCompositeComponentType");
+        RECORD_CALL();
+        ReplayContext::get().recordArray(RecordFlag::Input, componentTypes, componentTypeCount);
+
+        // Call create session
+        slang::IComponentType* compositeComponentTypePtr;
+        if(!outCompositeComponentType)
+            outCompositeComponentType = &compositeComponentTypePtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+        auto result = getActual<slang::ISession>()->createCompositeComponentType(componentTypes, componentTypeCount, outCompositeComponentType, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outCompositeComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL specializeType(
