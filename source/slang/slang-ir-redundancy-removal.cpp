@@ -141,8 +141,6 @@ bool isAddressMutable(IRInst* inst)
 /// Returns true if any changes were made.
 static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
 {
-    // Compute dominator tree for dominance checking during optimization.
-    RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
 
     // Consider the following IR pattern:
     // ```
@@ -231,13 +229,14 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                         continue; // check the next use
                     }
 
-                    // Check dominance for this use site. loadPtr's definition must dominate all use
-                    // sites. If loadPtr is defined inside a conditional branch but destPtr is used
-                    // outside that branch, replacing destPtr with loadPtr would be invalid.
+                    // If loadPtr is an instruction (has a parent block), all uses must be in the
+                    // same block. Otherwise, if loadPtr is computed inside a conditional but used
+                    // outside, we would create a dominance violation. This is a conservative check
+                    // that avoids computing the full dominator tree.
                     if (loadPtrBlock)
                     {
                         auto userBlock = as<IRBlock>(user->getParent());
-                        if (userBlock && !domTree->dominates(loadPtrBlock, userBlock))
+                        if (userBlock != loadPtrBlock)
                             goto unsafeToOptimize;
                     }
 
