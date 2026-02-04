@@ -746,6 +746,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
+    SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+
     if (requiredLoweringPassSet.globalVaryingVar)
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
@@ -1052,6 +1054,9 @@ Result linkAndOptimizeIR(
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
         SLANG_PASS(lowerResultType, targetProgram, sink);
+
+    if (requiredLoweringPassSet.optionalType)
+        SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);

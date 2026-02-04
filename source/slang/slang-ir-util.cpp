@@ -135,6 +135,9 @@ IROp getTypeStyle(IROp op)
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         {
             // All float like
             return kIROp_FloatType;
@@ -1740,7 +1743,6 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
-    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;
@@ -2790,6 +2792,8 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     case kIROp_Geq:
     case kIROp_Less:
     case kIROp_Greater:
+    case kIROp_And:
+    case kIROp_Or:
         {
             IRInst* operand1;
             IRInst* operand2;
@@ -2884,6 +2888,9 @@ bool isSignedType(IRType* type)
     {
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return true;
     case kIROp_IntType:
     case kIROp_Int16Type:
