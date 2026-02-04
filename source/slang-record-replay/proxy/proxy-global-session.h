@@ -46,7 +46,7 @@ public:
         // wraps outSession, and records 'outSession' as an output
         // Note: this may need an extra set of 'record' functions added, or just a dereference
         // Note: we could do the wrapping inside serialize - this may be cleaner
-        RECORD_OUTPUT(outSession);
+        RECORD_COM_OUTPUT(outSession);
 
         // Records the result and returns it
         RECORD_RETURN(result);
@@ -130,15 +130,22 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setLanguagePrelude(SlangSourceLanguage sourceLanguage, const char* preludeText) override
     {
-        // Passthrough - prelude settings don't need recording for replay
+        RECORD_CALL();
+        RECORD_INPUT(sourceLanguage);
+        RECORD_INPUT(preludeText);
         getActual<IGlobalSession>()->setLanguagePrelude(sourceLanguage, preludeText);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     getLanguagePrelude(SlangSourceLanguage sourceLanguage, ISlangBlob** outPrelude) override
     {
-        // Passthrough - prelude retrieval doesn't need recording for replay
+        RECORD_CALL();
+        RECORD_INPUT(sourceLanguage);
+        ISlangBlob* preludePtr;
+        if(!outPrelude)
+            outPrelude = &preludePtr;
         getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
+        RECORD_COM_OUTPUT(outPrelude);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

@@ -45,7 +45,7 @@ namespace SlangRecord {
     _ctx.record(RecordFlag::Input, const_cast<std::remove_const_t<std::remove_reference_t<decltype(arg)>>&>(arg))
 
 // Record an output parameter (for T** style outputs, dereferences and wraps)
-#define RECORD_OUTPUT(arg) \
+#define RECORD_COM_OUTPUT(arg) \
     if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(wrapObject(static_cast<ISlangUnknown*>(*arg))); \
     _ctx.record(RecordFlag::Output, *arg)
 
@@ -83,7 +83,7 @@ inline void recordInputs(ReplayContext&) {}
     RECORD_CALL(); \
     recordInputs(_ctx, __VA_ARGS__); \
     auto _result = ProxyBase::getActual()->method(__VA_ARGS__, outParam); \
-    RECORD_OUTPUT(outParam); \
+    RECORD_COM_OUTPUT(outParam); \
     RECORD_RETURN(_result)
 
 // Pattern: T method(inputs...) - method with inputs and return value
