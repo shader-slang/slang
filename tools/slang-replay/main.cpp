@@ -1,4 +1,5 @@
 #include "../../source/core/slang-io.h"
+#include "../../source/slang-record-replay/replay-stream-decoder.h"
 
 #include <memory>
 #include <stdio.h>
@@ -6,6 +7,7 @@
 struct Options
 {
     bool convertToJson{false};
+    bool decode{false};
     Slang::String recordFileName;
 };
 
@@ -16,6 +18,7 @@ void printUsage()
     printf(
         "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
+    printf("  --decode, -d: Decode the binary stream.bin file to human-readable text.\n");
 }
 
 Options parseOption(int argc, char* argv[])
@@ -44,6 +47,11 @@ Options parseOption(int argc, char* argv[])
             option.convertToJson = true;
             argIndex++;
         }
+        else if ((strcmp("--decode", arg) == 0) || (strcmp("-d", arg) == 0))
+        {
+            option.decode = true;
+            argIndex++;
+        }
         else if ((strcmp("--help", arg) == 0) || (strcmp("-h", arg) == 0))
         {
             printUsage();
@@ -70,6 +78,25 @@ Options parseOption(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
     Options options = parseOption(argc, argv);
+
+    if (options.decode)
+    {
+        // Decode the binary stream to human-readable text
+        try
+        {
+            Slang::String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(
+                options.recordFileName.getBuffer());
+            printf("%s", decoded.getBuffer());
+            return 0;
+        }
+        catch (const Slang::Exception& e)
+        {
+            fprintf(stderr, "Error decoding file: %s\n", e.Message.getBuffer());
+            return 1;
+        }
+    }
+
+    // TODO: Add replay functionality
 
     return 0;
 }
