@@ -71,10 +71,17 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     getEntryPointHash(SlangInt entryPointIndex, SlangInt targetIndex, ISlangBlob** outHash) override
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outHash);
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getEntryPointHash");
+        RECORD_CALL();
+        RECORD_INPUT(entryPointIndex);
+        RECORD_INPUT(targetIndex);
+
+        ISlangBlob* hashPtr = nullptr;
+        if (!outHash)
+            outHash = &hashPtr;
+
+        getActual<slang::IComponentType>()->getEntryPointHash(entryPointIndex, targetIndex, outHash);
+
+        RECORD_COM_OUTPUT(outHash);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL specialize(

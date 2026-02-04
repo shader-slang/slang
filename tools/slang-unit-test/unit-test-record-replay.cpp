@@ -108,6 +108,9 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     // The child process will check SLANG_RECORD_LAYER on startup
     writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
 
+    // Also enable logging
+    writeEnvironmentVariable("SLANG_RECORD_LOG", "1");
+
     // Run the example with recording enabled
     RefPtr<Process> process;
     ExecuteResult exeRes;

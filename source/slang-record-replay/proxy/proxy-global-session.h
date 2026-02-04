@@ -214,8 +214,10 @@ public:
 
     virtual SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override
     {
-        SLANG_UNUSED(name);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::findCapability");
+        RECORD_CALL();
+        RECORD_INPUT(name);
+        auto result = getActual<slang::IGlobalSession>()->findCapability(name);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDownstreamCompilerForTransition(
