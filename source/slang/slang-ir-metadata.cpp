@@ -43,13 +43,14 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
-// Forward declaration for recursive calls.
+// Forward declaration for mutual recursion.
 static void collectMetadataFromTypeLayout(
     IRTypeLayout* typeLayout,
     UInt spaceOffset,
     ArtifactPostEmitMetadata& outMetadata);
 
-// Collect metadata from an IRVarLayout, which may represent a parameter or a struct field.
+// Collect metadata from an IRVarLayout (parameter or struct field)
+// and recursively process any nested struct fields.
 static void collectMetadataFromVarLayout(
     IRVarLayout* varLayout,
     UInt parentSpaceOffset,
