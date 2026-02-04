@@ -86,21 +86,14 @@ jobs:
           path: build/llvm-project-install
           key: llvm-linux-gcc-x86_64-${{ hashFiles('external/build-llvm.sh') }}
 
-      # Build LLVM from source if cache miss (takes 15-25 minutes)
-      - name: Build LLVM
+      # Fail if LLVM cache not available (don't build from source in container)
+      - name: Verify LLVM cache
         if: steps.cache-llvm.outputs.cache-hit != 'true'
         run: |
-          ./external/build-llvm.sh \
-            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
-
-      # Save LLVM cache only on master branch to avoid cache pollution
-      - name: Save LLVM cache
-        uses: actions/cache/save@v4
-        if: steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
-        with:
-          path: build/llvm-project-install
-          key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
+          echo "ERROR: LLVM cache not available"
+          echo "This workflow requires pre-built LLVM cache to be available"
+          echo "Run populate-llvm-cache workflow first or wait for weekly rebuild"
+          exit 1
 
       # Set LLVM paths for CMake to find the installation
       - name: Set LLVM paths
