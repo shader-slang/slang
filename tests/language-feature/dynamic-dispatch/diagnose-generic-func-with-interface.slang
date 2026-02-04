@@ -1,9 +1,9 @@
-// Test: Verify that specializing a user-defined generic function with an
-//       interface type (existential) produces error 33180.
-// Gap: Negative test for "Use an interface type to specialize a generic function"
+// User-defined generic functions cannot be specialized with interface types
+// because the concrete type is not known at compile time.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 #lang slang 2025
