@@ -59,7 +59,7 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
     if(auto existing = ReplayContext::get().getProxy(obj)) {
-        existing->addRef();
+        reinterpret_cast<RefObject*>(existing)->addReference();
         return existing;
     }
 
