@@ -2,60 +2,33 @@
 
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "slang-ir-util.h"
+#include "slang-target-program.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
 
-Index findRegisterSpaceResourceInfo(IRVarLayout* layout);
-UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+/// Get the bindless descriptor set/space index from the program layout.
+/// This index was allocated during layout generation (before DCE),
+/// ensuring consistency with reflection data.
+UInt getBindlessSpaceIndex(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    HashSet<int> usedSpaces;
-    for (auto inst : module->getGlobalInsts())
+    SLANG_UNUSED(sink);
+
+    // Get the pre-allocated bindless space index from the program layout.
+    // This was determined during generateParameterBindings() before any DCE,
+    // so it correctly accounts for all declared parameters.
+    if (auto programLayout = targetProgram->getExistingLayout())
     {
-        if (auto varLayout = findVarLayout(inst))
+        if (programLayout->bindlessDescriptorSetIndex >= 0)
         {
-            // Get container space (for ParameterBlocks etc.)
-            auto containerSpace = findRegisterSpaceResourceInfo(varLayout);
-            if (containerSpace >= 0)
-                usedSpaces.add((int)containerSpace);
-
-            // Get base offset for nested resources
-            UInt spaceOffset = 0;
-            if (auto spaceAttr =
-                    varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
-                spaceOffset = spaceAttr->getOffset();
-
-            // Get direct binding spaces
-            for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-            {
-                if (!ShaderBindingRange::isUsageTracked(sizeAttr->getResourceKind()))
-                    continue;
-                if (auto offsetAttr = varLayout->findOffsetAttr(sizeAttr->getResourceKind()))
-                    usedSpaces.add((int)(spaceOffset + offsetAttr->getSpace()));
-            }
+            return (UInt)programLayout->bindlessDescriptorSetIndex;
         }
     }
 
-    // Find next unused space index.
-    int requestedIndex =
-        targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    int availableIndex = requestedIndex;
-
-    while (usedSpaces.contains(availableIndex))
-    {
-        availableIndex++;
-    }
-
-    if (availableIndex != requestedIndex &&
-        targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
-    {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::requestedBindlessSpaceIndexUnavailable,
-            requestedIndex,
-            availableIndex);
-    }
-    return availableIndex;
+    // Fallback: if no layout exists yet, use the user-specified index or default to 0.
+    // This shouldn't normally happen since layout is generated before this pass runs.
+    return (UInt)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -79,7 +52,9 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
 
 void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module, sink);
+    // Get the bindless space index that was allocated during layout generation.
+    // This is done before DCE, so it correctly accounts for all declared parameters.
+    auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram, sink);
     List<IRInst*> workList;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -100,7 +75,7 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         auto varLayout = createResourceHeapVarLayoutWithSpaceAndBinding(
             builder,
             param,
-            unusedSpaceIndex,
+            bindlessSpaceIndex,
             bindingIndex);
         builder.addLayoutDecoration(param, varLayout);
         builder.addNameHintDecoration(param, toSlice("__slang_resource_heap"));

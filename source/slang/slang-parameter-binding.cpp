@@ -4323,6 +4323,41 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         }
     }
 
+    // Allocate a descriptor set/space for bindless resource heap.
+    // This must be done here (during layout generation) before any DCE occurs,
+    // so that the allocated space is consistent with reflection data.
+    // The space index is stored in ProgramLayout and will be used later
+    // by the lowerDynamicResourceHeap pass.
+    {
+        // Check if user has specified a preferred bindless space index
+        int requestedIndex =
+            targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+
+        // Try to use the requested index, or find the next available one
+        int availableIndex = requestedIndex;
+        while (sharedContext.usedSpaces.contains(availableIndex))
+        {
+            availableIndex++;
+        }
+
+        // Warn if we had to use a different index than requested
+        if (availableIndex != requestedIndex &&
+            targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+        {
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::requestedBindlessSpaceIndexUnavailable,
+                requestedIndex,
+                availableIndex);
+        }
+
+        // Reserve the space so nothing else can use it
+        markSpaceUsed(&context, nullptr, availableIndex);
+
+        // Store the allocated space index in the program layout
+        programLayout->bindlessDescriptorSetIndex = availableIndex;
+    }
+
     return programLayout;
 }
 
