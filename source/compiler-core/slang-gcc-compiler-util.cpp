@@ -13,6 +13,8 @@
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -641,23 +643,26 @@ static SlangResult _parseGCCFamilyLine(
     //   1. Raw compiler stderr output
     //   2. Each parsed diagnostic with file:line:column and message
     // Useful for debugging compiler integration and error parsing issues
-    // Cached for performance (only check once per process)
-    static int s_debugEnabled = -1; // -1 = not checked, 0 = disabled, 1 = enabled
-    if (s_debugEnabled == -1)
-    {
-        StringBuilder envValue;
-        s_debugEnabled = 0;
-        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
-                UnownedStringSlice("SLANG_GCC_PARSER_DEBUG"),
-                envValue)))
+    // Thread-safe initialization using std::call_once
+    static std::once_flag s_debugInitFlag;
+    static bool s_debugEnabled = false;
+
+    std::call_once(
+        s_debugInitFlag,
+        []()
         {
-            UnownedStringSlice value = envValue.getUnownedSlice();
-            if (value == "1" || value == "true" || value == "TRUE")
+            StringBuilder envValue;
+            if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                    UnownedStringSlice("SLANG_GCC_PARSER_DEBUG"),
+                    envValue)))
             {
-                s_debugEnabled = 1;
+                UnownedStringSlice value = envValue.getUnownedSlice();
+                if (value == "1" || value == "true" || value == "TRUE")
+                {
+                    s_debugEnabled = true;
+                }
             }
-        }
-    }
+        });
 
     if (s_debugEnabled)
     {
