@@ -28,15 +28,26 @@ public:
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
     {
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getSession");
+        RECORD_CALL();
+        slang::ISession* result = getActual<slang::IComponentType>()->getSession();
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
     getLayout(SlangInt targetIndex, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getLayout");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        slang::ProgramLayout* result = getActual<slang::IComponentType>()->getLayout(targetIndex, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outDiagnostics);
+        // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
+        return result;
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override

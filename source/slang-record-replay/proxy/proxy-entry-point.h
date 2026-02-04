@@ -2,6 +2,7 @@
 #define SLANG_PROXY_ENTRY_POINT_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang.h"
@@ -92,9 +93,20 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(outLinkedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("EntryPointProxy::link");
+        RECORD_CALL();
+
+        slang::IComponentType* linkedComponentTypePtr = nullptr;
+        if (!outLinkedComponentType)
+            outLinkedComponentType = &linkedComponentTypePtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IEntryPoint>()->link(outLinkedComponentType, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outLinkedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
