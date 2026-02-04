@@ -1,12 +1,15 @@
-# Feature-Oriented Test Development Guide
+---
+name: slang-test-coverage
+description: Comprehensive test coverage analysis and gap-filling for Slang language features. Use when the user wants to increase test coverage, maximize testing for a feature, perform coverage analysis, identify test gaps, or systematically test all aspects of a language feature.
+---
 
-**For**: AI agents and developers creating tests targeted for Slang language features
+# Feature-Oriented Test Coverage
+
+**For**: Systematic test coverage improvement for specific Slang language features
 
 **Core Principle**: Write tests that verify behavior and document intent, not tests that just increase coverage numbers.
 
----
-
-## Workflow: 7 Phases
+## Workflow Overview: 7 Phases
 
 1. **Understanding** → Read reference docs, extract concepts/restrictions/error conditions
 2. **Analysis** → Inventory existing tests, check coverage reports, verify code reachability
@@ -125,13 +128,15 @@ void computeMain() {
 ### Diagnostic Test Template
 
 ```slang
-//TEST:SIMPLE:-target spirv -entry main -stage compute
-
 // Test: [what error should occur]
+// Gap: [which gap this addresses]
+
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 [Code that should trigger error]
 
-// CHECK: error [number]
+// CHECK: ([[# @LINE+1]]): error [number]
+badCode();
 ```
 
 ---
@@ -139,7 +144,7 @@ void computeMain() {
 ## Phase 5: Implementation
 
 **Placement**: `tests/language-feature/` or `tests/diagnostics/`
-**Naming**: `feature-scenario.slang` or `error-condition.slang`
+**Naming**: `feature-scenario.slang` or `diagnose-error-condition.slang`
 
 ```bash
 # Run test
@@ -189,53 +194,49 @@ Create `tmp/feature-name/SUMMARY.md`:
 
 ---
 
-## Quick Reference
+## Decision Rules
 
-### Decision Rules
-
-**WRITE test if**:
+### WRITE test if:
 - ✅ Reference describes behavior but no test exists (score ≥6)
 - ✅ Error case should trigger but untested
 - ✅ Existing tests unclear + your test notably better
 
-**SKIP test if**:
+### SKIP test if:
 - ❌ Code unreachable (dead code)
 - ❌ Same scenario already tested
 - ❌ Heavily tested core operations
 - ❌ Value score <5
 
-**Investigate as BUG if**:
+### Investigate as BUG if:
 - Behavior violates documented semantics
 - Error should trigger but doesn't
 
-### Anti-Patterns
+---
+
+## Anti-Patterns
 
 1. **Coverage %-driven**: Writing tests to hit percentage targets
 2. **Dead code testing**: Not checking reachability first
 3. **Test duplication**: Not checking existing coverage
 4. **Execution-only tests**: Tests that run but don't verify behavior
 
-### Key Commands
+---
 
-```bash
-grep -rn "functionName" source/                              # Check reachability
-find tests/ -name "*feature*.slang"                          # Find tests
-./build/Release/bin/slang-test tests/path/test.slang         # Run test
-./build/Release/bin/slang-test -use-test-server -server-count 8  # Full suite
-```
-
-### Output Structure
+## Output Structure
 
 ```
-tmp/feature-name/
+tmp/feature-name/                    # Working directory (do NOT check in)
 ├── README.md          # Feature overview
-├── test-coverage.md   # Analysis
-└── SUMMARY.md         # Results
+├── test-coverage.md   # Analysis with gap status
+└── SUMMARY.md         # Final results
 
-tests/language-feature/feature-name/
+tests/language-feature/feature-name/ # Test files (check in)
 ├── scenario-1.slang
-└── error-case-1.slang
+├── scenario-2.slang
+└── diagnose-error-case.slang
 ```
+
+**Note**: The `tmp/` directory is for your reference during the coverage work and is gitignored. Only the test files under `tests/` should be committed.
 
 ---
 
