@@ -261,8 +261,9 @@ public:
 
         getActual<slang::IGlobalSession>()->getCompilerElapsedTime(outTotalTime, outDownstreamTime);
 
-        RECORD_INPUT(*outTotalTime);
-        RECORD_INPUT(*outDownstreamTime);
+        // These cause indeterminism
+        // RECORD_INPUT(*outTotalTime);
+        // RECORD_INPUT(*outDownstreamTime);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

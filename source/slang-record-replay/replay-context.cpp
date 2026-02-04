@@ -544,6 +544,13 @@ void ReplayContext::unregisterProxy(ISlangUnknown* proxy)
         m_implToProxy.remove(*impl);
     }
     m_proxyToImpl.remove(proxy);
+
+    uint64_t* handle = m_objectToHandle.tryGetValue(proxy);
+    if (handle)
+    {
+        m_objectToHandle.remove(proxy);
+        m_handleToObject.remove(*handle);
+    }
 }
 
 ISlangUnknown* ReplayContext::getProxy(ISlangUnknown* implementation)
