@@ -27,7 +27,6 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         // Use static_cast to T* first (the interface), then to ISlangUnknown*
         // to avoid ambiguity from multiple inheritance
         ProxyT* proxy = new ProxyT(queried.get());
-        obj->release();
         proxy->addRef();
         
         // Register the proxy with the ReplayContext so it can be tracked as a handle
@@ -58,8 +57,10 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
     
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
-    if(auto existing = ReplayContext::get().getProxy(obj))
+    if(auto existing = ReplayContext::get().getProxy(obj)) {
+        existing->addRef();
         return existing;
+    }
 
     // If we've already got a proxy, just return it. Not sure
     // this should ever happen.
