@@ -78,48 +78,11 @@ jobs:
           echo "=== CUDA version ==="
           nvcc --version
 
-      # LLVM caching support - restore cached LLVM build if available
-      - name: Restore cached LLVM
-        uses: actions/cache/restore@v4
-        id: cache-llvm
-        with:
-          path: build/llvm-project-install
-          key: llvm-linux-gcc-x86_64-${{ hashFiles('external/build-llvm.sh') }}
-
-      # Fail if LLVM cache not available (don't build from source in container)
-      - name: Verify LLVM cache
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          echo "ERROR: LLVM cache not available"
-          echo "This workflow requires pre-built LLVM cache to be available"
-          echo "Run populate-llvm-cache workflow first or wait for weekly rebuild"
-          exit 1
-
-      # Set LLVM paths for CMake to find the installation
-      - name: Set LLVM paths
-        run: |
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-
-      # Verify LLVM installation
-      - name: Verify LLVM installation
-        run: |
-          echo "=== LLVM Installation ==="
-          if [ -d build/llvm-project-install ]; then
-            echo "LLVM installed at: build/llvm-project-install"
-            echo "LLVM_DIR=$LLVM_DIR"
-            echo "Clang_DIR=$Clang_DIR"
-            ls -lh build/llvm-project-install/lib/ | head -20
-          else
-            echo "ERROR: LLVM not found at build/llvm-project-install"
-            exit 1
-          fi
-
       - name: Configure CMake
         run: |
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
 
       - name: Build Slang
         run: |
