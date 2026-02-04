@@ -178,52 +178,6 @@ jobs:
             python3 -m pytest tests/integration/slangpy/neural/ -ra -v --lf
           fi
 
-      - name: Clone slangpy-samples
-        run: |
-          # Clone slangpy-samples and checkout the tag matching the installed
-          # slangpy version. This ensures compatibility between the slangpy
-          # release and the samples. Falls back to main if no matching tag exists.
-          echo "Cloning slangpy-samples repository..."
-
-          # Detect installed slangpy version
-          SLANGPY_VERSION=$(python3 -c "import slangpy; print(slangpy.__version__)" 2>/dev/null || echo "unknown")
-          echo "Installed slangpy version: $SLANGPY_VERSION"
-
-          # Try to clone specific version tag directly, fallback to main if it fails
-          if [ "$SLANGPY_VERSION" != "unknown" ]; then
-            if git clone --branch "v${SLANGPY_VERSION}" --depth 1 https://github.com/shader-slang/slangpy-samples.git 2>/dev/null; then
-              echo "Successfully cloned version tag v${SLANGPY_VERSION}"
-            else
-              echo "Warning: No matching tag found for v${SLANGPY_VERSION}, cloning main branch"
-              git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
-            fi
-          else
-            echo "Warning: Could not detect slangpy version, cloning main branch"
-            git clone --depth 1 https://github.com/shader-slang/slangpy-samples.git
-          fi
-
-      - name: Install slangpy-samples dependencies
-        run: |
-          echo "Installing slangpy-samples dependencies..."
-          python3 -m pip install -r slangpy-samples/requirements.txt --user
-
-      - name: Run slangpy-samples tests
-        # Skip test_check_urls because URL checking is not required for slang CI
-        run: |
-          echo "Running slangpy-samples tests..."
-          export SLANG_RUN_SPIRV_VALIDATION=1
-
-          if python3 -m pytest "slangpy-samples/tests" -n 4 -k "not test_check_urls"
-          then
-            echo "All tests passed on first attempt."
-          else
-            echo ""
-            echo "========================================"
-            echo "Some tests failed. Re-running failed tests sequentially..."
-            echo "========================================"
-            echo ""
-            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
-            #   --lf, --last-failed   Rerun only the tests that failed at the last run
-            #   -n 0                  Rerun the tests sequentially
-            python3 -m pytest "slangpy-samples/tests" -n 0 --lf -k "not test_check_urls"
-          fi
+      # NOTE: slangpy-samples tests are not run here to match the original
+      # ci-slang-test-container.yml behavior. The slangpy-samples tests have
+      # known issues with pickled test data that need to be fixed upstream.
