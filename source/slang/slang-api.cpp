@@ -245,24 +245,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
     }
 
-    // Wrap in proxy if record/replay is active
-    if (SlangRecord::ReplayContext::get().isActive())
-    {
-        auto* wrapped = SlangRecord::wrapObject(globalSession.get());
-        if (wrapped)
-        {
-            globalSession.detach();  // Release ownership from ComPtr
-            *outGlobalSession = static_cast<slang::IGlobalSession*>(wrapped);
-        }
-        else
-        {
-            *outGlobalSession = globalSession.detach();
-        }
-    }
-    else
-    {
-        *outGlobalSession = globalSession.detach();
-    }
+    *outGlobalSession = globalSession.detach();
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Reset inst debug alloc counter to 0 so IRInsts for user code always starts from 0.
@@ -276,8 +259,23 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
+    // Replay system code is manually written here for simplicity. It does nothing if replays aren't active.
+    using namespace SlangRecord;
+    auto& _ctx = ReplayContext::get();
+    _ctx.beginStaticCall(__FUNCSIG__);
+    _ctx.record(RecordFlag::Input, *const_cast<SlangGlobalSessionDesc*>(desc));
+
+    // Main internal call (regardless of replay state)
     Slang::GlobalSessionInternalDesc internalDesc = {};
-    return slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+    SlangResult result = slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+
+    // If replay system active, wrap output and record it
+    auto* wrapped = wrapObject(*outGlobalSession);
+    *outGlobalSession = static_cast<slang::IGlobalSession*>(wrapped);
+    _ctx.record(RecordFlag::Output, *outGlobalSession);
+    _ctx.record(RecordFlag::ReturnValue, result);
+
+    return result;
 }
 
 SLANG_API void slang_shutdown()
@@ -291,7 +289,7 @@ SLANG_API void slang_shutdown()
 SLANG_API void slang_enableRecordLayer(bool enable)
 {
     if (enable)
-        SlangRecord::ReplayContext::get().enable();
+        SlangRecord::ReplayContext::get().setMode(SlangRecord::Mode::Record);
     else
         SlangRecord::ReplayContext::get().disable();
 }

@@ -260,6 +260,19 @@ public:
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
     SLANG_API ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
 
+    /// Get the next handle value that will be assigned.
+    /// Useful for testing to know how many objects have been registered.
+    SLANG_API uint64_t getNextHandle() const { return m_nextHandle; }
+
+    /// Check if an object is registered.
+    SLANG_API bool isInterfaceRegistered(ISlangUnknown* obj) const;
+
+    /// Get handle for an object (throws if not registered).
+    SLANG_API uint64_t getHandleForInterface(ISlangUnknown* obj) const;
+
+    /// Get object for a handle (returns nullptr if not found).
+    SLANG_API ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
+
     // Enum types - record as int32_t
     template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
 
@@ -328,15 +341,6 @@ private:
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
     void recordInterfaceImpl(RecordFlag flags, T*& obj);
-
-    /// Check if an object is registered.
-    SLANG_API bool isInterfaceRegistered(ISlangUnknown* obj) const;
-
-    /// Get handle for an object (throws if not registered).
-    SLANG_API uint64_t getHandleForInterface(ISlangUnknown* obj) const;
-
-    /// Get object for a handle (throws if not registered).
-    SLANG_API ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
 
     std::recursive_mutex m_mutex;
     ReplayStream m_stream;          ///< Main stream for record/playback

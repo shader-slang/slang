@@ -13,15 +13,36 @@
 using namespace Slang;
 using namespace SlangRecord;
 
+inline ReplayContext& ctx()
+{
+    return ReplayContext::get();
+}
+
+class ScopedReplayContext
+{
+public:
+    ScopedReplayContext()
+    {
+        ctx().reset();
+    }
+
+    ~ScopedReplayContext()
+    {
+        ctx().reset();
+    }
+};
+
+#define REPLAY_TEST \
+    if(ReplayContext::get().isActive()) { \
+        SLANG_IGNORE_TEST; \
+    } \
+    ScopedReplayContext _scopedReplayContext;
+
 // =============================================================================
 // Helper: Round-trip test template
 // Writes a value, creates a reader, reads it back, and compares
 // =============================================================================
 // quick access to global context
-inline ReplayContext& ctx()
-{
-    return ReplayContext::get();
-}
 
 template<typename T>
 static bool roundTripValue(T writeValue, T& readValue)
@@ -52,6 +73,7 @@ static bool roundTripCheck(T value)
 
 SLANG_UNIT_TEST(replayContextInt8)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int8_t>(0));
     SLANG_CHECK(roundTripCheck<int8_t>(127));
@@ -61,6 +83,7 @@ SLANG_UNIT_TEST(replayContextInt8)
 
 SLANG_UNIT_TEST(replayContextInt16)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int16_t>(0));
     SLANG_CHECK(roundTripCheck<int16_t>(32767));
@@ -70,6 +93,7 @@ SLANG_UNIT_TEST(replayContextInt16)
 
 SLANG_UNIT_TEST(replayContextInt32)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int32_t>(0));
     SLANG_CHECK(roundTripCheck<int32_t>(2147483647));
@@ -79,6 +103,7 @@ SLANG_UNIT_TEST(replayContextInt32)
 
 SLANG_UNIT_TEST(replayContextInt64)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<int64_t>(0));
     SLANG_CHECK(roundTripCheck<int64_t>(9223372036854775807LL));
@@ -88,6 +113,7 @@ SLANG_UNIT_TEST(replayContextInt64)
 
 SLANG_UNIT_TEST(replayContextUInt8)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint8_t>(0));
     SLANG_CHECK(roundTripCheck<uint8_t>(255));
@@ -96,6 +122,7 @@ SLANG_UNIT_TEST(replayContextUInt8)
 
 SLANG_UNIT_TEST(replayContextUInt16)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint16_t>(0));
     SLANG_CHECK(roundTripCheck<uint16_t>(65535));
@@ -104,6 +131,7 @@ SLANG_UNIT_TEST(replayContextUInt16)
 
 SLANG_UNIT_TEST(replayContextUInt32)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint32_t>(0));
     SLANG_CHECK(roundTripCheck<uint32_t>(4294967295U));
@@ -112,6 +140,7 @@ SLANG_UNIT_TEST(replayContextUInt32)
 
 SLANG_UNIT_TEST(replayContextUInt64)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<uint64_t>(0));
     SLANG_CHECK(roundTripCheck<uint64_t>(18446744073709551615ULL));
@@ -124,6 +153,7 @@ SLANG_UNIT_TEST(replayContextUInt64)
 
 SLANG_UNIT_TEST(replayContextFloat)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<float>(0.0f));
     SLANG_CHECK(roundTripCheck<float>(3.14159f));
@@ -134,6 +164,7 @@ SLANG_UNIT_TEST(replayContextFloat)
 
 SLANG_UNIT_TEST(replayContextDouble)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<double>(0.0));
     SLANG_CHECK(roundTripCheck<double>(3.141592653589793));
@@ -148,6 +179,7 @@ SLANG_UNIT_TEST(replayContextDouble)
 
 SLANG_UNIT_TEST(replayContextBool)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     SLANG_CHECK(roundTripCheck<bool>(true));
     SLANG_CHECK(roundTripCheck<bool>(false));
@@ -159,6 +191,7 @@ SLANG_UNIT_TEST(replayContextBool)
 
 SLANG_UNIT_TEST(replayContextString)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     auto testString = [](const char* str)
@@ -192,6 +225,7 @@ SLANG_UNIT_TEST(replayContextString)
 
 SLANG_UNIT_TEST(replayContextBlob)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     auto testBlob = [](const void* data, size_t size)
@@ -230,6 +264,7 @@ SLANG_UNIT_TEST(replayContextBlob)
 
 SLANG_UNIT_TEST(replayContextHandle)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // This test emulates a real-world scenario:
@@ -273,6 +308,7 @@ SLANG_UNIT_TEST(replayContextHandle)
 
 SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test with multiple blobs to ensure handle tracking works correctly
@@ -322,6 +358,7 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
 
 SLANG_UNIT_TEST(replayContextHandleNull)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test that null pointers are handled correctly
@@ -345,6 +382,7 @@ SLANG_UNIT_TEST(replayContextHandleNull)
 
 SLANG_UNIT_TEST(replayContextInlineBlob)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test inline blob serialization - when a user-provided blob (not tracked)
@@ -388,6 +426,7 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
 
 SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test that an inline blob can later be output (registered) and input again
@@ -443,6 +482,7 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
 
 SLANG_UNIT_TEST(replayContextSlangEnums)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test a selection of Slang enum types
@@ -495,6 +535,7 @@ SLANG_UNIT_TEST(replayContextSlangEnums)
 
 SLANG_UNIT_TEST(replayContextSlangUUID)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     SlangUUID writeValue = {0x12345678, 0x1234, 0x5678, {0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78}};
@@ -520,6 +561,7 @@ SLANG_UNIT_TEST(replayContextSlangUUID)
 
 SLANG_UNIT_TEST(replayContextCompilerOptionValue)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     slang::CompilerOptionValue writeValue = {};
@@ -551,6 +593,7 @@ SLANG_UNIT_TEST(replayContextCompilerOptionValue)
 
 SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     slang::PreprocessorMacroDesc writeValue = {};
@@ -576,6 +619,7 @@ SLANG_UNIT_TEST(replayContextPreprocessorMacroDesc)
 
 SLANG_UNIT_TEST(replayContextTargetDesc)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     slang::TargetDesc writeValue = {};
@@ -611,6 +655,7 @@ SLANG_UNIT_TEST(replayContextTargetDesc)
 
 SLANG_UNIT_TEST(replayContextMultipleValues)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Write multiple values of different types
@@ -657,6 +702,7 @@ SLANG_UNIT_TEST(replayContextMultipleValues)
 
 SLANG_UNIT_TEST(replayContextTypeMismatch)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Write an int32, try to read a string - should throw
@@ -688,6 +734,7 @@ SLANG_UNIT_TEST(replayContextTypeMismatch)
 
 SLANG_UNIT_TEST(replayContextStreamState)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Test isReading/isWriting
@@ -710,6 +757,7 @@ SLANG_UNIT_TEST(replayContextStreamState)
 
 SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Save original state using the public C API
@@ -737,6 +785,7 @@ SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
 
 SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Save original state using the public C API
@@ -766,6 +815,7 @@ SLANG_UNIT_TEST(replayContextSessionNotWrappedWhenInactive)
 
 SLANG_UNIT_TEST(replayContextIdleMode)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // In Idle mode, record operations should be no-ops
@@ -789,6 +839,7 @@ SLANG_UNIT_TEST(replayContextIdleMode)
 
 SLANG_UNIT_TEST(replayContextRecordMode)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // In Record mode, data should be written to stream
@@ -812,6 +863,7 @@ SLANG_UNIT_TEST(replayContextRecordMode)
 
 SLANG_UNIT_TEST(replayContextPlaybackMode)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // First record some data
@@ -848,6 +900,7 @@ SLANG_UNIT_TEST(replayContextPlaybackMode)
 
 SLANG_UNIT_TEST(replayContextSyncModeMatching)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
@@ -884,6 +937,7 @@ SLANG_UNIT_TEST(replayContextSyncModeMatching)
 
 SLANG_UNIT_TEST(replayContextSyncModeMismatch)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // First, record reference data
@@ -913,6 +967,7 @@ SLANG_UNIT_TEST(replayContextSyncModeMismatch)
 
 SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Record data with Output flag
@@ -950,6 +1005,7 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputVerification)
 
 SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Record an output value
@@ -979,6 +1035,7 @@ SLANG_UNIT_TEST(replayContextPlaybackOutputMismatch)
 
 SLANG_UNIT_TEST(replayContextModeTransitions)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     ctx().reset();
@@ -1009,6 +1066,7 @@ SLANG_UNIT_TEST(replayContextModeTransitions)
 
 SLANG_UNIT_TEST(replayContextReset)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     ctx().reset();
@@ -1026,6 +1084,7 @@ SLANG_UNIT_TEST(replayContextReset)
 
 SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Record reference data
@@ -1077,6 +1136,7 @@ static TypeId readTypeIdFromStream(ReplayStream& stream)
 
 SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Save and set up recording using DLL's context
@@ -1112,26 +1172,40 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 
     dllCtx.switchToPlayback();
 
-    // Read function signature
+    // Read / verify the creation of the global session. This is:
+    // - signature (slang_createGlobalSession2)
+    // - input descriptor
+    // - output handle to new global context
+    // - output success result code
     const char* signature = nullptr;
     dllCtx.record(RecordFlag::Input, signature);
     SLANG_CHECK(signature != nullptr);
-    // The signature should contain "findProfile"
-    SLANG_CHECK(strstr(signature, "findProfile") != nullptr);
+    SLANG_CHECK(strcmp(signature, "slang_createGlobalSession2") == 0);
+    SlangGlobalSessionDesc globalDesc = {};
+    dllCtx.record(RecordFlag::Input, globalDesc);
+    SLANG_CHECK(globalDesc.apiVersion == 0);
+    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
+    uint64_t globalContextHandle = 0;
+    dllCtx.getStream().read(&globalContextHandle, sizeof(globalContextHandle));
+    SLANG_CHECK(globalContextHandle == kFirstValidHandle);
+    SlangResult globalContextResult;
+    dllCtx.record(RecordFlag::None, globalContextResult);
 
-    // Read 'this' pointer handle - check TypeId then read uint64
+    // Read / verify the findProfile call. This is:
+    // - signature: GlobalSessionProxy::findProfile
+    // - this handle (the handle of the global session)
+    // - input profile name ("sm_5_0")
+    // - output profileId
+    dllCtx.record(RecordFlag::Input, signature);
+    SLANG_CHECK(strcmp(signature, "GlobalSessionProxy::findProfile") == 0);
     SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
     uint64_t thisHandle = 0;
     dllCtx.getStream().read(&thisHandle, sizeof(thisHandle));
     SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
-
-    // Read profile name
     const char* profileName = nullptr;
     dllCtx.record(RecordFlag::Input, profileName);
     SLANG_CHECK(profileName != nullptr);
     SLANG_CHECK(strcmp(profileName, "sm_5_0") == 0);
-
-    // Read return value (SlangProfileID recorded as int32)
     int32_t returnedProfileId = 0;
     dllCtx.record(RecordFlag::None, returnedProfileId);
     SLANG_CHECK(returnedProfileId == static_cast<int32_t>(profileId));
@@ -1148,6 +1222,7 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
 
 SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Save and set up recording using DLL's context
@@ -1265,6 +1340,7 @@ static void playbackFindProfile(ReplayContext& ctx)
 
 SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Reset test state
@@ -1325,6 +1401,7 @@ SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
 
 SLANG_UNIT_TEST(replayContextPlaybackMultipleCalls)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     s_playbackCallCount = 0;
@@ -1481,6 +1558,7 @@ private:
 // with a known signature
 SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Reset test state
@@ -1559,6 +1637,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 // Test the MemberFunctionTraits template
 SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
     
     // Test arity detection
@@ -1589,6 +1668,7 @@ SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 // This validates that parseSignature produces matching signatures in both directions
 SLANG_UNIT_TEST(replayContextFullRoundTrip)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     // Reset test state
@@ -1689,6 +1769,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
 // Test parseSignature with various signature formats
 SLANG_UNIT_TEST(replayContextParseSignature)
 {
+    REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
     char buffer[256];
@@ -1722,6 +1803,157 @@ SLANG_UNIT_TEST(replayContextParseSignature)
         SLANG_CHECK(result != nullptr);
     }
 }
+
+// =============================================================================
+// End-to-End Playback Test: Global Session and Session Creation
+// =============================================================================
+
+// This test validates the full playback process for creating a global session
+// and a session within it. The test has 3 stages:
+// 
+// Stage 1: Without replay system, create objects to establish baseline behavior
+// Stage 2: With recording enabled, create same objects and verify proxy wrapping
+// Stage 3: Playback the recording and verify objects are recreated correctly
+
+SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
+{
+    REPLAY_TEST;
+    SLANG_UNUSED(unitTestContext);
+
+    auto& dllCtx = getDllContext();
+
+    // =========================================================================
+    // Stage 1: Create objects WITHOUT replay system to establish baseline
+    // =========================================================================
+    
+    // Ensure replay is disabled
+    bool wasActive = dllCtx.isActive();
+    dllCtx.disable();
+    SLANG_CHECK(!dllCtx.isActive());
+
+    // Create a global session without replay
+    Slang::ComPtr<slang::IGlobalSession> baselineGlobalSession;
+    SlangGlobalSessionDesc globalDesc = {};
+    globalDesc.apiVersion = 0;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
+
+    // Create a session with a specific target
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = baselineGlobalSession->findProfile("spirv_1_5");
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    Slang::ComPtr<slang::ISession> baselineSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
+
+    // Store baseline values for comparison
+    SlangProfileID baselineProfile = targetDesc.profile;
+    SLANG_CHECK(baselineProfile != SLANG_PROFILE_UNKNOWN);
+
+    // =========================================================================
+    // Stage 2: Create objects WITH recording enabled and verify proxy wrapping
+    // =========================================================================
+
+    // Enable recording
+    dllCtx.enable();
+    dllCtx.reset();
+    dllCtx.setMode(Mode::Record);
+    SLANG_CHECK(dllCtx.isRecording());
+
+    // Remember the starting handle value
+    uint64_t handleBeforeRecord = dllCtx.getNextHandle();
+
+    // Create a global session - should be wrapped in a proxy
+    Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+
+    // Verify we got a proxy (the pointer should be different from baseline since
+    // it's a proxy wrapper, but we can verify it's registered)
+    SLANG_CHECK(recordedGlobalSession != nullptr);
+    SLANG_CHECK(dllCtx.isInterfaceRegistered(recordedGlobalSession.get()));
+
+    // The global session should be a GlobalSessionProxy wrapping the actual implementation
+    // We can verify this by checking it implements IGlobalSession
+    Slang::ComPtr<slang::IGlobalSession> queriedGlobal;
+    SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->queryInterface(
+        slang::IGlobalSession::getTypeGuid(), (void**)queriedGlobal.writeRef())));
+
+    // Create a session with the same descriptor
+    targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+    SLANG_CHECK(targetDesc.profile == baselineProfile); // Profile IDs should match
+
+    Slang::ComPtr<slang::ISession> recordedSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
+
+    // Verify session is also registered
+    SLANG_CHECK(recordedSession != nullptr);
+    SLANG_CHECK(dllCtx.isInterfaceRegistered(recordedSession.get()));
+
+    // Check that new handles were assigned
+    uint64_t handleAfterRecord = dllCtx.getNextHandle();
+    SLANG_CHECK(handleAfterRecord > handleBeforeRecord);
+
+    // Get the handle for the session so we can look it up after playback
+    uint64_t recordedSessionHandle = dllCtx.getHandleForInterface(recordedSession.get());
+    SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
+
+    // Store recorded stream data for playback
+    size_t recordedSize = dllCtx.getStream().getSize();
+    SLANG_CHECK(recordedSize > 0);
+
+    // =========================================================================
+    // Stage 3: Playback the recording and verify objects are recreated
+    // =========================================================================
+
+    // Release the recorded objects before playback
+    recordedSession = nullptr;
+    recordedGlobalSession = nullptr;
+
+    // Switch to playback mode - this resets handles but keeps stream data
+    dllCtx.switchToPlayback();
+    SLANG_CHECK(dllCtx.isPlayback());
+
+    // Remember handle value before playback
+    uint64_t handleBeforePlayback = dllCtx.getNextHandle();
+    SLANG_CHECK(handleBeforePlayback == kFirstValidHandle); // Should be reset
+
+    // Execute all recorded calls
+    // This should recreate the global session and session
+    dllCtx.executeAll();
+
+    // Check that handles were assigned during playback
+    uint64_t handleAfterPlayback = dllCtx.getNextHandle();
+    SLANG_CHECK(handleAfterPlayback > handleBeforePlayback);
+
+    // The same number of handles should have been assigned
+    uint64_t handlesAssignedDuringRecord = handleAfterRecord - handleBeforeRecord;
+    uint64_t handlesAssignedDuringPlayback = handleAfterPlayback - handleBeforePlayback;
+    SLANG_CHECK(handlesAssignedDuringPlayback == handlesAssignedDuringRecord);
+
+    // Look up the session by its handle - it should exist after playback
+    ISlangUnknown* playedBackSessionUnk = dllCtx.getInterfaceForHandle(recordedSessionHandle);
+    SLANG_CHECK(playedBackSessionUnk != nullptr);
+
+    // Verify we can query the ISession interface
+    Slang::ComPtr<slang::ISession> playedBackSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(playedBackSessionUnk->queryInterface(
+        slang::ISession::getTypeGuid(), (void**)playedBackSession.writeRef())));
+
+    // =========================================================================
+    // Cleanup
+    // =========================================================================
+
+    playedBackSession = nullptr;
+    baselineSession = nullptr;
+    baselineGlobalSession = nullptr;
+    
+    dllCtx.reset();
+    if (!wasActive)
+        dllCtx.disable();
+}
+
 
 
 

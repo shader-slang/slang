@@ -39,7 +39,8 @@ public:
     queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
     {
         // Delegate to the underlying object to check if it supports the interface
-        if (m_actual->queryInterface(uuid, nullptr) == SLANG_OK)
+        ComPtr<ISlangUnknown> ptr;
+        if (m_actual->queryInterface(uuid, (void**)ptr.writeRef()) == SLANG_OK)
         {
             addRef();
             // Cast through TFirstInterface to avoid ambiguity with multiple inheritance

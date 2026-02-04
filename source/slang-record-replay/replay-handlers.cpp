@@ -23,12 +23,56 @@
 #include "proxy/proxy-shared-library.h"
 #include "proxy/proxy-mutable-file-system.h"
 
+#include <slang.h>
+#include "../slang/slang-internal.h"
+
 namespace SlangRecord {
+
+// =============================================================================
+// Static/Free Function Handlers
+// =============================================================================
+
+/// Handler for slang_createGlobalSession2
+/// This is a special case - it's a free function, not a method on a proxy.
+/// We call slang_createGlobalSessionImpl directly to avoid re-recording,
+/// then wrap the result to match what was recorded.
+static void handle_slang_createGlobalSession2(ReplayContext& ctx)
+{
+    // Read the input descriptor
+    SlangGlobalSessionDesc desc = {};
+    ctx.record(RecordFlag::Input, desc);
+    
+    // Call the implementation directly (not slang_createGlobalSession2) to avoid re-recording
+    Slang::GlobalSessionInternalDesc internalDesc = {};
+    slang::IGlobalSession* globalSession = nullptr;
+    SlangResult result = slang_createGlobalSessionImpl(&desc, &internalDesc, &globalSession);
+    
+    // Wrap the session in a proxy (just like slang_createGlobalSession2 does during recording)
+    if (SLANG_SUCCEEDED(result) && globalSession)
+    {
+        auto* wrapped = wrapObject(globalSession);
+        if (wrapped)
+            globalSession = static_cast<slang::IGlobalSession*>(wrapped);
+    }
+    
+    // Read and verify the output (this will register the created session in the handle table)
+    ctx.record(RecordFlag::Output, globalSession);
+    
+    // Read and verify the return value
+    ctx.record(RecordFlag::ReturnValue, result);
+}
 
 /// Register all replay handlers.
 /// This function is called during static initialization.
 static void registerAllHandlers()
 {
+    // =========================================================================
+    // Static/Free Function handlers
+    // =========================================================================
+    
+    // slang_createGlobalSession2 - the entry point for creating global sessions
+    ReplayContext::get().registerHandler("slang_createGlobalSession2", handle_slang_createGlobalSession2);
+    
     // =========================================================================
     // GlobalSessionProxy handlers
     // =========================================================================

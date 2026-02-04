@@ -51,6 +51,8 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
 
 ISlangUnknown* wrapObject(ISlangUnknown* obj)
 {
+    if(!ReplayContext::get().isActive())
+        return obj;
     if (!obj)
         return nullptr;
 
