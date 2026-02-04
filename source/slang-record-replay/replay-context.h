@@ -322,6 +322,10 @@ public:
     /// Call this when wrapping an implementation with a proxy.
     SLANG_API void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
 
+    /// Unregister a proxy when it is destroyed.
+    /// Call this from the proxy destructor to clean up the mappings.
+    SLANG_API void unregisterProxy(ISlangUnknown* proxy);
+
     /// Register an interface object and get its handle.
     /// Used when creating proxy objects to register them for handle tracking.
     SLANG_API uint64_t registerInterface(ISlangUnknown* obj);

@@ -6,6 +6,10 @@
 #include <chrono>
 #include <cstdio>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace SlangRecord {
 
 using Slang::File;
@@ -388,11 +392,18 @@ void ReplayContext::setTtyLogging(bool enable)
 
 void ReplayContext::logCall(const char* signature, void* thisPtr)
 {
-    // Print to stderr for visibility
+    char buffer[512];
     if (thisPtr)
-        fprintf(stderr, "[REPLAY] %s [this=%p]\n", signature, thisPtr);
+        snprintf(buffer, sizeof(buffer), "[REPLAY] %s [this=%p]\n", signature, thisPtr);
     else
-        fprintf(stderr, "[REPLAY] %s [static]\n", signature);
+        snprintf(buffer, sizeof(buffer), "[REPLAY] %s [static]\n", signature);
+    
+#ifdef _WIN32
+    // Use OutputDebugString on Windows since GUI apps don't have stderr
+    OutputDebugStringA(buffer);
+#endif
+    // Also try stderr in case it's connected
+    fputs(buffer, stderr);
     fflush(stderr);
 }
 
@@ -412,7 +423,15 @@ void ReplayContext::recordError(const char* message)
     
     // Also log to TTY if enabled
     if (m_ttyLogging)
-        fprintf(stderr, "[REPLAY ERROR] %s\n", message ? message : "(null)");
+    {
+        char buffer[4200];
+        snprintf(buffer, sizeof(buffer), "[REPLAY ERROR] %s\n", message ? message : "(null)");
+#ifdef _WIN32
+        OutputDebugStringA(buffer);
+#endif
+        fputs(buffer, stderr);
+        fflush(stderr);
+    }
 }
 
 // =============================================================================
@@ -512,6 +531,19 @@ void ReplayContext::registerProxy(ISlangUnknown* proxy, ISlangUnknown* implement
 
     m_proxyToImpl[proxy] = implementation;
     m_implToProxy[implementation] = proxy;
+}
+
+void ReplayContext::unregisterProxy(ISlangUnknown* proxy)
+{
+    if (proxy == nullptr)
+        return;
+
+    ISlangUnknown** impl = m_proxyToImpl.tryGetValue(proxy);
+    if (impl)
+    {
+        m_implToProxy.remove(*impl);
+    }
+    m_proxyToImpl.remove(proxy);
 }
 
 ISlangUnknown* ReplayContext::getProxy(ISlangUnknown* implementation)

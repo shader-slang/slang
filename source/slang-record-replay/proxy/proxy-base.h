@@ -24,6 +24,8 @@ public:
     {
     }
 
+    virtual ~ProxyBase();
+
     // ISlangUnknown implementation
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
     {
