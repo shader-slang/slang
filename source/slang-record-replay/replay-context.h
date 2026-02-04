@@ -204,6 +204,8 @@ public:
 
     /// Set the base directory for replays (default: ".slang-replays").
     /// Must be called before enabling recording.
+    /// Note: If SLANG_RECORD_PATH environment variable is set, it overrides
+    /// the base directory and uses the exact path specified.
     SLANG_API void setReplayDirectory(const char* path);
 
     /// Get the current replay base directory.

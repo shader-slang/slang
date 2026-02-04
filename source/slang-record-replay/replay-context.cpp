@@ -287,9 +287,20 @@ String ReplayContext::generateTimestampFolderName()
 
 void ReplayContext::setupRecordingMirror()
 {
-    // Generate timestamped folder path
-    String timestamp = generateTimestampFolderName();
-    m_currentReplayPath = Path::combine(m_replayDirectory, timestamp);
+    // Check for SLANG_RECORD_PATH environment variable for explicit path
+    Slang::StringBuilder envPath;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice("SLANG_RECORD_PATH"), envPath)) && envPath.getLength() > 0)
+    {
+        // Use the explicit path directly
+        m_currentReplayPath = envPath.toString();
+    }
+    else
+    {
+        // Generate timestamped folder path
+        String timestamp = generateTimestampFolderName();
+        m_currentReplayPath = Path::combine(m_replayDirectory, timestamp);
+    }
     
     // Create the directory structure
     if (!Path::createDirectoryRecursive(m_currentReplayPath))
