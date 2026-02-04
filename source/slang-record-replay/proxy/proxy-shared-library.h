@@ -21,6 +21,9 @@ public:
     {
     }
 
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(SharedLibraryProxy)
+
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {

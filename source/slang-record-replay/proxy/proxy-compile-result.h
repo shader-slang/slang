@@ -2,6 +2,7 @@
 #define SLANG_PROXY_COMPILE_RESULT_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang.h"
@@ -23,6 +24,9 @@ public:
         : ProxyBase(actual)
     {
     }
+
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(CompileResultProxy)
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override

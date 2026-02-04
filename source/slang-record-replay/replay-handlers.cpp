@@ -83,6 +83,8 @@ static void registerAllHandlers()
     // GlobalSessionProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(GlobalSessionProxy, addRef);
+    REPLAY_REGISTER(GlobalSessionProxy, release);
     REPLAY_REGISTER(GlobalSessionProxy, createSession);
     REPLAY_REGISTER(GlobalSessionProxy, findProfile);
     REPLAY_REGISTER(GlobalSessionProxy, setDownstreamCompilerPath);
@@ -117,6 +119,8 @@ static void registerAllHandlers()
     // SessionProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(SessionProxy, addRef);
+    REPLAY_REGISTER(SessionProxy, release);
     REPLAY_REGISTER(SessionProxy, getGlobalSession);
     REPLAY_REGISTER(SessionProxy, loadModule);
     REPLAY_REGISTER(SessionProxy, loadModuleFromSource);
@@ -138,6 +142,8 @@ static void registerAllHandlers()
     // ModuleProxy handlers  
     // =========================================================================
     
+    REPLAY_REGISTER(ModuleProxy, addRef);
+    REPLAY_REGISTER(ModuleProxy, release);
     REPLAY_REGISTER(ModuleProxy, findEntryPointByName);
     REPLAY_REGISTER(ModuleProxy, getDefinedEntryPointCount);
     REPLAY_REGISTER(ModuleProxy, getDefinedEntryPoint);
@@ -156,6 +162,8 @@ static void registerAllHandlers()
     // ComponentTypeProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(ComponentTypeProxy, addRef);
+    REPLAY_REGISTER(ComponentTypeProxy, release);
     REPLAY_REGISTER(ComponentTypeProxy, getSession);
     REPLAY_REGISTER(ComponentTypeProxy, getLayout);
     REPLAY_REGISTER(ComponentTypeProxy, getSpecializationParamCount);
@@ -176,6 +184,8 @@ static void registerAllHandlers()
     // EntryPointProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(EntryPointProxy, addRef);
+    REPLAY_REGISTER(EntryPointProxy, release);
     REPLAY_REGISTER(EntryPointProxy, getSession);
     REPLAY_REGISTER(EntryPointProxy, getLayout);
     REPLAY_REGISTER(EntryPointProxy, getSpecializationParamCount);
@@ -194,6 +204,8 @@ static void registerAllHandlers()
     // TypeConformanceProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(TypeConformanceProxy, addRef);
+    REPLAY_REGISTER(TypeConformanceProxy, release);
     REPLAY_REGISTER(TypeConformanceProxy, getSession);
     REPLAY_REGISTER(TypeConformanceProxy, getLayout);
     REPLAY_REGISTER(TypeConformanceProxy, getSpecializationParamCount);
@@ -211,6 +223,8 @@ static void registerAllHandlers()
     // CompileRequestProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(CompileRequestProxy, addRef);
+    REPLAY_REGISTER(CompileRequestProxy, release);
     REPLAY_REGISTER(CompileRequestProxy, setFileSystem);
     REPLAY_REGISTER(CompileRequestProxy, setCompileFlags);
     REPLAY_REGISTER(CompileRequestProxy, getCompileFlags);
@@ -289,6 +303,8 @@ static void registerAllHandlers()
     // BlobProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(BlobProxy, addRef);
+    REPLAY_REGISTER(BlobProxy, release);
     REPLAY_REGISTER(BlobProxy, getBufferPointer);
     REPLAY_REGISTER(BlobProxy, getBufferSize);
     
@@ -296,12 +312,16 @@ static void registerAllHandlers()
     // SharedLibraryProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(SharedLibraryProxy, addRef);
+    REPLAY_REGISTER(SharedLibraryProxy, release);
     REPLAY_REGISTER(SharedLibraryProxy, findSymbolAddressByName);
     
     // =========================================================================
     // MutableFileSystemProxy handlers
     // =========================================================================
     
+    REPLAY_REGISTER(MutableFileSystemProxy, addRef);
+    REPLAY_REGISTER(MutableFileSystemProxy, release);
     REPLAY_REGISTER(MutableFileSystemProxy, loadFile);
     REPLAY_REGISTER(MutableFileSystemProxy, getFileUniqueIdentity);
     REPLAY_REGISTER(MutableFileSystemProxy, calcCombinedPath);

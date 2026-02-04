@@ -2,6 +2,7 @@
 #define SLANG_PROXY_COMPILE_REQUEST_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang-deprecated.h"
@@ -24,6 +25,9 @@ public:
         : ProxyBase(actual)
     {
     }
+
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(CompileRequestProxy)
 
     // ICompileRequest
     virtual SLANG_NO_THROW void SLANG_MCALL setFileSystem(ISlangFileSystem* fileSystem) override

@@ -2,6 +2,7 @@
 #define SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 namespace SlangRecord
 {
@@ -19,6 +20,9 @@ public:
         : ProxyBase(actual)
     {
     }
+
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override

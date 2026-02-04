@@ -26,13 +26,26 @@ public:
 
     virtual ~ProxyBase();
 
-    // ISlangUnknown implementation
+    // ISlangUnknown implementation - these are virtual so derived classes can override
+    // to record the calls for replay
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
+    {
+        return addRefImpl();
+    }
+
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    {
+        return releaseImpl();
+    }
+
+    /// Internal addRef - used by the replay system to hold references without recording
+    uint32_t addRefImpl()
     {
         return (uint32_t)RefObject::addReference();
     }
 
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
+    /// Internal release - used by the replay system to release references without recording
+    uint32_t releaseImpl()
     {
         return (uint32_t)RefObject::releaseReference();
     }

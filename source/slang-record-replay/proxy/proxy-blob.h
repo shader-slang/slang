@@ -2,6 +2,7 @@
 #define SLANG_PROXY_BLOB_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 namespace SlangRecord
 {
@@ -19,6 +20,9 @@ public:
         : ProxyBase(actual)
     {
     }
+
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(BlobProxy)
 
     virtual SLANG_NO_THROW void const* SLANG_MCALL getBufferPointer() override
     {

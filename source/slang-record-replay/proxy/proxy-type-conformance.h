@@ -2,6 +2,7 @@
 #define SLANG_PROXY_TYPE_CONFORMANCE_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang.h"
@@ -23,6 +24,9 @@ public:
         : ProxyBase(actual)
     {
     }
+
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(TypeConformanceProxy)
 
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override

@@ -27,7 +27,8 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         // Use static_cast to T* first (the interface), then to ISlangUnknown*
         // to avoid ambiguity from multiple inheritance
         ProxyT* proxy = new ProxyT(queried.get());
-        proxy->addRef();
+        // Use addRefImpl to avoid recording this internal reference
+        proxy->addRefImpl();
         
         // Register the proxy with the ReplayContext so it can be tracked as a handle
         auto& ctx = ReplayContext::get();

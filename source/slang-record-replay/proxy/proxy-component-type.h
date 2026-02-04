@@ -25,6 +25,9 @@ public:
     {
     }
 
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(ComponentTypeProxy)
+
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
     {

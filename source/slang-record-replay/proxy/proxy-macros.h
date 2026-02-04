@@ -67,6 +67,35 @@ namespace SlangRecord {
 #define RECORD_RETURN_VOID() ((void)0)
 
 // =============================================================================
+// addRef/release recording macros for proxies
+// These record user ref-count changes so playback can match object lifetimes
+// =============================================================================
+
+// Override addRef to record the call
+// ProxyType is the concrete proxy class (e.g., SessionProxy)
+#define PROXY_ADDREF_IMPL(ProxyType) \
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override \
+    { \
+        RECORD_CALL(); \
+        uint32_t result = ProxyBase::addRefImpl(); \
+        RECORD_RETURN(result); \
+    }
+
+// Override release to record the call
+#define PROXY_RELEASE_IMPL(ProxyType) \
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override \
+    { \
+        RECORD_CALL(); \
+        uint32_t result = ProxyBase::releaseImpl(); \
+        RECORD_RETURN(result); \
+    }
+
+// Convenience macro to add both overrides
+#define PROXY_REFCOUNT_IMPL(ProxyType) \
+    PROXY_ADDREF_IMPL(ProxyType) \
+    PROXY_RELEASE_IMPL(ProxyType)
+
+// =============================================================================
 // Helper templates for variadic input recording
 // =============================================================================
 

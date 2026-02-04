@@ -25,6 +25,9 @@ public:
     {
     }
 
+    // Record addRef/release for lifetime tracking during replay
+    PROXY_REFCOUNT_IMPL(GlobalSessionProxy)
+
     // IGlobalSession
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
