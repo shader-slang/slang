@@ -120,4 +120,6 @@ ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
     // Not a registered proxy, return as-is
     return proxy;
 
+}
+
 } // namespace SlangRecord

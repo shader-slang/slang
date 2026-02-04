@@ -563,6 +563,10 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
         // Recording mode
         if (isInput)
         {
+            // An input from the user to a function, should be a proxy they have previously been
+            // handed by a wrapping api. Needs unwrapping before returning to hand into main
+            // slang api.
+
             // Handle null
             if (obj == nullptr)
             {
@@ -592,9 +596,19 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // Normal case: look up handle for tracked object
             uint64_t handle = getHandleForInterface(static_cast<ISlangUnknown*>(obj));
             recordHandle(flags, handle);
+
+            // Unwrap the object before returning
+            obj = static_cast<T*>(unwrapObject(static_cast<ISlangUnknown*>(obj)));
+
         }
         else if (isOutput)
         {
+            // An output from a slang api to be handed back to user. Should be an implementation
+            // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
+
+            // Wrap the object before using
+            obj = static_cast<T*>(wrapObject(static_cast<ISlangUnknown*>(obj)));
+
             // Output: register object and record handle
             uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
             recordHandle(flags, handle);
@@ -605,6 +619,10 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
         // Playback mode
         if (isInput)
         {
+            // An input from the user to a function, should be a proxy they have previously been
+            // handed by a wrapping api. Needs unwrapping before returning to hand into main
+            // slang api.
+
             // Read handle
             uint64_t handle = kNullHandle;
             recordHandle(flags, handle);
@@ -628,12 +646,21 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             {
                 obj = static_cast<T*>(getInterfaceForHandle(handle));
             }
+
+            // Unwrap the object before returning
+            obj = static_cast<T*>(unwrapObject(static_cast<ISlangUnknown*>(obj)));
         }
         else if (isOutput)
         {
+            // An output from a slang api to be handed back to user. Should be an implementation
+            // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
+
+            // Wrap the object before using
+            obj = static_cast<T*>(wrapObject(static_cast<ISlangUnknown*>(obj)));
+
             // Output: register object and record handle
             uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
-            recordHandle(flags, handle);
+            recordHandle(flags, handle);            
         }
     }
 }

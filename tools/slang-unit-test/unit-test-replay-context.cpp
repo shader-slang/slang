@@ -277,13 +277,16 @@ SLANG_UNIT_TEST(replayContextHandle)
     ctx().setMode(Mode::Record);
     
     // Simulate: API creates a blob and returns it as output (e.g., getCompileResult)
+    // The 'record' call should wrap the recordedBlob in a proxy
     Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create("original data", 13);
     ISlangBlob* outputBlob = recordedBlob.get();
     ctx().record(RecordFlag::Output, outputBlob);  // Registers blob with handle 1, records handle
     
-    // Simulate: Same blob is passed as input to another call (e.g., writeToFile)
-    ISlangBlob* inputBlob = recordedBlob.get();
+    // Simulate: The output is passed as input to another call (e.g., writeToFile)
+    // The 'record' call should unwrap the proxy and spit out the original
+    ISlangBlob* inputBlob = outputBlob;
     ctx().record(RecordFlag::Input, inputBlob);  // Looks up handle for blob, records handle
+    SLANG_CHECK(inputBlob == recordedBlob.get());
     
     // Verify recording produced data
     SLANG_CHECK(ctx().getStream().getSize() > 0);
@@ -298,7 +301,8 @@ SLANG_UNIT_TEST(replayContextHandle)
     ISlangBlob* playbackOutput = playbackBlob.get();
     ctx().record(RecordFlag::Output, playbackOutput);  // Reads handle, verifies/registers
     
-    // Playback: Second call inputs the blob - should resolve to our new blob
+    // Playback: Second call should replay the same mechanism - playbackInput should end
+    // up as an unwrapped reference to the original blob we fed in.
     ISlangBlob* playbackInput = nullptr;
     ctx().record(RecordFlag::Input, playbackInput);  // Reads handle, looks up object
     
@@ -327,8 +331,8 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     ctx().record(RecordFlag::Output, out2);  // Handle 2
     
     // Now input them in reverse order
-    ISlangBlob* in2 = blob2.get();
-    ISlangBlob* in1 = blob1.get();
+    ISlangBlob* in2 = out2;
+    ISlangBlob* in1 = out1;
     ctx().record(RecordFlag::Input, in2);
     ctx().record(RecordFlag::Input, in1);
     
@@ -450,7 +454,7 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
     ctx().record(RecordFlag::Output, outputBlob);
 
     // Later, it's passed as input again (should use handle, not inline)
-    ISlangBlob* inputAgain = userBlob.get();
+    ISlangBlob* inputAgain = outputBlob;
     ctx().record(RecordFlag::Input, inputAgain);
 
     // === PLAYBACK PHASE ===
