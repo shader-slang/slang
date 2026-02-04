@@ -108,7 +108,8 @@ public:
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override
     {
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getBuildTagString");
+        // No recording - this is just a version string query
+        return getActual<slang::IGlobalSession>()->getBuildTagString();
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(
@@ -178,15 +179,19 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     checkCompileTargetSupport(SlangCompileTarget target) override
     {
-        SLANG_UNUSED(target);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::checkCompileTargetSupport");
+        RECORD_CALL();
+        RECORD_INPUT(target);
+        auto result = getActual<slang::IGlobalSession>()->checkCompileTargetSupport(target);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     checkPassThroughSupport(SlangPassThrough passThrough) override
     {
-        SLANG_UNUSED(passThrough);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::checkPassThroughSupport");
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        auto result = getActual<slang::IGlobalSession>()->checkPassThroughSupport(passThrough);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -235,9 +240,11 @@ public:
         SlangCompileTarget source,
         SlangCompileTarget target) override
     {
-        SLANG_UNUSED(source);
-        SLANG_UNUSED(target);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getDownstreamCompilerForTransition");
+        RECORD_CALL();
+        RECORD_INPUT(source);
+        RECORD_INPUT(target);
+        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerForTransition(source, target);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL

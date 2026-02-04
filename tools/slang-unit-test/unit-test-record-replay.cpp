@@ -101,7 +101,7 @@ static SlangResult cleanupRecordFiles(const String& recordDir)
     return SLANG_OK;
 }
 
-static SlangResult runTest(UnitTestContext* context, const char* testName)
+static SlangResult runTest(UnitTestContext* context, const char* testName, uint64_t expectedHash = 0)
 {
     // The replay system uses ".slang-replays" as the default directory.
     // We just need to enable recording and verify files are created there.
@@ -177,6 +177,18 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
         msgBuilder << decoded;
         msgBuilder << "--- End decoded content ---\n";
         getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
+        
+        // Verify the hash matches the expected value (if provided)
+        if (expectedHash != 0 && hash.hash != expectedHash)
+        {
+            StringBuilder errBuilder;
+            StringUtil::appendFormat(errBuilder, 
+                "Hash mismatch for '%s': expected 0x%016llx, got 0x%016llx\n",
+                testName, (unsigned long long)expectedHash, (unsigned long long)hash.hash);
+            getTestReporter()->message(TestMessageType::TestFailure, errBuilder.toString().getBuffer());
+            cleanupRecordFiles(recordDir);
+            return SLANG_FAIL;
+        }
     }
     catch (const Exception& e)
     {
@@ -204,19 +216,23 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
 // dependencies so they can run on Apple platforms.
 #if !(SLANG_APPLE_FAMILY)
 
+// Expected hashes for deterministic verification.
+// These hashes include machine-specific paths, so they may need to be updated
+// when running on a different machine or after significant code changes.
+
 SLANG_UNIT_TEST(RecordReplay_cpu_hello_world)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0x12f60833457a6bc0)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_triangle)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0xc376e178cff6a1dd)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_ray_tracing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x5d3588e1a4fd985a)));
 }
 
 // This causes a Windows Graphics driver crash.
@@ -230,12 +246,12 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 
 SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x712dffdc05a1e58d)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_gpu_printing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x3d76635fc8d4e12c)));
 }
 
 #if 0
