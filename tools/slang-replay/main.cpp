@@ -1,4 +1,5 @@
 #include "../../source/core/slang-io.h"
+#include "../../source/slang-record-replay/replay-context.h"
 #include "../../source/slang-record-replay/replay-stream-decoder.h"
 
 #include <memory>
@@ -8,6 +9,8 @@ struct Options
 {
     bool convertToJson{false};
     bool decode{false};
+    bool replay{false};
+    bool verbose{false};
     Slang::String recordFileName;
     Slang::String outputFileName;
 };
@@ -20,6 +23,8 @@ void printUsage()
         "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
     printf("  --decode, -d: Decode the binary stream.bin file to human-readable text.\n");
+    printf("  --replay, -r: Replay the recorded API calls.\n");
+    printf("  --verbose, -v: Enable verbose output during replay.\n");
     printf("  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
 }
 
@@ -52,6 +57,16 @@ Options parseOption(int argc, char* argv[])
         else if ((strcmp("--decode", arg) == 0) || (strcmp("-d", arg) == 0))
         {
             option.decode = true;
+            argIndex++;
+        }
+        else if ((strcmp("--replay", arg) == 0) || (strcmp("-r", arg) == 0))
+        {
+            option.replay = true;
+            argIndex++;
+        }
+        else if ((strcmp("--verbose", arg) == 0) || (strcmp("-v", arg) == 0))
+        {
+            option.verbose = true;
             argIndex++;
         }
         else if ((strcmp("--output", arg) == 0) || (strcmp("-o", arg) == 0))
@@ -127,7 +142,58 @@ int main(int argc, char* argv[])
         }
     }
 
-    // TODO: Add replay functionality
+    if (options.replay)
+    {
+        // Replay the recorded API calls
+        try
+        {
+            auto& ctx = SlangRecord::ReplayContext::get();
+            
+            // Enable verbose logging if requested
+            if (options.verbose)
+            {
+                ctx.setTtyLogging(true);
+            }
+            
+            // Load the replay file
+            // The input can be either a folder containing stream.bin or the stream.bin file directly
+            Slang::String streamPath = options.recordFileName;
+            if (!streamPath.endsWith(".bin"))
+            {
+                streamPath = Slang::Path::combine(streamPath, "stream.bin");
+            }
+            
+            if (!Slang::File::exists(streamPath))
+            {
+                fprintf(stderr, "Error: stream.bin not found at: %s\n", streamPath.getBuffer());
+                return 1;
+            }
+            
+            printf("Loading replay from: %s\n", streamPath.getBuffer());
+            
+            // Load and execute the replay
+            SlangResult loadResult = ctx.loadReplay(
+                Slang::Path::getParentDirectory(streamPath).getBuffer());
+            if (SLANG_FAILED(loadResult))
+            {
+                fprintf(stderr, "Error loading replay file\n");
+                return 1;
+            }
+            
+            printf("Executing replay...\n");
+            ctx.executeAll();
+            printf("Replay completed successfully.\n");
+            
+            return 0;
+        }
+        catch (const Slang::Exception& e)
+        {
+            fprintf(stderr, "Error during replay: %s\n", e.Message.getBuffer());
+            return 1;
+        }
+    }
 
-    return 0;
+    // Default: print usage if no operation specified
+    printUsage();
+    return 1;
 }

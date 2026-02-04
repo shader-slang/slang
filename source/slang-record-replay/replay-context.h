@@ -496,7 +496,11 @@ public:
     {
         if (m_currentThisHandle == kNullHandle)
             return nullptr;
-        return static_cast<T*>(getInterfaceForHandle(m_currentThisHandle));
+        auto* unknown = getInterfaceForHandle(m_currentThisHandle);
+        // Use reinterpret_cast because proxy classes inherit from multiple COM interfaces,
+        // making static_cast ambiguous. The handle table stores the original proxy pointer,
+        // so this cast is safe.
+        return reinterpret_cast<T*>(unknown);
     }
 
 private:
