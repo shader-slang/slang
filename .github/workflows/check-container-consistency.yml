@@ -35,7 +35,7 @@ jobs:
           fi
 
           # Count unique images
-          count=$(echo "$images" | wc -l)
+          count=$(printf '%s\n' "$images" | grep -c '^')
 
           echo "Found container image references:"
           echo "$images"

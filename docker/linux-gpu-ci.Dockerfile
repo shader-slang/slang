@@ -15,7 +15,7 @@
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
 #   - .github/workflows/ci-slang-test-container.yml
-#   - .github/workflows/ci-slangpy-tests-container.yml (if merged)
+#   - .github/workflows/ci-slangpy-tests-container.yml
 #
 # Find all references:
 #   grep -rn "ghcr.io/shader-slang/slang-linux-gpu-ci" .github/workflows/
