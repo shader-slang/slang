@@ -1740,7 +1740,6 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
-    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;

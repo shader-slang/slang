@@ -412,5 +412,9 @@ void applySettingsToDiagnosticSink(
     {
         targetSink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
     }
+    if (options.shouldEmitMachineReadableDiagnostics())
+    {
+        targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
 }
 } // namespace Slang

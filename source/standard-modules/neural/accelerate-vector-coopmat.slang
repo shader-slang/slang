@@ -8,7 +8,7 @@ implementing neural;
 #define VISIBILITY_LEVEL internal
 #endif
 
-VISIBILITY_LEVEL enum TargetEnum : uint32_t
+public enum TargetEnum : uint32_t
 {
     CUDA = 0,
     SPIR_V = 1,

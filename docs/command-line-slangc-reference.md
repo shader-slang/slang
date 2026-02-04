@@ -895,6 +895,11 @@ Enable experimental features (loading builtin neural module)
 Enable experimental rich diagnostics with enhanced formatting and details 
 
 
+<a id="enable-machine-readable-diagnostics"></a>
+### -enable-machine-readable-diagnostics
+Enable machine-readable diagnostic output in tab-separated format 
+
+
 
 <a id="Internal"></a>
 ## Internal

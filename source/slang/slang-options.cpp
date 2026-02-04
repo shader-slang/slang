@@ -991,6 +991,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-rich-diagnostics",
          nullptr,
          "Enable experimental rich diagnostics with enhanced formatting and details"},
+        {OptionKind::EnableMachineReadableDiagnostics,
+         "-enable-machine-readable-diagnostics",
+         nullptr,
+         "Enable machine-readable diagnostic output in tab-separated format"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2354,6 +2358,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.set(optionKind, true);
             // -report-detailed-perf-benchmark implies -report-perf-benchmark
             linkage->m_optionSet.set(OptionKind::ReportPerfBenchmark, true);
+            break;
+        case OptionKind::EnableMachineReadableDiagnostics:
+            linkage->m_optionSet.set(optionKind, true);
+            // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
+            linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
             break;
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
