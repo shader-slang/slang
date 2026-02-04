@@ -1,9 +1,10 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage vertex -entry main
 
 // Regression test for SPIR-V dominance error with conditionally assigned variables.
-// The load-store redundancy-removal pass replaced uses of a temporary variable with a pointer
-// computed inside a conditional branch. When the temporary was used after the branch, the
-// replacement pointer's definition did not dominate that use site, resulting in invalid SPIR-V.
+// The load-store redundancy-removal pass saw that `result` is assigned from an immutable
+// source inside the conditional, and tried to eliminate `result` by loading directly from
+// the source. But the source pointer is only computed inside the conditional, so using it
+// outside creates invalid SPIR-V.
 
 struct Constants
 {
@@ -12,7 +13,7 @@ struct Constants
 
 ConstantBuffer<Constants> g_constants;
 
-// Verify the temporary variable and load-store pair are not optimized away.
+// Verify the result variable and load-store pair are not optimized away.
 // CHECK: %result = OpVariable %_ptr_Function_v3float Function
 // CHECK: OpStore %result
 // CHECK: OpLoad %v3float %result
