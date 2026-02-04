@@ -101,18 +101,77 @@ static SlangResult cleanupRecordFiles(const String& recordDir)
     return SLANG_OK;
 }
 
+static String getRecordPathForTest(const char* testName)
+{
+    // Use a predictable path: .slang-replays/<testName>
+    return Path::combine(".slang-replays", testName);
+}
+
+static SlangResult executeReplay(const char* testName, const String& recordPath)
+{
+    StringBuilder msgBuilder;
+    msgBuilder << "Executing replay for '" << testName << "'...\n";
+    getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
+
+    // Get the replay context and reset it to clean state
+    auto& ctx = SlangRecord::ReplayContext::get();
+    ctx.reset();
+
+    // Load the replay from the recorded folder
+    SlangResult res = ctx.loadReplay(recordPath.getBuffer());
+    if (SLANG_FAILED(res))
+    {
+        msgBuilder.clear();
+        msgBuilder << "Failed to load replay for '" << testName << "' from: " << recordPath << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        ctx.reset();
+        return res;
+    }
+
+    // Execute all recorded calls
+    try
+    {
+        ctx.executeAll();
+        
+        msgBuilder.clear();
+        msgBuilder << "Replay completed successfully for '" << testName << "'\n";
+        getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
+    }
+    catch (const Slang::Exception& e)
+    {
+        msgBuilder.clear();
+        msgBuilder << "Replay failed for '" << testName << "': " << e.Message << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        ctx.reset();
+        return SLANG_FAIL;
+    }
+    catch (const std::exception& e)
+    {
+        msgBuilder.clear();
+        msgBuilder << "Replay failed for '" << testName << "': " << e.what() << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        ctx.reset();
+        return SLANG_FAIL;
+    }
+
+    // Reset context after replay
+    ctx.reset();
+    return SLANG_OK;
+}
+
 static SlangResult runTest(UnitTestContext* context, const char* testName, uint64_t expectedHash = 0)
 {
-    // The replay system uses ".slang-replays" as the default directory.
-    // We just need to enable recording and verify files are created there.
-    String recordDir = ".slang-replays";
+    // Use a predictable path for each test so we can easily find and verify recordings
+    String recordPath = getRecordPathForTest(testName);
 
     // Clean up any leftover files from previous runs
-    cleanupRecordFiles(recordDir);
+    cleanupRecordFiles(recordPath);
 
     // Enable recording via environment variable for child process
-    // The child process will check SLANG_RECORD_LAYER on startup
     writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
+    
+    // Set the explicit recording path
+    writeEnvironmentVariable("SLANG_RECORD_PATH", recordPath.getBuffer());
 
     // Disable logging during tests to reduce noise
     writeEnvironmentVariable("SLANG_RECORD_LOG", "0");
@@ -127,34 +186,23 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
 
     // Disable recording for any future child processes
     writeEnvironmentVariable("SLANG_RECORD_LAYER", "0");
+    writeEnvironmentVariable("SLANG_RECORD_PATH", "");
 
     if (SLANG_FAILED(res))
     {
-        cleanupRecordFiles(recordDir);
+        cleanupRecordFiles(recordPath);
         return res;
     }
 
-    // Verify that a replay folder was created
-    String latestFolder = SlangRecord::ReplayContext::findLatestReplayFolder(recordDir.getBuffer());
-    if (latestFolder.getLength() == 0)
-    {
-        StringBuilder msgBuilder;
-        msgBuilder << "No replay folder created for '" << testName << "'\n";
-        msgBuilder << "Expected replay files in: " << recordDir << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        cleanupRecordFiles(recordDir);
-        return SLANG_FAIL;
-    }
-
-    // Verify stream.bin exists
-    String streamPath = Path::combine(Path::combine(recordDir, latestFolder), "stream.bin");
+    // Verify stream.bin exists at the expected path
+    String streamPath = Path::combine(recordPath, "stream.bin");
     if (!File::exists(streamPath))
     {
         StringBuilder msgBuilder;
         msgBuilder << "No stream.bin found for '" << testName << "'\n";
         msgBuilder << "Expected file at: " << streamPath << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        cleanupRecordFiles(recordDir);
+        cleanupRecordFiles(recordPath);
         return SLANG_FAIL;
     }
 
@@ -172,6 +220,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
         StringBuilder msgBuilder;
         msgBuilder << "Decoded stream.bin for '" << testName << "' (" 
                    << decoded.getLength() << " bytes):\n";
+        msgBuilder << "Recording path: " << recordPath << "\n";
         StringUtil::appendFormat(msgBuilder, "Hash: 0x%016llx\n", (unsigned long long)hash.hash);
         msgBuilder << "--- Begin decoded content ---\n";
         msgBuilder << decoded;
@@ -186,7 +235,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
                 "Hash mismatch for '%s': expected 0x%016llx, got 0x%016llx\n",
                 testName, (unsigned long long)expectedHash, (unsigned long long)hash.hash);
             getTestReporter()->message(TestMessageType::TestFailure, errBuilder.toString().getBuffer());
-            cleanupRecordFiles(recordDir);
+            cleanupRecordFiles(recordPath);
             return SLANG_FAIL;
         }
     }
@@ -196,14 +245,20 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
         msgBuilder << "Failed to decode stream.bin for '" << testName << "': " 
                    << e.Message << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        cleanupRecordFiles(recordDir);
+        cleanupRecordFiles(recordPath);
         return SLANG_FAIL;
     }
 
-    // TODO: Future enhancement - load and playback the replay to verify determinism
+    // Execute the replay to verify the recording works
+    SlangResult replayResult = executeReplay(testName, recordPath);
+    if (SLANG_FAILED(replayResult))
+    {
+        // Don't cleanup on failure so we can debug
+        return replayResult;
+    }
 
-    // Cleanup
-    cleanupRecordFiles(recordDir);
+    // Cleanup (disable for now for debugging)
+    // cleanupRecordFiles(recordPath);
     return SLANG_OK;
 }
 
