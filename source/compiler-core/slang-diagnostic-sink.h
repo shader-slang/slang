@@ -170,6 +170,8 @@ public:
                 0x10, ///< If set will format message in a way that is suitable for language server
             AlwaysGenerateRichDiagnostics =
                 0x20, ///< Convert old style diagnostics to the new style
+            MachineReadableDiagnostics =
+                0x40, ///< If set will format diagnostics in machine-readable TSV format
         };
     };
 

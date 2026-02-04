@@ -378,6 +378,11 @@ struct CompilerOptionSet
         return getBoolOption(CompilerOptionName::EnableRichDiagnostics);
     }
 
+    bool shouldEmitMachineReadableDiagnostics()
+    {
+        return getBoolOption(CompilerOptionName::EnableMachineReadableDiagnostics);
+    }
+
     FloatingPointMode getFloatingPointMode()
     {
         return getEnumOption<FloatingPointMode>(CompilerOptionName::FloatingPointMode);
