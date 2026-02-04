@@ -1115,17 +1115,6 @@ SLANG_UNIT_TEST(replayContextSyncModeWritesToStream)
 // Integration Test: Record actual API calls and verify exact bytes
 // =============================================================================
 
-// NOTE: These integration tests use the DLL's global ReplayContext (accessed via
-// slang_getReplayContext()) rather than the local copy created by including
-// replay-context.cpp. This is important because proxy wrapping and handle
-// registration happens in the DLL's context.
-
-// Helper to get the DLL's ReplayContext
-static ReplayContext& getDllContext()
-{
-    return *static_cast<ReplayContext*>(slang_getReplayContext());
-}
-
 // Helper to read a TypeId byte from the stream
 static TypeId readTypeIdFromStream(ReplayStream& stream)
 {
@@ -1139,85 +1128,69 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Save and set up recording using DLL's context
-    auto& dllCtx = getDllContext();
-    bool wasActive = dllCtx.isActive();
-    dllCtx.enable();
-    dllCtx.reset();
-    dllCtx.setMode(Mode::Record); // Restore record mode after reset
+    // Start recording
+    ctx().setMode(Mode::Record);
 
-    // Create a global session
+    // Record the creation of a global session and calling findProfile
     Slang::ComPtr<slang::IGlobalSession> globalSession;
     SlangGlobalSessionDesc desc = {};
     desc.apiVersion = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&desc, globalSession.writeRef())));
-
-    // Call findProfile to generate a recorded call
     SlangProfileID profileId = globalSession->findProfile("sm_5_0");
     SLANG_CHECK(profileId != SLANG_PROFILE_UNKNOWN);
 
-    // Get the recorded data from DLL's context
-    const void* data = dllCtx.getStream().getData();
-    size_t size = dllCtx.getStream().getSize();
-
+    // Get the recorded data from DLL's context + switch to playback.
+    const void* data = ctx().getStream().getData();
+    size_t size = ctx().getStream().getSize();
     SLANG_CHECK(data != nullptr);
     SLANG_CHECK(size > 0);
-
-    // Parse the recorded data to verify the structure
-    // Expected format for findProfile call:
-    // 1. String (function signature) - TypeId::String (0x10), length, bytes
-    // 2. ObjectHandle (this pointer) - TypeId::ObjectHandle (0x13), uint64 handle
-    // 3. String (profile name "sm_5_0") - TypeId::String (0x10), length, bytes
-    // 4. Int32 (return value - profileId) - TypeId::Int32 (0x03), int32 value
-
-    dllCtx.switchToPlayback();
+    ctx().switchToPlayback();
 
     // Read / verify the creation of the global session. This is:
     // - signature (slang_createGlobalSession2)
+    // - this handle (null)
     // - input descriptor
     // - output handle to new global context
     // - output success result code
     const char* signature = nullptr;
-    dllCtx.record(RecordFlag::Input, signature);
+    ctx().record(RecordFlag::Input, signature);
     SLANG_CHECK(signature != nullptr);
     SLANG_CHECK(strcmp(signature, "slang_createGlobalSession2") == 0);
+    uint64_t thisHandle = 0;
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+    SLANG_CHECK(thisHandle == kNullHandle);
     SlangGlobalSessionDesc globalDesc = {};
-    dllCtx.record(RecordFlag::Input, globalDesc);
+    ctx().record(RecordFlag::Input, globalDesc);
     SLANG_CHECK(globalDesc.apiVersion == 0);
-    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
+    SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::ObjectHandle);
     uint64_t globalContextHandle = 0;
-    dllCtx.getStream().read(&globalContextHandle, sizeof(globalContextHandle));
+    ctx().getStream().read(&globalContextHandle, sizeof(globalContextHandle));
     SLANG_CHECK(globalContextHandle == kFirstValidHandle);
     SlangResult globalContextResult;
-    dllCtx.record(RecordFlag::None, globalContextResult);
+    ctx().record(RecordFlag::None, globalContextResult);
 
     // Read / verify the findProfile call. This is:
     // - signature: GlobalSessionProxy::findProfile
     // - this handle (the handle of the global session)
     // - input profile name ("sm_5_0")
     // - output profileId
-    dllCtx.record(RecordFlag::Input, signature);
+    ctx().record(RecordFlag::Input, signature);
     SLANG_CHECK(strcmp(signature, "GlobalSessionProxy::findProfile") == 0);
-    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
-    uint64_t thisHandle = 0;
-    dllCtx.getStream().read(&thisHandle, sizeof(thisHandle));
-    SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+     SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
     const char* profileName = nullptr;
-    dllCtx.record(RecordFlag::Input, profileName);
+    ctx().record(RecordFlag::Input, profileName);
     SLANG_CHECK(profileName != nullptr);
     SLANG_CHECK(strcmp(profileName, "sm_5_0") == 0);
     int32_t returnedProfileId = 0;
-    dllCtx.record(RecordFlag::None, returnedProfileId);
+    ctx().record(RecordFlag::None, returnedProfileId);
     SLANG_CHECK(returnedProfileId == static_cast<int32_t>(profileId));
 
     // Should have consumed all data
-    SLANG_CHECK(dllCtx.getStream().atEnd());
+    SLANG_CHECK(ctx().getStream().atEnd());
 
     // Clean up
     globalSession = nullptr;
-    dllCtx.reset();
-    if (!wasActive)
-        dllCtx.disable();
 }
 
 SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
@@ -1225,12 +1198,8 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Save and set up recording using DLL's context
-    auto& dllCtx = getDllContext();
-    bool wasActive = dllCtx.isActive();
-    dllCtx.enable();
-    dllCtx.reset();
-    dllCtx.setMode(Mode::Record); // Restore record mode after reset
+    // Start recording
+    ctx().setMode(Mode::Record);
 
     // Create a global session
     Slang::ComPtr<slang::IGlobalSession> globalSession;
@@ -1243,64 +1212,67 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     Slang::ComPtr<slang::ISession> session;
     SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
 
-    // Get the recorded data from DLL's context
-    const void* data = dllCtx.getStream().getData();
-    size_t size = dllCtx.getStream().getSize();
-
+    // Get the recorded data from DLL's context + switch to playback.
+    const void* data = ctx().getStream().getData();
+    size_t size = ctx().getStream().getSize();
     SLANG_CHECK(data != nullptr);
     SLANG_CHECK(size > 0);
+    ctx().switchToPlayback();
 
-    // Parse the recorded data
-    // Expected format for createSession call:
-    // 1. String (function signature)
-    // 2. ObjectHandle (this pointer)
-    // 3. SessionDesc (complex struct)
-    // 4. ObjectHandle (output session)
-    // 5. Int32 (return value - SlangResult)
-
-    dllCtx.switchToPlayback();
-
-    // Read function signature
+    // Read / verify the creation of the global session. This is:
+    // - signature (slang_createGlobalSession2)
+    // - this handle (NULL)
+    // - input descriptor
+    // - output handle to new global context
+    // - output success result code
     const char* signature = nullptr;
-    dllCtx.record(RecordFlag::Input, signature);
+    ctx().record(RecordFlag::Input, signature);
+    SLANG_CHECK(signature != nullptr);
+    SLANG_CHECK(strcmp(signature, "slang_createGlobalSession2") == 0);
+    uint64_t thisHandle = 0;
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+    SLANG_CHECK(thisHandle == kNullHandle);
+    SlangGlobalSessionDesc readGlobalDesc = {};
+    ctx().record(RecordFlag::Input, readGlobalDesc);
+    SLANG_CHECK(readGlobalDesc.apiVersion == 0);
+    SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::ObjectHandle);
+    uint64_t globalContextHandle = 0;
+    ctx().getStream().read(&globalContextHandle, sizeof(globalContextHandle));
+    SLANG_CHECK(globalContextHandle == kFirstValidHandle);
+    SlangResult globalContextResult;
+    ctx().record(RecordFlag::None, globalContextResult);
+
+    // Read / verify the createSession call. This is:
+    // - signature: GlobalSessionProxy::createSession
+    // - this handle (the handle of the global session)
+    // - SessionDesc (complex struct)
+    // - output session handle
+    // - return value (SlangResult)
+    ctx().record(RecordFlag::Input, signature);
     SLANG_CHECK(signature != nullptr);
     SLANG_CHECK(strstr(signature, "createSession") != nullptr);
-
-    // Read 'this' pointer handle
-    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
-    uint64_t thisHandle = 0;
-    dllCtx.getStream().read(&thisHandle, sizeof(thisHandle));
-    SLANG_CHECK(thisHandle >= kFirstValidHandle);
-
-    // Read SessionDesc
+    ctx().recordHandle(RecordFlag::Input, thisHandle);
+    SLANG_CHECK(thisHandle == kFirstValidHandle);
+    SLANG_CHECK(thisHandle == globalContextHandle); // Should be the global session
     slang::SessionDesc readDesc = {};
-    dllCtx.record(RecordFlag::Input, readDesc);
-    // Verify it matches what we passed (empty desc)
+    ctx().record(RecordFlag::Input, readDesc);
     SLANG_CHECK(readDesc.targetCount == 0);
     SLANG_CHECK(readDesc.searchPathCount == 0);
-
-    // Read output session handle
-    SLANG_CHECK(readTypeIdFromStream(dllCtx.getStream()) == TypeId::ObjectHandle);
+    SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::ObjectHandle);
     uint64_t sessionHandle = 0;
-    dllCtx.getStream().read(&sessionHandle, sizeof(sessionHandle));
+    ctx().getStream().read(&sessionHandle, sizeof(sessionHandle));
     SLANG_CHECK(sessionHandle >= kFirstValidHandle);
-    SLANG_CHECK(sessionHandle != thisHandle); // Different object
-
-    // Read return value (SlangResult is int32)
-    int32_t result = 0;
-    dllCtx.record(RecordFlag::None, result);
+    SLANG_CHECK(sessionHandle != globalContextHandle); // Different object from global session
+    SlangResult result = 0;
+    ctx().record(RecordFlag::None, result);
     SLANG_CHECK(result == SLANG_OK);
 
     // Should have consumed all data
-    SLANG_CHECK(dllCtx.getStream().atEnd());
-
+    SLANG_CHECK(ctx().getStream().atEnd());
 
     // Clean up
     session = nullptr;
     globalSession = nullptr;
-    dllCtx.reset();
-    if (!wasActive)
-        dllCtx.disable();
 }
 
 // =============================================================================
@@ -1820,35 +1792,22 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    auto& dllCtx = getDllContext();
-
-    // =========================================================================
-    // Stage 1: Create objects WITHOUT replay system to establish baseline
-    // =========================================================================
-    
-    // Ensure replay is disabled
-    bool wasActive = dllCtx.isActive();
-    dllCtx.disable();
-    SLANG_CHECK(!dllCtx.isActive());
+    // Start recording
+    ctx().setMode(Mode::Record);
 
     // Create a global session without replay
     Slang::ComPtr<slang::IGlobalSession> baselineGlobalSession;
     SlangGlobalSessionDesc globalDesc = {};
     globalDesc.apiVersion = 0;
     SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
-
-    // Create a session with a specific target
     slang::SessionDesc sessionDesc = {};
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = baselineGlobalSession->findProfile("spirv_1_5");
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-
     Slang::ComPtr<slang::ISession> baselineSession;
     SLANG_CHECK(SLANG_SUCCEEDED(baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
-
-    // Store baseline values for comparison
     SlangProfileID baselineProfile = targetDesc.profile;
     SLANG_CHECK(baselineProfile != SLANG_PROFILE_UNKNOWN);
 
@@ -1857,13 +1816,13 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     // =========================================================================
 
     // Enable recording
-    dllCtx.enable();
-    dllCtx.reset();
-    dllCtx.setMode(Mode::Record);
-    SLANG_CHECK(dllCtx.isRecording());
+    ctx().enable();
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    SLANG_CHECK(ctx().isRecording());
 
     // Remember the starting handle value
-    uint64_t handleBeforeRecord = dllCtx.getNextHandle();
+    uint64_t handleBeforeRecord = ctx().getNextHandle();
 
     // Create a global session - should be wrapped in a proxy
     Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
@@ -1872,7 +1831,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     // Verify we got a proxy (the pointer should be different from baseline since
     // it's a proxy wrapper, but we can verify it's registered)
     SLANG_CHECK(recordedGlobalSession != nullptr);
-    SLANG_CHECK(dllCtx.isInterfaceRegistered(recordedGlobalSession.get()));
+    SLANG_CHECK(ctx().isInterfaceRegistered(recordedGlobalSession.get()));
 
     // The global session should be a GlobalSessionProxy wrapping the actual implementation
     // We can verify this by checking it implements IGlobalSession
@@ -1889,18 +1848,18 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
 
     // Verify session is also registered
     SLANG_CHECK(recordedSession != nullptr);
-    SLANG_CHECK(dllCtx.isInterfaceRegistered(recordedSession.get()));
+    SLANG_CHECK(ctx().isInterfaceRegistered(recordedSession.get()));
 
     // Check that new handles were assigned
-    uint64_t handleAfterRecord = dllCtx.getNextHandle();
+    uint64_t handleAfterRecord = ctx().getNextHandle();
     SLANG_CHECK(handleAfterRecord > handleBeforeRecord);
 
     // Get the handle for the session so we can look it up after playback
-    uint64_t recordedSessionHandle = dllCtx.getHandleForInterface(recordedSession.get());
+    uint64_t recordedSessionHandle = ctx().getHandleForInterface(recordedSession.get());
     SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
 
     // Store recorded stream data for playback
-    size_t recordedSize = dllCtx.getStream().getSize();
+    size_t recordedSize = ctx().getStream().getSize();
     SLANG_CHECK(recordedSize > 0);
 
     // =========================================================================
@@ -1912,19 +1871,19 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     recordedGlobalSession = nullptr;
 
     // Switch to playback mode - this resets handles but keeps stream data
-    dllCtx.switchToPlayback();
-    SLANG_CHECK(dllCtx.isPlayback());
+    ctx().switchToPlayback();
+    SLANG_CHECK(ctx().isPlayback());
 
     // Remember handle value before playback
-    uint64_t handleBeforePlayback = dllCtx.getNextHandle();
+    uint64_t handleBeforePlayback = ctx().getNextHandle();
     SLANG_CHECK(handleBeforePlayback == kFirstValidHandle); // Should be reset
 
     // Execute all recorded calls
     // This should recreate the global session and session
-    dllCtx.executeAll();
+    ctx().executeAll();
 
     // Check that handles were assigned during playback
-    uint64_t handleAfterPlayback = dllCtx.getNextHandle();
+    uint64_t handleAfterPlayback = ctx().getNextHandle();
     SLANG_CHECK(handleAfterPlayback > handleBeforePlayback);
 
     // The same number of handles should have been assigned
@@ -1933,7 +1892,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     SLANG_CHECK(handlesAssignedDuringPlayback == handlesAssignedDuringRecord);
 
     // Look up the session by its handle - it should exist after playback
-    ISlangUnknown* playedBackSessionUnk = dllCtx.getInterfaceForHandle(recordedSessionHandle);
+    ISlangUnknown* playedBackSessionUnk = ctx().getInterfaceForHandle(recordedSessionHandle);
     SLANG_CHECK(playedBackSessionUnk != nullptr);
 
     // Verify we can query the ISession interface
@@ -1948,10 +1907,6 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     playedBackSession = nullptr;
     baselineSession = nullptr;
     baselineGlobalSession = nullptr;
-    
-    dllCtx.reset();
-    if (!wasActive)
-        dllCtx.disable();
 }
 
 

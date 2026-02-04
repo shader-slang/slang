@@ -38,10 +38,16 @@ namespace SlangRecord {
 /// then wrap the result to match what was recorded.
 static void handle_slang_createGlobalSession2(ReplayContext& ctx)
 {
+    // Read header
+    const char* signature = nullptr;
+    uint64_t thisHandle = 0;
+    ctx.record(RecordFlag::Input, signature);
+    ctx.recordHandle(RecordFlag::Input, thisHandle);
+
     // Read the input descriptor
     SlangGlobalSessionDesc desc = {};
     ctx.record(RecordFlag::Input, desc);
-    
+
     // Call the implementation directly (not slang_createGlobalSession2) to avoid re-recording
     Slang::GlobalSessionInternalDesc internalDesc = {};
     slang::IGlobalSession* globalSession = nullptr;

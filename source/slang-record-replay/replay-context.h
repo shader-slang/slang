@@ -246,6 +246,8 @@ public:
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
         record(RecordFlag::Input, parsed);
+        uint64_t nh = kNullHandle;
+        recordHandle(RecordFlag::Input, nh);
     }
 
     /// Register a proxy-implementation pair.
