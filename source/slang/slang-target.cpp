@@ -100,7 +100,6 @@ CapabilitySet TargetRequest::getTargetCaps()
     case CodeGenTarget::SPIRVAssembly:
         if (getOptionSet().shouldEmitSPIRVDirectly())
         {
-            // Default to SPIRV 1.5 if the user has not specified a target version.
             bool hasTargetVersionAtom = false;
             if (!profileCaps.isEmpty())
             {
@@ -117,9 +116,10 @@ CapabilitySet TargetRequest::getTargetCaps()
                     }
                 }
             }
+            // Default to SPIRV 1.6 if the user has not specified a target version.
             if (!hasTargetVersionAtom)
             {
-                atoms.add(CapabilityName::spirv_1_5);
+                atoms.add(CapabilityName::spirv_1_6);
             }
             // If the user specified any SPIR-V extensions in the profile,
             // pull them in.

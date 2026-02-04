@@ -253,6 +253,10 @@ extern "C"
     return succ;
 }
 
+// Forward declarations
+static spv_target_env _getUniversalTargetEnv(const glsl_SPIRVVersion& spirvVersion);
+static spv_target_env _getVulkanTargetEnv(const glsl_SPIRVVersion& spirvVersion);
+
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
 static int glslang_optimizeSPIRV(
@@ -558,7 +562,9 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
     std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
 
-    int err = glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
+    // Calculate target environment from the request's SPIR-V version
+    spv_target_env targetEnv = _getUniversalTargetEnv(request.spirvVersion);
+    int err = glslang_optimizeSPIRV(targetEnv, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
     {
         request.outputFunc(
@@ -655,36 +661,26 @@ static int _findTargetIndex(const char* name)
 }
 
 // Validate the given SPIRV-ASM instructions with a specific target environment.
-// spirvTargetEnvName can be a SPIRV version like "1.5", "1.6" or a Vulkan environment like "vk1.2", "vk1.3".
-// If spirvTargetEnvName is null or unrecognized, uses SPV_ENV_UNIVERSAL_1_5 as default.
+// Converts the glsl_SPIRVVersion to the appropriate spv_target_env for validation.
 extern "C"
 #ifdef _MSC_VER
     _declspec(dllexport)
 #else
     __attribute__((__visibility__("default")))
 #endif
-        bool glslang_validateSPIRVWithEnv(
+        bool glslang_validateSPIRVWithVersion(
             const uint32_t* contents,
             int contentsSize,
-            const char* spirvTargetEnvName)
+            glsl_SPIRVVersion spirvVersion)
 {
-    spv_target_env target_env = SPV_ENV_VULKAN_1_4; // Default
-
-    if (spirvTargetEnvName != nullptr)
-    {
-        int targetIndex = _findTargetIndex(spirvTargetEnvName);
-        if (targetIndex >= 0)
-        {
-            target_env = kSpirvTargetInfos[targetIndex].targetEnv;
-        }
-    }
-
+    // Convert the SPIR-V version to Vulkan target environment for validation
+    // Using Vulkan environments enables Vulkan-specific validation rules
+    spv_target_env target_env = _getVulkanTargetEnv(spirvVersion);
     return _validateSPIRVWithEnv(contents, contentsSize, target_env);
 }
 
-static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
+static spv_target_env _getUniversalTargetEnv(const glsl_SPIRVVersion& spirvVersion)
 {
-    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
     uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
 
     switch (ver)
@@ -715,6 +711,46 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
     }
     // Just use the default...
     return SPV_ENV_UNIVERSAL_1_2;
+}
+
+static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
+{
+    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
+    return _getUniversalTargetEnv(spirvVersion);
+}
+
+// Map SPIR-V version to Vulkan target environment for validation.
+// Using Vulkan environments enables Vulkan-specific validation rules.
+static spv_target_env _getVulkanTargetEnv(const glsl_SPIRVVersion& spirvVersion)
+{
+    uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
+
+    switch (ver)
+    {
+    case 0x100:
+        return SPV_ENV_VULKAN_1_0;           // SPIR-V 1.0
+    case 0x101:
+    case 0x102:
+    case 0x103:
+        return SPV_ENV_VULKAN_1_1;           // SPIR-V 1.1, 1.2, 1.3
+    case 0x104:
+        return SPV_ENV_VULKAN_1_1_SPIRV_1_4; // SPIR-V 1.4
+    case 0x105:
+        return SPV_ENV_VULKAN_1_2;           // SPIR-V 1.5
+    case 0x106:
+        return SPV_ENV_VULKAN_1_4;           // SPIR-V 1.6
+    default:
+        {
+            if (ver > 0x106)
+            {
+                // Use the highest Vulkan environment we know
+                return SPV_ENV_VULKAN_1_4;
+            }
+            break;
+        }
+    }
+    // Default to SPV_ENV_VULKAN_1_4 (SPIR-V 1.6)
+    return SPV_ENV_VULKAN_1_4;
 }
 
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)

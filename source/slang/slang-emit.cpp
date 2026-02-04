@@ -2610,41 +2610,31 @@ static bool shouldRunSPIRVValidation(CodeGenContext* codeGenContext)
     return false;
 }
 
-// Helper function to get the SPIR-V target environment name from the target capabilities.
-// Returns a string that can be passed to glslang_validateSPIRVWithEnv.
-// The returned string matches the target environment names in kSpirvTargetInfos in slang-glslang.cpp.
-static const char* getSpirvTargetEnvName(TargetRequest* targetReq)
+// Helper function to get the SPIR-V version from the target capabilities.
+// Returns a SemanticVersion for the SPIR-V specification version.
+static SemanticVersion getSpirvVersion(TargetRequest* targetReq)
 {
     auto targetCaps = targetReq->getTargetCaps();
 
-    // Return Vulkan environment names to enable Vulkan-specific validation rules.
-    // The returned string matches the keys in kSpirvTargetInfos in slang-glslang.cpp.
-    // Mapping from SPIR-V version to equivalent Vulkan environment:
-    //   vk1.0         -> SPIR-V 1.0
-    //   vk1.1         -> SPIR-V 1.3 (also covers 1.1, 1.2)
-    //   vk1.1_spirv1.4 -> SPIR-V 1.4
-    //   vk1.2         -> SPIR-V 1.5
-    //   vk1.3         -> SPIR-V 1.6
-
     // Check from highest to lowest SPIR-V version
     if (targetCaps.implies(CapabilityAtom::_spirv_1_6))
-        return "vk1.3";
+        return SemanticVersion(1, 6);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_5))
-        return "vk1.2";
+        return SemanticVersion(1, 5);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_4))
-        return "vk1.1_spirv1.4";
+        return SemanticVersion(1, 4);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_3))
-        return "vk1.1";
+        return SemanticVersion(1, 3);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_2))
-        return "vk1.1";
+        return SemanticVersion(1, 2);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_1))
-        return "vk1.1";
+        return SemanticVersion(1, 1);
     if (targetCaps.implies(CapabilityAtom::_spirv_1_0))
-        return "vk1.0";
+        return SemanticVersion(1, 0);
 
-    // Default to vk1.2 (SPIR-V 1.5) if no specific version is implied
+    // Default to SPIR-V 1.5 if no specific version is implied
     // This matches the default in slang-target.cpp
-    return "vk1.2";
+    return SemanticVersion(1, 5);
 }
 
 // Helper function to create an artifact from IR used internally by
@@ -2743,14 +2733,18 @@ static SlangResult createArtifactFromIR(
                 artifact = _Move(linkedArtifact);
             }
         }
+    
+        // Set the required SPIR-V capability version based on target request
+        DownstreamCompileOptions::CapabilityVersion spirvCapVersion;
+        spirvCapVersion.kind = DownstreamCompileOptions::CapabilityVersion::Kind::SPIRV;
+        spirvCapVersion.version = getSpirvVersion(targetRequest);
 
         if (shouldRunSPIRVValidation(codeGenContext))
         {
-            const char* spirvTargetEnvName = getSpirvTargetEnvName(targetRequest);
-            if (SLANG_FAILED(compiler->validateWithTargetEnv(
+            if (SLANG_FAILED(compiler->validateWithTargetVersion(
                     (uint32_t*)spirv.getBuffer(),
                     int(spirv.getCount() / 4),
-                    spirvTargetEnvName)))
+                    spirvCapVersion)))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
                 codeGenContext->getSink()->diagnoseWithoutSourceView(
@@ -2764,6 +2758,10 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
+
+        List<DownstreamCompileOptions::CapabilityVersion> requiredCapabilityVersions;
+        requiredCapabilityVersions.add(spirvCapVersion);
+        downstreamOptions.requiredCapabilityVersions = SliceUtil::asSlice(requiredCapabilityVersions);
         switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
             CompilerOptionName::Optimization))
         {

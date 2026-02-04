@@ -169,13 +169,12 @@ typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contents
 /// Validate SPIR-V with a specific target environment.
 /// @param contents The SPIR-V binary data.
 /// @param contentsSize The size of the SPIR-V binary in 32-bit words.
-/// @param spirvTargetEnvName The target environment name (e.g., "1.5", "vk1.2", "vk1.3").
-///                           If null, uses a default environment.
+/// @param spirvVersion The SPIR-V version structure.
 /// @return true if validation succeeded, false otherwise.
 typedef bool (*glslang_ValidateSPIRVWithEnvFunc)(
     const uint32_t* contents,
     int contentsSize,
-    const char* spirvTargetEnvName);
+    glsl_SPIRVVersion spirvVersion);
 typedef bool (*glslang_DisassembleSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     const uint32_t* contents,

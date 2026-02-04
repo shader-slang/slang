@@ -49,7 +49,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    validateWithTargetEnv(const uint32_t* contents, int contentsSize, const char* spirvTargetEnvName)
+    validateWithTargetVersion(const uint32_t* contents, int contentsSize, const DownstreamCompileOptions::CapabilityVersion& spirvCapVersion)
         SLANG_OVERRIDE;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) SLANG_OVERRIDE;
@@ -78,7 +78,7 @@ protected:
     glslang_CompileFunc_1_1 m_compile_1_1 = nullptr;
     glslang_CompileFunc_1_2 m_compile_1_2 = nullptr;
     glslang_ValidateSPIRVFunc m_validate = nullptr;
-    glslang_ValidateSPIRVWithEnvFunc m_validateWithEnv = nullptr;
+    glslang_ValidateSPIRVWithEnvFunc m_validateWithVersion = nullptr;
     glslang_DisassembleSPIRVFunc m_disassemble = nullptr;
     glslang_DisassembleSPIRVWithResultFunc m_disassembleWithResult = nullptr;
     glslang_LinkSPIRVFunc m_link = nullptr;
@@ -94,8 +94,8 @@ SlangResult GlslangDownstreamCompiler::init(ISlangSharedLibrary* library)
     m_compile_1_1 = (glslang_CompileFunc_1_1)library->findFuncByName("glslang_compile_1_1");
     m_compile_1_2 = (glslang_CompileFunc_1_2)library->findFuncByName("glslang_compile_1_2");
     m_validate = (glslang_ValidateSPIRVFunc)library->findFuncByName("glslang_validateSPIRV");
-    m_validateWithEnv =
-        (glslang_ValidateSPIRVWithEnvFunc)library->findFuncByName("glslang_validateSPIRVWithEnv");
+    m_validateWithVersion =
+        (glslang_ValidateSPIRVWithEnvFunc)library->findFuncByName("glslang_validateSPIRVWithVersion");
     m_disassemble =
         (glslang_DisassembleSPIRVFunc)library->findFuncByName("glslang_disassembleSPIRV");
     m_disassembleWithResult = (glslang_DisassembleSPIRVWithResultFunc)library->findFuncByName(
@@ -329,15 +329,21 @@ SlangResult GlslangDownstreamCompiler::validate(const uint32_t* contents, int co
     return SLANG_FAIL;
 }
 
-SlangResult GlslangDownstreamCompiler::validateWithTargetEnv(
+SlangResult GlslangDownstreamCompiler::validateWithTargetVersion(
     const uint32_t* contents,
     int contentsSize,
-    const char* spirvTargetEnvName)
+    const DownstreamCompileOptions::CapabilityVersion& spirvCapVersion)
 {
     // Prefer the new function that accepts target env
-    if (m_validateWithEnv != nullptr)
+    if (m_validateWithVersion != nullptr)
     {
-        if (m_validateWithEnv(contents, contentsSize, spirvTargetEnvName))
+        // Convert SemanticVersion to glsl_SPIRVVersion
+        glsl_SPIRVVersion spirvVersion;
+        spirvVersion.major = spirvCapVersion.version.m_major;
+        spirvVersion.minor = spirvCapVersion.version.m_minor;
+        spirvVersion.patch = spirvCapVersion.version.m_patch;
+        
+        if (m_validateWithVersion(contents, contentsSize, spirvVersion))
         {
             return SLANG_OK;
         }
