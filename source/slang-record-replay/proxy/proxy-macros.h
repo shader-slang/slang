@@ -49,6 +49,15 @@ namespace SlangRecord {
     if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(wrapObject(static_cast<ISlangUnknown*>(*arg))); \
     _ctx.record(RecordFlag::Output, *arg)
 
+// Record a COM object result and return it (wraps in proxy and records)
+// Usage: return RECORD_COM_RESULT(actualModule);
+#define RECORD_COM_RESULT(result) \
+    [&]() -> decltype(result) { \
+        auto* _wrapped = static_cast<decltype(result)>(wrapObject(static_cast<ISlangUnknown*>(result))); \
+        _ctx.record(RecordFlag::ReturnValue, _wrapped); \
+        return _wrapped; \
+    }()
+
 // Record return value and return it  
 #define RECORD_RETURN(result) \
     _ctx.record(RecordFlag::ReturnValue, result); \

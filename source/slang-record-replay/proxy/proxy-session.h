@@ -2,6 +2,7 @@
 #define SLANG_PROXY_SESSION_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 namespace SlangRecord
 {
@@ -29,9 +30,17 @@ public:
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL
     loadModule(const char* moduleName, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(moduleName);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::loadModule");
+        RECORD_CALL();
+        RECORD_INPUT(moduleName);
+        
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+            
+        slang::IModule* result = getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSource(
