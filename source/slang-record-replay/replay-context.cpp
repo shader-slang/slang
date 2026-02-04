@@ -514,7 +514,7 @@ void ReplayContext::registerProxy(ISlangUnknown* proxy, ISlangUnknown* implement
     m_implToProxy[implementation] = proxy;
 }
 
-ISlangUnknown* ReplayContext::getExistingProxy(ISlangUnknown* implementation)
+ISlangUnknown* ReplayContext::getProxy(ISlangUnknown* implementation)
 {
     if (implementation == nullptr)
         return nullptr;
@@ -524,6 +524,19 @@ ISlangUnknown* ReplayContext::getExistingProxy(ISlangUnknown* implementation)
         return nullptr;
 
     return *proxy;
+}
+
+// get implementatoin
+ISlangUnknown* ReplayContext::getImplementation(ISlangUnknown* proxy)
+{
+    if (proxy == nullptr)
+        return nullptr;
+
+    ISlangUnknown** impl = m_proxyToImpl.tryGetValue(proxy);
+    if (!impl)
+        return nullptr;
+
+    return *impl;
 }
 
 bool ReplayContext::isInterfaceRegistered(ISlangUnknown* obj) const

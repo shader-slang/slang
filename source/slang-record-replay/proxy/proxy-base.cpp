@@ -55,6 +55,16 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
         return obj;
     if (!obj)
         return nullptr;
+    
+    // If already wrapped, return it - can happen if slang api returns
+    // the same things twice (eg for loadModule)
+    if(auto existing = ReplayContext::get().getProxy(obj))
+        return existing;
+
+    // If we've already got a proxy, just return it. Not sure
+    // this should ever happen.
+    if(ReplayContext::get().getImplementation(obj))
+        return obj;
 
     // Order matters due to inheritance!
     // Check more derived types before base types.
@@ -92,5 +102,22 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
 }
 
 #undef TRY_WRAP
+
+ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
+{
+    if (proxy == nullptr)
+        return nullptr;
+
+    // Check if this is a registered proxy and return the implementation
+    auto& ctx = ReplayContext::get();
+    if (ctx.isActive())
+    {
+        ISlangUnknown* impl = ctx.getImplementation(proxy);
+        if (impl)
+            return impl;
+    }
+
+    // Not a registered proxy, return as-is
+    return proxy;
 
 } // namespace SlangRecord

@@ -19,6 +19,10 @@ using Slang::List;
 using Slang::MemoryArena;
 using Slang::String;
 
+// Fwd declare form proxy-base.h
+SLANG_API ISlangUnknown* wrapObject(ISlangUnknown* obj);
+SLANG_API ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
+
 /// Handle constants for interface tracking.
 /// Handles 0-255 are reserved for special meanings.
 constexpr uint64_t kNullHandle = 0;          ///< Null pointer
@@ -324,7 +328,10 @@ public:
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
-    SLANG_API ISlangUnknown* getExistingProxy(ISlangUnknown* implementation);
+    SLANG_API ISlangUnknown* getProxy(ISlangUnknown* implementation);
+
+    /// Get the implementation
+    SLANG_API ISlangUnknown* getImplementation(ISlangUnknown* proxy);
 
     /// Get the next handle value that will be assigned.
     /// Useful for testing to know how many objects have been registered.

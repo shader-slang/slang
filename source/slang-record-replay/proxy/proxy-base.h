@@ -66,7 +66,8 @@ protected:
 /// Wrap a Slang COM interface pointer in its corresponding proxy type.
 /// Returns nullptr if the object cannot be wrapped (unknown type).
 /// The returned pointer is ref-counted and must be released by the caller.
-ISlangUnknown* wrapObject(ISlangUnknown* obj);
+SLANG_API ISlangUnknown* wrapObject(ISlangUnknown* obj);
+SLANG_API ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
 
 
 } // namespace SlangRecord
