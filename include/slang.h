@@ -5038,6 +5038,35 @@ SLANG_EXTERN_C SLANG_API void slang_clearRecordLayer();
  */
 SLANG_EXTERN_C SLANG_API void* slang_getReplayContext();
 
+/* Set the base directory for replay files (default: ".slang-replays").
+   Must be called before enabling recording.
+   @param path Path to the replay directory.
+ */
+SLANG_EXTERN_C SLANG_API void slang_setReplayDirectory(const char* path);
+
+/* Get the current replay base directory.
+   @return Path to the replay directory.
+ */
+SLANG_EXTERN_C SLANG_API const char* slang_getReplayDirectory();
+
+/* Get the path to the current recording session folder.
+   @return Path to the current replay folder, or nullptr if not recording.
+ */
+SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
+
+/* Load a replay from a folder path (reads stream.bin).
+   Switches to playback mode on success.
+   @param folderPath Path to the replay folder.
+   @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
+
+/* Load the most recent replay from the replay directory.
+   Switches to playback mode on success.
+   @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
+
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();

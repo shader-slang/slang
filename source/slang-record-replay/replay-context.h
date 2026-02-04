@@ -158,7 +158,9 @@ public:
     SLANG_API bool isActive() const { return m_mode != Mode::Idle; }
 
     /// Set the operating mode.
-    SLANG_API void setMode(Mode mode) { m_mode = mode; }
+    /// When entering Record mode, sets up mirror file for crash-safe capture.
+    /// When leaving Record mode, closes the mirror file.
+    SLANG_API void setMode(Mode mode);
 
     /// Convenience methods for common mode checks.
     SLANG_API bool isIdle() const { return m_mode == Mode::Idle; }
@@ -167,10 +169,39 @@ public:
     SLANG_API bool isPlayback() const { return m_mode == Mode::Playback; }
 
     /// Enable recording (sets mode to Record if currently Idle).
-    SLANG_API void enable() { if (m_mode == Mode::Idle) m_mode = Mode::Record; }
+    SLANG_API void enable();
 
     /// Disable recording (sets mode to Idle).
-    SLANG_API void disable() { m_mode = Mode::Idle; }
+    SLANG_API void disable();
+
+    // =========================================================================
+    // Replay Directory Management
+    // =========================================================================
+
+    /// Set the base directory for replays (default: ".slang-replays").
+    /// Must be called before enabling recording.
+    SLANG_API void setReplayDirectory(const char* path);
+
+    /// Get the current replay base directory.
+    SLANG_API const char* getReplayDirectory() const;
+
+    /// Get the path to the current recording session folder.
+    /// Returns nullptr if not currently recording.
+    SLANG_API const char* getCurrentReplayPath() const;
+
+    /// Load a replay from a folder path (reads stream.bin).
+    /// Switches to Playback mode on success.
+    SLANG_API SlangResult loadReplay(const char* folderPath);
+
+    /// Load the most recent replay from the replay directory.
+    /// Switches to Playback mode on success.
+    SLANG_API SlangResult loadLatestReplay();
+
+    /// Find the most recent replay folder in the given directory.
+    /// Returns empty string if no replays found.
+    SLANG_API static String findLatestReplayFolder(const char* baseDir);
+
+    // =========================================================================
 
     /// Legacy compatibility - maps to Record/Playback modes.
     SLANG_API bool isReading() const { return m_mode == Mode::Playback; }
@@ -359,6 +390,19 @@ private:
     // Proxy tracking: maps proxies to implementations and back
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // Replay directory management
+    String m_replayDirectory = ".slang-replays";  ///< Base directory for replays
+    String m_currentReplayPath;                    ///< Current recording session folder
+
+    /// Set up mirror file for crash-safe capture when entering Record mode.
+    void setupRecordingMirror();
+    
+    /// Close mirror file when leaving Record mode.
+    void closeRecordingMirror();
+    
+    /// Generate a timestamp folder name (e.g., "2026-02-04_14-30-45-123").
+    static String generateTimestampFolderName();
 
     // ==========================================================================
     // Playback Dispatcher

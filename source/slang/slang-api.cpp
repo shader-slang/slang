@@ -323,6 +323,31 @@ SLANG_API void* slang_getReplayContext()
     return &SlangRecord::ReplayContext::get();
 }
 
+SLANG_API void slang_setReplayDirectory(const char* path)
+{
+    SlangRecord::ReplayContext::get().setReplayDirectory(path);
+}
+
+SLANG_API const char* slang_getReplayDirectory()
+{
+    return SlangRecord::ReplayContext::get().getReplayDirectory();
+}
+
+SLANG_API const char* slang_getCurrentReplayPath()
+{
+    return SlangRecord::ReplayContext::get().getCurrentReplayPath();
+}
+
+SLANG_API SlangResult slang_loadReplay(const char* folderPath)
+{
+    return SlangRecord::ReplayContext::get().loadReplay(folderPath);
+}
+
+SLANG_API SlangResult slang_loadLatestReplay()
+{
+    return SlangRecord::ReplayContext::get().loadLatestReplay();
+}
+
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession)

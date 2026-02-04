@@ -1,8 +1,14 @@
 #include "replay-context.h"
 
+#include "../core/slang-io.h"
 #include "../core/slang-platform.h"
 
+#include <chrono>
+
 namespace SlangRecord {
+
+using Slang::File;
+using Slang::Path;
 
 // =============================================================================
 // Environment variable check
@@ -111,6 +117,7 @@ ReplayContext::~ReplayContext()
 
 void ReplayContext::reset()
 {
+    closeRecordingMirror();  // Close any active mirror file
     m_stream.reset();
     m_referenceStream.reset();
     m_arena.reset();
@@ -159,6 +166,185 @@ void ReplayContext::switchToSync()
     // Reset main stream for new recording that will be verified against reference
     m_stream.reset();
     m_mode = Mode::Sync;
+}
+
+// =============================================================================
+// Mode Management
+// =============================================================================
+
+void ReplayContext::setMode(Mode mode)
+{
+    if (mode == m_mode)
+        return;
+
+    // Handle transitions to/from Record mode
+    if (mode == Mode::Record && m_mode != Mode::Record)
+    {
+        setupRecordingMirror();
+    }
+    else if (mode != Mode::Record && m_mode == Mode::Record)
+    {
+        closeRecordingMirror();
+    }
+    
+    m_mode = mode;
+}
+
+void ReplayContext::enable()
+{
+    if (m_mode == Mode::Idle)
+        setMode(Mode::Record);
+}
+
+void ReplayContext::disable()
+{
+    setMode(Mode::Idle);
+}
+
+// =============================================================================
+// Replay Directory Management
+// =============================================================================
+
+void ReplayContext::setReplayDirectory(const char* path)
+{
+    m_replayDirectory = path ? path : ".slang-replays";
+}
+
+const char* ReplayContext::getReplayDirectory() const
+{
+    return m_replayDirectory.getBuffer();
+}
+
+const char* ReplayContext::getCurrentReplayPath() const
+{
+    if (m_currentReplayPath.getLength() == 0)
+        return nullptr;
+    return m_currentReplayPath.getBuffer();
+}
+
+String ReplayContext::generateTimestampFolderName()
+{
+    // Get current time with milliseconds
+    auto now = std::chrono::system_clock::now();
+    auto time_t_now = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now.time_since_epoch()) % 1000;
+    
+    std::tm tm_now;
+#ifdef _WIN32
+    localtime_s(&tm_now, &time_t_now);
+#else
+    localtime_r(&time_t_now, &tm_now);
+#endif
+
+    // Format: YYYY-MM-DD_HH-MM-SS-mmm
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d_%02d-%02d-%02d-%03d",
+        tm_now.tm_year + 1900,
+        tm_now.tm_mon + 1,
+        tm_now.tm_mday,
+        tm_now.tm_hour,
+        tm_now.tm_min,
+        tm_now.tm_sec,
+        static_cast<int>(ms.count()));
+    
+    return String(buffer);
+}
+
+void ReplayContext::setupRecordingMirror()
+{
+    // Generate timestamped folder path
+    String timestamp = generateTimestampFolderName();
+    m_currentReplayPath = Path::combine(m_replayDirectory, timestamp);
+    
+    // Create the directory structure
+    if (!Path::createDirectoryRecursive(m_currentReplayPath))
+    {
+        // If we can't create the directory, just record without mirroring
+        m_currentReplayPath = String();
+        return;
+    }
+    
+    // Set up mirror file
+    String streamPath = Path::combine(m_currentReplayPath, "stream.bin");
+    try
+    {
+        m_stream.setMirrorFile(streamPath.getBuffer());
+    }
+    catch (const Slang::Exception&)
+    {
+        // If we can't create the mirror file, just record without mirroring
+        m_currentReplayPath = String();
+    }
+}
+
+void ReplayContext::closeRecordingMirror()
+{
+    m_stream.closeMirrorFile();
+    m_currentReplayPath = String();
+}
+
+// Helper class for collecting directory entries
+class DirectoryCollector : public Path::Visitor
+{
+public:
+    List<String> directories;
+    
+    void accept(Path::Type type, const Slang::UnownedStringSlice& filename) override
+    {
+        if (type == Path::Type::Directory)
+        {
+            directories.add(String(filename));
+        }
+    }
+};
+
+String ReplayContext::findLatestReplayFolder(const char* baseDir)
+{
+    DirectoryCollector collector;
+    SlangResult result = Path::find(String(baseDir), nullptr, &collector);
+    
+    if (SLANG_FAILED(result) || collector.directories.getCount() == 0)
+        return String();
+    
+    // Sort alphabetically - timestamps will sort chronologically
+    collector.directories.sort();
+    
+    // Return the last one (most recent)
+    return collector.directories.getLast();
+}
+
+SlangResult ReplayContext::loadReplay(const char* folderPath)
+{
+    if (!folderPath)
+        return SLANG_E_INVALID_ARG;
+    
+    String streamPath = Path::combine(String(folderPath), "stream.bin");
+    
+    if (!File::exists(streamPath))
+        return SLANG_E_NOT_FOUND;
+    
+    try
+    {
+        m_stream = ReplayStream::loadFromFile(streamPath.getBuffer());
+        m_mode = Mode::Playback;
+        return SLANG_OK;
+    }
+    catch (const Slang::Exception&)
+    {
+        return SLANG_FAIL;
+    }
+}
+
+SlangResult ReplayContext::loadLatestReplay()
+{
+    String latestFolder = findLatestReplayFolder(m_replayDirectory.getBuffer());
+    
+    if (latestFolder.getLength() == 0)
+        return SLANG_E_NOT_FOUND;
+    
+    String fullPath = Path::combine(m_replayDirectory, latestFolder);
+    return loadReplay(fullPath.getBuffer());
 }
 
 // =============================================================================
