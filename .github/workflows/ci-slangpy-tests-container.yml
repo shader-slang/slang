@@ -107,26 +107,16 @@ jobs:
           cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
           chmod +x "$SLANGC_TARGET_DIR/slangc"
 
-          # slangpy's Python extension was compiled against a specific version of
-          # libslang-compiler (e.g., libslang-compiler.so.0.2025.24.3). We need to
-          # replace it with our new library while keeping the expected filename.
+          # Remove old slang libraries and copy new ones
+          echo "Removing old slang libraries..."
+          rm -f "$SITE_PACKAGES/slangpy"/libslang*
 
-          # Find the versioned library that slangpy expects
-          OLD_VERSIONED_LIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.so.*.*.*" ! -name "*.dwarf" | head -1)
-          echo "Old versioned library: $OLD_VERSIONED_LIB"
+          echo "Copying new slang libraries..."
+          cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
 
-          # Find our new library (the main .so file, not versioned symlinks)
-          NEW_SLANGLIB="$lib_dir/libslang-compiler.so"
-          echo "New slang library: $NEW_SLANGLIB"
-
-          if [[ -n "$OLD_VERSIONED_LIB" && -f "$NEW_SLANGLIB" ]]; then
-            # Copy new library over old one (keeping the versioned filename slangpy expects)
-            cp -f "$NEW_SLANGLIB" "$OLD_VERSIONED_LIB"
-            echo "Replaced $OLD_VERSIONED_LIB with new library"
-          fi
-
-          # Also copy all library files from build (handles libslang.so and others)
-          cp -f "$lib_dir"/libslang*.so "$SITE_PACKAGES/slangpy/" 2>/dev/null || true
+          # Create symlink for the old library version that slangpy extension was linked against
+          echo "Creating symlink for slangpy compatibility..."
+          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
 
           # Copy standard modules directory (contains neural module)
           STD_MODULE_DIR=$(find "$lib_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
