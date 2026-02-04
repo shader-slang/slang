@@ -168,9 +168,17 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     findEntryPointByName(char const* name, slang::IEntryPoint** outEntryPoint) override
     {
-        SLANG_UNUSED(name);
-        SLANG_UNUSED(outEntryPoint);
-        SLANG_UNIMPLEMENTED_X("ModuleProxy::findEntryPointByName");
+        RECORD_CALL();
+        RECORD_INPUT(name);
+        
+        slang::IEntryPoint* entryPointPtr = nullptr;
+        if (!outEntryPoint)
+            outEntryPoint = &entryPointPtr;
+            
+        SlangResult result = getActual<slang::IModule>()->findEntryPointByName(name, outEntryPoint);
+        
+        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override

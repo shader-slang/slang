@@ -289,8 +289,9 @@ public:
             logCall(parsed, thisPtr);
         
         record(RecordFlag::Input, parsed);
-        // Record the 'this' pointer as a handle - cast to ISlangUnknown* for tracking
-        ISlangUnknown* obj = static_cast<ISlangUnknown*>(thisPtr);
+        // Record the 'this' pointer as a handle
+        // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
+        ISlangUnknown* obj = reinterpret_cast<ISlangUnknown*>(thisPtr);
         recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, obj);
     }
 
