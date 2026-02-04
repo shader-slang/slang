@@ -96,6 +96,7 @@ enum class TypeId : uint8_t
     UInt8 = 0x05, UInt16 = 0x06, UInt32 = 0x07, UInt64 = 0x08,
     Float32 = 0x09, Float64 = 0x0A, Bool = 0x0B,
     String = 0x10, Blob = 0x11, Array = 0x12, ObjectHandle = 0x13, Null = 0x14,
+    Error = 0xEE,  ///< Error marker - indicates an exception occurred
 };
 
 SLANG_API const char* getTypeIdName(TypeId id);
@@ -173,6 +174,22 @@ public:
 
     /// Disable recording (sets mode to Idle).
     SLANG_API void disable();
+
+    // =========================================================================
+    // TTY Logging (Live Trace)
+    // =========================================================================
+
+    /// Enable or disable live TTY logging of recorded calls.
+    /// When enabled, prints call signatures to stderr as they are recorded.
+    /// Can also be enabled via SLANG_RECORD_LOG=1 environment variable.
+    SLANG_API void setTtyLogging(bool enable);
+
+    /// Check if TTY logging is enabled.
+    SLANG_API bool isTtyLogging() const { return m_ttyLogging; }
+
+    /// Record an error marker in the stream.
+    /// Call this when an exception occurs to mark the error location in the stream.
+    SLANG_API void recordError(const char* message);
 
     // =========================================================================
     // Replay Directory Management
@@ -262,6 +279,11 @@ public:
         // Parse and record the normalized signature
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
+        
+        // Log to TTY if enabled
+        if (m_ttyLogging)
+            logCall(parsed, thisPtr);
+        
         record(RecordFlag::Input, parsed);
         // Record the 'this' pointer as a handle - cast to ISlangUnknown* for tracking
         ISlangUnknown* obj = static_cast<ISlangUnknown*>(thisPtr);
@@ -270,12 +292,17 @@ public:
 
     /// Begin recording a static/free function call.
     /// Records only the function signature.
-    SLANG_API void beginStaticCall(const char* signature)
+    void beginStaticCall(const char* signature)
     {
         if (!isActive())
             return;
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
+        
+        // Log to TTY if enabled
+        if (m_ttyLogging)
+            logCall(parsed, nullptr);
+        
         record(RecordFlag::Input, parsed);
         uint64_t nh = kNullHandle;
         recordHandle(RecordFlag::Input, nh);
@@ -394,6 +421,12 @@ private:
     // Replay directory management
     String m_replayDirectory = ".slang-replays";  ///< Base directory for replays
     String m_currentReplayPath;                    ///< Current recording session folder
+
+    // TTY logging
+    bool m_ttyLogging = false;  ///< Whether to log calls to stderr
+    
+    /// Log a call to stderr (used when m_ttyLogging is enabled).
+    void logCall(const char* signature, void* thisPtr);
 
     /// Set up mirror file for crash-safe capture when entering Record mode.
     void setupRecordingMirror();

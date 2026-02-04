@@ -4,6 +4,7 @@
 #include "../core/slang-platform.h"
 
 #include <chrono>
+#include <cstdio>
 
 namespace SlangRecord {
 
@@ -13,6 +14,17 @@ using Slang::Path;
 // =============================================================================
 // Environment variable check
 // =============================================================================
+
+static bool isRecordLogRequested()
+{
+    Slang::StringBuilder envValue;
+    if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
+            Slang::UnownedStringSlice("SLANG_RECORD_LOG"), envValue)))
+    {
+        return envValue == "1";
+    }
+    return false;
+}
 
 bool isRecordLayerRequested()
 {
@@ -84,8 +96,12 @@ ReplayContext::ReplayContext()
     : m_stream()
     , m_referenceStream()
     , m_arena(4096)
-    , m_mode(isRecordLayerRequested() ? Mode::Record : Mode::Idle)
+    , m_mode(Mode::Idle)
+    , m_ttyLogging(isRecordLogRequested())
 {
+    // Set mode through setMode() to trigger mirror file setup if recording
+    if (isRecordLayerRequested())
+        setMode(Mode::Record);
 }
 
 ReplayContext::ReplayContext(const void* data, size_t size)
@@ -93,6 +109,7 @@ ReplayContext::ReplayContext(const void* data, size_t size)
     , m_referenceStream()
     , m_arena(4096)
     , m_mode(Mode::Playback)
+    , m_ttyLogging(isRecordLogRequested())
 {
 }
 
@@ -100,9 +117,12 @@ ReplayContext::ReplayContext(const void* referenceData, size_t referenceSize, bo
     : m_stream()
     , m_referenceStream(referenceData, referenceSize)
     , m_arena(4096)
-    , m_mode(syncMode ? Mode::Sync : Mode::Record)
+    , m_mode(Mode::Idle)
+    , m_ttyLogging(isRecordLogRequested())
 {
     SLANG_UNUSED(syncMode);
+    // Set mode through setMode() to trigger mirror file setup if recording
+    setMode(syncMode ? Mode::Sync : Mode::Record);
 }
 
 ReplayContext::~ReplayContext()
@@ -342,6 +362,44 @@ SlangResult ReplayContext::loadLatestReplay()
     
     String fullPath = Path::combine(m_replayDirectory, latestFolder);
     return loadReplay(fullPath.getBuffer());
+}
+
+// =============================================================================
+// TTY Logging
+// =============================================================================
+
+void ReplayContext::setTtyLogging(bool enable)
+{
+    m_ttyLogging = enable;
+}
+
+void ReplayContext::logCall(const char* signature, void* thisPtr)
+{
+    // Print to stderr for visibility
+    if (thisPtr)
+        fprintf(stderr, "[REPLAY] %s [this=%p]\n", signature, thisPtr);
+    else
+        fprintf(stderr, "[REPLAY] %s [static]\n", signature);
+    fflush(stderr);
+}
+
+void ReplayContext::recordError(const char* message)
+{
+    if (!isActive() || m_mode != Mode::Record)
+        return;
+    
+    // Write an error marker to the stream
+    writeTypeId(TypeId::Error);
+    
+    size_t len = message ? strlen(message) : 0;
+    uint32_t len32 = static_cast<uint32_t>(len > 4095 ? 4095 : len);
+    m_stream.write(&len32, sizeof(len32));
+    if (len32 > 0)
+        m_stream.write(message, len32);
+    
+    // Also log to TTY if enabled
+    if (m_ttyLogging)
+        fprintf(stderr, "[REPLAY ERROR] %s\n", message ? message : "(null)");
 }
 
 // =============================================================================
