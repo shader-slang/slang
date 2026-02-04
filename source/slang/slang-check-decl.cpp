@@ -1661,6 +1661,42 @@ bool isInterfaceType(Type* type)
     return false;
 }
 
+static bool _containsInterfaceType(Type* type)
+{
+    if (!type)
+        return false;
+
+    type = type->getCanonicalType();
+    if (isInterfaceType(type))
+        return true;
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _containsInterfaceType(arrayType->getElementType());
+
+    if (auto optionalType = as<OptionalType>(type))
+        return _containsInterfaceType(optionalType->getValueType());
+
+    if (auto conditionalType = as<ConditionalType>(type))
+        return _containsInterfaceType(conditionalType->getValueType());
+
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); ++i)
+        {
+            if (_containsInterfaceType(tupleType->getMember(i)))
+                return true;
+        }
+    }
+
+    if (auto eachType = as<EachType>(type))
+        return _containsInterfaceType(eachType->getElementType());
+
+    if (auto expandType = as<ExpandType>(type))
+        return _containsInterfaceType(expandType->getPatternType());
+
+    return false;
+}
+
 EnumDecl* isEnumType(Type* type)
 {
     if (auto declRefType = as<DeclRefType>(type))
@@ -7628,6 +7664,24 @@ bool SemanticsVisitor::checkConformance(
         if (auto superDeclRefType = as<DeclRefType>(superType))
         {
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
+            if (auto superInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+            {
+                if (auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl()))
+                {
+                    for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
+                    {
+                        ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
+                        if (_containsInterfaceType(varDecl->getType()))
+                        {
+                            getSink()->diagnose(
+                                varDecl,
+                                Diagnostics::cannotHaveInterfaceMemberWhenConformingToInterface,
+                                varDecl,
+                                superInterfaceDecl);
+                        }
+                    }
+                }
+            }
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
                 // A struct cannot implement a COM Interface.
