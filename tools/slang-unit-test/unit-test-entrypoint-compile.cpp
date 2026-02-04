@@ -40,15 +40,35 @@ SLANG_UNIT_TEST(entryPointCompile)
     SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> diagnosticBlob;
-    String userSourceBody;
-    File::readAllText("d:\\test\\valve-dbg.hlsl", userSourceBody);
+    String userSourceBody = R"(
+        struct VS_INPUT 
+        { 
+            float3 vPositionOs : POSITION; 
+            uint nInstanceIdx : TEXCOORD13; 
+            uint instanceId : SV_InstanceID; 
+        }
+
+        struct PS_INPUT 
+        {
+            float4 vPositionPs : SV_Position ; 
+        }
+
+        StructuredBuffer<float3> gBuffer;
+
+        PS_INPUT vsMain(VS_INPUT i) 
+        { 
+            PS_INPUT o = {}; 
+            float3 v = gBuffer[i.instanceId].xyz ; 
+            o.vPositionPs = float4(v, 1.0f);
+            return o ; 
+        })";
     auto srcBlob = StringBlob::moveCreate(_Move(userSourceBody));
     auto module = session->loadModuleFromSource("m", "m.slang", srcBlob, diagnosticBlob.writeRef());
     SLANG_CHECK_ABORT(module != nullptr);
 
     ComPtr<slang::IEntryPoint> entryPoint;
     module->findAndCheckEntryPoint(
-        "MainVs",
+        "vsMain",
         SLANG_STAGE_VERTEX,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
