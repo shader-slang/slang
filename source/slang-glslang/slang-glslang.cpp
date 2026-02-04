@@ -736,7 +736,7 @@ static spv_target_env _getVulkanTargetEnv(const glsl_SPIRVVersion& spirvVersion)
     case 0x104:
         return SPV_ENV_VULKAN_1_1_SPIRV_1_4; // SPIR-V 1.4
     case 0x105:
-        return SPV_ENV_VULKAN_1_2;           // SPIR-V 1.5
+        return SPV_ENV_VULKAN_1_4;           // SPIR-V 1.5
     case 0x106:
         return SPV_ENV_VULKAN_1_4;           // SPIR-V 1.6
     default:
