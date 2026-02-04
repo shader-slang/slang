@@ -31,6 +31,13 @@ async function runSmokeTest() {
         }
         console.log('Available compile targets:', JSON.stringify(targets, null, 2));
 
+        // Print version info.
+        const version = module.getVersionString();
+        if (!version) {
+            throw new Error('Failed to get version string');
+        }
+        console.log('Slang version:', version);
+
         // Find SPIRV target value
         const spirvTarget = targets.findIndex(target => target.name.toLowerCase() === 'spirv');
         if (spirvTarget === -1) {

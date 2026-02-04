@@ -2373,6 +2373,15 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
         break;
+    case kIROp_FloatE4M3Type:
+        keyInst.value.floatVal = FloatE4M3ToFloat(FloatToFloatE4M3((float)inValue));
+        break;
+    case kIROp_FloatE5M2Type:
+        keyInst.value.floatVal = FloatE5M2ToFloat(FloatToFloatE5M2((float)inValue));
+        break;
+    case kIROp_BFloat16Type:
+        keyInst.value.floatVal = BFloat16ToFloat(FloatToBFloat16((float)inValue));
+        break;
     default:
         keyInst.value.floatVal = inValue;
         break;
@@ -3704,6 +3713,9 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_FloatType:
     case kIROp_HalfType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return getFloatValue(type, 0.0);
     case kIROp_VoidType:
         return getVoidValue();
@@ -3867,6 +3879,9 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_FloatType:
     case kIROp_HalfType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return TypeCastStyle::Float;
     case kIROp_BoolType:
         return TypeCastStyle::Bool;
@@ -5126,6 +5141,9 @@ IRInst* IRBuilder::emitElementExtract(IRType* type, IRInst* base, IRInst* index)
         return vectorFromScalar->getOperand(0);
     if (base->getOp() == kIROp_MakeArrayFromElement)
         return base->getOperand(0);
+
+    if (as<IRTupleType>(base->getDataType()))
+        return emitGetTupleElement(type, base, index);
 
     auto inst = createInst<IRGetElement>(this, kIROp_GetElement, type, base, index);
 
