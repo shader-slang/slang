@@ -5,6 +5,7 @@
 #include "slang-compiler.h"
 #include "slang-mangle.h"
 #include "slang-serialize-container.h"
+#include "slang-lower-to-ir.h"
 
 namespace Slang
 {
@@ -135,6 +136,24 @@ RefPtr<EntryPoint> Module::findAndCheckEntryPoint(
     {
         sink.getBlobIfNeeded(outDiagnostics);
     }
+    
+    // If we successfully created an entry point and the module already has IR,
+    // we need to generate the entry point wrapper in the existing IR module.
+    // This handles the case where findAndCheckEntryPoint is called after
+    // loadModuleFromSource has already generated IR.
+    if (result && m_irModule)
+    {
+        // Generate the entry point wrapper in the existing IR module
+        String moduleName = m_name ? String(m_name->text) : String("module");
+        addEntryPointToExistingIR(m_irModule, result, moduleName, &sink);
+        
+        // Update diagnostics if needed
+        if (outDiagnostics)
+        {
+            sink.getBlobIfNeeded(outDiagnostics);
+        }
+    }
+    
     return result;
 }
 
