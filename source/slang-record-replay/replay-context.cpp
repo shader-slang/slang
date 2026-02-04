@@ -161,6 +161,79 @@ void ReplayContext::switchToSync()
     m_mode = Mode::Sync;
 }
 
+// =============================================================================
+// Signature Parsing
+// =============================================================================
+
+const char* ReplayContext::parseSignature(const char* signature, char* buffer, size_t bufferSize)
+{
+    // Parse __FUNCSIG__ (MSVC) or __PRETTY_FUNCTION__ (GCC/Clang) to extract
+    // "ClassName::methodName" format.
+    //
+    // MSVC __FUNCSIG__ examples:
+    //   "SlangResult __cdecl SlangRecord::GlobalSessionProxy::createSession(...)"
+    //   "void __cdecl SlangRecord::SessionProxy::addSearchPath(...)"
+    //
+    // GCC/Clang __PRETTY_FUNCTION__ examples:
+    //   "SlangResult SlangRecord::GlobalSessionProxy::createSession(...)"
+    //   "void SlangRecord::SessionProxy::addSearchPath(...)"
+    //
+    // We want to extract: "GlobalSessionProxy::createSession"
+    
+    if (!signature || !buffer || bufferSize == 0)
+        return signature;
+    
+    const char* start = signature;
+    const char* end = signature + strlen(signature);
+    
+    // Find the opening parenthesis (marks end of function name)
+    const char* parenPos = strchr(signature, '(');
+    if (parenPos)
+        end = parenPos;
+    
+    // Walk backwards from end to find the function name
+    // Skip any template arguments by counting angle brackets
+    const char* funcEnd = end;
+    while (funcEnd > start && (funcEnd[-1] == ' ' || funcEnd[-1] == '\t'))
+        funcEnd--;
+    
+    // Find the start of "ClassName::methodName" by looking for SlangRecord::
+    // or the second-to-last "::" before the function name
+    const char* namespaceMarker = strstr(signature, "SlangRecord::");
+    const char* classStart = nullptr;
+    
+    if (namespaceMarker && namespaceMarker < funcEnd)
+    {
+        // Skip past "SlangRecord::"
+        classStart = namespaceMarker + strlen("SlangRecord::");
+    }
+    else
+    {
+        // No SlangRecord:: namespace, look for the class name differently
+        // Find the last space before the function name (after return type/calling convention)
+        const char* lastSpace = nullptr;
+        for (const char* p = start; p < funcEnd; p++)
+        {
+            if (*p == ' ')
+                lastSpace = p;
+        }
+        if (lastSpace)
+            classStart = lastSpace + 1;
+        else
+            classStart = start;
+    }
+    
+    // Copy to buffer
+    size_t len = funcEnd - classStart;
+    if (len >= bufferSize)
+        len = bufferSize - 1;
+    
+    memcpy(buffer, classStart, len);
+    buffer[len] = '\0';
+    
+    return buffer;
+}
+
 uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
 {
     if (obj == nullptr)

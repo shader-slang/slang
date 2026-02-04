@@ -216,6 +216,11 @@ public:
     template<typename T, typename CountT>
     void recordArray(RecordFlag flags, const T*& arr, CountT& count);
 
+    /// Parse a function signature to extract "ClassName::methodName" format.
+    /// Works with both MSVC __FUNCSIG__ and GCC/Clang __PRETTY_FUNCTION__.
+    /// Returns the normalized signature, or the original if parsing fails.
+    SLANG_API static const char* parseSignature(const char* signature, char* buffer, size_t bufferSize);
+
     /// Begin recording a method call.
     /// Records the function signature and 'this' pointer as a tracked handle.
     template<typename T>
@@ -223,8 +228,10 @@ public:
     {
         if (!isActive())
             return;
-        // Record the signature as a string
-        record(RecordFlag::Input, signature);
+        // Parse and record the normalized signature
+        char normalizedSig[256];
+        const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
+        record(RecordFlag::Input, parsed);
         // Record the 'this' pointer as a handle - cast to ISlangUnknown* for tracking
         ISlangUnknown* obj = static_cast<ISlangUnknown*>(thisPtr);
         recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, obj);
@@ -236,7 +243,9 @@ public:
     {
         if (!isActive())
             return;
-        record(RecordFlag::Input, signature);
+        char normalizedSig[256];
+        const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
+        record(RecordFlag::Input, parsed);
     }
 
     /// Register a proxy-implementation pair.

@@ -139,6 +139,7 @@ struct DefaultValue<const T&> {
 // Function traits to extract return type and argument types from member functions
 // =============================================================================
 
+
 template<typename T>
 struct MemberFunctionTraits;
 
@@ -155,6 +156,26 @@ struct MemberFunctionTraits<R(C::*)(Args...)>
 // Const member function
 template<typename R, typename C, typename... Args>
 struct MemberFunctionTraits<R(C::*)(Args...) const>
+{
+    using ReturnType = R;
+    using ClassType = C;
+    using ArgsTuple = std::tuple<Args...>;
+    static constexpr size_t Arity = sizeof...(Args);
+};
+
+// Non-const member function
+template<typename R, typename C, typename... Args>
+struct MemberFunctionTraits<R(C::*)(Args...) noexcept>
+{
+    using ReturnType = R;
+    using ClassType = C;
+    using ArgsTuple = std::tuple<Args...>;
+    static constexpr size_t Arity = sizeof...(Args);
+};
+
+// Const member function
+template<typename R, typename C, typename... Args>
+struct MemberFunctionTraits<R(C::*)(Args...) const noexcept>
 {
     using ReturnType = R;
     using ClassType = C;
@@ -247,43 +268,26 @@ void replayHandler(ReplayContext& ctx, MethodPtr method)
 // =============================================================================
 
 // Register a replay handler for a proxy method
-// Usage: REPLAY_REGISTER(IGlobalSession, GlobalSessionProxy, findProfile)
+// Usage: REPLAY_REGISTER(GlobalSessionProxy, findProfile)
 //
 // This creates a static handler function and registers it with the replay context.
-// The signature is captured using __FUNCSIG__ which must match what was recorded.
+// The signature is normalized to "ProxyType::methodName" format to match what
+// parseSignature extracts from __FUNCSIG__.
 
-#ifdef _MSC_VER
-#define REPLAY_REGISTER(InterfaceType, ProxyType, methodName) \
+#define REPLAY_REGISTER(ProxyType, methodName) \
     do { \
         /* Create a handler that captures the method pointer */ \
         static auto handler = [](ReplayContext& ctx) { \
-            replayHandler<InterfaceType, ProxyType>( \
+            replayHandler<ProxyType, ProxyType>( \
                 ctx, \
                 &ProxyType::methodName \
             ); \
         }; \
-        /* Get the signature - we need to match what RECORD_CALL produces */ \
-        /* This is tricky because we need the proxy's method signature */ \
+        /* Register with normalized signature "ProxyType::methodName" */ \
         ReplayContext::get().registerHandler( \
-            /* The signature string needs to match what __FUNCSIG__ produces in the proxy */ \
-            #InterfaceType "::" #methodName, \
+            #ProxyType "::" #methodName, \
             handler \
         ); \
     } while(0)
-#else
-#define REPLAY_REGISTER(InterfaceType, ProxyType, methodName) \
-    do { \
-        static auto handler = [](ReplayContext& ctx) { \
-            replayHandler<InterfaceType, ProxyType>( \
-                ctx, \
-                &ProxyType::methodName \
-            ); \
-        }; \
-        ReplayContext::get().registerHandler( \
-            #InterfaceType "::" #methodName, \
-            handler \
-        ); \
-    } while(0)
-#endif
 
 } // namespace SlangRecord

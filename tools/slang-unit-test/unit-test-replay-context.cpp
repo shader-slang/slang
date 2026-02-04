@@ -1241,14 +1241,22 @@ static void playbackFindProfile(ReplayContext& ctx)
 {
     s_playbackCallCount++;
 
-    // Read the profile name input
+    // executeNextCall seeks back to the start of the command, so we must
+    // first consume the signature and 'this' handle (just like RECORD_CALL does)
+    const char* signature = nullptr;
+    ctx.record(RecordFlag::Input, signature);
+    
+    ISlangBlob* thisPtr = nullptr;
+    ctx.record(RecordFlag::Input, thisPtr);
+
+    // Now read the profile name input
     const char* profileName = nullptr;
     ctx.record(RecordFlag::Input, profileName);
     s_lastProfileName = profileName;
 
     // In a real playback, we'd call the actual function here:
-    // auto* thisPtr = ctx.getCurrentThis<slang::IGlobalSession>();
-    // SlangProfileID result = thisPtr->findProfile(profileName);
+    // auto* globalSession = ctx.getCurrentThis<slang::IGlobalSession>();
+    // SlangProfileID result = globalSession->findProfile(profileName);
 
     // For testing, just read and discard the return value
     int32_t returnValue = 0;
@@ -1571,6 +1579,148 @@ SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
     
     // All checks passed
     SLANG_CHECK(true);
+}
+
+// =============================================================================
+// Test full round-trip: record through proxy, playback through proxy
+// =============================================================================
+
+// Test that recording via RECORD_CALL and playback via REPLAY_REGISTER work together
+// This validates that parseSignature produces matching signatures in both directions
+SLANG_UNIT_TEST(replayContextFullRoundTrip)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    // Reset test state
+    s_testCalcLastA = 0;
+    s_testCalcLastB = 0;
+    s_testCalcAddCalls = 0;
+    s_testCalcSetOffsetCalls = 0;
+    s_testCalcOffset = 0;
+
+    // Create implementation and proxy
+    Slang::ComPtr<ITestCalculator> impl(new TestCalculatorImpl());
+    TestCalculatorProxy* proxy = new TestCalculatorProxy(impl.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr(proxy);
+
+    // ========== RECORDING PHASE ==========
+    ctx().reset();
+    ctx().setMode(Mode::Record);
+    
+    // Register the proxy (simulates what happens during createSession)
+    uint64_t proxyHandle = ctx().registerInterface(proxyPtr.get());
+    SLANG_CHECK(proxyHandle >= kFirstValidHandle);
+
+    // Call methods through proxy - this uses RECORD_CALL() which normalizes the signature
+    int32_t result1 = proxy->add(10, 20);
+    SLANG_CHECK(result1 == 30);  // Implementation adds the values
+    SLANG_CHECK(s_testCalcAddCalls == 1);
+    SLANG_CHECK(s_testCalcLastA == 10);
+    SLANG_CHECK(s_testCalcLastB == 20);
+
+    proxy->setOffset(5);
+    SLANG_CHECK(s_testCalcSetOffsetCalls == 1);
+    SLANG_CHECK(s_testCalcOffset == 5);
+
+    int32_t result2 = proxy->add(100, 200);
+    SLANG_CHECK(result2 == 305);  // 100 + 200 + 5 (offset)
+    SLANG_CHECK(s_testCalcAddCalls == 2);
+
+    // Verify we recorded something
+    SLANG_CHECK(ctx().getStream().getSize() > 0);
+
+    // ========== PLAYBACK PHASE ==========
+    // Reset call tracking
+    s_testCalcLastA = 0;
+    s_testCalcLastB = 0;
+    s_testCalcAddCalls = 0;
+    s_testCalcSetOffsetCalls = 0;
+    s_testCalcOffset = 0;
+
+    // Create new implementation and proxy for playback
+    Slang::ComPtr<ITestCalculator> impl2(new TestCalculatorImpl());
+    TestCalculatorProxy* proxy2 = new TestCalculatorProxy(impl2.get());
+    Slang::ComPtr<ITestCalculator> proxyPtr2(proxy2);
+
+    // Switch to playback mode
+    ctx().switchToPlayback();
+    
+    // Re-register with same handle - during real playback, this happens
+    // when the creation methods are replayed
+    ctx().registerInterface(proxyPtr2.get());
+
+    // Register handlers - this is what REPLAY_REGISTER does
+    // We need to use the signature that parseSignature produces from __FUNCSIG__
+    // For TestCalculatorProxy::add, parseSignature extracts "TestCalculatorProxy::add"
+    auto addHandler = [](ReplayContext& ctxRef) {
+        SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
+            ctxRef,
+            &TestCalculatorProxy::add
+        );
+    };
+    auto setOffsetHandler = [](ReplayContext& ctxRef) {
+        SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
+            ctxRef,
+            &TestCalculatorProxy::setOffset
+        );
+    };
+    
+    // Use the exact signature that parseSignature will produce
+    ctx().registerHandler("TestCalculatorProxy::add", addHandler);
+    ctx().registerHandler("TestCalculatorProxy::setOffset", setOffsetHandler);
+
+    // Execute all recorded calls
+    ctx().executeAll();
+
+    // Verify the calls were replayed
+    // Note: the values should match what was recorded
+    SLANG_CHECK(s_testCalcAddCalls == 2);
+    SLANG_CHECK(s_testCalcSetOffsetCalls == 1);
+
+    // The last recorded call was add(100, 200)
+    SLANG_CHECK(s_testCalcLastA == 100);
+    SLANG_CHECK(s_testCalcLastB == 200);
+    SLANG_CHECK(s_testCalcOffset == 5);
+
+    // No more calls
+    SLANG_CHECK(!ctx().hasMoreCalls());
+}
+
+// Test parseSignature with various signature formats
+SLANG_UNIT_TEST(replayContextParseSignature)
+{
+    SLANG_UNUSED(unitTestContext);
+
+    char buffer[256];
+
+    // Test MSVC-style __FUNCSIG__
+    {
+        const char* msvcSig = "SlangResult __cdecl SlangRecord::GlobalSessionProxy::createSession(struct slang::SessionDesc const &,struct slang::ISession **)";
+        const char* result = ReplayContext::parseSignature(msvcSig, buffer, sizeof(buffer));
+        SLANG_CHECK(strcmp(result, "GlobalSessionProxy::createSession") == 0);
+    }
+
+    // Test with void return type
+    {
+        const char* voidSig = "void __cdecl SlangRecord::SessionProxy::addSearchPath(char const *)";
+        const char* result = ReplayContext::parseSignature(voidSig, buffer, sizeof(buffer));
+        SLANG_CHECK(strcmp(result, "SessionProxy::addSearchPath") == 0);
+    }
+
+    // Test with virtual and other modifiers
+    {
+        const char* virtualSig = "virtual SlangProfileID __cdecl SlangRecord::GlobalSessionProxy::findProfile(char const *)";
+        const char* result = ReplayContext::parseSignature(virtualSig, buffer, sizeof(buffer));
+        SLANG_CHECK(strcmp(result, "GlobalSessionProxy::findProfile") == 0);
+    }
+
+    // Test simple signature (no namespace)
+    {
+        const char* simpleSig = "int MyClass::myMethod(int, int)";
+        const char* result = ReplayContext::parseSignature(simpleSig, buffer, sizeof(buffer));
+        // Should handle this case gracefully
+        SLANG_CHECK(result != nullptr);
+    }
 }
 
 
