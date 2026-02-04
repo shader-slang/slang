@@ -141,6 +141,9 @@ bool isAddressMutable(IRInst* inst)
 /// Returns true if any changes were made.
 static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
 {
+    // Compute dominator tree for dominance checking during optimization.
+    RefPtr<IRDominatorTree> domTree = computeDominatorTree(func);
+
     // Consider the following IR pattern:
     // ```
     // let %temp = var
@@ -218,6 +221,7 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                         continue;
 
                 // Check all uses of the destination variable
+                auto loadPtrBlock = as<IRBlock>(loadPtr->getParent());
                 for (auto use = destPtr->firstUse; use; use = use->nextUse)
                 {
                     auto user = use->getUser();
@@ -225,6 +229,16 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     {
                         // Skip the store itself
                         continue; // check the next use
+                    }
+
+                    // Check dominance for this use site. loadPtr's definition must dominate all use sites.
+                    // If loadPtr is defined inside a conditional branch but destPtr is used
+                    // outside that branch, replacing destPtr with loadPtr would be invalid.
+                    if (loadPtrBlock)
+                    {
+                        auto userBlock = as<IRBlock>(user->getParent());
+                        if (userBlock && !domTree->dominates(loadPtrBlock, userBlock))
+                            goto unsafeToOptimize;
                     }
 
                     if (as<IRStore>(use->getUser()))
