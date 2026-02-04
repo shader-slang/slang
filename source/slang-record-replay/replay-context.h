@@ -156,7 +156,10 @@ public:
     SLANG_API Mode getMode() const { return m_mode; }
 
     /// Check if the context is active (not Idle).
-    SLANG_API bool isActive() const { return m_mode != Mode::Idle; }
+    SLANG_API bool isActive() const
+    {
+        return m_mode != Mode::Idle;
+    }
 
     /// Set the operating mode.
     /// When entering Record mode, sets up mirror file for crash-safe capture.
@@ -274,6 +277,7 @@ public:
     template<typename T>
     void beginCall(const char* signature, T* thisPtr)
     {
+        ensureInitialized();
         if (!isActive())
             return;
         // Parse and record the normalized signature
@@ -294,6 +298,7 @@ public:
     /// Records only the function signature.
     void beginStaticCall(const char* signature)
     {
+        ensureInitialized();
         if (!isActive())
             return;
         char normalizedSig[256];
@@ -425,8 +430,15 @@ private:
     // TTY logging
     bool m_ttyLogging = false;  ///< Whether to log calls to stderr
     
+    // Deferred initialization (to avoid global init order issues with CharEncoding)
+    bool m_initialized = false;          ///< True after ensureInitialized() has run
+    
+    /// Ensure deferred initialization has completed.
+    /// Called on first actual use to avoid global init order issues.
+    SLANG_API void ensureInitialized();
+    
     /// Log a call to stderr (used when m_ttyLogging is enabled).
-    void logCall(const char* signature, void* thisPtr);
+    SLANG_API void logCall(const char* signature, void* thisPtr);
 
     /// Set up mirror file for crash-safe capture when entering Record mode.
     void setupRecordingMirror();

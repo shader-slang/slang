@@ -130,17 +130,15 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setLanguagePrelude(SlangSourceLanguage sourceLanguage, const char* preludeText) override
     {
-        SLANG_UNUSED(sourceLanguage);
-        SLANG_UNUSED(preludeText);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setLanguagePrelude");
+        // Passthrough - prelude settings don't need recording for replay
+        getActual<IGlobalSession>()->setLanguagePrelude(sourceLanguage, preludeText);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     getLanguagePrelude(SlangSourceLanguage sourceLanguage, ISlangBlob** outPrelude) override
     {
-        SLANG_UNUSED(sourceLanguage);
-        SLANG_UNUSED(outPrelude);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getLanguagePrelude");
+        // Passthrough - prelude retrieval doesn't need recording for replay
+        getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

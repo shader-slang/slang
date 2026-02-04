@@ -99,9 +99,8 @@ ReplayContext::ReplayContext()
     , m_mode(Mode::Idle)
     , m_ttyLogging(isRecordLogRequested())
 {
-    // Set mode through setMode() to trigger mirror file setup if recording
-    if (isRecordLayerRequested())
-        setMode(Mode::Record);
+    // Don't call setMode() here - CharEncoding may not be initialized yet.
+    // The deferred setup will happen on first use via ensureInitialized().
 }
 
 ReplayContext::ReplayContext(const void* data, size_t size)
@@ -130,6 +129,20 @@ ReplayContext::~ReplayContext()
     // Destructor must be defined in DLL to properly free Dictionary memory.
     // The compiler will generate calls to ~Dictionary() for each member,
     // and this ensures they run in the DLL's allocator context.
+}
+
+void ReplayContext::ensureInitialized()
+{
+    // Guard against re-entry and multiple initialization
+    if (m_initialized)
+        return;
+    m_initialized = true;
+    
+    // Now it's safe to use file system operations (CharEncoding is initialized)
+    if (m_mode == Mode::Idle && isRecordLayerRequested())
+    {
+        setMode(Mode::Record);
+    }
 }
 
 void ReplayContext::reset()
