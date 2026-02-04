@@ -526,13 +526,12 @@ static SlangResult locateGlslangSpirvDownstreamCompiler(
 #else
     String libraryName = String("slang-glslang-") + SLANG_VERSION_NUMERIC;
 #endif
-    SLANG_RETURN_ON_FAIL(
-        DownstreamCompilerUtil::loadSharedLibrary(
-            path,
-            loader,
-            nullptr,
-            libraryName.getBuffer(),
-            library));
+    SLANG_RETURN_ON_FAIL(DownstreamCompilerUtil::loadSharedLibrary(
+        path,
+        loader,
+        nullptr,
+        libraryName.getBuffer(),
+        library));
 
     SLANG_ASSERT(library);
     if (!library)
