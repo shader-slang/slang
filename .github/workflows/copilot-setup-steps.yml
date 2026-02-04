@@ -19,6 +19,7 @@ jobs:
       contents: read
       pull-requests: write
       checks: write
+      packages: read
 
     # Testing container approach with Copilot workaround
     # Uses existing GPU CI container image with all prerequisites pre-installed
