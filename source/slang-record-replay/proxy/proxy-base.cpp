@@ -59,7 +59,11 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
     if(auto existing = ReplayContext::get().getProxy(obj)) {
-        reinterpret_cast<RefObject*>(existing)->addReference();
+        // Use dynamic_cast to get to RefObject and call addReference() directly.
+        // We can't use static_cast because ISlangUnknown and RefObject are in
+        // different inheritance branches of ProxyBase.
+        // We can't call addRef() because that would record the call for replay.
+        dynamic_cast<RefObject*>(existing)->addReference();
         return existing;
     }
 
