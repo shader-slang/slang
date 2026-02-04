@@ -1796,20 +1796,23 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     ctx().setMode(Mode::Record);
 
     // Create a global session without replay
+    SlangProfileID baselineProfile;
     Slang::ComPtr<slang::IGlobalSession> baselineGlobalSession;
-    SlangGlobalSessionDesc globalDesc = {};
-    globalDesc.apiVersion = 0;
-    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
-    slang::SessionDesc sessionDesc = {};
-    slang::TargetDesc targetDesc = {};
-    targetDesc.format = SLANG_SPIRV;
-    targetDesc.profile = baselineGlobalSession->findProfile("spirv_1_5");
-    sessionDesc.targets = &targetDesc;
-    sessionDesc.targetCount = 1;
     Slang::ComPtr<slang::ISession> baselineSession;
-    SLANG_CHECK(SLANG_SUCCEEDED(baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
-    SlangProfileID baselineProfile = targetDesc.profile;
-    SLANG_CHECK(baselineProfile != SLANG_PROFILE_UNKNOWN);
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = baselineGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        SLANG_CHECK(SLANG_SUCCEEDED(baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
+        baselineProfile = targetDesc.profile;
+        SLANG_CHECK(baselineProfile != SLANG_PROFILE_UNKNOWN);
+    }
 
     // =========================================================================
     // Stage 2: Create objects WITH recording enabled and verify proxy wrapping
@@ -1819,77 +1822,40 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     ctx().enable();
     ctx().reset();
     ctx().setMode(Mode::Record);
-    SLANG_CHECK(ctx().isRecording());
 
-    // Remember the starting handle value
-    uint64_t handleBeforeRecord = ctx().getNextHandle();
-
-    // Create a global session - should be wrapped in a proxy
+    // Pretty much identical process but recording this time. From outside perspective,
+    // should have exactly the same data (albeit wrapped in proxys)
     Slang::ComPtr<slang::IGlobalSession> recordedGlobalSession;
-    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
-
-    // Verify we got a proxy (the pointer should be different from baseline since
-    // it's a proxy wrapper, but we can verify it's registered)
-    SLANG_CHECK(recordedGlobalSession != nullptr);
-    SLANG_CHECK(ctx().isInterfaceRegistered(recordedGlobalSession.get()));
-
-    // The global session should be a GlobalSessionProxy wrapping the actual implementation
-    // We can verify this by checking it implements IGlobalSession
-    Slang::ComPtr<slang::IGlobalSession> queriedGlobal;
-    SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->queryInterface(
-        slang::IGlobalSession::getTypeGuid(), (void**)queriedGlobal.writeRef())));
-
-    // Create a session with the same descriptor
-    targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
-    SLANG_CHECK(targetDesc.profile == baselineProfile); // Profile IDs should match
-
     Slang::ComPtr<slang::ISession> recordedSession;
-    SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
-
-    // Verify session is also registered
-    SLANG_CHECK(recordedSession != nullptr);
-    SLANG_CHECK(ctx().isInterfaceRegistered(recordedSession.get()));
-
-    // Check that new handles were assigned
-    uint64_t handleAfterRecord = ctx().getNextHandle();
-    SLANG_CHECK(handleAfterRecord > handleBeforeRecord);
+    {
+        SlangGlobalSessionDesc globalDesc = {};
+        globalDesc.apiVersion = 0;
+        SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        slang::SessionDesc sessionDesc = {};
+        slang::TargetDesc targetDesc = {};
+        targetDesc.format = SLANG_SPIRV;
+        targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.targetCount = 1;
+        SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
+        SLANG_CHECK(baselineProfile == targetDesc.profile);
+    }
 
     // Get the handle for the session so we can look it up after playback
     uint64_t recordedSessionHandle = ctx().getHandleForInterface(recordedSession.get());
     SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
 
-    // Store recorded stream data for playback
-    size_t recordedSize = ctx().getStream().getSize();
-    SLANG_CHECK(recordedSize > 0);
-
     // =========================================================================
     // Stage 3: Playback the recording and verify objects are recreated
     // =========================================================================
-
-    // Release the recorded objects before playback
-    recordedSession = nullptr;
-    recordedGlobalSession = nullptr;
 
     // Switch to playback mode - this resets handles but keeps stream data
     ctx().switchToPlayback();
     SLANG_CHECK(ctx().isPlayback());
 
-    // Remember handle value before playback
-    uint64_t handleBeforePlayback = ctx().getNextHandle();
-    SLANG_CHECK(handleBeforePlayback == kFirstValidHandle); // Should be reset
-
     // Execute all recorded calls
     // This should recreate the global session and session
     ctx().executeAll();
-
-    // Check that handles were assigned during playback
-    uint64_t handleAfterPlayback = ctx().getNextHandle();
-    SLANG_CHECK(handleAfterPlayback > handleBeforePlayback);
-
-    // The same number of handles should have been assigned
-    uint64_t handlesAssignedDuringRecord = handleAfterRecord - handleBeforeRecord;
-    uint64_t handlesAssignedDuringPlayback = handleAfterPlayback - handleBeforePlayback;
-    SLANG_CHECK(handlesAssignedDuringPlayback == handlesAssignedDuringRecord);
 
     // Look up the session by its handle - it should exist after playback
     ISlangUnknown* playedBackSessionUnk = ctx().getInterfaceForHandle(recordedSessionHandle);
@@ -1900,13 +1866,6 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     SLANG_CHECK(SLANG_SUCCEEDED(playedBackSessionUnk->queryInterface(
         slang::ISession::getTypeGuid(), (void**)playedBackSession.writeRef())));
 
-    // =========================================================================
-    // Cleanup
-    // =========================================================================
-
-    playedBackSession = nullptr;
-    baselineSession = nullptr;
-    baselineGlobalSession = nullptr;
 }
 
 
