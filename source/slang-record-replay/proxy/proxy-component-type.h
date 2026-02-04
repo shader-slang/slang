@@ -2,6 +2,7 @@
 #define SLANG_PROXY_COMPONENT_TYPE_H
 
 #include "proxy-base.h"
+#include "proxy-macros.h"
 
 #include "slang-com-helper.h"
 #include "slang.h"
@@ -103,11 +104,26 @@ public:
         ISlangSharedLibrary** outSharedLibrary,
         slang::IBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outSharedLibrary);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::getEntryPointHostCallable");
+        RECORD_CALL();
+        RECORD_INPUT(entryPointIndex);
+        RECORD_INPUT(targetIndex);
+
+        ISlangSharedLibrary* sharedLibraryPtr = nullptr;
+        if (!outSharedLibrary)
+            outSharedLibrary = &sharedLibraryPtr;
+        slang::IBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IComponentType>()->getEntryPointHostCallable(
+            entryPointIndex,
+            targetIndex,
+            outSharedLibrary,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outSharedLibrary);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
