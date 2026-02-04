@@ -16,8 +16,6 @@ using Slang::Path;
 
 bool isRecordLayerRequested()
 {
-    return false;
-    /*
     Slang::StringBuilder envValue;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
             Slang::UnownedStringSlice("SLANG_RECORD_LAYER"), envValue)))
@@ -28,7 +26,6 @@ bool isRecordLayerRequested()
     {
         return false;
     }
-        */
 }
 
 // =============================================================================

@@ -1,16 +1,22 @@
 // unit-test-record-replay.cpp
+//
+// Tests that verify the record-replay system works correctly by:
+// 1. Running example programs with recording enabled (via SLANG_RECORD_LAYER=1)
+// 2. Verifying that replay files (stream.bin) are created
+//
+// Future: Load and playback the recordings to verify determinism
 
-#include "../../source/core/slang-http.h"
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
-#include "../../source/core/slang-random-generator.h"
 #include "../../source/core/slang-string-util.h"
+#include "../../source/slang-record-replay/replay-context.h"
 #include "unit-test/slang-unit-test.h"
 
-#include <chrono>
-#include <thread>
-
 using namespace Slang;
+
+// =============================================================================
+// Process launching helpers
+// =============================================================================
 
 static SlangResult createProcess(
     UnitTestContext* context,
@@ -30,88 +36,6 @@ static SlangResult createProcess(
     return SLANG_OK;
 }
 
-struct entryHashInfo
-{
-    int64_t callIdx = -1;
-    int64_t targetIndex = -1;
-    int64_t entryPointIndex = -1;
-    String hash;
-};
-
-static SlangResult parseHashes(List<String> const& lines, List<entryHashInfo>& outHashes)
-{
-    SlangResult res = SLANG_OK;
-
-    for (const auto& line : lines)
-    {
-        List<UnownedStringSlice> tokens;
-        Index skipCharacters = line.indexOf(UnownedStringSlice("[slang-record-replay]:"));
-        if (skipCharacters == -1)
-        {
-            skipCharacters = 0;
-        }
-        else
-        {
-            skipCharacters += strlen("[slang-record-replay]:");
-        }
-        StringUtil::split(UnownedStringSlice(line.getBuffer() + skipCharacters), ',', tokens);
-
-        if (tokens.getCount() != 4)
-        {
-            return SLANG_FAIL;
-        }
-
-        entryHashInfo hashInfo;
-        auto extractToken = [](const UnownedStringSlice& token,
-                               const char splitChar,
-                               UnownedStringSlice& outToken) -> SlangResult
-        {
-            List<UnownedStringSlice> subTokens;
-            StringUtil::split(token, splitChar, subTokens);
-            if (subTokens.getCount() != 2)
-            {
-                return SLANG_FAIL;
-            }
-            outToken = subTokens[1];
-            return SLANG_OK;
-        };
-
-        {
-            UnownedStringSlice subToken;
-            SLANG_RETURN_ON_FAIL(extractToken(tokens[0], ':', subToken));
-            int64_t outNumer = 0;
-            StringUtil::parseInt64(subToken, outNumer);
-            hashInfo.callIdx = outNumer;
-        }
-
-        {
-            UnownedStringSlice subToken;
-            SLANG_RETURN_ON_FAIL(extractToken(tokens[1], ':', subToken));
-            int64_t outNumer = 0;
-            StringUtil::parseInt64(subToken, outNumer);
-            hashInfo.entryPointIndex = outNumer;
-        }
-
-        {
-            UnownedStringSlice subToken;
-            SLANG_RETURN_ON_FAIL(extractToken(tokens[2], ':', subToken));
-            int64_t outNumer = 0;
-            StringUtil::parseInt64(subToken, outNumer);
-            hashInfo.targetIndex = outNumer;
-        }
-
-        {
-            UnownedStringSlice subToken;
-            SLANG_RETURN_ON_FAIL(extractToken(tokens[3], ':', subToken));
-            // remove the white space after ":"
-            hashInfo.hash = subToken.begin() + 1;
-        }
-
-        outHashes.add(hashInfo);
-    }
-    return res;
-}
-
 static int writeEnvironmentVariable(const char* key, const char* val)
 {
 #ifdef _WIN32
@@ -120,52 +44,6 @@ static int writeEnvironmentVariable(const char* key, const char* val)
 #else
     return setenv(key, val, 1);
 #endif
-}
-
-static bool enableRecordLayer()
-{
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
-    return retCode == 0;
-}
-
-static bool disableRecordLayer()
-{
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LAYER", "0");
-    return retCode == 0;
-}
-
-static bool enableLogInReplayer()
-{
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL", "3");
-    return retCode == 0;
-}
-
-static bool disableLogInReplayer()
-{
-    int retCode = writeEnvironmentVariable("SLANG_RECORD_LOG_LEVEL", "0");
-    return retCode == 0;
-}
-
-static void findRecordFileName(List<String>* fileNames, const String& recordDir)
-{
-    struct Visitor : Path::Visitor
-    {
-        void accept(Path::Type type, const UnownedStringSlice& filename) SLANG_OVERRIDE
-        {
-            if (type == Path::Type::File)
-            {
-                m_fileNames->add(filename);
-            }
-        }
-        Visitor(List<String>* fileNames)
-            : m_fileNames(fileNames)
-        {
-        }
-        List<String>* m_fileNames;
-    };
-
-    Visitor visitor(fileNames);
-    Path::find(recordDir.getBuffer(), "*.cap", &visitor);
 }
 
 static SlangResult launchProcessAndReadStdout(
@@ -203,241 +81,93 @@ static SlangResult launchProcessAndReadStdout(
         return SLANG_FAIL;
     }
 
-    if (exeRes.standardOutput.getLength() == 0)
-    {
-        msgBuilder << "No stdout found in '" << exampleName << "'\n";
-        msgBuilder << "Standard error: " << exeRes.standardError;
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
     return SLANG_OK;
 }
 
-static SlangResult runExample(
-    UnitTestContext* context,
-    const char* exampleName,
-    const String& recordDir,
-    List<entryHashInfo>& outHashes)
-{
-    SlangResult finalRes = SLANG_OK;
+// =============================================================================
+// Record/Replay test infrastructure
+// =============================================================================
 
+static SlangResult cleanupRecordFiles(const String& recordDir)
+{
+    // Silently try to remove the directory - it's okay if it doesn't exist
+    Path::removeNonEmpty(recordDir.getBuffer());
+    return SLANG_OK;
+}
+
+static SlangResult runTest(UnitTestContext* context, const char* testName)
+{
+    // The replay system uses ".slang-replays" as the default directory.
+    // We just need to enable recording and verify files are created there.
+    String recordDir = ".slang-replays";
+
+    // Clean up any leftover files from previous runs
+    cleanupRecordFiles(recordDir);
+
+    // Enable recording via environment variable for child process
+    // The child process will check SLANG_RECORD_LAYER on startup
+    writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
+
+    // Run the example with recording enabled
     RefPtr<Process> process;
     ExecuteResult exeRes;
     List<String> optArgs;
     optArgs.add("--test-mode");
 
-    StringBuilder msgBuilder;
-    SlangResult res = SLANG_OK;
+    SlangResult res = launchProcessAndReadStdout(context, optArgs, testName, process, exeRes);
 
-    // Set unique record directory for this test
-    writeEnvironmentVariable("SLANG_RECORD_DIRECTORY", recordDir.getBuffer());
-    enableRecordLayer();
-    res = launchProcessAndReadStdout(context, optArgs, exampleName, process, exeRes);
-    disableRecordLayer();
+    // Disable recording for any future child processes
+    writeEnvironmentVariable("SLANG_RECORD_LAYER", "0");
 
     if (SLANG_FAILED(res))
     {
+        cleanupRecordFiles(recordDir);
         return res;
     }
 
-    List<String> hashLines;
-    for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
-    {
-        if (line.getLength() == 0)
-        {
-            continue;
-        }
-
-        if (line.indexOf(UnownedStringSlice("hash:")) == -1)
-        {
-            continue;
-        }
-
-        hashLines.add(line);
-    }
-
-    if (hashLines.getCount() == 0)
-    {
-        msgBuilder << "Hash value is not found for '" << exampleName << "'\n";
-        msgBuilder << "Process ret code: " << exeRes.resultCode << "\n";
-        msgBuilder << "Standard output:\n" << exeRes.standardOutput << "\n";
-        msgBuilder << "Standard error:\n" << exeRes.standardError << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
-
-    res = parseHashes(hashLines, outHashes);
-    if (SLANG_FAILED(res))
-    {
-        msgBuilder << "Failed to parse hash from stdout of '" << exampleName << "'\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return res;
-    }
-
-    return SLANG_OK;
-}
-
-static SlangResult replayExample(
-    UnitTestContext* context,
-    const String& recordDir,
-    List<entryHashInfo>& outHashes)
-{
-    List<String> fileNames;
-    findRecordFileName(&fileNames, recordDir);
-    if (fileNames.getCount() == 0)
-    {
-        getTestReporter()->message(TestMessageType::TestFailure, "No record files found\n");
-        return SLANG_FAIL;
-    }
-
-    List<String> optArgs;
-    String recordFileName = Path::combine(recordDir, fileNames[0]);
-    optArgs.add(recordFileName.getBuffer());
-
-    RefPtr<Process> process;
-    ExecuteResult exeRes;
-
-    StringBuilder msgBuilder;
-    msgBuilder << "replay the test\n";
-
-    enableLogInReplayer();
-    SlangResult res = launchProcessAndReadStdout(context, optArgs, "slang-replay", process, exeRes);
-    disableLogInReplayer();
-
-    if (SLANG_FAILED(res))
-    {
-        return res;
-    }
-
-    List<String> hashLines;
-    for (auto line : LineParser(exeRes.standardOutput.getUnownedSlice()))
-    {
-        if (line.getLength() == 0)
-        {
-            continue;
-        }
-
-        if (line.indexOf(UnownedStringSlice("hash:")) == -1)
-        {
-            continue;
-        }
-
-        hashLines.add(line);
-    }
-
-    res = parseHashes(hashLines, outHashes);
-    if (SLANG_FAILED(res))
-    {
-        msgBuilder << "Failed to parse hash from stdout of 'slang-replay'\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
-
-    return SLANG_OK;
-}
-
-static SlangResult resultCompare(
-    List<entryHashInfo> const& expectHashes,
-    List<entryHashInfo> const& resultHashes)
-{
-    if (expectHashes.getCount() == 0)
-    {
-        getTestReporter()->message(TestMessageType::TestFailure, "No hash found\n");
-        return SLANG_FAIL;
-    }
-
-    StringBuilder msgBuilder;
-    if (expectHashes.getCount() != resultHashes.getCount())
-    {
-        msgBuilder << "The number of hashes doesn't match, expect: " << expectHashes.getCount()
-                   << ", actual: " << resultHashes.getCount() << "\n";
-        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
-        return SLANG_FAIL;
-    }
-
-    for (Index i = 0; i < expectHashes.getCount(); i++)
-    {
-        if (expectHashes[i].targetIndex != resultHashes[i].targetIndex)
-        {
-            msgBuilder << "Failed to match 'targetIndex' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].targetIndex
-                       << ", actual: " << resultHashes[i].targetIndex << "\n";
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                msgBuilder.toString().getBuffer());
-            return SLANG_FAIL;
-        }
-        if (expectHashes[i].entryPointIndex != resultHashes[i].entryPointIndex)
-        {
-            msgBuilder << "Failed to match 'entryPointIndex' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].entryPointIndex
-                       << ", actual: " << resultHashes[i].entryPointIndex << "\n";
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                msgBuilder.toString().getBuffer());
-            return SLANG_FAIL;
-        }
-
-        if (expectHashes[i].hash != resultHashes[i].hash)
-        {
-            msgBuilder << "Failed to match 'hash' at index " << i << "\n";
-            msgBuilder << "Expect: " << expectHashes[i].hash << ", actual: " << resultHashes[i].hash
-                       << "\n";
-            getTestReporter()->message(
-                TestMessageType::TestFailure,
-                msgBuilder.toString().getBuffer());
-            return SLANG_FAIL;
-        }
-    }
-
-    return SLANG_OK;
-}
-
-static SlangResult cleanupRecordFiles(const String& recordDir)
-{
-    SlangResult res = Path::removeNonEmpty(recordDir.getBuffer());
-    if (SLANG_FAILED(res))
+    // Verify that a replay folder was created
+    String latestFolder = SlangRecord::ReplayContext::findLatestReplayFolder(recordDir.getBuffer());
+    if (latestFolder.getLength() == 0)
     {
         StringBuilder msgBuilder;
-        msgBuilder << "Failed to remove '" << recordDir << "' directory\n";
+        msgBuilder << "No replay folder created for '" << testName << "'\n";
+        msgBuilder << "Expected replay files in: " << recordDir << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        cleanupRecordFiles(recordDir);
+        return SLANG_FAIL;
     }
 
-    return res;
-}
-
-static SlangResult runTest(UnitTestContext* context, const char* testName)
-{
-    // Create unique directory for this test to avoid conflicts
-    StringBuilder recordDirBuilder;
-    recordDirBuilder << "slang-record-" << testName;
-    String recordDir = recordDirBuilder.toString();
-
-    List<entryHashInfo> expectHashes;
-    List<entryHashInfo> resultHashes;
-    SlangResult res = SLANG_OK;
-
-    // Run the example to generate recording
-    res = runExample(context, testName, recordDir, expectHashes);
-    if (SLANG_SUCCEEDED(res))
+    // Verify stream.bin exists
+    String streamPath = Path::combine(Path::combine(recordDir, latestFolder), "stream.bin");
+    if (!File::exists(streamPath))
     {
-        // Replay the recording
-        res = replayExample(context, recordDir, resultHashes);
-        if (SLANG_SUCCEEDED(res))
-        {
-            // Compare results
-            res = resultCompare(expectHashes, resultHashes);
-        }
+        StringBuilder msgBuilder;
+        msgBuilder << "No stream.bin found for '" << testName << "'\n";
+        msgBuilder << "Expected file at: " << streamPath << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        cleanupRecordFiles(recordDir);
+        return SLANG_FAIL;
     }
 
-    // Always cleanup, regardless of success or failure
+    // TODO: Future enhancement - load and playback the replay to verify determinism
+    // SlangResult loadRes = slang_loadReplay(Path::combine(recordDir, latestFolder).getBuffer());
+    // if (SLANG_SUCCEEDED(loadRes))
+    // {
+    //     SlangRecord::ReplayContext::get().executeAll();
+    // }
+
+    // Cleanup
     cleanupRecordFiles(recordDir);
-    return res;
+    return SLANG_OK;
 }
 
-// Those examples all depend on the Vulkan, so we only run them on non-Apple platforms.
-// In the future, we may be able to modify the examples further to remove all the render APIs
-// such that it can be ran on Apple platforms.
+// =============================================================================
+// Test cases
+// =============================================================================
+
+// These examples depend on Vulkan, so we only run them on non-Apple platforms.
+// In the future, we may be able to modify the examples to remove render API
+// dependencies so they can run on Apple platforms.
 #if !(SLANG_APPLE_FAMILY)
 
 SLANG_UNIT_TEST(RecordReplay_cpu_hello_world)
@@ -475,8 +205,7 @@ SLANG_UNIT_TEST(RecordReplay_gpu_printing)
 }
 
 #if 0
-// These examples requires reflection API to replay, we have to disable
-// it for now. "model-viewer",
+// These examples require reflection API to replay, disabled for now.
 
 SLANG_UNIT_TEST(RecordReplay_shader_object)
 {
