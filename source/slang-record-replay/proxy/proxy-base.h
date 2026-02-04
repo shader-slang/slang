@@ -56,7 +56,7 @@ public:
     template<typename T>
     T* getActual() const
     {
-        return dynamic_cast<T*>(m_actual.get());
+        return static_cast<T*>(m_actual.get());
     }
 
 protected:
