@@ -27,11 +27,13 @@ void main(uint2 pixelIndex : SV_DispatchThreadID)
     // CHECK2: %[[VAR5]] = OpAccessChain %_ptr_UniformConstant_{{.*}} %{{.*}} %[[VAR4]]
     // CHECK2: %[[VAR6]] = OpLoad %{{.*}} %[[VAR5]]
 
-    // CHECK3: %[[VAR1:[a-zA-Z0-9_]+]] = OpAccessChain{{.*}}NonUniform
-    // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpLoad %{{.*}}[[VAR1]]{{.*}}NonUniform
+    // CHECK3-DAG: OpDecorate %[[IDX1:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK3-DAG: OpDecorate %[[IDX2:[a-zA-Z0-9_]+]] NonUniform
+    // CHECK3: %[[VAR1:[a-zA-Z0-9_]+]] = OpAccessChain %{{.*}} %{{.*}} %[[IDX1]]
+    // CHECK3: %[[VAR2:[a-zA-Z0-9_]+]] = OpLoad %{{.*}} %[[VAR1]]
     // CHECK3: %{{.*}} = OpImageFetch %v4float %[[VAR2]] %{{.*}}
-    // CHECK3: %[[VAR3:[a-zA-Z0-9_]+]] = OpAccessChain{{.*}}NonUniform
-    // CHECK3: %[[VAR4:[a-zA-Z0-9_]+]] = OpLoad %{{.*}}[[VAR3]]{{.*}}NonUniform
+    // CHECK3: %[[VAR3:[a-zA-Z0-9_]+]] = OpAccessChain %{{.*}} %{{.*}} %[[IDX2]]
+    // CHECK3: %[[VAR4:[a-zA-Z0-9_]+]] = OpLoad %{{.*}} %[[VAR3]]
     // CHECK3: %{{.*}} = OpImageFetch %v4float %[[VAR4]] %{{.*}}
     
     // CHECK4: FixedArray<CUtexObject, 2>  [[TEXTURES:textures[_0-9]*]];
