@@ -12,8 +12,10 @@ struct Constants
 
 ConstantBuffer<Constants> g_constants;
 
-// CHECK-NOT: error
-// CHECK: result code = 0
+// Verify the temporary variable and load-store pair are not optimized away.
+// CHECK: %result = OpVariable %_ptr_Function_v3float Function
+// CHECK: OpStore %result
+// CHECK: OpLoad %v3float %result
 
 float4 main(uint condition : A) : SV_Position
 {
