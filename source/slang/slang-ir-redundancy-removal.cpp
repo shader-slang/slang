@@ -141,7 +141,6 @@ bool isAddressMutable(IRInst* inst)
 /// Returns true if any changes were made.
 static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
 {
-
     // Consider the following IR pattern:
     // ```
     // let %temp = var
