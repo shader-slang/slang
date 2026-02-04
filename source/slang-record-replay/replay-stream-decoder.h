@@ -73,6 +73,10 @@ private:
 
     void decodeAll(size_t maxBytes);
     void decodeCall();
+    
+    /// Try to recover from a decoding error by finding the next valid call.
+    /// @return true if recovery was successful, false if end of stream.
+    bool tryRecoverToNextCall();
 
     static TypeId peekTypeId(ReplayStream& stream);
     static TypeId readTypeId(ReplayStream& stream);

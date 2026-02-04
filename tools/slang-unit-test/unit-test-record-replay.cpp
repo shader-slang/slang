@@ -3,13 +3,16 @@
 // Tests that verify the record-replay system works correctly by:
 // 1. Running example programs with recording enabled (via SLANG_RECORD_LAYER=1)
 // 2. Verifying that replay files (stream.bin) are created
+// 3. Decoding the stream.bin and computing a hash for verification
 //
 // Future: Load and playback the recordings to verify determinism
 
 #include "../../source/core/slang-io.h"
 #include "../../source/core/slang-process-util.h"
+#include "../../source/core/slang-stable-hash.h"
 #include "../../source/core/slang-string-util.h"
 #include "../../source/slang-record-replay/replay-context.h"
+#include "../../source/slang-record-replay/replay-stream-decoder.h"
 #include "unit-test/slang-unit-test.h"
 
 using namespace Slang;
@@ -111,8 +114,8 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
     // The child process will check SLANG_RECORD_LAYER on startup
     writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
 
-    // Also enable logging
-    writeEnvironmentVariable("SLANG_RECORD_LOG", "1");
+    // Disable logging during tests to reduce noise
+    writeEnvironmentVariable("SLANG_RECORD_LOG", "0");
 
     // Run the example with recording enabled
     RefPtr<Process> process;
@@ -131,7 +134,6 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
         return res;
     }
 
-    #if 0
     // Verify that a replay folder was created
     String latestFolder = SlangRecord::ReplayContext::findLatestReplayFolder(recordDir.getBuffer());
     if (latestFolder.getLength() == 0)
@@ -155,14 +157,38 @@ static SlangResult runTest(UnitTestContext* context, const char* testName)
         cleanupRecordFiles(recordDir);
         return SLANG_FAIL;
     }
-    #endif
+
+    // Decode the stream.bin and compute a hash
+    try
+    {
+        String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(streamPath.getBuffer());
+        
+        // Compute hash of the decoded content
+        StableHashCode64 hash = getStableHashCode64(
+            decoded.getBuffer(), 
+            decoded.getLength());
+        
+        // Log the decoded content and hash
+        StringBuilder msgBuilder;
+        msgBuilder << "Decoded stream.bin for '" << testName << "' (" 
+                   << decoded.getLength() << " bytes):\n";
+        StringUtil::appendFormat(msgBuilder, "Hash: 0x%016llx\n", (unsigned long long)hash.hash);
+        msgBuilder << "--- Begin decoded content ---\n";
+        msgBuilder << decoded;
+        msgBuilder << "--- End decoded content ---\n";
+        getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
+    }
+    catch (const Exception& e)
+    {
+        StringBuilder msgBuilder;
+        msgBuilder << "Failed to decode stream.bin for '" << testName << "': " 
+                   << e.Message << "\n";
+        getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
+        cleanupRecordFiles(recordDir);
+        return SLANG_FAIL;
+    }
 
     // TODO: Future enhancement - load and playback the replay to verify determinism
-    // SlangResult loadRes = slang_loadReplay(Path::combine(recordDir, latestFolder).getBuffer());
-    // if (SLANG_SUCCEEDED(loadRes))
-    // {
-    //     SlangRecord::ReplayContext::get().executeAll();
-    // }
 
     // Cleanup
     cleanupRecordFiles(recordDir);

@@ -9,6 +9,7 @@ struct Options
     bool convertToJson{false};
     bool decode{false};
     Slang::String recordFileName;
+    Slang::String outputFileName;
 };
 
 void printUsage()
@@ -19,6 +20,7 @@ void printUsage()
         "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
     printf("  --decode, -d: Decode the binary stream.bin file to human-readable text.\n");
+    printf("  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
 }
 
 Options parseOption(int argc, char* argv[])
@@ -50,6 +52,18 @@ Options parseOption(int argc, char* argv[])
         else if ((strcmp("--decode", arg) == 0) || (strcmp("-d", arg) == 0))
         {
             option.decode = true;
+            argIndex++;
+        }
+        else if ((strcmp("--output", arg) == 0) || (strcmp("-o", arg) == 0))
+        {
+            argIndex++;
+            if (argIndex >= argc)
+            {
+                printf("Error: --output requires a filename argument\n");
+                printUsage();
+                exit(1);
+            }
+            option.outputFileName = argv[argIndex];
             argIndex++;
         }
         else if ((strcmp("--help", arg) == 0) || (strcmp("-h", arg) == 0))
@@ -86,7 +100,24 @@ int main(int argc, char* argv[])
         {
             Slang::String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(
                 options.recordFileName.getBuffer());
-            printf("%s", decoded.getBuffer());
+            
+            if (options.outputFileName.getLength() > 0)
+            {
+                // Write to file
+                SlangResult res = Slang::File::writeAllText(
+                    options.outputFileName.getBuffer(), 
+                    decoded.getUnownedSlice());
+                if (SLANG_FAILED(res))
+                {
+                    fprintf(stderr, "Error writing to file: %s\n", options.outputFileName.getBuffer());
+                    return 1;
+                }
+            }
+            else
+            {
+                // Write to stdout
+                printf("%s", decoded.getBuffer());
+            }
             return 0;
         }
         catch (const Slang::Exception& e)

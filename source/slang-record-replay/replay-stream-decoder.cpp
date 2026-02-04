@@ -201,10 +201,12 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Array:
         {
-            uint32_t count;
+            uint64_t count;
+            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
             stream.read(&count, sizeof(count));
+
             output << "Array[" << count << "]:";
-            for (uint32_t i = 0; i < count && i < 100; i++)
+            for (uint64_t i = 0; i < count && i < 100; i++)
             {
                 output << "\n";
                 indent(output, indentLevel + 1);
@@ -313,9 +315,10 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
     case TypeId::Array:
         {
-            uint32_t count;
+            uint64_t count;
+            stream.skip(1); // the type of the count (1B, should be TypeId::UInt64)
             stream.read(&count, sizeof(count));
-            for (uint32_t i = 0; i < count; i++)
+            for (uint64_t i = 0; i < count; i++)
                 skipValueInStream(stream);
         }
         break;
@@ -432,26 +435,26 @@ void ReplayStreamDecoder::decodeAll(size_t maxBytes)
     m_output << "Total size: " << m_stream.getSize() << " bytes\n";
     m_output << "Start position: " << m_startPosition << "\n\n";
 
-    int callNumber = 0;
+    int valueNumber = 0;
     while (m_stream.getPosition() < endPosition && m_stream.getPosition() < m_stream.getSize())
     {
-        size_t callStart = m_stream.getPosition();
-        m_output << "--- Call #" << callNumber++ << " (offset " << callStart << ") ---\n";
+        size_t offset = m_stream.getPosition();
         
         try
         {
-            decodeCall();
+            m_output << "[" << valueNumber++ << "] @" << offset << ": ";
+            decodeValueFromStream(m_stream, m_output, 0);
+            m_output << "\n";
         }
         catch (const Slang::Exception& e)
         {
-            m_output << "  ERROR: " << e.Message.getBuffer() << "\n";
-            m_output << "  (stopped decoding at offset " << m_stream.getPosition() << ")\n";
+            m_output << "ERROR: " << e.Message.getBuffer() << "\n";
+            m_output << "(stopped at offset " << m_stream.getPosition() << ")\n";
             break;
         }
-        m_output << "\n";
     }
 
-    m_output << "=== End of Stream ===\n";
+    m_output << "\n=== End of Stream (decoded " << valueNumber << " values) ===\n";
 }
 
 void ReplayStreamDecoder::decodeCall()
@@ -482,6 +485,56 @@ void ReplayStreamDecoder::decodeCall()
         decodeValueFromStream(m_stream, m_output, 2);
         m_output << "\n";
     }
+}
+
+bool ReplayStreamDecoder::tryRecoverToNextCall()
+{
+    // Try to find the next valid call by scanning for TypeId::String followed
+    // by a reasonable-looking string length and then TypeId::ObjectHandle
+    
+    const size_t maxScan = 4096; // Don't scan forever
+    size_t startPos = m_stream.getPosition();
+    size_t endPos = m_stream.getSize();
+    
+    for (size_t i = 0; i < maxScan && startPos + i + 1 < endPos; i++)
+    {
+        m_stream.seek(startPos + i);
+        
+        // Check for TypeId::String
+        uint8_t typeVal;
+        m_stream.read(&typeVal, sizeof(typeVal));
+        if (static_cast<TypeId>(typeVal) != TypeId::String)
+            continue;
+        
+        // Check for reasonable string length (function names are typically < 256 chars)
+        if (startPos + i + 5 >= endPos)
+            break;
+            
+        uint32_t strLen;
+        m_stream.read(&strLen, sizeof(strLen));
+        if (strLen == 0 || strLen > 512)
+            continue;
+        
+        // Check we have enough bytes for the string + handle type + handle
+        if (startPos + i + 5 + strLen + 1 + 8 >= endPos)
+            break;
+        
+        // Skip the string and check for ObjectHandle
+        m_stream.skip(strLen);
+        
+        uint8_t handleType;
+        m_stream.read(&handleType, sizeof(handleType));
+        if (static_cast<TypeId>(handleType) != TypeId::ObjectHandle)
+            continue;
+        
+        // Looks like a valid call header - rewind to the start
+        m_stream.seek(startPos + i);
+        return true;
+    }
+    
+    // Could not find a valid call header
+    m_stream.seek(endPos);
+    return false;
 }
 
 // =============================================================================
