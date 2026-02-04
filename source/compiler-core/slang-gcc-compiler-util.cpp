@@ -393,6 +393,36 @@ static SlangResult _parseFileLinkError(
     return SLANG_OK;
 }
 
+// Pattern: objectfile:section:section:message (object file link error fallback)
+// Handles patterns like: /tmp/file.o:something:section:message
+static SlangResult _parseObjectFileLinkError(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    const List<UnownedStringSlice>& split,
+    LineParseResult& outLineParseResult,
+    ArtifactDiagnostic& outDiagnostic)
+{
+    SLANG_UNUSED(line);
+
+    if (split.getCount() != 4)
+        return SLANG_FAIL;
+
+    // Check if first element has .o or .obj extension
+    String ext = Path::getPathExt(split[0]);
+    if (ext != "o" && ext != "obj")
+        return SLANG_FAIL;
+
+    outDiagnostic.filePath = allocator.allocate(split[1]);
+    outDiagnostic.location.line = 0;
+    outDiagnostic.location.column = 0;
+    outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    outDiagnostic.text = allocator.allocate(split[3]);
+    outLineParseResult = LineParseResult::Start;
+
+    return SLANG_OK;
+}
+
 // Pattern: gcc:filename:link error:message (GCC 13.x format)
 static SlangResult _parseGCC13LinkError(
     SliceAllocator& allocator,
@@ -520,6 +550,7 @@ static const GCCPatternMatcher s_gccPatterns[] = {
     // Link errors (priority 0-99)
     {10, "ld-linker-error", _parseLdLinkerError},
     {20, "gcc13-link-error", _parseGCC13LinkError},
+    {25, "object-file-link-error", _parseObjectFileLinkError},
     {30, "file-link-error", _parseFileLinkError},
     {40, "text-section-error", _parseTextSectionError},
 
