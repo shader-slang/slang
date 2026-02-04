@@ -72,6 +72,7 @@ SLANG_UNIT_TEST(entryPointCompile)
         SLANG_STAGE_VERTEX,
         entryPoint.writeRef(),
         diagnosticBlob.writeRef());
+    SLANG_CHECK_ABORT(entryPoint != nullptr);
 
     ComPtr<slang::IComponentType> linkedProgram;
     entryPoint->link(linkedProgram.writeRef(), diagnosticBlob.writeRef());
