@@ -118,3 +118,46 @@ float train_step(
 
     return lossSum * invN;
 }
+
+// Multi-workgroup compute shader for testing atomicAdd correctness.
+// Each thread processes one sample and uses atomicAdd to accumulate gradients.
+// Dispatch with (sample_count / 32, 1, 1) workgroups.
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void compute_grad_multiworkgroup(
+    uint3 tid : SV_DispatchThreadID,
+    RWStructuredBuffer<float> params,
+    RWStructuredBuffer<float> grads,
+    StructuredBuffer<float> xs,
+    StructuredBuffer<float> ys,
+    uniform int count)
+{
+    let idx = int(tid.x);
+    if (idx >= count)
+        return;
+
+    let storage = Storage(params);
+    let layer = LinearLayer(0, 2);
+
+    let x = xs[idx];
+    let t = ys[idx];
+
+    float featsArr[2] = { x, x * x };
+    let feats = V2(featsArr);
+
+    let predV = layer.eval<Storage>(storage, feats);
+    let pred = predV[0];
+
+    let err = pred - t;
+
+    // Compute per-sample gradients (scaled by 2/count for MSE)
+    let scale = 2.0 / float(count);
+    let g0 = scale * err * x;
+    let g1 = scale * err * (x * x);
+    let gb = scale * err;
+
+    // atomicAdd to accumulate gradients from all threads
+    InterlockedAdd(grads[0], g0);
+    InterlockedAdd(grads[1], g1);
+    InterlockedAdd(grads[2], gb);
+}
