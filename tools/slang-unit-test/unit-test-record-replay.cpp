@@ -293,7 +293,7 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing)
 
 SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x59dab6dad0e81bba)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
@@ -308,12 +308,12 @@ SLANG_UNIT_TEST(RecordReplay_gpu_printing)
 
 SLANG_UNIT_TEST(RecordReplay_shader_object)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0xc6c1d1ffa8f90fd7)));
 }
 
 SLANG_UNIT_TEST(RecordReplay_model_viewer)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer")));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0x1c7721b511ccb995)));
 }
 
 #endif

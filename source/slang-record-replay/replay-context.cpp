@@ -1043,9 +1043,7 @@ void ReplayContext::record(RecordFlag flags, slang::SpecializationArg& value)
     case slang::SpecializationArg::Kind::Unknown: break;
     case slang::SpecializationArg::Kind::Type:
     {
-        uint64_t typeHandle = 0;
-        recordHandle(flags, typeHandle);
-        if (isReading()) value.type = nullptr;
+        record(flags, value.type);
         break;
     }
     case slang::SpecializationArg::Kind::Expr:

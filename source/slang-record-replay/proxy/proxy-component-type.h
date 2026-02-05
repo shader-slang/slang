@@ -121,7 +121,27 @@ public:
         slang::IComponentType** outSpecializedComponentType,
         ISlangBlob** outDiagnostics) override
     {
+        RECORD_CALL();
 
+        // Record the specialization args array
+        _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
+
+        slang::IComponentType* specializedPtr = nullptr;
+        if (!outSpecializedComponentType)
+            outSpecializedComponentType = &specializedPtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IComponentType>()->specialize(
+            specializationArgs,
+            specializationArgCount,
+            outSpecializedComponentType,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outSpecializedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
