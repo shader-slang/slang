@@ -2087,26 +2087,24 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
 
     //<layout->findTypeByName not captured>
  
-    // Should now be hitting the call to 
+    // Now at the point we recorded a type
     slang::TypeReflection* readType = nullptr;
     ctx().record(RecordFlag::Input, readType);
 
     // Verify the type was recovered
     SLANG_CHECK(readType != nullptr);
-
-    // Verify it's the same type by checking its name
     ComPtr<ISlangBlob> originalNameBlob;
     ComPtr<ISlangBlob> readNameBlob;
     originalType->getFullName(originalNameBlob.writeRef());
     readType->getFullName(readNameBlob.writeRef());
-
     SLANG_CHECK(originalNameBlob != nullptr);
     SLANG_CHECK(readNameBlob != nullptr);
-
     const char* originalName = (const char*)originalNameBlob->getBufferPointer();
     const char* readName = (const char*)readNameBlob->getBufferPointer();
-
     SLANG_CHECK(strcmp(originalName, readName) == 0);
+
+    // We messed with the stream, so clear context before it tries to clean itself up
+    ctx().reset();
 }
 
 SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)

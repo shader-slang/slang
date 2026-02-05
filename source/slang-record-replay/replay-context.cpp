@@ -1165,26 +1165,9 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         if (owningModule)
         {
             // Module implements slang::IModule, so we can cast it
-            auto moduleInterface = static_cast<slang::IModule*>(owningModule);
-            auto moduleUnknown = static_cast<ISlangUnknown*>(moduleInterface);
-
-            // Use queryInterface to get a canonical ISlangUnknown pointer
-            // This handles multiple inheritance correctly
-            Slang::ComPtr<ISlangUnknown> canonicalUnknown;
-            if (SLANG_SUCCEEDED(moduleInterface->queryInterface(
-                    SLANG_IID_PPV_ARGS(canonicalUnknown.writeRef()))))
-            {
-                // Try to get the proxy for this module if it exists
-                auto proxy = getProxy(canonicalUnknown);
-                if (proxy && isInterfaceRegistered(proxy))
-                {
-                    moduleHandle = getHandleForInterface(proxy);
-                }
-                else if (isInterfaceRegistered(canonicalUnknown))
-                {
-                    moduleHandle = getHandleForInterface(canonicalUnknown);
-                }
-            }
+            slang::IModule* moduleInterface = static_cast<slang::IModule*>(owningModule);
+            auto proxy = getProxy(moduleInterface);
+            moduleHandle = getHandleForInterface(proxy);
         }
 
         // Record the module handle and type name
@@ -1210,10 +1193,10 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         record(flags, typeName);
 
         // Look up the module from the handle
-        auto* moduleUnknown = getInterfaceForHandle(moduleHandle);
+        ISlangUnknown* moduleUnknown = getInterfaceForHandle(moduleHandle);
 
         // Unwrap proxy if needed
-        auto* impl = getImplementation(moduleUnknown);
+        ISlangUnknown* impl = getImplementation(moduleUnknown);
         if (impl)
             moduleUnknown = impl;
 
