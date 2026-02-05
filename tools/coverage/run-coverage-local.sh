@@ -20,31 +20,31 @@ SHOW_HELP=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --skip-build)
-      SKIP_BUILD=true
-      shift
-      ;;
-    --skip-test)
-      SKIP_TEST=true
-      shift
-      ;;
-    --skip-report)
-      SKIP_REPORT=true
-      shift
-      ;;
-    --server-count)
-      SERVER_COUNT="$2"
-      shift 2
-      ;;
-    -h|--help)
-      SHOW_HELP=true
-      shift
-      ;;
-    *)
-      echo -e "${RED}Unknown option: $1${NC}"
-      SHOW_HELP=true
-      shift
-      ;;
+  --skip-build)
+    SKIP_BUILD=true
+    shift
+    ;;
+  --skip-test)
+    SKIP_TEST=true
+    shift
+    ;;
+  --skip-report)
+    SKIP_REPORT=true
+    shift
+    ;;
+  --server-count)
+    SERVER_COUNT="$2"
+    shift 2
+    ;;
+  -h | --help)
+    SHOW_HELP=true
+    shift
+    ;;
+  *)
+    echo -e "${RED}Unknown option: $1${NC}"
+    SHOW_HELP=true
+    shift
+    ;;
   esac
 done
 
@@ -174,7 +174,7 @@ if [[ -f "$REPO_ROOT/coverage-html/index.html" ]]; then
     if [[ "$OSTYPE" == "darwin"* ]]; then
       echo "Opening coverage report in your browser..."
       open "$REPO_ROOT/coverage-html/index.html"
-    elif command -v xdg-open &> /dev/null; then
+    elif command -v xdg-open &>/dev/null; then
       echo "Opening coverage report in your browser..."
       xdg-open "$REPO_ROOT/coverage-html/index.html" 2>/dev/null || true
     fi
