@@ -241,6 +241,7 @@ Each serialized value is prefixed with a `TypeId` byte:
 | Array | 0x12 | Count + elements |
 | ObjectHandle | 0x13 | COM interface as uint64_t handle |
 | Null | 0x14 | Null pointer |
+| TypeReflectionRef | 0x15 | Type reflection reference (module handle + type name) |
 | Error | 0xEE | Error marker |
 
 ### Handle System
@@ -515,11 +516,42 @@ printf("%s\n", decoded.getBuffer());
 
 The `ReplayContext` uses a recursive mutex. All recording operations acquire the lock via `RECORD_CALL()` which calls `ctx.lock()`.
 
+## TypeReflection Serialization
+
+`TypeReflection*` pointers require special handling since they are not COM objects with handles. Instead, types are serialized as a reference to their owning module plus the type's full name:
+
+```
+[TypeId::TypeReflectionRef]
+[module handle]       # Handle of the IModule that owns this type
+[type name string]    # Full name from TypeReflection::getFullName()
+```
+
+During playback, the type is recovered by:
+1. Looking up the module from its handle
+2. Calling `module->getLayout()->findTypeByName(typeName)`
+
+To ensure builtin types (like `float3`) can be resolved, all loaded modules (including core/stdlib) are registered when a session is created.
+
+### Decoded Output Example
+
+In the decoded stream, TypeReflection references appear as:
+
+```
+[43] ComponentTypeProxy::specialize, #260
+    [0] Array[1]:
+        [0] Int32: 1
+    [1] TypeRef(module=#258): "AddTransformer"
+    [2] Handle: #262
+    ...
+```
+
+The `TypeRef(module=#258): "AddTransformer"` format shows the module handle and type name.
+
 ## Future Enhancements
 
-- Support for TypeReflection (and potentially other reflection types)
+- Support for other reflection types (DeclReflection, etc.)
 - Recording/playback of file system operations
-- Refine the instrumentation macros
+- Refine the instrumentation macros (need to ensure normal values can be output as well)
 - Full API coverage - should be able to run full slang testing framework
 - Struct begin/end markers to make decoded files a bit easier to read
 - PyQT based viewer
