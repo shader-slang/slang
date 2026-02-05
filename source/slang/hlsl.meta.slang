@@ -20548,6 +20548,25 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    [require(metal, rayquery)]
+    [mutating]
+    void __reset(
+        float3 origin,
+        float3 direction,
+        float tMin,
+        float tMax,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceInclusionMask,
+        RAY_FLAG rayFlags)
+    {
+        __intrinsic_asm R"(
+            raytracing::intersection_params params;
+            if (($7 & 0x100 /*RAY_FLAG_SKIP_TRIANGLES*/) == 0) params.assume_geometry_type(raytracing::geometry_type::triangle);
+            if (($7 & 0x200 /*RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES*/) == 0) params.assume_geometry_type(raytracing::geometry_type::bounding_box);
+            $0->reset({ $1, $2, $3, $4 }, $5, $6, params)
+        )";
+    }
+
     /// Initialize a ray-tracing query.
     ///
     /// This method may be called on a "fresh" ray query, or
@@ -20566,7 +20585,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @param ray Description of ray parameters (origin, direction, tMin, tMax)
     [__unsafeForceInlineEarly]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -20586,6 +20605,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 ray.TMin,
                 ray.Direction,
                 ray.TMax);
+        case metal:
+            __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags);
         }
     }
 
@@ -20607,7 +20628,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks When true is returned, use Candidate* methods to evaluate the hit
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     bool Proceed()
     {
         __target_switch
@@ -20618,6 +20639,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 result:$$bool = OpRayQueryProceedKHR &this
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20625,7 +20648,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks Causes subsequent Proceed() calls to return false
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void Abort()
     {
         __target_switch
@@ -20633,6 +20656,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         case hlsl: __intrinsic_asm ".Abort";
         case glsl: __intrinsic_asm "rayQueryTerminateEXT";
         case spirv: spirv_asm { OpRayQueryTerminateKHR &this };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20640,7 +20665,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void CommitNonOpaqueTriangleHit()
     {
         __target_switch
@@ -20648,6 +20673,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         case hlsl: __intrinsic_asm ".CommitNonOpaqueTriangleHit";
         case glsl: __intrinsic_asm "rayQueryConfirmIntersectionEXT";
         case spirv: spirv_asm { OpRayQueryConfirmIntersectionKHR &this };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20656,7 +20683,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void CommitProceduralPrimitiveHit(float t)
     {
         __target_switch
@@ -20664,6 +20691,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         case hlsl: __intrinsic_asm ".CommitProceduralPrimitiveHit";
         case glsl: __intrinsic_asm "rayQueryGenerateIntersectionEXT";
         case spirv: spirv_asm { OpRayQueryGenerateIntersectionKHR &this $t };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20679,7 +20708,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
@@ -20691,6 +20720,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             return spirv_asm {
                 result:$$CANDIDATE_TYPE = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCandidateIntersectionKHR;
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20700,7 +20731,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
@@ -20713,6 +20744,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 result:$$COMMITTED_STATUS = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCommittedIntersectionKHR;
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20721,7 +20754,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
@@ -20735,6 +20768,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
                 result:$$bool = OpLogicalNot %rr;
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20743,7 +20778,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float CandidateTriangleRayT()
     {
         __target_switch
@@ -20756,6 +20791,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
@@ -20764,7 +20801,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float CommittedRayT()
     {
         __target_switch
@@ -20777,6 +20814,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
             };
+        case metal:
+            __intrinsic_asm "()";
         }
     }
 
