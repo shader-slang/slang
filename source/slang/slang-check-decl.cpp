@@ -1661,38 +1661,48 @@ bool isInterfaceType(Type* type)
     return false;
 }
 
-static bool _containsInterfaceType(Type* type)
+// Check if a type contains the specific interface type (for self-reference detection).
+// This is used to catch infinite recursion in existential representation (issue #9835).
+static bool _containsSpecificInterfaceType(Type* type, InterfaceDecl* targetInterface)
 {
-    if (!type)
+    if (!type || !targetInterface)
         return false;
 
     type = type->getCanonicalType();
-    if (isInterfaceType(type))
-        return true;
+
+    // Check if this type is the target interface
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto interfaceDecl = as<InterfaceDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            if (interfaceDecl == targetInterface)
+                return true;
+        }
+    }
 
     if (auto arrayType = as<ArrayExpressionType>(type))
-        return _containsInterfaceType(arrayType->getElementType());
+        return _containsSpecificInterfaceType(arrayType->getElementType(), targetInterface);
 
     if (auto optionalType = as<OptionalType>(type))
-        return _containsInterfaceType(optionalType->getValueType());
+        return _containsSpecificInterfaceType(optionalType->getValueType(), targetInterface);
 
     if (auto conditionalType = as<ConditionalType>(type))
-        return _containsInterfaceType(conditionalType->getValueType());
+        return _containsSpecificInterfaceType(conditionalType->getValueType(), targetInterface);
 
     if (auto tupleType = as<TupleType>(type))
     {
         for (Index i = 0; i < tupleType->getMemberCount(); ++i)
         {
-            if (_containsInterfaceType(tupleType->getMember(i)))
+            if (_containsSpecificInterfaceType(tupleType->getMember(i), targetInterface))
                 return true;
         }
     }
 
     if (auto eachType = as<EachType>(type))
-        return _containsInterfaceType(eachType->getElementType());
+        return _containsSpecificInterfaceType(eachType->getElementType(), targetInterface);
 
     if (auto expandType = as<ExpandType>(type))
-        return _containsInterfaceType(expandType->getPatternType());
+        return _containsSpecificInterfaceType(expandType->getPatternType(), targetInterface);
 
     return false;
 }
@@ -7666,12 +7676,15 @@ bool SemanticsVisitor::checkConformance(
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
             if (auto superInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
             {
+                // Check for self-referential interface fields (issue #9835).
+                // A struct implementing IFoo cannot have IFoo or IFoo[] fields,
+                // as this causes infinite recursion in existential representation.
                 if (auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl()))
                 {
                     for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
                     {
                         ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
-                        if (_containsInterfaceType(varDecl->getType()))
+                        if (_containsSpecificInterfaceType(varDecl->getType(), superInterfaceDecl))
                         {
                             getSink()->diagnose(
                                 varDecl,

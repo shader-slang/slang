@@ -159,8 +159,7 @@ jobs:
 
       - name: Run slang-rhi tests
         run: |
-          # shader-cache-specialization excluded due to issue #9835 (interface-typed fields in interface implementations)
-          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*,shader-cache-specialization*"
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
       - name: Run slang-rhi tests (OptiX 8.0)
