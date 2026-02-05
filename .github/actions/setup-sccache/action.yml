@@ -5,7 +5,6 @@ inputs:
   gcs-bucket:
     description: "GCS bucket name for sccache"
     required: true
-    default: "slang-ci-cache"
   platform:
     description: "Platform: linux or macos"
     required: true
