@@ -1168,21 +1168,6 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     return false;
 }
 
-static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
-{
-    switch (matrixUse)
-    {
-    case 0:
-        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixA");
-    case 1:
-        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixB");
-    case 2:
-        return UnownedStringSlice("Slang_CUDA_WMMA::MatrixC");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 struct FragmentShape
 {
     int m, n, k;

@@ -8103,82 +8103,53 @@ struct alignas(16) MMAMatrix
         return result;
     }
 
+private:
+    // Helper struct to hold packed 2D coordinates
+    struct PackedCoords {
+        uint32_t row_packed;
+        uint32_t col_packed;
+    };
 
+    // Compute packed coordinates in a Matrix
+    static __device__ PackedCoords computePackedCoords(
+        uint32_t reg_row, uint32_t reg_col,
+        uint2 target_subreg_rc)
+    {
+        uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
+        uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
+        return {row_packed, col_packed};
+    }
+
+    // Compute linear buffer address from packed coordinates and stride configuration
+    template<Layout memoryLayout>
+    static __device__ uint32_t computeBufferAddress(
+        PackedCoords coords,
+        const uint32_t stride_packed)
+    {
+        if constexpr (memoryLayout == Layout::RowMajor) {
+            return coords.row_packed * stride_packed + coords.col_packed;
+        } else {
+            return coords.col_packed * stride_packed + coords.row_packed;
+        }
+    }
+
+public:
     // Store matrix to memory
     // Uses MMA fragment layout mapping based on register distribution
     template<Layout storeLayout>
     __device__ void Store(T* buffer, uint element, uint stride)
     {
-        uint laneId = _getLaneId();
-        
-        // Calculate thread's position within the warp's MMA fragment layout
-        // Each MMAReg handles a specific sub-region of the matrix
-        // ranges -> x (row): [0 - 7], y (col): [0 - 3] for ROW_MAJOR
-        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(laneId);
-        
-        // Calculate stride parameters based on store layout
-        // Stride is in element units, convert to packed units
+        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(_getLaneId());
         uint32_t stride_packed = stride / elements_per_reg;
-        uint32_t outer_stride, inner_stride;
-        
-        // Determine if we need to transpose during store
-        constexpr bool transpose = (storeLayout != layout);
-        
-        if constexpr (!transpose) {
-            // Storing in same layout as matrix internal layout
-            if constexpr (ROW_MAJOR) {
-                outer_stride = stride_packed;  // Stride between rows
-                inner_stride = 1;              // Adjacent columns
-            } else {
-                outer_stride = stride_packed;  // Stride between columns
-                inner_stride = 1;              // Adjacent rows
-            }
-        } else {
-            // Transposing during store: swap stride interpretation
-            if constexpr (ROW_MAJOR) {
-                // Matrix is row-major, storing as column-major
-                outer_stride = 1;              // Rows become adjacent
-                inner_stride = stride_packed;  // Columns become strided
-            } else {
-                // Matrix is column-major, storing as row-major
-                outer_stride = stride_packed;  // Columns become rows
-                inner_stride = 1;              // Rows become adjacent
-            }
-        }
-        
-        // Output buffer in packed element units (uint32_t)
         uint32_t* buffer_packed = reinterpret_cast<uint32_t*>(buffer + element);
         
         // Iterate over all registers owned by this thread
-        // RegRows x RegCols defines the 2D layout of registers per thread
-        // e.g. 2x2 for 4 registers
         for (uint32_t reg_row = 0; reg_row < RegRows; reg_row++)
         {
             for (uint32_t reg_col = 0; reg_col < RegCols; reg_col++)
             {
-                // Calculate the global packed row/column position for this register
-                // This accounts for:
-                // 1. The register's position within this thread's layout (reg_row, reg_col)
-                // 2. This thread's position within the warp's layout (target_subreg_rc)                    
-                uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
-                uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
-                
-                // If transposing, swap row and column
-                if constexpr (transpose) {
-                    uint32_t temp = row_packed;
-                    row_packed = col_packed;
-                    col_packed = temp;
-                }
-                
-                // Convert 2D packed coordinates to linear buffer address
-                uint32_t addr_idx;
-                if constexpr (storeLayout == Layout::RowMajor) {
-                    addr_idx = row_packed * outer_stride + col_packed * inner_stride;
-                } else {
-                    addr_idx = col_packed * outer_stride + row_packed * inner_stride;
-                }
-                
-                // Get the linear register index and store the packed data
+                PackedCoords coords = computePackedCoords(reg_row, reg_col, target_subreg_rc);
+                uint32_t addr_idx = computeBufferAddress<storeLayout>(coords, stride_packed);
                 uint32_t reg_idx = reg_rc_to_idx(reg_row, reg_col);
                 buffer_packed[addr_idx] = m_mma_reg[reg_idx].m_reg;
             }
@@ -8207,36 +8178,8 @@ struct alignas(16) MMAMatrix
     static __device__ MMAMatrix<T, M, N, layout> Load(const T* buffer, uint element, uint stride)
     {
         MMAMatrix<T, M, N, layout> result;
-        uint laneId = _getLaneId();
-        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(laneId);
-        
-        // Calculate stride in packed units
-        uint stride_packed = stride / (sizeof(uint32_t) / sizeof(T));
-        uint32_t outer_stride, inner_stride;
-        
-        // Determine if we need to transpose during load
-        constexpr bool transpose = (loadLayout != layout);
-        
-        if constexpr (!transpose) {
-            // Loading in same layout as matrix internal layout
-            if constexpr (ROW_MAJOR) {
-                outer_stride = stride_packed;  // Stride between rows
-                inner_stride = 1;              // Adjacent columns
-            } else {
-                outer_stride = stride_packed;  // Stride between columns
-                inner_stride = 1;              // Adjacent rows
-            }
-        } else {
-            // Transposing during load: swap stride interpretation
-            if constexpr (ROW_MAJOR) {
-                outer_stride = 1;
-                inner_stride = stride_packed;
-            } else {
-                outer_stride = stride_packed;
-                inner_stride = 1;
-            }
-        }
-        
+        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(_getLaneId());
+        uint32_t stride_packed = stride / (sizeof(uint32_t) / sizeof(T));
         const uint32_t* buffer_packed = reinterpret_cast<const uint32_t*>(buffer + element);
         
         // Iterate over all registers and load from memory
@@ -8244,26 +8187,8 @@ struct alignas(16) MMAMatrix
         {
             for (uint32_t reg_col = 0; reg_col < RegCols; reg_col++)
             {
-                // Calculate the global position for this register's data
-                uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
-                uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
-                
-                // If transposing, swap row and column
-                if constexpr (transpose) {
-                    uint32_t temp = row_packed;
-                    row_packed = col_packed;
-                    col_packed = temp;
-                }
-                
-                // Convert 2D coordinates to linear buffer address
-                uint32_t addr_idx;
-                if constexpr (loadLayout == Layout::RowMajor) {
-                    addr_idx = row_packed * outer_stride + col_packed * inner_stride;
-                } else {
-                    addr_idx = col_packed * outer_stride + row_packed * inner_stride;
-                }
-                
-                // Load the data into the register
+                PackedCoords coords = computePackedCoords(reg_row, reg_col, target_subreg_rc);
+                uint32_t addr_idx = computeBufferAddress<loadLayout>(coords, stride_packed);
                 uint32_t reg_idx = reg_rc_to_idx(reg_row, reg_col);
                 result.m_mma_reg[reg_idx].m_reg = buffer_packed[addr_idx];
             }
