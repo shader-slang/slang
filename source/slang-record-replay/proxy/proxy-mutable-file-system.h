@@ -3,6 +3,7 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
+#include "../replay-context.h"
 
 namespace SlangRecord
 {
@@ -27,26 +28,32 @@ public:
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {
-        SLANG_UNUSED(guid);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::castAs");
+        // Forward to underlying - no need to record this
+        return getActual<ISlangMutableFileSystem>()->castAs(guid);
     }
 
     // ISlangFileSystem
+    // loadFile is special - it captures file content during recording
+    // and serves from captured files during playback
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    loadFile(char const* path, ISlangBlob** outBlob) override
-    {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(outBlob);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::loadFile");
-    }
+    loadFile(char const* path, ISlangBlob** outBlob) override;
 
     // ISlangFileSystemExt
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(outUniqueIdentity);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::getFileUniqueIdentity");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+
+        ISlangBlob* identityPtr = nullptr;
+        if (!outUniqueIdentity)
+            outUniqueIdentity = &identityPtr;
+
+        auto result =
+            getActual<ISlangMutableFileSystem>()->getFileUniqueIdentity(path, outUniqueIdentity);
+
+        RECORD_COM_OUTPUT(outUniqueIdentity);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
@@ -55,33 +62,66 @@ public:
         const char* path,
         ISlangBlob** pathOut) override
     {
-        SLANG_UNUSED(fromPathType);
-        SLANG_UNUSED(fromPath);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(pathOut);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::calcCombinedPath");
+        RECORD_CALL();
+        uint32_t fromPathTypeVal = static_cast<uint32_t>(fromPathType);
+        _ctx.record(RecordFlag::Input, fromPathTypeVal);
+        RECORD_INPUT(fromPath);
+        RECORD_INPUT(path);
+
+        ISlangBlob* pathPtr = nullptr;
+        if (!pathOut)
+            pathOut = &pathPtr;
+
+        auto result = getActual<ISlangMutableFileSystem>()->calcCombinedPath(
+            fromPathType,
+            fromPath,
+            path,
+            pathOut);
+
+        RECORD_COM_OUTPUT(pathOut);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getPathType(const char* path, SlangPathType* pathTypeOut) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(pathTypeOut);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::getPathType");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+
+        SlangPathType pathType = SLANG_PATH_TYPE_FILE;
+        if (!pathTypeOut)
+            pathTypeOut = &pathType;
+
+        auto result = getActual<ISlangMutableFileSystem>()->getPathType(path, pathTypeOut);
+
+        uint32_t pathTypeVal = static_cast<uint32_t>(*pathTypeOut);
+        _ctx.record(RecordFlag::Output, pathTypeVal);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getPath(PathKind kind, const char* path, ISlangBlob** outPath) override
     {
-        SLANG_UNUSED(kind);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(outPath);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::getPath");
+        RECORD_CALL();
+        uint8_t kindVal = static_cast<uint8_t>(kind);
+        _ctx.record(RecordFlag::Input, kindVal);
+        RECORD_INPUT(path);
+
+        ISlangBlob* pathPtr = nullptr;
+        if (!outPath)
+            outPath = &pathPtr;
+
+        auto result = getActual<ISlangMutableFileSystem>()->getPath(kind, path, outPath);
+
+        RECORD_COM_OUTPUT(outPath);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL clearCache() override
     {
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::clearCache");
+        RECORD_CALL();
+        getActual<ISlangMutableFileSystem>()->clearCache();
+        RECORD_RETURN_VOID();
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
@@ -89,45 +129,63 @@ public:
         FileSystemContentsCallBack callback,
         void* userData) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(callback);
-        SLANG_UNUSED(userData);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::enumeratePathContents");
+        // Callbacks are complex to serialize - just forward without recording
+        return getActual<ISlangMutableFileSystem>()->enumeratePathContents(
+            path,
+            callback,
+            userData);
     }
 
     virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() override
     {
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::getOSPathKind");
+        RECORD_CALL();
+        auto result = getActual<ISlangMutableFileSystem>()->getOSPathKind();
+        uint8_t resultVal = static_cast<uint8_t>(result);
+        _ctx.record(RecordFlag::ReturnValue, resultVal);
+        return result;
     }
 
     // ISlangMutableFileSystem
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     saveFile(const char* path, const void* data, size_t size) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(data);
-        SLANG_UNUSED(size);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::saveFile");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+        const void* dataPtr = data;
+        size_t dataSize = size;
+        _ctx.recordBlob(RecordFlag::Input, dataPtr, dataSize);
+
+        auto result = getActual<ISlangMutableFileSystem>()->saveFile(path, data, size);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     saveFileBlob(const char* path, ISlangBlob* dataBlob) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(dataBlob);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::saveFileBlob");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+        RECORD_INPUT(dataBlob);
+
+        auto result = getActual<ISlangMutableFileSystem>()->saveFileBlob(path, dataBlob);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::remove");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+
+        auto result = getActual<ISlangMutableFileSystem>()->remove(path);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) override
     {
-        SLANG_UNUSED(path);
-        SLANG_UNIMPLEMENTED_X("MutableFileSystemProxy::createDirectory");
+        RECORD_CALL();
+        RECORD_INPUT(path);
+
+        auto result = getActual<ISlangMutableFileSystem>()->createDirectory(path);
+        RECORD_RETURN(result);
     }
 };
 
