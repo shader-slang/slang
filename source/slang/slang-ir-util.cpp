@@ -549,7 +549,8 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         {
             auto subpassInputType = as<IRSubpassInputType>(type);
             sb << "SubpassInput";
-            // Handle isMultisample individually - if constant, use pretty name; if generic, include it
+            // Handle isMultisample individually - if constant, use pretty name; if generic, include
+            // it
             auto isMS = subpassInputType->getIsMultisampleInst();
             if (auto isMSLit = as<IRIntLit>(isMS))
             {
@@ -662,11 +663,9 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             }
 
             // If any parameters are generic (not constants), append them for uniqueness
-            bool hasGenericParams =
-                !as<IRIntLit>(textureType->getAccessInst()) || !isCombinedLit ||
-                !as<IRIntLit>(isMultisampleInst) ||
-                !as<IRIntLit>(isArrayInst) ||
-                !as<IRIntLit>(isShadowInst);
+            bool hasGenericParams = !as<IRIntLit>(textureType->getAccessInst()) || !isCombinedLit ||
+                                    !as<IRIntLit>(isMultisampleInst) ||
+                                    !as<IRIntLit>(isArrayInst) || !as<IRIntLit>(isShadowInst);
 
             if (hasGenericParams)
             {
