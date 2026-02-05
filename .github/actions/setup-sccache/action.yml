@@ -30,8 +30,16 @@ runs:
 
         echo "Installing sccache for $ARCH ($SCCACHE_ARCH)"
         curl -L https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz | tar xz
-        sudo mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
-        chmod +x /usr/local/bin/sccache
+
+        # Try with sudo if available, otherwise install directly (for containers running as root)
+        if command -v sudo &> /dev/null; then
+          sudo mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          sudo chmod +x /usr/local/bin/sccache
+        else
+          mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          chmod +x /usr/local/bin/sccache
+        fi
+
         sccache --version
 
     - name: Install sccache (macOS)
