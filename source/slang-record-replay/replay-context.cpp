@@ -1149,16 +1149,9 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         const char* typeName =
             nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
 
-        // Get the module that owns this type
-        // TypeReflection is actually a Slang::Type*, which for most cases is a DeclRefType
-        auto internalType = Slang::asInternal(type);
-        Slang::Module* owningModule = nullptr;
-
-        if (auto declRefType = Slang::as<Slang::DeclRefType>(internalType))
-        {
-            auto declRef = declRefType->getDeclRef();
-            owningModule = Slang::getModule(declRef.getDecl());
-        }
+        // Go via decl ref to get to the module that owns the type, and from there its module
+        Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
+        Slang::Module* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
 
         // Get the module handle (the module should already be registered)
         uint64_t moduleHandle = kNullHandle;
@@ -1168,6 +1161,28 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             slang::IModule* moduleInterface = static_cast<slang::IModule*>(owningModule);
             auto proxy = getProxy(moduleInterface);
             moduleHandle = getHandleForInterface(proxy);
+        }
+
+        // HACK! The module wasn't found, which means this was probably a builtin type that
+        // was looked up via a user loaded module's layout. The only way we can currently
+        // handle this is to go over our loaded modules and find one that contains it
+        if(!moduleHandle) 
+        {
+            for(auto& kv : m_implToProxy) 
+            {
+                ISlangUnknown* impl = kv.first;
+                slang::IModule* moduleInterface = dynamic_cast<slang::IModule*>(impl);
+                if(moduleInterface) 
+                {
+                    auto layout = moduleInterface->getLayout(0, nullptr);
+                    if (layout && layout->findTypeByName(typeName) == type)
+                    {
+                        auto proxy = getProxy(moduleInterface);
+                        moduleHandle = getHandleForInterface(proxy);
+                        break;
+                    }
+                }
+            }
         }
 
         // Record the module handle and type name

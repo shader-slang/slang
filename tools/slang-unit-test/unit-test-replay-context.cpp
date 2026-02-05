@@ -2111,6 +2111,10 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
 {
     REPLAY_TEST;
 
+    // Enable recording first
+    ctx().enable();
+    ctx().setTtyLogging(true);
+
     // Create a global session and session
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
@@ -2149,19 +2153,22 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     slang::TypeReflection* float3Type = layout->findTypeByName("float3");
     SLANG_CHECK(float3Type != nullptr);
 
-    ctx().enable();
-
-    // Register the module using queryInterface for canonical pointer
-    ComPtr<ISlangUnknown> moduleUnknown;
-    SLANG_CHECK(SLANG_SUCCEEDED(module->queryInterface(SLANG_IID_PPV_ARGS(moduleUnknown.writeRef()))));
-    ctx().registerInterface(moduleUnknown);
-
     // Record the builtin type
     slang::TypeReflection* writeType = float3Type;
     ctx().record(RecordFlag::Input, writeType);
 
+    // Switch to playback and execute the calls that get us to the point
+    // at which the type was recorded.
     ctx().switchToPlayback();
+    ctx().executeNextCall(); //slang_createGlobalSession
+    ctx().executeNextCall(); //globalSession->findProfile
+    ctx().executeNextCall(); //globalSession->createSession
+    ctx().executeNextCall(); //session->loadModuleFromSourceString
+    ctx().executeNextCall(); //module->getLayout
 
+    //<layout->findTypeByName not captured>
+
+    // Now at the point we recorded a type
     slang::TypeReflection* readType = nullptr;
     ctx().record(RecordFlag::Input, readType);
 
@@ -2177,4 +2184,7 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     const char* readName = (const char*)readNameBlob->getBufferPointer();
 
     SLANG_CHECK(strcmp(originalName, readName) == 0);
+
+    // We messed with the stream, so clear context before it tries to clean itself up
+    ctx().reset();
 }
