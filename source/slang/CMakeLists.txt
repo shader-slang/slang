@@ -218,6 +218,9 @@ set(slang_build_args
     REQUIRES
     copy_slang_headers
     generate_standard_module_config_header
+    PRECOMPILE_HEADERS
+    ${slang_SOURCE_DIR}/source/core/slang-basic.h
+    ${slang_SOURCE_DIR}/source/slang/slang-compiler.h
 )
 set(slang_link_args
     LINK_WITH_PRIVATE
