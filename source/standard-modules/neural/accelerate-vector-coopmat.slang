@@ -298,6 +298,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         uint4 value;
         uint indexInWeight;
+
+        [ForceUnroll]
         for (uint i = 0; i < numLoadOrStorePerThread; i++)
         {
             if (coordInWeight.y >= TileInfo.HeightInElementsTileA)
@@ -540,6 +542,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         uint index = (laneId % BatchSize) * TileStrideInVector;
 
+        [ForceUnroll]
         for (uint i = 0; i < TileStrideInVector; i++)
         {
             uint4 value;
@@ -569,9 +572,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // will use one shared memory. And left subgroup loads, right subgroup stores.
             uint subgroupOffset = (subgroupId / (k<<1)) * (CMShape.CoopMatCSizeInVector * COLUMN);
             let ptrPerWarp = sharedMemory + subgroupOffset;
+            [ForceUnroll]
             for (int i = 0; i < ROW; i++)
             {
                 // Store one row of cooperative matrix to the shared memory.
+                [ForceUnroll]
                 for (int j = 0; j < COLUMN; j++)
                 {
                     // This is the right node in the 2-way merge operation.
@@ -593,6 +598,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     // If the left node is the last subgroup, it means that there is no right node for it, so we don't need to do any addition for this subgroup.
                     if (subgroupId != (subgroupCount - 1))
                     {
+                        [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
                             MatC rightMatC = MatC.Load<RowMajor, uint4>(ptrPerWarp + j * CMShape.CoopMatCSizeInVector,
@@ -743,6 +749,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         static const int StrideInVectorTileC = CoopMatCColumns * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
+        [ForceUnroll]
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
         {
             matC[i].fill(T(0.0f));
@@ -753,6 +760,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // Perform outer product for each warp.
         // The shared dimension is the Subgroup size N.
+        [ForceUnroll]
         for (uint k = 0; k < N; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -761,11 +769,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             GroupMemoryBarrierWithWaveSync();
 
             MatA matA[CoopMatCRows];
+            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
                 matA[i] = MatA.Load<ColumnMajor, uint4>( warpLocalPtrA + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
             }
 
+            [ForceUnroll]
             for (uint j = 0; j < CoopMatCColumns; j++)
             {
                 // For matrix B, stride will be the width of the tile. This is different from the forward pass in A*B where the stride is height of tile B.
@@ -789,8 +799,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         if (subgroupIndex == 0)
         {
             // Store the result shared memory. We store one row of the cooperative matrix at a time.
+            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
+                [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
                     // Save the result to shared memory in row major, because this is cache friendly for global memory access.
@@ -879,6 +891,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
         }
 
+        [ForceUnroll]
         for (int k = 0; k < TileInfo.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -915,6 +928,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // shB is shared only by each subgroup, and each subgroup will have its own offset on shB.
             // For matB, each warp could only have 1 or 2 Tiles to load according whether this warp is less (1 tile) or more than half warp (2 tiles).
             MatA matA[TileInfo.NCoopMatRow];
+            [ForceUnroll]
             for (uint i = 0; i < TileInfo.NCoopMatRow; i ++)
             {
                 if (TransposeA)
@@ -929,6 +943,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
             }
 
+            [ForceUnroll]
             for (uint j = 0; j < TileInfo.NCoopMatColumn; j ++)
             {
                 // NTilesColumn * HeightInVectorTileB is the size of the shared memory for matrix B in one warp measured in vector uint4.
