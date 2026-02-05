@@ -65,10 +65,23 @@ def checkMarkDownLinks(srcFile):
                     dstFile = os.path.join(os.path.dirname(srcFile), linkDstFile)
 
                 try:
-                    with open(dstFile) as file2:
-                        if len(linkDstAnchor) > 0:
-                            verbosePrint("")
-                            scanForAnchor(file2, anchorMatcher, dstFile, linkDstAnchor)
+                    # Check if this is a relative path outside the
+                    # Slang reference manual and user guide. In this
+                    # case, we don't scan the file and we'll accept
+                    # .html -> .md mapping.
+                    if linkDstAnchor == "" and linkDstFile.startswith("../../"):
+                        found = os.path.isfile(dstFile)
+                        if (not found) and dstFile.endswith(".html"):
+                            found = os.path.isfile(dstFile[:-5] + ".md")
+
+                        if not found:
+                            raise FileNotFoundError;
+
+                    else:
+                        with open(dstFile) as file2:
+                            if len(linkDstAnchor) > 0:
+                                verbosePrint("")
+                                scanForAnchor(file2, anchorMatcher, dstFile, linkDstAnchor)
                 except FileNotFoundError:
                     errors = errors + 1
                     print(f"{srcFile}:{lineNo}: Link destination file {dstFile} not found!")
