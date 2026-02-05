@@ -18,6 +18,7 @@ jobs:
     permissions:
       id-token: write # Required for Workload Identity
       contents: read
+      packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       options: --user root
