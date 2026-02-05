@@ -180,3 +180,65 @@ void compute_train_step(
         loss_out[0] = lossSum * invN;
     }
 }
+
+// Multi-workgroup compute shader for testing atomicAdd correctness.
+// Each workgroup processes samples and uses atomicAdd to accumulate gradients.
+// Dispatch with (sample_count / 32, 1, 1) workgroups.
+[shader("compute")]
+[numthreads(32, 1, 1)]
+void compute_grad_multiworkgroup(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    RWStructuredBuffer<float> params,
+    RWStructuredBuffer<float> grads,
+    StructuredBuffer<float> xs,
+    StructuredBuffer<float> ys,
+    uniform int count)
+{
+    typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer>;
+    typealias V2 = WaveTangledVector<float, ShMemPool, InputSize, SubgroupSize>;
+    typealias V1 = WaveTangledVector<float, ShMemPool, OutputSize, SubgroupSize>;
+    typealias Act = IdentityActivation<float>;
+    typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+
+    // Each workgroup processes one sample (using gtid=0 for the computation)
+    let idx = int(gid.x);
+    if (idx >= count)
+        return;
+
+    let storage = Storage(params);
+    let layer = LinearLayer(0, 2);
+
+    let x = xs[idx];
+    let t = ys[idx];
+
+    float featsArr[InputSize] = { x, x * x };
+    let feats = V2(featsArr);
+
+    let predV = layer.eval<Storage>(storage, feats);
+    let pred = predV[0];
+
+    let err = pred - t;
+
+    // Only first thread in workgroup does the atomicAdd
+    if (gtid == 0)
+    {
+        let scale = 2.0 / float(count);
+        let g0 = scale * err * x;
+        let g1 = scale * err * (x * x);
+        let gb = scale * err;
+
+        InterlockedAdd(grads[0], g0);
+        InterlockedAdd(grads[1], g1);
+        InterlockedAdd(grads[2], gb);
+    }
+}
+
+// Clear gradients buffer
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void compute_clear_grads(RWStructuredBuffer<float> grads)
+{
+    for (int i = 0; i < PARAM_COUNT; i++)
+        grads[i] = 0.0;
+}

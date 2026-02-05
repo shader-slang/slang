@@ -28,25 +28,16 @@ import slangpy as spy
 from slangpy.core.calldata import SLANG_PATH
 from slangpy.testing import helpers
 
-from conftest import find_neural_module_dir
-
 
 def _get_device_with_native_neural(device_type: spy.DeviceType) -> spy.Device:
     if helpers.should_skip_test_for_device(device_type):
         pytest.skip(f"Device type {device_type.name} not selected for this test run")
 
     test_dir = Path(__file__).resolve().parent
-    
-    # Find neural module directory from slang build
-    neural_module_dir = find_neural_module_dir()
-    
-    include_paths = [test_dir, SLANG_PATH]
-    if neural_module_dir:
-        include_paths.append(neural_module_dir)
 
     # Try to enable experimental features (required for neural module)
     compiler_options_dict = {
-        "include_paths": include_paths,
+        "include_paths": [test_dir, SLANG_PATH],
         "debug_info": spy.SlangDebugInfoLevel.standard,
     }
     
@@ -97,7 +88,7 @@ def test_neural_coopmat_frontend_training_converges(device_type: spy.DeviceType)
         if not device.has_feature(spy.Feature.cooperative_matrix):
             pytest.skip("Cooperative matrix not supported on this device.")
 
-        module = device.load_module("test_neural_coopmat_frontend_training.slang")
+        module = device.load_module("test_neural_coopmat_training.slang")
 
         # Get param count via simple function (doesn't need CoopMat)
         param_count = int(spy.Module(module).get_param_count())
@@ -198,7 +189,7 @@ def test_neural_coopmat_fflayer_forward_pass(device_type: spy.DeviceType) -> Non
         if not device.has_feature(spy.Feature.cooperative_matrix):
             pytest.skip("Cooperative matrix not supported on this device.")
 
-        module = device.load_module("test_neural_coopmat_frontend_training.slang")
+        module = device.load_module("test_neural_coopmat_training.slang")
 
         forward_program = device.link_program(
             modules=[module],
@@ -232,6 +223,88 @@ def test_neural_coopmat_fflayer_forward_pass(device_type: spy.DeviceType) -> Non
         output = result.to_numpy().view(np.float32)[0]
         expected = 1.0 * 1.0 + 2.0 * 2.0 + 0.5  # = 5.5
         assert np.isclose(output, expected, rtol=0.1), f"Output {output} != expected {expected}"
+
+    finally:
+        device.close()
+
+
+@pytest.mark.parametrize("device_type", COOPMAT_DEVICE_TYPES)
+def test_neural_coopmat_multiworkgroup_atomicadd(device_type: spy.DeviceType) -> None:
+    """
+    Test that atomicAdd works correctly with multiple workgroups using CoopMat.
+
+    This test verifies that gradient accumulation via atomicAdd produces
+    correct results when dispatched across multiple workgroups.
+    """
+    device = _get_device_with_native_neural(device_type)
+    try:
+        if not device.has_feature(spy.Feature.cooperative_matrix):
+            pytest.skip("Cooperative matrix not supported on this device.")
+
+        module = device.load_module("test_neural_coopmat_training.slang")
+
+        clear_program = device.link_program(
+            modules=[module],
+            entry_points=[module.entry_point("compute_clear_grads")]
+        )
+        clear_kernel = device.create_compute_kernel(clear_program)
+
+        grad_program = device.link_program(
+            modules=[module],
+            entry_points=[module.entry_point("compute_grad_multiworkgroup")]
+        )
+        grad_kernel = device.create_compute_kernel(grad_program)
+
+        param_count = 3
+
+        # Use sample count that requires multiple workgroups
+        sample_count = 64  # 64 workgroups (one sample per workgroup)
+        xs = np.linspace(-1.0, 1.0, sample_count, dtype=np.float32)
+        ys = (2.0 * xs * xs - 0.5 * xs + 0.25).astype(np.float32)
+
+        xs_buf = device.create_buffer(data=xs, usage=spy.BufferUsage.shader_resource)
+        ys_buf = device.create_buffer(data=ys, usage=spy.BufferUsage.shader_resource)
+
+        # Known parameters for gradient verification
+        params = device.create_buffer(
+            data=np.array([1.0, 1.0, 1.0], dtype=np.float32),
+            usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access,
+        )
+        grads = device.create_buffer(
+            data=np.zeros((param_count,), dtype=np.float32),
+            usage=spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access,
+        )
+
+        # Clear gradients
+        clear_kernel.dispatch(thread_count=[1, 1, 1], grads=grads)
+
+        # Compute gradients with multiple workgroups using atomicAdd
+        # One workgroup per sample, 32 threads per workgroup
+        grad_kernel.dispatch(
+            thread_count=[sample_count * 32, 1, 1],
+            params=params,
+            grads=grads,
+            xs=xs_buf,
+            ys=ys_buf,
+            count=sample_count,
+        )
+
+        # Verify gradients are computed (non-zero)
+        grads_np = grads.to_numpy().view(np.float32)[:param_count]
+        assert np.any(grads_np != 0.0), "Gradients should be non-zero"
+
+        # Compute expected gradients analytically
+        preds = xs + xs * xs + 1.0
+        targets = 2.0 * xs * xs - 0.5 * xs + 0.25
+        errs = preds - targets
+        expected_g0 = (2.0 / sample_count) * np.sum(errs * xs)
+        expected_g1 = (2.0 / sample_count) * np.sum(errs * xs * xs)
+        expected_gb = (2.0 / sample_count) * np.sum(errs)
+        expected_grads = np.array([expected_g0, expected_g1, expected_gb], dtype=np.float32)
+
+        # Allow some tolerance for floating-point atomicAdd accumulation
+        assert np.allclose(grads_np, expected_grads, rtol=0.05, atol=1e-3), \
+            f"Gradients mismatch: got {grads_np}, expected {expected_grads}"
 
     finally:
         device.close()

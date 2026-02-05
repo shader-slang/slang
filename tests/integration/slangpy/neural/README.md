@@ -46,22 +46,20 @@ SLANGPY_DEVICE_TYPES=cuda pytest tests/integration/slangpy/neural/ -v
 
 ## Test Files
 
-| File                                       | Description                                               |
-| ------------------------------------------ | --------------------------------------------------------- |
-| `test_neural_bindless.py`                  | Tests bindless pointer and DescriptorHandle resources     |
-| `test_neural_bwd_diff_smoke.py`            | Smoke test for autodiff backward pass                     |
-| `test_neural_frontend_training.py`         | FFLayer training with InlineVector backend                |
-| `test_neural_coopmat_frontend_training.py` | FFLayer training with CoopMat (WaveTangledVector) backend |
+| File                                    | Description                                               |
+| --------------------------------------- | --------------------------------------------------------- |
+| `test_neural_bindless.py`               | Tests bindless pointer and DescriptorHandle resources     |
+| `test_neural_inline_vector_training.py` | FFLayer training with InlineVector backend                |
+| `test_neural_coopmat_training.py`       | FFLayer training with CoopMat (WaveTangledVector) backend |
 
 ## Slang Modules
 
-| File                                           | Description                        |
-| ---------------------------------------------- | ---------------------------------- |
-| `test_neural_bindless_pointer.slang`           | Simple pointer read test           |
-| `test_neural_bindless_descriptor_handle.slang` | DescriptorHandle compute shader    |
-| `test_neural_frontend_training.slang`          | FFLayer with InlineVector          |
-| `test_neural_coopmat_frontend_training.slang`  | FFLayer with WaveTangledVector     |
-| `fflayer-bug-repro.slang`                      | Autodiff backward pass test module |
+| File                                           | Description                     |
+| ---------------------------------------------- | ------------------------------- |
+| `test_neural_bindless_pointer.slang`           | Simple pointer read test        |
+| `test_neural_bindless_descriptor_handle.slang` | DescriptorHandle compute shader |
+| `test_neural_inline_vector_training.slang`     | FFLayer with InlineVector       |
+| `test_neural_coopmat_training.slang`           | FFLayer with WaveTangledVector  |
 
 ## CI Integration
 

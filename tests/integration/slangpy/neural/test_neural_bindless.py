@@ -19,26 +19,17 @@ import slangpy as spy
 from slangpy.core.calldata import SLANG_PATH
 from slangpy.testing import helpers
 
-from conftest import find_neural_module_dir
-
 
 def _get_device_with_native_neural(device_type: spy.DeviceType) -> spy.Device:
     if helpers.should_skip_test_for_device(device_type):
         pytest.skip(f"Device type {device_type.name} not selected for this test run")
 
     test_dir = Path(__file__).resolve().parent
-    
-    # Find neural module directory from slang build
-    neural_module_dir = find_neural_module_dir()
-    
-    include_paths = [test_dir, SLANG_PATH]
-    if neural_module_dir:
-        include_paths.append(neural_module_dir)
 
     # Try to enable experimental features (required for neural module)
     # This option may not be available in older slangpy versions
     compiler_options_dict = {
-        "include_paths": include_paths,
+        "include_paths": [test_dir, SLANG_PATH],
         "debug_info": spy.SlangDebugInfoLevel.standard,
     }
     
