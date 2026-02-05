@@ -68,7 +68,7 @@ public:
     // ISlangFileSystem
     // loadFile is special - it captures file content during recording
     // and serves from captured files during playback
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    SLANG_API virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     loadFile(char const* path, ISlangBlob** outBlob) override;
 
     // ISlangFileSystemExt

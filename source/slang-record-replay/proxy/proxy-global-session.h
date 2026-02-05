@@ -40,13 +40,9 @@ public:
         slang::SessionDesc modifiedDesc = desc;
 
         // Get the file system to wrap - use provided one or Slang's default
-        ISlangFileSystem* fileSystemToWrap =
-            desc.fileSystem ? desc.fileSystem : OSFileSystem::getMutableSingleton();
-
-        // Create proxy wrapper for the file system
-        ComPtr<MutableFileSystemProxy> fileSystemProxy(
-            new MutableFileSystemProxy(fileSystemToWrap));
-        modifiedDesc.fileSystem = fileSystemProxy;
+        //ISlangFileSystem* fileSystemToWrap =
+        //    desc.fileSystem ? desc.fileSystem : OSFileSystem::getMutableSingleton();
+        //modifiedDesc.fileSystem = static_cast<ISlangFileSystem*>(wrapObject(fileSystemToWrap));
 
         // Record the original descriptor (before our modification)
         RECORD_INPUT(desc);
