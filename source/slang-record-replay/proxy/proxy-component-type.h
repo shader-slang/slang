@@ -121,11 +121,7 @@ public:
         slang::IComponentType** outSpecializedComponentType,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(specializationArgs);
-        SLANG_UNUSED(specializationArgCount);
-        SLANG_UNUSED(outSpecializedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("ComponentTypeProxy::specialize");
+
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

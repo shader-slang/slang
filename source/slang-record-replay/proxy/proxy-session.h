@@ -103,11 +103,19 @@ public:
         slang::LayoutRules rules,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(type);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(rules);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getTypeLayout");
+        RECORD_CALL();
+        RECORD_INPUT(type);
+        RECORD_INPUT(targetIndex);
+        RECORD_INPUT(rules);
+        
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+            
+        slang::TypeLayoutReflection* result = getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return result;        
     }
 
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL getContainerType(
@@ -150,10 +158,14 @@ public:
         slang::TypeReflection* interfaceType,
         uint32_t* outId) override
     {
-        SLANG_UNUSED(type);
-        SLANG_UNUSED(interfaceType);
-        SLANG_UNUSED(outId);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getTypeConformanceWitnessSequentialID");
+        RECORD_CALL();
+        RECORD_INPUT(type);
+        RECORD_INPUT(interfaceType);
+        uint32_t id;
+        if(!outId)
+            outId = &id;
+        auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(type, interfaceType, outId);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
