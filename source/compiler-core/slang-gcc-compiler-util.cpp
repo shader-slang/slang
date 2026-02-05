@@ -282,6 +282,42 @@ static SlangResult _parseSimpleLdInfo(
     return SLANG_OK;
 }
 
+// Pattern: file:line:message (link error with line number, no column)
+// Handles: /usr/include/stdio2.h:112: undefined reference to `thing'
+static SlangResult _parseFileLineMessage(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    const List<UnownedStringSlice>& split,
+    LineParseResult& outLineParseResult,
+    ArtifactDiagnostic& outDiagnostic)
+{
+    SLANG_UNUSED(line);
+
+    if (split.getCount() != 3)
+        return SLANG_FAIL;
+
+    const auto text = split[2].trim();
+
+    // Must contain "undefined reference" to be a link error
+    if (text.indexOf(UnownedStringSlice(GCCPatternStrings::UNDEFINED_REF)) == -1)
+        return SLANG_FAIL;
+
+    // Parse line number
+    Int lineNumber = 0;
+    if (SLANG_FAILED(StringUtil::parseInt(split[1].trim(), lineNumber)))
+        return SLANG_FAIL;
+
+    outDiagnostic.filePath = allocator.allocate(split[0]);
+    outDiagnostic.location.line = lineNumber;
+    outDiagnostic.location.column = 0;
+    outDiagnostic.severity = ArtifactDiagnostic::Severity::Error;
+    outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
+    outDiagnostic.text = allocator.allocate(text);
+    outLineParseResult = LineParseResult::Single;
+
+    return SLANG_OK;
+}
+
 // Pattern: file:(.text+0x0):message (object file section errors)
 // Handles: test-link.c:(.text+0xa):undefined reference to `thing'
 static SlangResult _parseTextSectionError(
@@ -558,6 +594,7 @@ static const GCCPatternMatcher s_gccPatterns[] = {
     {20, "gcc13-link-error", _parseGCC13LinkError},
     {25, "object-file-link-error", _parseObjectFileLinkError},
     {30, "file-link-error", _parseFileLinkError},
+    {35, "file-line-message", _parseFileLineMessage},
     {40, "text-section-error", _parseTextSectionError},
 
     // Compiler-prefixed (priority 100-199)
