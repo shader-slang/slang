@@ -7740,25 +7740,6 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
     return value << 24 | value << 16 | value << 8 | value;
 };
 
-
-// PTX MMA wrapper (m16n8k16 shape)
-__device__ inline uint2 _hmma(uint4 &a, uint2 &b, uint2 &c)
-{
-    uint2           D;
-    unsigned const *A = reinterpret_cast<unsigned const *>(&a);
-    unsigned const *B = reinterpret_cast<unsigned const *>(&b);
-    unsigned const *C = reinterpret_cast<unsigned const *>(&c);
-    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16  {%0, %1}, \n"
-                 "    {%2, %3, %4, %5}, \n"
-                 "    {%6, %7}, \n"
-                 "    {%8, %9}; \n"
-                 : "=r"(D.x), "=r"(D.y)
-                 : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3])
-                 , "r"(B[0]), "r"(B[1])
-                 , "r"(C[0]), "r"(C[1]));
-    return D;
-}
-
 template <class T>
 constexpr __device__ __host__ int num_packed() {
     return 4 / (sizeof(T));
@@ -7778,6 +7759,56 @@ using MMA_16x8x16 = MMAShape<16, 8, 16>; // Current
 using MMA_16x8x8 = MMAShape<16, 8, 8>;
 using MMA_8x8x4 = MMAShape<8, 8, 4>;
 using MMA_16x8x4 = MMAShape<16, 8, 4>;
+
+
+// PTX MMA wrapper - template on MMAShape
+// Helper struct for PTX instruction dispatch
+template<typename Shape>
+struct _hmma_impl;
+
+// Specialization for MMA_16x8x16: A=4 regs, B=2 regs, D=2 regs
+template<>
+struct _hmma_impl<MMA_16x8x16>
+{
+    __device__ static uint2 call(uint4 &a, uint2 &b, uint2 &c)
+    {
+        uint2           D;
+        unsigned const *A = reinterpret_cast<unsigned const *>(&a);
+        unsigned const *B = reinterpret_cast<unsigned const *>(&b);
+        unsigned const *C = reinterpret_cast<unsigned const *>(&c);
+        asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16  {%0, %1}, \n"
+                     "    {%2, %3, %4, %5}, \n"
+                     "    {%6, %7}, \n"
+                     "    {%8, %9}; \n"
+                     : "=r"(D.x), "=r"(D.y)
+                     : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3])
+                     , "r"(B[0]), "r"(B[1])
+                     , "r"(C[0]), "r"(C[1]));
+        return D;
+    }
+};
+
+// Specialization for MMA_16x8x8: A=2 regs, B=1 reg, D=2 regs
+template<>
+struct _hmma_impl<MMA_16x8x8>
+{
+    __device__ static uint2 call(uint2 &a, uint32_t &b, uint2 &c)
+    {
+        uint2           D;
+        unsigned const *A = reinterpret_cast<unsigned const *>(&a);
+        unsigned const *C = reinterpret_cast<unsigned const *>(&c);
+        asm volatile("mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16  {%0, %1}, \n"
+                     "    {%2, %3}, \n"
+                     "    {%4}, \n"
+                     "    {%5, %6}; \n"
+                     : "=r"(D.x), "=r"(D.y)
+                     : "r"(A[0]), "r"(A[1])
+                     , "r"(b)
+                     , "r"(C[0]), "r"(C[1]));
+        return D;
+    }
+};
+
 
 // Forward declaration for MMAMatrix - represents a 2D matrix fragment (M x N)
 template<typename T, int M, int N, Layout layout>
@@ -7853,7 +7884,48 @@ struct MMATraits<T, MMA_16x8x16, layout>
         };
         
         // Call PTX instruction: mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16
-        uint2 d_regs = _hmma(a_regs, b_regs, c_regs);
+        uint2 d_regs = _hmma_impl<MMA_16x8x16>::call(a_regs, b_regs, c_regs);
+        
+        // Unpack result back to D matrix
+        d.m_mma_reg[0].m_reg = d_regs.x;
+        d.m_mma_reg[1].m_reg = d_regs.y;
+    }
+};
+
+// Specialization for m16n8k8 shape
+template<typename T, Layout layout>
+struct MMATraits<T, MMA_16x8x8, layout>
+{
+    // High-level mma() for m16n8k8 with half precision
+    // - A matrix (M x K = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs
+    // - B matrix (K x N = 8 x 8): 128 bytes / 32 threads = 4 bytes/thread = 1 uint32 reg
+    // - C/D matrix (M x N = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs
+    // Accepts different layouts for each matrix to support row-major A with column-major B
+    template<Layout layoutA, Layout layoutB, Layout layoutC>
+    __device__ static void mma(
+        MMAMatrix<T, MMA_16x8x8::m, MMA_16x8x8::n, layout>& d,
+        const MMAMatrix<T, MMA_16x8x8::m, MMA_16x8x8::k, layoutA>& a,
+        const MMAMatrix<T, MMA_16x8x8::k, MMA_16x8x8::n, layoutB>& b,
+        const MMAMatrix<T, MMA_16x8x8::m, MMA_16x8x8::n, layoutC>& c)
+    {        
+        // Pack registers into vector types for PTX instruction
+        // A matrix: 16x8 needs 2 registers
+        uint2 a_regs = {
+            a.m_mma_reg[0].m_reg,
+            a.m_mma_reg[1].m_reg
+        };
+        
+        // B matrix: 8x8 needs 1 register
+        uint32_t b_reg = b.m_mma_reg[0].m_reg;
+        
+        // C matrix (accumulator): 16x8 needs 2 registers
+        uint2 c_regs = {
+            c.m_mma_reg[0].m_reg,
+            c.m_mma_reg[1].m_reg
+        };
+        
+        // Call PTX instruction: mma.sync.aligned.m16n8k8.row.col.f16.f16.f16.f16
+        uint2 d_regs = _hmma_impl<MMA_16x8x8>::call(a_regs, b_reg, c_regs);
         
         // Unpack result back to D matrix
         d.m_mma_reg[0].m_reg = d_regs.x;
