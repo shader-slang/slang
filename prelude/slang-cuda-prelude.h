@@ -32,6 +32,14 @@
 #include <cuda_fp16.h>
 #endif
 
+#ifdef SLANG_CUDA_ENABLE_FP8
+#include <cuda_fp8.h>
+#endif
+
+#ifdef SLANG_CUDA_ENABLE_BF16
+#include <cuda_bf16.h>
+#endif
+
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
 #endif
@@ -351,6 +359,60 @@ struct __align__(4) __half4
 };
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+
+// Add the other vector bfloat16 types
+struct __nv_bfloat161
+{
+    __nv_bfloat16 x;
+};
+struct __nv_bfloat163
+{
+    __nv_bfloat16 x, y, z;
+};
+struct __nv_bfloat164
+{
+    __nv_bfloat16 x, y, z, w;
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+
+// Add the other vector fp8 types
+struct __nv_fp8_e4m31
+{
+    __nv_fp8_e4m3 x;
+};
+struct __nv_fp8_e4m32
+{
+    __nv_fp8_e4m3 x, y;
+};
+struct __nv_fp8_e4m33
+{
+    __nv_fp8_e4m3 x, y, z;
+};
+struct __nv_fp8_e4m34
+{
+    __nv_fp8_e4m3 x, y, z, w;
+};
+struct __nv_fp8_e5m21
+{
+    __nv_fp8_e5m2 x;
+};
+struct __nv_fp8_e5m22
+{
+    __nv_fp8_e5m2 x, y;
+};
+struct __nv_fp8_e5m23
+{
+    __nv_fp8_e5m2 x, y, z;
+};
+struct __nv_fp8_e5m24
+{
+    __nv_fp8_e5m2 x, y, z, w;
+};
+#endif
+
 #define SLANG_VECTOR_GET_ELEMENT(T)                                                   \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##1 x, int index) \
     {                                                                                 \
@@ -412,6 +474,49 @@ SLANG_VECTOR_GET_ELEMENT_PTR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_VECTOR_GET_ELEMENT(__half)
 SLANG_VECTOR_GET_ELEMENT_PTR(__half)
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_VECTOR_GET_ELEMENT(__nv_bfloat16)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_bfloat16)
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat162 v0, __nv_bfloat162 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 2; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat163 v0, __nv_bfloat163 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 3; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat164 v0, __nv_bfloat164 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 4; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
 #define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
@@ -554,6 +659,15 @@ SLANG_MAKE_VECTOR(ulonglong)
 SLANG_MAKE_VECTOR(__half)
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR(__nv_bfloat16)
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR(__nv_fp8_e5m2)
+#endif
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
 {
     return bool1{x};
@@ -635,6 +749,30 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 }
 #endif
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+{
+    return __nv_bfloat16{x};
+}
+#endif
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+{
+    return __nv_fp8_e4m3{x};
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+{
+    return __nv_fp8_e5m2{x};
+}
+#endif
+#endif
 
 #define SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(Fn, T, N)                                            \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##N Fn(T##N* address, T##N val)                           \
@@ -700,6 +838,14 @@ GET_VECTOR_TYPE_IMPL_N(double)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+GET_VECTOR_TYPE_IMPL_N(__nv_bfloat16)
+#endif
+#if SLANG_CUDA_ENABLE_FP8
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e4m3)
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e5m2)
+#endif
+
 template<typename T, int n>
 using Vector = typename GetVectorTypeImpl<T, n>::type;
 
@@ -5192,6 +5338,15 @@ static __forceinline__ __device__ void optixInvoke(
         optixInvoke(r0, r1);
     }
 }
+
+// Overload for empty payloads (when payload is eliminated by type legalization)
+static __forceinline__ __device__ void optixInvoke(
+    OptixTraversableHandle AccelerationStructure,
+    OptixTraversableHandle* HitOrMiss)
+{
+    // Call OptiX invoke with no payload for empty payload case
+    optixInvoke();
+}
 #endif
 
 #if (OPTIX_VERSION >= 80100)
@@ -6299,6 +6454,27 @@ struct PtxTypeName<half>
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+struct PtxTypeName<__nv_fp8_e4m3>
+{
+    static constexpr const char name[] = "f8e4m3";
+};
+template<>
+struct PtxTypeName<__nv_fp8_e5m2>
+{
+    static constexpr const char name[] = "f8e5m2";
+};
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PtxTypeName<__nv_bfloat16>
+{
+    static constexpr const char name[] = "bf16";
+};
+#endif
+
 template<>
 struct PtxTypeName<float>
 {
@@ -6349,6 +6525,30 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
     static constexpr int value = 4;
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+// bfloat16 - 8 regs for A/B, 4 regs for C/D
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+{
+    static constexpr int value = 4;
+};
+#endif // #if SLANG_CUDA_ENABLE_BF16
 
 // Float (f32) - 8 regs for C/D only
 template<int M, int N, int K>
@@ -6438,6 +6638,71 @@ struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
     static constexpr int value = 1;
 };
 
+#if SLANG_CUDA_ENABLE_FP8
+// fp8 - same as u8
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+#endif
+
 
 // ====================================================================================
 // Saturation at the output for integer MMA
@@ -6462,7 +6727,7 @@ struct IsSaturated<false>
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
-__device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
+__device__ inline void wmmaLoad(uint32_t* regs, const void* ptr, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, use>::value;
 
@@ -6527,7 +6792,7 @@ __device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, Layout layout>
-__device__ inline void wmmaStore(ElemT* ptr, const uint32_t* regs, int stride)
+__device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, MatrixUse::MatrixD>::value;
 
@@ -6623,7 +6888,7 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
+template<typename T, int M, int N, int K, MatrixUse R>
 struct WmmaFragment
 {
     __device__ WmmaFragment() {}
@@ -6647,25 +6912,19 @@ struct WmmaFragment
     void __device__ fill(T value)
     {
         unsigned packed = Pack32Helper(value);
-
-        // Manually assign to prevent register coalescing
-        regs[0] = packed;
-        regs[1] = packed;
-        regs[2] = packed;
-        regs[3] = packed;
-        regs[4] = packed;
-        regs[5] = packed;
-        regs[6] = packed;
-        regs[7] = packed;
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        for (int i = 0; i < nregs; i++)
+        {
+            regs[i] = packed;
+        }
     }
 
     __device__ This operator*(T b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b);
         }
@@ -6674,11 +6933,10 @@ struct WmmaFragment
 
     __device__ This operator*(const This& b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b.get(i));
         }
@@ -6687,10 +6945,9 @@ struct WmmaFragment
 
     __device__ This operator/(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) / other.get(i));
         }
@@ -6699,10 +6956,9 @@ struct WmmaFragment
 
     __device__ This operator-(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) - other.get(i));
         }
@@ -6711,10 +6967,9 @@ struct WmmaFragment
 
     __device__ This operator-()
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, -get(i));
         }
@@ -6723,10 +6978,9 @@ struct WmmaFragment
 
     __device__ This operator+(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) + other.get(i));
         }
@@ -6735,10 +6989,9 @@ struct WmmaFragment
 
     __device__ This operator%(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) % other.get(i));
         }
@@ -6751,7 +7004,7 @@ struct WmmaFragment
         // If the data type is different, we need to copy element by element.
         // Since the shape of two matrices are the same, they have the same
         // number of elements.
-        for (int i = 0; i < elements_per_thread; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             set(i, static_cast<T>(other.get(i)));
         }
@@ -6763,7 +7016,6 @@ struct WmmaFragment
     //   - index 1: bits [8:15]  of regs[0]
     //   - index 2: bits [16:23] of regs[0]
     //   - index 3: bits [24:31] of regs[0]
-    //   - index 4: bits [0:7]   of regs[1], etc.
     __device__ T get(int index) const
     {
         if constexpr (sizeof(T) == 4)
@@ -6848,40 +7100,52 @@ struct WmmaFragment
         wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
+    template<Layout layout, typename U>
+    void __device__ Store(U* buffer, uint stride)
+    {
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+    }
+
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
-        WmmaFragment<T, M, N, K, R, layout> fragment;
+        WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
         wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-
+        fragment.m_layout = layout;
         return fragment;
     }
 
-    static __device__ uint32_t GetLength() { return This::elements_per_thread; }
+    template<Layout layout, typename U>
+    static This __device__ Load(U* buffer, uint stride)
+    {
+        WmmaFragment<T, M, N, K, R> fragment;
+
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        fragment.m_layout = layout;
+        return fragment;
+    }
+
+    static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
 
     // For referencing those template parameters outside the struct
     using ElementType = T;
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    static constexpr Layout m_layout = MatrixLayout;
+    Layout m_layout = Layout::RowMajor;
 
-    // Maximum registers needed across all fragment types and data types
-    static constexpr int MAX_REGS = 8;
-    uint32_t regs[MAX_REGS] = {};
+    // Register Count requirement
+    static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
+    unsigned regs[RegsCount] = {};
 
-    static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
-                                                  : (R == MatrixUse::MatrixB) ? (K * N)
-                                                                              : (M * N);
-
-    static_assert(elements_per_warp % 32 == 0, "Total elements per warp must be divisible by 32");
-
-    static constexpr uint32_t elements_per_thread = elements_per_warp / 32;
-    static constexpr uint32_t bytes_per_thread = elements_per_thread * sizeof(T);
-    static constexpr uint32_t registers_per_thread = (bytes_per_thread + 3) / 4;
+    static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
 };
 
 // ====================================================================================
@@ -7350,12 +7614,10 @@ template<
     int M,
     int N,
     int K,
-    Layout layoutA,
-    Layout layoutB,
     bool saturatingAccumulation>
 WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
-    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA, layoutA> matA,
-    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB, layoutB> matB,
+    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA> matA,
+    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB> matB,
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     constexpr ShapeCombination shape = (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
@@ -7364,11 +7626,60 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(
-        matD,
-        matA,
-        matB,
-        matC);
+    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
+                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
+
+    switch (encodedLayout)
+    {
+    // 00011
+    case 0x3:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 00010
+    case 0x2:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0001
+    case 0x01:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0000
+    case 0x00:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    }
 
     return matD;
 }

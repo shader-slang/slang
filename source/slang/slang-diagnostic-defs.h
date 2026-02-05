@@ -1802,6 +1802,11 @@ DIAGNOSTIC(
     varWithoutTypeMustHaveInitializer,
     "a variable declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(
+    30621,
+    Error,
+    paramWithoutTypeMustHaveInitializer,
+    "a parameter declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(
     30622,
     Error,
     ambiguousDefaultInitializerForType,
@@ -1824,6 +1829,16 @@ DIAGNOSTIC(
     Error,
     outputParameterCannotHaveDefaultValue,
     "an 'out' or 'inout' parameter cannot have a default-value expression")
+DIAGNOSTIC(
+    30701,
+    Error,
+    systemValueSemanticInvalidType,
+    "type '$0' is not valid for system value semantic '$1'; expected '$2'")
+DIAGNOSTIC(
+    30702,
+    Error,
+    systemValueSemanticInvalidDirection,
+    "system value semantic '$0' cannot be used as $1 in '$2' shader stage")
 
 // 308xx: inheritance
 DIAGNOSTIC(

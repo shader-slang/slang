@@ -16,7 +16,7 @@ jobs:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       options: --user root
 
     defaults:

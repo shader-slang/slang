@@ -527,6 +527,7 @@ enum class IRTypeLayoutRuleName
     D3DConstantBuffer,
     MetalParameterBlock,
     C,
+    CUDA,
     LLVM,
     _Count,
 };
@@ -995,6 +996,9 @@ bool isTypeEqual(IRType* a, IRType* b);
 bool isIntegralType(IRType* t);
 
 bool isFloatingType(IRType* t);
+
+// True if t is fp8 or bf16 types.
+bool isPackedFloatType(IRType* t);
 
 struct IntInfo
 {
@@ -1968,6 +1972,8 @@ public:
     Session* getSession() { return m_session; }
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
+
+    void removeInstFromConstantMap(IRInst* inst);
 
     void tryHoistInst(IRInst* inst);
 

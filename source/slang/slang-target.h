@@ -71,6 +71,7 @@ bool isD3DTarget(TargetRequest* targetReq);
 
 // Are we generating code for Metal?
 bool isMetalTarget(TargetRequest* targetReq);
+bool isMetalTarget(CodeGenTarget target);
 
 /// Are we generating code for a Khronos API (OpenGL or Vulkan)?
 bool isKhronosTarget(TargetRequest* targetReq);
@@ -89,6 +90,11 @@ bool isCPUTarget(CodeGenTarget codeGenTarget);
 
 // Are we generating code for a CPU target, using LLVM
 bool isCPUTargetViaLLVM(TargetRequest* targetReq);
+bool isCUDATarget(CodeGenTarget target);
+
+// Are we generating code for a CPU target
+bool isCPUTarget(TargetRequest* targetReq);
+bool isCPUTarget(CodeGenTarget target);
 
 /// Are we generating code for the WebGPU API?
 bool isWGPUTarget(TargetRequest* targetReq);

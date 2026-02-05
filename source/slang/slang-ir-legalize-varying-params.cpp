@@ -3,6 +3,7 @@
 
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-layout.h"
 #include "slang-ir-lower-out-parameters.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
@@ -1116,218 +1117,53 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
     };
     List<PayloadWritebackInfo> m_payloadWritebacks;
 
-    // Get the C++ alignment of a type in bytes.
-    // This must match the alignment rules used by CUDA C++.
-    int getTypeCppAlignment(IRType* type, IRBuilder* builder)
+    // Get C++ size and alignment of a type using CUDA layout rules.
+    // Uses IRTypeLayoutRules::getCUDA() which extends C layout with CUDA-specific
+    // vector alignment to match CUDA C++ compiler behavior and the prelude's layout.
+    bool getTypeCppSizeAndAlignment(
+        IRType* type,
+        IRBuilder* builder,
+        int& outSize,
+        int& outAlignment)
     {
         if (auto ptrValType = tryGetPointedToType(builder, type))
             type = ptrValType;
 
-        if (auto structType = as<IRStructType>(type))
-        {
-            // Struct alignment is the max alignment of its fields
-            int maxAlign = 1;
-            for (auto field : structType->getFields())
-            {
-                int fieldAlign = getTypeCppAlignment(field->getFieldType(), builder);
-                if (fieldAlign > maxAlign)
-                    maxAlign = fieldAlign;
-            }
-            return maxAlign;
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(type))
-        {
-            return getTypeCppAlignment(arrayType->getElementType(), builder);
-        }
-        else if (auto matType = as<IRMatrixType>(type))
-        {
-            // Matrix alignment is same as vector alignment
-            return getTypeCppAlignment(matType->getElementType(), builder) *
-                   int(as<IRIntLit>(matType->getColumnCount())->getValue());
-        }
-        else if (auto vecType = as<IRVectorType>(type))
-        {
-            // CUDA vector types (float2, float3, float4, etc.) have special alignment:
-            // - float2/int2/etc: 8-byte aligned
-            // - float3: 4-byte aligned (not power of 2)
-            // - float4/int4/etc: 16-byte aligned
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if (!elementCountInst)
-                return 4;
-            int elementCount = int(elementCountInst->getValue());
-            int elementAlign = getTypeCppAlignment(vecType->getElementType(), builder);
+        IRSizeAndAlignment sizeAndAlign;
+        Result result =
+            getSizeAndAlignment(nullptr, IRTypeLayoutRules::getCUDA(), type, &sizeAndAlign);
+        if (SLANG_FAILED(result))
+            return false;
 
-            if (elementCount == 3)
-            {
-                // float3/int3 has same alignment as element (4 bytes for float3)
-                return elementAlign;
-            }
-            else
-            {
-                // float2 -> 8, float4 -> 16, double2 -> 16, double4 -> 32
-                return elementAlign * elementCount;
-            }
-        }
-        else if (auto basicType = as<IRBasicType>(type))
-        {
-            switch (basicType->getBaseType())
-            {
-            case BaseType::Int:
-            case BaseType::UInt:
-            case BaseType::Float:
-            case BaseType::Bool:
-            // 16-bit types are promoted to 32-bit in OptiX payload registers
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
-                return 4;
-            case BaseType::Int64:
-            case BaseType::UInt64:
-            case BaseType::Double:
-                return 8;
-            default:
-                return 4;
-            }
-        }
-        return 4;
+        outSize = int(sizeAndAlign.size);
+        outAlignment = int(sizeAndAlign.alignment);
+        return true;
+    }
+
+    // Get the C++ alignment of a type in bytes.
+    int getTypeCppAlignment(IRType* type, IRBuilder* builder)
+    {
+        int size, alignment;
+        if (getTypeCppSizeAndAlignment(type, builder, size, alignment))
+            return alignment;
+        return 4; // Default fallback
     }
 
     // Get the C++ size of a type in bytes (including internal padding).
-    // Note: 16-bit types are treated as 32-bit since OptiX payload registers are 32-bit.
     int getTypeCppSize(IRType* type, IRBuilder* builder)
     {
-        if (auto ptrValType = tryGetPointedToType(builder, type))
-            type = ptrValType;
-
-        if (auto structType = as<IRStructType>(type))
-        {
-            int offset = 0;
-            int maxAlign = 1;
-            for (auto field : structType->getFields())
-            {
-                int fieldAlign = getTypeCppAlignment(field->getFieldType(), builder);
-                int fieldSize = getTypeCppSize(field->getFieldType(), builder);
-                if (fieldAlign > maxAlign)
-                    maxAlign = fieldAlign;
-                // Align offset to field alignment
-                offset = (offset + fieldAlign - 1) & ~(fieldAlign - 1);
-                offset += fieldSize;
-            }
-            // Struct size is padded to struct alignment
-            offset = (offset + maxAlign - 1) & ~(maxAlign - 1);
-            return offset;
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(type))
-        {
-            auto elementCountInst = as<IRIntLit>(arrayType->getElementCount());
-            if (!elementCountInst)
-                return 0;
-            int elementCount = int(elementCountInst->getValue());
-            int elementSize = getTypeCppSize(arrayType->getElementType(), builder);
-            return elementCount * elementSize;
-        }
-        else if (auto matType = as<IRMatrixType>(type))
-        {
-            auto rowCountInst = as<IRIntLit>(matType->getRowCount());
-            auto colCountInst = as<IRIntLit>(matType->getColumnCount());
-            if (!rowCountInst || !colCountInst)
-                return 0;
-            int rows = int(rowCountInst->getValue());
-            int cols = int(colCountInst->getValue());
-            int elementSize = getTypeCppSize(matType->getElementType(), builder);
-            return rows * cols * elementSize;
-        }
-        else if (auto vecType = as<IRVectorType>(type))
-        {
-            auto elementCountInst = as<IRIntLit>(vecType->getElementCount());
-            if (!elementCountInst)
-                return 0;
-            int elementCount = int(elementCountInst->getValue());
-            int elementSize = getTypeCppSize(vecType->getElementType(), builder);
-            return elementCount * elementSize;
-        }
-        else if (auto basicType = as<IRBasicType>(type))
-        {
-            switch (basicType->getBaseType())
-            {
-            case BaseType::Int:
-            case BaseType::UInt:
-            case BaseType::Float:
-            case BaseType::Bool:
-            // 16-bit types occupy a full 32-bit register in OptiX payload
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
-                return 4;
-            case BaseType::Int64:
-            case BaseType::UInt64:
-            case BaseType::Double:
-                return 8;
-            default:
-                return 0;
-            }
-        }
-        return 0;
-    }
-
-    // Check if a type contains any sub-32-bit types (bool, int8, int16, half).
-    // These types cannot be used with register-based payload because the prelude
-    // packs them byte-by-byte, but we read whole registers at a time.
-    bool containsSubWordTypes(IRType* type, IRBuilder* builder)
-    {
-        if (auto ptrValType = tryGetPointedToType(builder, type))
-            type = ptrValType;
-
-        if (auto structType = as<IRStructType>(type))
-        {
-            for (auto field : structType->getFields())
-            {
-                if (containsSubWordTypes(field->getFieldType(), builder))
-                    return true;
-            }
-            return false;
-        }
-        else if (auto arrayType = as<IRArrayTypeBase>(type))
-        {
-            return containsSubWordTypes(arrayType->getElementType(), builder);
-        }
-        else if (auto matType = as<IRMatrixType>(type))
-        {
-            return containsSubWordTypes(matType->getElementType(), builder);
-        }
-        else if (auto vecType = as<IRVectorType>(type))
-        {
-            return containsSubWordTypes(vecType->getElementType(), builder);
-        }
-        else if (auto basicType = as<IRBasicType>(type))
-        {
-            switch (basicType->getBaseType())
-            {
-            case BaseType::Bool:
-            case BaseType::Int8:
-            case BaseType::UInt8:
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
-                return true;
-            default:
-                return false;
-            }
-        }
-        return false;
+        int size, alignment;
+        if (getTypeCppSizeAndAlignment(type, builder, size, alignment))
+            return size;
+        return 0; // Failure
     }
 
     // Compute how many uint32 registers a type requires.
     // Returns 0 if the type is too large (> 32 registers = 128 bytes),
-    // if it cannot be flattened to registers, or if it contains sub-32-bit types.
+    // or if it cannot be flattened to registers.
     // Uses C++ sizeof rules to match the prelude's PayloadRegisters<T>.
     int computePayloadRegisterCount(IRType* type, IRBuilder* builder)
     {
-        // Reject types with sub-32-bit members (bool, int8, int16, half)
-        // because the C++ packing doesn't match our register-at-a-time reading.
-        if (containsSubWordTypes(type, builder))
-            return 0;
-
         int sizeBytes = getTypeCppSize(type, builder);
         if (sizeBytes == 0)
             return 0;
@@ -1455,20 +1291,54 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                         &regIdxInst);
                     return builder->emitBitCast(typeToFetch, uintVal);
                 }
-            case BaseType::Int16:
-            case BaseType::UInt16:
-            case BaseType::Half:
             case BaseType::Bool:
+            case BaseType::Int8:
+            case BaseType::UInt8:
                 {
-                    // Read as uint, then cast to the target type
-                    // Note: These take a full register (4 bytes) in payload
-                    ioByteOffset += 4;
-                    auto uintVal = builder->emitIntrinsicInst(
+                    // Read 1 byte from the appropriate position in the register
+                    int byteInReg = ioByteOffset % 4;
+                    ioByteOffset += 1;
+                    auto regVal = builder->emitIntrinsicInst(
                         uintType,
                         kIROp_GetOptiXPayloadRegister,
                         1,
                         &regIdxInst);
-                    return builder->emitCast(typeToFetch, uintVal);
+                    if (byteInReg > 0)
+                    {
+                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
+                        regVal = builder->emitShr(uintType, regVal, shiftAmount);
+                    }
+                    auto mask = builder->getIntValue(uintType, 0xFF);
+                    auto maskedVal = builder->emitBitAnd(uintType, regVal, mask);
+                    return builder->emitCast(typeToFetch, maskedVal);
+                }
+            case BaseType::Int16:
+            case BaseType::UInt16:
+            case BaseType::Half:
+                {
+                    // Read 2 bytes from the appropriate position in the register
+                    int byteInReg = ioByteOffset % 4;
+                    ioByteOffset += 2;
+                    auto regVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
+                    if (byteInReg > 0)
+                    {
+                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
+                        regVal = builder->emitShr(uintType, regVal, shiftAmount);
+                    }
+                    auto mask = builder->getIntValue(uintType, 0xFFFF);
+                    auto maskedVal = builder->emitBitAnd(uintType, regVal, mask);
+                    if (basicType->getBaseType() == BaseType::Half)
+                    {
+                        // Cast uint32 → uint16 first, then bitcast uint16 → Half
+                        auto uint16Type = builder->getBasicType(BaseType::UInt16);
+                        auto uint16Val = builder->emitCast(uint16Type, maskedVal);
+                        return builder->emitBitCast(typeToFetch, uint16Val);
+                    }
+                    return builder->emitCast(typeToFetch, maskedVal);
                 }
             case BaseType::Int64:
             case BaseType::UInt64:
@@ -1623,12 +1493,93 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             case BaseType::Float:
                 uintVal = builder->emitBitCast(uintType, value);
                 break;
+            case BaseType::Bool:
+            case BaseType::Int8:
+            case BaseType::UInt8:
+                {
+                    // Write 1 byte at the appropriate position in the register
+                    // Need read-modify-write since multiple sub-word values may share a register
+                    int byteInReg = ioByteOffset % 4;
+                    auto valAsUint = builder->emitCast(uintType, value);
+                    auto mask = builder->getIntValue(uintType, 0xFF);
+                    valAsUint = builder->emitBitAnd(uintType, valAsUint, mask);
+
+                    if (byteInReg > 0)
+                    {
+                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
+                        valAsUint = builder->emitShl(uintType, valAsUint, shiftAmount);
+                    }
+
+                    // Read current register value
+                    auto oldVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
+                    // Clear the byte we're writing
+                    auto clearMask =
+                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFu << (byteInReg * 8)));
+                    auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
+                    // OR in the new value
+                    auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
+
+                    IRInst* args[] = {regIdxInst, newVal};
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        args);
+                    ioByteOffset += 1;
+                    return;
+                }
             case BaseType::Int16:
             case BaseType::UInt16:
             case BaseType::Half:
-            case BaseType::Bool:
-                uintVal = builder->emitCast(uintType, value);
-                break;
+                {
+                    // Write 2 bytes at the appropriate position in the register
+                    // Need read-modify-write since multiple sub-word values may share a register
+                    int byteInReg = ioByteOffset % 4;
+                    IRInst* valAsUint;
+                    if (basicType->getBaseType() == BaseType::Half)
+                    {
+                        // Bitcast Half → uint16 first, then cast uint16 → uint32
+                        auto uint16Type = builder->getBasicType(BaseType::UInt16);
+                        auto uint16Val = builder->emitBitCast(uint16Type, value);
+                        valAsUint = builder->emitCast(uintType, uint16Val);
+                    }
+                    else
+                        valAsUint = builder->emitCast(uintType, value);
+                    auto mask = builder->getIntValue(uintType, 0xFFFF);
+                    valAsUint = builder->emitBitAnd(uintType, valAsUint, mask);
+
+                    if (byteInReg > 0)
+                    {
+                        auto shiftAmount = builder->getIntValue(uintType, byteInReg * 8);
+                        valAsUint = builder->emitShl(uintType, valAsUint, shiftAmount);
+                    }
+
+                    // Read current register value
+                    auto oldVal = builder->emitIntrinsicInst(
+                        uintType,
+                        kIROp_GetOptiXPayloadRegister,
+                        1,
+                        &regIdxInst);
+                    // Clear the bytes we're writing
+                    auto clearMask =
+                        builder->getIntValue(uintType, ~IRIntegerValue(0xFFFFu << (byteInReg * 8)));
+                    auto clearedVal = builder->emitBitAnd(uintType, oldVal, clearMask);
+                    // OR in the new value
+                    auto newVal = builder->emitBitOr(uintType, clearedVal, valAsUint);
+
+                    IRInst* args[] = {regIdxInst, newVal};
+                    builder->emitIntrinsicInst(
+                        builder->getVoidType(),
+                        kIROp_SetOptiXPayloadRegister,
+                        2,
+                        args);
+                    ioByteOffset += 2;
+                    return;
+                }
             case BaseType::Int64:
             case BaseType::UInt64:
                 {
@@ -2404,6 +2355,11 @@ class LegalizeShaderEntryPointContext
 public:
     void legalizeEntryPoints(List<EntryPointInfo>& entryPoints)
     {
+        // Collect struct types used as return types before processing.
+        // We should not remove semantic decorations from these structs
+        // since they are needed for output variable binding (e.g., @location in WGSL).
+        collectStructTypesUsedAsReturnType(entryPoints);
+
         for (auto entryPoint : entryPoints)
             legalizeEntryPoint(entryPoint);
         removeSemanticLayoutsFromLegalizedStructs();
@@ -2595,6 +2551,25 @@ protected:
 
 private:
     HashSet<IRStructField*> semanticInfoToRemove;
+    HashSet<IRStructType*> structTypesUsedAsReturnType;
+
+    void collectStructTypesUsedAsReturnType(List<EntryPointInfo>& entryPoints)
+    {
+        for (auto entryPoint : entryPoints)
+        {
+            auto func = entryPoint.entryPointFunc;
+            if (!func)
+                continue;
+            auto funcType = as<IRFuncType>(func->getDataType());
+            if (!funcType)
+                continue;
+            auto returnType = funcType->getResultType();
+            if (!returnType)
+                continue;
+            if (auto structType = as<IRStructType>(returnType))
+                structTypesUsedAsReturnType.add(structType);
+        }
+    }
 
     void removeSemanticLayoutsFromLegalizedStructs()
     {
@@ -2684,8 +2659,12 @@ private:
                     field->getKey(),
                     fieldParam);
 
-                // Remove the sementic info from the original struct
-                semanticInfoToRemove.add(field);
+                // Remove the semantic info from the original struct, but only if
+                // the struct is not used as a return type of another entry point.
+                // If the struct is used as a return type, we need to keep the semantic
+                // decorations for output variable binding (e.g., @location in WGSL).
+                if (!structTypesUsedAsReturnType.contains(structType))
+                    semanticInfoToRemove.add(field);
 
                 IRVarLayout* fieldLayout =
                     structTypeLayout ? structTypeLayout->getFieldLayout(fieldIndex) : nullptr;

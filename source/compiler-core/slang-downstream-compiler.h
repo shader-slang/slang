@@ -170,6 +170,9 @@ struct DownstreamCompileOptions
             EnableSecurityChecks = 0x04, ///< Enable runtime security checks (such as for buffer
                                          ///< overruns) - enabling typically decreases performance
             EnableFloat16 = 0x08,        ///< If set compiles with support for float16/half
+            EnableFloat8 = 0x10,         ///< If set compiles with support for float8
+            EnableBfloat16 = 0x20,       ///< If set compiles with support for bfloat16
+
         };
     };
 

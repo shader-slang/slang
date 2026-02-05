@@ -712,6 +712,8 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
+    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
