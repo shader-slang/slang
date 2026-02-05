@@ -1059,11 +1059,25 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     if (inst->getOp() == kIROp_FloatLit)
     {
         IRConstant* constantInst = static_cast<IRConstant*>(inst);
+        bool shouldExplicitTypeCast = false;
 
         IRType* type = constantInst->getDataType();
-        if (type && type->getOp() == kIROp_HalfType)
+        if (type)
         {
-            m_writer->emit("half(");
+            switch (type->getOp())
+            {
+            case kIROp_HalfType:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
+            case kIROp_BFloat16Type:
+                shouldExplicitTypeCast = true;
+                break;
+            }
+        }
+        if (shouldExplicitTypeCast)
+        {
+            emitType(type);
+            m_writer->emit("(");
         }
 
         switch (constantInst->getFloatKind())
@@ -1100,7 +1114,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             }
         }
 
-        if (type && type->getOp() == kIROp_HalfType)
+        if (shouldExplicitTypeCast)
         {
             m_writer->emit(")");
         }

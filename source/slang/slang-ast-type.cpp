@@ -870,6 +870,13 @@ bool ArrayExpressionType::isUnsized()
     return false;
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConditionalType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Type* ConditionalType::getValueType()
+{
+    return as<Type>(_getGenericTypeArg(this, 0));
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! AtomicType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 Type* AtomicType::getElementType()
 {

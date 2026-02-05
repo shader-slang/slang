@@ -1099,6 +1099,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return SpvLiteralBits::from32(FloatAsInt((float)fval->getValue()));
                 break;
             }
+        case kIROp_FloatE4M3Type:
+            {
+                if (auto fval = as<IRFloatLit>(inst))
+                    return SpvLiteralBits::from32(
+                        uint32_t(FloatToFloatE4M3((float)fval->getValue())));
+                break;
+            }
+        case kIROp_FloatE5M2Type:
+            {
+                if (auto fval = as<IRFloatLit>(inst))
+                    return SpvLiteralBits::from32(
+                        uint32_t(FloatToFloatE5M2((float)fval->getValue())));
+                break;
+            }
+        case kIROp_BFloat16Type:
+            {
+                if (auto fval = as<IRFloatLit>(inst))
+                    return SpvLiteralBits::from32(
+                        uint32_t(FloatToBFloat16((float)fval->getValue())));
+                break;
+            }
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
             {
@@ -1198,27 +1219,43 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_mapIRInstToSpvInst[inst] = result;
             return result;
         }
-        if (type->getOp() == kIROp_DoubleType)
+        switch (type->getOp())
         {
+        case kIROp_DoubleType:
             result =
                 emitOpConstant(inst, type, SpvLiteralBits::from64(uint64_t(DoubleAsInt64(val))));
-        }
-        else if (type->getOp() == kIROp_FloatType)
-        {
+            break;
+        case kIROp_FloatType:
             result = emitOpConstant(
                 inst,
                 type,
                 SpvLiteralBits::from32(uint32_t(FloatAsInt(float(val)))));
-        }
-        else if (type->getOp() == kIROp_HalfType)
-        {
+            break;
+        case kIROp_HalfType:
             result = emitOpConstant(
                 inst,
                 type,
                 SpvLiteralBits::from32(uint32_t(FloatToHalf(float(val)))));
-        }
-        else
-        {
+            break;
+        case kIROp_FloatE4M3Type:
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatToFloatE4M3(float(val)))));
+            break;
+        case kIROp_FloatE5M2Type:
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatToFloatE5M2(float(val)))));
+            break;
+        case kIROp_BFloat16Type:
+            result = emitOpConstant(
+                inst,
+                type,
+                SpvLiteralBits::from32(uint32_t(FloatToBFloat16(float(val)))));
+            break;
+        default:
             SLANG_UNEXPECTED("missing case in SPIR-V emitFloatConstant");
         }
         m_mapIRInstToSpvInst[inst] = result;

@@ -26780,7 +26780,7 @@ struct CoopMat
         case spirv:
             this = spirv_asm
             {
-                result:$$CoopMat<T, S, M, N, R> = OpConstantComposite $t;
+                result:$$CoopMat<T, S, M, N, R> = OpCompositeConstruct $t;
             };
         case cuda:
             __intrinsic_asm "($0)->fill($1)";

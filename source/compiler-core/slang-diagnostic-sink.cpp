@@ -632,11 +632,19 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
         m_errorCount++;
     }
 
-    String message = renderDiagnostic(
-        getSourceLocationLexer(),
-        getSourceManager(),
-        {.enableTerminalColors = false, .enableUnicode = false},
-        diagnostic);
+    String message;
+    if (isFlagSet(Flag::MachineReadableDiagnostics))
+    {
+        message = renderDiagnosticMachineReadable(getSourceManager(), diagnostic);
+    }
+    else
+    {
+        message = renderDiagnostic(
+            getSourceLocationLexer(),
+            getSourceManager(),
+            {.enableTerminalColors = false, .enableUnicode = false},
+            diagnostic);
+    }
 
     if (writer)
     {
