@@ -367,3 +367,134 @@ SLANG_UNIT_TEST(replayContextFileSystemProxyLoadFile)
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays");
 }
+
+SLANG_UNIT_TEST(replayContextFileSystemProxyCalcCombinedPath)
+{
+    REPLAY_TEST;
+
+    // Create a file system proxy wrapping the OS file system
+    auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
+
+    // Enable recording
+    ctx().enable();
+    ctx().setMode(Mode::Record);
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Call calcCombinedPath through the proxy
+    ComPtr<ISlangBlob> pathBlob;
+    SlangResult result = fsProxy->calcCombinedPath(
+        SLANG_PATH_TYPE_DIRECTORY, "/base/dir", "subpath/file.txt", pathBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(pathBlob != nullptr);
+
+    // Store the result for comparison
+    UnownedStringSlice recordedPath(
+        (const char*)pathBlob->getBufferPointer(), pathBlob->getBufferSize());
+
+    // Switch to playback - the file system proxy should serve from recorded data
+    ctx().switchToPlayback();
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Call calcCombinedPath again - should read from recorded data, not call actual FS
+    ComPtr<ISlangBlob> replayedPathBlob;
+    SlangResult replayResult = fsProxy->calcCombinedPath(
+        SLANG_PATH_TYPE_DIRECTORY, "/base/dir", "subpath/file.txt", replayedPathBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
+    SLANG_CHECK(replayedPathBlob != nullptr);
+
+    // The replayed path should match the recorded path
+    UnownedStringSlice replayedPath(
+        (const char*)replayedPathBlob->getBufferPointer(), replayedPathBlob->getBufferSize());
+    SLANG_CHECK(recordedPath == replayedPath);
+
+    // Clean up
+    ctx().reset();
+}
+
+SLANG_UNIT_TEST(replayContextFileSystemProxyGetPathType)
+{
+    REPLAY_TEST;
+
+    // Create a temp file for testing
+    auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    const char* testFileName = ".slang-test-pathtype-file.txt";
+    SlangResult writeResult = osFileSystem->saveFile(testFileName, "test", 4);
+    SLANG_CHECK(SLANG_SUCCEEDED(writeResult));
+
+    ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
+
+    // Enable recording
+    ctx().enable();
+    ctx().setMode(Mode::Record);
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Call getPathType through the proxy
+    SlangPathType pathType = SLANG_PATH_TYPE_DIRECTORY;
+    SlangResult result = fsProxy->getPathType(testFileName, &pathType);
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(pathType == SLANG_PATH_TYPE_FILE);
+
+    // Delete the file
+    osFileSystem->remove(testFileName);
+
+    // Switch to playback
+    ctx().switchToPlayback();
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Call getPathType again - should read from recorded data even though file is gone
+    SlangPathType replayedPathType = SLANG_PATH_TYPE_DIRECTORY;
+    SlangResult replayResult = fsProxy->getPathType(testFileName, &replayedPathType);
+    SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
+    SLANG_CHECK(replayedPathType == SLANG_PATH_TYPE_FILE);
+
+    // Clean up
+    ctx().reset();
+}
+
+SLANG_UNIT_TEST(replayContextFileSystemProxySaveFile)
+{
+    REPLAY_TEST;
+
+    auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
+
+    const char* testFileName = ".slang-test-savefile-replay.txt";
+    const char* testContent = "Test content for replay";
+
+    // Enable recording
+    ctx().enable();
+    ctx().setMode(Mode::Record);
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Save file through proxy
+    SlangResult result = fsProxy->saveFile(testFileName, testContent, strlen(testContent));
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
+
+    // Verify file was actually written
+    SLANG_CHECK(File::exists(testFileName));
+
+    // Delete the file
+    osFileSystem->remove(testFileName);
+    SLANG_CHECK(!File::exists(testFileName));
+
+    // Switch to playback
+    ctx().switchToPlayback();
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Call saveFile again through playback - should NOT actually write to disk
+    SlangResult replayResult = fsProxy->saveFile(testFileName, testContent, strlen(testContent));
+    SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
+
+    // File should NOT exist because playback doesn't call actual FS
+    SLANG_CHECK(!File::exists(testFileName));
+
+    // Clean up
+    ctx().reset();
+}
