@@ -20,10 +20,7 @@ UInt getBindlessSpaceIndex(TargetProgram* targetProgram, DiagnosticSink* sink)
     // so it correctly accounts for all declared parameters.
     if (auto programLayout = targetProgram->getExistingLayout())
     {
-        if (programLayout->bindlessDescriptorSetIndex >= 0)
-        {
-            return (UInt)programLayout->bindlessDescriptorSetIndex;
-        }
+        return (UInt)programLayout->bindlessSpaceIndex;
     }
 
     // Fallback: if no layout exists yet, use the user-specified index or default to 0.

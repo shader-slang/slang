@@ -4355,7 +4355,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         markSpaceUsed(&context, nullptr, availableIndex);
 
         // Store the allocated space index in the program layout
-        programLayout->bindlessDescriptorSetIndex = availableIndex;
+        programLayout->bindlessSpaceIndex = availableIndex;
     }
 
     return programLayout;
