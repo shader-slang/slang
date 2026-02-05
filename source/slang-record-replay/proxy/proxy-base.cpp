@@ -128,12 +128,5 @@ ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
 
 }
 
-template<typename TFirstInterface, typename... TRestInterfaces>
-ProxyBase<TFirstInterface, TRestInterfaces...>::~ProxyBase()
-{
-    // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
-    ReplayContext::get().unregisterProxy(reinterpret_cast<ISlangUnknown*>(this));
-}
-
 
 } // namespace SlangRecord

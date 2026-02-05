@@ -5,6 +5,10 @@
 #include "../../source/slang-record-replay/replay-context.h"
 #include "../../source/slang-record-replay/proxy/proxy-base.h"
 #include "../../source/slang-record-replay/proxy/proxy-global-session.h"
+#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.h"
+#include "../../source/slang-record-replay/proxy/proxy-mutable-file-system.cpp"
+#include "../../source/core/slang-file-system.h"
+#include "../../source/core/slang-io.h"
 
 #include "unit-test/slang-unit-test.h"
 
@@ -2187,4 +2191,62 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
 
     // We messed with the stream, so clear context before it tries to clean itself up
     ctx().reset();
+}
+
+// =============================================================================
+// File System Proxy Tests
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextFileSystemProxyLoadFile)
+{
+    REPLAY_TEST;
+
+    // Use a unique test directory for this test's replays
+    ctx().setReplayDirectory(".slang-replays-fs-test");
+
+    // Create a file system proxy wrapping the OS file system
+    auto osFileSystem = Slang::OSFileSystem::getMutableSingleton();
+    ComPtr<MutableFileSystemProxy> fsProxy(new MutableFileSystemProxy(osFileSystem));
+
+    // Define test file content and write it out (using non-recorded FS)
+    const char* testFileName = ".slang-test-temp-file.txt";
+    const char* testContent = "Hello from file system proxy test!\nLine 2\nLine 3";
+    size_t testContentSize = strlen(testContent);
+    SlangResult writeResult = osFileSystem->saveFile(testFileName, testContent, testContentSize);
+    SLANG_CHECK(SLANG_SUCCEEDED(writeResult));
+
+    // Enable recording - this creates the replay directory
+    ctx().enable();
+    ctx().setMode(Mode::Record);
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Load the file through the proxy - this should capture its content
+    ComPtr<ISlangBlob> blob;
+    SlangResult result = fsProxy->loadFile(testFileName, blob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(result));
+    SLANG_CHECK(blob != nullptr);
+    SLANG_CHECK(blob->getBufferSize() == testContentSize);
+    SLANG_CHECK(memcmp(blob->getBufferPointer(), testContent, testContentSize) == 0);
+
+    // Delete the file (using non-recorded FS)
+    SlangResult removeResult = osFileSystem->remove(testFileName);
+    SLANG_CHECK(SLANG_SUCCEEDED(removeResult));
+
+    // Switch to playback - the file system proxy should serve from captured files
+    ctx().switchToPlayback();
+    ctx().registerInterface(fsProxy.get());
+    ctx().registerProxy(fsProxy.get(), osFileSystem);
+
+    // Should be able to replay, even though the file is gone.
+    ComPtr<ISlangBlob> replayedBlob;
+    SlangResult replayResult = fsProxy->loadFile(testFileName, replayedBlob.writeRef());
+    SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
+    SLANG_CHECK(replayedBlob != nullptr);
+    SLANG_CHECK(replayedBlob->getBufferSize() == testContentSize);
+    SLANG_CHECK(memcmp(replayedBlob->getBufferPointer(), testContent, testContentSize) == 0);
+
+    // Clean up
+    ctx().reset();
+    ctx().setReplayDirectory(".slang-replays");
 }

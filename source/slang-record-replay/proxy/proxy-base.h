@@ -3,6 +3,7 @@
 #include "../../core/slang-smart-pointer.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
+#include "../replay-context.h"
 
 namespace SlangRecord
 {
@@ -24,7 +25,12 @@ public:
     {
     }
 
-    virtual ~ProxyBase();
+    virtual ~ProxyBase()
+    {
+        // The proxy is being destroyed - unregister it from the context
+        // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
+        ReplayContext::get().unregisterProxy(reinterpret_cast<ISlangUnknown*>(this));
+    }
 
     // ISlangUnknown implementation - these are virtual so derived classes can override
     // to record the calls for replay

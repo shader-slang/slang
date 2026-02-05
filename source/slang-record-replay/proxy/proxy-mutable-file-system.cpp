@@ -48,7 +48,7 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
 
             // Record the hash (so playback can find the file)
             const char* hashCStr = hash.getBuffer();
-            ctx.record(RecordFlag::Output, hashCStr);
+            ctx.record(RecordFlag::None, hashCStr);
 
             if (outBlob)
                 *outBlob = blob.detach();
@@ -57,7 +57,7 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
         {
             // Record empty hash for failed loads
             const char* emptyHash = "";
-            ctx.record(RecordFlag::Output, emptyHash);
+            ctx.record(RecordFlag::None, emptyHash);
         }
 
         RECORD_RETURN(result);
@@ -66,7 +66,7 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
     {
         // Read the hash from the stream
         const char* hashCStr = nullptr;
-        ctx.record(RecordFlag::Output, hashCStr);
+        ctx.record(RecordFlag::None, hashCStr);
 
         if (!hashCStr || hashCStr[0] == '\0')
         {
