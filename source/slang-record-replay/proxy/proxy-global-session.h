@@ -3,7 +3,9 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
+#include "proxy-mutable-file-system.h"
 
+#include "../../core/slang-file-system.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -32,26 +34,30 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
     {
-        // Uses pretty function name to extract type and function and create a scoped object that:
-        // - use a scoped mutex to lock the replay context (by getting its mutex)
-        // - record the type/function (this will need to be added to the replace context (eg 'beginCall'))
         RECORD_CALL();
 
-        // Records 'desc' as an input
+        // Make a copy of the descriptor so we can modify the file system
+        slang::SessionDesc modifiedDesc = desc;
+
+        // Get the file system to wrap - use provided one or Slang's default
+        ISlangFileSystem* fileSystemToWrap =
+            desc.fileSystem ? desc.fileSystem : OSFileSystem::getMutableSingleton();
+
+        // Create proxy wrapper for the file system
+        ComPtr<MutableFileSystemProxy> fileSystemProxy(
+            new MutableFileSystemProxy(fileSystemToWrap));
+        modifiedDesc.fileSystem = fileSystemProxy;
+
+        // Record the original descriptor (before our modification)
         RECORD_INPUT(desc);
 
-        // Call create session
+        // Call create session with our wrapped file system
         slang::ISession* sessionPtr;
-        if(!outSession)
+        if (!outSession)
             outSession = &sessionPtr;
-        auto result = getActual<slang::IGlobalSession>()->createSession(desc, outSession);
+        auto result = getActual<slang::IGlobalSession>()->createSession(modifiedDesc, outSession);
 
-        // wraps outSession, and records 'outSession' as an output
-        // Note: this may need an extra set of 'record' functions added, or just a dereference
-        // Note: we could do the wrapping inside serialize - this may be cleaner
         RECORD_COM_OUTPUT(outSession);
-
-        // Records the result and returns it
         RECORD_RETURN(result);
     }
 

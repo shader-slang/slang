@@ -20,7 +20,7 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
     {
         // Forward to underlying file system
         ComPtr<ISlangBlob> blob;
-        SlangResult result = getActual<ISlangMutableFileSystem>()->loadFile(path, blob.writeRef());
+        SlangResult result = m_fileSystem->loadFile(path, blob.writeRef());
 
         if (SLANG_SUCCEEDED(result) && blob)
         {
@@ -104,7 +104,7 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
     else
     {
         // Idle mode - just forward
-        SlangResult result = getActual<ISlangMutableFileSystem>()->loadFile(path, outBlob);
+        SlangResult result = m_fileSystem->loadFile(path, outBlob);
         RECORD_RETURN(result);
     }
 }
