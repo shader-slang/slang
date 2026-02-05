@@ -2309,7 +2309,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     operands.add(argVal);
                 });
 
-        auto isRefThisTypeWitness = [](IRInst* inst) -> IRThisTypeWitness*
+        auto findThisTypeWitness = [](IRInst* inst) -> IRThisTypeWitness*
         {
             for (;;)
             {
@@ -2326,7 +2326,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         for (Index i = 0; i < operands.getCount(); i++)
         {
-            if (auto thisTypeWitness = isRefThisTypeWitness(operands[i]))
+            if (auto thisTypeWitness = findThisTypeWitness(operands[i]))
             {
                 // Check if thisTypeWitness is already in scope at current insert location
                 auto currentInsertLoc = getBuilder()->getInsertLoc().getParent();
