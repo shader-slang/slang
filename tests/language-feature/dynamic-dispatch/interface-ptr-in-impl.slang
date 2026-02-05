@@ -1,9 +1,12 @@
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -llvm
 
 // Test for issue #9836: Interface implementation containing pointer to interface
 //
 // An implementation of IFoo SHOULD be allowed to contain IFoo* (pointer to interface)
 // since pointers have fixed size regardless of pointee.
+//
+// Note: This test is restricted to LLVM backend because other backends (dx11, dx12, 
+// wgpu, metal) don't yet fully support the IR operations for pointer-to-interface casts.
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
