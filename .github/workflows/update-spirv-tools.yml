@@ -1,18 +1,124 @@
 name: Test SPIRV-Tools ToT
 
-# This is a placeholder workflow file.
-# The full implementation will be added in a subsequent PR.
-
 on:
-  workflow_dispatch: # Manual trigger only
+  schedule:
+    - cron: "0 2 * * 1" # Weekly on Monday 2 AM UTC
+  workflow_dispatch: # Manual trigger for testing
 
 jobs:
-  placeholder:
-    runs-on: windows-latest
-    timeout-minutes: 5
+  test-spirv-tot:
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 120
+
+    permissions:
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+
+    defaults:
+      run:
+        shell: bash
 
     steps:
-      - name: Placeholder step
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update SPIRV-Tools and run tests
+        id: update
+        shell: bash
+        env:
+          # Fix for non-LTS Abseil: set install prefix to avoid system-wide install
+          # See: https://github.com/abseil/abseil-cpp/blob/master/CMake/README.md
+          CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/external/spirv-tools/build/install
         run: |
-          echo "This is a placeholder for the SPIRV-Tools ToT testing workflow."
-          echo "The full implementation will be added in a subsequent PR."
+          bash extras/update-spirv-tools.sh --test 2>&1 | tee spirv-update.log
+        continue-on-error: true
+
+      - name: Parse results
+        id: parse
+        if: always()
+        shell: bash
+        run: |
+          # Check if script succeeded by checking the step outcome
+          if [ "${{ steps.update.outcome }}" = "success" ]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            STATUS_MSG=":green-check-mark: SPIRV-Tools ToT test PASSED"
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            STATUS_MSG=":alert:\nSPIRV-Tools ToT test FAILED"
+          fi
+
+          # Extract commit info from script output
+          # Script outputs: OLD_SPIRV_COMMIT=<short-hash>
+          #                 NEW_SPIRV_COMMIT=<short-hash>
+          OLD_COMMIT=$(grep "^OLD_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+          NEW_COMMIT=$(grep "^NEW_SPIRV_COMMIT=" spirv-update.log | cut -d= -f2)
+
+          # Log extracted commits
+          echo "Extracted commits:"
+          echo "  OLD_COMMIT: '$OLD_COMMIT'"
+          echo "  NEW_COMMIT: '$NEW_COMMIT'"
+
+          # Set outputs
+          echo "old_spirv_commit=${OLD_COMMIT:-unknown}" >> $GITHUB_OUTPUT
+          echo "new_spirv_commit=${NEW_COMMIT:-unknown}" >> $GITHUB_OUTPUT
+          echo "status_msg=$STATUS_MSG" >> $GITHUB_OUTPUT
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirv-update-logs
+          path: |
+            spirv-update.log
+            build/test-results/
+
+      - name: Suggest update command
+        if: steps.parse.outputs.status == 'success'
+        shell: bash
+        run: |
+          echo ""
+          echo "=========================================="
+          echo "SPIRV-Tools ToT Test PASSED"
+          echo "=========================================="
+          echo ""
+          echo "To update SPIRV-Tools and create a PR, run:"
+          echo ""
+          echo "  ./extras/update-spirv-tools.sh --test --create-pr"
+          echo ""
+          echo "Or to update to the specific commit tested by CI:"
+          echo ""
+          echo "  ./extras/update-spirv-tools.sh --commit ${{ steps.parse.outputs.new_spirv_commit }} --test --create-pr"
+          echo ""
+          echo "=========================================="
+
+      - name: Send Slack notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "SPIRV-Tools-ToT-Test": "${{ steps.parse.outputs.status_msg }}\nUpdate: `${{ steps.parse.outputs.old_spirv_commit }}` -> `${{ steps.parse.outputs.new_spirv_commit }}`${{ steps.parse.outputs.status == 'failure' && format('\nRun: {0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) || '' }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SPIRV }}
+
+      - name: Fail workflow if tests failed
+        if: steps.parse.outputs.status == 'failure'
+        run: exit 1
