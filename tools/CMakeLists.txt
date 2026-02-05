@@ -32,6 +32,13 @@ function(generator dir)
                     "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
         )
     else()
+        # Check if using compiler-core to enable PCH
+        string(FIND "${ARGN}" "compiler-core" HAS_COMPILER_CORE)
+        if(${HAS_COMPILER_CORE} GREATER -1)
+            set(PCH_ARGS PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH})
+        else()
+            set(PCH_ARGS "")
+        endif()
         slang_add_target(
             ${dir}
             EXECUTABLE
@@ -43,6 +50,7 @@ function(generator dir)
             FOLDER generators
             INSTALL_COMPONENT generators
             EXPORT_SET_NAME SlangGeneratorTargets
+            ${PCH_ARGS}
             ${ARGN}
         )
     endif()
@@ -93,6 +101,7 @@ slang_add_target(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core
     INCLUDE_DIRECTORIES_PUBLIC .
+    PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
     FOLDER generators
 )
 
@@ -153,6 +162,7 @@ if(SLANG_ENABLE_GFX)
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
             $<$<BOOL:${SLANG_ENABLE_NVAPI}>:GFX_NVAPI>
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         # This is a shared library, so we need to set a preprocessor macro to mark
         # exported symbols
         EXPORT_MACRO_PREFIX SLANG_GFX
@@ -431,6 +441,7 @@ if(SLANG_ENABLE_REPLAYER)
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}/source/slang-record-replay
+        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         FOLDER test
     )
 endif()
