@@ -1,5 +1,7 @@
 #include "replay-stream-decoder.h"
 
+#include "../core/slang-io.h"
+
 #include <cstdio>
 
 namespace SlangRecord {
@@ -23,6 +25,97 @@ String ReplayStreamDecoder::decodeFile(const char* filePath)
 {
     ReplayStream stream = ReplayStream::loadFromFile(filePath);
     return decode(stream, 0);
+}
+
+String ReplayStreamDecoder::decodeWithIndex(const char* folderPath)
+{
+    // Construct paths to stream.bin and index.bin
+    String folder(folderPath);
+    String streamPath = Slang::Path::combine(folder, "stream.bin");
+    String indexPath = Slang::Path::combine(folder, "index.bin");
+
+    // Check if index.bin exists - if not, fall back to simple decoding
+    if (!Slang::File::exists(indexPath))
+    {
+        // Try to decode just the stream.bin
+        if (Slang::File::exists(streamPath))
+            return decodeFile(streamPath.getBuffer());
+        
+        // Maybe the path itself is the stream.bin file
+        return decodeFile(folderPath);
+    }
+
+    ReplayStream dataStream = ReplayStream::loadFromFile(streamPath.getBuffer());
+    ReplayStream indexStream = ReplayStream::loadFromFile(indexPath.getBuffer());
+    
+    return decodeWithIndex(dataStream, indexStream);
+}
+
+String ReplayStreamDecoder::decodeWithIndex(
+    ReplayStream& dataStream,
+    ReplayStream& indexStream)
+{
+    StringBuilder output;
+    
+    // Calculate number of calls from index stream size
+    size_t indexSize = indexStream.getSize();
+    size_t callCount = indexSize / CallIndexEntry::kSize;
+    size_t dataSize = dataStream.getSize();
+    
+    output << "=== Replay Stream Dump (Indexed) ===\n";
+    output << "Data stream size: " << dataSize << " bytes\n";
+    output << "Index stream size: " << indexSize << " bytes\n";
+    output << "Total calls: " << callCount << "\n\n";
+
+    // Read all index entries into memory for easy access
+    Slang::List<CallIndexEntry> entries;
+    entries.setCount(Slang::Index(callCount));
+    indexStream.seek(0);
+    for (size_t i = 0; i < callCount; i++)
+    {
+        indexStream.read(&entries[Slang::Index(i)], sizeof(CallIndexEntry));
+    }
+
+    // Process each call
+    for (size_t callIdx = 0; callIdx < callCount; callIdx++)
+    {
+        const CallIndexEntry& entry = entries[Slang::Index(callIdx)];
+        
+        // Determine the end position for this call's data
+        size_t startOffset = entry.streamPosition;
+        size_t endOffset;
+        if (callIdx + 1 < callCount)
+        {
+            endOffset = entries[Slang::Index(callIdx + 1)].streamPosition;
+        }
+        else
+        {
+            endOffset = dataSize;
+        }
+
+        // Output the call header
+        output << "[" << callIdx << "] " << entry.signature;
+        if (entry.thisHandle == kNullHandle)
+            output << ", #null (static)";
+        else
+            output << ", #" << entry.thisHandle;
+        output << "\n";
+
+        // Decode the call's data with indentation
+        try
+        {
+            decodeByteRange(dataStream, output, startOffset, endOffset, 1);
+        }
+        catch (const Slang::Exception& e)
+        {
+            output << "    ERROR decoding call: " << e.Message.getBuffer() << "\n";
+        }
+        
+        output << "\n";
+    }
+
+    output << "=== End of Stream (" << callCount << " calls) ===\n";
+    return output.produceString();
 }
 
 String ReplayStreamDecoder::decodeBytes(const void* data, size_t size)
@@ -261,6 +354,51 @@ String ReplayStreamDecoder::decodeValueFromBytes(const void* data, size_t size)
     StringBuilder output;
     decodeValueFromStream(stream, output, 0);
     return output.produceString();
+}
+
+void ReplayStreamDecoder::decodeByteRange(
+    ReplayStream& stream,
+    StringBuilder& output,
+    size_t startOffset,
+    size_t endOffset,
+    int indentLevel)
+{
+    stream.seek(startOffset);
+    
+    // Skip the call signature and this handle (already shown in header)
+    // First value should be the signature string
+    TypeId sigType = peekTypeId(stream);
+    if (sigType == TypeId::String)
+    {
+        skipValueInStream(stream); // Skip signature
+    }
+    
+    // Next should be the this handle
+    TypeId handleType = peekTypeId(stream);
+    if (handleType == TypeId::ObjectHandle)
+    {
+        skipValueInStream(stream); // Skip this handle
+    }
+
+    // Now decode remaining values (arguments, outputs, return value)
+    int argNum = 0;
+    while (stream.getPosition() < endOffset && stream.getPosition() < stream.getSize())
+    {
+        indent(output, indentLevel);
+        output << "[" << argNum++ << "] ";
+        
+        try
+        {
+            decodeValueFromStream(stream, output, indentLevel);
+        }
+        catch (const Slang::Exception& e)
+        {
+            output << "ERROR: " << e.Message.getBuffer();
+            break;
+        }
+        
+        output << "\n";
+    }
 }
 
 void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)

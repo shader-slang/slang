@@ -17,16 +17,29 @@ public:
     // Static API for decoding entire streams
     // =========================================================================
 
-    /// Decode a replay stream to a string.
+    /// Decode a replay stream to a string (raw value-by-value dump).
     /// @param stream The stream to decode (will be read from current position).
     /// @param maxBytes Maximum bytes to decode (0 = entire stream).
     /// @return Human-readable text representation.
     SLANG_API static Slang::String decode(ReplayStream& stream, size_t maxBytes = 0);
 
-    /// Decode a file to string.
+    /// Decode a file to string (raw value-by-value dump).
     /// @param filePath Path to the stream.bin file.
     /// @return Human-readable text representation.
     SLANG_API static Slang::String decodeFile(const char* filePath);
+
+    /// Decode a replay folder using index.bin for structured call-by-call output.
+    /// @param folderPath Path to the folder containing stream.bin and index.bin.
+    /// @return Human-readable text representation with call structure.
+    SLANG_API static Slang::String decodeWithIndex(const char* folderPath);
+
+    /// Decode a replay using index stream for structured call-by-call output.
+    /// @param dataStream The main data stream (stream.bin contents).
+    /// @param indexStream The index stream (index.bin contents).
+    /// @return Human-readable text representation with call structure.
+    SLANG_API static Slang::String decodeWithIndex(
+        ReplayStream& dataStream,
+        ReplayStream& indexStream);
 
     /// Decode raw bytes to string.
     /// @param data Pointer to the data.
@@ -52,6 +65,19 @@ public:
     /// @param size Size of the data in bytes.
     /// @return Human-readable text representation.
     SLANG_API static Slang::String decodeValueFromBytes(const void* data, size_t size);
+
+    /// Decode a range of bytes from the stream (for a single call's data).
+    /// @param stream The stream to read from.
+    /// @param output StringBuilder to append the decoded text to.
+    /// @param startOffset Start position in the stream.
+    /// @param endOffset End position in the stream (exclusive).
+    /// @param indentLevel Base indentation level for output.
+    SLANG_API static void decodeByteRange(
+        ReplayStream& stream,
+        Slang::StringBuilder& output,
+        size_t startOffset,
+        size_t endOffset,
+        int indentLevel = 1);
 
     /// Skip a single value in the stream (advance position past it).
     /// @param stream The stream to skip in.

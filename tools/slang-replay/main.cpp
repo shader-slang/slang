@@ -9,6 +9,7 @@ struct Options
 {
     bool convertToJson{false};
     bool decode{false};
+    bool rawDecode{false};
     bool replay{false};
     bool verbose{false};
     Slang::String recordFileName;
@@ -22,7 +23,9 @@ void printUsage()
     printf(
         "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
-    printf("  --decode, -d: Decode the binary stream.bin file to human-readable text.\n");
+    printf("  --decode, -d: Decode the binary stream to human-readable text.\n");
+    printf("                If given a folder with index.bin, uses structured call-by-call output.\n");
+    printf("  --raw, -R: Force raw value-by-value output (ignore index.bin even if present).\n");
     printf("  --replay, -r: Replay the recorded API calls.\n");
     printf("  --verbose, -v: Enable verbose output during replay.\n");
     printf("  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
@@ -57,6 +60,11 @@ Options parseOption(int argc, char* argv[])
         else if ((strcmp("--decode", arg) == 0) || (strcmp("-d", arg) == 0))
         {
             option.decode = true;
+            argIndex++;
+        }
+        else if ((strcmp("--raw", arg) == 0) || (strcmp("-R", arg) == 0))
+        {
+            option.rawDecode = true;
             argIndex++;
         }
         else if ((strcmp("--replay", arg) == 0) || (strcmp("-r", arg) == 0))
@@ -113,8 +121,28 @@ int main(int argc, char* argv[])
         // Decode the binary stream to human-readable text
         try
         {
-            Slang::String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(
-                options.recordFileName.getBuffer());
+            Slang::String decoded;
+            
+            if (options.rawDecode)
+            {
+                // Raw mode: simple value-by-value dump
+                Slang::String inputPath = options.recordFileName;
+                
+                // If given a folder (check by seeing if stream.bin exists inside), append stream.bin
+                Slang::String possibleStreamPath = Slang::Path::combine(inputPath, "stream.bin");
+                if (Slang::File::exists(possibleStreamPath))
+                {
+                    inputPath = possibleStreamPath;
+                }
+                
+                decoded = SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer());
+            }
+            else
+            {
+                // Default: use index-based structured output if available
+                decoded = SlangRecord::ReplayStreamDecoder::decodeWithIndex(
+                    options.recordFileName.getBuffer());
+            }
             
             if (options.outputFileName.getLength() > 0)
             {
