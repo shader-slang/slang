@@ -292,6 +292,54 @@ void ReplayStreamDecoder::decodeValueFromStream(
         output << "Null";
         break;
 
+    case TypeId::TypeReflectionRef:
+        {
+            // TypeReflectionRef: module handle + type name
+            uint64_t moduleHandle;
+            stream.skip(1);  // Skip ObjectHandle TypeId for module
+            stream.read(&moduleHandle, sizeof(moduleHandle));
+            
+            // Read type name
+            uint8_t stringTypeId;
+            stream.read(&stringTypeId, 1);
+            
+            if (stringTypeId == static_cast<uint8_t>(TypeId::String))
+            {
+                uint32_t len;
+                stream.read(&len, sizeof(len));
+                
+                if (moduleHandle == kNullHandle)
+                {
+                    output << "TypeRef: null";
+                    stream.skip(len);  // Skip the string content
+                }
+                else if (len == 0)
+                {
+                    output << "TypeRef(module=#" << moduleHandle << "): \"\"";
+                }
+                else if (len < 256)
+                {
+                    char buffer[256];
+                    stream.read(buffer, len);
+                    buffer[len] = '\0';
+                    output << "TypeRef(module=#" << moduleHandle << "): \"" << buffer << "\"";
+                }
+                else
+                {
+                    char buffer[128];
+                    stream.read(buffer, 127);
+                    buffer[127] = '\0';
+                    stream.skip(len - 127);
+                    output << "TypeRef(module=#" << moduleHandle << ", len=" << len << "): \"" << buffer << "...\"";
+                }
+            }
+            else
+            {
+                output << "TypeRef(module=#" << moduleHandle << "): <invalid string type>";
+            }
+        }
+        break;
+
     case TypeId::Array:
         {
             uint64_t count;
@@ -451,6 +499,18 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
         // Nothing to skip
         break;
 
+    case TypeId::TypeReflectionRef:
+        {
+            // TypeReflectionRef: ObjectHandle TypeId + module handle + String TypeId + string length + string data
+            stream.skip(1);  // ObjectHandle TypeId
+            stream.skip(8);  // module handle
+            stream.skip(1);  // String TypeId
+            uint32_t len;
+            stream.read(&len, sizeof(len));
+            stream.skip(len);  // type name string
+        }
+        break;
+
     case TypeId::Array:
         {
             uint64_t count;
@@ -542,6 +602,7 @@ const char* ReplayStreamDecoder::getTypeIdName(TypeId type)
     case TypeId::Blob:          return "Blob";
     case TypeId::ObjectHandle:  return "ObjectHandle";
     case TypeId::Null:          return "Null";
+    case TypeId::TypeReflectionRef: return "TypeReflectionRef";
     case TypeId::Array:         return "Array";
     case TypeId::Error:         return "Error";
     default:                    return "Unknown";
