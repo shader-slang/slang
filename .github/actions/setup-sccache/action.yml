@@ -1,0 +1,47 @@
+name: Setup sccache
+description: Install and configure sccache with GCS backend for Linux and macOS
+
+inputs:
+  gcs-bucket:
+    description: "GCS bucket name for sccache"
+    required: true
+    default: "slang-ci-cache"
+  platform:
+    description: "Platform: linux or macos"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Install sccache
+    - name: Install sccache (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        curl -L https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-unknown-linux-musl.tar.gz | tar xz
+        sudo mv sccache-v0.7.4-x86_64-unknown-linux-musl/sccache /usr/local/bin/
+        chmod +x /usr/local/bin/sccache
+        sccache --version
+
+    - name: Install sccache (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        brew install sccache
+        sccache --version
+
+    # Configure sccache - Always READ_WRITE mode
+    - name: Configure sccache
+      shell: bash
+      run: |
+        echo "SCCACHE_GCS_BUCKET=${{ inputs.gcs-bucket }}" >> $GITHUB_ENV
+        echo "SCCACHE_GCS_RW_MODE=READ_WRITE" >> $GITHUB_ENV
+        echo "SCCACHE_CACHE_ZSTD_LEVEL=3" >> $GITHUB_ENV
+        echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
+
+        # Get sccache path for CMake
+        sccache_path=$(which sccache)
+        echo "sccache_path=$sccache_path" >> $GITHUB_ENV
+
+        echo "🔧 sccache configuration:"
+        sccache --show-stats || true

@@ -15,6 +15,7 @@ jobs:
     runs-on: slang-larger-runner-1
 
     permissions:
+      id-token: write # Required for Workload Identity (GCS auth)
       contents: read
       pull-requests: write
       checks: write
@@ -29,6 +30,18 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 2
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+          gcs-bucket: slang-ci-cache
 
       - name: Install build dependencies
         run: |
@@ -155,9 +168,15 @@ jobs:
           export PATH=/usr/local/cuda-13.0/bin:$PATH
           export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
+          # Show sccache stats before build
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats
+
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
       - name: Build Slang
         run: |
@@ -165,3 +184,6 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
           cmake --build --preset debug -j$(nproc)
+
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats
