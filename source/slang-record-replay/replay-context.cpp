@@ -1167,15 +1167,22 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             // Module implements slang::IModule, so we can cast it
             auto moduleInterface = static_cast<slang::IModule*>(owningModule);
 
-            // Try to get the proxy for this module if it exists
-            auto proxy = getProxy(static_cast<ISlangUnknown*>(moduleInterface));
-            if (proxy && isInterfaceRegistered(proxy))
+            // Use queryInterface to get a canonical ISlangUnknown pointer
+            // This handles multiple inheritance correctly
+            Slang::ComPtr<ISlangUnknown> canonicalUnknown;
+            if (SLANG_SUCCEEDED(moduleInterface->queryInterface(
+                    SLANG_IID_PPV_ARGS(canonicalUnknown.writeRef()))))
             {
-                moduleHandle = getHandleForInterface(proxy);
-            }
-            else if (isInterfaceRegistered(static_cast<ISlangUnknown*>(moduleInterface)))
-            {
-                moduleHandle = getHandleForInterface(static_cast<ISlangUnknown*>(moduleInterface));
+                // Try to get the proxy for this module if it exists
+                auto proxy = getProxy(canonicalUnknown);
+                if (proxy && isInterfaceRegistered(proxy))
+                {
+                    moduleHandle = getHandleForInterface(proxy);
+                }
+                else if (isInterfaceRegistered(canonicalUnknown))
+                {
+                    moduleHandle = getHandleForInterface(canonicalUnknown);
+                }
             }
         }
 
@@ -1203,12 +1210,18 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
 
         // Look up the module from the handle
         auto* moduleUnknown = getInterfaceForHandle(moduleHandle);
-        auto* moduleInterface = static_cast<slang::IModule*>(moduleUnknown);
 
         // Unwrap proxy if needed
         auto* impl = getImplementation(moduleUnknown);
         if (impl)
-            moduleInterface = static_cast<slang::IModule*>(impl);
+            moduleUnknown = impl;
+
+        // Query for IModule interface properly (handles multiple inheritance)
+        Slang::ComPtr<slang::IModule> moduleInterface;
+        if (moduleUnknown)
+        {
+            moduleUnknown->queryInterface(slang::IModule::getTypeGuid(), (void**)moduleInterface.writeRef());
+        }
 
         // Get the type via the module's layout
         if (moduleInterface && typeName)

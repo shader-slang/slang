@@ -2012,3 +2012,183 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays");
 }
+
+// =============================================================================
+// TypeReflection Tests
+// =============================================================================
+
+SLANG_UNIT_TEST(replayContextTypeReflectionNull)
+{
+    REPLAY_TEST;
+
+    // Test null TypeReflection round-trip
+    ctx().enable();
+
+    slang::TypeReflection* writeType = nullptr;
+    ctx().record(RecordFlag::Input, writeType);
+
+    ctx().switchToPlayback();
+
+    slang::TypeReflection* readType = reinterpret_cast<slang::TypeReflection*>(0xDEADBEEF);
+    ctx().record(RecordFlag::Input, readType);
+
+    SLANG_CHECK(readType == nullptr);
+}
+
+SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
+{
+    REPLAY_TEST;
+
+    // Now test recording/playback
+    ctx().enable();
+
+    // Create a global session and session to load a module
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    // Load a simple module with a type we can look up
+    const char* testCode = R"(
+        struct MyTestStruct
+        {
+            float x;
+            int y;
+        };
+    )";
+
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* module = session->loadModuleFromSourceString(
+        "test-module",
+        "test-module.slang",
+        testCode,
+        diagnostics.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    // Get a type from the module
+    auto* layout = module->getLayout();
+    SLANG_CHECK(layout != nullptr);
+
+    slang::TypeReflection* originalType = layout->findTypeByName("MyTestStruct");
+    SLANG_CHECK(originalType != nullptr);
+
+    // Register the module so the TypeReflection can find it during playback
+    // Use queryInterface to get the canonical ISlangUnknown pointer (handles multiple inheritance)
+    ComPtr<ISlangUnknown> moduleUnknown;
+    SLANG_CHECK(SLANG_SUCCEEDED(module->queryInterface(SLANG_IID_PPV_ARGS(moduleUnknown.writeRef()))));
+    uint64_t moduleHandle = ctx().registerInterface(moduleUnknown);
+    SLANG_CHECK(moduleHandle != kNullHandle);
+
+    // Record the type
+    slang::TypeReflection* writeType = originalType;
+    ctx().record(RecordFlag::Input, writeType);
+
+    ctx().switchToPlayback();
+
+    ctx().setTtyLogging(true);
+    ctx().executeNextCall();
+    ctx().executeNextCall();
+    ctx().executeNextCall();
+    ctx().executeNextCall();
+
+    // Read back the type
+    slang::TypeReflection* readType = nullptr;
+    ctx().record(RecordFlag::Input, readType);
+
+    // Verify the type was recovered
+    SLANG_CHECK(readType != nullptr);
+
+    // Verify it's the same type by checking its name
+    ComPtr<ISlangBlob> originalNameBlob;
+    ComPtr<ISlangBlob> readNameBlob;
+    originalType->getFullName(originalNameBlob.writeRef());
+    readType->getFullName(readNameBlob.writeRef());
+
+    SLANG_CHECK(originalNameBlob != nullptr);
+    SLANG_CHECK(readNameBlob != nullptr);
+
+    const char* originalName = (const char*)originalNameBlob->getBufferPointer();
+    const char* readName = (const char*)readNameBlob->getBufferPointer();
+
+    SLANG_CHECK(strcmp(originalName, readName) == 0);
+}
+
+SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
+{
+    REPLAY_TEST;
+
+    // Create a global session and session
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+
+    slang::SessionDesc sessionDesc = {};
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
+
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
+
+    // Load a module that uses built-in types
+    const char* testCode = R"(
+        struct TestStruct
+        {
+            float3 position;
+            float4x4 transform;
+        };
+    )";
+
+    ComPtr<slang::IBlob> diagnostics;
+    slang::IModule* module = session->loadModuleFromSourceString(
+        "builtin-test",
+        "builtin-test.slang",
+        testCode,
+        diagnostics.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    auto* layout = module->getLayout();
+    SLANG_CHECK(layout != nullptr);
+
+    // Get a builtin type like float3
+    slang::TypeReflection* float3Type = layout->findTypeByName("float3");
+    SLANG_CHECK(float3Type != nullptr);
+
+    ctx().enable();
+
+    // Register the module using queryInterface for canonical pointer
+    ComPtr<ISlangUnknown> moduleUnknown;
+    SLANG_CHECK(SLANG_SUCCEEDED(module->queryInterface(SLANG_IID_PPV_ARGS(moduleUnknown.writeRef()))));
+    ctx().registerInterface(moduleUnknown);
+
+    // Record the builtin type
+    slang::TypeReflection* writeType = float3Type;
+    ctx().record(RecordFlag::Input, writeType);
+
+    ctx().switchToPlayback();
+
+    slang::TypeReflection* readType = nullptr;
+    ctx().record(RecordFlag::Input, readType);
+
+    SLANG_CHECK(readType != nullptr);
+
+    // Verify name matches
+    ComPtr<ISlangBlob> originalNameBlob;
+    ComPtr<ISlangBlob> readNameBlob;
+    float3Type->getFullName(originalNameBlob.writeRef());
+    readType->getFullName(readNameBlob.writeRef());
+
+    const char* originalName = (const char*)originalNameBlob->getBufferPointer();
+    const char* readName = (const char*)readNameBlob->getBufferPointer();
+
+    SLANG_CHECK(strcmp(originalName, readName) == 0);
+}

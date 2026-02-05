@@ -216,11 +216,19 @@ public:
         const char* string,
         slang::IBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(moduleName);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(string);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::loadModuleFromSourceString");
+        RECORD_CALL();
+        RECORD_INPUT(moduleName);
+        RECORD_INPUT(path);
+        RECORD_INPUT(string);
+        
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+            
+        slang::IModule* result = getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getDynamicObjectRTTIBytes(
