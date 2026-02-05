@@ -718,6 +718,12 @@ bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern
     return false;
 }
 
+bool isAbstractWitnessTable(IRInst* inst);
+static IRInst* maybeCloneThisTypeWitness(
+    IRGenContext* context,
+    IRInst* thisTypeWitness,
+    Type* thisType);
+
 /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance
 /// declaration?
 bool isEffectivelyStatic(Decl* decl, ContainerDecl* parentDecl);
@@ -2308,6 +2314,54 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
+
+        auto isRefThisTypeWitness = [](IRInst* inst) -> IRThisTypeWitness*
+        {
+            for(;;)
+            {
+                if (auto thisTypeWitness = as<IRThisTypeWitness>(inst))
+                    return thisTypeWitness;
+                if (auto lookup = as<IRLookupWitnessMethod>(inst))
+                {
+                    inst = lookup->getWitnessTable();
+                    continue;
+                }
+                return nullptr;
+            }
+        };
+
+        for (Index i = 0; i < operands.getCount(); i++)
+        {
+            if (auto thisTypeWitness = isRefThisTypeWitness(operands[i]))
+            {
+                // Check if thisTypeWitness is already in scope at current insert location
+                auto currentInsertLoc = getBuilder()->getInsertLoc().getParent();
+                auto parentOfThisTypeWitness = thisTypeWitness->parent;
+                bool needsClone = true;
+
+                while (currentInsertLoc != nullptr)
+                {
+                    if (parentOfThisTypeWitness == currentInsertLoc)
+                    {
+                        needsClone = false;
+                        break;
+                    }
+                    currentInsertLoc = currentInsertLoc->parent;
+                }
+
+                if (needsClone)
+                {
+                    // Clone the ThisTypeWitness at current insert location
+                    // The constraint type is stored in the witness table type, not as an operand
+                    auto witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
+                    SLANG_ASSERT(witnessTableType);
+                    auto constraintType = (IRType*)witnessTableType->getConformanceType();
+                    auto newThisTypeWitness = getBuilder()->createThisTypeWitness(constraintType);
+                    operands[i] = newThisTypeWitness;
+                }
+            }
+        }
+
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
