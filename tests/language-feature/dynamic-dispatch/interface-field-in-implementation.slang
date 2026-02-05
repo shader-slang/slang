@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 // Test for issue #9835: An implementation of IFoo should NOT be allowed
-// to contain IFoo or IFoo[] typed fields, as this creates infinite recursion
-// in the existential representation.
+// to contain IFoo or IFoo[] typed fields (directly or indirectly), as this
+// creates infinite recursion in the existential representation.
 
 interface IFoo
 {
@@ -30,11 +30,35 @@ struct BadImpl2 : IFoo
     void foo() {}
 };
 
-// Case 3: Different interface - allowed (only problematic if IBar is existential-typed)
-// This case is deferred per issue #9835 discussion.
+// Case 3: Indirect self-reference through nested struct - should error
+struct InnerWithIFoo
+{
+    IFoo nested;
+};
+
+struct BadImpl3 : IFoo
+{
+    // CHECK: ([[# @LINE+1]]): error 33083: cannot have interface-typed member 'wrapper' when conforming to interface 'IFoo'.
+    InnerWithIFoo wrapper;  // Contains IFoo indirectly
+    void foo() {}
+};
+
+// Case 4: Different interface - allowed (no self-referential recursion)
 struct OkImpl : IFoo
 {
-    IBar other;  // OK - different interface, no self-referential recursion
+    IBar other;  // OK - different interface
+    void foo() {}
+};
+
+// Case 5: Struct without target interface - allowed
+struct InnerWithIBar
+{
+    IBar nested;
+};
+
+struct OkImpl2 : IFoo
+{
+    InnerWithIBar wrapper;  // OK - doesn't contain IFoo
     void foo() {}
 };
 
