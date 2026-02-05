@@ -1166,6 +1166,7 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         {
             // Module implements slang::IModule, so we can cast it
             auto moduleInterface = static_cast<slang::IModule*>(owningModule);
+            auto moduleUnknown = static_cast<ISlangUnknown*>(moduleInterface);
 
             // Use queryInterface to get a canonical ISlangUnknown pointer
             // This handles multiple inheritance correctly

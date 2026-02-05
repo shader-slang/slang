@@ -37,9 +37,17 @@ public:
     virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
     getLayout(SlangInt targetIndex, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("ModuleProxy::getLayout");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+        
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+            
+        slang::ProgramLayout* result = getActual<slang::IModule>()->getLayout(targetIndex, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return result; // don't capture pointer
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override

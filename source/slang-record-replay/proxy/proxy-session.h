@@ -225,7 +225,7 @@ public:
         if (!outDiagnostics)
             outDiagnostics = &diagnosticsPtr;
             
-        slang::IModule* result = getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(moduleName, path, string, outDiagnostics);
         
         RECORD_COM_OUTPUT(outDiagnostics);
         return RECORD_COM_RESULT(result);

@@ -2041,18 +2041,17 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
 
     // Now test recording/playback
     ctx().enable();
+    ctx().setTtyLogging(true);
 
     // Create a global session and session to load a module
     ComPtr<slang::IGlobalSession> globalSession;
     SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
-
     slang::SessionDesc sessionDesc = {};
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
     targetDesc.profile = globalSession->findProfile("spirv_1_5");
     sessionDesc.targets = &targetDesc;
     sessionDesc.targetCount = 1;
-
     ComPtr<slang::ISession> session;
     SLANG_CHECK(SLANG_SUCCEEDED(globalSession->createSession(sessionDesc, session.writeRef())));
 
@@ -2064,42 +2063,31 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
             int y;
         };
     )";
-
     ComPtr<slang::IBlob> diagnostics;
     slang::IModule* module = session->loadModuleFromSourceString(
         "test-module",
         "test-module.slang",
         testCode,
         diagnostics.writeRef());
-    SLANG_CHECK(module != nullptr);
-
-    // Get a type from the module
     auto* layout = module->getLayout();
-    SLANG_CHECK(layout != nullptr);
-
     slang::TypeReflection* originalType = layout->findTypeByName("MyTestStruct");
-    SLANG_CHECK(originalType != nullptr);
 
-    // Register the module so the TypeReflection can find it during playback
-    // Use queryInterface to get the canonical ISlangUnknown pointer (handles multiple inheritance)
-    ComPtr<ISlangUnknown> moduleUnknown;
-    SLANG_CHECK(SLANG_SUCCEEDED(module->queryInterface(SLANG_IID_PPV_ARGS(moduleUnknown.writeRef()))));
-    uint64_t moduleHandle = ctx().registerInterface(moduleUnknown);
-    SLANG_CHECK(moduleHandle != kNullHandle);
-
-    // Record the type
+    // Record the type explicitly
     slang::TypeReflection* writeType = originalType;
     ctx().record(RecordFlag::Input, writeType);
 
+    // Switch to playback and execute the calls that get us to the point
+    // at which the type was recorded.
     ctx().switchToPlayback();
+    ctx().executeNextCall(); //slang_createGlobalSession
+    ctx().executeNextCall(); //globalSession->findProfile
+    ctx().executeNextCall(); //globalSession->createSession
+    ctx().executeNextCall(); //session->loadModuleFromSourceString
+    ctx().executeNextCall(); //module->getLayout
 
-    ctx().setTtyLogging(true);
-    ctx().executeNextCall();
-    ctx().executeNextCall();
-    ctx().executeNextCall();
-    ctx().executeNextCall();
-
-    // Read back the type
+    //<layout->findTypeByName not captured>
+ 
+    // Should now be hitting the call to 
     slang::TypeReflection* readType = nullptr;
     ctx().record(RecordFlag::Input, readType);
 

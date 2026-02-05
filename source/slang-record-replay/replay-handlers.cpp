@@ -157,6 +157,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ModuleProxy, getDependencyFilePath);
     REPLAY_REGISTER(ModuleProxy, getModuleReflection);
     REPLAY_REGISTER(ModuleProxy, precompileForTarget);
+    REPLAY_REGISTER(ModuleProxy, getLayout);
     
     // =========================================================================
     // ComponentTypeProxy handlers
