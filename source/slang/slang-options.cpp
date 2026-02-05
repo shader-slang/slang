@@ -1319,10 +1319,6 @@ struct OptionsParser
 
     List<RawTranslationUnit> m_rawTranslationUnits;
 
-    // If we already have a translation unit for Slang code, then this will give its index.
-    // If not, it will be `-1`.
-    int m_slangTranslationUnitIndex = -1;
-
     int m_translationUnitCount = 0;
     int m_currentTranslationUnitIndex = -1;
 
@@ -1371,21 +1367,15 @@ int OptionsParser::addTranslationUnit(SlangSourceLanguage language, Stage implie
 
 void OptionsParser::addInputSlangPath(String const& path)
 {
-    // All of the input .slang files will be grouped into a single logical translation unit,
-    // which we create lazily when the first .slang file is encountered.
-    if (m_slangTranslationUnitIndex == -1)
-    {
-        m_translationUnitCount++;
-        m_slangTranslationUnitIndex =
-            addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
-    }
+    // Each input .slang file represents a separate module.
+    // This allows for proper module deduplication when a file
+    // imports another file that was also specified on the command line.
+    m_translationUnitCount++;
+    m_currentTranslationUnitIndex = addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, Stage::Unknown);
 
     m_compileRequest->addTranslationUnitSourceFile(
-        m_rawTranslationUnits[m_slangTranslationUnitIndex].translationUnitID,
+        m_rawTranslationUnits[m_currentTranslationUnitIndex].translationUnitID,
         path.begin());
-
-    // Set the translation unit to be used by subsequent entry points
-    m_currentTranslationUnitIndex = m_slangTranslationUnitIndex;
 }
 
 void OptionsParser::addInputForeignShaderPath(
@@ -1991,7 +1981,6 @@ SlangResult OptionsParser::addReferencedModule(String path, SourceLoc loc, bool 
         m_rawTranslationUnits.add(rawTU);
     }
     m_currentTranslationUnitIndex = m_requestImpl->getTranslationUnitCount() - 1;
-    m_slangTranslationUnitIndex = m_currentTranslationUnitIndex;
     return SLANG_OK;
 }
 
