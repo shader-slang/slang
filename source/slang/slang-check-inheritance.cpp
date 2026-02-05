@@ -981,6 +981,15 @@ void SharedSemanticsContext::_mergeFacetLists(
                 isDeclRefTypeOf<InterfaceDecl>(baseType) &&
                 isDeclRefTypeOf<InterfaceDecl>(facetType))
             {
+                // If we're dealing with an type parameter pack as the selfType,
+                // we'll need to construct it as a Expand(chain-of-lookups(Each Witness))
+                //
+                if (isDeclRefTypeOf<GenericTypePackParamDecl>(selfType))
+                {
+                    selfIsSubtypeOfBase =
+                        astBuilder->getEachSubtypeWitness(selfType, baseType, selfIsSubtypeOfBase);
+                }
+
                 // (class | struct | interface) -> interface -> interface
                 // can use the base' witness, with a substitution of self for 'this-type'
                 //
@@ -993,11 +1002,17 @@ void SharedSemanticsContext::_mergeFacetLists(
                 // Substitute 'selfIsSubtypeOfBase' witness in place of the `thisTypeWitness` for
                 // the base
                 //
-                indirectFacet->setSubtypeWitness(
-                    _getASTBuilder(),
-                    as<SubtypeWitness>(
-                        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution)));
+                auto transitiveWitness = as<SubtypeWitness>(
+                    baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
 
+                // If we're dealing with a parameter pack, pack the witness back up.
+                if (isDeclRefTypeOf<GenericTypePackParamDecl>(selfType))
+                {
+                    transitiveWitness =
+                        astBuilder->getExpandSubtypeWitness(selfType, facetType, transitiveWitness);
+                }
+
+                indirectFacet->setSubtypeWitness(_getASTBuilder(), transitiveWitness);
                 ioMergedFacets.add(indirectFacet);
             }
         }
@@ -1305,21 +1320,23 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         Facet tail = directFacet;
         for (auto facet : elementInheritanceInfo.facets)
         {
-            if (facet->directness == Facet::Directness::Direct)
-            {
-                auto eachFacet = new (arena) Facet::Impl(
-                    astBuilder,
-                    Facet::Kind::Type,
-                    Facet::Directness::Direct,
-                    facet->origin.declRef,
-                    facet->origin.type,
-                    astBuilder->getEachSubtypeWitness(
-                        type,
-                        facet->subtypeWitness->getSup(),
-                        facet->subtypeWitness));
-                tail->next = eachFacet;
-                tail = eachFacet;
-            }
+            // Skip self facet from base - we already have our own self facet
+            if (facet->directness == Facet::Directness::Self)
+                continue;
+
+            auto eachFacet = new (arena) Facet::Impl(
+                astBuilder,
+                Facet::Kind::Type,
+                Facet::Directness::Direct,
+                facet->origin.declRef,
+                facet->origin.type,
+                astBuilder->getEachSubtypeWitness(
+                    type,
+                    facet->subtypeWitness->getSup(),
+                    facet->subtypeWitness));
+
+            tail->next = eachFacet;
+            tail = eachFacet;
         }
         InheritanceInfo info;
         info.facets = FacetList(directFacet);

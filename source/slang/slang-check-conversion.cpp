@@ -1225,7 +1225,7 @@ bool SemanticsVisitor::_coerce(
         ShortList<Expr*> coercibleCandidates;
         for (auto candidate : overloadedExpr2->candidateExprs)
         {
-            if (canCoerce(toType, candidate->type, candidate))
+            if ((candidate->type.type) && canCoerce(toType, candidate->type, candidate))
                 coercibleCandidates.add(candidate);
         }
         if (coercibleCandidates.getCount() == 1)

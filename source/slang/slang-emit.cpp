@@ -1032,6 +1032,12 @@ Result linkAndOptimizeIR(
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
 
+    // If our linking step resulted in errors, abort. We can't assume that
+    // our IR is complete.
+    //
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     // For now, only emit the debug build identifier if separate debug info is enabled
     // and only if there are targets.
     // TODO: We will ultimately need to change this to always emit the instruction.
@@ -1279,6 +1285,11 @@ Result linkAndOptimizeIR(
         specOptions.lowerWitnessLookups = true;
         specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
+    }
+
+    if (requiredLoweringPassSet.higherOrderFunc)
+    {
+        SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
     // Report checkpointing information

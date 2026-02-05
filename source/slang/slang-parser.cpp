@@ -2004,7 +2004,8 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             {
                 decl->errorType = parser->ParseTypeExp();
             }
-            //_parseOptSemantics(parser, decl); TODO: Fix this (make sure semantics can also be
+            _parseOptSemantics(parser, decl);
+            // TODO: Fix this (make sure semantics can also be
             // parsed)
             //
             // parseOptionalInheritanceClause(parser, decl);
@@ -2015,7 +2016,7 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             // TODO: Need to figure out how to parse interface requirements constraints as
             // constraints & regular function constraints as inheritance decls.
             //
-            parseOptionalGenericConstraints(parser, decl);       // Parse ":"
+            // parseOptionalGenericConstraints(parser, decl);       // Parse ":"
             maybeParseGenericConstraints(parser, genericParent); // Parse "where"
             parser->PushScope(funcScope);
 

@@ -1328,6 +1328,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
                 hasSpvAsm = true;
                 continue;
             case kIROp_Load:
+            case kIROp_LoadFromUninitializedMemory:
             case kIROp_Swizzle:
             case kIROp_Store:
                 continue;
