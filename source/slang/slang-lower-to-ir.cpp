@@ -718,12 +718,6 @@ bool isImportedDecl(IRGenContext* context, Decl* decl, bool& outIsExplicitExtern
     return false;
 }
 
-bool isAbstractWitnessTable(IRInst* inst);
-static IRInst* maybeCloneThisTypeWitness(
-    IRGenContext* context,
-    IRInst* thisTypeWitness,
-    Type* thisType);
-
 /// Should the given `decl` nested in `parentDecl` be treated as a static rather than instance
 /// declaration?
 bool isEffectivelyStatic(Decl* decl, ContainerDecl* parentDecl);
@@ -2317,7 +2311,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
         auto isRefThisTypeWitness = [](IRInst* inst) -> IRThisTypeWitness*
         {
-            for(;;)
+            for (;;)
             {
                 if (auto thisTypeWitness = as<IRThisTypeWitness>(inst))
                     return thisTypeWitness;
@@ -2353,7 +2347,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 {
                     // Clone the ThisTypeWitness at current insert location
                     // The constraint type is stored in the witness table type, not as an operand
-                    auto witnessTableType = as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
+                    auto witnessTableType =
+                        as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
                     SLANG_ASSERT(witnessTableType);
                     auto constraintType = (IRType*)witnessTableType->getConformanceType();
                     auto newThisTypeWitness = getBuilder()->createThisTypeWitness(constraintType);
