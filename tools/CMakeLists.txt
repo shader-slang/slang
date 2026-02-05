@@ -162,7 +162,6 @@ if(SLANG_ENABLE_GFX)
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:GFX_OPTIX>
             $<$<BOOL:${SLANG_ENABLE_NVAPI}>:GFX_NVAPI>
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         # This is a shared library, so we need to set a preprocessor macro to mark
         # exported symbols
         EXPORT_MACRO_PREFIX SLANG_GFX
