@@ -1,19 +1,13 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK-VK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK-CUDA):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK):-cuda -output-using-type
 
 // Note the length is NOT row * column.
 // When the memory scope is set to subgroup, each thread gets 16 * 16 / 32 = 8 where 32 is the value used in `numthreads`.
 
-//CHK-VK:8
-//CHK-VK:4
-//CHK-VK:16
-//CHK-VK:4
-
-// https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-fragment
-//CHK-CUDA:8
-//CHK-CUDA:16
-//CHK-CUDA:16
-//CHK-CUDA:16
+//CHK:8
+//CHK:4
+//CHK:16
+//CHK:4
 
 //TEST_INPUT:ubuffer(stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;

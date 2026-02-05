@@ -1312,9 +1312,18 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     outStr << typeName << ", ";
     outStr << rowCount << ", " << colCount;
     
-    // Layout: Default to RowMajor since IRCoopMatrixType doesn't store layout info
-    // TODO: Consider adding layout parameter to IRCoopMatrixType or inferring from usage
-    outStr << ", Slang_CUDA_MMA::Layout::RowMajor>";
+    // Layout: Choose based on matrix use to match CUDA tensor core expectations
+    // MatrixA: RowMajor (matches PTX mma.sync .row format)
+    // MatrixB: ColMajor (matches PTX mma.sync .col format)
+    // MatrixC/Accumulator: RowMajor (output format)
+    if (matrixUse == 1) // MatrixB
+    {
+        outStr << ", Slang_CUDA_MMA::Layout::ColMajor>";
+    }
+    else // MatrixA (0) or MatrixC/Accumulator (2+)
+    {
+        outStr << ", Slang_CUDA_MMA::Layout::RowMajor>";
+    }
 
     return SLANG_OK;
 }

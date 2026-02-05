@@ -7047,7 +7047,9 @@ struct WmmaFragment
             int bitOffset = elementOffset * 8;
             uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFF;
             uint8_t value8 = static_cast<uint8_t>(extracted);
-            return *reinterpret_cast<const T*>(&value8);
+            T v;
+            memcpy(&v, &value8, 1);
+            return v;
         }
     }
 
@@ -7686,7 +7688,6 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
 
 } // namespace Slang_CUDA_WMMA
 
-
 namespace Slang_CUDA_MMA
 {
 // Enums for template specialization
@@ -7704,627 +7705,655 @@ enum Layout : int
     ColMajor = 1
 };
 
+// Helper function to pack scalar values into 32-bit registers
+template<typename T>
+inline unsigned __device__ Pack32Helper(T value);
 
-    // Helper function to pack scalar values into 32-bit registers
-    template<typename T>
-    inline unsigned __device__ Pack32Helper(T value);
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+inline unsigned __device__ Pack32Helper<half>(half value)
+{
+    return __half_as_ushort(value) | (__half_as_ushort(value) << 16);
+};
+#endif
 
-    #if SLANG_CUDA_ENABLE_HALF
-    template<>
-    inline unsigned __device__ Pack32Helper<half>(half value)
-    {
-        return __half_as_ushort(value) | (__half_as_ushort(value) << 16);
-    };
-    #endif
-
-    template<>
-    inline unsigned __device__ Pack32Helper<float>(float value)
-    {
-        return __float_as_uint(value);
-    };
-
-    template<>
-    inline unsigned __device__ Pack32Helper<int>(int value)
-    {
-        return (unsigned)value;
-    };
+template<>
+inline unsigned __device__ Pack32Helper<float>(float value)
+{
+    return __float_as_uint(value);
+};
+template<>
+inline unsigned __device__ Pack32Helper<int>(int value)
+{
+    return (unsigned)value;
+};
     
-    template<>
-    inline unsigned __device__ Pack32Helper<char>(char value)
-    {
-        return value << 24 | value << 16 | value << 8 | value;
-    };
-    
-    template<>
-    inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
-    {
-        return value << 24 | value << 16 | value << 8 | value;
-    };
+template<>
+inline unsigned __device__ Pack32Helper<char>(char value)
+{
+    return value << 24 | value << 16 | value << 8 | value;
+};
 
-    // ====================================================================================
-    // MMA Load/Store - PTX ldmatrix/stmatrix instructions
-    // ====================================================================================
+template<>
+inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
+{
+    return value << 24 | value << 16 | value << 8 | value;
+};
+
+
+// PTX MMA wrapper (m16n8k16 shape)
+__device__ inline uint2 _hmma(uint4 &a, uint2 &b, uint2 &c)
+{
+    uint2           D;
+    unsigned const *A = reinterpret_cast<unsigned const *>(&a);
+    unsigned const *B = reinterpret_cast<unsigned const *>(&b);
+    unsigned const *C = reinterpret_cast<unsigned const *>(&c);
+    asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16  {%0, %1}, \n"
+                 "    {%2, %3, %4, %5}, \n"
+                 "    {%6, %7}, \n"
+                 "    {%8, %9}; \n"
+                 : "=r"(D.x), "=r"(D.y)
+                 : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3])
+                 , "r"(B[0]), "r"(B[1])
+                 , "r"(C[0]), "r"(C[1]));
+    return D;
+}
+
+template <class T>
+constexpr __device__ __host__ int num_packed() {
+    return 4 / (sizeof(T));
+};
+
+
+// Define shape tag types
+template<int M, int N, int K>
+struct MMAShape {
+    static constexpr int m = M;
+    static constexpr int n = N;
+    static constexpr int k = K;
+};
+
+// Common shapes as type aliases
+using MMA_16x8x16 = MMAShape<16, 8, 16>; // Current
+using MMA_16x8x8 = MMAShape<16, 8, 8>;
+using MMA_8x8x4 = MMAShape<8, 8, 4>;
+using MMA_16x8x4 = MMAShape<16, 8, 4>;
+
+// Forward declaration for MMAMatrix - represents a 2D matrix fragment (M x N)
+template<typename T, int M, int N, Layout layout>
+struct MMAMatrix;
+
+// MMATraits - Base template with common traits
+// IMPORTANT: This base template does NOT provide an mma() implementation
+// You must specialize this for specific MMAShape configurations
+template<typename T, typename Shape, Layout layout>
+struct MMATraits
+{
+    static constexpr int M = Shape::m;
+    static constexpr int N = Shape::n;
+    static constexpr int K = Shape::k;
+    static constexpr int NumRegs = (M * N * sizeof(T)) / (sizeof(uint32_t) * SLANG_CUDA_WARP_SIZE); // usually 4 for 16x16 half
     
-    // ldmatrix: Load matrix from shared memory into registers
-    // The instruction loads a matrix fragment from shared memory in an optimized layout
-    // .trans modifier transposes the matrix during load
-    template<int NumRegs>
-    __device__ inline void mmaLoad(uint32_t* regs, const void* ptr)
+    // We break the registers into a 2D grid
+    // For example: 4 regs → 2×2, 2 regs → 1×2 or 2×1, 1 reg → 1×1
+    // For all mma shapes, the number of registers in rows is always number of rows of the matrix divided by 8
+    static constexpr int RegRows = (Shape::m / 8);
+    static constexpr int RegCols = NumRegs / RegRows;
+
+    // If you get a compilation error here, it means you're trying to use
+    // an unsupported MMAShape. Please add a specialization for your shape.
+    template<Layout layoutA, Layout layoutB, Layout layoutC>
+    __device__ static void mma(
+        MMAMatrix<T, M, N, layout>& d,
+        const MMAMatrix<T, M, K, layoutA>& a,
+        const MMAMatrix<T, K, N, layoutB>& b,
+        const MMAMatrix<T, M, N, layoutC>& c)
     {
-        if constexpr (NumRegs == 1)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x1.shared.b16 {%0}, [%1];\n"
-                        : "=r"(regs[0])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
-        else if constexpr (NumRegs == 2)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];\n"
-                        : "=r"(regs[0]), "=r"(regs[1])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
-        else if constexpr (NumRegs == 4)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];\n"
-                        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
+        static_assert(sizeof(T) == 0, 
+            "No MMATraits specialization found for this shape. "
+            "Please specialize MMATraits for your MMAShape configuration.");
     }
-    
-    // ldmatrix with transpose
-    template<int NumRegs>
-    __device__ inline void mmaLoadTrans(uint32_t* regs, const void* ptr)
-    {
-        if constexpr (NumRegs == 1)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x1.trans.shared.b16 {%0}, [%1];\n"
-                        : "=r"(regs[0])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
-        else if constexpr (NumRegs == 2)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];\n"
-                        : "=r"(regs[0]), "=r"(regs[1])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
-        else if constexpr (NumRegs == 4)
-        {
-            asm volatile("ldmatrix.sync.aligned.m8n8.x4.trans.shared.b16 {%0, %1, %2, %3}, [%4];\n"
-                        : "=r"(regs[0]), "=r"(regs[1]), "=r"(regs[2]), "=r"(regs[3])
-                        : "r"(__cvta_generic_to_shared(ptr)));
-        }
-    }
-    
-    // stmatrix: Store matrix from registers to shared memory
-    // Note: stmatrix is available from PTX ISA 7.8+ (SM_90+)
-    template<int NumRegs>
-    __device__ inline void mmaStore(void* ptr, const uint32_t* regs)
-    {
-        if constexpr (NumRegs == 1)
-        {
-            asm volatile("stmatrix.sync.aligned.m8n8.x1.shared.b16 [%0], {%1};\n"
-                        :
-                        : "r"(__cvta_generic_to_shared(ptr)), "r"(regs[0]));
-        }
-        else if constexpr (NumRegs == 2)
-        {
-            asm volatile("stmatrix.sync.aligned.m8n8.x2.shared.b16 [%0], {%1, %2};\n"
-                        :
-                        : "r"(__cvta_generic_to_shared(ptr)), "r"(regs[0]), "r"(regs[1]));
-        }
-        else if constexpr (NumRegs == 4)
-        {
-            asm volatile("stmatrix.sync.aligned.m8n8.x4.shared.b16 [%0], {%1, %2, %3, %4};\n"
-                        :
-                        : "r"(__cvta_generic_to_shared(ptr)), "r"(regs[0]), "r"(regs[1]), "r"(regs[2]), "r"(regs[3]));
-        }
-    }
+}; // struct MMATraits
 
-    // PTX MMA wrapper (m16n8k16 shape)
-    __device__ inline uint2 _hmma(uint4 &a, uint2 &b, uint2 &c)
-    {
-        uint2           D;
-        unsigned const *A = reinterpret_cast<unsigned const *>(&a);
-        unsigned const *B = reinterpret_cast<unsigned const *>(&b);
-        unsigned const *C = reinterpret_cast<unsigned const *>(&c);
-        asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16  {%0, %1}, \n"
-                     "    {%2, %3, %4, %5}, \n"
-                     "    {%6, %7}, \n"
-                     "    {%8, %9}; \n"
-                     : "=r"(D.x), "=r"(D.y)
-                     : "r"(A[0]), "r"(A[1]), "r"(A[2]), "r"(A[3]), "r"(B[0]), "r"(B[1]), "r"(C[0]), "r"(C[1]));
-        return D;
-    }
-
-    template <class T>
-    constexpr __device__ __host__ int num_packed() {
-        return 4 / (sizeof(T));
-    };
-
-
-    // Define shape tag types
-    template<int M, int N, int K>
-    struct MMAShape {
-        static constexpr int m = M;
-        static constexpr int n = N;
-        static constexpr int k = K;
-    };
-
-    // Common shapes as type aliases
-    using MMA_16x8x16 = MMAShape<16, 8, 16>; // Current
-    using MMA_16x8x8 = MMAShape<16, 8, 8>;
-    using MMA_8x8x4 = MMAShape<8, 8, 4>;
-    using MMA_16x8x4 = MMAShape<16, 8, 4>;
-
-    // Forward declaration for MMAMatrix - represents a 2D matrix fragment (M x N)
-    template<typename T, int M, int N, Layout layout>
-    struct MMAMatrix;
-
-    // MMATraits - Base template with common traits
-    // IMPORTANT: This base template does NOT provide an mma() implementation
-    // You must specialize this for specific MMAShape configurations
-    template<typename T, typename Shape, Layout layout>
-    struct MMATraits
-    {
-        static constexpr int BitsPerElement = sizeof(T) * 8;
-        static constexpr int WarpSize = 32;
-        
-        // For accumulator (output) dimensions
-        static constexpr int M = Shape::m;
-        static constexpr int N = Shape::n;
-        static constexpr int K = Shape::k;
-
-        // Total 32-bit registers per thread
-        static constexpr int NumRegs = (M * N * BitsPerElement) / (WarpSize * 32);
-
-         // Typically arranged as a 2D grid of registers
-         // For example: 4 regs → 2×2, 2 regs → 1×2 or 2×1, 1 reg → 1×1
-         static constexpr int RegRows = (Shape::m / 8); // TODO:
-         static constexpr int RegCols = NumRegs / RegRows;
-
-         static_assert(NumRegs * WarpSize * 32 == M * N * BitsPerElement, 
-            "Register count must match matrix size");
-
-        // mma() function must be specialized for each shape
-        // Specializations should implement:
-        // __device__ static void mma(
-        //     MMAMatrix<T, M, N, layout>& d,
-        //     const MMAMatrix<T, M, K, layout>& a,
-        //     const MMAMatrix<T, K, N, layout>& b,
-        //     const MMAMatrix<T, M, N, layout>& c)
-        
-        // If you get a compilation error here, it means you're trying to use
-        // an unsupported MMAShape. Please add a specialization for your shape.
-        __device__ static void mma(
-            MMAMatrix<T, M, N, layout>& d,
-            const MMAMatrix<T, M, K, layout>& a,
-            const MMAMatrix<T, K, N, layout>& b,
-            const MMAMatrix<T, M, N, layout>& c)
-        {
-            static_assert(sizeof(T) == 0, 
-                "No MMATraits specialization found for this shape. "
-                "Please specialize MMATraits for your MMAShape configuration.");
-        }
-    };
-
-    // Specialization for m16n8k16 shape
-    template<typename T, Layout layout>
-    struct MMATraits<T, MMA_16x8x16, layout>
-    {
-        using Shape = MMA_16x8x16;
-        
-        static constexpr int BitsPerElement = sizeof(T) * 8;
-        static constexpr int WarpSize = 32;
-        static constexpr int M = Shape::m;
-        static constexpr int N = Shape::n;
-        static constexpr int K = Shape::k;
-        static constexpr int NumRegs = (M * N * BitsPerElement) / (WarpSize * 32);
-        static constexpr int RegRows = (Shape::m / 8);
-        static constexpr int RegCols = NumRegs / RegRows;
-
-        static_assert(NumRegs * WarpSize * 32 == M * N * BitsPerElement, 
-            "Register count must match matrix size");
-
-        // High-level mma() implementation for m16n8k16
-        // For m16n8k16 with half precision:
-        // - A matrix (M x K = 16 x 16): 512 bytes / 32 threads = 16 bytes/thread = 4 uint32 regs
-        // - B matrix (K x N = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs  
-        // - C/D matrix (M x N = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs
-        __device__ static void mma(
-            MMAMatrix<T, M, N, layout>& d,
-            const MMAMatrix<T, M, K, layout>& a,
-            const MMAMatrix<T, K, N, layout>& b,
-            const MMAMatrix<T, M, N, layout>& c)
-        {
-            static_assert(M == 16 && N == 8 && K == 16, "m16n8k16 specialization requires M=16, N=8, K=16");
-            static_assert(sizeof(T) == 2, "m16n8k16 specialization currently only supports half precision");
-            
-            // Pack registers into vector types for PTX instruction
-            // A matrix: 16x16 needs 4 registers
-            uint4 a_regs = {
-                a.m_mma_reg[0].m_reg,
-                a.m_mma_reg[1].m_reg,
-                a.m_mma_reg[2].m_reg,
-                a.m_mma_reg[3].m_reg
-            };
-            
-            // B matrix: 16x8 needs 2 registers
-            uint2 b_regs = {
-                b.m_mma_reg[0].m_reg,
-                b.m_mma_reg[1].m_reg
-            };
-            
-            // C matrix (accumulator): 16x8 needs 2 registers
-            uint2 c_regs = {
-                c.m_mma_reg[0].m_reg,
-                c.m_mma_reg[1].m_reg
-            };
-            
-            // Call PTX instruction: mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16
-            uint2 d_regs = _hmma(a_regs, b_regs, c_regs);
-            
-            // Unpack result back to D matrix
-            d.m_mma_reg[0].m_reg = d_regs.x;
-            d.m_mma_reg[1].m_reg = d_regs.y;
-        }
-    };
-
-    // Specialization for m8n8k4 with half
-    template<Layout layout>
-    struct MMATraits<half, MMA_8x8x4, layout>
-    {
-        using Shape = MMA_8x8x4;
-        
-        static constexpr int BitsPerElement = sizeof(half) * 8;
-        static constexpr int WarpSize = 32;
-        static constexpr int M = Shape::m;
-        static constexpr int N = Shape::n;
-        static constexpr int K = Shape::k;
-        static constexpr int NumRegs = (M * N * BitsPerElement) / (WarpSize * 32);
-        static constexpr int RegRows = 1;
-        static constexpr int RegCols = NumRegs;
-
-        // High-level mma() that takes MMAMatrix objects and delegates to PTX wrapper
-        // For m8n8k4: A is 8x4 (1 reg), B is 4x8 (1 reg), C is 8x8 (2 regs), D is 8x8 (2 regs)
-        __device__ static void mma(
-            MMAMatrix<half, M, N, layout>& d,
-            const MMAMatrix<half, M, K, layout>& a,
-            const MMAMatrix<half, K, N, layout>& b,
-            const MMAMatrix<half, M, N, layout>& c)
-        {
-            // Pack registers for PTX instruction
-            // A matrix: 8x4 needs 1 register
-            uint32_t a_reg = a.m_mma_reg[0].m_reg;
-            
-            // B matrix: 4x8 needs 1 register
-            uint32_t b_reg = b.m_mma_reg[0].m_reg;
-            
-            // C matrix (accumulator): 8x8 needs 2 registers
-            uint2 c_regs = {
-                c.m_mma_reg[0].m_reg,
-                c.m_mma_reg[1].m_reg
-            };
-            
-            // Call PTX instruction: mma.sync.aligned.m8n8k4
-            uint2 d_regs = _hmma_8x8x4(a_reg, b_reg, c_regs);
-            
-            // Unpack result back to D matrix
-            d.m_mma_reg[0].m_reg = d_regs.x;
-            d.m_mma_reg[1].m_reg = d_regs.y;
-        }
-    };
-
-
-    template<typename T, int M, int N, Layout layout>
-    struct alignas(16) MMAMatrix
-    {
-        // For referencing template parameters outside the struct (used by Slang intrinsics)
-        using ElementType = T;
-        static constexpr int m_M = M;
-        static constexpr int m_N = N;
-        static constexpr Layout m_Layout = layout;
-        
-        // Calculate register layout based on M x N dimensions
-        static constexpr int BitsPerElement = sizeof(T) * 8;
-        static constexpr int WarpSize = 32;
-        static constexpr int NumRegs = (M * N * BitsPerElement) / (WarpSize * 32); // usually 4 for 16x16 half
-        static constexpr uint32_t RegRows = (M / 8 > 0) ? (M / 8) : 1; // usually 2 for 4 NumRegs
-        static constexpr uint32_t RegCols = (NumRegs / RegRows > 0) ? (NumRegs / RegRows) : NumRegs; // usually 2 for 4 NumRegs
-        static constexpr bool ROW_MAJOR = (layout == Layout::RowMajor);
-
-        // MMAReg definition becomes shape-aware
-        struct MMAReg
-        {
-            __device__ static uint32_t rc_to_lin_packed(uint32_t row_packed, uint32_t col_packed) {
-                if (ROW_MAJOR) {
-                    return row_packed * ColsPacked + col_packed;
-                }
-                else {
-                    return col_packed * RowsPacked + row_packed;
-                }
-            }
-
-            __device__ static uint2 lin_to_rc_packed(uint32_t idx) {
-                uint2 rc_packed;
-                if (ROW_MAJOR) {
-                    rc_packed.x = idx / ColsPacked;
-                    rc_packed.y = idx % ColsPacked;
-                }
-                else {
-                    rc_packed.y = idx / RowsPacked;
-                    rc_packed.x = idx % RowsPacked;
-                }
-                return rc_packed;
-            }
-
-            static const uint32_t NumOuter = 8U;
-            static const uint32_t InnerPacked = WarpSize / NumOuter; // 4
-            static const uint32_t RowsPacked = ROW_MAJOR ? NumOuter : InnerPacked; // ROW_MAJOR ? 8 : 4
-            static const uint32_t ColsPacked = ROW_MAJOR ? InnerPacked : NumOuter; // ROW_MAJOR ? 4 : 8
-
-            static const uint32_t NumInner = InnerPacked * Slang_CUDA_MMA::num_packed<T>(); // 4, 8 (half), 16
-            static const uint32_t NumElements = NumInner * NumOuter; // 32, 64 (half), 128
-            static const uint32_t Rows = ROW_MAJOR ? NumOuter : NumInner;
-            static const uint32_t Cols = ROW_MAJOR ? NumInner : NumOuter;
-            uint32_t m_reg;
+// Specialization for m16n8k16 shape
+template<typename T, Layout layout>
+struct MMATraits<T, MMA_16x8x16, layout>
+{
+    // High-level mma() for m16n8k16 with half precision
+    // - A matrix (M x K = 16 x 16): 512 bytes / 32 threads = 16 bytes/thread = 4 uint32 regs
+    // - B matrix (K x N = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs  
+    // - C/D matrix (M x N = 16 x 8): 256 bytes / 32 threads = 8 bytes/thread = 2 uint32 regs
+    // Accepts different layouts for each matrix to support row-major A with column-major B
+    template<Layout layoutA, Layout layoutB, Layout layoutC>
+    __device__ static void mma(
+        MMAMatrix<T, MMA_16x8x16::m, MMA_16x8x16::n, layout>& d,
+        const MMAMatrix<T, MMA_16x8x16::m, MMA_16x8x16::k, layoutA>& a,
+        const MMAMatrix<T, MMA_16x8x16::k, MMA_16x8x16::n, layoutB>& b,
+        const MMAMatrix<T, MMA_16x8x16::m, MMA_16x8x16::n, layoutC>& c)
+    {        
+        // Pack registers into vector types for PTX instruction
+        // A matrix: 16x16 needs 4 registers
+        uint4 a_regs = {
+            a.m_mma_reg[0].m_reg,
+            a.m_mma_reg[1].m_reg,
+            a.m_mma_reg[2].m_reg,
+            a.m_mma_reg[3].m_reg
         };
-
-        // Array of MMARegs for shape-aware layout
-        MMAReg m_mma_reg[NumRegs];
         
-        // Utility: Convert register row/col to linear register index
-        __device__ static constexpr uint32_t reg_rc_to_idx(uint32_t reg_row, uint32_t reg_col) {
+        // B matrix: 16x8 needs 2 registers
+        uint2 b_regs = {
+            b.m_mma_reg[0].m_reg,
+            b.m_mma_reg[1].m_reg
+        };
+        
+        // C matrix (accumulator): 16x8 needs 2 registers
+        uint2 c_regs = {
+            c.m_mma_reg[0].m_reg,
+            c.m_mma_reg[1].m_reg
+        };
+        
+        // Call PTX instruction: mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16
+        uint2 d_regs = _hmma(a_regs, b_regs, c_regs);
+        
+        // Unpack result back to D matrix
+        d.m_mma_reg[0].m_reg = d_regs.x;
+        d.m_mma_reg[1].m_reg = d_regs.y;
+    }
+};
+
+
+
+template<typename T, int M, int N, Layout layout>
+struct alignas(16) MMAMatrix
+{
+    // For referencing template parameters outside the struct (used by Slang intrinsics)
+    using ElementType = T;
+    static constexpr int m_M = M;
+    static constexpr int m_N = N;
+    static constexpr Layout m_Layout = layout;
+
+    static constexpr size_t TotalMatrixBytes = M * N * sizeof(T);
+    static constexpr size_t BytesPerWarpOneReg = SLANG_CUDA_WARP_SIZE * sizeof(uint32_t);
+    static constexpr size_t elements_per_reg = sizeof(uint32_t) / sizeof(T);
+    
+    // This will fail at compile time if the shape is invalid
+    static_assert(TotalMatrixBytes % BytesPerWarpOneReg == 0,
+        "Matrix dimensions MxN must result in an integer number of registers per thread. "
+        "Only hardware-supported MMA shapes are valid (e.g., 16x8, 16x16, 32x8 for half).");
+    
+    // Calculate register layout based on M x N dimensions
+    static constexpr int NumRegs = TotalMatrixBytes / BytesPerWarpOneReg; // usually 2 for 4 NumRegs
+    
+    // Break the NumRegs into 2D grid, e.g. 2 x 2 for 16x16 half matrix
+    // This assumes each row has 8 elements, packed or unpacked
+    static constexpr uint32_t RegRows = (M / 8 > 0) ? (M / 8) : 1;
+    static constexpr uint32_t RegCols = (NumRegs / RegRows > 0) ? (NumRegs / RegRows) : NumRegs;
+    static constexpr bool ROW_MAJOR = (layout == Layout::RowMajor);
+    // MMAReg definition becomes shape-aware
+    struct MMAReg
+    {
+        __device__ static uint32_t rc_to_lin_packed(uint32_t row_packed, uint32_t col_packed) {
+            if (ROW_MAJOR) {
+                return row_packed * ColsPacked + col_packed;
+            }
+            else {
+                return col_packed * RowsPacked + row_packed;
+            }
+        }
+        __device__ static uint2 lin_to_rc_packed(uint32_t idx) {
+            uint2 rc_packed;
+            if (ROW_MAJOR) {
+                rc_packed.x = idx / ColsPacked;
+                rc_packed.y = idx % ColsPacked;
+            }
+            else {
+                rc_packed.y = idx / RowsPacked;
+                rc_packed.x = idx % RowsPacked;
+            }
+            return rc_packed;
+        }
+        static const uint32_t NumOuter = 8U;
+        static const uint32_t InnerPacked = SLANG_CUDA_WARP_SIZE / NumOuter; // 4
+        static const uint32_t RowsPacked = ROW_MAJOR ? 8 : 4; // ROW_MAJOR ? 8 : 4
+        static const uint32_t ColsPacked = ROW_MAJOR ? 4 : 8; // ROW_MAJOR ? 4 : 8
+        static const uint32_t Rows = RowsPacked * Slang_CUDA_MMA::num_packed<T>();
+        static const uint32_t Cols = ColsPacked * Slang_CUDA_MMA::num_packed<T>();
+        uint32_t m_reg;
+    };
+
+    // Array of MMARegs for shape-aware layout
+    MMAReg m_mma_reg[NumRegs];
+    
+    // Utility: Convert register row/col to linear register index
+    __device__ static constexpr uint32_t reg_rc_to_idx(uint32_t reg_row, uint32_t reg_col) {
+        // the registers (tiles) are always placed in the column major order for the known shapes
+        return reg_col * RegRows + reg_row;
+    }
+        
+    // Constructors
+    __device__ MMAMatrix() {}
+    __device__ MMAMatrix(T scalarValue) { fill(scalarValue); }
+        
+    // Fill all elements with a scalar value
+    // Note: There is no direct PTX fill instruction for MMA matrices,
+    // so we manually set all registers to the packed value
+    __device__ void fill(T value)
+    {
+        uint32_t packed = Pack32Helper(value);
+        for (int i = 0; i < NumRegs; i++)
+        {
+            m_mma_reg[i].m_reg = packed;
+        }
+    }
+
+    // Get the number of elements stored per thread
+    static constexpr __device__ uint32_t GetLength()
+    {
+        return NumRegs * elements_per_reg;
+    }
+
+    // Get element by linear index (handles packed elements within registers)
+    __device__ T get(int index) const
+    {        
+        if constexpr (sizeof(T) == 4)
+        {
+            // T is 32-bit (float or int32): 1 element per register
+            T v;
+            memcpy(&v, &m_mma_reg[index].m_reg, 4);
+            return v;
+        }
+        else if constexpr (sizeof(T) == 2)
+        {
+            // T is 16-bit (half): 2 elements per register
+            // Elements per register: [0:15] and [16:31]
+            int reg_idx = index / 2;
+            int elem_idx = index % 2;
+            int bit_offset = elem_idx * 16;
+            uint32_t extracted = (m_mma_reg[reg_idx].m_reg >> bit_offset) & 0xFFFF;
+            uint16_t value16 = static_cast<uint16_t>(extracted);
+            T v;
+            memcpy(&v, &value16, 2);
+            return v;
+        }
+        else if constexpr (sizeof(T) == 1)
+        {
+            // T is 8-bit (int8): 4 elements per register
+            // Elements per register: [0:7], [8:15], [16:23], [24:31]
+            int reg_idx = index / 4;
+            int elem_idx = index % 4;
+            int bit_offset = elem_idx * 8;
+            uint32_t extracted = (m_mma_reg[reg_idx].m_reg >> bit_offset) & 0xFF;
+            uint8_t value8 = static_cast<uint8_t>(extracted);
+            T v;
+            memcpy(&v, &value8, 1);
+            return v;
+        }
+    }
+
+    // Set element by linear index (handles packed elements within registers)
+    __device__ void set(int index, T value)
+    {        
+        if constexpr (sizeof(T) == 4)
+        {
+            // T is 32-bit (float or int32): 1 element per register
+            memcpy(&m_mma_reg[index].m_reg, &value, 4);
+        }
+        else if constexpr (sizeof(T) == 2)
+        {
+            // T is 16-bit (half): 2 elements per register
+            int reg_idx = index / 2;
+            int elem_idx = index % 2;
+            int bit_offset = elem_idx * 16;
+            
+            // Extract bits from value using memcpy (safe type punning)
+            uint16_t value_bits;
+            memcpy(&value_bits, &value, 2);
+            
+            // Clear the bits for this element and set new value
+            uint32_t mask = ~(0xFFFF << bit_offset);
+            m_mma_reg[reg_idx].m_reg = (m_mma_reg[reg_idx].m_reg & mask) | (uint32_t(value_bits) << bit_offset);
+        }
+        else if constexpr (sizeof(T) == 1)
+        {
+            // T is 8-bit (int8): 4 elements per register
+            int reg_idx = index / 4;
+            int elem_idx = index % 4;
+            int bit_offset = elem_idx * 8;
+            
+            // Extract bits from value using memcpy (safe type punning)
+            uint8_t value_bits;
+            memcpy(&value_bits, &value, 1);
+            
+            // Clear the bits for this element and set new value
+            uint32_t mask = ~(0xFF << bit_offset);
+            m_mma_reg[reg_idx].m_reg = (m_mma_reg[reg_idx].m_reg & mask) | (uint32_t(value_bits) << bit_offset);
+        }
+    }
+
+    // Copy from another MMAMatrix with potentially different element type
+    // This allows type conversion between matrices (e.g., int to float)
+    template<typename U>
+    __device__ void copyFrom(const MMAMatrix<U, M, N, layout>& other)
+    {
+        // If the data type is different, we need to copy element by element.  
+        for (int i = 0; i < GetLength(); i++)
+        {
+            set(i, static_cast<T>(other.get(i)));
+        }
+    }
+
+    // Arithmetic operators - element-wise operations
+    __device__ MMAMatrix<T, M, N, layout> operator*(T scalar) const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, get(i) * scalar);
+        }
+        return result;
+    }
+
+    __device__ MMAMatrix<T, M, N, layout> operator*(const MMAMatrix<T, M, N, layout>& other) const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, get(i) * other.get(i));
+        }
+        return result;
+    }
+
+    __device__ MMAMatrix<T, M, N, layout> operator/(const MMAMatrix<T, M, N, layout>& other) const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, get(i) / other.get(i));
+        }
+        return result;
+    }
+
+    __device__ MMAMatrix<T, M, N, layout> operator+(const MMAMatrix<T, M, N, layout>& other) const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, get(i) + other.get(i));
+        }
+        return result;
+    }
+
+    __device__ MMAMatrix<T, M, N, layout> operator-(const MMAMatrix<T, M, N, layout>& other) const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, get(i) - other.get(i));
+        }
+        return result;
+    }
+
+    __device__ MMAMatrix<T, M, N, layout> operator-() const
+    {
+        MMAMatrix<T, M, N, layout> result;
+        for (int i = 0; i < GetLength(); i++)
+        {
+            result.set(i, -get(i));
+        }
+        return result;
+    }
+
+
+    // Store matrix to memory
+    // Uses MMA fragment layout mapping based on register distribution
+    template<Layout storeLayout>
+    __device__ void Store(T* buffer, uint element, uint stride)
+    {
+        uint laneId = _getLaneId();
+        
+        // Calculate thread's position within the warp's MMA fragment layout
+        // Each MMAReg handles a specific sub-region of the matrix
+        // ranges -> x (row): [0 - 7], y (col): [0 - 3] for ROW_MAJOR
+        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(laneId);
+        
+        // Calculate stride parameters based on store layout
+        // Stride is in element units, convert to packed units
+        uint32_t stride_packed = stride / elements_per_reg;
+        uint32_t outer_stride, inner_stride;
+        
+        // Determine if we need to transpose during store
+        constexpr bool transpose = (storeLayout != layout);
+        
+        if constexpr (!transpose) {
+            // Storing in same layout as matrix internal layout
             if constexpr (ROW_MAJOR) {
-                return reg_row * RegCols + reg_col;
+                outer_stride = stride_packed;  // Stride between rows
+                inner_stride = 1;              // Adjacent columns
             } else {
-                return reg_col * RegRows + reg_row;
+                outer_stride = stride_packed;  // Stride between columns
+                inner_stride = 1;              // Adjacent rows
             }
-        }
-        
-        // Constructors
-        __device__ MMAMatrix() {}
-        __device__ MMAMatrix(T scalarValue) { fill(scalarValue); }
-        
-        // Fill all elements with a scalar value
-        // Note: There is no direct PTX fill instruction for MMA matrices,
-        // so we manually set all registers to the packed value
-        __device__ void fill(T value)
-        {
-            uint32_t packed = Pack32Helper(value);
-            for (int i = 0; i < NumRegs; i++)
-            {
-                m_mma_reg[i].m_reg = packed;
-            }
-        }
-        
-        // Store matrix to memory
-        // Uses MMA fragment layout mapping based on register distribution
-        template<Layout storeLayout>
-        __device__ void Store(T* buffer, uint element, uint stride)
-        {
-            uint laneId = threadIdx.x % 32;
-            constexpr int elements_per_reg = sizeof(uint32_t) / sizeof(T);
-            
-            // Calculate thread's position within the warp's MMA fragment layout
-            // Each MMAReg handles a specific sub-region of the matrix
-            uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(laneId);
-            
-            // Calculate stride parameters based on store layout
-            // Stride is in element units, convert to packed units
-            uint32_t stride_packed = stride / elements_per_reg;
-            uint32_t outer_stride, inner_stride;
-            
-            // Determine if we need to transpose during store
-            constexpr bool transpose = (storeLayout != layout);
-            
-            if constexpr (!transpose) {
-                // Storing in same layout as matrix internal layout
-                if constexpr (ROW_MAJOR) {
-                    outer_stride = stride_packed;  // Stride between rows
-                    inner_stride = 1;              // Adjacent columns
-                } else {
-                    outer_stride = stride_packed;  // Stride between columns
-                    inner_stride = 1;              // Adjacent rows
-                }
+        } else {
+            // Transposing during store: swap stride interpretation
+            if constexpr (ROW_MAJOR) {
+                // Matrix is row-major, storing as column-major
+                outer_stride = 1;              // Rows become adjacent
+                inner_stride = stride_packed;  // Columns become strided
             } else {
-                // Transposing during store: swap stride interpretation
-                if constexpr (ROW_MAJOR) {
-                    // Matrix is row-major, storing as column-major
-                    outer_stride = 1;              // Rows become adjacent
-                    inner_stride = stride_packed;  // Columns become strided
-                } else {
-                    // Matrix is column-major, storing as row-major
-                    outer_stride = stride_packed;  // Columns become rows
-                    inner_stride = 1;              // Rows become adjacent
-                }
-            }
-            
-            // Output buffer in packed element units (uint32_t)
-            uint32_t* buffer_packed = reinterpret_cast<uint32_t*>(buffer + element);
-            
-            // Iterate over all registers owned by this thread
-            // RegRows x RegCols defines the 2D layout of registers per thread
-            // e.g. 2x2 for 4 registers
-            for (uint32_t reg_row = 0; reg_row < RegRows; reg_row++)
-            {
-                for (uint32_t reg_col = 0; reg_col < RegCols; reg_col++)
-                {
-                    // Calculate the global packed row/column position for this register
-                    // This accounts for:
-                    // 1. The register's position within this thread's layout (reg_row, reg_col)
-                    // 2. This thread's position within the warp's layout (target_subreg_rc)                    
-                    uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
-                    uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
-                    
-                    // If transposing, swap row and column
-                    if constexpr (transpose) {
-                        uint32_t temp = row_packed;
-                        row_packed = col_packed;
-                        col_packed = temp;
-                    }
-                    
-                    // Convert 2D packed coordinates to linear buffer address
-                    uint32_t addr_idx;
-                    if constexpr (storeLayout == Layout::RowMajor) {
-                        addr_idx = row_packed * outer_stride + col_packed * inner_stride;
-                    } else {
-                        addr_idx = col_packed * outer_stride + row_packed * inner_stride;
-                    }
-                    
-                    // Get the linear register index and store the packed data
-                    uint32_t reg_idx = reg_rc_to_idx(reg_row, reg_col);
-                    buffer_packed[addr_idx] = m_mma_reg[reg_idx].m_reg;
-                }
+                // Matrix is column-major, storing as row-major
+                outer_stride = stride_packed;  // Columns become rows
+                inner_stride = 1;              // Rows become adjacent
             }
         }
         
-        // Store to RWStructuredBuffer
-        template<Layout storeLayout>
-        __device__ void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
-        {
-            Store<storeLayout>(buffer.data, element, stride);
-        }
+        // Output buffer in packed element units (uint32_t)
+        uint32_t* buffer_packed = reinterpret_cast<uint32_t*>(buffer + element);
         
-        // Load matrix from memory
-        // Uses element-wise load for global memory (ldmatrix only works with shared memory)
-        // TODO: Optimize with async copy operations or vectorized loads
-        template<Layout loadLayout>
-        static __device__ MMAMatrix<T, M, N, layout> Load(const T* buffer, uint element, uint stride)
+        // Iterate over all registers owned by this thread
+        // RegRows x RegCols defines the 2D layout of registers per thread
+        // e.g. 2x2 for 4 registers
+        for (uint32_t reg_row = 0; reg_row < RegRows; reg_row++)
         {
-            MMAMatrix<T, M, N, layout> result;
-            uint laneId = threadIdx.x % 32;
-            
-            // Temporary array to build registers
-            uint32_t regs[NumRegs];
-            
-            constexpr int elements_per_reg = sizeof(uint32_t) / sizeof(T);
-            
-            for (int reg_idx = 0; reg_idx < NumRegs; reg_idx++)
+            for (uint32_t reg_col = 0; reg_col < RegCols; reg_col++)
             {
-                uint32_t reg_data = 0;
+                // Calculate the global packed row/column position for this register
+                // This accounts for:
+                // 1. The register's position within this thread's layout (reg_row, reg_col)
+                // 2. This thread's position within the warp's layout (target_subreg_rc)                    
+                uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
+                uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
                 
-                for (int elem_in_reg = 0; elem_in_reg < elements_per_reg; elem_in_reg++)
-                {
-                    // Calculate matrix position for this element
-                    int linear_idx = laneId * NumRegs * elements_per_reg + reg_idx * elements_per_reg + elem_in_reg;
-                    
-                    T elem_value = 0;
-                    if (loadLayout == Layout::RowMajor)
-                    {
-                        int row = linear_idx / N;
-                        int col = linear_idx % N;
-                        if (row < M && col < N)
-                            elem_value = buffer[element + row * stride + col];
-                    }
-                    else // ColMajor
-                    {
-                        int col = linear_idx / M;
-                        int row = linear_idx % M;
-                        if (row < M && col < N)
-                            elem_value = buffer[element + col * stride + row];
-                    }
-                    
-                    // Pack element into register
-                    if constexpr (sizeof(T) == 2) // half
-                    {
-                        uint16_t half_bits = *reinterpret_cast<const uint16_t*>(&elem_value);
-                        if (elem_in_reg == 0)
-                            reg_data = half_bits;
-                        else
-                            reg_data |= (uint32_t(half_bits) << 16);
-                    }
-                    else if constexpr (sizeof(T) == 4) // float or int
-                    {
-                        reg_data = *reinterpret_cast<const uint32_t*>(&elem_value);
-                    }
+                // If transposing, swap row and column
+                if constexpr (transpose) {
+                    uint32_t temp = row_packed;
+                    row_packed = col_packed;
+                    col_packed = temp;
                 }
                 
-                regs[reg_idx] = reg_data;
+                // Convert 2D packed coordinates to linear buffer address
+                uint32_t addr_idx;
+                if constexpr (storeLayout == Layout::RowMajor) {
+                    addr_idx = row_packed * outer_stride + col_packed * inner_stride;
+                } else {
+                    addr_idx = col_packed * outer_stride + row_packed * inner_stride;
+                }
+                
+                // Get the linear register index and store the packed data
+                uint32_t reg_idx = reg_rc_to_idx(reg_row, reg_col);
+                buffer_packed[addr_idx] = m_mma_reg[reg_idx].m_reg;
             }
-            
-            // Copy to result
-            for (int i = 0; i < NumRegs; i++)
-            {
-                result.m_mma_reg[i].m_reg = regs[i];
+        }
+    }
+
+    
+    // Store to RWStructuredBuffer
+    template<Layout storeLayout>
+    __device__ void Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
+    {
+        Store<storeLayout>(buffer.data, element, stride);
+    }
+
+    // Store to different pointer types (e.g., uint4*)
+    // Adjusts stride based on pointer type size
+    template<Layout storeLayout, typename U>
+    __device__ void Store(U* buffer, uint stride)
+    {
+        // Adjust stride to account for different pointer type
+        // If storing int via uint4*, stride needs to be scaled by sizeof(uint4)/sizeof(int)
+        Store<storeLayout>(reinterpret_cast<T*>(buffer), 0, stride * sizeof(U) / sizeof(T));
+    }
+
+    template<Layout loadLayout>
+    static __device__ MMAMatrix<T, M, N, layout> Load(const T* buffer, uint element, uint stride)
+    {
+        MMAMatrix<T, M, N, layout> result;
+        uint laneId = _getLaneId();
+        uint2 target_subreg_rc = MMAReg::lin_to_rc_packed(laneId);
+        
+        // Calculate stride in packed units
+        uint stride_packed = stride / (sizeof(uint32_t) / sizeof(T));
+        uint32_t outer_stride, inner_stride;
+        
+        // Determine if we need to transpose during load
+        constexpr bool transpose = (loadLayout != layout);
+        
+        if constexpr (!transpose) {
+            // Loading in same layout as matrix internal layout
+            if constexpr (ROW_MAJOR) {
+                outer_stride = stride_packed;  // Stride between rows
+                inner_stride = 1;              // Adjacent columns
+            } else {
+                outer_stride = stride_packed;  // Stride between columns
+                inner_stride = 1;              // Adjacent rows
             }
-            
-            return result;
+        } else {
+            // Transposing during load: swap stride interpretation
+            if constexpr (ROW_MAJOR) {
+                outer_stride = 1;
+                inner_stride = stride_packed;
+            } else {
+                outer_stride = stride_packed;
+                inner_stride = 1;
+            }
         }
         
-        // Load from StructuredBuffer
-        template<Layout loadLayout>
-        static __device__ MMAMatrix<T, M, N, layout> Load(StructuredBuffer<T> buffer, uint element, uint stride)
+        const uint32_t* buffer_packed = reinterpret_cast<const uint32_t*>(buffer + element);
+        
+        // Iterate over all registers and load from memory
+        for (uint32_t reg_row = 0; reg_row < RegRows; reg_row++)
         {
-            return Load<loadLayout>(buffer.data, element, stride);
+            for (uint32_t reg_col = 0; reg_col < RegCols; reg_col++)
+            {
+                // Calculate the global position for this register's data
+                uint32_t row_packed = reg_row * MMAReg::RowsPacked + target_subreg_rc.x;
+                uint32_t col_packed = reg_col * MMAReg::ColsPacked + target_subreg_rc.y;
+                
+                // If transposing, swap row and column
+                if constexpr (transpose) {
+                    uint32_t temp = row_packed;
+                    row_packed = col_packed;
+                    col_packed = temp;
+                }
+                
+                // Convert 2D coordinates to linear buffer address
+                uint32_t addr_idx;
+                if constexpr (loadLayout == Layout::RowMajor) {
+                    addr_idx = row_packed * outer_stride + col_packed * inner_stride;
+                } else {
+                    addr_idx = col_packed * outer_stride + row_packed * inner_stride;
+                }
+                
+                // Load the data into the register
+                uint32_t reg_idx = reg_rc_to_idx(reg_row, reg_col);
+                result.m_mma_reg[reg_idx].m_reg = buffer_packed[addr_idx];
+            }
         }
-    };
-
-    // mad() - Matrix multiply-add: D = A * B + C
-    // A is (M x K), B is (K x N), C and D are (M x N)
-    template<typename AType, typename BType, typename CType, typename DType, 
-             int M, int N, int K, Layout layout>
-    __device__ MMAMatrix<DType, M, N, layout> mad(
-        const MMAMatrix<AType, M, K, layout>& a,
-        const MMAMatrix<BType, K, N, layout>& b,
-        const MMAMatrix<CType, M, N, layout>& c)
+        return result;
+    }
+        
+    // Load from different pointer types (e.g., uint4*)
+    // Adjusts stride based on pointer type size
+    template<Layout loadLayout, typename U>
+    static __device__ MMAMatrix<T, M, N, layout> Load(const U* buffer, uint stride)
     {
-        // Construct the full MMAShape (M x N x K) from matrix dimensions
-        using Shape = MMAShape<M, N, K>;
-        // Traits acts like a dispatch table for the different shapes
-        using Traits = MMATraits<DType, Shape, layout>;
-        
-        MMAMatrix<DType, M, N, layout> matD;
-        
-        // Delegate to specialized Traits::mma() function
-        // This will fail at compile time if no specialization exists for this Shape
-        Traits::mma(matD, a, b, c);
-        
-        return matD;
-    };
-
-
-    template<
-        typename AType,
-        typename BType,
-        typename CType,
-        typename DType,
-        int M,
-        int N,
-        int K,
-        Layout layoutA,
-        Layout layoutB,
-        bool saturatingAccumulation>
-    __device__ MMAMatrix<DType, M, N, layoutA> coopMatMulAdd(
-        const MMAMatrix<AType, M, K, layoutA>& matA,
-        const MMAMatrix<BType, K, N, layoutB>& matB,
-        const MMAMatrix<CType, M, N, layoutA>& matC)
-    {
-        // Note: saturatingAccumulation and layoutB are currently not used but kept for API compatibility
-        // Construct MMAShape (M x N x K) dynamically and assert if no specialization exists
-        MMAMatrix<DType, M, N, layoutA> matD = mad<AType, BType, CType, DType, M, N, K, layoutA>(matA, matB, matC);
-
-        return matD;
+        // Adjust stride to account for different pointer type
+        return Load<loadLayout>(reinterpret_cast<const T*>(buffer), 0, stride * sizeof(U) / sizeof(T));
     }
 
-    // Deduced template wrapper to avoid explicit template argument issues
-    template<typename AType, int MA, int KA, Layout layoutA,
-             typename BType, int KB, int NB, Layout layoutB,
-             typename CType, int MC, int NC, Layout layoutC>
-    __device__ auto coopMatMulAdd(
-        const MMAMatrix<AType, MA, KA, layoutA>& matA,
-        const MMAMatrix<BType, KB, NB, layoutB>& matB,
-        const MMAMatrix<CType, MC, NC, layoutC>& matC)
-    -> MMAMatrix<CType, MA, NB, layoutA>
+    // Load from StructuredBuffer
+    template<Layout loadLayout>
+    static __device__ MMAMatrix<T, M, N, layout> Load(StructuredBuffer<T> buffer, uint element, uint stride)
     {
-        // Validate dimensions at compile time
-        static_assert(KA == KB, "Matrix A columns must equal Matrix B rows");
-        static_assert(MA == MC, "Result M dimension must match");
-        static_assert(NB == NC, "Result N dimension must match");
-        static_assert(layoutA == layoutC, "Result layout must match Matrix A layout");
-        
-        return coopMatMulAdd<AType, BType, CType, CType, MA, NB, KA, layoutA, layoutB, false>(
-            matA, matB, matC);
+        return Load<loadLayout>(buffer.data, element, stride);
     }
+
+}; // struct MMAMatrix
+
+// mad() - Matrix multiply-add: D = A * B + C
+// A is (M x K), B is (K x N), C and D are (M x N)
+// Supports different layouts for each matrix (A, B, C can have different layouts)
+template<typename AType, typename BType, typename CType, typename DType, 
+         int M, int N, int K, Layout layoutA, Layout layoutB, Layout layoutC>
+__device__ MMAMatrix<DType, M, N, layoutA> mad(
+    const MMAMatrix<AType, M, K, layoutA>& a,
+    const MMAMatrix<BType, K, N, layoutB>& b,
+    const MMAMatrix<CType, M, N, layoutC>& c)
+{
+    // Construct the full MMAShape (M x N x K) from matrix dimensions
+    using Shape = MMAShape<M, N, K>;
+    // Traits uses layoutA for the result (matches A and D)
+    using Traits = MMATraits<DType, Shape, layoutA>;
+    
+    MMAMatrix<DType, M, N, layoutA> matD;
+    
+    // Delegate to specialized Traits::mma() function with explicit layout template parameters
+    // This will fail at compile time if no specialization exists for this Shape
+    Traits::template mma<layoutA, layoutB, layoutC>(matD, a, b, c);
+    
+    return matD;
+};
+
+template<
+    typename AType,
+    typename BType,
+    typename CType,
+    typename DType,
+    int M,
+    int N,
+    int K,
+    Layout layoutA,
+    Layout layoutB,
+    bool saturatingAccumulation>
+__device__ MMAMatrix<DType, M, N, layoutA> coopMatMulAdd(
+    const MMAMatrix<AType, M, K, layoutA>& matA,
+    const MMAMatrix<BType, K, N, layoutB>& matB,
+    const MMAMatrix<CType, M, N, layoutA>& matC)
+{
+    // Note: saturatingAccumulation is currently not used but kept for API compatibility
+    // Construct MMAShape (M x N x K) dynamically and assert if no specialization exists
+    MMAMatrix<DType, M, N, layoutA> matD = mad<AType, BType, CType, DType, M, N, K, layoutA, layoutB, layoutA>(matA, matB, matC);
+    return matD;
+}
+
+// Deduced template wrapper to avoid explicit template argument issues
+template<typename AType, int MA, int KA, Layout layoutA,
+         typename BType, int KB, int NB, Layout layoutB,
+         typename CType, int MC, int NC, Layout layoutC>
+__device__ auto coopMatMulAdd(
+    const MMAMatrix<AType, MA, KA, layoutA>& matA,
+    const MMAMatrix<BType, KB, NB, layoutB>& matB,
+    const MMAMatrix<CType, MC, NC, layoutC>& matC)
+-> MMAMatrix<CType, MA, NB, layoutA>
+{
+    // Validate dimensions at compile time
+    static_assert(KA == KB, "Matrix A columns must equal Matrix B rows");
+    static_assert(MA == MC, "Result M dimension must match");
+    static_assert(NB == NC, "Result N dimension must match");
+    static_assert(layoutA == layoutC, "Result layout must match Matrix A layout");
+    
+    return coopMatMulAdd<AType, BType, CType, CType, MA, NB, KA, layoutA, layoutB, false>(
+        matA, matB, matC);
+}
 } // namespace Slang_CUDA_MMA
 #endif // #if (((__CUDACC_VER_MAJOR__ >=12)&&(__CUDACC_VER_MINOR__>=5)) || (CUDA_VERSION >= 12050))
 
