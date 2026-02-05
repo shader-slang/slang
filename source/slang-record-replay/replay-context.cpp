@@ -473,6 +473,7 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
             // No index file, clear any existing index
             m_indexStream = ReplayStream();
         }
+        m_currentReplayPath = folderPath;
         
         m_mode = Mode::Playback;
         return SLANG_OK;
