@@ -2346,7 +2346,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 if (needsClone)
                 {
                     // Clone the ThisTypeWitness at current insert location
-                    // The constraint type is stored in the witness table type, not as an operand
+                    // because it exists in the interface scope that is not accessible from here.
                     auto witnessTableType =
                         as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
                     SLANG_ASSERT(witnessTableType);
