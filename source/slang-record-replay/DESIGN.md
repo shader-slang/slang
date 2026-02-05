@@ -102,7 +102,40 @@ When enabled, recordings are saved to timestamped folders under `.slang-replays/
 ```
 .slang-replays/
 └── 2026-02-04_14-30-45-123/
-    └── stream.bin
+    ├── stream.bin    # Main call data stream
+    └── index.bin     # Call index for quick navigation
+```
+
+## Call Index Stream
+
+The `index.bin` file is a secondary stream written alongside `stream.bin` during recording. It contains fixed-size entries that allow quick navigation through a replay without parsing the entire main stream.
+
+### Index Entry Format
+
+Each entry is a `CallIndexEntry` struct (fixed 144 bytes):
+
+| Field | Type | Size | Description |
+|-------|------|------|-------------|
+| `streamPosition` | uint64_t | 8 bytes | Byte offset in stream.bin where call begins |
+| `thisHandle` | uint64_t | 8 bytes | Handle of 'this' pointer (0 for static calls) |
+| `signature` | char[] | 128 bytes | Null-terminated function signature |
+
+### Usage
+
+```cpp
+// Load a replay with index
+ctx.loadReplay("/path/to/recording");
+
+// Get total number of calls
+size_t count = ctx.getCallCount();
+
+// Get info about a specific call
+const CallIndexEntry* entry = ctx.getCallIndexEntry(5);
+printf("Call 5: %s at offset %llu\n", entry->signature, entry->streamPosition);
+
+// Skip to a specific call
+ctx.seekToCall(10);  // Position stream at call #10
+ctx.executeNextCall();
 ```
 
 ## Proxy Pattern

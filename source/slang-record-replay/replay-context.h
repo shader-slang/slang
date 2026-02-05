@@ -29,6 +29,27 @@ constexpr uint64_t kNullHandle = 0;          ///< Null pointer
 constexpr uint64_t kInlineBlobHandle = 1;    ///< User-provided blob serialized inline
 constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
 
+/// Maximum length for function signatures stored in index entries.
+constexpr size_t kMaxSignatureLength = 128;
+
+/// Fixed-size index entry for the call index stream.
+/// Each entry records metadata about a function call to enable quick navigation.
+/// The index stream (index.bin) is written alongside stream.bin during recording.
+#pragma pack(push, 1)
+struct CallIndexEntry
+{
+    uint64_t streamPosition;                   ///< Byte offset in stream.bin where call begins
+    uint64_t thisHandle;                       ///< Handle of 'this' pointer (kNullHandle for static)
+    char signature[kMaxSignatureLength];       ///< Null-terminated function signature
+    
+    /// Total size of this struct (must be fixed for file I/O)
+    static constexpr size_t kSize = sizeof(uint64_t) + sizeof(uint64_t) + kMaxSignatureLength;
+};
+#pragma pack(pop)
+
+static_assert(sizeof(CallIndexEntry) == CallIndexEntry::kSize, 
+    "CallIndexEntry must have expected fixed size");
+
 /// Exception thrown when trying to record an untracked interface.
 class UntrackedInterfaceException : public Slang::Exception
 {
@@ -280,6 +301,7 @@ public:
 
     /// Begin recording a method call.
     /// Records the function signature and 'this' pointer as a tracked handle.
+    /// Also writes an index entry to the index stream for quick navigation.
     template<typename T>
     void beginCall(const char* signature, T* thisPtr)
     {
@@ -294,6 +316,18 @@ public:
         if (m_ttyLogging)
             logCall(parsed, thisPtr);
         
+        // Write index entry before recording to main stream (for correct position)
+        if (isWriting())
+        {
+            // Get the handle for 'this' pointer (may not be registered yet for outputs)
+            ISlangUnknown* obj = reinterpret_cast<ISlangUnknown*>(thisPtr);
+            uint64_t thisHandle = kNullHandle;
+            if (obj != nullptr && isInterfaceRegistered(obj))
+                thisHandle = getHandleForInterface(obj);
+            
+            writeIndexEntry(parsed, thisHandle);
+        }
+        
         record(RecordFlag::Input, parsed);
         // Record the 'this' pointer as a handle
         // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
@@ -303,6 +337,7 @@ public:
 
     /// Begin recording a static/free function call.
     /// Records only the function signature.
+    /// Also writes an index entry to the index stream for quick navigation.
     void beginStaticCall(const char* signature)
     {
         ensureInitialized();
@@ -314,6 +349,10 @@ public:
         // Log to TTY if enabled
         if (m_ttyLogging)
             logCall(parsed, nullptr);
+        
+        // Write index entry before recording to main stream (for correct position)
+        if (isWriting())
+            writeIndexEntry(parsed, kNullHandle);
         
         record(RecordFlag::Input, parsed);
         uint64_t nh = kNullHandle;
@@ -423,6 +462,7 @@ private:
 
     std::recursive_mutex m_mutex;
     ReplayStream m_stream;          ///< Main stream for record/playback
+    ReplayStream m_indexStream;     ///< Index stream for call navigation (index.bin)
     ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
     MemoryArena m_arena;
     Mode m_mode;
@@ -462,6 +502,30 @@ private:
     
     /// Generate a timestamp folder name (e.g., "2026-02-04_14-30-45-123").
     static String generateTimestampFolderName();
+    
+    /// Write an index entry to the index stream.
+    /// Called by beginCall/beginStaticCall before writing to main stream.
+    void writeIndexEntry(const char* signature, uint64_t thisHandle);
+
+    // ==========================================================================
+    // Call Index Access
+    // ==========================================================================
+public:
+    /// Get the number of calls in the loaded index.
+    /// Returns 0 if no index is loaded.
+    SLANG_API size_t getCallCount() const;
+    
+    /// Get an index entry by call number (0-based).
+    /// Returns nullptr if index is not loaded or callIndex is out of range.
+    SLANG_API const CallIndexEntry* getCallIndexEntry(size_t callIndex) const;
+    
+    /// Seek the main stream to a specific call by index.
+    /// Returns SLANG_OK on success, SLANG_E_NOT_FOUND if index not loaded,
+    /// SLANG_E_INVALID_ARG if callIndex is out of range.
+    SLANG_API SlangResult seekToCall(size_t callIndex);
+    
+    /// Check if the call index is loaded/available.
+    SLANG_API bool hasCallIndex() const { return m_indexStream.getSize() > 0; }
 
     // ==========================================================================
     // Playback Dispatcher

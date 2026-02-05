@@ -153,6 +153,7 @@ void ReplayContext::reset()
 {
     closeRecordingMirror();  // Close any active mirror file
     m_stream.reset();
+    m_indexStream.reset();
     m_referenceStream.reset();
     m_arena.reset();
     m_mode = Mode::Idle;
@@ -180,6 +181,9 @@ void ReplayContext::switchToPlayback()
     // Switch stream to reading mode and reset position to 0
     m_stream.setReading(true);
     m_stream.seek(0);
+    // Index stream stays as-is for navigation purposes
+    m_indexStream.setReading(true);
+    m_indexStream.seek(0);
     m_mode = Mode::Playback;
 }
 
@@ -199,6 +203,8 @@ void ReplayContext::switchToSync()
 
     // Reset main stream for new recording that will be verified against reference
     m_stream.reset();
+    // Also reset index stream for new recording
+    m_indexStream.reset();
     m_mode = Mode::Sync;
 }
 
@@ -310,7 +316,7 @@ void ReplayContext::setupRecordingMirror()
         return;
     }
     
-    // Set up mirror file
+    // Set up mirror file for main stream
     String streamPath = Path::combine(m_currentReplayPath, "stream.bin");
     try
     {
@@ -320,13 +326,84 @@ void ReplayContext::setupRecordingMirror()
     {
         // If we can't create the mirror file, just record without mirroring
         m_currentReplayPath = String();
+        return;
+    }
+    
+    // Set up mirror file for index stream
+    String indexPath = Path::combine(m_currentReplayPath, "index.bin");
+    try
+    {
+        m_indexStream.setMirrorFile(indexPath.getBuffer());
+    }
+    catch (const Slang::Exception&)
+    {
+        // Index is optional - continue without it but close main mirror to be consistent
+        m_stream.closeMirrorFile();
+        m_currentReplayPath = String();
     }
 }
 
 void ReplayContext::closeRecordingMirror()
 {
     m_stream.closeMirrorFile();
+    m_indexStream.closeMirrorFile();
     m_currentReplayPath = String();
+}
+
+void ReplayContext::writeIndexEntry(const char* signature, uint64_t thisHandle)
+{
+    // Create a fixed-size index entry
+    CallIndexEntry entry;
+    entry.streamPosition = m_stream.getPosition();
+    entry.thisHandle = thisHandle;
+    
+    // Copy signature, truncating if necessary
+    size_t sigLen = signature ? strlen(signature) : 0;
+    if (sigLen >= kMaxSignatureLength)
+        sigLen = kMaxSignatureLength - 1;
+    
+    if (signature && sigLen > 0)
+        memcpy(entry.signature, signature, sigLen);
+    entry.signature[sigLen] = '\0';
+    
+    // Zero-fill the rest to ensure consistent file format
+    if (sigLen + 1 < kMaxSignatureLength)
+        memset(entry.signature + sigLen + 1, 0, kMaxSignatureLength - sigLen - 1);
+    
+    // Write the entry to the index stream
+    m_indexStream.write(&entry, sizeof(entry));
+}
+
+// =============================================================================
+// Call Index Access
+// =============================================================================
+
+size_t ReplayContext::getCallCount() const
+{
+    if (m_indexStream.getSize() == 0)
+        return 0;
+    return m_indexStream.getSize() / sizeof(CallIndexEntry);
+}
+
+const CallIndexEntry* ReplayContext::getCallIndexEntry(size_t callIndex) const
+{
+    size_t count = getCallCount();
+    if (callIndex >= count)
+        return nullptr;
+    
+    // The index stream data is a flat array of CallIndexEntry structs
+    const uint8_t* data = m_indexStream.getData();
+    return reinterpret_cast<const CallIndexEntry*>(data + callIndex * sizeof(CallIndexEntry));
+}
+
+SlangResult ReplayContext::seekToCall(size_t callIndex)
+{
+    const CallIndexEntry* entry = getCallIndexEntry(callIndex);
+    if (!entry)
+        return SLANG_E_INVALID_ARG;
+    
+    m_stream.seek(entry->streamPosition);
+    return SLANG_OK;
 }
 
 // Helper class for collecting directory entries
@@ -372,6 +449,27 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
     try
     {
         m_stream = ReplayStream::loadFromFile(streamPath.getBuffer());
+        
+        // Also try to load the index stream (optional - may not exist for older recordings)
+        String indexPath = Path::combine(String(folderPath), "index.bin");
+        if (File::exists(indexPath))
+        {
+            try
+            {
+                m_indexStream = ReplayStream::loadFromFile(indexPath.getBuffer());
+            }
+            catch (const Slang::Exception&)
+            {
+                // Index is optional, continue without it
+                m_indexStream = ReplayStream();
+            }
+        }
+        else
+        {
+            // No index file, clear any existing index
+            m_indexStream = ReplayStream();
+        }
+        
         m_mode = Mode::Playback;
         return SLANG_OK;
     }
