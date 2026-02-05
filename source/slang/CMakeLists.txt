@@ -395,11 +395,26 @@ if(UNIX AND SLANG_LIB_TYPE STREQUAL "SHARED")
         VERBATIM
     )
 
-    # Install the symlink by copying it from the build directory
-    install(
-        FILES $<TARGET_FILE_DIR:slang>/libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>
-        DESTINATION lib
-    )
+    # Install the symlink properly (not as a file copy)
+    # Create symlink during installation pointing to the actual installed library
+    # The actual library will be installed as libslang-compiler.so[.X] by CMake
+    # We need to point libslang.so to the base name (libslang-compiler.so)
+    # which CMake will create as a symlink to the versioned library
+    install(CODE "
+        set(SYMLINK_NAME \"libslang.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>\")
+        set(TARGET_LIB_BASE \"libslang-compiler.$<IF:$<PLATFORM_ID:Darwin>,dylib,so>\")
+        set(LIB_DIR \"\${CMAKE_INSTALL_PREFIX}/lib\")
+        execute_process(
+            COMMAND \${CMAKE_COMMAND} -E create_symlink
+                \${TARGET_LIB_BASE}
+                \${LIB_DIR}/\${SYMLINK_NAME}
+            WORKING_DIRECTORY \"\${CMAKE_INSTALL_PREFIX}\"
+            RESULT_VARIABLE SYMLINK_RESULT
+        )
+        if(SYMLINK_RESULT)
+            message(WARNING \"Failed to create symlink \${SYMLINK_NAME} -> \${TARGET_LIB_BASE}\")
+        endif()
+    ")
 
     message(STATUS "Unix backward compatibility symlink (libslang -> libslang-compiler) will be created during build and installation")
 endif()
