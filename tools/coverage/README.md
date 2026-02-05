@@ -16,6 +16,14 @@ COVERAGE_HTML=1 ./tools/coverage/run-coverage.sh
 open ./coverage-html/index.html
 ```
 
+Wrapper script handles the full workflow on local workspace:
+
+```bash
+./tools/coverage/run-coverage-local.sh
+```
+
+Run `./tools/coverage/run-coverage-local.sh --help` for options.
+
 ## Command-Line Options and Environment Variables
 
 - `--report-only` - Generate reports from existing coverage data without re-running tests. Requires that coverage data was collected previously (i.e., `build/coverage-data/slang-test.profdata` exists).
