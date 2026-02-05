@@ -17,8 +17,7 @@ SLANG_UNIT_TEST(RecordReplayApiCreateSession)
 {
     // Create global session
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
-                SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
     SLANG_CHECK(globalSession != nullptr);
 
     // Create a session
@@ -34,8 +33,7 @@ SLANG_UNIT_TEST(RecordReplayApiCompileModule)
 {
     // Create session with a target
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
-                SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -49,9 +47,8 @@ SLANG_UNIT_TEST(RecordReplayApiCompileModule)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     // Load a module with a struct type
-    const char* moduleCode =
-        "struct MyStruct { int x; float y; }\n"
-        "int simpleFunction(int x) { return x * 2; }\n";
+    const char* moduleCode = "struct MyStruct { int x; float y; }\n"
+                             "int simpleFunction(int x) { return x * 2; }\n";
 
     ComPtr<slang::IBlob> diagnosticsBlob;
     auto module = session->loadModuleFromSourceString(
@@ -85,8 +82,7 @@ SLANG_UNIT_TEST(RecordReplayApiCompileModule)
 SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
-                SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -99,10 +95,9 @@ SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
     ComPtr<slang::ISession> session;
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
-    const char* shaderCode =
-        "[shader(\"compute\")]\n"
-        "[numthreads(1,1,1)]\n"
-        "void main(uniform int value) {}\n";
+    const char* shaderCode = "[shader(\"compute\")]\n"
+                             "[numthreads(1,1,1)]\n"
+                             "void main(uniform int value) {}\n";
 
     ComPtr<slang::IBlob> diagnosticsBlob;
     auto module = session->loadModuleFromSourceString(
@@ -126,11 +121,12 @@ SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
     slang::IComponentType* components[] = {module, entryPoint};
     ComPtr<slang::IComponentType> composite;
     ComPtr<ISlangBlob> compositeBlob;
-    SLANG_CHECK(session->createCompositeComponentType(
-        components,
-        2,
-        composite.writeRef(),
-        compositeBlob.writeRef()) == SLANG_OK);
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            2,
+            composite.writeRef(),
+            compositeBlob.writeRef()) == SLANG_OK);
 
     SLANG_CHECK(composite != nullptr);
 
@@ -154,8 +150,7 @@ SLANG_UNIT_TEST(RecordReplayApiEntryPoint)
 SLANG_UNIT_TEST(RecordReplayApiTypeOperations)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
-                SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -169,9 +164,8 @@ SLANG_UNIT_TEST(RecordReplayApiTypeOperations)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     // Load module with generic types
-    const char* moduleCode =
-        "struct MyStruct<T> { T value; }\n"
-        "int useStruct(MyStruct<int> s) { return s.value; }\n";
+    const char* moduleCode = "struct MyStruct<T> { T value; }\n"
+                             "int useStruct(MyStruct<int> s) { return s.value; }\n";
 
     ComPtr<slang::IBlob> diagnosticsBlob;
     auto module = session->loadModuleFromSourceString(
@@ -211,8 +205,7 @@ SLANG_UNIT_TEST(RecordReplayApiTypeOperations)
 SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) ==
-                SLANG_OK);
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     // Create session with multiple targets to exercise parameter recording
     slang::TargetDesc targetDesc = {};
@@ -227,14 +220,13 @@ SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
     SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
 
     // Load a compute shader
-    const char* shaderCode =
-        "RWStructuredBuffer<int> outputBuffer;\n"
-        "[shader(\"compute\")]\n"
-        "[numthreads(64,1,1)]\n"
-        "void computeMain(uint3 tid : SV_DispatchThreadID)\n"
-        "{\n"
-        "    outputBuffer[tid.x] = tid.x * 2;\n"
-        "}\n";
+    const char* shaderCode = "RWStructuredBuffer<int> outputBuffer;\n"
+                             "[shader(\"compute\")]\n"
+                             "[numthreads(64,1,1)]\n"
+                             "void computeMain(uint3 tid : SV_DispatchThreadID)\n"
+                             "{\n"
+                             "    outputBuffer[tid.x] = tid.x * 2;\n"
+                             "}\n";
 
     ComPtr<slang::IBlob> diagnosticsBlob;
     auto module = session->loadModuleFromSourceString(
@@ -247,28 +239,31 @@ SLANG_UNIT_TEST(RecordReplayApiParameterSerialization)
 
     // Get entry point
     ComPtr<slang::IEntryPoint> entryPoint;
-    SLANG_CHECK(module->findAndCheckEntryPoint(
-        "computeMain",
-        SLANG_STAGE_COMPUTE,
-        entryPoint.writeRef(),
-        diagnosticsBlob.writeRef()) == SLANG_OK);
+    SLANG_CHECK(
+        module->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnosticsBlob.writeRef()) == SLANG_OK);
     SLANG_CHECK(entryPoint != nullptr);
 
     // Create and link composite (exercises parameter recording for component arrays)
     slang::IComponentType* components[] = {module, entryPoint};
     ComPtr<slang::IComponentType> composite;
-    SLANG_CHECK(session->createCompositeComponentType(
-        components,
-        2,
-        composite.writeRef(),
-        diagnosticsBlob.writeRef()) == SLANG_OK);
+    SLANG_CHECK(
+        session->createCompositeComponentType(
+            components,
+            2,
+            composite.writeRef(),
+            diagnosticsBlob.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IComponentType> linked;
     SLANG_CHECK(composite->link(linked.writeRef(), diagnosticsBlob.writeRef()) == SLANG_OK);
 
     // Get target code (exercises ParameterRecorder with IBlob results)
     ComPtr<ISlangBlob> targetCode;
-    SLANG_CHECK(linked->getTargetCode(0, targetCode.writeRef(), diagnosticsBlob.writeRef()) == SLANG_OK);
+    SLANG_CHECK(
+        linked->getTargetCode(0, targetCode.writeRef(), diagnosticsBlob.writeRef()) == SLANG_OK);
     SLANG_CHECK(targetCode != nullptr);
     SLANG_CHECK(targetCode->getBufferSize() > 0);
 }
