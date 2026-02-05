@@ -1267,8 +1267,7 @@ public:
     /// The descriptor set/space index allocated for the bindless resource heap.
     /// This is determined during layout generation before any DCE occurs,
     /// ensuring consistency with reflection data.
-    /// A value of -1 indicates no bindless space has been allocated.
-    Int bindlessDescriptorSetIndex = -1;
+    Int bindlessSpaceIndex = 0;
 };
 
 StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);
