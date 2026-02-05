@@ -116,6 +116,7 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     // Get the replay context and reset it to clean state
     auto& ctx = SlangRecord::ReplayContext::get();
     ctx.reset();
+    ctx.setTtyLogging(true);
 
     // Load the replay from the recorded folder
     SlangResult res = ctx.loadReplay(recordPath.getBuffer());

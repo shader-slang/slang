@@ -405,7 +405,7 @@ void ReplayContext::logCall(const char* signature, void* thisPtr)
 {
     char buffer[512];
     if (thisPtr)
-        snprintf(buffer, sizeof(buffer), "[REPLAY] %s [this=%p]\n", signature, thisPtr);
+        snprintf(buffer, sizeof(buffer), "[REPLAY] %s [this=%p, handle=%llu]\n", signature, thisPtr, m_currentThisHandle);
     else
         snprintf(buffer, sizeof(buffer), "[REPLAY] %s [static]\n", signature);
     
@@ -559,8 +559,8 @@ void ReplayContext::unregisterProxy(ISlangUnknown* proxy)
     uint64_t* handle = m_objectToHandle.tryGetValue(proxy);
     if (handle)
     {
-        m_objectToHandle.remove(proxy);
         m_handleToObject.remove(*handle);
+        m_objectToHandle.remove(proxy);
     }
 }
 
