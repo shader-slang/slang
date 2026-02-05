@@ -1188,12 +1188,17 @@ SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
     return witness;
 }
 
-TypeCoercionWitness* ASTBuilder::getTypeCoercionWitness(
-    Type* subType,
-    Type* superType,
+BuiltinTypeCoercionWitness* ASTBuilder::getBuiltinTypeCoercionWitness(Type* fromType, Type* toType)
+{
+    return getOrCreate<BuiltinTypeCoercionWitness>(fromType, toType);
+}
+
+DeclRefTypeCoercionWitness* ASTBuilder::getDeclRefTypeCoercionWitness(
+    Type* fromType,
+    Type* toType,
     DeclRef<Decl> declRef)
 {
-    return getOrCreate<TypeCoercionWitness>(subType, superType, declRef.declRefBase);
+    return getOrCreate<DeclRefTypeCoercionWitness>(fromType, toType, declRef);
 }
 
 DeclRef<Decl> _getMemberDeclRef(ASTBuilder* builder, DeclRef<Decl> parent, Decl* decl)

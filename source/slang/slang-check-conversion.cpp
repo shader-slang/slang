@@ -1186,23 +1186,6 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
     return candidateCost;
 }
 
-FuncDecl* SharedSemanticsContext::getIntrinsicOpFunc(IROp irOp, Type* toType, QualType fromType)
-{
-    IntrinsicOpConversionMethodKey key = IntrinsicOpConversionMethodKey(irOp, fromType, toType);
-    if (m_intrinsicOpConversionMethods.containsKey(key))
-        return m_intrinsicOpConversionMethods.getValue(key);
-
-    auto astBuilder = this->_getASTBuilder();
-    IntrinsicOpModifier* intrinsicOpModifier = astBuilder->create<IntrinsicOpModifier>();
-    intrinsicOpModifier->op = irOp;
-    FuncDecl* funcDecl = astBuilder->create<FuncDecl>();
-    funcDecl->parentDecl = this->getModule()->getModuleDecl();
-    addModifier(funcDecl, intrinsicOpModifier);
-
-    m_intrinsicOpConversionMethods.add(key, funcDecl);
-    return funcDecl;
-}
-
 bool SemanticsVisitor::_coerce(
     CoercionSite site,
     Type* toType,
@@ -1211,10 +1194,10 @@ bool SemanticsVisitor::_coerce(
     Expr* fromExpr,
     DiagnosticSink* sink,
     ConversionCost* outCost,
-    DeclRef<Decl>* outDeclRefUsedToConvert)
+    TypeCoercionWitness** outWitnessOfConversion)
 {
-    if (outDeclRefUsedToConvert)
-        *outDeclRefUsedToConvert = m_astBuilder->getDefaultEmptyDecl();
+    if (outWitnessOfConversion)
+        *outWitnessOfConversion = nullptr;
 
     // If we are about to try and coerce an overloaded expression,
     // then we should start by trying to resolve the ambiguous reference
@@ -1254,7 +1237,7 @@ bool SemanticsVisitor::_coerce(
                 coercibleCandidates[0],
                 sink,
                 outCost,
-                outDeclRefUsedToConvert);
+                outWitnessOfConversion);
         }
         if (sink)
         {
@@ -1284,8 +1267,9 @@ bool SemanticsVisitor::_coerce(
             *outToExpr = fromExpr;
         if (outCost)
             *outCost = kConversionCost_None;
-        if (outDeclRefUsedToConvert)
-            *outDeclRefUsedToConvert = getShared()->getIntrinsicOpFunc(kIROp_Nop, toType, fromType);
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion =
+                getASTBuilder()->getBuiltinTypeCoercionWitness(fromType, toType);
         return true;
     }
 
@@ -1722,7 +1706,7 @@ bool SemanticsVisitor::_coerce(
                 derefExpr,
                 sink,
                 &subCost,
-                outDeclRefUsedToConvert))
+                outWitnessOfConversion))
         {
             return false;
         }
@@ -1816,7 +1800,7 @@ bool SemanticsVisitor::_coerce(
                 openRefExpr,
                 sink,
                 &subCost,
-                outDeclRefUsedToConvert))
+                outWitnessOfConversion))
         {
             return false;
         }
@@ -1886,8 +1870,11 @@ bool SemanticsVisitor::_coerce(
         }
         overloadContext.bestCandidateStorage = cachedMethod->conversionFuncOverloadCandidate;
         overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
-        if (outDeclRefUsedToConvert)
-            *outDeclRefUsedToConvert = overloadContext.bestCandidate->item.declRef;
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+                fromType,
+                toType,
+                overloadContext.bestCandidate->item.declRef);
         if (!outToExpr)
         {
             // If we are not requesting to create an expression, we can return early.
@@ -1981,8 +1968,11 @@ bool SemanticsVisitor::_coerce(
             getShared()->cacheImplicitCastMethod(implicitCastKey, method);
         }
 
-        if (outDeclRefUsedToConvert)
-            *outDeclRefUsedToConvert = method.conversionFuncOverloadCandidate.item.declRef;
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+                fromType,
+                toType,
+                method.conversionFuncOverloadCandidate.item.declRef);
         if (outCost)
             *outCost = bestCost;
         return result;

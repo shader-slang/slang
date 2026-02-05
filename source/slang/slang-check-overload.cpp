@@ -1088,10 +1088,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
 
             if (constraintDecl->findModifier<ImplicitConversionModifier>())
             {
-                // The type arguments are not implicitly convertible, return failure.
+                // If the arguments are not implicitly convertible, return failure.
                 if (conversionCost > kConversionCost_GeneralConversion)
                 {
-                    DeclRef<Decl> declRefUsedToConvert{};
+                    TypeCoercionWitness* typeCoercionWitness{};
                     _coerce(
                         CoercionSite::General,
                         toType,
@@ -1100,7 +1100,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                         nullptr,
                         getSink(),
                         nullptr,
-                        &declRefUsedToConvert);
+                        &typeCoercionWitness);
 
                     if (context.mode != OverloadResolveContext::Mode::JustTrying)
                     {
@@ -1109,10 +1109,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                             Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
                             fromType,
                             toType);
-                        getSink()->diagnose(
-                            declRefUsedToConvert,
-                            Diagnostics::seeDefinitionOf,
-                            "the non implicit conversion function");
+                        if (auto declRefTypeCoercionWitness = as<DeclRefTypeCoercionWitness>(
+                                typeCoercionWitness))
+                        {
+                            getSink()->diagnose(
+                                declRefTypeCoercionWitness->getDeclRef(),
+                                Diagnostics::seeDefinitionOf,
+                                "the non implicit conversion function");
+                        }
                         getSink()->diagnose(
                             constraintDecl,
                             Diagnostics::seeDefinitionOf,
@@ -1142,7 +1146,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     return false;
                 }
             }
-            DeclRef<Decl> declRefUsedToConvert{};
+            TypeCoercionWitness* typeCoercionWitness{};
             _coerce(
                 CoercionSite::General,
                 toType,
@@ -1151,9 +1155,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                 nullptr,
                 getSink(),
                 nullptr,
-                &declRefUsedToConvert);
-            newArgs.add(
-                m_astBuilder->getTypeCoercionWitness(fromType, toType, declRefUsedToConvert));
+                &typeCoercionWitness);
+            newArgs.add(typeCoercionWitness);
         }
     }
 

@@ -1936,19 +1936,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
-
-    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    
+    LoweredValInfo visitBuiltinTypeCoercionWitness(BuiltinTypeCoercionWitness* witness)
     {
-        // For now we do not use the result of a `TypeCoercionWitness` in any senario, so this logic
-        // is stubbed-out
-        return LoweredValInfo();
+        auto irBuilder = getBuilder();
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        IRFunc* irFunc = irBuilder->createFunc();
+        irFunc->setFullType(funcType);
+        
+        IRBuilderInsertLocScope insertScope(irBuilder);
+        irBuilder->setInsertInto(irFunc);
+        irBuilder->emitBlock();
+        auto param = irBuilder->emitParam(fromType);
+        auto cast = irBuilder->emitCast(toType, param);
+        irBuilder->emitReturn(cast);
+        return LoweredValInfo::simple(irFunc);
+    }
 
-        // auto declRef = val->getDeclRef();
-        //// If we have a `EmptyDecl` we encountered a unhandled `_coerce` senario.
-        // if (as<EmptyDecl>(declRef))
-        //     return LoweredValInfo();
-        // auto type = lowerType(context, getFuncType(getCurrentASTBuilder(), declRef));
-        // return emitDeclRef(context, declRef, type);
+    LoweredValInfo visitDeclRefTypeCoercionWitness(DeclRefTypeCoercionWitness* witness)
+    {
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        return emitDeclRef(
+            context,
+            witness->getDeclRef(),
+            funcType);
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)

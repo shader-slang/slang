@@ -791,6 +791,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             constrainedGenericParams.add(toDecl.getDecl());
         }
+        TypeCoercionWitness* typeCoercionWitness{};
         DeclRef<Decl> declRefUsedToConvert{};
         _coerce(
             CoercionSite::General,
@@ -800,8 +801,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             nullptr,
             getSink(),
             nullptr,
-            &declRefUsedToConvert);
-        args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, declRefUsedToConvert));
+            &typeCoercionWitness);
+        args.add(typeCoercionWitness);
     }
 
     // Add a flat cost to all unconstrained generic params.
