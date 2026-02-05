@@ -41,6 +41,8 @@ jobs:
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+          token_format: "access_token"
+          create_credentials_file: true
 
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
