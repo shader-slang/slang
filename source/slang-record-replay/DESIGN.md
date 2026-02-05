@@ -517,8 +517,9 @@ The `ReplayContext` uses a recursive mutex. All recording operations acquire the
 
 ## Future Enhancements
 
-- [ ] Full replay verification (compare outputs during replay)
-- [ ] Differential recording (only record changes)
-- [ ] Network transport for remote debugging
-- [ ] Compression for large recordings
-- [ ] More complete API coverage
+- Support for TypeReflection (and potentially other reflection types)
+- Recording/playback of file system operations
+- Refine the instrumentation macros
+- Full API coverage - should be able to run full slang testing framework
+- Struct begin/end markers to make decoded files a bit easier to read
+- PyQT based viewer

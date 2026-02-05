@@ -116,7 +116,7 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     // Get the replay context and reset it to clean state
     auto& ctx = SlangRecord::ReplayContext::get();
     ctx.reset();
-    ctx.setTtyLogging(true);
+    //ctx.setTtyLogging(true);
 
     // Load the replay from the recorded folder
     SlangResult res = ctx.loadReplay(recordPath.getBuffer());
@@ -291,14 +291,10 @@ SLANG_UNIT_TEST(RecordReplay_ray_tracing)
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0xe31a5f4c7e51ee66)));
 }
 
-// This causes a Windows Graphics driver crash.
-// Temporarily disabled; issue #8022
-#if 0
 SLANG_UNIT_TEST(RecordReplay_ray_tracing_pipeline)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline")));
 }
-#endif
 
 SLANG_UNIT_TEST(RecordReplay_autodiff_texture)
 {
@@ -310,9 +306,6 @@ SLANG_UNIT_TEST(RecordReplay_gpu_printing)
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x3c8ef95e2fb331bb)));
 }
 
-#if 0
-// These examples require reflection API to replay, disabled for now.
-
 SLANG_UNIT_TEST(RecordReplay_shader_object)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object")));
@@ -322,6 +315,5 @@ SLANG_UNIT_TEST(RecordReplay_model_viewer)
 {
     SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer")));
 }
-#endif
 
 #endif

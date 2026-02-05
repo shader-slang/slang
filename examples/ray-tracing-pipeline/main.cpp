@@ -165,31 +165,38 @@ struct RayTracing : public WindowedAppBase
         if (!module)
             return SLANG_FAIL;
 
+        ComPtr<slang::IEntryPoint> rayGenShaderEntryPoint;
+        ComPtr<slang::IEntryPoint> missShaderEntryPoint;
+        ComPtr<slang::IEntryPoint> closestHitShaderEntryPoint;
+        ComPtr<slang::IEntryPoint> shadowRayHitShaderEntryPoint;
+        ComPtr<slang::IEntryPoint> vertexMainEntryPoint;
+        ComPtr<slang::IEntryPoint> fragmentMainEntryPoint;
+
         Slang::List<slang::IComponentType*> componentTypes;
         componentTypes.add(module);
         if (isRayTracingPipeline)
         {
-            ComPtr<slang::IEntryPoint> entryPoint;
             SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("rayGenShader", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
-            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("missShader", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
+                module->findEntryPointByName("rayGenShader", rayGenShaderEntryPoint.writeRef()));
+            componentTypes.add(rayGenShaderEntryPoint);
             SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("closestHitShader", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
+                module->findEntryPointByName("missShader", missShaderEntryPoint.writeRef()));
+            componentTypes.add(missShaderEntryPoint);
             SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("shadowRayHitShader", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
+                module->findEntryPointByName("closestHitShader", closestHitShaderEntryPoint.writeRef()));
+            componentTypes.add(closestHitShaderEntryPoint);
+            SLANG_RETURN_ON_FAIL(
+                module->findEntryPointByName("shadowRayHitShader", shadowRayHitShaderEntryPoint.writeRef()));
+            componentTypes.add(shadowRayHitShaderEntryPoint);
         }
         else
         {
-            ComPtr<slang::IEntryPoint> entryPoint;
-            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
             SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("fragmentMain", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
+                module->findEntryPointByName("vertexMain", vertexMainEntryPoint.writeRef()));
+            componentTypes.add(vertexMainEntryPoint);
+            SLANG_RETURN_ON_FAIL(
+                module->findEntryPointByName("fragmentMain", fragmentMainEntryPoint.writeRef()));
+            componentTypes.add(fragmentMainEntryPoint);
         }
 
         ComPtr<slang::IComponentType> linkedProgram;
