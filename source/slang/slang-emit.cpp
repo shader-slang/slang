@@ -746,6 +746,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
+    SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+
     if (requiredLoweringPassSet.globalVaryingVar)
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 

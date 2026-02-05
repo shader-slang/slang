@@ -135,6 +135,9 @@ IROp getTypeStyle(IROp op)
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         {
             // All float like
             return kIROp_FloatType;
@@ -2885,6 +2888,9 @@ bool isSignedType(IRType* type)
     {
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return true;
     case kIROp_IntType:
     case kIROp_Int16Type:
