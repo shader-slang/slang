@@ -2,6 +2,9 @@
 
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
+#include "../slang/slang-ast-type.h"
+#include "../slang/slang-syntax.h"
+#include "../slang/slang-compiler-api.h"
 
 #include <chrono>
 #include <cstdio>
@@ -68,6 +71,7 @@ const char* getTypeIdName(TypeId id)
     case TypeId::Array: return "Array";
     case TypeId::ObjectHandle: return "ObjectHandle";
     case TypeId::Null: return "Null";
+    case TypeId::TypeReflectionRef: return "TypeReflectionRef";
     default: return "Unknown";
     }
 }
@@ -1120,6 +1124,110 @@ void ReplayContext::record(RecordFlag flags, slang::ITypeConformance*& obj)
 void ReplayContext::record(RecordFlag flags, slang::ICompileRequest*& obj)
 {
     recordInterfaceImpl(flags, obj);
+}
+
+void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
+{
+    if (m_mode == Mode::Idle)
+        return;
+
+    if (isWriting())
+    {
+        recordTypeId(TypeId::TypeReflectionRef);
+
+        // Handle null type
+        if (type == nullptr)
+        {
+            uint64_t nullHandle = kNullHandle;
+            recordHandle(flags, nullHandle);
+            return;
+        }
+
+        // Get the type's full name
+        Slang::ComPtr<ISlangBlob> nameBlob;
+        type->getFullName(nameBlob.writeRef());
+        const char* typeName =
+            nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
+
+        // Get the module that owns this type
+        // TypeReflection is actually a Slang::Type*, which for most cases is a DeclRefType
+        auto internalType = Slang::asInternal(type);
+        Slang::Module* owningModule = nullptr;
+
+        if (auto declRefType = Slang::as<Slang::DeclRefType>(internalType))
+        {
+            auto declRef = declRefType->getDeclRef();
+            owningModule = Slang::getModule(declRef.getDecl());
+        }
+
+        // Get the module handle (the module should already be registered)
+        uint64_t moduleHandle = kNullHandle;
+        if (owningModule)
+        {
+            // Module implements slang::IModule, so we can cast it
+            auto moduleInterface = static_cast<slang::IModule*>(owningModule);
+
+            // Try to get the proxy for this module if it exists
+            auto proxy = getProxy(static_cast<ISlangUnknown*>(moduleInterface));
+            if (proxy && isInterfaceRegistered(proxy))
+            {
+                moduleHandle = getHandleForInterface(proxy);
+            }
+            else if (isInterfaceRegistered(static_cast<ISlangUnknown*>(moduleInterface)))
+            {
+                moduleHandle = getHandleForInterface(static_cast<ISlangUnknown*>(moduleInterface));
+            }
+        }
+
+        // Record the module handle and type name
+        recordHandle(flags, moduleHandle);
+        record(flags, typeName);
+    }
+    else
+    {
+        // Playback mode
+        expectTypeId(TypeId::TypeReflectionRef);
+
+        uint64_t moduleHandle = kNullHandle;
+        recordHandle(flags, moduleHandle);
+
+        if (moduleHandle == kNullHandle)
+        {
+            type = nullptr;
+            return;
+        }
+
+        // Read the type name
+        const char* typeName = nullptr;
+        record(flags, typeName);
+
+        // Look up the module from the handle
+        auto* moduleUnknown = getInterfaceForHandle(moduleHandle);
+        auto* moduleInterface = static_cast<slang::IModule*>(moduleUnknown);
+
+        // Unwrap proxy if needed
+        auto* impl = getImplementation(moduleUnknown);
+        if (impl)
+            moduleInterface = static_cast<slang::IModule*>(impl);
+
+        // Get the type via the module's layout
+        if (moduleInterface && typeName)
+        {
+            auto* layout = moduleInterface->getLayout(0, nullptr);
+            if (layout)
+            {
+                type = layout->findTypeByName(typeName);
+            }
+            else
+            {
+                type = nullptr;
+            }
+        }
+        else
+        {
+            type = nullptr;
+        }
+    }
 }
 
 // =============================================================================

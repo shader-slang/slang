@@ -121,6 +121,7 @@ enum class TypeId : uint8_t
     UInt8 = 0x05, UInt16 = 0x06, UInt32 = 0x07, UInt64 = 0x08,
     Float32 = 0x09, Float64 = 0x0A, Bool = 0x0B,
     String = 0x10, Blob = 0x11, Array = 0x12, ObjectHandle = 0x13, Null = 0x14,
+    TypeReflectionRef = 0x15,  ///< TypeReflection reference (module handle + type name)
     Error = 0xEE,  ///< Error marker - indicates an exception occurred
 };
 
@@ -443,6 +444,11 @@ public:
     SLANG_API void record(RecordFlag flags, slang::IEntryPoint*& obj);
     SLANG_API void record(RecordFlag flags, slang::ITypeConformance*& obj);
     SLANG_API void record(RecordFlag flags, slang::ICompileRequest*& obj);
+
+    // TypeReflection - stored as module handle + type name
+    // Unlike COM interfaces, TypeReflection cannot be wrapped, so we identify
+    // them by their owning module and full type name.
+    SLANG_API void record(RecordFlag flags, slang::TypeReflection*& type);
 
     // Object handles (COM interface pointers mapped to IDs)
     // Public for testing purposes
