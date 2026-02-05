@@ -403,7 +403,8 @@ slang-replay [options] <record-file>
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--decode` | `-d` | Decode binary stream.bin to human-readable text |
+| `--decode` | `-d` | Decode recording to human-readable text (uses index.bin for structured output if available) |
+| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin even if present) |
 | `--replay` | `-r` | Execute the recorded API calls |
 | `--verbose` | `-v` | Enable verbose output during replay |
 | `--output <file>` | `-o` | Write decoded output to file instead of stdout |
@@ -413,17 +414,69 @@ slang-replay [options] <record-file>
 ### Examples
 
 ```bash
-# Decode a recording to see what API calls were made
+# Decode a recording with structured call-by-call output (recommended)
+slang-replay -d .slang-replays/2026-02-04_14-30-45-123/
+
+# Decode with raw value-by-value output
+slang-replay -d -R .slang-replays/2026-02-04_14-30-45-123/
+
+# Decode a specific stream.bin file (falls back to raw mode)
 slang-replay -d .slang-replays/2026-02-04_14-30-45-123/stream.bin
 
 # Decode and save to file
-slang-replay -d -o calls.txt .slang-replays/2026-02-04_14-30-45-123/stream.bin
+slang-replay -d -o calls.txt .slang-replays/2026-02-04_14-30-45-123/
 
 # Replay a recording (execute all recorded API calls)
 slang-replay -r .slang-replays/2026-02-04_14-30-45-123/
 
 # Replay with verbose logging
 slang-replay -r -v .slang-replays/2026-02-04_14-30-45-123/
+```
+
+### Decode Output Formats
+
+#### Indexed Mode (default when index.bin is present)
+
+When given a folder containing both `stream.bin` and `index.bin`, the decoder outputs structured call-by-call information:
+
+```
+=== Replay Stream Dump (Indexed) ===
+Data stream size: 4184 bytes
+Index stream size: 9216 bytes
+Total calls: 64
+
+[0] slang_createGlobalSession2, #null (static)
+    [0] UInt32: 80
+    [1] UInt32: 0
+    [2] Handle: #256
+    [3] Int32: 0
+
+[1] GlobalSessionProxy::findCapability, #256
+    [0] String: "hlsl"
+    [1] Int32: 2
+
+...
+```
+
+Each call shows:
+- `[CallIdx]` - The call index number
+- `Signature` - The function/method signature  
+- `#HandleId` - The 'this' pointer handle (or `#null (static)` for static functions)
+- Indented parameters with their types and values
+
+#### Raw Mode (`-R` flag)
+
+Raw mode outputs a simple value-by-value dump without call structure:
+
+```
+=== Replay Stream Dump ===
+Total size: 4184 bytes
+Start position: 0
+
+[0] @0: String: "slang_createGlobalSession2"
+[1] @31: Handle: null
+[2] @40: UInt32: 80
+...
 ```
 
 ### Input Formats

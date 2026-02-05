@@ -303,7 +303,7 @@ public:
     /// Records the function signature and 'this' pointer as a tracked handle.
     /// Also writes an index entry to the index stream for quick navigation.
     template<typename T>
-    void beginCall(const char* signature, T* thisPtr)
+    inline void beginCall(const char* signature, T* thisPtr)
     {
         ensureInitialized();
         if (!isActive())
@@ -495,17 +495,17 @@ private:
     SLANG_API void logCall(const char* signature, void* thisPtr);
 
     /// Set up mirror file for crash-safe capture when entering Record mode.
-    void setupRecordingMirror();
+    SLANG_API void setupRecordingMirror();
     
     /// Close mirror file when leaving Record mode.
-    void closeRecordingMirror();
+    SLANG_API void closeRecordingMirror();
     
     /// Generate a timestamp folder name (e.g., "2026-02-04_14-30-45-123").
-    static String generateTimestampFolderName();
+    SLANG_API static String generateTimestampFolderName();
     
     /// Write an index entry to the index stream.
     /// Called by beginCall/beginStaticCall before writing to main stream.
-    void writeIndexEntry(const char* signature, uint64_t thisHandle);
+    SLANG_API void writeIndexEntry(const char* signature, uint64_t thisHandle);
 
     // ==========================================================================
     // Call Index Access
