@@ -4323,11 +4323,13 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         }
     }
 
-    // Allocate a descriptor set/space for bindless resource heap.
-    // This must be done here (during layout generation) before any DCE occurs,
-    // so that the allocated space is consistent with reflection data.
-    // The space index is stored in ProgramLayout and will be used later
-    // by the lowerDynamicResourceHeap pass.
+    // Allocate a space for the bindless resource descriptor heap if the target
+    // is compatible with the `descriptor_handle` capability. This alias covers
+    // all targets that support DescriptorHandle types (glsl_spirv, sm_6_6, cpp,
+    // cuda, metal, wgsl).
+    auto targetCaps = targetReq->getTargetCaps();
+    if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle)) ==
+        CapabilitySet::ImpliesReturnFlags::Implied)
     {
         // Check if user has specified a preferred bindless space index
         int requestedIndex =
@@ -4351,11 +4353,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
                 availableIndex);
         }
 
-        // Reserve the space so nothing else can use it
-        markSpaceUsed(&context, nullptr, availableIndex);
-
-        // Store the allocated space index in the program layout
         programLayout->bindlessSpaceIndex = availableIndex;
+        markSpaceUsed(&context, nullptr, availableIndex);
     }
 
     return programLayout;

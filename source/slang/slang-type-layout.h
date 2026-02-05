@@ -1265,9 +1265,14 @@ public:
     StringSlicePool hashedStringLiteralPool;
 
     /// The descriptor set/space index allocated for the bindless resource heap.
-    /// This is determined during layout generation before any DCE occurs,
-    /// ensuring consistency with reflection data.
-    Int bindlessSpaceIndex = 0;
+    /// This is determined after IR generation by scanning for kIROp_GetDynamicResourceHeap,
+    /// ensuring consistency with reflection data (before DCE).
+    ///
+    /// Values:
+    ///   -1 = Bindless resources not used (no GetDynamicResourceHeap in IR)
+    ///   >= 0 = Allocated space index for the bindless resource heap
+    Int bindlessSpaceIndex = -1;
+
 };
 
 StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);

@@ -93,6 +93,7 @@ standard output = {
                 }
             }
         }
-    ]
+    ],
+    "bindlessSpaceIndex": 1
 }
 }
