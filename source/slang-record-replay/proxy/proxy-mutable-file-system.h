@@ -56,7 +56,8 @@ public:
     }
 
     // Record addRef/release for lifetime tracking during replay
-    PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
+    // Lifetime of FS proxys is just held by the session
+    // PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
 
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override

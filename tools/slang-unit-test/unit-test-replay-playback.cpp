@@ -584,6 +584,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     // Execute all recorded calls
     // This should recreate the global session and session
     ctx().executeAll();
+    ctx().disable(); // Stop playback
 
     // Look up the session by its handle - it should exist after playback
     ISlangUnknown* playedBackSessionUnk = ctx().getInterfaceForHandle(recordedSessionHandle);

@@ -375,9 +375,6 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     ctx().executeNextCall(); //slang_createGlobalSession
     ctx().executeNextCall(); //globalSession->findProfile
     ctx().executeNextCall(); //globalSession->createSession
-    ctx().executeNextCall(); //filesystem->addRef
-    ctx().executeNextCall(); //filesystem->addRef
-    ctx().executeNextCall(); //filesystem->addRef
     ctx().executeNextCall(); //session->loadModuleFromSourceString
     ctx().executeNextCall(); //module->getLayout
 

@@ -36,22 +36,20 @@ public:
     {
         RECORD_CALL();
 
-        // Make a copy of the descriptor so we can modify the file system
-        slang::SessionDesc modifiedDesc = desc;
-
-        // Get the file system to wrap - use provided one or Slang's default
-        //ISlangFileSystem* fileSystemToWrap =
-        //    desc.fileSystem ? desc.fileSystem : OSFileSystem::getMutableSingleton();
-        //modifiedDesc.fileSystem = static_cast<ISlangFileSystem*>(wrapObject(fileSystemToWrap));
-
         // Record the original descriptor (before our modification)
         RECORD_INPUT(desc);
+
+        // Get the file system to wrap - use provided one or Slang's default
+        slang::SessionDesc desc2 = desc;
+        ISlangFileSystem* fileSystemToWrap =
+            desc2.fileSystem ? desc2.fileSystem : OSFileSystem::getMutableSingleton();
+        desc2.fileSystem = static_cast<ISlangFileSystem*>(wrapObject(fileSystemToWrap));
 
         // Call create session with our wrapped file system
         slang::ISession* sessionPtr;
         if (!outSession)
             outSession = &sessionPtr;
-        auto result = getActual<slang::IGlobalSession>()->createSession(modifiedDesc, outSession);
+        auto result = getActual<slang::IGlobalSession>()->createSession(desc2, outSession);
 
         RECORD_COM_OUTPUT(outSession);
         RECORD_RETURN(result);

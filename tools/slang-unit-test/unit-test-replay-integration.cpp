@@ -84,8 +84,8 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     // Should have consumed all data
     SLANG_CHECK(ctx().getStream().atEnd());
 
-    // Clean up
-    globalSession = nullptr;
+    // Stop playback (or replay mechanism will still be running during cleanup)
+    ctx().disable();
 }
 
 SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
@@ -165,9 +165,8 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     // Should have consumed all data
     SLANG_CHECK(ctx().getStream().atEnd());
 
-    // Clean up
-    session = nullptr;
-    globalSession = nullptr;
+    // Stop playback (or replay mechanism will still be running during cleanup)
+    ctx().disable();
 }
 
 // =============================================================================
