@@ -15,11 +15,11 @@ UInt getBindlessSpaceIndex(TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
 
-    // Get the pre-allocated bindless space index from the program layout.
-    // This was determined during generateParameterBindings() before any DCE,
-    // so it correctly accounts for all declared parameters.
+    // Get the bindless space index from the program layout.
+    // This is always allocated during generateParameterBindings().
     if (auto programLayout = targetProgram->getExistingLayout())
     {
+        SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
         return (UInt)programLayout->bindlessSpaceIndex;
     }
 
