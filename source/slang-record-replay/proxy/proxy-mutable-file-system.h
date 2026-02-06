@@ -189,8 +189,53 @@ public:
         if (!m_fileSystemExt)
             return SLANG_E_NOT_IMPLEMENTED;
 
-        // Callbacks are complex to serialize - just forward without recording
-        return m_fileSystemExt->enumeratePathContents(path, callback, userData);
+        RECORD_CALL();
+        RECORD_INPUT(path);
+
+        SlangResult result = SLANG_OK;
+        
+        if (ReplayContext::get().isWriting())
+        {
+            // Wrapper context to capture and record each entry during enumeration
+            struct WrapperContext {
+                FileSystemContentsCallBack originalCallback;
+                void* originalUserData;                
+                static void callback(SlangPathType pathType, const char* name, void* userData) {
+                    auto& _ctx = ReplayContext::get();
+                    RECORD_INFO(pathType);
+                    RECORD_INFO(name);
+                    auto* wrapper = static_cast<WrapperContext*>(userData);
+                    if (wrapper->originalCallback)
+                        wrapper->originalCallback(pathType, name, wrapper->originalUserData);
+                }
+            };
+            
+            // Call with wrapper, which records each entry before forwarding to the original callback
+            WrapperContext wrapper = { callback, userData };
+            result = m_fileSystemExt->enumeratePathContents(path, WrapperContext::callback, &wrapper);
+            
+            // Write sentinel to mark end of entries
+            SlangPathType sentinalPathType = static_cast<SlangPathType>(-1);
+            RECORD_INFO(sentinalPathType);
+        }
+        else 
+        {
+            // Read entries from stream and replay callbacks
+            while (true)
+            {
+                SlangPathType pathType;
+                RECORD_INFO(pathType);
+                if(pathType == static_cast<SlangPathType>(-1))
+                    break; // Sentinel reached, enumeration complete
+                const char* name = nullptr;
+                RECORD_INFO(name);
+                if (callback)
+                    callback(pathType, name, userData);
+            }            
+        }
+        
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() override
