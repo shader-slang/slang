@@ -163,6 +163,7 @@ jobs:
       # Complete Claude execution with authentication, setup, and execution
       - name: Run Claude Code
         id: claude
+        continue-on-error: true
         uses: ./.github/actions/claude-code-runner
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -266,18 +267,15 @@ jobs:
             Bash(cmake*),Bash(cmake.exe*),
             Bash(./build/*slangc*),
             Bash(./build/*slang-test*),
-            Bash(git status*),
-            Bash(git diff*),
-            Bash(git log*),
-            Bash(git add*),
-            Bash(git commit*),
-            Bash(git show*),
-            Bash(git branch*),
-            Bash(git checkout*),
-            Bash(git push*),
+            Bash(git *),
+            Bash(grep *),Bash(grep -*),
+            Bash(cat *),Bash(head *),Bash(tail *),
+            Bash(ls *),Bash(find *),Bash(wc *),
+            Bash(mkdir *),Bash(cp *),Bash(mv *),
             Bash(gh pr *),
             Bash(gh issue *),
             Bash(gh run *),
+            Bash(gh api *),
             Bash(./extras/formatting.sh*),
             Bash(python*extras/split-ir-dump.py*),
             Bash(python*extras/insttrace.py*),
@@ -288,6 +286,7 @@ jobs:
             mcp__github__list_issues,
             mcp__github__search_issues,
             mcp__github__create_pr,
+            mcp__github__create_pull_request,
             mcp__github__get_pull_request_diff,
             mcp__github__add_pull_request_review_comment,
             mcp__github_file_ops__commit_files,

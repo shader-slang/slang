@@ -107,11 +107,13 @@ jobs:
           # Read-only tools only — no Write, no git push
           allowed-tools: |
             View,GlobTool,GrepTool,BatchTool,
-            Bash(gh pr diff *),
-            Bash(gh pr view *),
-            Bash(gh pr comment *),
-            Bash(git log *),
-            Bash(git diff *),
+            Bash(git log *),Bash(git diff *),Bash(git show *),
+            Bash(grep *),Bash(grep -*),
+            Bash(cat *),Bash(head *),Bash(tail *),
+            Bash(ls *),Bash(find *),Bash(wc *),
+            Bash(gh pr *),
+            Bash(gh issue *),
+            Bash(gh api *),
             mcp__github_inline_comment__create_inline_comment,
             mcp__github__get_pull_request_diff,
             mcp__github__add_pull_request_review_comment,
