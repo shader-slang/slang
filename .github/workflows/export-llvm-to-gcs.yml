@@ -16,12 +16,7 @@ on:
 
 jobs:
   export:
-    runs-on: ${{
-      inputs.config == 'linux-gcc-aarch64' && 'ubuntu-24.04-arm' ||
-      inputs.config == 'macos-clang-aarch64' && 'macos-latest' ||
-      inputs.config == 'windows-cl-x86_64' && 'windows-latest' ||
-      'ubuntu-22.04'
-    }}
+    runs-on: ${{ inputs.config == 'linux-gcc-aarch64' && 'ubuntu-24.04-arm' || inputs.config == 'macos-clang-aarch64' && 'macos-latest' || inputs.config == 'windows-cl-x86_64' && 'windows-latest' || 'ubuntu-22.04' }}
     permissions:
       id-token: write
       contents: read
