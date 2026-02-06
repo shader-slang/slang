@@ -59,7 +59,7 @@ jobs:
 
       # Setup sccache for macOS and Linux GitHub-hosted runners
       - name: Setup sccache
-        if: runner.environment != 'self-hosted' && inputs.platform != 'wasm'
+        if: runner.environment != 'self-hosted'
         uses: ./.github/actions/setup-sccache
         with:
           platform: ${{ inputs.os }}
