@@ -75,7 +75,7 @@ runs:
         echo "✅ LLVM build complete"
 
     - name: Upload LLVM to GCS
-      if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+      if: steps.download.outputs.cache-hit != 'true'
       shell: bash
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
