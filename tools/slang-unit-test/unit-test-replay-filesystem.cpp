@@ -31,7 +31,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
     // Enable recording - this creates the replay directory
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Load the file through the proxy - this should capture its content
@@ -48,7 +48,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFile)
 
     // Switch to playback - the file system proxy should serve from captured files
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Should be able to replay, even though the file is gone.
@@ -83,7 +83,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getFileUniqueIdentity through the proxy
@@ -102,7 +102,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getFileUniqueIdentity again - should read from recorded data
@@ -131,7 +131,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call calcCombinedPath through the proxy
@@ -147,7 +147,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
 
     // Switch to playback - the file system proxy should serve from recorded data
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call calcCombinedPath again - should read from recorded data, not call actual FS
@@ -181,7 +181,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPathType)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getPathType through the proxy
@@ -195,7 +195,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPathType)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getPathType again - should read from recorded data even though file is gone
@@ -218,7 +218,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getPath through the proxy to simplify a path
@@ -234,7 +234,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getPath again - should read from recorded data
@@ -263,7 +263,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyClearCache)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call clearCache through the proxy - this is a void function
@@ -271,7 +271,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyClearCache)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call clearCache again - should replay successfully without calling actual FS
@@ -317,7 +317,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call enumeratePathContents through the proxy, capturing results
@@ -350,7 +350,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call enumeratePathContents again - should read from recorded data
@@ -380,7 +380,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetOSPathKind)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getOSPathKind through the proxy
@@ -389,7 +389,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetOSPathKind)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call getOSPathKind again - should read from recorded data
@@ -417,7 +417,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFile)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Save file through proxy
@@ -433,7 +433,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFile)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call saveFile again through playback - should NOT actually write to disk
@@ -463,7 +463,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Save file blob through proxy
@@ -485,7 +485,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call saveFileBlob again through playback - should NOT actually write to disk
@@ -515,7 +515,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyRemove)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Remove file through proxy
@@ -531,7 +531,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyRemove)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call remove again through playback - should NOT actually remove from disk
@@ -562,7 +562,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCreateDirectory)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Create directory through proxy
@@ -579,7 +579,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyCreateDirectory)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Call createDirectory again through playback - should NOT actually create on disk
@@ -610,7 +610,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFileNotFound)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Try to load a file that doesn't exist
@@ -621,7 +621,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLoadFileNotFound)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Try to load the same file - should get the same error result
@@ -649,7 +649,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEmptyFile)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Load the empty file
@@ -664,7 +664,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyEmptyFile)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Load the empty file again through replay
@@ -700,7 +700,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLargeFile)
     // Enable recording
     ctx().enable();
     ctx().setMode(Mode::Record);
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Load the large file
@@ -718,7 +718,7 @@ SLANG_UNIT_TEST(replayFileSystemProxyLargeFile)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(fsProxy.get());
+    ctx().testsOnlyRegisterProxy(fsProxy.get());
     ctx().registerProxy(fsProxy.get(), osFileSystem);
 
     // Load the large file again through replay

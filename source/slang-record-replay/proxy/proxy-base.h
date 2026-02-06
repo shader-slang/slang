@@ -28,7 +28,7 @@ public:
     virtual ~ProxyBase()
     {
         // The proxy is being destroyed - unregister it from the context
-        ReplayContext::get().unregisterProxy(toSlangUnknown());
+        ReplayContext::get().unregisterProxy(this);
     }
 
     /// Get the canonical ISlangUnknown* identity for this proxy.

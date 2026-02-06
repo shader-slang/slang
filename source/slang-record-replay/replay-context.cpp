@@ -622,7 +622,7 @@ const char* ReplayContext::parseSignature(const char* signature, char* buffer, s
     return buffer;
 }
 
-uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
+uint64_t ReplayContext::testOnlyRegisterProxyImpl(ISlangUnknown* obj)
 {
     if (obj == nullptr)
         return kNullHandle;
@@ -639,16 +639,26 @@ uint64_t ReplayContext::registerInterface(ISlangUnknown* obj)
     return handle;
 }
 
-void ReplayContext::registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation)
+uint64_t ReplayContext::registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation)
 {
     if (proxy == nullptr || implementation == nullptr)
-        return;
+        return kNullHandle;
 
+    // Check if already registered
+    uint64_t* existingHandle = m_objectToHandle.tryGetValue(proxy);
+    if (existingHandle)
+        return *existingHandle;
+
+    // Assign new handle
+    uint64_t handle = m_nextHandle++;
+    m_objectToHandle[proxy] = handle;
+    m_handleToObject[handle] = proxy;
     m_proxyToImpl[proxy] = implementation;
     m_implToProxy[implementation] = proxy;
+    return handle;
 }
 
-void ReplayContext::unregisterProxy(ISlangUnknown* proxy)
+void ReplayContext::unregisterProxyImpl(ISlangUnknown* proxy)
 {
     if (proxy == nullptr)
         return;
@@ -668,7 +678,7 @@ void ReplayContext::unregisterProxy(ISlangUnknown* proxy)
     }
 }
 
-ISlangUnknown* ReplayContext::getProxy(ISlangUnknown* implementation)
+ISlangUnknown* ReplayContext::getProxyImpl(ISlangUnknown* implementation)
 {
     if (implementation == nullptr)
         return nullptr;
@@ -681,7 +691,7 @@ ISlangUnknown* ReplayContext::getProxy(ISlangUnknown* implementation)
 }
 
 // get implementatoin
-ISlangUnknown* ReplayContext::getImplementation(ISlangUnknown* proxy)
+ISlangUnknown* ReplayContext::getImplementationImpl(ISlangUnknown* proxy)
 {
     if (proxy == nullptr)
         return nullptr;
@@ -693,14 +703,14 @@ ISlangUnknown* ReplayContext::getImplementation(ISlangUnknown* proxy)
     return *impl;
 }
 
-bool ReplayContext::isInterfaceRegistered(ISlangUnknown* obj) const
+bool ReplayContext::isInterfaceRegisteredImpl(ISlangUnknown* obj) const
 {
     if (obj == nullptr)
         return true; // null is always "registered" as kNullHandle
     return m_objectToHandle.containsKey(obj);
 }
 
-uint64_t ReplayContext::getHandleForInterface(ISlangUnknown* obj) const
+uint64_t ReplayContext::getProxyHandleImpl(ISlangUnknown* obj) const
 {
     if (obj == nullptr)
         return kNullHandle;
@@ -712,7 +722,7 @@ uint64_t ReplayContext::getHandleForInterface(ISlangUnknown* obj) const
     return *handle;
 }
 
-ISlangUnknown* ReplayContext::getInterfaceForHandle(uint64_t handle) const
+ISlangUnknown* ReplayContext::getProxy(uint64_t handle) const
 {
     if (handle == kNullHandle)
         return nullptr;
@@ -1171,9 +1181,12 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         if (owningModule)
         {
             // Module implements slang::IModule, so we can cast it
-            slang::IModule* moduleInterface = static_cast<slang::IModule*>(owningModule);
-            auto proxy = getProxy(moduleInterface);
-            moduleHandle = getHandleForInterface(proxy);
+            ComPtr<slang::IComponentType> componentTypeInterface;
+            if (owningModule->queryInterface(slang::IComponentType::getTypeGuid(), (void**)componentTypeInterface.writeRef()) == SLANG_OK)
+            {
+                auto proxy = getProxy(componentTypeInterface.get());
+                moduleHandle = getProxyHandle(proxy);
+            }
         }
 
         // HACK! The module wasn't found, which means this was probably a builtin type that
@@ -1185,34 +1198,15 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             {
                 // This 'safe' cast is applied to the proxy, which we know will always be some
                 // valid virtual ISlangUnknown pointer, even if its not a module, so won't break DC.
-                if(dynamic_cast<slang::IModule*>(kv.second)) 
+                ComPtr<slang::IComponentType> componentTypeInterface;
+                if(kv.first->queryInterface(slang::IComponentType::getTypeGuid(), (void**)componentTypeInterface.writeRef()) == SLANG_OK)
                 {
-                    ISlangUnknown* impl = kv.first;
-                    slang::IModule* moduleInterface = dynamic_cast<slang::IModule*>(impl);
-                    if(moduleInterface) 
+                    auto layout = componentTypeInterface->getLayout(0, nullptr);
+                    if (layout && layout->findTypeByName(typeName) == type)
                     {
-                        auto layout = moduleInterface->getLayout(0, nullptr);
-                        if (layout && layout->findTypeByName(typeName) == type)
-                        {
-                            auto proxy = getProxy(moduleInterface);
-                            moduleHandle = getHandleForInterface(proxy);
-                            break;
-                        }
-                    }
-                }
-                if(dynamic_cast<slang::IComponentType*>(kv.second)) 
-                {
-                    ISlangUnknown* impl = kv.first;
-                    slang::IComponentType* componentTypeInterface = dynamic_cast<slang::IComponentType*>(impl);
-                    if(componentTypeInterface) 
-                    {
-                        auto layout = componentTypeInterface->getLayout(0, nullptr);
-                        if (layout && layout->findTypeByName(typeName) == type)
-                        {
-                            auto proxy = getProxy(componentTypeInterface);
-                            moduleHandle = getHandleForInterface(proxy);
-                            break;
-                        }
+                        auto proxy = getProxy(componentTypeInterface.get());
+                        moduleHandle = getProxyHandle(proxy);
+                        break;
                     }
                 }                
             }
@@ -1247,7 +1241,7 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         record(flags, typeName);
 
         // Look up the module from the handle
-        ISlangUnknown* moduleUnknown = getInterfaceForHandle(moduleHandle);
+        ISlangUnknown* moduleUnknown = getProxy(moduleHandle);
 
         // Unwrap proxy if needed
         ISlangUnknown* impl = getImplementation(moduleUnknown);

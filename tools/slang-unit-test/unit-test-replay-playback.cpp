@@ -62,7 +62,7 @@ SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
     
     // Create a fake blob to use as "this"
     Slang::ComPtr<ISlangBlob> fakeBlob = Slang::RawBlob::create("fake", 4);
-    uint64_t thisHandle = ctx().registerInterface(fakeBlob.get());
+    uint64_t thisHandle = ctx().testsOnlyRegisterProxy(fakeBlob.get());
     SLANG_UNUSED(thisHandle);
     
     // Write the handle directly (ObjectHandle TypeId + handle value)
@@ -85,7 +85,7 @@ SLANG_UNIT_TEST(replayContextPlaybackDispatcher)
 
     // Also need to register the fake object so getCurrentThis works
     // Use the same handle value for consistency
-    ctx().registerInterface(fakeBlob.get());
+    ctx().testsOnlyRegisterProxy(fakeBlob.get());
 
     // Execute the call
     bool executed = ctx().executeNextCall();
@@ -111,7 +111,7 @@ SLANG_UNIT_TEST(replayContextPlaybackMultipleCalls)
     ctx().setMode(Mode::Record);
 
     Slang::ComPtr<ISlangBlob> fakeBlob = Slang::RawBlob::create("fake", 4);
-    ctx().registerInterface(fakeBlob.get());
+    ctx().testsOnlyRegisterProxy(fakeBlob.get());
 
     for (int i = 0; i < 3; i++)
     {
@@ -131,7 +131,7 @@ SLANG_UNIT_TEST(replayContextPlaybackMultipleCalls)
     // Playback all
     ctx().switchToPlayback();
     ctx().registerHandler("findProfile_test_signature", playbackFindProfile);
-    ctx().registerInterface(fakeBlob.get());
+    ctx().testsOnlyRegisterProxy(fakeBlob.get());
 
     ctx().executeAll();
 
@@ -278,7 +278,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     ctx().setMode(Mode::Record);
     
     // Register the proxy and get its handle
-    uint64_t proxyHandle = ctx().registerInterface(proxyPtr.get());
+    uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
     SLANG_CHECK(proxyHandle >= kFirstValidHandle);
 
     // Record a call manually with a simple signature we control
@@ -301,7 +301,7 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().registerInterface(proxyPtr.get());  // Same handle value
+    ctx().testsOnlyRegisterProxy(proxyPtr.get());  // Same handle value
     
     // Register a handler using the replayHandler template (what REPLAY_REGISTER does internally)
     auto addHandler = [](ReplayContext& ctxRef) {
@@ -388,7 +388,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     ctx().setMode(Mode::Record);
     
     // Register the proxy (simulates what happens during createSession)
-    uint64_t proxyHandle = ctx().registerInterface(proxyPtr.get());
+    uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
     SLANG_CHECK(proxyHandle >= kFirstValidHandle);
 
     // Call methods through proxy - this uses RECORD_CALL() which normalizes the signature
@@ -427,7 +427,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     
     // Re-register with same handle - during real playback, this happens
     // when the creation methods are replayed
-    ctx().registerInterface(proxyPtr2.get());
+    ctx().testsOnlyRegisterProxy(proxyPtr2.get());
 
     // Register handlers - this is what REPLAY_REGISTER does
     // We need to use the signature that parseSignature produces from __FUNCSIG__
@@ -570,7 +570,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     }
 
     // Get the handle for the session so we can look it up after playback
-    uint64_t recordedSessionHandle = ctx().getHandleForInterface(recordedSession.get());
+    uint64_t recordedSessionHandle = ctx().getProxyHandle(recordedSession.get());
     SLANG_CHECK(recordedSessionHandle >= kFirstValidHandle);
 
     // =========================================================================
@@ -587,7 +587,7 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     ctx().disable(); // Stop playback
 
     // Look up the session by its handle - it should exist after playback
-    ISlangUnknown* playedBackSessionUnk = ctx().getInterfaceForHandle(recordedSessionHandle);
+    ISlangUnknown* playedBackSessionUnk = ctx().getProxy(recordedSessionHandle);
     SLANG_CHECK(playedBackSessionUnk != nullptr);
 
     // Verify we can query the ISession interface

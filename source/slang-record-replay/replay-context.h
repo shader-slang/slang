@@ -7,6 +7,8 @@
 #include "../core/slang-memory-arena.h"
 
 #include <slang.h>
+#include <slang-com-helper.h>
+#include <slang-com-ptr.h>
 
 #include <cstdint>
 #include <cstring>
@@ -322,10 +324,6 @@ public:
     {
         return ptr->toSlangUnknown();
     }
-    static ISlangUnknown* toUnknown(ISlangUnknown* ptr)
-    {
-        return ptr;
-    }
 
     /// Begin recording a method call.
     /// Records the function signature and 'this' pointer as a tracked handle.
@@ -347,19 +345,14 @@ public:
         // Write index entry before recording to main stream (for correct position)
         if (isWriting())
         {
-            // Get the canonical ISlangUnknown* for this proxy
-            ISlangUnknown* obj = toUnknown(thisPtr);
             uint64_t thisHandle = kNullHandle;
-            if (obj != nullptr && isInterfaceRegistered(obj))
-                thisHandle = getHandleForInterface(obj);
-            
+            if (thisPtr)
+                thisHandle = getProxyHandle(thisPtr);    
             writeIndexEntry(parsed, thisHandle);
         }
         
         record(RecordFlag::Input, parsed);
-        // Record the 'this' pointer as a handle using canonical identity
-        ISlangUnknown* obj = toUnknown(thisPtr);
-        recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, obj);
+        recordInterfaceImpl(RecordFlag::Input, thisPtr);
     }
 
     /// Begin recording a static/free function call.
@@ -388,35 +381,77 @@ public:
 
     /// Register a proxy-implementation pair.
     /// Call this when wrapping an implementation with a proxy.
-    SLANG_API void registerProxy(ISlangUnknown* proxy, ISlangUnknown* implementation);
+    template<typename ProxyT, typename ImplT>
+    inline uint64_t registerProxy(ProxyT* proxy, ImplT* implementation)
+    {
+        Slang::ComPtr<ISlangUnknown> implUnknown;
+        implementation->queryInterface(ISlangUnknown::getTypeGuid(), (void**)implUnknown.writeRef());
+        ISlangUnknown* proxyUnknown = toUnknown(proxy);
+        return registerProxyImpl(proxyUnknown, implUnknown.get());
+    }
 
     /// Unregister a proxy when it is destroyed.
     /// Call this from the proxy destructor to clean up the mappings.
-    SLANG_API void unregisterProxy(ISlangUnknown* proxy);
+    template<typename ProxyT>
+    inline void unregisterProxy(ProxyT* proxy)
+    {
+        ISlangUnknown* proxyUnknown = toUnknown(proxy);
+        unregisterProxyImpl(proxyUnknown);
+    }
 
     /// Register an interface object and get its handle.
     /// Used when creating proxy objects to register them for handle tracking.
-    SLANG_API uint64_t registerInterface(ISlangUnknown* obj);
+    template<typename ProxyT>
+    inline uint64_t testsOnlyRegisterProxy(ProxyT* obj)
+    {
+        ISlangUnknown* objUnknown = toUnknown(obj);
+        return testOnlyRegisterProxyImpl(objUnknown);
+    }
 
     /// Get or create a proxy for an implementation.
     /// If a proxy already exists, returns it. Otherwise returns nullptr.
-    SLANG_API ISlangUnknown* getProxy(ISlangUnknown* implementation);
+    template<typename ImplT>
+    inline ISlangUnknown* getProxy(ImplT* implementation)
+    {
+        if (implementation == nullptr)
+            return nullptr;
+        Slang::ComPtr<ISlangUnknown> implUnknown;
+        implementation->queryInterface(ISlangUnknown::getTypeGuid(), (void**)implUnknown.writeRef());
+        return getProxyImpl(implUnknown.get());
+    }
 
     /// Get the implementation
-    SLANG_API ISlangUnknown* getImplementation(ISlangUnknown* proxy);
+    template<typename ProxyT>
+    inline ISlangUnknown* getImplementation(ProxyT* proxy)
+    {
+        if (proxy == nullptr)
+            return nullptr;
+        ISlangUnknown* proxyUnknown = toUnknown(proxy);
+        return getImplementationImpl(proxyUnknown);
+    }
 
     /// Get the next handle value that will be assigned.
     /// Useful for testing to know how many objects have been registered.
     SLANG_API uint64_t getNextHandle() const { return m_nextHandle; }
 
     /// Check if an object is registered.
-    SLANG_API bool isInterfaceRegistered(ISlangUnknown* obj) const;
+    template<typename ProxyT>
+    inline bool isInterfaceRegistered(ProxyT* obj) const
+    {
+        ISlangUnknown* objUnknown = toUnknown(obj);
+        return isInterfaceRegisteredImpl(objUnknown);
+    }
 
     /// Get handle for an object (throws if not registered).
-    SLANG_API uint64_t getHandleForInterface(ISlangUnknown* obj) const;
+    template<typename ProxyT>
+    inline uint64_t getProxyHandle(ProxyT* obj) const
+    {
+        ISlangUnknown* objUnknown = toUnknown(obj);
+        return getProxyHandleImpl(objUnknown);
+    }
 
     /// Get object for a handle (returns nullptr if not found).
-    SLANG_API ISlangUnknown* getInterfaceForHandle(uint64_t handle) const;
+    SLANG_API ISlangUnknown* getProxy(uint64_t handle) const;
 
     // Enum types - record as int32_t
     template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
@@ -491,6 +526,14 @@ private:
     TypeId readTypeId();
     TypeId readTypeIdFromReference();
     void expectTypeId(TypeId expected);
+
+    SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
+    SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
+    SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
+    SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
+    SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
+    SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
+    SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
 
     /// Record a COM interface pointer (internal implementation).
     template<typename T>
@@ -602,7 +645,7 @@ public:
     {
         if (m_currentThisHandle == kNullHandle)
             return nullptr;
-        auto* unknown = getInterfaceForHandle(m_currentThisHandle);
+        auto* unknown = getProxy(m_currentThisHandle);
         return reinterpret_cast<T*>(unknown);
     }
 
@@ -705,11 +748,11 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             }
 
             // Normal case: look up handle for tracked object
-            uint64_t handle = getHandleForInterface(static_cast<ISlangUnknown*>(obj));
+            uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
 
             // Unwrap the object before returning
-            obj = static_cast<T*>(unwrapObject(static_cast<ISlangUnknown*>(obj)));
+            obj = static_cast<T*>(unwrapObject(obj));
 
         }
         else if (isOutput)
@@ -718,10 +761,10 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
 
             // Wrap the object before using
-            obj = static_cast<T*>(wrapObject(static_cast<ISlangUnknown*>(obj)));
+            obj = static_cast<T*>(wrapObject(obj));
 
             // Output: register object and record handle
-            uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
+            uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
         }
     }
@@ -755,11 +798,11 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             }
             else
             {
-                obj = static_cast<T*>(getInterfaceForHandle(handle));
+                obj = static_cast<T*>(getProxy(handle));
             }
 
             // Unwrap the object before returning
-            obj = static_cast<T*>(unwrapObject(static_cast<ISlangUnknown*>(obj)));
+            obj = static_cast<T*>(unwrapObject(obj));
         }
         else if (isOutput)
         {
@@ -767,10 +810,10 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
 
             // Wrap the object before using
-            obj = static_cast<T*>(wrapObject(static_cast<ISlangUnknown*>(obj)));
+            obj = static_cast<T*>(wrapObject(obj));
 
             // Output: register object and record handle
-            uint64_t handle = registerInterface(static_cast<ISlangUnknown*>(obj));
+            uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);            
         }
     }

@@ -33,7 +33,6 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         if (ctx.isActive())
         {
             ISlangUnknown* proxyUnknown = proxy->toSlangUnknown();
-            ctx.registerInterface(proxyUnknown);
             ctx.registerProxy(proxyUnknown, queried.get());
         }
         
@@ -47,7 +46,8 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
     if (auto* wrapped = tryWrap<InterfaceType, ProxyType>(obj)) \
         return wrapped;
 
-ISlangUnknown* wrapObject(ISlangUnknown* obj)
+template<typename ImplT>
+ISlangUnknown* wrapObject(ImplT* obj)
 {
     if(!ReplayContext::get().isActive())
         return obj;
@@ -107,7 +107,8 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
 
 #undef TRY_WRAP
 
-ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
+template<typename ProxyT>
+ISlangUnknown* unwrapObject(ProxyT* proxy)
 {
     if (proxy == nullptr)
         return nullptr;
