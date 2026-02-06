@@ -2147,14 +2147,33 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
 
         // Okay, we want to walk through the fields here, and
         // generate one variable for each.
-        UInt fieldCounter = 0;
         auto nameSBLength = nameHintSB.getLength();
 
         for (auto field : structType->getFields())
         {
-            UInt fieldIndex = fieldCounter++;
+            // Find the field layout for this field by matching the field key.
+            // Note: We cannot simply use an incrementing index because some fields
+            // (e.g., empty base classes) may not have corresponding field layouts.
+            IRVarLayout* fieldLayout = nullptr;
+            for (auto fieldLayoutAttr : structTypeLayout->getFieldLayoutAttrs())
+            {
+                if (fieldLayoutAttr->getFieldKey() == field->getKey())
+                {
+                    fieldLayout = fieldLayoutAttr->getLayout();
+                    break;
+                }
+            }
 
-            auto fieldLayout = structTypeLayout->getFieldLayout(fieldIndex);
+            // If we didn't find a layout for this field, it means the field doesn't
+            // contribute any layout resources (e.g., it's an empty base class).
+            // In such cases, we skip processing this field.
+            if (!fieldLayout)
+            {
+                continue;
+            }
+
+            auto fieldTypeLayout = fieldLayout->getTypeLayout();
+            auto fieldType = field->getFieldType();
 
             UInt fieldBindingIndex = bindingIndex;
             UInt fieldBindingSpace = bindingSpace;
@@ -2171,13 +2190,14 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 nameHintSB << fieldNameHint->getName();
             }
             fieldParentInfo.outerParam = field;
+
             auto fieldVal = createGLSLGlobalVaryingsImpl(
                 context,
                 codeGenContext,
                 builder,
-                field->getFieldType(),
+                fieldType,
                 fieldLayout,
-                fieldLayout->getTypeLayout(),
+                fieldTypeLayout,
                 kind,
                 stage,
                 fieldBindingIndex,
