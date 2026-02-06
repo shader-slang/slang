@@ -153,8 +153,11 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createCompileRequest(slang::ICompileRequest** outCompileRequest) override
     {
-        SLANG_UNUSED(outCompileRequest);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::createCompileRequest");
+        RECORD_CALL();
+        PREPARE_POINTER_OUTPUT(outCompileRequest);
+        auto result = getActual<slang::IGlobalSession>()->createCompileRequest(outCompileRequest);
+        RECORD_COM_OUTPUT(outCompileRequest);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL

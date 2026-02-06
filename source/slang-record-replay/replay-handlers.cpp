@@ -144,6 +144,10 @@ static void registerAllHandlers()
     
     REPLAY_REGISTER(ModuleProxy, addRef);
     REPLAY_REGISTER(ModuleProxy, release);
+    REPLAY_REGISTER(ModuleProxy, getLayout);
+    REPLAY_REGISTER(ModuleProxy, getSpecializationParamCount);
+    REPLAY_REGISTER(ModuleProxy, specialize);
+    REPLAY_REGISTER(ModuleProxy, link);
     REPLAY_REGISTER(ModuleProxy, findEntryPointByName);
     REPLAY_REGISTER(ModuleProxy, getDefinedEntryPointCount);
     REPLAY_REGISTER(ModuleProxy, getDefinedEntryPoint);
@@ -157,7 +161,6 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ModuleProxy, getDependencyFilePath);
     REPLAY_REGISTER(ModuleProxy, getModuleReflection);
     REPLAY_REGISTER(ModuleProxy, precompileForTarget);
-    REPLAY_REGISTER(ModuleProxy, getLayout);
     
     // =========================================================================
     // ComponentTypeProxy handlers
