@@ -28,8 +28,15 @@ public:
     virtual ~ProxyBase()
     {
         // The proxy is being destroyed - unregister it from the context
-        // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
-        ReplayContext::get().unregisterProxy(reinterpret_cast<ISlangUnknown*>(this));
+        ReplayContext::get().unregisterProxy(toSlangUnknown());
+    }
+
+    /// Get the canonical ISlangUnknown* identity for this proxy.
+    /// Always casts through TFirstInterface to ensure a consistent pointer
+    /// value regardless of which base class 'this' is currently typed as.
+    ISlangUnknown* toSlangUnknown()
+    {
+        return static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this));
     }
 
     // ISlangUnknown implementation - these are virtual so derived classes can override

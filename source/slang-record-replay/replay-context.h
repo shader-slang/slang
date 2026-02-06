@@ -314,6 +314,19 @@ public:
     /// Returns the normalized signature, or the original if parsing fails.
     SLANG_API static const char* parseSignature(const char* signature, char* buffer, size_t bufferSize);
 
+    /// Helper to get canonical ISlangUnknown* from a proxy pointer.
+    /// Uses toSlangUnknown() if available (ProxyBase types), falls back to
+    /// static_cast for simple single-inheritance types (e.g. test proxies).
+    template<typename T>
+    static auto toUnknown(T* ptr) -> decltype(ptr->toSlangUnknown())
+    {
+        return ptr->toSlangUnknown();
+    }
+    static ISlangUnknown* toUnknown(ISlangUnknown* ptr)
+    {
+        return ptr;
+    }
+
     /// Begin recording a method call.
     /// Records the function signature and 'this' pointer as a tracked handle.
     /// Also writes an index entry to the index stream for quick navigation.
@@ -334,8 +347,8 @@ public:
         // Write index entry before recording to main stream (for correct position)
         if (isWriting())
         {
-            // Get the handle for 'this' pointer (may not be registered yet for outputs)
-            ISlangUnknown* obj = reinterpret_cast<ISlangUnknown*>(thisPtr);
+            // Get the canonical ISlangUnknown* for this proxy
+            ISlangUnknown* obj = toUnknown(thisPtr);
             uint64_t thisHandle = kNullHandle;
             if (obj != nullptr && isInterfaceRegistered(obj))
                 thisHandle = getHandleForInterface(obj);
@@ -344,9 +357,8 @@ public:
         }
         
         record(RecordFlag::Input, parsed);
-        // Record the 'this' pointer as a handle
-        // Use reinterpret_cast to avoid ambiguity with multiple inheritance from ISlangUnknown
-        ISlangUnknown* obj = reinterpret_cast<ISlangUnknown*>(thisPtr);
+        // Record the 'this' pointer as a handle using canonical identity
+        ISlangUnknown* obj = toUnknown(thisPtr);
         recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, obj);
     }
 
@@ -581,15 +593,16 @@ public:
 
     /// Get the 'this' pointer for the current call, cast to the given type.
     /// Only valid within a playback handler.
+    /// Note: The handle table stores canonical ISlangUnknown* pointers (via
+    /// ProxyBase::toSlangUnknown), which go through TFirstInterface. Since
+    /// TFirstInterface is always the first base of the proxy, the pointer
+    /// value equals the proxy's address, making this reinterpret_cast safe.
     template<typename T>
     T* getCurrentThis()
     {
         if (m_currentThisHandle == kNullHandle)
             return nullptr;
         auto* unknown = getInterfaceForHandle(m_currentThisHandle);
-        // Use reinterpret_cast because proxy classes inherit from multiple COM interfaces,
-        // making static_cast ambiguous. The handle table stores the original proxy pointer,
-        // so this cast is safe.
         return reinterpret_cast<T*>(unknown);
     }
 

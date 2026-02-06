@@ -24,8 +24,6 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
     Slang::ComPtr<T> queried;
     if (SLANG_SUCCEEDED(obj->queryInterface(T::getTypeGuid(), (void**)queried.writeRef())))
     {
-        // Use static_cast to T* first (the interface), then to ISlangUnknown*
-        // to avoid ambiguity from multiple inheritance
         ProxyT* proxy = new ProxyT(queried.get());
         // Use addRefImpl to avoid recording this internal reference
         proxy->addRefImpl();
@@ -34,12 +32,12 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         auto& ctx = ReplayContext::get();
         if (ctx.isActive())
         {
-            ISlangUnknown* proxyUnknown = static_cast<ISlangUnknown*>(static_cast<T*>(proxy));
+            ISlangUnknown* proxyUnknown = proxy->toSlangUnknown();
             ctx.registerInterface(proxyUnknown);
             ctx.registerProxy(proxyUnknown, queried.get());
         }
         
-        return static_cast<ISlangUnknown*>(static_cast<T*>(proxy));
+        return proxy->toSlangUnknown();
     }
     return nullptr;
 }
@@ -59,10 +57,10 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
     if(auto existing = ReplayContext::get().getProxy(obj)) {
-        // Use dynamic_cast to get to RefObject and call addReference() directly.
+        // Cross-cast to RefObject to call addReference() directly, bypassing
+        // the virtual addRef() which would record the call for replay.
         // We can't use static_cast because ISlangUnknown and RefObject are in
         // different inheritance branches of ProxyBase.
-        // We can't call addRef() because that would record the call for replay.
         dynamic_cast<RefObject*>(existing)->addReference();
         return existing;
     }
