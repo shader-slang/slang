@@ -586,6 +586,9 @@ static SlangResult _parseStandardCompileError(
 // SARIF Format Support - Helper Functions
 // ============================================================================
 
+// Runtime SARIF detection - Currently disabled to avoid unused function warning
+// Uncomment when enabling runtime detection in supportsSARIF()
+/*
 // Test if compiler supports SARIF at runtime by attempting to compile with the flag
 // This is more robust than version checks as it works with any compiler that supports SARIF
 static bool testSARIFSupport(const ExecutableLocation& exe, SlangPassThrough compilerType)
@@ -628,6 +631,7 @@ static bool testSARIFSupport(const ExecutableLocation& exe, SlangPassThrough com
     // Even if there are warnings before the JSON, the '{' indicates SARIF worked
     return stderrText.indexOf('{') != -1;
 }
+*/
 
 // Check if compiler supports SARIF output format
 // Uses runtime detection with caching to avoid repeated testing
