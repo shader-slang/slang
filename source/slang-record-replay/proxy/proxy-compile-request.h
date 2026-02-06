@@ -336,7 +336,10 @@ public:
 
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getDiagnosticOutput");
+        RECORD_CALL();
+        auto result = getActual<slang::ICompileRequest>()->getDiagnosticOutput();
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
