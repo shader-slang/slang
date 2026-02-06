@@ -620,11 +620,28 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
             }
-            else if (as<IRFunc>(parent) || as<IRModuleInst>(parent))
+            else if (as<IRFunc>(parent))
             {
                 SpvInst* spvInst = nullptr;
                 if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
                     return spvInst;
+            }
+            else if (auto moduleInst = as<IRModuleInst>(parent))
+            {
+                SpvInst* spvInst = nullptr;
+                if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
+                    return spvInst;
+
+                // If we reached the module inst and the debug scope isn't found yet,
+                // ensure the debug compilation unit is created.
+                if (auto module = moduleInst->getModule())
+                {
+                    ensureDebugCompilationUnit(module);
+
+                    // Try again after ensuring the compilation unit.
+                    if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))
+                        return spvInst;
+                }
             }
 
             inst = parent;
@@ -1723,30 +1740,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
     // Create DebugCompilationUnit for the module using the default (main) debug source.
     // This should be called after all debug sources are processed so we use the correct source.
+    // When called from findDebugScope for an imported module, m_defaultDebugSource may be null;
+    // in that case we use the first IRDebugSource from this module's globals so we can still
+    // register the module's debug scope and emit DebugFunctionDefinition for its functions.
     void ensureDebugCompilationUnit(IRModule* irModule)
     {
         auto debugLevel = m_targetProgram->getOptionSet().getDebugInfoLevel();
         if (debugLevel <= DebugInfoLevel::Minimal)
             return;
 
-        if (!m_defaultDebugSource)
-            return;
-
         auto moduleInst = irModule->getModuleInst();
         if (m_mapIRInstToSpvDebugInst.containsKey(moduleInst))
             return; // Already created
 
-        // Get the SpvInst for the default debug source
-        SpvInst* sourceSpvInst = nullptr;
-        if (!m_mapIRInstToSpvInst.tryGetValue(m_defaultDebugSource, sourceSpvInst))
+        IRDebugSource* debugSourceToUse = as<IRDebugSource>(m_defaultDebugSource);
+        if (!debugSourceToUse)
+        {
+            for (auto inst : irModule->getGlobalInsts())
+            {
+                if (auto debugSource = as<IRDebugSource>(inst))
+                {
+                    debugSourceToUse = debugSource;
+                    break;
+                }
+            }
+        }
+        if (!debugSourceToUse)
             return;
 
-        IRBuilder builder(m_defaultDebugSource);
-        builder.setInsertBefore(m_defaultDebugSource);
+        // Get the SpvInst for the debug source
+        SpvInst* sourceSpvInst = nullptr;
+        if (!m_mapIRInstToSpvInst.tryGetValue(debugSourceToUse, sourceSpvInst))
+            return;
+
+        IRBuilder builder(debugSourceToUse);
+        builder.setInsertBefore(debugSourceToUse);
         auto translationUnit = emitOpDebugCompilationUnit(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             moduleInst,
-            m_defaultDebugSource->getFullType(),
+            debugSourceToUse->getFullType(),
             getNonSemanticDebugInfoExtInst(),
             emitIntConstant(100, builder.getUIntType()), // ExtDebugInfo version.
             emitIntConstant(5, builder.getUIntType()),   // DWARF version.
