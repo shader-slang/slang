@@ -30,6 +30,25 @@ runs:
     - name: Setup gcloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
+    - name: Install zstd
+      shell: bash
+      run: |
+        if ! command -v zstd &> /dev/null; then
+          case "${{ inputs.os }}" in
+            linux)
+              sudo apt-get update
+              sudo apt-get install -y zstd
+              ;;
+            macos)
+              brew install zstd
+              ;;
+            windows)
+              choco install zstandard -y
+              ;;
+          esac
+        fi
+        zstd --version
+
     - name: Download LLVM from GCS
       id: download
       shell: bash
@@ -46,7 +65,9 @@ runs:
 
           echo "📦 Extracting LLVM..."
           mkdir -p build/llvm-project-install
-          tar -xf /tmp/llvm-prebuilt.tar.zst -C build/llvm-project-install
+
+          # Decompress and extract
+          zstd -d /tmp/llvm-prebuilt.tar.zst --stdout | tar -xf - -C build/llvm-project-install
           rm /tmp/llvm-prebuilt.tar.zst
 
           echo "cache-hit=true" >> $GITHUB_OUTPUT
