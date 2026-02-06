@@ -586,22 +586,92 @@ static SlangResult _parseStandardCompileError(
 // SARIF Format Support - Helper Functions
 // ============================================================================
 
+// Test if compiler supports SARIF at runtime by attempting to compile with the flag
+// This is more robust than version checks as it works with any compiler that supports SARIF
+static bool testSARIFSupport(const ExecutableLocation& exe, SlangPassThrough compilerType)
+{
+    // Determine which SARIF flag to test based on compiler type
+    const char* sarifFlag = nullptr;
+    if (compilerType == SLANG_PASS_THROUGH_GCC)
+        sarifFlag = "-fdiagnostics-format=sarif-stderr";
+    else if (compilerType == SLANG_PASS_THROUGH_CLANG)
+        sarifFlag = "-fdiagnostics-format=sarif";
+    else
+        return false;
+
+    // Test by running compiler with SARIF flag and --version
+    // If the flag is unrecognized, compiler will complain
+    // If recognized, it will just print version info (SARIF doesn't apply to --version)
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(exe);
+    cmdLine.addArg(sarifFlag);
+    cmdLine.addArg("--version");
+
+    ExecuteResult exeRes;
+    if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+    {
+        return false; // Execution failed
+    }
+
+    // Check if stderr contains JSON (SARIF) or an error about unrecognized option
+    UnownedStringSlice stderrText = exeRes.standardError.getUnownedSlice();
+
+    // If compiler doesn't support SARIF, it will output error like:
+    // "error: unrecognized command line option '-fdiagnostics-format=sarif-stderr'"
+    if (stderrText.indexOf(UnownedStringSlice::fromLiteral("unrecognized")) != -1 ||
+        stderrText.indexOf(UnownedStringSlice::fromLiteral("unknown")) != -1)
+    {
+        return false;
+    }
+
+    // If SARIF is supported, output should contain JSON (starts with '{')
+    // Even if there are warnings before the JSON, the '{' indicates SARIF worked
+    return stderrText.indexOf('{') != -1;
+}
+
 // Check if compiler supports SARIF output format
-// Note: Currently disabled by default because linker (ld) doesn't produce SARIF,
-// causing link errors to be lost. Can be force-enabled via SLANG_USE_SARIF_DIAGNOSTICS=1
-static bool supportsSARIF(const DownstreamCompilerDesc& desc)
+// Uses runtime detection with caching to avoid repeated testing
+// Note: Currently disabled by default because:
+// 1. Linkers (ld, lld) don't produce SARIF, causing link errors to be lost
+// 2. Runtime detection adds overhead on first compilation
+// Can be force-enabled via SLANG_USE_SARIF_DIAGNOSTICS=1
+static bool supportsSARIF(const DownstreamCompilerDesc& desc, const ExecutableLocation& exe)
 {
     SLANG_UNUSED(desc);
-    // Disabled by default - SARIF only covers compiler errors, not linker errors
-    // GCC 13+ and Clang 15+ support SARIF, but linkers (ld, lld) do not
+    SLANG_UNUSED(exe);
+
+    // Disabled by default - return false to skip auto-detection
+    // TODO: Enable when linker SARIF support is available or when we handle mixed output
     return false;
 
-    // To enable SARIF auto-detection in the future when linker support is added:
-    // if (desc.type == SLANG_PASS_THROUGH_GCC)
-    //     return desc.version.m_major >= 13;
-    // if (desc.type == SLANG_PASS_THROUGH_CLANG)
-    //     return desc.version.m_major >= 15;
-    // return false;
+    // Uncomment below to enable runtime SARIF detection:
+    /*
+    // Cache results per compiler executable path
+    // This avoids repeated runtime tests which can be expensive
+    static std::mutex s_cacheMutex;
+    static Dictionary<String, bool> s_sarifSupportCache;
+
+    String exePath = exe.m_pathOrName;
+
+    // Check cache first
+    {
+        std::lock_guard<std::mutex> lock(s_cacheMutex);
+        bool* cached = s_sarifSupportCache.tryGetValue(exePath);
+        if (cached)
+            return *cached;
+    }
+
+    // Runtime test
+    bool supported = testSARIFSupport(exe, desc.type);
+
+    // Cache result
+    {
+        std::lock_guard<std::mutex> lock(s_cacheMutex);
+        s_sarifSupportCache.add(exePath, supported);
+    }
+
+    return supported;
+    */
 }
 
 // Get the SARIF format flag for the compiler
@@ -1606,7 +1676,8 @@ SlangResult GCCDownstreamCompiler::compile(const CompileOptions& options, IArtif
     }
     else if (s_sarifSetting == -1)
     {
-        useSARIF = supportsSARIF(m_desc); // Auto-detect
+        useSARIF =
+            supportsSARIF(m_desc, m_cmdLine.m_executableLocation); // Auto-detect with runtime test
     }
     // s_sarifSetting == 0: force off, useSARIF stays false
 
