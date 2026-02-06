@@ -21083,12 +21083,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayPrimitiveIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionPrimitiveIndexEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_primitive_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21183,12 +21184,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CandidateRayObjectRayDirection()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_ray_direction()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21203,12 +21205,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CommittedRayObjectRayDirection()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_ray_direction()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21223,12 +21226,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CandidateRayObjectRayOrigin()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_ray_origin()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21243,12 +21247,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CommittedRayObjectRayOrigin()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_ray_origin()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
