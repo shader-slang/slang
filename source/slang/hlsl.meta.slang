@@ -20635,12 +20635,11 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".Proceed";
         case glsl: __intrinsic_asm "rayQueryProceedEXT";
+        case metal: __intrinsic_asm "$0->next()";
         case spirv: return spirv_asm
             {
                 result:$$bool = OpRayQueryProceedKHR &this
             };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
@@ -20655,9 +20654,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".Abort";
         case glsl: __intrinsic_asm "rayQueryTerminateEXT";
+        case metal: __intrinsic_asm "$0->abort()";
         case spirv: spirv_asm { OpRayQueryTerminateKHR &this };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
@@ -20672,9 +20670,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".CommitNonOpaqueTriangleHit";
         case glsl: __intrinsic_asm "rayQueryConfirmIntersectionEXT";
+        case metal: __intrinsic_asm "$0->commit_triangle_intersection()";
         case spirv: spirv_asm { OpRayQueryConfirmIntersectionKHR &this };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
@@ -20690,9 +20687,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".CommitProceduralPrimitiveHit";
         case glsl: __intrinsic_asm "rayQueryGenerateIntersectionEXT";
+        case metal: __intrinsic_asm "$0->commit_bounding_box_intersection($1)";
         case spirv: spirv_asm { OpRayQueryGenerateIntersectionKHR &this $t };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
