@@ -116,7 +116,7 @@ public:
         RECORD_CALL();
 
         // Record the specialization args array
-        _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
+        RECORD_INPUT_ARRAY(specializationArgs, specializationArgCount);
 
         PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);

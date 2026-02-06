@@ -13,8 +13,8 @@ This document describes the recommended workflow for implementing missing proxy 
 # Set environment variable to enable replay recording
 $env:SLANG_RECORD_LAYER=1
 
-# Optional: Set custom replay directory (default: .slang-replays)
-# $env:SLANG_RECORD_PATH="C:\slang-replays-custom"
+# Recommended: Set explicit replay path to avoid searching for latest replay
+$env:SLANG_RECORD_PATH="$PWD\replay-capture"
 ```
 
 ## Iteration Cycle
@@ -36,7 +36,9 @@ Run a failing test with replay recording enabled:
 
 ### Step 2: Find Latest Replay
 
-Locate the most recent replay directory:
+If you set `SLANG_RECORD_PATH` explicitly, skip to Step 3 using that path.
+
+Otherwise, locate the most recent replay directory:
 
 ```powershell
 # Get the most recent replay directory
@@ -177,7 +179,25 @@ Select-String -Path test-output-v2.txt -Pattern "FAILED|passed" | Measure-Object
     Select-Object Count
 ```
 
-### Step 9: Verify Replay Quality
+### Step 9: Replay the Recording
+
+Once the test passes, verify the replay can be played back correctly:
+
+```powershell
+# Using explicit path (if SLANG_RECORD_PATH was set)
+./build/Debug/bin/slang-replay.exe "$env:SLANG_RECORD_PATH\stream.bin"
+
+# Or using auto-discovered latest replay
+$latestReplay = Get-ChildItem -Path .slang-replays -Directory | 
+    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' } | 
+    Sort-Object Name -Descending | 
+    Select-Object -First 1
+./build/Debug/bin/slang-replay.exe "$($latestReplay.FullName)\stream.bin"
+```
+
+**If replay fails:** The recording may have missing or incorrect serialization. Debug the replay failure before proceeding - this indicates a gap in the proxy implementation that needs to be fixed.
+
+### Step 10: Verify Replay Quality
 
 Check the new replay for remaining issues:
 
@@ -201,12 +221,13 @@ if ((Get-Content remaining-unimplemented.txt).Count -eq 0) {
 }
 ```
 
-### Step 10: Repeat or Complete
+### Step 11: Repeat or Complete
 
+- **If replay fails** → Debug the replay, fix serialization gaps
 - **If unimplemented functions remain** → Go to Step 5
 - **If tests pass but different test fails** → Go to Step 1 with new test
 - **If all tests in category pass** → Move to next test category
-- **If all tests pass** → Success! 🎉
+- **If all tests pass and replay succeeds** → Success! 🎉
 
 ## Quick Helper Script
 

@@ -274,6 +274,10 @@ public:
         REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setSPIRVCoreGrammar");
     }
 
+    // parseCommandLineArguments is a bit special because tracking the 'aux allocation' is
+    // painful, and it only really acts as a holder for memory allocated for the session desc.
+    // Instead, we store/return the session desc directly in the stream, and we ignore 
+    // the aux allocation entirely.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
         int argc,
         const char* const* argv,
@@ -282,29 +286,15 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(argc);
-        // Record argv as an array of strings
-        for (int i = 0; i < argc; i++)
-        {
-            RECORD_INPUT(argv[i]);
-        }
-        
+        RECORD_INPUT_ARRAY(argv, argc);
+        PREPARE_POINTER_OUTPUT(outSessionDesc);  
         SlangResult result = SLANG_OK;
-        
-        // Only call the actual API when recording - during playback we reconstruct from stream
         if (ReplayContext::get().isWriting())
         {
             result = getActual<slang::IGlobalSession>()->parseCommandLineArguments(
                 argc, argv, outSessionDesc, outAuxAllocation);
-        }
-        
-        // Record the output SessionDesc (contains the parsed options)
-        // During playback this will be reconstructed from the stream
-        _ctx.record(RecordFlag::Output, *outSessionDesc);
-        
-        // Note: outAuxAllocation is only needed to keep memory alive during recording.
-        // During playback, the SessionDesc pointers will point to arena-allocated data.
-        // We don't need to wrap or record it.
-        
+        }        
+        RECORD_INFO(*outSessionDesc);
         RECORD_RETURN(result);
     }
 

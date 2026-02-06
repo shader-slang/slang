@@ -66,7 +66,7 @@ public:
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-        ReplayContext::get().recordArray(RecordFlag::Input, componentTypes, componentTypeCount);
+        RECORD_INPUT_ARRAY(componentTypes, componentTypeCount);
 
         // Call create session
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);

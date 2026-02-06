@@ -44,6 +44,10 @@ namespace SlangRecord {
 #define RECORD_INPUT(arg) \
     _ctx.record(RecordFlag::Input, const_cast<std::remove_const_t<std::remove_reference_t<decltype(arg)>>&>(arg))
 
+// Record an input array parameter
+#define RECORD_INPUT_ARRAY(arr, count) \
+    _ctx.recordArray(RecordFlag::Input, arr, count)
+
 // Record informational data (neither input nor output, just for stream documentation)
 #define RECORD_INFO(arg) \
     _ctx.record(RecordFlag::None, const_cast<std::remove_const_t<std::remove_reference_t<decltype(arg)>>&>(arg))
