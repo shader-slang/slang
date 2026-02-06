@@ -330,9 +330,8 @@ static SlangResult verifySeparateDebugOutput(
     bool strippedHasDebugInstructions = spirvAsmContainsDebugInstructions(strippedAsm);
     if (strippedHasDebugInstructions)
     {
-        printf(
-            "  ✗ FAIL: Stripped SPIR-V contains debug instructions (OpSource, OpName, "
-            "DebugExpression, etc.)\n");
+        printf("  ✗ FAIL: Stripped SPIR-V contains debug instructions (OpSource, OpName, "
+               "DebugExpression, etc.)\n");
         printf("  This indicates debug info was not properly stripped!\n");
         return SLANG_FAIL;
     }
@@ -506,9 +505,8 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
     if (!compileResult)
     {
         printf("ERROR: getEntryPointCompileResult returned SLANG_OK but compileResult is NULL!\n");
-        printf(
-            "This likely means EmitSeparateDebug is not properly enabled or supported for this "
-            "target.\n");
+        printf("This likely means EmitSeparateDebug is not properly enabled or supported for this "
+               "target.\n");
     }
     SLANG_CHECK_ABORT(compileResult != nullptr);
 
