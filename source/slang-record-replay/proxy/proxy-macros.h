@@ -65,6 +65,27 @@ namespace SlangRecord {
     if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(static_cast<ISlangUnknown*>(*arg)); \
     _ctx.record(RecordFlag::Output, *arg)
 
+// Record a blob output parameter (ISlangBlob**)
+// Captures blob contents during recording and reconstructs from stream during playback
+// Usage: RECORD_BLOB_OUTPUT(outBlob) where outBlob is ISlangBlob**
+#define RECORD_BLOB_OUTPUT(arg) \
+    const void* _ptr_##arg = (*arg) ? (*arg)->getBufferPointer() : nullptr; \
+    size_t _size_##arg = (*arg) ? (*arg)->getBufferSize() : 0; \
+    ReplayContext::get().recordBlob(RecordFlag::None, _ptr_##arg, _size_##arg); \
+    if (ReplayContext::get().isReading()) \
+    { \
+        if (_size_##arg > 0) \
+        { \
+            auto blob = Slang::UnownedRawBlob::create(_ptr_##arg, _size_##arg); \
+            *arg = blob.detach(); \
+        } \
+        else \
+        { \
+            *arg = nullptr; \
+        } \
+    } \
+    RECORD_COM_OUTPUT(arg)
+
 // Record a COM object result and return it (wraps in proxy and records)
 // Usage: return RECORD_COM_RESULT(actualModule);
 #define RECORD_COM_RESULT(result) \

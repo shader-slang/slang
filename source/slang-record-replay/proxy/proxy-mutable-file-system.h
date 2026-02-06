@@ -91,24 +91,7 @@ public:
         }
 
         RECORD_INFO(result);
-
-        const void* ptr = (*outUniqueIdentity) ? (*outUniqueIdentity)->getBufferPointer() : nullptr;
-        size_t size = (*outUniqueIdentity) ? (*outUniqueIdentity)->getBufferSize() : 0;
-        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-
-        if (ReplayContext::get().isReading())
-        {
-            if (size > 0)
-            {
-                auto blob = Slang::UnownedRawBlob::create(ptr, size);
-                *outUniqueIdentity = blob.detach();
-            }
-            else
-            {
-                *outUniqueIdentity = nullptr;
-            }
-        }
-        RECORD_COM_OUTPUT(outUniqueIdentity);
+        RECORD_BLOB_OUTPUT(outUniqueIdentity);
         RECORD_RETURN(result);
     }
 
@@ -135,18 +118,7 @@ public:
         }
 
         RECORD_INFO(result);
-
-        const void* ptr = (*pathOut) ? (*pathOut)->getBufferPointer() : nullptr;
-        size_t size = (*pathOut) ? (*pathOut)->getBufferSize() : 0;
-        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);                
-
-        if(ReplayContext::get().isReading() && ptr) 
-        {         
-            auto blob = Slang::UnownedRawBlob::create(ptr, size);
-            *pathOut = blob.detach();
-        }
-
-        RECORD_COM_OUTPUT(pathOut);
+        RECORD_BLOB_OUTPUT(pathOut);
         RECORD_RETURN(result);
     }
 
@@ -193,24 +165,7 @@ public:
         }
 
         RECORD_INFO(result);
-
-        const void* ptr = (*outPath) ? (*outPath)->getBufferPointer() : nullptr;
-        size_t size = (*outPath) ? (*outPath)->getBufferSize() : 0;
-        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-
-        if (ReplayContext::get().isReading())
-        {
-            if (size > 0)
-            {
-                auto blob = Slang::UnownedRawBlob::create(ptr, size);
-                *outPath = blob.detach();
-            }
-            else
-            {
-                *outPath = nullptr;
-            }
-        }
-        RECORD_COM_OUTPUT(outPath);
+        RECORD_BLOB_OUTPUT(outPath);
         RECORD_RETURN(result);
     }
 
