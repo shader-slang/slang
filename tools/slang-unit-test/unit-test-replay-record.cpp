@@ -278,42 +278,42 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
 
 SLANG_UNIT_TEST(replayRecord_cpu_hello_world)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0x0a02e29492a25cbc)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0xd1479b2fc60f96f4)));
 }
 
 SLANG_UNIT_TEST(replayRecord_triangle)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0xf7d92fd01661e5da)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0xbcab34e287651166)));
 }
 
 SLANG_UNIT_TEST(replayRecord_ray_tracing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x66af6453297e6df8)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0xce3657d0e05184d4)));
 }
 
 SLANG_UNIT_TEST(replayRecord_ray_tracing_pipeline)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0xc2e873a7d11d09e5)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0xb4534afbdd416912)));
 }
 
 SLANG_UNIT_TEST(replayRecord_autodiff_texture)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x90b21e34cbebcfdf)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x1af9d984cc7e9b7a)));
 }
 
 SLANG_UNIT_TEST(replayRecord_gpu_printing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x84a44b0eb977d9a5)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0x1894fc7b1f9fd7fa)));
 }
 
 SLANG_UNIT_TEST(replayRecord_shader_object)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0x354f545398077f72)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0x9e6a1f8c528c6f0f)));
 }
 
 SLANG_UNIT_TEST(replayRecord_model_viewer)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0xd056c2a94f913552)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0xe382cd77cb38818c)));
 }
 
 #endif
