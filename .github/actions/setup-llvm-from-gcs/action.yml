@@ -80,14 +80,20 @@ runs:
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.zst"
+        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+
+        if [ ! -d "${LLVM_DIR}" ]; then
+          echo "ERROR: LLVM directory not found at ${LLVM_DIR}"
+          exit 1
+        fi
 
         echo "📦 Compressing LLVM for upload..."
-        cd build/llvm-project-install
-
         echo "📊 Size before compression:"
-        du -sh .
+        du -sh "${LLVM_DIR}"
 
+        cd "${LLVM_DIR}"
         tar -cf - . | zstd -3 > /tmp/${LLVM_KEY}.tar.zst
+        cd -
 
         echo "📊 Compressed size:"
         ls -lh /tmp/${LLVM_KEY}.tar.zst
