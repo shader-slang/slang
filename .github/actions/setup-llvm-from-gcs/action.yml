@@ -104,10 +104,7 @@ runs:
         echo "📤 Uploading to GCS: ${GCS_PATH}"
         gcloud storage cp /tmp/${LLVM_KEY}.tar.zst "${GCS_PATH}"
 
-        echo "🔓 Making publicly readable..."
-        gcloud storage objects update "${GCS_PATH}" --add-acl-grant=entity=allUsers,role=READER
-
-        echo "✅ LLVM uploaded to GCS and made publicly readable"
+        echo "✅ LLVM uploaded to GCS (publicly readable via bucket-level access)"
 
         # Cleanup
         rm /tmp/${LLVM_KEY}.tar.zst
