@@ -9,13 +9,13 @@ on:
     branches: [master]
     types: [opened, synchronize, ready_for_review, reopened]
     paths:
-      - 'source/**'
-      - 'tests/**'
-      - 'prelude/**'
-      - 'include/**'
-      - 'tools/**'
-      - 'CMakeLists.txt'
-      - 'cmake/**'
+      - "source/**"
+      - "tests/**"
+      - "prelude/**"
+      - "include/**"
+      - "tools/**"
+      - "CMakeLists.txt"
+      - "cmake/**"
 
 permissions:
   contents: read
