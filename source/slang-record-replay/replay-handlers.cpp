@@ -296,6 +296,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(CompileRequestProxy, setTargetUseMinimumSlangOptimization);
     REPLAY_REGISTER(CompileRequestProxy, setIgnoreCapabilityCheck);
     REPLAY_REGISTER(CompileRequestProxy, getReflection);
+    REPLAY_REGISTER(CompileRequestProxy, setCommandLineCompilerMode);
     // setSourceEmbedStyle, setSourceEmbedName, setSourceEmbedLanguage not implemented in proxy
     // setEmitSpirvMethod not implemented in proxy
     REPLAY_REGISTER(CompileRequestProxy, getModule);

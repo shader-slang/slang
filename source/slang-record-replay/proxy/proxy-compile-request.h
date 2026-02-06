@@ -153,9 +153,11 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setWriter(SlangWriterChannel channel, ISlangWriter* writer) override
     {
-        SLANG_UNUSED(channel);
-        SLANG_UNUSED(writer);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::setWriter");
+        RECORD_CALL();
+        int32_t channelInt = static_cast<int32_t>(channel);
+        RECORD_INPUT(channelInt);
+        // Note: writer is a callback interface provided by client, not wrapped
+        getActual<slang::ICompileRequest>()->setWriter(channel, writer);
     }
 
     virtual SLANG_NO_THROW ISlangWriter* SLANG_MCALL getWriter(SlangWriterChannel channel) override
@@ -166,8 +168,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL addSearchPath(const char* searchDir) override
     {
-        SLANG_UNUSED(searchDir);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addSearchPath");
+        RECORD_CALL();
+        RECORD_INPUT(searchDir);
+        getActual<slang::ICompileRequest>()->addSearchPath(searchDir);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -478,7 +481,8 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::setCommandLineCompilerMode");
+        RECORD_CALL();
+        getActual<slang::ICompileRequest>()->setCommandLineCompilerMode();
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
