@@ -937,6 +937,7 @@ void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 // =============================================================================
 
 void ReplayContext::record(RecordFlag flags, SlangSeverity& value)              { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangParameterCategory& value)     { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangBindableResourceType& value)  { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangCompileTarget& value)         { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangContainerFormat& value)       { recordEnum(flags, value); }

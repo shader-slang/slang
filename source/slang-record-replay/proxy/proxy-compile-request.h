@@ -514,13 +514,17 @@ public:
         SlangUInt registerIndex,
         bool& outUsed) override
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(category);
-        SLANG_UNUSED(spaceIndex);
-        SLANG_UNUSED(registerIndex);
-        SLANG_UNUSED(outUsed);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::isParameterLocationUsed");
+        RECORD_CALL();
+        RECORD_INPUT(entryPointIndex);
+        RECORD_INPUT(targetIndex);
+        RECORD_INPUT(category);
+        RECORD_INPUT(spaceIndex);
+        RECORD_INPUT(registerIndex);
+        auto result = getActual<slang::ICompileRequest>()->isParameterLocationUsed(
+            entryPointIndex, targetIndex, category, spaceIndex, registerIndex, outUsed);
+        RECORD_INFO(outUsed);
+        RECORD_RETURN(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL

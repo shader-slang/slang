@@ -411,6 +411,7 @@ public:
 
     // Slang enum types
     SLANG_API void record(RecordFlag flags, SlangSeverity& value);
+    SLANG_API void record(RecordFlag flags, SlangParameterCategory& value);
     SLANG_API void record(RecordFlag flags, SlangBindableResourceType& value);
     SLANG_API void record(RecordFlag flags, SlangCompileTarget& value);
     SLANG_API void record(RecordFlag flags, SlangContainerFormat& value);

@@ -197,10 +197,17 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTargetCode(SlangInt targetIndex, ISlangBlob** outCode, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outCode);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::getTargetCode");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+
+        PREPARE_POINTER_OUTPUT(outCode);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+
+        auto result = getActual<slang::IComponentType>()->getTargetCode(targetIndex, outCode, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outCode);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
