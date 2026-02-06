@@ -192,7 +192,9 @@ public:
     // IEntryPoint
     virtual SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() override
     {
-        REPLAY_UNIMPLEMENTED_X("EntryPointProxy::getFunctionReflection");
+        RECORD_CALL();
+        slang::FunctionReflection* result = getActual<slang::IEntryPoint>()->getFunctionReflection();
+        return result; // don't capture pointer - reflection data is not wrapped
     }
 
     // IComponentType2
