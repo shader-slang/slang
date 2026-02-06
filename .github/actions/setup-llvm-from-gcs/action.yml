@@ -36,8 +36,14 @@ runs:
         if ! command -v zstd &> /dev/null; then
           case "${{ inputs.os }}" in
             linux)
-              sudo apt-get update
-              sudo apt-get install -y zstd
+              # Try with sudo if available, otherwise install directly (for containers as root)
+              if command -v sudo &> /dev/null; then
+                sudo apt-get update
+                sudo apt-get install -y zstd
+              else
+                apt-get update
+                apt-get install -y zstd
+              fi
               ;;
             macos)
               brew install zstd
