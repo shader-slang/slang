@@ -58,11 +58,6 @@ jobs:
           build-if-missing: "true"
           github-token: ${{ github.token }}
 
-      - name: Set LLVM paths
-        run: |
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-
       - name: Build Slang with CUDA
         run: |
           echo "cmake version: $(cmake --version)"
