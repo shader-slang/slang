@@ -1,0 +1,109 @@
+name: Claude PR Review
+
+# Automated PR review for the Slang compiler
+# Triggers on PRs to master that touch core source, tests, build, or tools
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      - 'source/**'
+      - 'tests/**'
+      - 'prelude/**'
+      - 'include/**'
+      - 'tools/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read  # Required for Claude to read CI check results on PRs
+
+jobs:
+  review:
+    # Skip draft PRs, bot PRs, and Claude's own branches (loop prevention)
+    if: |
+      github.event.pull_request.draft == false &&
+      !contains(github.event.pull_request.user.login, '[bot]') &&
+      !startsWith(github.event.pull_request.head.ref, 'claude/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # Centralized auth configuration
+    env:
+      CLAUDE_AUTH_PROVIDER: ${{ vars.CLAUDE_AUTH_PROVIDER || 'llmgw' }}
+      LLMGW_ID: ${{ secrets.LLMGW_ID }}
+      LLMGW_SECRET: ${{ secrets.LLMGW_SECRET }}
+      LLMGW_TOKEN_URL: ${{ secrets.LLMGW_TOKEN_URL }}
+      NV_INFERENCE_TOKEN: ${{ secrets.NV_INFERENCE_TOKEN }}
+
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: PR Review with Progress Tracking
+        uses: ./.github/actions/claude-code-runner
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          max-turns: "500"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this PR for the Slang shader compiler. Focus on:
+            1. IR consistency: ensure IR passes maintain type invariants and don't break SSA form
+            2. Target correctness: check that code generation changes work across SPIRV, HLSL, GLSL, Metal, CUDA targets
+            3. Bugs and security issues: look for null dereferences, use-after-free, missing error handling
+            4. Test coverage: verify new code has tests (CPU or INTERPRET mode for non-GPU features)
+            5. API compatibility: flag changes to public headers (include/slang.h, slang-gfx.h) as potentially breaking
+
+            IMPORTANT: Use mcp__github_inline_comment__create_inline_comment to add inline comments
+            ONLY for bugs, issues, inconsistencies, or actionable suggestions. Do NOT post inline
+            comments for praise or approval — positive observations belong in the top-level summary only.
+            Use a top-level summary comment for overall assessment and any positive feedback.
+
+          custom-instructions: |
+            ### **Slang Compiler Context**
+            - Slang is an SSA-based shader compiler with custom IR (not LLVM)
+            - Pipeline: Lexer -> Parser -> Semantic Check -> IR Gen -> IR Passes -> Code Emission
+            - Key source dirs: source/slang/ (compiler), source/core/ (utilities), source/compiler-core/ (infra)
+            - IR instructions defined in slang-ir-insts.lua, generated code in build/source/slang/fiddle/
+
+            ### **Review Priorities**
+            - IR pass changes: verify input/output IR invariants are maintained
+            - Emit changes: ensure all target backends are updated consistently
+            - Keep emit logic simple; heavy transforms belong in IR passes
+            - Check for proper use of FIDDLE macros in AST nodes
+
+          mcp-config: |
+            {
+              "mcpServers": {
+                "deepwiki": {
+                  "type": "http",
+                  "url": "https://mcp.deepwiki.com/mcp"
+                }
+              }
+            }
+
+          # Tools for PR review (read-only + inline comments)
+          allowed-tools: |
+            View,GlobTool,GrepTool,BatchTool,
+            Bash(gh pr diff *),
+            Bash(gh pr view *),
+            Bash(gh pr comment *),
+            Bash(git log *),
+            Bash(git diff *),
+            mcp__github_inline_comment__create_inline_comment,
+            mcp__github__get_pull_request_diff,
+            mcp__github__add_pull_request_review_comment,
+            mcp__github__get_issue,
+            mcp__github__get_issue_comments,
+            mcp__deepwiki__ask_question

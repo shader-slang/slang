@@ -1,0 +1,182 @@
+name: Claude CI Failure Analysis
+
+# Analyzes CI failures on PRs and comments with diagnosis
+# Triggers when the main CI workflow completes with failure
+# Based on: claude-code-action/examples/ci-failure-auto-fix.yml
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Failed CI workflow run ID to analyze"
+        required: true
+        type: string
+      pr_number:
+        description: "PR number associated with the failure"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  issues: write
+
+jobs:
+  analyze-failure:
+    # Auto-trigger: only on CI failure for PRs (not push-to-master)
+    # Manual trigger: always runs (workflow_dispatch)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.pull_requests[0] &&
+        !startsWith(github.event.workflow_run.head_branch, 'claude/')
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      CLAUDE_AUTH_PROVIDER: ${{ vars.CLAUDE_AUTH_PROVIDER || 'llmgw' }}
+      LLMGW_ID: ${{ secrets.LLMGW_ID }}
+      LLMGW_SECRET: ${{ secrets.LLMGW_SECRET }}
+      LLMGW_TOKEN_URL: ${{ secrets.LLMGW_TOKEN_URL }}
+      NV_INFERENCE_TOKEN: ${{ secrets.NV_INFERENCE_TOKEN }}
+
+    concurrency:
+      group: claude-ci-analysis-${{ github.event.workflow_run.pull_requests[0].number || github.event.inputs.pr_number || github.run_id }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get CI failure details
+        id: failure_details
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Support both workflow_run (auto) and workflow_dispatch (manual) triggers
+            const runId = context.eventName === 'workflow_dispatch'
+              ? parseInt('${{ github.event.inputs.run_id }}')
+              : ${{ github.event.workflow_run.id || 0 }};
+
+            const run = await github.rest.actions.getWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+
+            const jobs = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId
+            });
+
+            const failedJobs = jobs.data.jobs.filter(job => job.conclusion === 'failure');
+
+            // Collect failed job names and step names
+            const failures = failedJobs.map(job => ({
+              name: job.name,
+              failedSteps: job.steps
+                .filter(s => s.conclusion === 'failure')
+                .map(s => s.name)
+            }));
+
+            // Get PR number from event or input
+            const prNumber = context.eventName === 'workflow_dispatch'
+              ? parseInt('${{ github.event.inputs.pr_number }}')
+              : ${{ github.event.workflow_run.pull_requests[0].number || 0 }};
+
+            core.setOutput('run_id', runId);
+            core.setOutput('run_url', run.data.html_url);
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('head_branch', run.data.head_branch);
+            core.setOutput('failed_jobs', JSON.stringify(failures));
+
+      - name: Analyze CI Failure with Claude
+        uses: ./.github/actions/claude-code-runner
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          max-turns: "500"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ steps.failure_details.outputs.pr_number }}
+            BRANCH: ${{ steps.failure_details.outputs.head_branch }}
+
+            The CI workflow failed on this PR. Analyze the failure, fix the code, and push the fix.
+
+            Failed CI Run: ${{ steps.failure_details.outputs.run_url }}
+            Failed Jobs: ${{ steps.failure_details.outputs.failed_jobs }}
+
+            Steps:
+            1. Use `gh run view ${{ steps.failure_details.outputs.run_id }} --log-failed` to get the failure logs
+            2. Analyze the error messages and identify the root cause
+            3. Check the PR diff with `gh pr diff ${{ steps.failure_details.outputs.pr_number }}` to understand the changes
+            4. Checkout the PR branch: `git checkout ${{ steps.failure_details.outputs.head_branch }}`
+            5. Fix the code — apply the necessary changes to resolve the CI failure
+            6. Run `./extras/formatting.sh` if the failure is formatting-related
+            7. Commit and push the fix to the PR branch
+            8. Comment on the PR explaining what was fixed and why
+
+          custom-instructions: |
+            ### **Environment**
+            - This workflow runs on Linux (ubuntu-latest) — use `gh` (not `gh.exe`)
+            - Do NOT use `curl` for GitHub API calls — use `gh` CLI instead
+            - Build: `cmake --preset default`, then `cmake --build --preset release`
+
+            ### **Slang CI Context**
+            - Slang CI builds on multiple platforms (Windows, Linux, macOS)
+            - Common failures: compilation errors, test failures, SPIRV validation, formatting
+            - Build uses CMake presets; tests run via slang-test
+            - Check if failure is platform-specific or affects all platforms
+
+            ### **Fix Guidelines**
+            - Fix the root cause, not symptoms — apply minimal targeted changes
+            - For formatting failures: run `./extras/formatting.sh` and commit
+            - For compilation errors: fix the code and verify it builds
+            - For test failures: fix the test or the code that broke it
+            - Always commit and push fixes to the PR branch
+            - Comment on the PR explaining the fix
+
+          mcp-config: |
+            {
+              "mcpServers": {
+                "deepwiki": {
+                  "type": "http",
+                  "url": "https://mcp.deepwiki.com/mcp"
+                }
+              }
+            }
+
+          allowed-tools: |
+            View,GlobTool,GrepTool,BatchTool,Write,WebSearch,
+            Bash(cmake*),
+            Bash(./build/*slangc*),
+            Bash(./build/*slang-test*),
+            Bash(gh run view *),
+            Bash(gh run download *),
+            Bash(gh pr diff *),
+            Bash(gh pr view *),
+            Bash(gh pr comment *),
+            Bash(gh api *),
+            Bash(git status*),
+            Bash(git diff*),
+            Bash(git log*),
+            Bash(git add*),
+            Bash(git commit*),
+            Bash(git checkout*),
+            Bash(git fetch*),
+            Bash(git pull*),
+            Bash(git push*),
+            Bash(git show*),
+            Bash(./extras/formatting.sh*),
+            mcp__deepwiki__ask_question,
+            mcp__github__create_issue_comment,
+            mcp__github_ci__get_ci_status,
+            mcp__github_ci__download_job_log
