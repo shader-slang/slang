@@ -20853,12 +20853,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CandidateRayInstanceCustomIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_user_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -20898,12 +20899,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayInstanceCustomIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_user_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
