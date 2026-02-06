@@ -107,7 +107,7 @@ inputs:
   aws-region:
     description: "AWS region"
     required: false
-    default: ""
+    default: "us-west-2"
   bedrock-base-url:
     description: "Anthropic Bedrock base URL"
     required: false
@@ -444,6 +444,7 @@ runs:
         # Use Bedrock with bearer token auth (not AWS SigV4)
         ANTHROPIC_BEDROCK_BASE_URL: ${{ inputs.bedrock-base-url }}
         AWS_BEARER_TOKEN_BEDROCK: ${{ steps.auth-token.outputs.token }}
+        AWS_REGION: ${{ inputs.aws-region || 'us-west-2' }}
       with:
         github_token: ${{ inputs.github-token || github.token }}
         use_bedrock: "true"
@@ -469,7 +470,7 @@ runs:
           {
             "env": {
               "ANTHROPIC_SMALL_FAST_MODEL": "${{ inputs.small-fast-model }}",
-              "AWS_REGION": "${{ inputs.aws-region }}",
+              "AWS_REGION": "${{ inputs.aws-region || 'us-west-2' }}",
               "GITHUB_REPOSITORY": "${{ github.repository }}",
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
