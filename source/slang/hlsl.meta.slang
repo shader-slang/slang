@@ -20717,7 +20717,26 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 result:$$CANDIDATE_TYPE = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCandidateIntersectionKHR;
             };
         case metal:
-            __intrinsic_asm "()";
+            __requirePrelude(R"(
+typedef uint CANDIDATE_TYPE;
+CANDIDATE_TYPE _candidate_intersection_type_to_uint(raytracing::intersection_type type){
+    const CANDIDATE_TYPE CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
+    const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
+    switch(type){
+        case raytracing::intersection_type::none:
+            return 0;
+        case raytracing::intersection_type::triangle:
+            return CANDIDATE_NON_OPAQUE_TRIANGLE;
+        case raytracing::intersection_type::bounding_box:
+            return CANDIDATE_PROCEDURAL_PRIMITIVE;
+        default:
+            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+    }
+}
+            )");
+            __intrinsic_asm R"(
+                _candidate_intersection_type_to_uint($0->get_candidate_intersection_type())
+            )";
         }
     }
 
@@ -20741,7 +20760,25 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 result:$$COMMITTED_STATUS = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCommittedIntersectionKHR;
             };
         case metal:
-            __intrinsic_asm "()";
+        __requirePrelude(R"(
+typedef uint COMMITTED_STATUS;
+COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_type type){
+    const COMMITTED_STATUS COMMITTED_NOTHING = 0;
+    const COMMITTED_STATUS COMMITTED_TRIANGLE_HIT = 1;
+    const COMMITTED_STATUS COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
+    switch(type){
+        case raytracing::intersection_type::none:
+            return COMMITTED_NOTHING;
+        case raytracing::intersection_type::triangle:
+            return COMMITTED_TRIANGLE_HIT;
+        case raytracing::intersection_type::bounding_box:
+            return COMMITTED_PROCEDURAL_PRIMITIVE_HIT;
+        default:
+            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+    }
+}
+            )");
+            __intrinsic_asm "_committed_intersection_type_to_uint($0->get_committed_intersection_type())";
         }
     }
 
@@ -20750,7 +20787,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_metal_spirv, rayquery)]
+    [require(glsl_hlsl_spirv, rayquery)]
     bool CandidateProceduralPrimitiveNonOpaque()
     {
         __target_switch
@@ -20764,8 +20801,6 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 %rr:$$bool = OpRayQueryGetIntersectionCandidateAABBOpaqueKHR &this;
                 result:$$bool = OpLogicalNot %rr;
             };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
@@ -20781,14 +20816,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".CandidateTriangleRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_triangle_distance()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
             {
                 result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
             };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
@@ -20804,14 +20838,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         {
         case hlsl: __intrinsic_asm ".CommittedRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_distance()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
             {
                 result:$$float = OpRayQueryGetIntersectionTKHR &this $iCandidateOrCommitted;
             };
-        case metal:
-            __intrinsic_asm "()";
         }
     }
 
