@@ -28,6 +28,39 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(ComponentTypeProxy)
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        if (!outObject) return SLANG_E_INVALID_ARG;
+
+        if (uuid == ComponentTypeProxy::getTypeGuid() ||
+            uuid == slang::IComponentType::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::IComponentType*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == slang::IComponentType2::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::IComponentType2*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == slang::IModulePrecompileService_Experimental::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::IModulePrecompileService_Experimental*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == ISlangUnknown::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangUnknown*>(static_cast<slang::IComponentType*>(this));
+            return SLANG_OK;
+        }
+        return m_actual->queryInterface(uuid, outObject);
+    }
+
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
     {

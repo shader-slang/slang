@@ -30,6 +30,28 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(GlobalSessionProxy)
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        if (!outObject) return SLANG_E_INVALID_ARG;
+
+        if (uuid == GlobalSessionProxy::getTypeGuid() ||
+            uuid == slang::IGlobalSession::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::IGlobalSession*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == ISlangUnknown::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangUnknown*>(static_cast<slang::IGlobalSession*>(this));
+            return SLANG_OK;
+        }
+        // Unknown interface - pass through to underlying object
+        return m_actual->queryInterface(uuid, outObject);
+    }
+
     // IGlobalSession
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override

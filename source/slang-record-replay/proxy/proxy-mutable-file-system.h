@@ -59,6 +59,45 @@ public:
     // Lifetime of FS proxys is just held by the session
     // PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        if (!outObject) return SLANG_E_INVALID_ARG;
+
+        if (uuid == MutableFileSystemProxy::getTypeGuid() ||
+            uuid == ISlangMutableFileSystem::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangMutableFileSystem*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == ISlangFileSystemExt::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangFileSystemExt*>(static_cast<ISlangMutableFileSystem*>(this));
+            return SLANG_OK;
+        }
+        if (uuid == ISlangFileSystem::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangFileSystem*>(static_cast<ISlangMutableFileSystem*>(this));
+            return SLANG_OK;
+        }
+        if (uuid == ISlangCastable::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangCastable*>(static_cast<ISlangMutableFileSystem*>(this));
+            return SLANG_OK;
+        }
+        if (uuid == ISlangUnknown::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangUnknown*>(static_cast<ISlangMutableFileSystem*>(this));
+            return SLANG_OK;
+        }
+        return m_actual->queryInterface(uuid, outObject);
+    }
+
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {

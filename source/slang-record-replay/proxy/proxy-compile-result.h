@@ -28,6 +28,33 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(CompileResultProxy)
 
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    {
+        if (!outObject) return SLANG_E_INVALID_ARG;
+
+        if (uuid == CompileResultProxy::getTypeGuid() ||
+            uuid == slang::ICompileResult::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<slang::ICompileResult*>(this);
+            return SLANG_OK;
+        }
+        if (uuid == ISlangCastable::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangCastable*>(static_cast<slang::ICompileResult*>(this));
+            return SLANG_OK;
+        }
+        if (uuid == ISlangUnknown::getTypeGuid())
+        {
+            addRef();
+            *outObject = static_cast<ISlangUnknown*>(static_cast<slang::ICompileResult*>(this));
+            return SLANG_OK;
+        }
+        return m_actual->queryInterface(uuid, outObject);
+    }
+
     // ISlangCastable
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {
