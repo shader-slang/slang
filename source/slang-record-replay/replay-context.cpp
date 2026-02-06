@@ -1172,16 +1172,21 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         {
             for(auto& kv : m_implToProxy) 
             {
-                ISlangUnknown* impl = kv.first;
-                slang::IModule* moduleInterface = dynamic_cast<slang::IModule*>(impl);
-                if(moduleInterface) 
+                // This 'safe' cast is applied to the proxy, which we know will always be some
+                // valid virtual ISlangUnknown pointer, even if its not a module, so won't break DC.
+                if(dynamic_cast<slang::IModule*>(kv.second)) 
                 {
-                    auto layout = moduleInterface->getLayout(0, nullptr);
-                    if (layout && layout->findTypeByName(typeName) == type)
+                    ISlangUnknown* impl = kv.first;
+                    slang::IModule* moduleInterface = dynamic_cast<slang::IModule*>(impl);
+                    if(moduleInterface) 
                     {
-                        auto proxy = getProxy(moduleInterface);
-                        moduleHandle = getHandleForInterface(proxy);
-                        break;
+                        auto layout = moduleInterface->getLayout(0, nullptr);
+                        if (layout && layout->findTypeByName(typeName) == type)
+                        {
+                            auto proxy = getProxy(moduleInterface);
+                            moduleHandle = getHandleForInterface(proxy);
+                            break;
+                        }
                     }
                 }
             }

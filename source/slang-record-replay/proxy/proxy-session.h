@@ -172,12 +172,23 @@ public:
         SlangInt conformanceIdOverride,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(type);
-        SLANG_UNUSED(interfaceType);
-        SLANG_UNUSED(outConformance);
-        SLANG_UNUSED(conformanceIdOverride);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::createTypeConformanceComponentType");
+        RECORD_CALL();
+        RECORD_INPUT(type);
+        RECORD_INPUT(interfaceType);
+        RECORD_INPUT(conformanceIdOverride);
+
+        PREPARE_POINTER_OUTPUT(outConformance);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+        auto result = getActual<slang::ISession>()->createTypeConformanceComponentType(
+            type,
+            interfaceType,
+            outConformance,
+            conformanceIdOverride,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outConformance);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(

@@ -184,9 +184,11 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     processCommandLineArguments(char const* const* args, int argCount) override
     {
-        SLANG_UNUSED(args);
-        SLANG_UNUSED(argCount);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::processCommandLineArguments");
+        RECORD_CALL();
+        RECORD_INPUT(argCount);
+        RECORD_INPUT_ARRAY(args, argCount);
+        auto result = getActual<slang::ICompileRequest>()->processCommandLineArguments(args, argCount);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW int SLANG_MCALL
@@ -326,7 +328,9 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compile() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::compile");
+        RECORD_CALL();
+        auto result = getActual<slang::ICompileRequest>()->compile();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDiagnosticOutput() override

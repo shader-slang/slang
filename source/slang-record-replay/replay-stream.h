@@ -104,7 +104,7 @@ public:
 
         size_t newSize = m_position + size;
         if (newSize > size_t(m_buffer.getCount()))
-            m_buffer.setCount(Slang::Index(newSize));
+            m_buffer.setCount(Slang::Index(newSize*2));
 
         std::memcpy(m_buffer.getBuffer() + m_position, data, size);
         m_position += size;
