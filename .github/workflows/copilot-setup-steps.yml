@@ -119,29 +119,16 @@ jobs:
           echo "=== CUDA version ==="
           nvcc --version
 
-      # LLVM caching support - restore cached LLVM build if available
-      - name: Restore cached LLVM
-        uses: actions/cache/restore@v4
-        id: cache-llvm
+      # Setup LLVM from GCS (or build if missing)
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
         with:
-          path: build/llvm-project-install
-          key: llvm-linux-gcc-x86_64-${{ hashFiles('external/build-llvm.sh') }}
-
-      # Build LLVM from source if cache miss (takes 15-25 minutes)
-      - name: Build LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          ./external/build-llvm.sh \
-            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
-
-      # Save LLVM cache only on master branch to avoid cache pollution
-      - name: Save LLVM cache
-        uses: actions/cache/save@v4
-        if: steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
-        with:
-          path: build/llvm-project-install
-          key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
 
       # Set LLVM paths for CMake to find the installation
       - name: Set LLVM paths
