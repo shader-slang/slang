@@ -48,6 +48,21 @@ jobs:
           platform: linux
           gcs-bucket: slang-ci-cache
 
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Set LLVM paths
+        run: |
+          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+
       - name: Build Slang with CUDA
         run: |
           echo "cmake version: $(cmake --version)"
@@ -65,10 +80,10 @@ jobs:
           fi
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
-          # Configure with CUDA support, disable LLVM, use sccache
+          # Configure with CUDA support, use LLVM from GCS, use sccache
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
