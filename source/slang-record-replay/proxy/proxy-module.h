@@ -96,11 +96,27 @@ public:
         slang::IComponentType** outSpecializedComponentType,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(specializationArgs);
-        SLANG_UNUSED(specializationArgCount);
-        SLANG_UNUSED(outSpecializedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::specialize");
+        RECORD_CALL();
+
+        // Record the specialization args array
+        _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
+
+        slang::IComponentType* specializedPtr = nullptr;
+        if (!outSpecializedComponentType)
+            outSpecializedComponentType = &specializedPtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IModule>()->specialize(
+            specializationArgs,
+            specializationArgCount,
+            outSpecializedComponentType,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outSpecializedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -241,11 +257,23 @@ public:
         slang::IEntryPoint** outEntryPoint,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(name);
-        SLANG_UNUSED(stage);
-        SLANG_UNUSED(outEntryPoint);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::findAndCheckEntryPoint");
+        RECORD_CALL();
+        RECORD_INPUT(name);
+        RECORD_INPUT(stage);
+        
+        slang::IEntryPoint* entryPointPtr = nullptr;
+        if (!outEntryPoint)
+            outEntryPoint = &entryPointPtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+            
+        SlangResult result = getActual<slang::IModule>()->findAndCheckEntryPoint(
+            name, stage, outEntryPoint, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override

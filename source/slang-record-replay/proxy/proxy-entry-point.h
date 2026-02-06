@@ -44,7 +44,9 @@ public:
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("EntryPointProxy::getSpecializationParamCount");
+        RECORD_CALL();
+        SlangInt result = getActual<slang::IEntryPoint>()->getSpecializationParamCount();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
@@ -86,11 +88,27 @@ public:
         slang::IComponentType** outSpecializedComponentType,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(specializationArgs);
-        SLANG_UNUSED(specializationArgCount);
-        SLANG_UNUSED(outSpecializedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("EntryPointProxy::specialize");
+        RECORD_CALL();
+
+        // Record the specialization args array
+        _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
+
+        slang::IComponentType* specializedPtr = nullptr;
+        if (!outSpecializedComponentType)
+            outSpecializedComponentType = &specializedPtr;
+        ISlangBlob* diagnosticsPtr = nullptr;
+        if (!outDiagnostics)
+            outDiagnostics = &diagnosticsPtr;
+
+        auto result = getActual<slang::IEntryPoint>()->specialize(
+            specializationArgs,
+            specializationArgCount,
+            outSpecializedComponentType,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outSpecializedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
