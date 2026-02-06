@@ -32,7 +32,7 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {
         SLANG_UNUSED(guid);
-        SLANG_UNIMPLEMENTED_X("MetadataProxy::castAs");
+        REPLAY_UNIMPLEMENTED_X("MetadataProxy::castAs");
     }
 
     // IMetadata
@@ -46,12 +46,12 @@ public:
         SLANG_UNUSED(spaceIndex);
         SLANG_UNUSED(registerIndex);
         SLANG_UNUSED(outUsed);
-        SLANG_UNIMPLEMENTED_X("MetadataProxy::isParameterLocationUsed");
+        REPLAY_UNIMPLEMENTED_X("MetadataProxy::isParameterLocationUsed");
     }
 
     virtual const char* SLANG_MCALL getDebugBuildIdentifier() override
     {
-        SLANG_UNIMPLEMENTED_X("MetadataProxy::getDebugBuildIdentifier");
+        REPLAY_UNIMPLEMENTED_X("MetadataProxy::getDebugBuildIdentifier");
     }
 };
 

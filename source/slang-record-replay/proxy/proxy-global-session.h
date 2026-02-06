@@ -90,7 +90,7 @@ public:
     {
         SLANG_UNUSED(passThrough);
         SLANG_UNUSED(path);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerPath");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerPath");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -98,7 +98,7 @@ public:
     {
         SLANG_UNUSED(passThrough);
         SLANG_UNUSED(preludeText);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerPrelude");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerPrelude");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -106,7 +106,7 @@ public:
     {
         SLANG_UNUSED(passThrough);
         SLANG_UNUSED(outPrelude);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getDownstreamCompilerPrelude");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getDownstreamCompilerPrelude");
     }
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override
@@ -121,14 +121,14 @@ public:
     {
         SLANG_UNUSED(sourceLanguage);
         SLANG_UNUSED(defaultCompiler);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setDefaultDownstreamCompiler");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDefaultDownstreamCompiler");
     }
 
     virtual SlangPassThrough SLANG_MCALL
     getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override
     {
         SLANG_UNUSED(sourceLanguage);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getDefaultDownstreamCompiler");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getDefaultDownstreamCompiler");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -156,7 +156,7 @@ public:
     createCompileRequest(slang::ICompileRequest** outCompileRequest) override
     {
         SLANG_UNUSED(outCompileRequest);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::createCompileRequest");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::createCompileRequest");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -164,19 +164,19 @@ public:
     {
         SLANG_UNUSED(sourcePath);
         SLANG_UNUSED(sourceString);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::addBuiltins");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::addBuiltins");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     setSharedLibraryLoader(ISlangSharedLibraryLoader* loader) override
     {
         SLANG_UNUSED(loader);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setSharedLibraryLoader");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setSharedLibraryLoader");
     }
 
     virtual SLANG_NO_THROW ISlangSharedLibraryLoader* SLANG_MCALL getSharedLibraryLoader() override
     {
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getSharedLibraryLoader");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getSharedLibraryLoader");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -201,7 +201,7 @@ public:
     compileCoreModule(slang::CompileCoreModuleFlags flags) override
     {
         SLANG_UNUSED(flags);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::compileCoreModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::compileCoreModule");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -209,7 +209,7 @@ public:
     {
         SLANG_UNUSED(coreModule);
         SLANG_UNUSED(coreModuleSizeInBytes);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::loadCoreModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::loadCoreModule");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -217,7 +217,7 @@ public:
     {
         SLANG_UNUSED(archiveType);
         SLANG_UNUSED(outBlob);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::saveCoreModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::saveCoreModule");
     }
 
     virtual SLANG_NO_THROW SlangCapabilityID SLANG_MCALL findCapability(char const* name) override
@@ -236,7 +236,7 @@ public:
         SLANG_UNUSED(source);
         SLANG_UNUSED(target);
         SLANG_UNUSED(compiler);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerForTransition");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerForTransition");
     }
 
     virtual SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(
@@ -273,7 +273,7 @@ public:
     setSPIRVCoreGrammar(char const* jsonPath) override
     {
         SLANG_UNUSED(jsonPath);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::setSPIRVCoreGrammar");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setSPIRVCoreGrammar");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
@@ -286,7 +286,7 @@ public:
         SLANG_UNUSED(argv);
         SLANG_UNUSED(outSessionDesc);
         SLANG_UNUSED(outAuxAllocation);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::parseCommandLineArguments");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::parseCommandLineArguments");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -294,7 +294,7 @@ public:
     {
         SLANG_UNUSED(sessionDesc);
         SLANG_UNUSED(outBlob);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::getSessionDescDigest");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getSessionDescDigest");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(
@@ -303,7 +303,7 @@ public:
     {
         SLANG_UNUSED(module);
         SLANG_UNUSED(flags);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::compileBuiltinModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::compileBuiltinModule");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadBuiltinModule(
@@ -314,7 +314,7 @@ public:
         SLANG_UNUSED(module);
         SLANG_UNUSED(moduleData);
         SLANG_UNUSED(sizeInBytes);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::loadBuiltinModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::loadBuiltinModule");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL saveBuiltinModule(
@@ -325,7 +325,7 @@ public:
         SLANG_UNUSED(module);
         SLANG_UNUSED(archiveType);
         SLANG_UNUSED(outBlob);
-        SLANG_UNIMPLEMENTED_X("GlobalSessionProxy::saveBuiltinModule");
+        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::saveBuiltinModule");
     }
 };
 

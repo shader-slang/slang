@@ -32,26 +32,26 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {
         SLANG_UNUSED(guid);
-        SLANG_UNIMPLEMENTED_X("CompileResultProxy::castAs");
+        REPLAY_UNIMPLEMENTED_X("CompileResultProxy::castAs");
     }
 
     // ICompileResult
     virtual uint32_t SLANG_MCALL getItemCount() override
     {
-        SLANG_UNIMPLEMENTED_X("CompileResultProxy::getItemCount");
+        REPLAY_UNIMPLEMENTED_X("CompileResultProxy::getItemCount");
     }
 
     virtual SlangResult SLANG_MCALL getItemData(uint32_t index, ISlangBlob** outBlob) override
     {
         SLANG_UNUSED(index);
         SLANG_UNUSED(outBlob);
-        SLANG_UNIMPLEMENTED_X("CompileResultProxy::getItemData");
+        REPLAY_UNIMPLEMENTED_X("CompileResultProxy::getItemData");
     }
 
     virtual SlangResult SLANG_MCALL getMetadata(slang::IMetadata** outMetadata) override
     {
         SLANG_UNUSED(outMetadata);
-        SLANG_UNIMPLEMENTED_X("CompileResultProxy::getMetadata");
+        REPLAY_UNIMPLEMENTED_X("CompileResultProxy::getMetadata");
     }
 };
 

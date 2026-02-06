@@ -28,7 +28,7 @@ public:
     virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const SlangUUID& guid) override
     {
         SLANG_UNUSED(guid);
-        SLANG_UNIMPLEMENTED_X("SharedLibraryProxy::castAs");
+        REPLAY_UNIMPLEMENTED_X("SharedLibraryProxy::castAs");
     }
 
     // ISlangSharedLibrary

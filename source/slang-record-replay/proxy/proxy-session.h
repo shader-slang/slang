@@ -58,7 +58,7 @@ public:
         SLANG_UNUSED(path);
         SLANG_UNUSED(source);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::loadModuleFromSource");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleFromSource");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
@@ -94,7 +94,7 @@ public:
         SLANG_UNUSED(specializationArgs);
         SLANG_UNUSED(specializationArgCount);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::specializeType");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::specializeType");
     }
 
     virtual SLANG_NO_THROW slang::TypeLayoutReflection* SLANG_MCALL getTypeLayout(
@@ -126,12 +126,12 @@ public:
         SLANG_UNUSED(elementType);
         SLANG_UNUSED(containerType);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getContainerType");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getContainerType");
     }
 
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL getDynamicType() override
     {
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getDynamicType");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getDynamicType");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -139,7 +139,7 @@ public:
     {
         SLANG_UNUSED(type);
         SLANG_UNUSED(outNameBlob);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getTypeRTTIMangledName");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getTypeRTTIMangledName");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessMangledName(
@@ -150,7 +150,7 @@ public:
         SLANG_UNUSED(type);
         SLANG_UNUSED(interfaceType);
         SLANG_UNUSED(outNameBlob);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getTypeConformanceWitnessMangledName");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getTypeConformanceWitnessMangledName");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTypeConformanceWitnessSequentialID(
@@ -172,7 +172,7 @@ public:
     createCompileRequest(SlangCompileRequest** outCompileRequest) override
     {
         SLANG_UNUSED(outCompileRequest);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::createCompileRequest");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::createCompileRequest");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createTypeConformanceComponentType(
@@ -187,7 +187,7 @@ public:
         SLANG_UNUSED(outConformance);
         SLANG_UNUSED(conformanceIdOverride);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::createTypeConformanceComponentType");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::createTypeConformanceComponentType");
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromIRBlob(
@@ -200,18 +200,18 @@ public:
         SLANG_UNUSED(path);
         SLANG_UNUSED(source);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::loadModuleFromIRBlob");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleFromIRBlob");
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override
     {
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getLoadedModuleCount");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getLoadedModuleCount");
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override
     {
         SLANG_UNUSED(index);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getLoadedModule");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getLoadedModule");
     }
 
     virtual SLANG_NO_THROW bool SLANG_MCALL
@@ -219,7 +219,7 @@ public:
     {
         SLANG_UNUSED(modulePath);
         SLANG_UNUSED(binaryModuleBlob);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::isBinaryModuleUpToDate");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::isBinaryModuleUpToDate");
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSourceString(
@@ -253,7 +253,7 @@ public:
         SLANG_UNUSED(interfaceType);
         SLANG_UNUSED(outRTTIDataBuffer);
         SLANG_UNUSED(bufferSizeInBytes);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::getDynamicObjectRTTIBytes");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::getDynamicObjectRTTIBytes");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadModuleInfoFromIRBlob(
@@ -266,7 +266,7 @@ public:
         SLANG_UNUSED(outModuleVersion);
         SLANG_UNUSED(outModuleCompilerVersion);
         SLANG_UNUSED(outModuleName);
-        SLANG_UNIMPLEMENTED_X("SessionProxy::loadModuleInfoFromIRBlob");
+        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleInfoFromIRBlob");
     }
 };
 

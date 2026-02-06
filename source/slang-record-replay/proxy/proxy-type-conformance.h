@@ -31,7 +31,7 @@ public:
     // IComponentType
     virtual SLANG_NO_THROW slang::ISession* SLANG_MCALL getSession() override
     {
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getSession");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getSession");
     }
 
     virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
@@ -39,12 +39,12 @@ public:
     {
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getLayout");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getLayout");
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
     {
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getSpecializationParamCount");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getSpecializationParamCount");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
@@ -57,7 +57,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outCode);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointCode");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointCode");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
@@ -68,7 +68,7 @@ public:
         SLANG_UNUSED(entryPointIndex);
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outFileSystem);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getResultAsFileSystem");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getResultAsFileSystem");
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -77,7 +77,7 @@ public:
         SLANG_UNUSED(entryPointIndex);
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outHash);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointHash");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointHash");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL specialize(
@@ -90,7 +90,7 @@ public:
         SLANG_UNUSED(specializationArgCount);
         SLANG_UNUSED(outSpecializedComponentType);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::specialize");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::specialize");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -98,7 +98,7 @@ public:
     {
         SLANG_UNUSED(outLinkedComponentType);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::link");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::link");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
@@ -111,7 +111,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outSharedLibrary);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointHostCallable");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointHostCallable");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -119,7 +119,7 @@ public:
     {
         SLANG_UNUSED(newName);
         SLANG_UNUSED(outEntryPoint);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::renameEntryPoint");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::renameEntryPoint");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
@@ -132,7 +132,7 @@ public:
         SLANG_UNUSED(compilerOptionEntryCount);
         SLANG_UNUSED(compilerOptionEntries);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::linkWithOptions");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::linkWithOptions");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -141,7 +141,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outCode);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetCode");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetCode");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
@@ -152,7 +152,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outMetadata);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetMetadata");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetMetadata");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
@@ -165,7 +165,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outMetadata);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointMetadata");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointMetadata");
     }
 
     // ITypeConformance has no additional methods
@@ -179,7 +179,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outCompileResult);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetCompileResult");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetCompileResult");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCompileResult(
@@ -192,7 +192,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outCompileResult);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointCompileResult");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getEntryPointCompileResult");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
@@ -203,7 +203,7 @@ public:
         SLANG_UNUSED(targetIndex);
         SLANG_UNUSED(outSharedLibrary);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetHostCallable");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getTargetHostCallable");
     }
 
     // IModulePrecompileService_Experimental
@@ -212,7 +212,7 @@ public:
     {
         SLANG_UNUSED(target);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::precompileForTarget");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::precompileForTarget");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getPrecompiledTargetCode(
@@ -223,12 +223,12 @@ public:
         SLANG_UNUSED(target);
         SLANG_UNUSED(outCode);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getPrecompiledTargetCode");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getPrecompiledTargetCode");
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getModuleDependencyCount() override
     {
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getModuleDependencyCount");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getModuleDependencyCount");
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getModuleDependency(
@@ -239,7 +239,7 @@ public:
         SLANG_UNUSED(dependencyIndex);
         SLANG_UNUSED(outModule);
         SLANG_UNUSED(outDiagnostics);
-        SLANG_UNIMPLEMENTED_X("TypeConformanceProxy::getModuleDependency");
+        REPLAY_UNIMPLEMENTED_X("TypeConformanceProxy::getModuleDependency");
     }
 };
 

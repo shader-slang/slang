@@ -90,5 +90,18 @@ protected:
 SLANG_API ISlangUnknown* wrapObject(ISlangUnknown* obj);
 SLANG_API ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
 
-
 } // namespace SlangRecord
+
+/// Macro to mark unimplemented methods in proxy classes.
+/// Records "UNIMPLEMENTED: <message>" to the replay stream, then calls SLANG_UNIMPLEMENTED_X.
+#define REPLAY_UNIMPLEMENTED_X(message) \
+    do { \
+        auto& ctx = SlangRecord::ReplayContext::get(); \
+        if (ctx.isActive()) \
+        { \
+            const char* unimplementedMsg = "UNIMPLEMENTED: " message; \
+            ctx.record(SlangRecord::RecordFlag::None, unimplementedMsg); \
+        } \
+        SLANG_UNIMPLEMENTED_X(message); \
+    } while (0)
+
