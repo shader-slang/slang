@@ -30,29 +30,28 @@ runs:
     - name: Setup gcloud SDK
       uses: google-github-actions/setup-gcloud@v2
 
-    - name: Install zstd
+    - name: Install zstd and libzstd
       shell: bash
       run: |
-        if ! command -v zstd &> /dev/null; then
-          case "${{ inputs.os }}" in
-            linux)
-              # Try with sudo if available, otherwise install directly (for containers as root)
-              if command -v sudo &> /dev/null; then
-                sudo apt-get update
-                sudo apt-get install -y zstd
-              else
-                apt-get update
-                apt-get install -y zstd
-              fi
-              ;;
-            macos)
-              brew install zstd
-              ;;
-            windows)
-              choco install zstandard -y
-              ;;
-          esac
-        fi
+        case "${{ inputs.os }}" in
+          linux)
+            # Install both zstd tool and library
+            # Try with sudo if available, otherwise install directly (for containers as root)
+            if command -v sudo &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y zstd libzstd-dev
+            else
+              apt-get update
+              apt-get install -y zstd libzstd-dev
+            fi
+            ;;
+          macos)
+            brew install zstd
+            ;;
+          windows)
+            choco install zstandard -y
+            ;;
+        esac
         zstd --version
 
     - name: Download LLVM from GCS
