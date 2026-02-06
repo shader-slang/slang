@@ -54,6 +54,10 @@ runs:
 
           echo "📊 LLVM installation size:"
           du -sh build/llvm-project-install
+
+          # Set environment variables for CMake
+          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
         else
           echo "⚠️  LLVM prebuilt not found in GCS"
           echo "cache-hit=false" >> $GITHUB_OUTPUT
@@ -76,6 +80,10 @@ runs:
           --repo "${REPO_URL}"
 
         echo "✅ LLVM build complete"
+
+        # Set environment variables for CMake
+        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Upload LLVM to GCS
       if: steps.download.outputs.cache-hit != 'true'
