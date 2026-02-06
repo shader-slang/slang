@@ -282,11 +282,32 @@ public:
         slang::SessionDesc* outSessionDesc,
         ISlangUnknown** outAuxAllocation) override
     {
-        SLANG_UNUSED(argc);
-        SLANG_UNUSED(argv);
-        SLANG_UNUSED(outSessionDesc);
-        SLANG_UNUSED(outAuxAllocation);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::parseCommandLineArguments");
+        RECORD_CALL();
+        RECORD_INPUT(argc);
+        // Record argv as an array of strings
+        for (int i = 0; i < argc; i++)
+        {
+            RECORD_INPUT(argv[i]);
+        }
+        
+        SlangResult result = SLANG_OK;
+        
+        // Only call the actual API when recording - during playback we reconstruct from stream
+        if (ReplayContext::get().isWriting())
+        {
+            result = getActual<slang::IGlobalSession>()->parseCommandLineArguments(
+                argc, argv, outSessionDesc, outAuxAllocation);
+        }
+        
+        // Record the output SessionDesc (contains the parsed options)
+        // During playback this will be reconstructed from the stream
+        _ctx.record(RecordFlag::Output, *outSessionDesc);
+        
+        // Note: outAuxAllocation is only needed to keep memory alive during recording.
+        // During playback, the SessionDesc pointers will point to arena-allocated data.
+        // We don't need to wrap or record it.
+        
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

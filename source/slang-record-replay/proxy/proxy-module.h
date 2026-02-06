@@ -52,7 +52,9 @@ public:
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getSpecializationParamCount");
+        RECORD_CALL();
+        SlangInt result = getActual<slang::IModule>()->getSpecializationParamCount();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
