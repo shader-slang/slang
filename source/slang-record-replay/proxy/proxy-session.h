@@ -9,7 +9,7 @@ namespace SlangRecord
 
 class SessionProxy : public ProxyBase<slang::ISession>
 {
-public:
+public:    
     SLANG_COM_INTERFACE(
         0xa2b14d90,
         0x7e8f,

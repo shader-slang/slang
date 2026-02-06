@@ -78,6 +78,20 @@ private:
     uint64_t m_handle;
 };
 
+/// Exception thrown when a handle is not found during playback.
+class UnresolvedTypeException : public Slang::Exception
+{
+public:
+    UnresolvedTypeException(slang::TypeReflection* type)
+        : Slang::Exception(String("Handle not found: ") + String(type->getName()))
+        , m_type(type)
+    {
+    }
+    slang::TypeReflection* getType() const { return m_type; }
+private:
+    slang::TypeReflection* m_type;
+};
+
 /// Operating mode for the replay system.
 enum class Mode : uint8_t
 {

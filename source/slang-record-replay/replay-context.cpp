@@ -1,4 +1,5 @@
 #include "replay-context.h"
+#include "proxy/proxy-module.h"
 
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
@@ -1133,6 +1134,15 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
     if (m_mode == Mode::Idle)
         return;
 
+    // iterate over registered ModuleProxy objects and ensure they have all registered their core modules
+    //for(auto& kv : m_implToProxy) 
+    //{
+    //    if(ModuleProxy* proxy = dynamic_cast<ModuleProxy*>(kv.second)) 
+    //    {
+    //        proxy->tryRegisterCoreModule();
+    //    }
+    //}
+
     if (isWriting())
     {
         recordTypeId(TypeId::TypeReflectionRef);
@@ -1189,7 +1199,28 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
                         }
                     }
                 }
+                if(dynamic_cast<slang::IComponentType*>(kv.second)) 
+                {
+                    ISlangUnknown* impl = kv.first;
+                    slang::IComponentType* componentTypeInterface = dynamic_cast<slang::IComponentType*>(impl);
+                    if(componentTypeInterface) 
+                    {
+                        auto layout = componentTypeInterface->getLayout(0, nullptr);
+                        if (layout && layout->findTypeByName(typeName) == type)
+                        {
+                            auto proxy = getProxy(componentTypeInterface);
+                            moduleHandle = getHandleForInterface(proxy);
+                            break;
+                        }
+                    }
+                }                
             }
+        }
+
+        if(!moduleHandle) 
+        {
+            // If we still don't have a module handle, we can't record this type reference
+            throw UnresolvedTypeException(type);
         }
 
         // Record the module handle and type name
@@ -1223,10 +1254,10 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             moduleUnknown = impl;
 
         // Query for IModule interface properly (handles multiple inheritance)
-        Slang::ComPtr<slang::IModule> moduleInterface;
+        Slang::ComPtr<slang::IComponentType> moduleInterface;
         if (moduleUnknown)
         {
-            moduleUnknown->queryInterface(slang::IModule::getTypeGuid(), (void**)moduleInterface.writeRef());
+            moduleUnknown->queryInterface(slang::IComponentType::getTypeGuid(), (void**)moduleInterface.writeRef());
         }
 
         // Get the type via the module's layout
@@ -1240,11 +1271,13 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             else
             {
                 type = nullptr;
+                throw UnresolvedTypeException(type);
             }
         }
         else
         {
             type = nullptr;
+            throw UnresolvedTypeException(type);
         }
     }
 }

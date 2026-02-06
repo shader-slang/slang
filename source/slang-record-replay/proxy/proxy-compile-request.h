@@ -44,7 +44,8 @@ public:
 
     virtual SLANG_NO_THROW SlangCompileFlags SLANG_MCALL getCompileFlags() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getCompileFlags");
+        RECORD_CALL();
+        return getActual<slang::ICompileRequest>()->getCompileFlags();
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDumpIntermediates(int enable) override
@@ -480,7 +481,8 @@ public:
 
     virtual SLANG_NO_THROW SlangReflection* SLANG_MCALL getReflection() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getReflection");
+        RECORD_CALL();
+        return getActual<slang::ICompileRequest>()->getReflection();
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() override

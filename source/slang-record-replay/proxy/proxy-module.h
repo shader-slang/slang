@@ -6,6 +6,8 @@
 
 #include "slang-com-helper.h"
 #include "slang.h"
+#include "../slang/slang-ast-type.h"
+#include "../slang/slang-compiler-api.h"
 
 namespace SlangRecord
 {
@@ -14,6 +16,9 @@ using namespace Slang;
 class ModuleProxy : public ProxyBase<slang::IModule, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
 {
 public:
+
+    bool m_hasRegisteredCoreModule;
+
     SLANG_COM_INTERFACE(
         0xc4d36fb2,
         0x9fb1,
@@ -22,7 +27,22 @@ public:
 
     explicit ModuleProxy(slang::IModule* actual)
         : ProxyBase(actual)
+        , m_hasRegisteredCoreModule(false)
     {
+    }
+
+    void tryRegisterCoreModule()
+    {
+        if(m_hasRegisteredCoreModule)
+            return;
+        auto layout = getActual<slang::IModule>()->getLayout(0, nullptr);
+        if(layout) {
+            slang::TypeReflection* coreType = layout->findTypeByName("int");
+            Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(coreType));
+            IModule* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
+            wrapObject(owningModule);
+            m_hasRegisteredCoreModule = true;
+        }
     }
 
     // Record addRef/release for lifetime tracking during replay
