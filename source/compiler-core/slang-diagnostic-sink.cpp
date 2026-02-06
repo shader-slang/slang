@@ -642,7 +642,7 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
         message = renderDiagnostic(
             getSourceLocationLexer(),
             getSourceManager(),
-            {.enableTerminalColors = false, .enableUnicode = false},
+            {.enableTerminalColors = true, .enableUnicode = true},
             diagnostic);
     }
 
