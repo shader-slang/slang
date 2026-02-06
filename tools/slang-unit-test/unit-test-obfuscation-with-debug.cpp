@@ -406,7 +406,8 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
 
     // Create global session
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     // Common options
     slang::TargetDesc targetDesc = {};
@@ -445,11 +446,11 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
     sessionDesc1.compilerOptionEntryCount = sizeof(module_options) / sizeof(module_options[0]);
 
     ComPtr<slang::ISession> session1;
-    SLANG_CHECK(globalSession->createSession(sessionDesc1, session1.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(globalSession->createSession(sessionDesc1, session1.writeRef()) == SLANG_OK);
 
     // Compile and serialize library modules
     ComPtr<ISlangBlob> lib1Blob, lib2Blob;
-    SLANG_CHECK(compileLibraryModules(session1, lib1Blob, lib2Blob) == SLANG_OK);
+    SLANG_CHECK_ABORT(compileLibraryModules(session1, lib1Blob, lib2Blob) == SLANG_OK);
 
     // ====================================================================
     // Step 2: Generate SPIR-V with separate debug
@@ -468,18 +469,20 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
         sizeof(optionsWithSepDebug) / sizeof(optionsWithSepDebug[0]);
 
     ComPtr<slang::ISession> finalSession1;
-    SLANG_CHECK(globalSession->createSession(sessionDesc1, finalSession1.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        globalSession->createSession(sessionDesc1, finalSession1.writeRef()) == SLANG_OK);
 
     // Compile final shader
     ComPtr<slang::IComponentType> linkedProgram1;
-    SLANG_CHECK(compileFinalShader(finalSession1, lib1Blob, lib2Blob, linkedProgram1) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        compileFinalShader(finalSession1, lib1Blob, lib2Blob, linkedProgram1) == SLANG_OK);
 
     // Query for IComponentType2 interface
     ComPtr<slang::IComponentType2> linkedProgram1_v2;
     SlangResult queryResult =
         linkedProgram1->queryInterface(SLANG_IID_PPV_ARGS(linkedProgram1_v2.writeRef()));
-    SLANG_CHECK(queryResult == SLANG_OK);
-    SLANG_CHECK(linkedProgram1_v2 != nullptr);
+    SLANG_CHECK_ABORT(queryResult == SLANG_OK);
+    SLANG_CHECK_ABORT(linkedProgram1_v2 != nullptr);
     LOG("  IComponentType2 interface obtained successfully\n");
 
     // Get compile result with separate debug
@@ -498,7 +501,7 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
             (const char*)compileResultDiagnostics->getBufferPointer());
     }
 
-    SLANG_CHECK(compileStatus == SLANG_OK);
+    SLANG_CHECK_ABORT(compileStatus == SLANG_OK);
 
     if (!compileResult)
     {
@@ -507,28 +510,28 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
             "This likely means EmitSeparateDebug is not properly enabled or supported for this "
             "target.\n");
     }
-    SLANG_CHECK(compileResult != nullptr);
+    SLANG_CHECK_ABORT(compileResult != nullptr);
 
     LOG("  ICompileResult obtained successfully\n");
 
     // Verify we got exactly 2 items (stripped + debug)
     int itemCount = compileResult->getItemCount();
     LOG("  Item count: %d\n", itemCount);
-    SLANG_CHECK(itemCount == 2);
+    SLANG_CHECK_ABORT(itemCount == 2);
 
     // Extract the two SPIR-V outputs
     ComPtr<slang::IBlob> spirvStripped, spirvDebug;
-    SLANG_CHECK(compileResult->getItemData(0, spirvStripped.writeRef()) == SLANG_OK);
-    SLANG_CHECK(compileResult->getItemData(1, spirvDebug.writeRef()) == SLANG_OK);
-    SLANG_CHECK(spirvStripped != nullptr);
-    SLANG_CHECK(spirvDebug != nullptr);
+    SLANG_CHECK_ABORT(compileResult->getItemData(0, spirvStripped.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(compileResult->getItemData(1, spirvDebug.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(spirvStripped != nullptr);
+    SLANG_CHECK_ABORT(spirvDebug != nullptr);
 
     // Extract metadata and Debug Build Identifier
     ComPtr<slang::IMetadata> metadata;
-    SLANG_CHECK(compileResult->getMetadata(metadata.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(compileResult->getMetadata(metadata.writeRef()) == SLANG_OK);
 
     const char* debugBuildIdentifier = metadata->getDebugBuildIdentifier();
-    SLANG_CHECK(debugBuildIdentifier != nullptr);
+    SLANG_CHECK_ABORT(debugBuildIdentifier != nullptr);
 
     LOG("  Main SPIR-V (stripped): %zu bytes\n", spirvStripped->getBufferSize());
     LOG("  Debug SPIR-V (full): %zu bytes\n", spirvDebug->getBufferSize());
@@ -539,7 +542,7 @@ SLANG_UNIT_TEST(obfuscationWithSeparateDebug)
     // Step 3: Verification
     // ====================================================================
     LOG("=== Step 3: Verification ===\n");
-    SLANG_CHECK(
+    SLANG_CHECK_ABORT(
         verifySeparateDebugOutput(spirvStripped, spirvDebug, debugBuildIdentifier) == SLANG_OK);
 
 #ifdef ENABLE_DUMP_FILES
