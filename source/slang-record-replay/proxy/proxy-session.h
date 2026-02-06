@@ -197,11 +197,17 @@ public:
         slang::IBlob* source,
         slang::IBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(moduleName);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(source);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleFromIRBlob");
+        RECORD_CALL();
+        RECORD_INPUT(moduleName);
+        RECORD_INPUT(path);
+        RECORD_INPUT(source);
+        
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+        
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
+        
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override

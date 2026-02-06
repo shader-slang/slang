@@ -225,15 +225,23 @@ public:
 
     virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDefinedEntryPointCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getDefinedEntryPointCount");
+        RECORD_CALL();
+        auto result = getActual<slang::IModule>()->getDefinedEntryPointCount();
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getDefinedEntryPoint(SlangInt32 index, slang::IEntryPoint** outEntryPoint) override
     {
-        SLANG_UNUSED(index);
-        SLANG_UNUSED(outEntryPoint);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getDefinedEntryPoint");
+        RECORD_CALL();
+        RECORD_INPUT(index);
+        PREPARE_POINTER_OUTPUT(outEntryPoint);
+        
+        SlangResult result = getActual<slang::IModule>()->getDefinedEntryPoint(index, outEntryPoint);
+        
+        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) override
