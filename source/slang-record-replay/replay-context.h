@@ -413,6 +413,7 @@ public:
     SLANG_API void record(RecordFlag flags, SlangDebugInfoLevel& value);
     SLANG_API void record(RecordFlag flags, SlangDebugInfoFormat& value);
     SLANG_API void record(RecordFlag flags, SlangOptimizationLevel& value);
+    SLANG_API void record(RecordFlag flags, SlangPathType& value);
     SLANG_API void record(RecordFlag flags, SlangEmitSpirvMethod& value);
     SLANG_API void record(RecordFlag flags, slang::LayoutRules& value);
     SLANG_API void record(RecordFlag flags, slang::CompilerOptionName& value);

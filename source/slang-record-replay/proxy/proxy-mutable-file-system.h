@@ -90,27 +90,16 @@ public:
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getFileUniqueIdentity(path, outUniqueIdentity);
-            if (SLANG_SUCCEEDED(result) && *outUniqueIdentity)
-            {
-                const void* ptr = (*outUniqueIdentity)->getBufferPointer();
-                size_t size = (*outUniqueIdentity)->getBufferSize();
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-            }
-            else
-            {
-                const void* ptr = nullptr;
-                size_t size = 0;
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-            }
         }
 
-        ReplayContext::get().record(RecordFlag::None, result);
+        RECORD_INFO(result);
+
+        const void* ptr = (*outUniqueIdentity) ? (*outUniqueIdentity)->getBufferPointer() : nullptr;
+        size_t size = (*outUniqueIdentity) ? (*outUniqueIdentity)->getBufferSize() : 0;
+        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
 
         if (ReplayContext::get().isReading())
         {
-            const void* ptr = nullptr;
-            size_t size = 0;
-            ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
             if (size > 0)
             {
                 auto blob = Slang::UnownedRawBlob::create(ptr, size);
@@ -135,8 +124,7 @@ public:
             return SLANG_E_NOT_IMPLEMENTED;
 
         RECORD_CALL();
-        uint32_t fromPathTypeVal = static_cast<uint32_t>(fromPathType);
-        _ctx.record(RecordFlag::Input, fromPathTypeVal);
+        RECORD_INPUT(fromPathType);
         RECORD_INPUT(fromPath);
         RECORD_INPUT(path);
 
@@ -145,26 +133,23 @@ public:
             pathOut = &pathPtr;
         
         SlangResult result;
-        if(ReplayContext::get().isWriting()) {        
+        if(ReplayContext::get().isWriting()) 
+        {        
             result = m_fileSystemExt->calcCombinedPath(fromPathType, fromPath, path, pathOut);
-            if (result == SLANG_OK) {
-                const void* ptr = (*pathOut)->getBufferPointer();
-                size_t size = (*pathOut)->getBufferSize();
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-            }
         }
 
-        ReplayContext::get().record(RecordFlag::None, result);
+        RECORD_INFO(result);
 
-        if(ReplayContext::get().isReading()) {
-            if(result == SLANG_OK) {
-                const void* ptr = nullptr;
-                size_t size = 0;
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-                auto blob = Slang::UnownedRawBlob::create(ptr, size);
-                *pathOut = blob.detach();
-            }
+        const void* ptr = (*pathOut) ? (*pathOut)->getBufferPointer() : nullptr;
+        size_t size = (*pathOut) ? (*pathOut)->getBufferSize() : 0;
+        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);                
+
+        if(ReplayContext::get().isReading() && ptr) 
+        {         
+            auto blob = Slang::UnownedRawBlob::create(ptr, size);
+            *pathOut = blob.detach();
         }
+
         RECORD_COM_OUTPUT(pathOut);
         RECORD_RETURN(result);
     }
@@ -183,20 +168,14 @@ public:
             pathTypeOut = &pathType;
 
         SlangResult result;
-        uint32_t pathTypeVal;
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getPathType(path, pathTypeOut);
-            pathTypeVal = static_cast<uint32_t>(*pathTypeOut);
         }
 
-        _ctx.record(RecordFlag::None, pathTypeVal);
-        _ctx.record(RecordFlag::None, result);
+        RECORD_INFO(*pathTypeOut);
+        RECORD_INFO(result);
 
-        if (ReplayContext::get().isReading())
-        {
-            *pathTypeOut = static_cast<SlangPathType>(pathTypeVal);
-        }
         return result;
     }
 
@@ -219,27 +198,16 @@ public:
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getPath(kind, path, outPath);
-            if (SLANG_SUCCEEDED(result) && *outPath)
-            {
-                const void* ptr = (*outPath)->getBufferPointer();
-                size_t size = (*outPath)->getBufferSize();
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-            }
-            else
-            {
-                const void* ptr = nullptr;
-                size_t size = 0;
-                ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
-            }
         }
 
-        ReplayContext::get().record(RecordFlag::None, result);
+        RECORD_INFO(result);
+
+        const void* ptr = (*outPath) ? (*outPath)->getBufferPointer() : nullptr;
+        size_t size = (*outPath) ? (*outPath)->getBufferSize() : 0;
+        ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
 
         if (ReplayContext::get().isReading())
         {
-            const void* ptr = nullptr;
-            size_t size = 0;
-            ReplayContext::get().recordBlob(RecordFlag::None, ptr, size);
             if (size > 0)
             {
                 auto blob = Slang::UnownedRawBlob::create(ptr, size);
@@ -264,8 +232,6 @@ public:
         {
             m_fileSystemExt->clearCache();
         }
-        // No output to record for void method
-        RECORD_RETURN_VOID();
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
@@ -292,7 +258,7 @@ public:
             auto result = m_fileSystemExt->getOSPathKind();
             resultVal = static_cast<uint8_t>(result);
         }
-        _ctx.record(RecordFlag::None, resultVal);
+        RECORD_INFO(resultVal);
         return static_cast<OSPathKind>(resultVal);
     }
 
@@ -305,16 +271,13 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        const void* dataPtr = data;
-        size_t dataSize = size;
-        _ctx.recordBlob(RecordFlag::Input, dataPtr, dataSize);
 
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_mutableFileSystem->saveFile(path, data, size);
         }
-        _ctx.record(RecordFlag::None, result);
+        RECORD_INFO(result);
         return result;
     }
 
@@ -326,14 +289,13 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-        RECORD_INPUT(dataBlob);
 
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_mutableFileSystem->saveFileBlob(path, dataBlob);
         }
-        _ctx.record(RecordFlag::None, result);
+        RECORD_INFO(result);
         return result;
     }
 
@@ -350,7 +312,7 @@ public:
         {
             result = m_mutableFileSystem->remove(path);
         }
-        _ctx.record(RecordFlag::None, result);
+        RECORD_INFO(result);
         return result;
     }
 
@@ -367,7 +329,7 @@ public:
         {
             result = m_mutableFileSystem->createDirectory(path);
         }
-        _ctx.record(RecordFlag::None, result);
+        RECORD_INFO(result);
         return result;
     }
 

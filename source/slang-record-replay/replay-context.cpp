@@ -952,6 +952,7 @@ void ReplayContext::record(RecordFlag flags, SlangStage& value)                 
 void ReplayContext::record(RecordFlag flags, SlangDebugInfoLevel& value)        { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangDebugInfoFormat& value)       { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangOptimizationLevel& value)     { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangPathType& value)              { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, SlangEmitSpirvMethod& value)       { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, slang::LayoutRules& value)       { recordEnum(flags, value); }
 void ReplayContext::record(RecordFlag flags, slang::CompilerOptionName& value)  { recordEnum(flags, value); }

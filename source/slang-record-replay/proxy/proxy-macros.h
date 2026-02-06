@@ -44,6 +44,14 @@ namespace SlangRecord {
 #define RECORD_INPUT(arg) \
     _ctx.record(RecordFlag::Input, const_cast<std::remove_const_t<std::remove_reference_t<decltype(arg)>>&>(arg))
 
+// Record informational data (neither input nor output, just for stream documentation)
+#define RECORD_INFO(arg) \
+    _ctx.record(RecordFlag::None, const_cast<std::remove_const_t<std::remove_reference_t<decltype(arg)>>&>(arg))
+
+// Record an output parameter (for non-COM T* outputs, no wrapping)
+#define RECORD_OUTPUT(arg) \
+    _ctx.record(RecordFlag::Output, *arg)
+
 // Record an output parameter (for T** style outputs, dereferences and wraps)
 #define RECORD_COM_OUTPUT(arg) \
     if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(static_cast<ISlangUnknown*>(*arg)); \
