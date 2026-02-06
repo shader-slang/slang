@@ -82,9 +82,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(path);
 
-        ISlangBlob* identityPtr = nullptr;
-        if (!outUniqueIdentity)
-            outUniqueIdentity = &identityPtr;
+        PREPARE_POINTER_OUTPUT(outUniqueIdentity);
 
         SlangResult result;
         if (ReplayContext::get().isWriting())
@@ -128,9 +126,7 @@ public:
         RECORD_INPUT(fromPath);
         RECORD_INPUT(path);
 
-        ISlangBlob* pathPtr = nullptr;
-        if (!pathOut)
-            pathOut = &pathPtr;
+        PREPARE_POINTER_OUTPUT(pathOut);
         
         SlangResult result;
         if(ReplayContext::get().isWriting()) 
@@ -163,9 +159,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(path);
 
-        SlangPathType pathType = SLANG_PATH_TYPE_FILE;
-        if (!pathTypeOut)
-            pathTypeOut = &pathType;
+        PREPARE_POINTER_OUTPUT(pathTypeOut);
 
         SlangResult result;
         if (ReplayContext::get().isWriting())
@@ -190,9 +184,7 @@ public:
         _ctx.record(RecordFlag::Input, kindVal);
         RECORD_INPUT(path);
 
-        ISlangBlob* pathPtr = nullptr;
-        if (!outPath)
-            outPath = &pathPtr;
+        PREPARE_POINTER_OUTPUT(outPath);
 
         SlangResult result;
         if (ReplayContext::get().isWriting())
@@ -252,14 +244,13 @@ public:
             return OSPathKind::None;
 
         RECORD_CALL();
-        uint8_t resultVal;
+        OSPathKind result;
         if (ReplayContext::get().isWriting())
         {
-            auto result = m_fileSystemExt->getOSPathKind();
-            resultVal = static_cast<uint8_t>(result);
+            result = m_fileSystemExt->getOSPathKind();
         }
-        RECORD_INFO(resultVal);
-        return static_cast<OSPathKind>(resultVal);
+        RECORD_INFO(result);
+        return result;
     }
 
     // ISlangMutableFileSystem

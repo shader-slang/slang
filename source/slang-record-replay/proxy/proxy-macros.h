@@ -52,6 +52,14 @@ namespace SlangRecord {
 #define RECORD_OUTPUT(arg) \
     _ctx.record(RecordFlag::Output, *arg)
 
+// Prepare a pointer output parameter (T** style)
+// Creates a temporary local variable if the pointer is null
+// Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**
+//        or PREPARE_POINTER_OUTPUT(pathTypeOut) where pathTypeOut is SlangPathType*
+#define PREPARE_POINTER_OUTPUT(arg) \
+    std::decay_t<decltype(*arg)> _temp_##arg{}; \
+    if (!arg) arg = &_temp_##arg
+
 // Record an output parameter (for T** style outputs, dereferences and wraps)
 #define RECORD_COM_OUTPUT(arg) \
     if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(static_cast<ISlangUnknown*>(*arg)); \
