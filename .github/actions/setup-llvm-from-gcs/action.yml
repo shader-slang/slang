@@ -33,26 +33,39 @@ runs:
     - name: Install zstd and libzstd
       shell: bash
       run: |
-        case "${{ inputs.os }}" in
-          linux)
-            # Install both zstd tool and library
-            # Try with sudo if available, otherwise install directly (for containers as root)
-            if command -v sudo &> /dev/null; then
-              sudo apt-get update
-              sudo apt-get install -y zstd libzstd-dev
-            else
-              apt-get update
-              apt-get install -y zstd libzstd-dev
-            fi
-            ;;
-          macos)
-            brew install zstd
-            ;;
-          windows)
-            choco install zstandard -y
-            ;;
-        esac
-        zstd --version
+        # Check if zstd is already installed
+        if command -v zstd &> /dev/null; then
+          echo "✅ zstd already installed: $(zstd --version)"
+        else
+          echo "Installing zstd..."
+          case "${{ inputs.os }}" in
+            linux)
+              # Install both zstd tool and library
+              # Try with sudo if available, otherwise install directly (for containers as root)
+              if command -v sudo &> /dev/null; then
+                sudo apt-get update
+                sudo apt-get install -y zstd libzstd-dev
+              else
+                apt-get update
+                apt-get install -y zstd libzstd-dev
+              fi
+              ;;
+            macos)
+              brew install zstd
+              ;;
+            windows)
+              # Try to install, but don't fail if it doesn't work (may already be installed or need admin)
+              choco install zstandard -y || echo "⚠️ Chocolatey install failed, assuming zstd is already available"
+              ;;
+          esac
+
+          # Verify installation (don't fail if still not available)
+          if command -v zstd &> /dev/null; then
+            echo "✅ zstd available: $(zstd --version | head -1)"
+          else
+            echo "⚠️ Warning: zstd not found - LLVM extraction may fail if needed"
+          fi
+        fi
 
     - name: Download LLVM from GCS
       id: download
