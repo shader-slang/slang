@@ -58,15 +58,9 @@ runs:
         echo "SCCACHE_CACHE_ZSTD_LEVEL=3" >> $GITHUB_ENV
         echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
-        echo "SCCACHE_START_TIMEOUT=600" >> $GITHUB_ENV
 
         # Get sccache path for CMake
         sccache_path=$(which sccache)
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
 
-        echo "🔧 Testing sccache configuration..."
-        echo "SCCACHE_LOG=debug" >> $GITHUB_ENV
-
-        # Test sccache with verbose logging
-        echo "Attempting to start sccache server..."
-        SCCACHE_LOG=debug sccache --show-stats || echo "⚠️ sccache stats failed, but will continue"
+        echo "🔧 sccache configured for GCS bucket: ${{ inputs.gcs-bucket }}"
