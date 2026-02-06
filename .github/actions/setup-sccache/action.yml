@@ -60,15 +60,13 @@ runs:
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
         echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
 
+        # Set base directory to normalize paths across different environments
+        # This makes cache keys consistent between container and non-container builds
+        echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
+
         # Get sccache path for CMake
         sccache_path=$(which sccache)
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
 
         echo "🔧 sccache configured for GCS bucket: ${{ inputs.gcs-bucket }}"
-
-        # Show environment info for debugging
-        echo "📍 Environment:"
-        echo "  HOME: $HOME"
-        echo "  PWD: $PWD"
-        echo "  SCCACHE_DIR: $HOME/.cache/sccache"
-        echo "  GCS bucket: ${{ inputs.gcs-bucket }}"
+        echo "📍 Base dir set to: $PWD (for path normalization)"
