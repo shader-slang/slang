@@ -78,19 +78,6 @@ jobs:
           echo "📊 sccache statistics (post-build):"
           sccache --show-stats
 
-          echo ""
-          echo "🔍 sccache diagnostic info:"
-          echo "Server info:"
-          sccache --dist-status 2>/dev/null || echo "  (dist not enabled)"
-
-          echo ""
-          echo "GCS bucket check:"
-          gsutil ls gs://slang-ci-cache/ 2>/dev/null | head -5 || echo "  (cannot list bucket)"
-
-          echo ""
-          echo "Recent cache objects (if any):"
-          find $HOME/.cache/sccache -type f -mmin -30 2>/dev/null | head -10 || echo "  (no recent local cache)"
-
           echo "Build complete. Checking CUDA support in render-test-tool:"
           if ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null | grep -q cuda; then
             echo "✅ render-test-tool has CUDA support!"

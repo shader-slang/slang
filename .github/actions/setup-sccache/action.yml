@@ -69,4 +69,3 @@ runs:
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
 
         echo "🔧 sccache configured for GCS bucket: ${{ inputs.gcs-bucket }}"
-        echo "📍 Base dir set to: $PWD (for path normalization)"
