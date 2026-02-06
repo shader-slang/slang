@@ -4,6 +4,7 @@
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "../replay-context.h"
+#include "../replay-shared.h"
 
 namespace SlangRecord
 {
@@ -27,16 +28,13 @@ public:
 
     virtual ~ProxyBase()
     {
-        // The proxy is being destroyed - unregister it from the context
-        ReplayContext::get().unregisterProxy(this);
-    }
-
-    /// Get the canonical ISlangUnknown* identity for this proxy.
-    /// Always casts through TFirstInterface to ensure a consistent pointer
-    /// value regardless of which base class 'this' is currently typed as.
-    ISlangUnknown* toSlangUnknown()
-    {
-        return static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this));
+        // The proxy is being destroyed - unregister it from the context.
+        // We can't use the free-function toSlangUnknown() here because it does
+        // queryInterface → addRef → release, and during destruction the ref count
+        // is already 0 (release would trigger re-destruction).
+        // The static_cast chain is safe here because we know the concrete type.
+        ISlangUnknown* identity = static_cast<ISlangUnknown*>(static_cast<TFirstInterface*>(this));
+        ReplayContext::get().unregisterProxy(identity);
     }
 
     // ISlangUnknown implementation - these are virtual so derived classes can override

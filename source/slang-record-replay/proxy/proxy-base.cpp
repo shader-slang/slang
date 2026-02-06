@@ -13,6 +13,7 @@
 #include "proxy-shared-library.h"
 #include "proxy-type-conformance.h"
 #include "../replay-context.h"
+#include "../replay-shared.h"
 
 namespace SlangRecord
 {
@@ -28,15 +29,15 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         // Use addRefImpl to avoid recording this internal reference
         proxy->addRefImpl();
         
-        // Register the proxy with the ReplayContext so it can be tracked as a handle
+        // Register the proxy with the ReplayContext so it can be tracked as a handle.
+        // Use the free-function toSlangUnknown for canonical identity.
         auto& ctx = ReplayContext::get();
         if (ctx.isActive())
         {
-            ISlangUnknown* proxyUnknown = proxy->toSlangUnknown();
-            ctx.registerProxy(proxyUnknown, queried.get());
+            ctx.registerProxy(proxy, queried.get());
         }
         
-        return proxy->toSlangUnknown();
+        return toSlangUnknown(proxy);
     }
     return nullptr;
 }
@@ -46,8 +47,7 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
     if (auto* wrapped = tryWrap<InterfaceType, ProxyType>(obj)) \
         return wrapped;
 
-template<typename ImplT>
-ISlangUnknown* wrapObject(ImplT* obj)
+ISlangUnknown* wrapObject(ISlangUnknown* obj)
 {
     if(!ReplayContext::get().isActive())
         return obj;
@@ -57,11 +57,9 @@ ISlangUnknown* wrapObject(ImplT* obj)
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
     if(auto existing = ReplayContext::get().getProxy(obj)) {
-        // Cross-cast to RefObject to call addReference() directly, bypassing
-        // the virtual addRef() which would record the call for replay.
-        // We can't use static_cast because ISlangUnknown and RefObject are in
-        // different inheritance branches of ProxyBase.
-        dynamic_cast<RefObject*>(existing)->addReference();
+        // Use suppression so the addRef isn't recorded in the replay stream
+        SuppressRefCountRecording guard;
+        existing->addRef();
         return existing;
     }
 
@@ -107,8 +105,7 @@ ISlangUnknown* wrapObject(ImplT* obj)
 
 #undef TRY_WRAP
 
-template<typename ProxyT>
-ISlangUnknown* unwrapObject(ProxyT* proxy)
+ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
 {
     if (proxy == nullptr)
         return nullptr;

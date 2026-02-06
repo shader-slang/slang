@@ -4,6 +4,7 @@
 #include <type_traits>
 
 #include "../replay-context.h"
+#include "../replay-shared.h"
 #include "proxy-base.h"
 
 namespace SlangRecord {
@@ -117,6 +118,8 @@ namespace SlangRecord {
 #define PROXY_ADDREF_IMPL(ProxyType) \
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override \
     { \
+        if (SlangRecord::isRefCountRecordingSuppressed()) \
+            return ProxyBase::addRefImpl(); \
         RECORD_CALL(); \
         uint32_t result = ProxyBase::addRefImpl(); \
         RECORD_RETURN(result); \
@@ -126,6 +129,8 @@ namespace SlangRecord {
 #define PROXY_RELEASE_IMPL(ProxyType) \
     SLANG_NO_THROW uint32_t SLANG_MCALL release() override \
     { \
+        if (SlangRecord::isRefCountRecordingSuppressed()) \
+            return ProxyBase::releaseImpl(); \
         RECORD_CALL(); \
         uint32_t result = ProxyBase::releaseImpl(); \
         RECORD_RETURN(result); \
