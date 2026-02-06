@@ -59,8 +59,15 @@ runs:
         echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
 
+        # Enable cache key debugging
+        echo "SCCACHE_LOG=sccache::cache=trace" >> $GITHUB_ENV
+
+        # Normalize cache directory to avoid path differences
+        echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+
         # Get sccache path for CMake
         sccache_path=$(which sccache)
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
 
         echo "🔧 sccache configured for GCS bucket: ${{ inputs.gcs-bucket }}"
+        echo "🔍 Cache key debugging enabled (SCCACHE_LOG=sccache::cache=trace)"
