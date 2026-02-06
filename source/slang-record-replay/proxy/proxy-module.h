@@ -40,9 +40,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
             
         slang::ProgramLayout* result = getActual<slang::IModule>()->getLayout(targetIndex, outDiagnostics);
         
@@ -101,12 +99,8 @@ public:
         // Record the specialization args array
         _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
 
-        slang::IComponentType* specializedPtr = nullptr;
-        if (!outSpecializedComponentType)
-            outSpecializedComponentType = &specializedPtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IModule>()->specialize(
             specializationArgs,
@@ -201,9 +195,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(name);
         
-        slang::IEntryPoint* entryPointPtr = nullptr;
-        if (!outEntryPoint)
-            outEntryPoint = &entryPointPtr;
+        PREPARE_POINTER_OUTPUT(outEntryPoint);
             
         SlangResult result = getActual<slang::IModule>()->findEntryPointByName(name, outEntryPoint);
         
@@ -261,12 +253,8 @@ public:
         RECORD_INPUT(name);
         RECORD_INPUT(stage);
         
-        slang::IEntryPoint* entryPointPtr = nullptr;
-        if (!outEntryPoint)
-            outEntryPoint = &entryPointPtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outEntryPoint);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
             
         SlangResult result = getActual<slang::IModule>()->findAndCheckEntryPoint(
             name, stage, outEntryPoint, outDiagnostics);

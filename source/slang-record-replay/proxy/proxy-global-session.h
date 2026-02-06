@@ -46,9 +46,7 @@ public:
         desc2.fileSystem = static_cast<ISlangFileSystem*>(wrapObject(fileSystemToWrap));
 
         // Call create session with our wrapped file system
-        slang::ISession* sessionPtr;
-        if (!outSession)
-            outSession = &sessionPtr;
+        PREPARE_POINTER_OUTPUT(outSession);
         auto result = getActual<slang::IGlobalSession>()->createSession(desc2, outSession);
 
         RECORD_COM_OUTPUT(outSession);

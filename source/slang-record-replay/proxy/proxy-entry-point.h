@@ -93,12 +93,8 @@ public:
         // Record the specialization args array
         _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
 
-        slang::IComponentType* specializedPtr = nullptr;
-        if (!outSpecializedComponentType)
-            outSpecializedComponentType = &specializedPtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IEntryPoint>()->specialize(
             specializationArgs,
@@ -116,12 +112,8 @@ public:
     {
         RECORD_CALL();
 
-        slang::IComponentType* linkedComponentTypePtr = nullptr;
-        if (!outLinkedComponentType)
-            outLinkedComponentType = &linkedComponentTypePtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outLinkedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IEntryPoint>()->link(outLinkedComponentType, outDiagnostics);
 

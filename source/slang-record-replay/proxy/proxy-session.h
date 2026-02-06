@@ -38,9 +38,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(moduleName);
         
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
             
         slang::IModule* result = getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
         
@@ -71,12 +69,8 @@ public:
         ReplayContext::get().recordArray(RecordFlag::Input, componentTypes, componentTypeCount);
 
         // Call create session
-        slang::IComponentType* compositeComponentTypePtr;
-        if(!outCompositeComponentType)
-            outCompositeComponentType = &compositeComponentTypePtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outCompositeComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
         auto result = getActual<slang::ISession>()->createCompositeComponentType(componentTypes, componentTypeCount, outCompositeComponentType, outDiagnostics);
 
         RECORD_COM_OUTPUT(outCompositeComponentType);
@@ -108,9 +102,7 @@ public:
         RECORD_INPUT(targetIndex);
         RECORD_INPUT(rules);
         
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
             
         slang::TypeLayoutReflection* result = getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
         
@@ -161,9 +153,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(type);
         RECORD_INPUT(interfaceType);
-        uint32_t id;
-        if(!outId)
-            outId = &id;
+        PREPARE_POINTER_OUTPUT(outId);
         auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(type, interfaceType, outId);
         RECORD_RETURN(result);
     }
@@ -233,9 +223,7 @@ public:
         RECORD_INPUT(path);
         RECORD_INPUT(string);
         
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
             
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(moduleName, path, string, outDiagnostics);
         

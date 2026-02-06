@@ -42,9 +42,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
 
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         slang::ProgramLayout* result = getActual<slang::IComponentType>()->getLayout(targetIndex, outDiagnostics);
 
@@ -70,12 +68,8 @@ public:
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
 
-        ISlangBlob* codePtr = nullptr;
-        if (!outCode)
-            outCode = &codePtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outCode);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IComponentType>()->getEntryPointCode(
             entryPointIndex,
@@ -106,9 +100,7 @@ public:
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
 
-        ISlangBlob* hashPtr = nullptr;
-        if (!outHash)
-            outHash = &hashPtr;
+        PREPARE_POINTER_OUTPUT(outHash);
 
         getActual<slang::IComponentType>()->getEntryPointHash(entryPointIndex, targetIndex, outHash);
 
@@ -126,12 +118,8 @@ public:
         // Record the specialization args array
         _ctx.recordArray(RecordFlag::Input, specializationArgs, specializationArgCount);
 
-        slang::IComponentType* specializedPtr = nullptr;
-        if (!outSpecializedComponentType)
-            outSpecializedComponentType = &specializedPtr;
-        ISlangBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IComponentType>()->specialize(
             specializationArgs,
@@ -147,9 +135,18 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(outLinkedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::link");
+        RECORD_CALL();
+
+        PREPARE_POINTER_OUTPUT(outLinkedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+
+        auto result = getActual<slang::IComponentType>()->link(
+            outLinkedComponentType,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outLinkedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
@@ -162,12 +159,8 @@ public:
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
 
-        ISlangSharedLibrary* sharedLibraryPtr = nullptr;
-        if (!outSharedLibrary)
-            outSharedLibrary = &sharedLibraryPtr;
-        slang::IBlob* diagnosticsPtr = nullptr;
-        if (!outDiagnostics)
-            outDiagnostics = &diagnosticsPtr;
+        PREPARE_POINTER_OUTPUT(outSharedLibrary);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
 
         auto result = getActual<slang::IComponentType>()->getEntryPointHostCallable(
             entryPointIndex,
