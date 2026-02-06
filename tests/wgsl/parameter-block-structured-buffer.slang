@@ -1,19 +1,17 @@
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry main -stage compute
 
-// Test that ParameterBlock<StructuredBuffer<T>> generates proper @binding and @group attributes in WGSL.
+// Test that ParameterBlock directly wrapping a resource type generates proper
+// @binding and @group attributes in WGSL.
+//
 // This is a regression test for https://github.com/shader-slang/slang/issues/8358
+// ParameterBlocks containing structs are flattened, so they do not have the same issue.
 
-struct TriangleData {
-    float3[3] position;
-    uint32_t color;
-}
+ParameterBlock<RWStructuredBuffer<int>> buffer;
 
-ParameterBlock<StructuredBuffer<TriangleData>> triangle_data;
+// CHECK: @binding(0) @group(0) var<storage, read_write> buffer
 
-// CHECK: @binding(0) @group(0) var<storage, read> triangle_data
-
-[shader("vertex")]
-float4 vertexMain(uint vIdx : SV_VertexID, uint iIdx : SV_InstanceID) : SV_Position
-{
-    return float4(triangle_data[iIdx].position[vIdx], 1.0);
+[shader("compute")]
+[numthreads(1,1,1)]
+void main(uint3 tid : SV_DispatchThreadID) { 
+    buffer[tid.x] = 1; 
 }
