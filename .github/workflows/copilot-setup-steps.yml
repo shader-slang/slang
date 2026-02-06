@@ -66,6 +66,7 @@ jobs:
             glslang-tools \
             ca-certificates \
             libzstd-dev \
+            zstd \
             clang-format-17 \
             npm
 
