@@ -162,6 +162,24 @@ struct OptionalTypeLoweringContext
 
     void processMakeOptionalNone(IRMakeOptionalNone* inst)
     {
+        // Check if any user is GetOptionalValue - this is invalid since we're accessing
+        // .value on an optional that is always 'none'
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            if (use->getUser()->getOp() == kIROp_GetOptionalValue)
+            {
+                if (sink)
+                {
+                    auto optionalType = cast<IROptionalType>(inst->getDataType());
+                    auto valueType = optionalType->getValueType();
+                    sink->diagnose(
+                        use->getUser()->sourceLoc,
+                        Diagnostics::accessingValueOfNoneOptional,
+                        valueType);
+                }
+            }
+        }
+
         IRBuilder builderStorage(module);
         auto builder = &builderStorage;
         builder->setInsertBefore(inst);

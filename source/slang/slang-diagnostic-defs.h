@@ -2671,6 +2671,12 @@ DIAGNOSTIC(
     "this may affect wave/subgroup convergence if the duplicated code contains wave operations")
 
 DIAGNOSTIC(
+    41027,
+    Error,
+    accessingValueOfNoneOptional,
+    "accessing `.value` on `Optional<$0>` that is always `none`")
+
+DIAGNOSTIC(
     41024,
     Error,
     cannotDefaultInitializeResource,
