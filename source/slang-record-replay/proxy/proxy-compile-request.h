@@ -96,8 +96,10 @@ public:
 
     virtual SLANG_NO_THROW int SLANG_MCALL addCodeGenTarget(SlangCompileTarget target) override
     {
-        SLANG_UNUSED(target);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addCodeGenTarget");
+        RECORD_CALL();
+        RECORD_INPUT(target);
+        auto result = getActual<slang::ICompileRequest>()->addCodeGenTarget(target);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL

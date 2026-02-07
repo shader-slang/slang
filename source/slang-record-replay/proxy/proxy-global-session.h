@@ -139,16 +139,21 @@ public:
         SlangSourceLanguage sourceLanguage,
         SlangPassThrough defaultCompiler) override
     {
-        SLANG_UNUSED(sourceLanguage);
-        SLANG_UNUSED(defaultCompiler);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDefaultDownstreamCompiler");
+        RECORD_CALL();
+        RECORD_INPUT(sourceLanguage);
+        RECORD_INPUT(defaultCompiler);
+        auto result =
+            getActual<IGlobalSession>()->setDefaultDownstreamCompiler(sourceLanguage, defaultCompiler);
+        RECORD_RETURN(result);
     }
 
     virtual SlangPassThrough SLANG_MCALL
     getDefaultDownstreamCompiler(SlangSourceLanguage sourceLanguage) override
     {
-        SLANG_UNUSED(sourceLanguage);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getDefaultDownstreamCompiler");
+        RECORD_CALL();
+        RECORD_INPUT(sourceLanguage);
+        auto result = getActual<IGlobalSession>()->getDefaultDownstreamCompiler(sourceLanguage);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -256,10 +261,12 @@ public:
         SlangCompileTarget target,
         SlangPassThrough compiler) override
     {
-        SLANG_UNUSED(source);
-        SLANG_UNUSED(target);
-        SLANG_UNUSED(compiler);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerForTransition");
+        RECORD_CALL();
+        RECORD_INPUT(source);
+        RECORD_INPUT(target);
+        RECORD_INPUT(compiler);
+        getActual<IGlobalSession>()->setDownstreamCompilerForTransition(source, target, compiler);
+        RECORD_RETURN_VOID();
     }
 
     virtual SLANG_NO_THROW SlangPassThrough SLANG_MCALL getDownstreamCompilerForTransition(
