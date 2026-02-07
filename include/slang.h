@@ -5072,6 +5072,13 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
  */
 SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
 
+/* Insert a labeled marker into the replay stream.
+   Useful for debugging replay streams — marks a point with a human-readable label.
+   No-op if the record layer is not active.
+   @param label The marker label string.
+ */
+SLANG_EXTERN_C SLANG_API void slang_replayMarker(const char* label);
+
 /* Return the last signaled internal error message.
  */
 SLANG_EXTERN_C SLANG_API const char* slang_getLastInternalErrorMessage();
