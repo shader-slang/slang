@@ -980,6 +980,14 @@ class EmptyDecl : public Decl
     FIDDLE(...)
 };
 
+FIDDLE()
+class StaticAssertDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() Expr* condition = nullptr;
+    FIDDLE() Expr* message = nullptr;
+};
+
 // A declaration used by the implementation to put syntax keywords
 // into the current scope.
 //
