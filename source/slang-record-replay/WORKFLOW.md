@@ -13,9 +13,11 @@ This document describes the recommended workflow for implementing missing proxy 
 # Set environment variable to enable replay recording
 $env:SLANG_RECORD_LAYER=1
 
-# Recommended: Set explicit replay path to avoid searching for latest replay
+# Set replay capture path
 $env:SLANG_RECORD_PATH="$PWD\replay-capture"
 ```
+
+All replay data will be written to the `replay-capture/` directory in the workspace root.
 
 ## Iteration Cycle
 
@@ -27,36 +29,20 @@ Run a failing test with replay recording enabled:
 # Run a specific test
 ./build/Debug/bin/slang-test.exe "tests/compute/array-param" -v 2>&1 | Tee-Object test-output.txt
 
-# Or run a test category
-./build/Debug/bin/slang-test.exe -category compute -v 2>&1 | Tee-Object test-output.txt
-
 # Or run a test prefix
 ./build/Debug/bin/slang-test.exe "tests/language-feature" -v 2>&1 | Tee-Object test-output.txt
 ```
 
-### Step 2: Find Latest Replay
+NOTE: If test finishes with none-zero exit code but not error, this indicates an unhandled exception,
+probably caused by missing functions, so proceed to step 2.
 
-If you set `SLANG_RECORD_PATH` explicitly, skip to Step 3 using that path.
-
-Otherwise, locate the most recent replay directory:
-
-```powershell
-# Get the most recent replay directory
-$latestReplay = Get-ChildItem -Path .slang-replays -Directory | 
-    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' } | 
-    Sort-Object Name -Descending | 
-    Select-Object -First 1
-
-Write-Host "Latest replay: $($latestReplay.FullName)"
-```
-
-### Step 3: Decode and Analyze Replay
+### Step 2: Decode and Analyze Replay
 
 Decode the binary replay stream to human-readable format:
 
 ```powershell
 # Decode to file for easier analysis
-./build/Debug/bin/slang-replay.exe -d "$($latestReplay.FullName)\stream.bin" -o replay-analysis.txt
+./build/Debug/bin/slang-replay.exe -d "replay-capture\stream.bin" -o replay-analysis.txt
 
 # Find all unimplemented functions
 Select-String -Path replay-analysis.txt -Pattern "UNIMPLEMENTED" | 
@@ -120,36 +106,19 @@ For each unimplemented method:
 1. **Remove `REPLAY_UNIMPLEMENTED_X` call**
 2. **Add proper implementation** following the pattern:
    ```cpp
-   SLANG_NO_THROW ReturnType SLANG_MCALL methodName(params) override
-   {
-       auto& ctx = ReplayContext::get();
-       ctx.beginCall(__FUNCSIG__, this);
-       
-       // Record input parameters
-       ctx.record(RecordFlag::Input, param1);
-       ctx.record(RecordFlag::Input, param2);
-       
-       // Call actual implementation
-       ReturnType result = getActual<ActualInterface>()->methodName(param1, param2);
-       
-       // Record output/return values
-       ctx.record(RecordFlag::ReturnValue, result);
-       
-       return result;
-   }
+    virtual SLANG_NO_THROW void SLANG_MCALL
+    getLanguagePrelude(SlangSourceLanguage sourceLanguage, ISlangBlob** outPrelude) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(sourceLanguage);
+        ISlangBlob* preludePtr;
+        if(!outPrelude)
+            outPrelude = &preludePtr;
+        getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
+        RECORD_COM_OUTPUT(outPrelude);
+    }
    ```
 
-3. **For methods returning COM interfaces**, wrap the result:
-   ```cpp
-   ISlangBlob* result = nullptr;
-   actual->loadFile(path, &result);
-   
-   // Wrap the result before recording
-   ISlangBlob* wrappedResult = static_cast<ISlangBlob*>(wrapObject(result));
-   ctx.record(RecordFlag::Output, wrappedResult);
-   
-   return wrappedResult;
-   ```
 
 ### Step 7: Rebuild
 
@@ -184,15 +153,7 @@ Select-String -Path test-output-v2.txt -Pattern "FAILED|passed" | Measure-Object
 Once the test passes, verify the replay can be played back correctly:
 
 ```powershell
-# Using explicit path (if SLANG_RECORD_PATH was set)
-./build/Debug/bin/slang-replay.exe "$env:SLANG_RECORD_PATH\stream.bin"
-
-# Or using auto-discovered latest replay
-$latestReplay = Get-ChildItem -Path .slang-replays -Directory | 
-    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' } | 
-    Sort-Object Name -Descending | 
-    Select-Object -First 1
-./build/Debug/bin/slang-replay.exe "$($latestReplay.FullName)\stream.bin"
+./build/Debug/bin/slang-replay.exe "replay-capture\stream.bin"
 ```
 
 **If replay fails:** The recording may have missing or incorrect serialization. Debug the replay failure before proceeding - this indicates a gap in the proxy implementation that needs to be fixed.
@@ -202,14 +163,8 @@ $latestReplay = Get-ChildItem -Path .slang-replays -Directory |
 Check the new replay for remaining issues:
 
 ```powershell
-# Get the newest replay
-$newReplay = Get-ChildItem -Path .slang-replays -Directory | 
-    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' } | 
-    Sort-Object Name -Descending | 
-    Select-Object -First 1
-
 # Check for remaining unimplemented calls
-./build/Debug/bin/slang-replay.exe -d "$($newReplay.FullName)\stream.bin" | 
+./build/Debug/bin/slang-replay.exe -d "replay-capture\stream.bin" | 
     Select-String -Pattern "UNIMPLEMENTED" | 
     ForEach-Object { $_.Line -replace '.*String: "UNIMPLEMENTED: ([^"]+)".*', '$1' } | 
     Select-Object -Unique |
@@ -228,167 +183,3 @@ if ((Get-Content remaining-unimplemented.txt).Count -eq 0) {
 - **If tests pass but different test fails** → Go to Step 1 with new test
 - **If all tests in category pass** → Move to next test category
 - **If all tests pass and replay succeeds** → Success! 🎉
-
-## Quick Helper Script
-
-Save this as `analyze-replay.ps1` in the Slang root directory:
-
-```powershell
-param(
-    [string]$TestPattern = "tests/compute/array-param",
-    [switch]$ShowContext
-)
-
-Write-Host "=== Running Test ===" -ForegroundColor Cyan
-Write-Host "Test: $TestPattern`n"
-
-# Run test with replay
-$env:SLANG_RECORD_LAYER=1
-./build/Debug/bin/slang-test.exe $TestPattern -v 2>&1 | Tee-Object test-output.txt
-
-# Get latest replay
-$latest = Get-ChildItem -Path .slang-replays -Directory | 
-    Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' } | 
-    Sort-Object Name -Descending | 
-    Select-Object -First 1
-
-if ($latest) {
-    Write-Host "`n=== Replay Analysis ===" -ForegroundColor Cyan
-    Write-Host "Replay: $($latest.Name)`n"
-    
-    # Decode
-    ./build/Debug/bin/slang-replay.exe -d "$($latest.FullName)\stream.bin" -o replay-analysis.txt
-    
-    # Find unimplemented
-    $unimplemented = Select-String -Path replay-analysis.txt -Pattern "UNIMPLEMENTED" | 
-        ForEach-Object { $_.Line -replace '.*String: "UNIMPLEMENTED: ([^"]+)".*', '$1' } | 
-        Select-Object -Unique | 
-        Sort-Object
-    
-    if ($unimplemented) {
-        Write-Host "Unimplemented Functions:" -ForegroundColor Yellow
-        $unimplemented | ForEach-Object { Write-Host "  ❌ $_" -ForegroundColor Red }
-        
-        if ($ShowContext) {
-            Write-Host "`nContext saved to unimplemented-context.txt" -ForegroundColor Cyan
-            Select-String -Path replay-analysis.txt -Pattern "UNIMPLEMENTED" -Context 10,5 | 
-                Out-File unimplemented-context.txt
-        }
-    } else {
-        Write-Host "✓ No unimplemented functions!" -ForegroundColor Green
-    }
-    
-    # Test results
-    Write-Host "`n=== Test Results ===" -ForegroundColor Cyan
-    $passed = (Select-String -Path test-output.txt -Pattern "passed test").Count
-    $failed = (Select-String -Path test-output.txt -Pattern "FAILED test").Count
-    $total = $passed + $failed
-    
-    if ($total -gt 0) {
-        $passRate = [math]::Round(($passed / $total) * 100, 1)
-        Write-Host "  ✓ Passed: $passed / $total ($passRate%)" -ForegroundColor Green
-        Write-Host "  ✗ Failed: $failed / $total" -ForegroundColor Red
-    } else {
-        Write-Host "  No tests matched pattern" -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "No replay found!" -ForegroundColor Red
-}
-```
-
-**Usage:**
-
-```powershell
-# Basic usage
-.\analyze-replay.ps1 "tests/compute/array-param"
-
-# With context dump
-.\analyze-replay.ps1 "tests/compute/array-param" -ShowContext
-
-# Test category
-.\analyze-replay.ps1 -TestPattern "tests/language-feature" -ShowContext
-```
-
-## Common Patterns
-
-### Pattern 1: Simple Value Return
-
-```cpp
-SLANG_NO_THROW SlangInt SLANG_MCALL getCount() override
-{
-    auto& ctx = ReplayContext::get();
-    ctx.beginCall(__FUNCSIG__, this);
-    
-    SlangInt result = getActual<ActualInterface>()->getCount();
-    ctx.record(RecordFlag::ReturnValue, result);
-    
-    return result;
-}
-```
-
-### Pattern 2: Output Parameter
-
-```cpp
-SLANG_NO_THROW SlangResult SLANG_MCALL getData(ISlangBlob** outBlob) override
-{
-    auto& ctx = ReplayContext::get();
-    ctx.beginCall(__FUNCSIG__, this);
-    
-    ISlangBlob* result = nullptr;
-    SlangResult hr = getActual<ActualInterface>()->getData(&result);
-    
-    // Wrap result before recording
-    ISlangBlob* wrapped = static_cast<ISlangBlob*>(wrapObject(result));
-    ctx.record(RecordFlag::Output, wrapped);
-    ctx.record(RecordFlag::ReturnValue, hr);
-    
-    if (outBlob) *outBlob = wrapped;
-    return hr;
-}
-```
-
-### Pattern 3: Input Array
-
-```cpp
-SLANG_NO_THROW SlangResult SLANG_MCALL process(
-    int count,
-    const char** items) override
-{
-    auto& ctx = ReplayContext::get();
-    ctx.beginCall(__FUNCSIG__, this);
-    
-    ctx.record(RecordFlag::Input, count);
-    ctx.recordArray(RecordFlag::Input, items, count);
-    
-    SlangResult result = getActual<ActualInterface>()->process(count, items);
-    ctx.record(RecordFlag::ReturnValue, result);
-    
-    return result;
-}
-```
-
-## Tips
-
-1. **Start with simple tests** that hit fewer API calls
-2. **Group related methods** - if one method fails, related methods likely need implementation too
-3. **Check existing implementations** in other proxy files for examples
-4. **Test incrementally** - implement 1-2 methods, rebuild, test
-5. **Keep replays** from successful runs as regression tests
-6. **Use `git diff`** to verify you're only changing what you intended
-
-## Troubleshooting
-
-**Test fails with "Handle not found"**
-- You forgot to wrap a returned COM interface with `wrapObject()`
-
-**Replay decoder shows garbled data**
-- Type mismatch in record/playback order
-- Check that input/output flags match between record and playback
-
-**Test still fails after implementation**
-- Check for nested unimplemented calls in returned objects
-- Verify you're wrapping all COM interface returns
-
-**Build errors after changes**
-- Missing includes (add to proxy header file)
-- Wrong method signature (check against actual interface in `slang.h`)

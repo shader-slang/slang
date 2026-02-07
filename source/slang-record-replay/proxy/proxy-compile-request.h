@@ -221,9 +221,11 @@ public:
     virtual SLANG_NO_THROW int SLANG_MCALL
     addTranslationUnit(SlangSourceLanguage language, char const* name) override
     {
-        SLANG_UNUSED(language);
-        SLANG_UNUSED(name);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addTranslationUnit");
+        RECORD_CALL();
+        RECORD_INPUT(language);
+        RECORD_INPUT(name);
+        auto result = getActual<slang::ICompileRequest>()->addTranslationUnit(language, name);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -247,9 +249,10 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     addTranslationUnitSourceFile(int translationUnitIndex, char const* path) override
     {
-        SLANG_UNUSED(translationUnitIndex);
-        SLANG_UNUSED(path);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addTranslationUnitSourceFile");
+        RECORD_CALL();
+        RECORD_INPUT(translationUnitIndex);
+        RECORD_INPUT(path);
+        getActual<slang::ICompileRequest>()->addTranslationUnitSourceFile(translationUnitIndex, path);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceString(
