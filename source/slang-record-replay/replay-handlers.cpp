@@ -19,7 +19,6 @@
 #include "proxy/proxy-entry-point.h"
 #include "proxy/proxy-type-conformance.h"
 #include "proxy/proxy-compile-request.h"
-#include "proxy/proxy-blob.h"
 #include "proxy/proxy-shared-library.h"
 #include "proxy/proxy-mutable-file-system.h"
 
@@ -307,13 +306,8 @@ static void registerAllHandlers()
     // setEmitSpirvDirectly not implemented in proxy
     
     // =========================================================================
-    // BlobProxy handlers
+    // Blobs are serialized by content hash, not tracked as proxies
     // =========================================================================
-    
-    REPLAY_REGISTER(BlobProxy, addRef);
-    REPLAY_REGISTER(BlobProxy, release);
-    REPLAY_REGISTER(BlobProxy, getBufferPointer);
-    REPLAY_REGISTER(BlobProxy, getBufferSize);
     
     // =========================================================================
     // SharedLibraryProxy handlers

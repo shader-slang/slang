@@ -48,7 +48,6 @@ inline T* unwrapObject(T* obj)
 /// Handle constants for interface tracking.
 /// Handles 0-255 are reserved for special meanings.
 constexpr uint64_t kNullHandle = 0;                 ///< Null pointer
-constexpr uint64_t kInlineBlobHandle = 1;           ///< User-provided blob serialized inline
 constexpr uint64_t kCustomFileSystemHandle = 2;     ///< User-provided custom file system (that has not yet been registered with a handle)
 constexpr uint64_t kDefaultFileSystemHandle = 3;    ///< Default file system (when user doesn't provide one)
 constexpr uint64_t kFirstValidHandle = 0x100;       ///< First handle for tracked objects
@@ -326,8 +325,13 @@ public:
     SLANG_API void record(RecordFlag flags, bool& value);
     SLANG_API void record(RecordFlag flags, const char*& str);
 
-    // Blob data (void* + size)
+    // Blob data (void* + size) - records raw blob bytes inline in the stream
     SLANG_API void recordBlob(RecordFlag flags, const void*& data, size_t& size);
+
+    // Blob by hash - hashes content, stores to disk, records hash in stream.
+    // During playback, loads content from disk by hash.
+    // This is the primary mechanism for recording ISlangBlob values.
+    SLANG_API void recordBlobByHash(RecordFlag flags, ISlangBlob*& blob);
 
     // Arrays with count - calls record() on each element
     template<typename T, typename CountT>
@@ -511,8 +515,10 @@ public:
     SLANG_API void record(RecordFlag flags, slang::SpecializationArg& value);
     SLANG_API void record(RecordFlag flags, SlangGlobalSessionDesc& value);
 
-    // COM interface pointers - handle tracking is done internally
+    // Blob interface - serialized by content hash, not tracked as COM interface
     SLANG_API void record(RecordFlag flags, ISlangBlob*& obj);
+
+    // COM interface pointers - handle tracking is done internally
     SLANG_API void record(RecordFlag flags, ISlangFileSystem*& obj);
     SLANG_API void record(RecordFlag flags, ISlangFileSystemExt*& obj);
     SLANG_API void record(RecordFlag flags, ISlangMutableFileSystem*& obj);
@@ -744,24 +750,6 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
                 return;
             }
 
-            // Special case: ISlangBlob may be user-provided data
-            if (auto blob = toSlangInterface<ISlangBlob>(obj))
-            {
-                // Record blob contents inline if not already tracked
-                if (!isInterfaceRegistered(blob))
-                {
-                    // Write inline blob marker
-                    uint64_t handle = kInlineBlobHandle;
-                    recordHandle(flags, handle);
-                    
-                    // Record blob data
-                    const void* data = blob->getBufferPointer();
-                    size_t size = blob->getBufferSize();
-                    recordBlob(flags, data, size);
-                    return;
-                }
-            }
-
             // Normal case: look up handle for tracked object
             uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
@@ -799,18 +787,6 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             if (handle == kNullHandle)
             {
                 obj = nullptr;
-            }
-            else if (handle == kInlineBlobHandle)
-            {
-                // Read inline blob data and create a new blob
-                const void* data = nullptr;
-                size_t size = 0;
-                recordBlob(flags, data, size);
-                
-                // Create a RawBlob from the data (arena-allocated during recordBlob)
-                Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data, size);
-                ISlangUnknown* blobUnknown = blob.detach();
-                obj = blobUnknown ? toSlangInterface<T>(blobUnknown) : nullptr;
             }
             else
             {

@@ -1,8 +1,6 @@
 #include "proxy-mutable-file-system.h"
 
 #include "../../core/slang-blob.h"
-#include "../../core/slang-crypto.h"
-#include "../../core/slang-io.h"
 
 namespace SlangRecord
 {
@@ -11,102 +9,25 @@ using namespace Slang;
 
 SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outBlob)
 {
+    // Prevent logging proxy blob ref counts
+    SuppressRefCountRecording guard;
+
     RECORD_CALL();
     RECORD_INPUT(path);
 
-    auto& ctx = ReplayContext::get();
+    PREPARE_POINTER_OUTPUT(outBlob);
 
-    if (ctx.isRecording())
+    SlangResult result = SLANG_OK;
+    if (ReplayContext::get().isWriting())
     {
-        // Forward to underlying file system
-        ComPtr<ISlangBlob> blob;
-        SlangResult result = m_fileSystem->loadFile(path, blob.writeRef());
-
-        if (SLANG_SUCCEEDED(result) && blob)
-        {
-            // Compute SHA1 hash of content
-            SHA1::Digest digest =
-                SHA1::compute(blob->getBufferPointer(), blob->getBufferSize());
-            String hash = digest.toString();
-
-            // Store file content by hash (de-duplicated)
-            const char* replayPath = ctx.getCurrentReplayPath();
-            if (replayPath)
-            {
-                String filesDir = Path::combine(String(replayPath), "files");
-                Path::createDirectoryRecursive(filesDir);
-
-                String contentPath = Path::combine(filesDir, hash);
-                if (!File::exists(contentPath))
-                {
-                    File::writeAllBytes(
-                        contentPath,
-                        blob->getBufferPointer(),
-                        blob->getBufferSize());
-                }
-            }
-
-            // Record the hash (so playback can find the file)
-            const char* hashCStr = hash.getBuffer();
-            ctx.record(RecordFlag::None, hashCStr);
-
-            if (outBlob)
-                *outBlob = blob.detach();
-        }
-        else
-        {
-            // Record empty hash for failed loads
-            const char* emptyHash = "";
-            ctx.record(RecordFlag::None, emptyHash);
-        }
-
-        RECORD_RETURN(result);
+        result = m_fileSystem->loadFile(path, outBlob);
     }
-    else if (ctx.isPlayback())
-    {
-        // Read the hash from the stream
-        const char* hashCStr = nullptr;
-        ctx.record(RecordFlag::None, hashCStr);
 
-        if (!hashCStr || hashCStr[0] == '\0')
-        {
-            // File load failed during recording
-            SlangResult result = SLANG_E_NOT_FOUND;
-            RECORD_RETURN(result);
-        }
-
-        // Load content from captured file
-        const char* replayPath = ctx.getCurrentReplayPath();
-        if (!replayPath)
-        {
-            SlangResult result = SLANG_E_NOT_AVAILABLE;
-            RECORD_RETURN(result);
-        }
-
-        String filesDir = Path::combine(String(replayPath), "files");
-        String contentPath = Path::combine(filesDir, String(hashCStr));
-
-        List<uint8_t> fileData;
-        SlangResult readResult = File::readAllBytes(contentPath, fileData);
-        if (SLANG_FAILED(readResult))
-        {
-            RECORD_RETURN(readResult);
-        }
-
-        // Create blob from content
-        ComPtr<ISlangBlob> blob = RawBlob::create(fileData.getBuffer(), fileData.getCount());
-        if (outBlob)
-            *outBlob = blob.detach();
-
-        SlangResult result = SLANG_OK;
-        RECORD_RETURN(result);
-    }
-    else
-    {
-        // Idle mode - just forward
-        SlangResult result = m_fileSystem->loadFile(path, outBlob);
-        RECORD_RETURN(result);
-    }
+    // recordBlobByHash (via RECORD_BLOB_OUTPUT) handles hashing, writing to disk,
+    // and loading from disk during playback
+    RECORD_BLOB_OUTPUT(outBlob);
+    RECORD_INFO(result);
+    return result;
 }
 
 } // namespace SlangRecord

@@ -1,6 +1,5 @@
 #include "proxy-base.h"
 
-#include "proxy-blob.h"
 #include "proxy-compile-request.h"
 #include "proxy-compile-result.h"
 #include "proxy-component-type.h"
@@ -101,7 +100,8 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
 
     // Other types
     TRY_WRAP(ISlangSharedLibrary, SharedLibraryProxy)
-    TRY_WRAP(ISlangBlob, BlobProxy)
+
+    // Blobs are not wrapped - they are serialized by content hash
 
     // Unknown type - return nullptr
     return nullptr;

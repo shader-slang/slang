@@ -1,6 +1,8 @@
 #include "replay-context.h"
 #include "proxy/proxy-module.h"
 
+#include "../core/slang-blob.h"
+#include "../core/slang-crypto.h"
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
 #include "../slang/slang-ast-type.h"
@@ -942,6 +944,89 @@ void ReplayContext::recordBlob(RecordFlag flags, const void*& data, size_t& size
     }
 }
 
+void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
+{
+    SLANG_UNUSED(flags);
+    if (m_mode == Mode::Idle) return;
+
+    if (isWriting())
+    {
+        recordTypeId(TypeId::Blob);
+
+        if (blob == nullptr)
+        {
+            // Write empty hash for null blob
+            const char* emptyHash = "";
+            record(RecordFlag::None, emptyHash);
+            return;
+        }
+
+        // Compute SHA1 hash of blob content
+        Slang::SHA1::Digest digest =
+            Slang::SHA1::compute(blob->getBufferPointer(), blob->getBufferSize());
+        Slang::String hash = digest.toString();
+
+        // Store blob content to disk by hash (de-duplicated)
+        const char* replayPath = getCurrentReplayPath();
+        if (replayPath)
+        {
+            Slang::String filesDir = Slang::Path::combine(Slang::String(replayPath), "files");
+            Slang::Path::createDirectoryRecursive(filesDir);
+
+            Slang::String contentPath = Slang::Path::combine(filesDir, hash);
+            if (!Slang::File::exists(contentPath))
+            {
+                Slang::File::writeAllBytes(
+                    contentPath,
+                    blob->getBufferPointer(),
+                    blob->getBufferSize());
+            }
+        }
+
+        // Record the hash in the stream
+        const char* hashCStr = hash.getBuffer();
+        record(RecordFlag::None, hashCStr);
+    }
+    else
+    {
+        // Playback: read hash and load blob from disk
+        expectTypeId(TypeId::Blob);
+
+        const char* hashCStr = nullptr;
+        record(RecordFlag::None, hashCStr);
+
+        if (!hashCStr || hashCStr[0] == '\0')
+        {
+            blob = nullptr;
+            return;
+        }
+
+        // Load content from captured file
+        const char* replayPath = getCurrentReplayPath();
+        if (!replayPath)
+        {
+            blob = nullptr;
+            return;
+        }
+
+        Slang::String filesDir = Slang::Path::combine(Slang::String(replayPath), "files");
+        Slang::String contentPath = Slang::Path::combine(filesDir, Slang::String(hashCStr));
+
+        Slang::List<uint8_t> fileData;
+        SlangResult readResult = Slang::File::readAllBytes(contentPath, fileData);
+        if (SLANG_FAILED(readResult))
+        {
+            blob = nullptr;
+            return;
+        }
+
+        // Create blob from loaded content
+        Slang::ComPtr<ISlangBlob> loadedBlob =
+            Slang::RawBlob::create(fileData.getBuffer(), fileData.getCount());
+        blob = loadedBlob.detach();
+    }
+}
+
 void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 {
     if (m_mode == Mode::Idle) return;
@@ -1089,7 +1174,7 @@ void ReplayContext::record(RecordFlag flags, SlangGlobalSessionDesc& value)
 
 void ReplayContext::record(RecordFlag flags, ISlangBlob*& obj)
 {
-    recordInterfaceImpl(flags, obj);
+    recordBlobByHash(flags, obj);
 }
 
 void ReplayContext::record(RecordFlag flags, ISlangFileSystem*& obj)

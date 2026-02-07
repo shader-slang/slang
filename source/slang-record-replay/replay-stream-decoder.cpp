@@ -281,8 +281,6 @@ void ReplayStreamDecoder::decodeValueFromStream(
             stream.read(&handle, sizeof(handle));
             if (handle == kNullHandle)
                 output << "Handle: null";
-            else if (handle == kInlineBlobHandle)
-                output << "Handle: inline-blob";
             else
                 output << "Handle: #" << handle;
         }

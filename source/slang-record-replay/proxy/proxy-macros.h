@@ -70,24 +70,10 @@ namespace SlangRecord {
     _ctx.record(RecordFlag::Output, *arg)
 
 // Record a blob output parameter (ISlangBlob**)
-// Captures blob contents during recording and reconstructs from stream during playback
+// Serializes blob by content hash to disk. During playback, loads from disk.
+// No proxy wrapping is needed for blobs.
 // Usage: RECORD_BLOB_OUTPUT(outBlob) where outBlob is ISlangBlob**
 #define RECORD_BLOB_OUTPUT(arg) \
-    const void* _ptr_##arg = (*arg) ? (*arg)->getBufferPointer() : nullptr; \
-    size_t _size_##arg = (*arg) ? (*arg)->getBufferSize() : 0; \
-    ReplayContext::get().recordBlob(RecordFlag::None, _ptr_##arg, _size_##arg); \
-    if (ReplayContext::get().isReading()) \
-    { \
-        if (_size_##arg > 0) \
-        { \
-            auto blob = Slang::UnownedRawBlob::create(_ptr_##arg, _size_##arg); \
-            *arg = blob.detach(); \
-        } \
-        else \
-        { \
-            *arg = nullptr; \
-        } \
-    } \
     RECORD_COM_OUTPUT(arg)
 
 // Record a COM object result and return it (wraps in proxy and records)
