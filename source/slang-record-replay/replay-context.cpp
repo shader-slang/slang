@@ -884,8 +884,8 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
         {
             recordTypeId(TypeId::String);
             uint32_t length = static_cast<uint32_t>(strlen(str));
-            recordRaw(flags, &length, sizeof(length));
-            if (length > 0) recordRaw(flags, const_cast<char*>(str), length);
+            recordRaw(RecordFlag::None, &length, sizeof(length));
+            if (length > 0) recordRaw(RecordFlag::None, const_cast<char*>(str), length);
         }
     }
     else
@@ -895,10 +895,17 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
         else if (typeId == TypeId::String)
         {
             uint32_t length;
-            recordRaw(flags, &length, sizeof(length));
+            recordRaw(RecordFlag::None, &length, sizeof(length));
             char* buf = m_arena.allocateArray<char>(length + 1);
-            if (length > 0) recordRaw(flags, buf, length);
+            if (length > 0) recordRaw(RecordFlag::None, buf, length);
             buf[length] = '\0';
+            if(hasFlag(flags, RecordFlag::Output))
+            {
+                if(strcmp(str, buf) != 0)
+                {
+                    throw DataMismatchException(m_stream.getPosition() - length, length);
+                }
+            }
             str = buf;
         }
         else { throw TypeMismatchException(TypeId::String, typeId); }

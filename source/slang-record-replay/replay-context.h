@@ -47,9 +47,11 @@ inline T* unwrapObject(T* obj)
 
 /// Handle constants for interface tracking.
 /// Handles 0-255 are reserved for special meanings.
-constexpr uint64_t kNullHandle = 0;          ///< Null pointer
-constexpr uint64_t kInlineBlobHandle = 1;    ///< User-provided blob serialized inline
-constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
+constexpr uint64_t kNullHandle = 0;                 ///< Null pointer
+constexpr uint64_t kInlineBlobHandle = 1;           ///< User-provided blob serialized inline
+constexpr uint64_t kCustomFileSystemHandle = 2;     ///< User-provided custom file system (that has not yet been registered with a handle)
+constexpr uint64_t kDefaultFileSystemHandle = 3;    ///< Default file system (when user doesn't provide one)
+constexpr uint64_t kFirstValidHandle = 0x100;       ///< First handle for tracked objects
 
 /// Maximum length for function signatures stored in index entries.
 constexpr size_t kMaxSignatureLength = 128;
@@ -365,7 +367,8 @@ public:
             writeIndexEntry(parsed, thisHandle);
         }
         
-        record(RecordFlag::Input, parsed);
+        // Note: the parsed signature is fixed/known, so can be treated as a verifiable output.
+        record(RecordFlag::Output, parsed);
         recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, thisUnknown);
     }
 

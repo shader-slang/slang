@@ -61,11 +61,51 @@ public:
         // Record the original descriptor (before our modification)
         RECORD_INPUT(desc);
 
-        // Get the file system to wrap - use provided one or Slang's default
+        // This logic handles the fact that a user can supply a custom file system, and we need to make
+        // sure that on playback, we emulate EXACTLY the same behaviour. That means distinguishing,
+        // between calling createSession twice with the same custom file system, or twice with
+        // different ones. To do so, on writing we record a handle that identifies the file system used, 
+        // and on reading we use that to decide whether to look for an existing proxy, wrap the OS, or
+        // wrap a new dummy 'NULL' filesystem.
         slang::SessionDesc desc2 = desc;
-        ISlangFileSystem* fileSystemToWrap =
-            desc2.fileSystem ? desc2.fileSystem : OSFileSystem::getMutableSingleton();
-        desc2.fileSystem = static_cast<ISlangFileSystem*>(wrapObject(fileSystemToWrap));
+        if(_ctx.isWriting()) {
+            uint64_t handle = 0;
+            if(desc.fileSystem) {
+                if(_ctx.isInterfaceRegistered(desc.fileSystem)) {
+                    desc2.fileSystem = wrapObject(desc.fileSystem);   
+                    handle = _ctx.getProxyHandle(desc.fileSystem);                 
+                } else {
+                    desc2.fileSystem = wrapObject(desc.fileSystem);
+                    handle = kCustomFileSystemHandle;
+                }
+            } else {
+                desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
+                handle = kDefaultFileSystemHandle;
+            }
+            RECORD_INFO(handle);
+        } else if(_ctx.isReading()) {
+            uint64_t handle;
+            RECORD_INFO(handle);
+            switch(handle) {
+                case kDefaultFileSystemHandle:
+                {
+                    desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
+                    break;
+                }
+                case kCustomFileSystemHandle:
+                {                    
+                    auto nfs = new NULLFileSystem();
+                    nfs->addRef();
+                    desc2.fileSystem = wrapObject(nfs);
+                    break;
+                }
+                default:
+                {
+                    desc2.fileSystem = toSlangInterface<ISlangFileSystem>(_ctx.getProxy(handle));
+                    break;
+                }
+            }
+        }
 
         // Call create session with our wrapped file system
         PREPARE_POINTER_OUTPUT(outSession);
