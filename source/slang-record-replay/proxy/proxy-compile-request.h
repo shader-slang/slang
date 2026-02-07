@@ -7,6 +7,8 @@
 #include "slang-com-helper.h"
 #include "slang-deprecated.h"
 #include "slang.h"
+#include "../../core/slang-file-system.h"
+#include "slang-com-helper.h"
 
 namespace SlangRecord
 {
@@ -15,6 +17,8 @@ using namespace Slang;
 class CompileRequestProxy : public ProxyBase<slang::ICompileRequest>
 {
 public:
+    ComPtr<ISlangFileSystem> m_fileSystem;
+
     SLANG_COM_INTERFACE(
         0xf7695fe5,
         0xcfe4,
@@ -24,6 +28,8 @@ public:
     explicit CompileRequestProxy(slang::ICompileRequest* actual)
         : ProxyBase(actual)
     {
+        m_fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
+        actual->setFileSystem(m_fileSystem);
     }
 
     // Record addRef/release for lifetime tracking during replay

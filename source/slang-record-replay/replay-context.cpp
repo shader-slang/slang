@@ -709,7 +709,7 @@ bool ReplayContext::isInterfaceRegisteredImpl(ISlangUnknown* obj) const
 {
     if (obj == nullptr)
         return true; // null is always "registered" as kNullHandle
-    return m_objectToHandle.containsKey(obj);
+    return m_proxyToImpl.containsKey(obj) || m_implToProxy.containsKey(obj);
 }
 
 uint64_t ReplayContext::getProxyHandleImpl(ISlangUnknown* obj) const

@@ -74,7 +74,7 @@ public:
                 desc.fileSystem->addRef();
                 if(_ctx.isInterfaceRegistered(desc.fileSystem)) {
                     desc2.fileSystem = wrapObject(desc.fileSystem);   
-                    handle = _ctx.getProxyHandle(desc.fileSystem);                 
+                    handle = _ctx.getProxyHandle(desc2.fileSystem);                 
                 } else {
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = kCustomFileSystemHandle;

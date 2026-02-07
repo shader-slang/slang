@@ -74,15 +74,16 @@ public:
         
         RECORD_COM_OUTPUT(outDiagnostics);
 
+        uint64_t handle = kNullHandle;
         if(result) {
             SuppressRefCountRecording guard;
             slang::IModule* wrapped = wrapObject(result); // ensure the module is wrapped in a proxy for recording
             auto modulePtr = Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, wrapped);
             m_loadedModules.add(modulePtr); // keep a reference to the loaded module to manage its lifetime
-            uint64_t handle = _ctx.getProxyHandle(wrapped);
-            _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
-            return wrapped;
+            handle = _ctx.getProxyHandle(wrapped);
+            result = wrapped;
         }
+        _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
         return result;
     }
 
@@ -95,6 +96,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
+        RECORD_INPUT(source);
 
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
@@ -102,15 +104,16 @@ public:
 
         RECORD_COM_OUTPUT(outDiagnostics);
 
+        uint64_t handle = kNullHandle;
         if(result) {
             SuppressRefCountRecording guard;
             slang::IModule* wrapped = wrapObject(result); // ensure the module is wrapped in a proxy for recording
             auto modulePtr = Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, wrapped);
             m_loadedModules.add(modulePtr); // keep a reference to the loaded module to manage its lifetime
-            uint64_t handle = _ctx.getProxyHandle(wrapped);
-            _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
-            return wrapped;
+            handle = _ctx.getProxyHandle(wrapped);
+            result = wrapped;
         }
+        _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
         return result;
     }
 
@@ -262,15 +265,16 @@ public:
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
         
         RECORD_COM_OUTPUT(outDiagnostics);
+        uint64_t handle = kNullHandle;
         if(result) {
             SuppressRefCountRecording guard;
             slang::IModule* wrapped = wrapObject(result); // ensure the module is wrapped in a proxy for recording
             auto modulePtr = Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, wrapped);
             m_loadedModules.add(modulePtr); // keep a reference to the loaded module to manage its lifetime
-            uint64_t handle = _ctx.getProxyHandle(wrapped);
-            _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
-            return wrapped;
+            handle = _ctx.getProxyHandle(wrapped);
+            result = wrapped;
         }
+        _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
         return result;
     }
 
@@ -286,15 +290,16 @@ public:
         RECORD_CALL();
         RECORD_INPUT(index);
         slang::IModule* result = getActual<slang::ISession>()->getLoadedModule(index);
+        uint64_t handle = kNullHandle;
         if(result) {
             SuppressRefCountRecording guard;
             slang::IModule* wrapped = wrapObject(result); // ensure the module is wrapped in a proxy for recording
             auto modulePtr = Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, wrapped);
             m_loadedModules.add(modulePtr); // keep a reference to the loaded module to manage its lifetime
-            uint64_t handle = _ctx.getProxyHandle(wrapped);
-            _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
-            return wrapped;
+            handle = _ctx.getProxyHandle(wrapped);
+            result = wrapped;
         }
+        _ctx.recordHandle(RecordFlag::ReturnValue, handle);  
         return result;
     }
 
