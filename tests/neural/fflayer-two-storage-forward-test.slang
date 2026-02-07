@@ -22,7 +22,7 @@ typealias Storage = StructuredBufferStorage<float>;
 typealias Vec2 = InlineVector<float, 2>;
 typealias Vec1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer = FFLayer<float, Vec2, Vec1, Storage, Act, true>;
+typealias Layer = FFLayer<float, Vec2, Vec1, Storage, LinearLayout, Act, true>;
 
 bool approxEqual(float a, float b, float eps = 0.001)
 {
