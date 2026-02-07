@@ -71,6 +71,7 @@ public:
         if(_ctx.isWriting()) {
             uint64_t handle = 0;
             if(desc.fileSystem) {
+                desc.fileSystem->addRef();
                 if(_ctx.isInterfaceRegistered(desc.fileSystem)) {
                     desc2.fileSystem = wrapObject(desc.fileSystem);   
                     handle = _ctx.getProxyHandle(desc.fileSystem);                 
