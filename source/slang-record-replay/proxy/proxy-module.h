@@ -175,9 +175,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(outLinkedComponentType);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::link");
+        RECORD_CALL();
+        PREPARE_POINTER_OUTPUT(outLinkedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+        auto result = getActual<slang::IModule>()->link(outLinkedComponentType, outDiagnostics);
+        RECORD_COM_OUTPUT(outLinkedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(
@@ -217,10 +221,14 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTargetCode(SlangInt targetIndex, ISlangBlob** outCode, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outCode);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getTargetCode");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+        PREPARE_POINTER_OUTPUT(outCode);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+        auto result = getActual<slang::IModule>()->getTargetCode(targetIndex, outCode, outDiagnostics);
+        RECORD_COM_OUTPUT(outCode);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
@@ -344,7 +352,8 @@ public:
 
     virtual SLANG_NO_THROW slang::DeclReflection* SLANG_MCALL getModuleReflection() override
     {
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getModuleReflection");
+        RECORD_CALL();
+        return getActual<slang::IModule>()->getModuleReflection();
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

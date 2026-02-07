@@ -26,8 +26,12 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
     if (SLANG_SUCCEEDED(obj->queryInterface(T::getTypeGuid(), (void**)queried.writeRef())))
     {
         ProxyT* proxy = new ProxyT(queried.get());
+        
         // Use addRefImpl to avoid recording this internal reference
         proxy->addRefImpl();
+
+        // Release the original reference since the proxy now owns it
+        obj->release();
         
         // Register the proxy with the ReplayContext so it can be tracked as a handle.
         // Use the free-function toSlangUnknown for canonical identity.

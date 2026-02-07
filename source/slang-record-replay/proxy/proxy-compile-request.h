@@ -260,10 +260,11 @@ public:
         char const* path,
         char const* source) override
     {
-        SLANG_UNUSED(translationUnitIndex);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(source);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addTranslationUnitSourceString");
+        RECORD_CALL();
+        RECORD_INPUT(translationUnitIndex);
+        RECORD_INPUT(path);
+        RECORD_INPUT(source);
+        getActual<slang::ICompileRequest>()->addTranslationUnitSourceString(translationUnitIndex, path, source);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -439,9 +440,12 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTargetHostCallable(int targetIndex, ISlangSharedLibrary** outSharedLibrary) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outSharedLibrary);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getTargetHostCallable");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+        PREPARE_POINTER_OUTPUT(outSharedLibrary);
+        auto result = getActual<slang::ICompileRequest>()->getTargetHostCallable(targetIndex, outSharedLibrary);
+        RECORD_COM_OUTPUT(outSharedLibrary);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW void const* SLANG_MCALL getCompileRequestCode(size_t* outSize) override

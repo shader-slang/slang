@@ -377,12 +377,17 @@ SLANG_API void spDestroySession(SlangSession* inSession)
     if (!inSession)
         return;
 
-    Slang::Session* session = Slang::asInternal(inSession);
+#ifdef _DEBUG        
     // It is assumed there is only a single reference on the session (the one placed
-    // with spCreateSession) if this function is called
-    SLANG_ASSERT(session->debugGetReferenceCount() == 1);
+    // with spCreateSession) if this function is called. 
+    // NOTE: When a replay is activate Slang::asInternal skips the proxy, so this
+    // line checks the ref count on the internal object only.
+    Slang::Session* internalSession = Slang::asInternal(inSession);
+    SLANG_ASSERT(internalSession->debugGetReferenceCount() == 1);
+#endif
+
     // Release
-    session->release();
+    inSession->release();
 }
 
 SLANG_API const char* spGetBuildTagString()
