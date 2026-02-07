@@ -241,6 +241,9 @@ public:
     /// Disable recording (sets mode to Idle).
     SLANG_API void disable();
 
+    /// Notify external object destryoed
+    SLANG_API void notifyDestroyed(ISlangUnknown* obj);
+
     // =========================================================================
     // TTY Logging (Live Trace)
     // =========================================================================
@@ -325,9 +328,6 @@ public:
     SLANG_API void record(RecordFlag flags, bool& value);
     SLANG_API void record(RecordFlag flags, const char*& str);
 
-    // Blob data (void* + size) - records raw blob bytes inline in the stream
-    SLANG_API void recordBlob(RecordFlag flags, const void*& data, size_t& size);
-
     // Blob by hash - hashes content, stores to disk, records hash in stream.
     // During playback, loads content from disk by hash.
     // This is the primary mechanism for recording ISlangBlob values.
@@ -398,6 +398,21 @@ public:
         record(RecordFlag::Input, parsed);
         uint64_t nh = kNullHandle;
         recordHandle(RecordFlag::Input, nh);
+    }
+
+    /// Insert a user-defined marker into the replay stream.
+    /// During recording, writes a labeled marker entry.
+    /// During playback, reads and logs the marker (no-op otherwise).
+    void marker(const char* label)
+    {
+        ensureInitialized();
+        if (!isActive())
+            return;
+        const char* sig = "__marker__";
+        record(RecordFlag::Input, sig);
+        uint64_t nh = kNullHandle;
+        recordHandle(RecordFlag::Input, nh);
+        record(RecordFlag::Input, label);
     }
 
     /// Register a proxy-implementation pair.

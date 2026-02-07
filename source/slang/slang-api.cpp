@@ -348,6 +348,11 @@ SLANG_API SlangResult slang_loadLatestReplay()
     return SlangRecord::ReplayContext::get().loadLatestReplay();
 }
 
+SLANG_API void slang_replayMarker(const char* label)
+{
+    SlangRecord::ReplayContext::get().marker(label);
+}
+
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
     SlangInt apiVersion,
     slang::IGlobalSession** outGlobalSession)

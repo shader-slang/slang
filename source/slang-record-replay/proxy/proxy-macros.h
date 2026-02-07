@@ -13,6 +13,11 @@ namespace SlangRecord {
 // Core Macros - Fine-grained control for recording API calls
 // =============================================================================
 
+// Insert a labeled marker into the replay stream for debugging.
+// Usage: SLANG_REPLAY_MARKER("before createSession")
+#define SLANG_REPLAY_MARKER(label) \
+    do { ReplayContext::get().marker(label); } while(0)
+
 // Begins a recorded instance method call - locks context, records signature and 'this'
 // Uses compiler-specific macro for full signature including type name
 #ifdef _MSC_VER

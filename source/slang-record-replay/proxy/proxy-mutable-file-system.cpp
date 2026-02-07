@@ -9,9 +9,6 @@ using namespace Slang;
 
 SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outBlob)
 {
-    // Prevent logging proxy blob ref counts
-    SuppressRefCountRecording guard;
-
     RECORD_CALL();
     RECORD_INPUT(path);
 

@@ -156,45 +156,6 @@ SLANG_UNIT_TEST(replayContextString)
 }
 
 // =============================================================================
-// Blob Data
-// =============================================================================
-
-SLANG_UNIT_TEST(replayContextBlob)
-{
-    REPLAY_TEST;
-    SLANG_UNUSED(unitTestContext);
-
-    auto testBlob = [](const void* data, size_t size)
-    {
-        ctx().reset();
-        ctx().setMode(Mode::Record);
-        ctx().recordBlob(RecordFlag::None, data, size);
-
-        ctx().switchToPlayback();
-
-        const void* readData = nullptr;
-        size_t readSize = 0;
-        ctx().recordBlob(RecordFlag::None, readData, readSize);
-
-        if (size != readSize)
-            return false;
-        if (size == 0)
-            return true;
-        return memcmp(data, readData, size) == 0;
-    };
-
-    uint8_t blobData[] = {0x01, 0x02, 0x03, 0x04, 0x05, 0xFE, 0xFF};
-    SLANG_CHECK(testBlob(blobData, sizeof(blobData)));
-    SLANG_CHECK(testBlob(nullptr, 0));
-
-    // Larger blob
-    uint8_t largeBlob[1024];
-    for (int i = 0; i < 1024; ++i)
-        largeBlob[i] = static_cast<uint8_t>(i & 0xFF);
-    SLANG_CHECK(testBlob(largeBlob, sizeof(largeBlob)));
-}
-
-// =============================================================================
 // Slang Enums
 // =============================================================================
 

@@ -736,6 +736,36 @@ ISlangUnknown* ReplayContext::getProxy(uint64_t handle) const
     return *obj;
 }
 
+void ReplayContext::notifyDestroyed(ISlangUnknown* obj)
+{
+    if (obj == nullptr)
+        return;
+
+    uint64_t* handle = m_objectToHandle.tryGetValue(obj);
+    if (handle)
+    {
+        fprintf(stderr, "[REPLAY] Object destroyed: handle=%llu, ptr=%p\n", *handle, obj);
+        m_handleToObject.remove(*handle);
+        m_objectToHandle.remove(obj);
+    }
+
+    ISlangUnknown** impl = m_proxyToImpl.tryGetValue(obj);
+    if (impl)
+    {
+        fprintf(stderr, "[REPLAY] Proxy-impl association removed: proxy=%p, impl=%p\n", obj, *impl);
+        m_proxyToImpl.remove(obj);
+        m_implToProxy.remove(*impl);
+    }
+
+    ISlangUnknown** proxy = m_implToProxy.tryGetValue(obj);
+    if (proxy)
+    {
+        fprintf(stderr, "[REPLAY] Impl-proxy association removed: impl=%p, proxy=%p\n", obj, *proxy);
+        m_implToProxy.remove(obj);
+        m_proxyToImpl.remove(*proxy);
+    }
+}
+
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
     switch (m_mode)
@@ -917,32 +947,6 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
 // =============================================================================
 // Blob and Handle
 // =============================================================================
-
-void ReplayContext::recordBlob(RecordFlag flags, const void*& data, size_t& size)
-{
-    if (m_mode == Mode::Idle) return;
-    if (isWriting())
-    {
-        recordTypeId(TypeId::Blob);
-        uint64_t blobSize = static_cast<uint64_t>(size);
-        recordRaw(flags, &blobSize, sizeof(blobSize));
-        if (size > 0 && data != nullptr) recordRaw(flags, const_cast<void*>(data), size);
-    }
-    else
-    {
-        expectTypeId(TypeId::Blob);
-        uint64_t blobSize;
-        recordRaw(flags, &blobSize, sizeof(blobSize));
-        size = static_cast<size_t>(blobSize);
-        if (size > 0)
-        {
-            void* buf = m_arena.allocate(size);
-            recordRaw(flags, buf, size);
-            data = buf;
-        }
-        else { data = nullptr; }
-    }
-}
 
 void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 {

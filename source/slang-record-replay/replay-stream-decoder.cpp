@@ -255,22 +255,41 @@ void ReplayStreamDecoder::decodeValueFromStream(
 
     case TypeId::Blob:
         {
-            uint64_t size;
-            stream.read(&size, sizeof(size));
-            output << "Blob(" << size << " bytes)";
-            
-            if (size > 0)
+            // Blob is serialized as a content hash string (via recordBlobByHash).
+            // Format: [TypeId::Blob][TypeId::String][uint32_t len][hash chars]
+            // or:     [TypeId::Blob][TypeId::Null]  (for null blob)
+            TypeId innerType = readTypeId(stream);
+            if (innerType == TypeId::Null)
             {
-                // Show hex dump of first few bytes
-                size_t showBytes = (size < 32) ? (size_t)size : 32;
-                uint8_t buffer[32];
-                stream.read(buffer, showBytes);
-                output << ": ";
-                appendHexDump(output, buffer, showBytes, 32);
-                
-                // Skip remaining bytes
-                if (size > showBytes)
-                    stream.skip((size_t)size - showBytes);
+                output << "BlobHash: null";
+            }
+            else if (innerType == TypeId::String)
+            {
+                uint32_t len;
+                stream.read(&len, sizeof(len));
+                if (len == 0)
+                {
+                    output << "BlobHash: (empty)";
+                }
+                else if (len < 256)
+                {
+                    char buffer[256];
+                    stream.read(buffer, len);
+                    buffer[len] = '\0';
+                    output << "BlobHash: \"" << buffer << "\"";
+                }
+                else
+                {
+                    char buffer[128];
+                    stream.read(buffer, 127);
+                    buffer[127] = '\0';
+                    stream.skip(len - 127);
+                    output << "BlobHash(" << len << "): \"" << buffer << "...\"";
+                }
+            }
+            else
+            {
+                output << "Blob: unexpected inner type " << (int)innerType;
             }
         }
         break;
@@ -487,9 +506,15 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
     case TypeId::Blob:
         {
-            uint64_t size;
-            stream.read(&size, sizeof(size));
-            stream.skip((size_t)size);
+            // Blob is stored as a nested String (content hash) or Null
+            TypeId innerType = readTypeId(stream);
+            if (innerType == TypeId::String)
+            {
+                uint32_t len;
+                stream.read(&len, sizeof(len));
+                stream.skip(len);
+            }
+            // TypeId::Null has no payload to skip
         }
         break;
 

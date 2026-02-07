@@ -71,6 +71,18 @@ static void registerAllHandlers()
     // Static/Free Function handlers
     // =========================================================================
     
+    // __marker__ - user-inserted marker for debugging replay streams
+    ReplayContext::get().registerHandler("__marker__", [](ReplayContext& ctx) {
+        const char* sig = nullptr;
+        ctx.record(RecordFlag::Input, sig);
+        uint64_t thisHandle = 0;
+        ctx.recordHandle(RecordFlag::Input, thisHandle);
+        const char* label = nullptr;
+        ctx.record(RecordFlag::Input, label);
+        if (ctx.isTtyLogging())
+            fprintf(stderr, "[REPLAY] *** MARKER: %s ***\n", label ? label : "(null)");
+    });
+
     // slang_createGlobalSession2 - the entry point for creating global sessions
     ReplayContext::get().registerHandler("slang_createGlobalSession2", handle_slang_createGlobalSession2);
     
