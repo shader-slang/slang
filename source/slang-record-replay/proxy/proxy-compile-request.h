@@ -143,8 +143,9 @@ public:
 
     virtual SLANG_NO_THROW void SLANG_MCALL setDebugInfoLevel(SlangDebugInfoLevel level) override
     {
-        SLANG_UNUSED(level);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::setDebugInfoLevel");
+        RECORD_CALL();
+        RECORD_INPUT(level);
+        getActual<slang::ICompileRequest>()->setDebugInfoLevel(level);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
