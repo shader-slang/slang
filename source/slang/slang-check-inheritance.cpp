@@ -29,9 +29,11 @@ InheritanceInfo SharedSemanticsContext::getInheritanceInfo(
     // inheritance graph, and we need to avoid crashing or going
     // into an infinite loop in such cases.
     //
+
     m_mapTypeToInheritanceInfo[type] = InheritanceInfo();
 
     auto info = _calcInheritanceInfo(type, circularityInfo);
+
     m_mapTypeToInheritanceInfo[type] = info;
 
     return info;
@@ -93,9 +95,11 @@ InheritanceInfo SharedSemanticsContext::_getInheritanceInfo(
     // inheritance graph, and we need to avoid crashing or going
     // into an infinite loop in such cases.
     //
+
     m_mapDeclRefToInheritanceInfo[declRef] = InheritanceInfo();
 
     auto info = _calcInheritanceInfo(declRef, selfType, circularityInfo);
+
     m_mapDeclRefToInheritanceInfo[declRef] = info;
 
     getSession()->m_typeDictionarySize = Math::Max(
@@ -490,11 +494,42 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             // If the sub-type part of the generic constraint is a member expression, it can't
             // possibly be defining a constraint for a generic type parameter, so we skip it
             // to avoid circular checking on the generic param type.
-            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+            if (selfIsGenericParamType && (as<MemberExpr>(sub.exp)))
                 continue;
 
             if (!sub.type)
-                sub = visitor.TranslateTypeNodeForced(sub);
+            {
+                DiagnosticSink tmpSink;
+                SemanticsVisitor subVisitor(visitor.withInheritanceCacheDisabled(&tmpSink));
+                auto orgQualType = sub.exp->type;
+
+                // The idea here is that not all the constraintDeclRef is possibly related to
+                // the selfType. So we shouldn't report any errors if it's failed to check its
+                // type, because at this point, there is possible some of other constraints that
+                // is dependent by this one is being check now, so it's expected to fail here. We
+                // can leave the upper level caller to report the error when the inheritance info
+                // doesn't satisfy the requirement. Meanwhile, we should also disable the cache
+                // because if the inheritance info is not completed for some type due to the above
+                // reason, we will still have chance to check later on when everything is ready.
+                //
+                // This solution might be too aggressive to abandon the cache. The more smart
+                // solution is that we can check if sub has any dependency constraintDeclRef that is
+                // being checked, then we will know that it's expected to fail here, so we can
+                // disable the cache only in that case.
+                auto typeRepr = subVisitor.TranslateTypeNodeImpl(sub.exp);
+
+                if (tmpSink.getErrorCount() != 0)
+                {
+                    sub.exp->checked = false;
+                    sub.exp->type = orgQualType;
+                    sub.type = nullptr;
+                    continue;
+                }
+
+                TypeExp result;
+                sub.exp = typeRepr;
+                sub.type = subVisitor.ExtractTypeFromTypeRepr(typeRepr);
+            }
             auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
 
             // We only consider constraints where the type represented
