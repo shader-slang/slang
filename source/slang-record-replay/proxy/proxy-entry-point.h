@@ -76,9 +76,16 @@ public:
     virtual SLANG_NO_THROW slang::ProgramLayout* SLANG_MCALL
     getLayout(SlangInt targetIndex, ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("EntryPointProxy::getLayout");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+
+        slang::ProgramLayout* result = getActual<slang::IEntryPoint>()->getLayout(targetIndex, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outDiagnostics);
+        // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
+        return result;
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override

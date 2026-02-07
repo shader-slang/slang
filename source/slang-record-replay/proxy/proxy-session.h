@@ -73,11 +73,16 @@ public:
         slang::IBlob* source,
         slang::IBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(moduleName);
-        SLANG_UNUSED(path);
-        SLANG_UNUSED(source);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleFromSource");
+        RECORD_CALL();
+        RECORD_INPUT(moduleName);
+        RECORD_INPUT(path);
+
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSource(moduleName, path, source, outDiagnostics);
+
+        RECORD_COM_OUTPUT(outDiagnostics);
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL createCompositeComponentType(
@@ -288,11 +293,10 @@ public:
         const char*& outModuleCompilerVersion,
         const char*& outModuleName) override
     {
-        SLANG_UNUSED(source);
-        SLANG_UNUSED(outModuleVersion);
-        SLANG_UNUSED(outModuleCompilerVersion);
-        SLANG_UNUSED(outModuleName);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::loadModuleInfoFromIRBlob");
+        RECORD_CALL();
+        auto result = getActual<slang::ISession>()->loadModuleInfoFromIRBlob(
+            source, outModuleVersion, outModuleCompilerVersion, outModuleName);
+        RECORD_RETURN(result);
     }
 };
 

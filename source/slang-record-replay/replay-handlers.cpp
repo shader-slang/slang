@@ -133,6 +133,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, createCompileRequest);
     REPLAY_REGISTER(SessionProxy, createTypeConformanceComponentType);
     REPLAY_REGISTER(SessionProxy, isBinaryModuleUpToDate);
+    REPLAY_REGISTER(SessionProxy, loadModuleInfoFromIRBlob);
     
     // =========================================================================
     // ModuleProxy handlers  

@@ -293,8 +293,11 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) override
     {
-        SLANG_UNUSED(outSerializedBlob);
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::serialize");
+        RECORD_CALL();
+        PREPARE_POINTER_OUTPUT(outSerializedBlob);
+        auto result = getActual<slang::IModule>()->serialize(outSerializedBlob);
+        RECORD_COM_OUTPUT(outSerializedBlob);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName) override
