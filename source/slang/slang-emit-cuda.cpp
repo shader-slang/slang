@@ -1016,6 +1016,48 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
         }
         return true;
+
+    case kIROp_CoopMatMapElementIFunc:
+    {
+        auto mapElementInst = as<IRCoopMatMapElementIFunc>(inst);
+        IRInst* coopMat = mapElementInst->getCoopMat();
+
+        // Emit: coopMat.MapElement(functor)
+        emitOperand(coopMat, getInfo(EmitOp::Postfix));
+        m_writer->emit(".MapElement(");
+
+        // For lambdas with captures, we need to create a callable wrapper.
+        // The function pointer (getIFuncCall) takes (lambdaObj, row, col, value),
+        // so we create a lambda wrapper that captures the lambda object and calls
+        // the function (which is in scope, so doesn't need to be captured).
+        if (mapElementInst->hasIFuncThis())
+        {
+            // Get the element type from the cooperative matrix result type
+            auto resultType = mapElementInst->getFullType();
+            IRType* elementType = nullptr;
+            if (auto coopMatType = as<IRCoopMatrixType>(resultType))
+            {
+                elementType = coopMatType->getElementType();
+            }
+            
+            // Lambda with captures: use a helper struct from the prelude to wrap the lambda object
+            // and function pointer. This avoids issues with CUDA device lambda capture restrictions.
+            // Use C++17 class template argument deduction (CTAD) to avoid needing explicit types
+            m_writer->emit("Slang_MapElementFunctor{");
+            emitOperand(mapElementInst->getIFuncThis(), getInfo(EmitOp::General));
+            m_writer->emit(", &");
+            emitOperand(mapElementInst->getIFuncCall(), getInfo(EmitOp::General));
+            m_writer->emit("}");
+        }
+        else if (mapElementInst->getOperandCount() > 1)
+        {
+            // Lambda without captures: pass the function pointer directly
+            emitOperand(mapElementInst->getOperand(1), getInfo(EmitOp::General));
+        }
+
+        m_writer->emit(")");
+        return true;
+    }
     default:
         break;
     }

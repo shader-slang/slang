@@ -27015,12 +27015,19 @@ struct CoopMat
     [require(cooperative_matrix_map_element)]
     This MapElement(functype(uint32_t, uint32_t, T)->T mapOp)
     {
-        return spirv_asm
+        __target_switch
         {
-            OpCapability CooperativeMatrixPerElementOperationsNV;
-            OpExtension "SPV_NV_cooperative_matrix2";
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
-        };
+        case spirv:
+            return spirv_asm
+            {
+                OpCapability CooperativeMatrixPerElementOperationsNV;
+                OpExtension "SPV_NV_cooperative_matrix2";
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixPerElementOpNV $this $mapOp;
+            };
+        case cuda:
+            // Call the MapElement method implemented in the CUDA prelude
+            __intrinsic_asm "$0.MapElement($1)";
+        }
     }
 
     __intrinsic_op($(kIROp_CoopMatMapElementIFunc))

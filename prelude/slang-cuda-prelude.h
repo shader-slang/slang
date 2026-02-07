@@ -7148,6 +7148,62 @@ struct WmmaFragment
     unsigned regs[RegsCount] = {};
 
     static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
+
+    // MapElement: Apply a per-element operation to the cooperative matrix
+    // This iterates through all elements in this thread's portion of the matrix,
+    // computes the logical row/column coordinates, and applies the map function.
+    // Note: WMMA fragments distribute elements across threads in a warp, so we
+    // compute logical coordinates based on thread ID and element index.
+    template<typename TFunc>
+    __device__ This MapElement(TFunc mapOp)
+    {
+        This result;
+        result.m_layout = this->m_layout;
+        
+        // Get the thread's lane ID within the warp (0-31)
+        uint32_t laneId = _getLaneId();
+        
+        // Iterate through all elements in this thread's fragment
+        for (int i = 0; i < GetLength(); i++)
+        {
+            // Compute the global linear index across all threads in the warp
+            // Each thread holds elements_per_thread elements
+            uint32_t globalIndex = laneId * GetLength() + i;
+            
+            // Compute logical row and column from global linear index
+            // Based on the matrix layout
+            uint32_t row, col;
+            if (m_layout == Layout::RowMajor)
+            {
+                // For row-major: elements are laid out row by row
+                row = globalIndex / N;
+                col = globalIndex % N;
+            }
+            else
+            {
+                // For column-major: elements are laid out column by column
+                row = globalIndex % M;
+                col = globalIndex / M;
+            }
+            
+            // Clamp to matrix dimensions (in case of rounding)
+            if (row < (uint32_t)M && col < (uint32_t)N)
+            {
+                // Get the current element value
+                T value = this->get(i);
+                
+                // Apply the map function
+                // For Slang lambda structs, the CUDA emitter should pass a wrapper
+                // that makes them callable. For function pointers, direct call works.
+                T newValue = mapOp(row, col, value);
+                
+                // Set the result
+                result.set(i, newValue);
+            }
+        }
+        
+        return result;
+    }
 };
 
 // ====================================================================================
@@ -7688,6 +7744,26 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
 
 } // namespace Slang_CUDA_WMMA
 
+// Helper struct to wrap a lambda object and function pointer for MapElement
+// This is needed because CUDA device lambdas have restrictions on capturing function pointers.
+// The function pointer signature is: TReturn (*)(TLambda lambdaObj, ...args)
+template<typename TLambda, typename TFuncPtr>
+struct Slang_MapElementFunctor
+{
+    TLambda lambdaObj;
+    TFuncPtr funcPtr;
+    
+    // Constructor for C++17 class template argument deduction (CTAD)
+    __device__ Slang_MapElementFunctor(TLambda lambda, TFuncPtr func) 
+        : lambdaObj(lambda), funcPtr(func) {}
+    
+    template<typename... Args>
+    __device__ auto operator()(Args... args) -> decltype(funcPtr(lambdaObj, args...))
+    {
+        return funcPtr(lambdaObj, args...);
+    }
+};
+
 namespace Slang_CUDA_MMA
 {
 // Enums for template specialization
@@ -8172,6 +8248,61 @@ struct alignas(16) MMAMatrix
         {
             result.set(i, -get(i));
         }
+        return result;
+    }
+
+    // MapElement: Apply a per-element operation to the cooperative matrix
+    // This iterates through all elements in this thread's portion of the matrix,
+    // computes the logical row/column coordinates, and applies the map function.
+    // Note: MMA matrices distribute elements across threads in a warp, so we
+    // compute logical coordinates based on thread ID and element index.
+    template<typename TFunc>
+    __device__ MMAMatrix<T, M, N, layout> MapElement(TFunc mapOp)
+    {
+        MMAMatrix<T, M, N, layout> result;
+        
+        // Get the thread's lane ID within the warp (0-31)
+        uint32_t laneId = _getLaneId();
+        
+        // Iterate through all elements in this thread's fragment
+        for (int i = 0; i < GetLength(); i++)
+        {
+            // Compute the global linear index across all threads in the warp
+            // Each thread holds GetLength() elements
+            uint32_t globalIndex = laneId * GetLength() + i;
+            
+            // Compute logical row and column from global linear index
+            // Based on the matrix layout
+            uint32_t row, col;
+            if constexpr (ROW_MAJOR)
+            {
+                // For row-major: elements are laid out row by row
+                row = globalIndex / N;
+                col = globalIndex % N;
+            }
+            else
+            {
+                // For column-major: elements are laid out column by column
+                row = globalIndex % M;
+                col = globalIndex / M;
+            }
+            
+            // Clamp to matrix dimensions (in case of rounding)
+            if (row < (uint32_t)M && col < (uint32_t)N)
+            {
+                // Get the current element value
+                T value = this->get(i);
+                
+                // Apply the map function
+                // Slang lambdas are structs that are callable via function call syntax.
+                // This works for both function pointers and lambda structs.
+                T newValue = mapOp(row, col, value);
+                
+                // Set the result
+                result.set(i, newValue);
+            }
+        }
+        
         return result;
     }
 

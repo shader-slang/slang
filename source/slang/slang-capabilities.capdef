@@ -1354,7 +1354,7 @@ alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
 alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
-alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
+alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV | cuda;
 /// Capabilities needed to load or store with tensor_addressing extension
 /// [Compound]
 alias cooperative_matrix_tensor_addressing = spvCooperativeMatrixTensorAddressingNV;
