@@ -67,7 +67,6 @@ namespace SlangRecord {
 
 // Record an output parameter (for T** style outputs, dereferences and wraps)
 #define RECORD_COM_OUTPUT(arg) \
-    if (arg && *arg) *arg = static_cast<std::remove_pointer_t<decltype(arg)>>(static_cast<ISlangUnknown*>(*arg)); \
     _ctx.record(RecordFlag::Output, *arg)
 
 // Record a blob output parameter (ISlangBlob**)
@@ -95,7 +94,7 @@ namespace SlangRecord {
 // Usage: return RECORD_COM_RESULT(actualModule);
 #define RECORD_COM_RESULT(result) \
     [&]() -> decltype(result) { \
-        auto* _wrapped = static_cast<decltype(result)>(static_cast<ISlangUnknown*>(result)); \
+        auto* _wrapped = result; \
         _ctx.record(RecordFlag::ReturnValue, _wrapped); \
         return _wrapped; \
     }()

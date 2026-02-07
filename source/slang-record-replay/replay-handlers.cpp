@@ -55,11 +55,7 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
     
     // Wrap the session in a proxy (just like slang_createGlobalSession2 does during recording)
     if (SLANG_SUCCEEDED(result) && globalSession)
-    {
-        auto* wrapped = wrapObject(globalSession);
-        if (wrapped)
-            globalSession = static_cast<slang::IGlobalSession*>(wrapped);
-    }
+        globalSession = wrapObject(globalSession);
     
     // Read and verify the output (this will register the created session in the handle table)
     ctx.record(RecordFlag::Output, globalSession);

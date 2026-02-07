@@ -79,10 +79,17 @@ public:
     }
 
     /// Get the underlying actual object, cast to the requested interface type.
+    /// Uses queryInterface for safe cross-hierarchy casting (avoids UB when T
+    /// is not in the same single-inheritance chain as the stored ISlangUnknown*).
     template<typename T>
     T* getActual() const
     {
-        return static_cast<T*>(m_actual.get());
+        SuppressRefCountRecording guard;
+        T* result = nullptr;
+        m_actual->queryInterface(T::getTypeGuid(), (void**)&result);
+        if (result)
+            result->release(); // undo the addRef; we don't transfer ownership
+        return result;
     }
 
 protected:

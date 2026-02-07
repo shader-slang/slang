@@ -23,9 +23,27 @@ using Slang::List;
 using Slang::MemoryArena;
 using Slang::String;
 
-// Fwd declare form proxy-base.h
+// Fwd declare from proxy-base.h (non-template, work with canonical ISlangUnknown*)
 SLANG_API ISlangUnknown* wrapObject(ISlangUnknown* obj);
 SLANG_API ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
+
+/// Type-safe wrapObject: canonicalizes the input via queryInterface, wraps it,
+/// then QIs the result back to T. Safe for diamond-inheritance types.
+template<typename T>
+inline T* wrapObject(T* obj)
+{
+    ISlangUnknown* wrapped = wrapObject(toSlangUnknown(obj));
+    return wrapped ? toSlangInterface<T>(wrapped) : nullptr;
+}
+
+/// Type-safe unwrapObject: canonicalizes the input via queryInterface, unwraps it,
+/// then QIs the result back to T. Safe for diamond-inheritance types.
+template<typename T>
+inline T* unwrapObject(T* obj)
+{
+    ISlangUnknown* impl = unwrapObject(toSlangUnknown(obj));
+    return impl ? toSlangInterface<T>(impl) : nullptr;
+}
 
 /// Handle constants for interface tracking.
 /// Handles 0-255 are reserved for special meanings.
@@ -745,8 +763,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             uint64_t handle = getProxyHandle(obj);
             recordHandle(flags, handle);
 
-            // Unwrap the object before returning
-            obj = static_cast<T*>(unwrapObject(obj));
+            // Unwrap the proxy to get the underlying implementation
+            obj = unwrapObject(obj);
 
         }
         else if (isOutput)
@@ -754,8 +772,8 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
             // An output from a slang api to be handed back to user. Should be an implementation
             // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
 
-            // Wrap the object before using
-            obj = static_cast<T*>(wrapObject(obj));
+            // Wrap the implementation in a proxy
+            obj = wrapObject(obj);
 
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
@@ -788,23 +806,25 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
                 
                 // Create a RawBlob from the data (arena-allocated during recordBlob)
                 Slang::ComPtr<ISlangBlob> blob = Slang::RawBlob::create(data, size);
-                obj = static_cast<T*>(static_cast<ISlangUnknown*>(blob.detach()));
+                ISlangUnknown* blobUnknown = blob.detach();
+                obj = blobUnknown ? toSlangInterface<T>(blobUnknown) : nullptr;
             }
             else
             {
-                obj = static_cast<T*>(getProxy(handle));
+                ISlangUnknown* proxy = getProxy(handle);
+                obj = proxy ? toSlangInterface<T>(proxy) : nullptr;
             }
 
-            // Unwrap the object before returning
-            obj = static_cast<T*>(unwrapObject(obj));
+            // Unwrap the proxy to get the underlying implementation
+            obj = unwrapObject(obj);
         }
         else if (isOutput)
         {
             // An output from a slang api to be handed back to user. Should be an implementation
             // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
 
-            // Wrap the object before using
-            obj = static_cast<T*>(wrapObject(obj));
+            // Wrap the implementation in a proxy
+            obj = wrapObject(obj);
 
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);

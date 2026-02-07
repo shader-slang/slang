@@ -1145,15 +1145,6 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
     if (m_mode == Mode::Idle)
         return;
 
-    // iterate over registered ModuleProxy objects and ensure they have all registered their core modules
-    //for(auto& kv : m_implToProxy) 
-    //{
-    //    if(ModuleProxy* proxy = dynamic_cast<ModuleProxy*>(kv.second)) 
-    //    {
-    //        proxy->tryRegisterCoreModule();
-    //    }
-    //}
-
     if (isWriting())
     {
         recordTypeId(TypeId::TypeReflectionRef);
