@@ -49,6 +49,11 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
 
 void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
+    // TODO: Check capability and print an error if it doesn't match:
+    // if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle))
+    //     != CapabilitySet::ImpliesReturnFlags::Implied)
+    //     print error;
+
     // Get the bindless space index that was allocated during layout generation.
     // This is done before DCE, so it correctly accounts for all declared parameters.
     auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram, sink);

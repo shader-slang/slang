@@ -5540,6 +5540,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
         // Add descriptor_handle capability to the target when DescriptorHandle is used.
+        // TODO: add the capability only in the auto-promotion mode.
         if (context.targetReq)
         {
             auto targetCaps = context.targetReq->getTargetCaps();
@@ -6210,6 +6211,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
         // Add descriptor_handle capability to the target when DescriptorHandle is used.
+        // TODO: add the capability only in the auto-promotion mode.
         if (context.targetReq)
         {
             auto targetCaps = context.targetReq->getTargetCaps();
