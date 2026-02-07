@@ -113,9 +113,10 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setTargetFlags(int targetIndex, SlangTargetFlags flags) override
     {
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(flags);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::setTargetFlags");
+        RECORD_CALL();
+        RECORD_INPUT(targetIndex);
+        RECORD_INPUT(flags);
+        getActual<slang::ICompileRequest>()->setTargetFlags(targetIndex, flags);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -149,8 +150,9 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setOptimizationLevel(SlangOptimizationLevel level) override
     {
-        SLANG_UNUSED(level);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::setOptimizationLevel");
+        RECORD_CALL();
+        RECORD_INPUT(level);
+        getActual<slang::ICompileRequest>()->setOptimizationLevel(level);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
