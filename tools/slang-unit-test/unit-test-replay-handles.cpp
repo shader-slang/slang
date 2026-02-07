@@ -12,26 +12,25 @@ SLANG_UNIT_TEST(replayContextHandle)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // This test emulates a real-world scenario:
-    // 1. RECORD: An API call creates a blob and outputs it, then later inputs it
-    // 2. PLAYBACK: A new blob is created, and when the 2nd input occurs,
-    //    the system correctly identifies it by handle and provides the new blob
+    // This test verifies that blob content survives a record/playback round-trip
+    // using hash-based serialization. Blobs are serialized by content hash to disk,
+    // not tracked as COM interface proxies.
     
+    const char* testData = "original data";
+    size_t testDataSize = 13;
+
     // === RECORDING PHASE ===
     ctx().reset();
     ctx().setMode(Mode::Record);
     
-    // Simulate: API creates a blob and returns it as output (e.g., getCompileResult)
-    // The 'record' call should wrap the recordedBlob in a proxy
-    Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create("original data", 13);
+    // Simulate: API creates a blob and returns it as output
+    Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* outputBlob = recordedBlob.get();
-    ctx().record(RecordFlag::Output, outputBlob);  // Registers blob with handle 1, records handle
+    ctx().record(RecordFlag::Output, outputBlob);  // Hashes content, stores to disk
     
-    // Simulate: The output is passed as input to another call (e.g., writeToFile)
-    // The 'record' call should unwrap the proxy and spit out the original
-    ISlangBlob* inputBlob = outputBlob;
-    ctx().record(RecordFlag::Input, inputBlob);  // Looks up handle for blob, records handle
-    SLANG_CHECK(inputBlob == recordedBlob.get());
+    // Simulate: The output is passed as input to another call
+    ISlangBlob* inputBlob = recordedBlob.get();
+    ctx().record(RecordFlag::Input, inputBlob);  // Hashes content, stores hash to stream
     
     // Verify recording produced data
     SLANG_CHECK(ctx().getStream().getSize() > 0);
@@ -39,20 +38,23 @@ SLANG_UNIT_TEST(replayContextHandle)
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
     
-    // During playback, a NEW blob is created (simulating the real API being called)
-    Slang::ComPtr<ISlangBlob> playbackBlob = Slang::RawBlob::create("playback data", 13);
+    // Playback: First call outputs the blob - reads hash, loads from disk
+    ISlangBlob* playbackOutput = nullptr;
+    ctx().record(RecordFlag::Output, playbackOutput);
+    SLANG_CHECK(playbackOutput != nullptr);
+    SLANG_CHECK(playbackOutput->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(playbackOutput->getBufferPointer(), testData, testDataSize) == 0);
     
-    // Playback: First call outputs the blob - we register the new blob with the handle
-    ISlangBlob* playbackOutput = playbackBlob.get();
-    ctx().record(RecordFlag::Output, playbackOutput);  // Reads handle, verifies/registers
-    
-    // Playback: Second call should replay the same mechanism - playbackInput should end
-    // up as an unwrapped reference to the original blob we fed in.
+    // Playback: Second call inputs the blob - reads hash, loads from disk
     ISlangBlob* playbackInput = nullptr;
-    ctx().record(RecordFlag::Input, playbackInput);  // Reads handle, looks up object
-    
-    // The input should resolve to our playback blob (same pointer)
-    SLANG_CHECK(playbackInput == playbackBlob.get());
+    ctx().record(RecordFlag::Input, playbackInput);
+    SLANG_CHECK(playbackInput != nullptr);
+    SLANG_CHECK(playbackInput->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(playbackInput->getBufferPointer(), testData, testDataSize) == 0);
+
+    // Clean up
+    playbackOutput->release();
+    playbackInput->release();
 }
 
 SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
@@ -60,39 +62,46 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Test with multiple blobs to ensure handle tracking works correctly
+    // Test with multiple blobs with different content to ensure hash-based
+    // serialization correctly distinguishes them by content
     
+    const char* data1 = "blob one";
+    const char* data2 = "blob two";
+    size_t size1 = 8;
+    size_t size2 = 8;
+
     // === RECORDING PHASE ===
     ctx().reset();
     ctx().setMode(Mode::Record);
     
     // Create and output two different blobs
-    Slang::ComPtr<ISlangBlob> blob1 = Slang::RawBlob::create("blob one", 8);
-    Slang::ComPtr<ISlangBlob> blob2 = Slang::RawBlob::create("blob two", 8);
+    Slang::ComPtr<ISlangBlob> blob1 = Slang::RawBlob::create(data1, size1);
+    Slang::ComPtr<ISlangBlob> blob2 = Slang::RawBlob::create(data2, size2);
     
     ISlangBlob* out1 = blob1.get();
     ISlangBlob* out2 = blob2.get();
-    ctx().record(RecordFlag::Output, out1);  // Handle 1
-    ctx().record(RecordFlag::Output, out2);  // Handle 2
+    ctx().record(RecordFlag::Output, out1);
+    ctx().record(RecordFlag::Output, out2);
     
     // Now input them in reverse order
-    ISlangBlob* in2 = out2;
-    ISlangBlob* in1 = out1;
+    ISlangBlob* in2 = blob2.get();
+    ISlangBlob* in1 = blob1.get();
     ctx().record(RecordFlag::Input, in2);
     ctx().record(RecordFlag::Input, in1);
     
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
     
-    // Create new blobs for playback
-    Slang::ComPtr<ISlangBlob> newBlob1 = Slang::RawBlob::create("new one!", 8);
-    Slang::ComPtr<ISlangBlob> newBlob2 = Slang::RawBlob::create("new two!", 8);
-    
-    // Playback outputs
-    ISlangBlob* playOut1 = newBlob1.get();
-    ISlangBlob* playOut2 = newBlob2.get();
+    // Playback outputs - each creates a blob from disk
+    ISlangBlob* playOut1 = nullptr;
+    ISlangBlob* playOut2 = nullptr;
     ctx().record(RecordFlag::Output, playOut1);
     ctx().record(RecordFlag::Output, playOut2);
+    
+    SLANG_CHECK(playOut1 != nullptr);
+    SLANG_CHECK(playOut2 != nullptr);
+    SLANG_CHECK(memcmp(playOut1->getBufferPointer(), data1, size1) == 0);
+    SLANG_CHECK(memcmp(playOut2->getBufferPointer(), data2, size2) == 0);
     
     // Playback inputs (reverse order, matching recording)
     ISlangBlob* playIn2 = nullptr;
@@ -100,9 +109,17 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     ctx().record(RecordFlag::Input, playIn2);
     ctx().record(RecordFlag::Input, playIn1);
     
-    // Verify correct blob resolution
-    SLANG_CHECK(playIn1 == newBlob1.get());
-    SLANG_CHECK(playIn2 == newBlob2.get());
+    // Verify correct blob content resolution
+    SLANG_CHECK(playIn1 != nullptr);
+    SLANG_CHECK(playIn2 != nullptr);
+    SLANG_CHECK(memcmp(playIn1->getBufferPointer(), data1, size1) == 0);
+    SLANG_CHECK(memcmp(playIn2->getBufferPointer(), data2, size2) == 0);
+
+    // Clean up
+    playOut1->release();
+    playOut2->release();
+    playIn1->release();
+    playIn2->release();
 }
 
 SLANG_UNIT_TEST(replayContextHandleNull)
@@ -178,9 +195,8 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    // Test that an inline blob can later be output (registered) and input again
-    // This simulates: user passes blob as input, API stores it internally,
-    // then later returns the same blob as output
+    // Test that the same blob content serialized multiple times (as input then output
+    // then input again) is correctly de-duplicated on disk and round-trips properly.
 
     const char* testData = "Inline then tracked";
     size_t testDataSize = strlen(testData) + 1;
@@ -189,40 +205,47 @@ SLANG_UNIT_TEST(replayContextInlineBlobThenTracked)
     ctx().reset();
     ctx().setMode(Mode::Record);
 
-    // User provides blob as input (untracked -> inline)
+    // User provides blob as input
     Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* inputBlob = userBlob.get();
     ctx().record(RecordFlag::Input, inputBlob);
 
-    // API stores it and later returns it as output (now it gets tracked)
+    // API stores it and later returns it as output
     ISlangBlob* outputBlob = userBlob.get();
     ctx().record(RecordFlag::Output, outputBlob);
 
-    // Later, it's passed as input again (should use handle, not inline)
-    ISlangBlob* inputAgain = outputBlob;
+    // Later, it's passed as input again
+    ISlangBlob* inputAgain = userBlob.get();
     ctx().record(RecordFlag::Input, inputAgain);
 
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
 
-    // First: read inline blob
-    ISlangBlob* readInline = nullptr;
-    ctx().record(RecordFlag::Input, readInline);
-    SLANG_CHECK(readInline != nullptr);
-    SLANG_CHECK(readInline->getBufferSize() == testDataSize);
+    // First: read input blob
+    ISlangBlob* readInput = nullptr;
+    ctx().record(RecordFlag::Input, readInput);
+    SLANG_CHECK(readInput != nullptr);
+    SLANG_CHECK(readInput->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(readInput->getBufferPointer(), testData, testDataSize) == 0);
 
-    // Second: output registers a blob (simulating API creating/returning it)
-    // In real usage, playback would provide its own blob here
-    ISlangBlob* playbackOutput = readInline;  // Use the reconstructed blob
-    ctx().record(RecordFlag::Output, playbackOutput);
+    // Second: read output blob (same content, loaded from same hash on disk)
+    ISlangBlob* readOutput = nullptr;
+    ctx().record(RecordFlag::Output, readOutput);
+    SLANG_CHECK(readOutput != nullptr);
+    SLANG_CHECK(readOutput->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(readOutput->getBufferPointer(), testData, testDataSize) == 0);
 
-    // Third: input should resolve to the registered blob
+    // Third: read input again
     ISlangBlob* readAgain = nullptr;
     ctx().record(RecordFlag::Input, readAgain);
-    SLANG_CHECK(readAgain == readInline);
+    SLANG_CHECK(readAgain != nullptr);
+    SLANG_CHECK(readAgain->getBufferSize() == testDataSize);
+    SLANG_CHECK(memcmp(readAgain->getBufferPointer(), testData, testDataSize) == 0);
 
     // Clean up
-    readInline->release();
+    readInput->release();
+    readOutput->release();
+    readAgain->release();
 }
 
 // =============================================================================

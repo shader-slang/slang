@@ -138,6 +138,7 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     // - signature: GlobalSessionProxy::createSession
     // - this handle (the handle of the global session)
     // - SessionDesc (complex struct)
+    // - file system handle
     // - output session handle
     // - return value (SlangResult)
     ctx().record(RecordFlag::Input, signature);
@@ -150,6 +151,10 @@ SLANG_UNIT_TEST(replayContextRecordCreateSessionCall)
     ctx().record(RecordFlag::Input, readDesc);
     SLANG_CHECK(readDesc.targetCount == 0);
     SLANG_CHECK(readDesc.searchPathCount == 0);
+    SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::UInt64);
+    uint64_t fileSystemHandle = 0;
+    ctx().getStream().read(&fileSystemHandle, sizeof(fileSystemHandle));
+    SLANG_CHECK(fileSystemHandle == kDefaultFileSystemHandle); // NULL file system
     SLANG_CHECK(readTypeIdFromStream(ctx().getStream()) == TypeId::ObjectHandle);
     uint64_t sessionHandle = 0;
     ctx().getStream().read(&sessionHandle, sizeof(sessionHandle));
