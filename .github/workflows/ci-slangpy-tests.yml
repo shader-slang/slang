@@ -1,0 +1,188 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+name: CI SlangPy Test Workflow
+
+on:
+  workflow_call:
+    inputs:
+      os:
+        required: true
+        type: string
+      compiler:
+        required: true
+        type: string
+      platform:
+        required: true
+        type: string
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+      artifact-suffix:
+        required: false
+        type: string
+        default: ""
+        description: "Optional suffix for artifact name (e.g., '-cuda')"
+
+jobs:
+  test-slangpy:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Common Test Setup
+        uses: ./.github/actions/common-test-setup
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          config: ${{ inputs.config }}
+          artifact-suffix: ${{ inputs.artifact-suffix }}
+
+      - name: Setup Python
+        if: ${{ runner.environment != 'self-hosted' }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install and setup slangpy
+        run: |
+          python --version
+          echo "Cleaning up existing installations and installing slangpy..."
+
+          # Try to uninstall existing slangpy
+          python -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+
+          # Install slangpy
+          python -m pip install --verbose slangpy --user
+
+          # Get site packages directory
+          SITE_PACKAGES=$(python -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
+
+          #
+          # THIS IS A HUGE HACK, the latest slangpy release hardcoded this
+          # directory when looking for slangc. We should remove the offending
+          # code from slangpy and just put slangc into PATH here. The offending
+          # code is find_slangc() in
+          # slangpy/tests/device/test_precompiled_modules.py
+          #
+          # See https://github.com/shader-slang/slangpy/issues/696
+          #
+          SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
+          mkdir -p "$SLANGC_TARGET_DIR"
+          # Copy slangc binary to the expected location
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+              cp -v "$bin_dir/slangc.exe" "$SLANGC_TARGET_DIR/"
+          else
+              cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+              chmod +x "$SLANGC_TARGET_DIR/slangc"
+          fi
+
+          # Copy library files
+          if [[ "${{ inputs.os }}" == "windows" ]]; then
+            cp -v "$bin_dir"/slang*.dll "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+            # Copy standard modules directory (contains neural module)
+            STD_MODULE_DIR=$(find "$bin_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+            if [[ -n "$STD_MODULE_DIR" ]]; then
+              echo "Copying standard modules from: $STD_MODULE_DIR"
+              cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+            fi
+          else
+
+            # This is kind of awkward because the version numbers might be
+            # different between the old libslang-compiler and the new one, so
+            # we need to make sure we overwrite the old one. This logic also
+            # tries to avoid making assumptions about filename extension due to
+            # differences in macos and Linux conventions.
+
+            # There should only be one libslang-compiler library present; the
+            # one that slangpy linked to.
+            OLD_SLANGLIB=$(find "$SITE_PACKAGES/slangpy/" -type f -name "libslang-compiler.*")
+            echo "old slang library location: $OLD_SLANGLIB"
+
+            # Find the new libslang-compiler library via developer symlink
+            # filename. This is unlikely to still be a symlink since it went
+            # through artifactory, but in practice symlink or not shouldn't
+            # matter, since we copy the rest of the libraries over.
+            NEW_SLANGLIB=$(find "$lib_dir" -name "libslang-compiler.*" ! -name "*.*.*")
+            echo "new slang library location: $NEW_SLANGLIB"
+
+            cp "$NEW_SLANGLIB" "$OLD_SLANGLIB" || { echo "Failed to copy main library file"; exit 1; }
+
+            # Copy the rest of the library files
+            cp "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+            # Copy standard modules directory (contains neural module)
+            STD_MODULE_DIR=$(find "$lib_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+            if [[ -n "$STD_MODULE_DIR" ]]; then
+              echo "Copying standard modules from: $STD_MODULE_DIR"
+              cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+            fi
+          fi
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          # Export SITE_PACKAGES for use in subsequent steps
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python -m pip install -r requirements-dev.txt --user
+          python -m pip install pytest-github-actions-annotate-failures --user
+          python -m pip install pytest-xdist --user
+
+      - name: Run slangpy tests
+        run: |
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          # First attempt: run with parallel execution
+          if python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi
+
+      - name: Run slang neural integration tests
+        run: |
+          export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          echo "Running neural module integration tests..."
+          # These tests live in the slang repo and test neural module functionality via slangpy
+          if python -m pytest tests/integration/slangpy/neural/ -ra -v
+          then
+            echo "All neural integration tests passed."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some neural integration tests failed. Re-running failed tests..."
+            echo "========================================"
+            echo ""
+            python -m pytest tests/integration/slangpy/neural/ -ra -v --lf
+          fi
+
+      # NOTE: slangpy-samples tests are not run here to match the original
+      # ci-slang-test.yml behavior. The slangpy-samples tests have known issues
+      # with pickled test data that need to be fixed upstream.
