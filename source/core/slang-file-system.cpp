@@ -1142,4 +1142,24 @@ SlangResult RelativeFileSystem::createDirectory(const char* path)
     return fileSystem->createDirectory(fixedPath.getBuffer());
 }
 
+/* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! NULLFileSystem !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+
+ISlangUnknown* NULLFileSystem::getInterface(const Guid& guid)
+{
+    if (guid == ISlangUnknown::getTypeGuid() || guid == ICastable::getTypeGuid() ||
+        guid == ISlangCastable::getTypeGuid() || guid == ISlangFileSystem::getTypeGuid() ||
+        guid == ISlangFileSystemExt::getTypeGuid() ||
+        guid == ISlangMutableFileSystem::getTypeGuid())
+    {
+        return static_cast<ISlangMutableFileSystem*>(this);
+    }
+    return nullptr;
+}
+
+void* NULLFileSystem::getObject(const Guid& guid)
+{
+    SLANG_UNUSED(guid);
+    return nullptr;
+}
+
 } // namespace Slang
