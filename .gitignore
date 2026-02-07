@@ -136,3 +136,4 @@ perf.data.*
 
 .slang-replays*
 log*.txt
+replay-capture
