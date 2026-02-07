@@ -3155,6 +3155,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return false;
         }
     }
+
     void emitSystemVarDecoration(IRInst* var, SpvInst* varInst)
     {
         for (auto decor : var->getDecorations())
@@ -3294,7 +3295,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 SpvLiteralInteger::from32(int32_t(0)));
         }
 
-        bool anyModifiers = (var->findDecoration<IRInterpolationModeDecoration>() != nullptr);
+        bool anyModifiers = (var->findDecoration<IRInterpolationModeDecoration>() != nullptr || var->findDecoration<IRGLSLPrimitivesRateDecoration>() != nullptr);
 
         // If the user didn't explicitly qualify a varying
         // with integer or pointer type, then we need to explicitly
@@ -3321,13 +3322,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (decor->getOp())
             {
-            case kIROp_GLSLPrimitivesRateDecoration:
-                emitOpDecorate(
-                    getSection(SpvLogicalSectionID::Annotations),
-                    decor,
-                    varInst,
-                    SpvDecorationPerPrimitiveEXT);
-                break;
             case kIROp_RequireSPIRVDescriptorIndexingExtensionDecoration:
                 ensureExtensionDeclarationBeforeSpv15(
                     UnownedStringSlice("SPV_EXT_descriptor_indexing"));
@@ -5936,6 +5930,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 dstID,
                 SpvDecorationPerVertexKHR);
             break;
+        case kIROp_GLSLPrimitivesRateDecoration:
+            ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_mesh_shader"));
+            requireSPIRVAnyCapability({SpvCapabilityMeshShadingEXT});
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                decoration,
+                dstID,
+                SpvDecorationPerPrimitiveEXT);
+                break;
         case kIROp_OutputControlPointsDecoration:
             requireSPIRVExecutionMode(
                 decoration,
