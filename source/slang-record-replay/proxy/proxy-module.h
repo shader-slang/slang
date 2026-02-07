@@ -313,7 +313,8 @@ public:
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getFilePath() override
     {
-        REPLAY_UNIMPLEMENTED_X("ModuleProxy::getFilePath");
+        RECORD_CALL();
+        return getActual<slang::IModule>()->getFilePath();
     }
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getUniqueIdentity() override

@@ -134,6 +134,9 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, createTypeConformanceComponentType);
     REPLAY_REGISTER(SessionProxy, isBinaryModuleUpToDate);
     REPLAY_REGISTER(SessionProxy, loadModuleInfoFromIRBlob);
+    REPLAY_REGISTER(SessionProxy, getLoadedModuleCount);
+    REPLAY_REGISTER(SessionProxy, getLoadedModule);
+    REPLAY_REGISTER(SessionProxy, loadModuleFromSource);
     
     // =========================================================================
     // ModuleProxy handlers  
@@ -181,6 +184,7 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ComponentTypeProxy, getTargetHostCallable);
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointMetadata);
     REPLAY_REGISTER(ComponentTypeProxy, getTargetMetadata);
+    REPLAY_REGISTER(ComponentTypeProxy, getEntryPointCompileResult);
     
     // =========================================================================
     // EntryPointProxy handlers

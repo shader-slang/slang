@@ -303,10 +303,13 @@ public:
     virtual SLANG_NO_THROW int SLANG_MCALL
     addEntryPoint(int translationUnitIndex, char const* name, SlangStage stage) override
     {
-        SLANG_UNUSED(translationUnitIndex);
-        SLANG_UNUSED(name);
-        SLANG_UNUSED(stage);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::addEntryPoint");
+        RECORD_CALL();
+        RECORD_INPUT(translationUnitIndex);
+        RECORD_INPUT(name);
+        RECORD_INPUT(stage);
+        auto result =
+            getActual<slang::ICompileRequest>()->addEntryPoint(translationUnitIndex, name, stage);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW int SLANG_MCALL addEntryPointEx(
@@ -412,10 +415,16 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getEntryPointCodeBlob(int entryPointIndex, int targetIndex, ISlangBlob** outBlob) override
     {
-        SLANG_UNUSED(entryPointIndex);
-        SLANG_UNUSED(targetIndex);
-        SLANG_UNUSED(outBlob);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getEntryPointCodeBlob");
+        RECORD_CALL();
+        RECORD_INPUT(entryPointIndex);
+        RECORD_INPUT(targetIndex);
+        PREPARE_POINTER_OUTPUT(outBlob);
+        auto result = getActual<slang::ICompileRequest>()->getEntryPointCodeBlob(
+            entryPointIndex,
+            targetIndex,
+            outBlob);
+        RECORD_COM_OUTPUT(outBlob);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointHostCallable(

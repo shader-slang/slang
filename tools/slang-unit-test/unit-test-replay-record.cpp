@@ -162,6 +162,14 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
 
 static SlangResult runTest(UnitTestContext* context, const char* testName, uint64_t expectedHash = 0)
 {
+    // If the context is already active, it means we're running the testing framework as a replay,
+    // so specific replay based test cases have to be ignored.
+    if (SlangRecord::ReplayContext::get().isActive())
+    {
+        SLANG_IGNORE_TEST;
+        return SLANG_OK;
+    }
+
     // Use a predictable path for each test so we can easily find and verify recordings
     String recordPath = getRecordPathForTest(testName);
 

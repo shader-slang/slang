@@ -238,13 +238,17 @@ public:
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getLoadedModuleCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::getLoadedModuleCount");
+        RECORD_CALL();
+        SlangInt result = getActual<slang::ISession>()->getLoadedModuleCount();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override
     {
-        SLANG_UNUSED(index);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::getLoadedModule");
+        RECORD_CALL();
+        RECORD_INPUT(index);
+        slang::IModule* result = getActual<slang::ISession>()->getLoadedModule(index);
+        return RECORD_COM_RESULT(result);
     }
 
     virtual SLANG_NO_THROW bool SLANG_MCALL
