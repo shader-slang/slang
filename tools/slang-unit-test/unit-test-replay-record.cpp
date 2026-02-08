@@ -266,8 +266,8 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
         return replayResult;
     }
 
-    // Cleanup (disable for now for debugging)
-    // cleanupRecordFiles(recordPath);
+    // Cleanup
+    cleanupRecordFiles(recordPath);
     return SLANG_OK;
 }
 

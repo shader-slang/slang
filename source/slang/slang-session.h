@@ -90,7 +90,16 @@ struct ContainerTypeKey
 class Linkage : public RefObject, public slang::ISession
 {
 public:
-    SLANG_REF_OBJECT_IUNKNOWN_ALL
+    SLANG_COM_INTERFACE(
+        0xa3f29c15,
+        0x4e82,
+        0x47d1,
+        {0x9b, 0x53, 0x7c, 0xe6, 0x1f, 0x48, 0xd2, 0x07})
+
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE;
+    SLANG_REF_OBJECT_IUNKNOWN_ADD_REF
+    SLANG_REF_OBJECT_IUNKNOWN_RELEASE
 
     CompilerOptionSet m_optionSet;
 

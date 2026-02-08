@@ -1,10 +1,16 @@
 # Slang Record-Replay System Design
 
-This document describes the architecture and design of the Slang Record-Replay system, which enables capturing and replaying Slang API calls for debugging, testing, and determinism verification.
+This document describes the architecture and design of the Slang Record-Replay system,
+which enables capturing and replaying Slang API calls for debugging, testing, and
+determinism verification.
+
+**Last updated:** 2026-02-08
 
 ## Overview
 
-The Record-Replay system intercepts all Slang COM interface calls, serializes them to a binary stream, and can replay them later to reproduce exact API call sequences. This is useful for:
+The Record-Replay system intercepts all Slang COM interface calls, serializes them to a
+binary stream, and can replay them later to reproduce exact API call sequences. This is
+useful for:
 
 - **Bug reproduction**: Capture a failing scenario and replay it for debugging
 - **Determinism testing**: Verify that replaying calls produces identical results
@@ -52,24 +58,39 @@ The Record-Replay system intercepts all Slang COM interface calls, serializes th
 ```
 source/slang-record-replay/
 ├── DESIGN.md                    # This document
+├── WORKFLOW.md                  # Iterative proxy implementation workflow
 ├── replay-context.h/cpp         # Core serialization and state management
 ├── replay-stream.h              # Binary stream implementation
 ├── replay-stream-decoder.h/cpp  # Human-readable stream decoding
+├── replay-stream-logger.h       # (EMPTY — planned but not implemented)
+├── replay-shared.h              # Ref-count suppression, canonical identity helpers
 ├── replay-handlers.cpp          # Playback handler registration
 └── proxy/
-    ├── proxy-base.h/cpp         # Base class for all proxies
-    ├── proxy-macros.h           # Recording macros (RECORD_CALL, etc.)
+    ├── proxy-base.h/cpp         # Base class for all proxies + wrapObject/unwrapObject
+    ├── proxy-macros.h           # Recording macros + playback registration infrastructure
     ├── proxy-global-session.h   # IGlobalSession proxy
     ├── proxy-session.h          # ISession proxy
     ├── proxy-module.h           # IModule proxy
     ├── proxy-component-type.h   # IComponentType proxy
     ├── proxy-entry-point.h      # IEntryPoint proxy
     ├── proxy-compile-request.h  # ICompileRequest proxy
-    ├── proxy-blob.h             # ISlangBlob proxy
-    └── ...                      # Other interface proxies
+    ├── proxy-compile-result.h   # ICompileResult proxy (all stubs)
+    ├── proxy-metadata.h         # IMetadata proxy (all stubs)
+    ├── proxy-type-conformance.h # ITypeConformance proxy (all stubs)
+    ├── proxy-shared-library.h   # ISlangSharedLibrary proxy
+    └── proxy-mutable-file-system.h/cpp  # ISlangMutableFileSystem proxy (fully implemented)
 
 tools/slang-replay/
 └── main.cpp                     # Command-line replay utility
+
+tools/slang-unit-test/
+├── unit-test-replay-serialization.cpp  # Type round-trip tests
+├── unit-test-replay-record.cpp         # End-to-end recording tests (child process)
+├── unit-test-replay-playback.cpp       # Playback dispatcher tests
+├── unit-test-replay-modes.cpp          # Mode/state machine tests
+├── unit-test-replay-integration.cpp    # Byte-level stream verification
+├── unit-test-replay-handles.cpp        # Blob + TypeReflection serialization
+└── unit-test-replay-filesystem.cpp     # MutableFileSystemProxy tests
 ```
 
 ## Operating Modes
@@ -98,17 +119,27 @@ SLANG_RECORD_PATH=/path/to/recording
 SLANG_RECORD_LOG=1
 ```
 
+It can also be enabled programmatically:
+
+```cpp
+slang_enableRecordLayer(true);  // Enable
+slang_enableRecordLayer(false); // Disable
+```
+
 When enabled, recordings are saved to timestamped folders under `.slang-replays/`:
 ```
 .slang-replays/
 └── 2026-02-04_14-30-45-123/
     ├── stream.bin    # Main call data stream
-    └── index.bin     # Call index for quick navigation
+    ├── index.bin     # Call index for quick navigation
+    └── files/        # Content-addressed blob storage (SHA1 hashes)
 ```
 
 ## Call Index Stream
 
-The `index.bin` file is a secondary stream written alongside `stream.bin` during recording. It contains fixed-size entries that allow quick navigation through a replay without parsing the entire main stream.
+The `index.bin` file is a secondary stream written alongside `stream.bin` during
+recording. It contains fixed-size entries that allow quick navigation through a replay
+without parsing the entire main stream.
 
 ### Index Entry Format
 
@@ -150,12 +181,14 @@ class ProxyBase : public TFirstInterface, public TRestInterfaces..., public RefO
 {
 public:
     explicit ProxyBase(ISlangUnknown* actual);
-    
-    // ISlangUnknown implementation (ref counting, queryInterface)
-    
+
+    // ISlangUnknown: ref counting, queryInterface
+    // queryInterface delegates to the underlying object to check support,
+    // but always returns 'this' (the proxy) on success.
+
     template<typename T>
-    T* getActual() const;  // Access underlying implementation
-    
+    T* getActual() const;  // Access underlying implementation (via queryInterface)
+
 protected:
     ComPtr<ISlangUnknown> m_actual;
 };
@@ -163,52 +196,62 @@ protected:
 
 ### Object Wrapping
 
-The `wrapObject()` and `unwrapObject()` functions manage proxy creation:
+The `wrapObject()` and `unwrapObject()` functions in `proxy-base.cpp` manage proxy
+creation:
 
 ```cpp
-// Wrap an implementation in a proxy (for outputs)
-ISlangUnknown* wrapObject(ISlangUnknown* obj);
-
-// Unwrap a proxy to get the implementation (for inputs)
-ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
+ISlangUnknown* wrapObject(ISlangUnknown* obj);   // Wrap implementation in proxy (for outputs)
+ISlangUnknown* unwrapObject(ISlangUnknown* proxy); // Unwrap proxy to implementation (for inputs)
 ```
 
-Wrapping order matters due to inheritance - more derived types are checked first.
+Wrapping order matters due to inheritance — more derived types are checked first
+(e.g., `IModule` before `IComponentType`).
+
+### Canonical Identity (replay-shared.h)
+
+COM objects can be reached through multiple interface pointers due to multiple
+inheritance. The `toSlangUnknown()` helper calls `queryInterface(ISlangUnknown)` to get
+a canonical pointer, used as the key for handle tracking. `SuppressRefCountRecording`
+suppresses ref-count recording during these internal identity queries.
 
 ## Recording Macros
 
-### Core Macros
+### Core Macros (proxy-macros.h)
 
 ```cpp
-// Begin a method call - records signature and 'this' pointer
-RECORD_CALL()
-
-// Record input parameters
-RECORD_INPUT(arg)
-
-// Record COM output parameters (T** style)
-RECORD_COM_OUTPUT(outParam)
-
-// Record return value
-RECORD_RETURN(result)
-RECORD_RETURN_VOID()
+RECORD_CALL()                    // Begin a method call (locks ctx, records signature + 'this')
+RECORD_STATIC_CALL()             // Begin a free/static function call
+RECORD_INPUT(arg)                // Record input parameter
+RECORD_INPUT_ARRAY(arr, count)   // Record input array
+RECORD_INFO(arg)                 // Record informational data (not input/output)
+RECORD_OUTPUT(arg)               // Record non-COM output (T* style)
+PREPARE_POINTER_OUTPUT(arg)      // Create temp if pointer is null
+RECORD_COM_OUTPUT(arg)           // Record COM output (T** style, wraps + records)
+RECORD_BLOB_OUTPUT(arg)          // Record blob output (by content hash)
+RECORD_COM_RESULT(result)        // Wrap COM result and record it
+RECORD_RETURN(result)            // Record return value and return
+RECORD_RETURN_VOID()             // No-op for void returns
+PROXY_REFCOUNT_IMPL(ProxyType)   // addRef/release overrides that record
 ```
 
 ### Higher-Level Macros
 
 ```cpp
-// Pattern: SlangResult method(inputs..., T** outObject)
-RECORD_METHOD_OUTPUT(method, outParam, inputs...)
-
-// Pattern: T method(inputs...) - with return value
-RECORD_METHOD_RETURN(method, inputs...)
-
-// Pattern: void method(inputs...) - void methods
-RECORD_METHOD_VOID(method, inputs...)
-
-// Pattern: T method() - no args
-RECORD_METHOD_RETURN_NOARGS(method)
+RECORD_METHOD_OUTPUT(method, outParam, inputs...)  // SlangResult method(inputs..., T** out)
+RECORD_METHOD_RETURN(method, inputs...)            // T method(inputs...)
+RECORD_METHOD_VOID(method, inputs...)              // void method(inputs...)
+RECORD_METHOD_RETURN_NOARGS(method)                // T method()
 ```
+
+### Playback Registration
+
+```cpp
+REPLAY_REGISTER(ProxyType, methodName)   // Register handler in replay-handlers.cpp
+```
+
+This uses `MemberFunctionTraits` and `callMethodWithDefaults` to invoke the proxy method
+with default-initialized arguments — the proxy reads actual values from the stream during
+the call.
 
 ### Example Usage
 
@@ -216,11 +259,11 @@ RECORD_METHOD_RETURN_NOARGS(method)
 virtual SLANG_NO_THROW SlangResult SLANG_MCALL
 createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
 {
-    RECORD_CALL();                                           // Begin call
-    RECORD_INPUT(desc);                                      // Record input
+    RECORD_CALL();
+    RECORD_INPUT(desc);
     auto result = getActual<slang::IGlobalSession>()->createSession(desc, outSession);
-    RECORD_COM_OUTPUT(outSession);                           // Wrap & record output
-    RECORD_RETURN(result);                                   // Record return value
+    RECORD_COM_OUTPUT(outSession);
+    RECORD_RETURN(result);
 }
 ```
 
@@ -237,7 +280,7 @@ Each serialized value is prefixed with a `TypeId` byte:
 | Float32, Float64 | 0x09-0x0A | Floating point |
 | Bool | 0x0B | Boolean |
 | String | 0x10 | Null-terminated string with length prefix |
-| Blob | 0x11 | Binary data with size prefix |
+| Blob | 0x11 | Content-hash reference (blob stored in files/ directory) |
 | Array | 0x12 | Count + elements |
 | ObjectHandle | 0x13 | COM interface as uint64_t handle |
 | Null | 0x14 | Null pointer |
@@ -251,7 +294,8 @@ COM interface pointers are mapped to uint64_t handles:
 | Handle Value | Meaning |
 |--------------|---------|
 | 0 (kNullHandle) | Null pointer |
-| 1 (kInlineBlobHandle) | User-provided blob (data serialized inline) |
+| 2 (kCustomFileSystemHandle) | User-provided custom file system (not yet registered) |
+| 3 (kDefaultFileSystemHandle) | Default file system |
 | ≥256 (kFirstValidHandle) | Tracked object handle |
 
 ### Call Structure
@@ -266,35 +310,75 @@ Each recorded call has this structure:
 [TypeId::*] [return value]
 ```
 
+## Blob Serialization
+
+Blobs (`ISlangBlob*`) are NOT tracked as COM objects with handles. Instead they use
+content-addressed storage:
+
+1. **Recording**: Compute SHA1 hash of blob content, write content to
+   `<replay-dir>/files/<hash>`, record the hash string in the stream.
+2. **Playback**: Read hash from stream, load content from `files/<hash>`, create a
+   new `RawBlob`.
+
+This deduplicates identical blobs and avoids the need for blob proxy objects.
+
 ## Playback System
 
 ### Handler Registration
 
-Handlers are registered in `replay-handlers.cpp`:
+Handlers are registered in `replay-handlers.cpp` via static initialization:
 
 ```cpp
-// For proxy methods
+// For proxy methods (auto-generated handler)
 REPLAY_REGISTER(GlobalSessionProxy, createSession);
 REPLAY_REGISTER(SessionProxy, loadModule);
 
 // For static functions (manual handler)
-ReplayContext::get().registerHandler("slang_createGlobalSession2", handle_slang_createGlobalSession2);
+ReplayContext::get().registerHandler("slang_createGlobalSession2",
+                                     handle_slang_createGlobalSession2);
 ```
 
 ### Execution
 
 ```cpp
-// Load a recording
 ctx.loadReplay("/path/to/recording");
-
-// Execute all calls
 ctx.executeAll();
 
-// Or execute one at a time
-while (ctx.hasMoreCalls()) {
+// Or step-by-step:
+while (ctx.hasMoreCalls())
     ctx.executeNextCall();
-}
 ```
+
+### Playback Dispatch Flow
+
+1. `executeNextCall()` reads the function signature and `this` handle from the stream
+2. Looks up the registered `PlaybackHandler` by signature
+3. Seeks the stream back to the call start
+4. Calls the handler, which invokes the proxy method with default arguments
+5. The proxy's `RECORD_CALL()` in playback mode reads the signature and `this` handle
+6. Each `RECORD_INPUT()` reads the actual value from the stream
+7. The actual Slang API is called with the deserialized arguments
+8. Each `RECORD_COM_OUTPUT()` wraps the result and registers it
+9. `RECORD_RETURN()` reads the expected return value from the stream
+
+## TypeReflection Serialization
+
+`TypeReflection*` pointers require special handling since they are not COM objects.
+They are serialized as a reference to their owning module plus the type's full name:
+
+```
+[TypeId::TypeReflectionRef]
+[module handle]       # Handle of the IModule that owns this type
+[type name string]    # Full name from TypeReflection::getFullName()
+```
+
+During playback, the type is recovered by looking up the module from its handle and
+calling `module->getLayout()->findTypeByName(typeName)`.
+
+**Known limitation:** Finding the owning module uses internal compiler casts
+(`Slang::as<DeclRefType>`, `Slang::asInternal()`), tightly coupling the proxy layer to
+compiler internals. For builtin types like `float3`, a fallback iterates all registered
+modules to find one whose layout contains the type.
 
 ## Adding New API Support
 
@@ -306,11 +390,9 @@ If the interface doesn't have a proxy, create one:
 class NewInterfaceProxy : public ProxyBase<slang::INewInterface>
 {
 public:
-    SLANG_COM_INTERFACE(/* unique GUID */)
-    
     explicit NewInterfaceProxy(slang::INewInterface* actual)
         : ProxyBase(actual) {}
-    
+
     // Implement each method with recording...
 };
 ```
@@ -330,7 +412,7 @@ virtual ReturnType SLANG_MCALL methodName(ArgType arg, OutType** out) override
 
 ### Step 3: Register Wrapping (if new interface)
 
-Add to `proxy-base.cpp`:
+Add to `proxy-base.cpp` in the `wrapObject()` function:
 
 ```cpp
 TRY_WRAP(slang::INewInterface, NewInterfaceProxy)
@@ -338,7 +420,7 @@ TRY_WRAP(slang::INewInterface, NewInterfaceProxy)
 
 ### Step 4: Register Replay Handler
 
-Add to `replay-handlers.cpp`:
+Add to `replay-handlers.cpp` in `registerAllHandlers()`:
 
 ```cpp
 REPLAY_REGISTER(NewInterfaceProxy, methodName);
@@ -346,18 +428,17 @@ REPLAY_REGISTER(NewInterfaceProxy, methodName);
 
 ### Step 5: Add Type Serialization (if needed)
 
-If the method uses new struct types, add `record()` overloads in `replay-context.h/cpp`:
+If the method uses new struct types, add `record()` overloads:
 
 ```cpp
-// Declaration in header
+// Declaration in replay-context.h
 SLANG_API void record(RecordFlag flags, NewStructType& value);
 
-// Implementation in cpp
+// Implementation in replay-context.cpp
 void ReplayContext::record(RecordFlag flags, NewStructType& value)
 {
     record(flags, value.field1);
     record(flags, value.field2);
-    // ...
 }
 ```
 
@@ -367,8 +448,15 @@ void ReplayContext::record(RecordFlag flags, NewStructType& value)
 
 Located in `tools/slang-unit-test/`:
 
-- `unit-test-replay-context.cpp` - Tests serialization round-trips
-- `unit-test-record-replay.cpp` - Tests end-to-end recording/replay
+| File | Coverage |
+|------|----------|
+| `unit-test-replay-serialization.cpp` | Round-trip tests for all basic types, enums, structs |
+| `unit-test-replay-record.cpp` | End-to-end recording via child process launch of examples |
+| `unit-test-replay-playback.cpp` | Playback dispatcher, handler registration, `parseSignature` |
+| `unit-test-replay-modes.cpp` | Mode transitions, Idle/Record/Sync/Playback state machine |
+| `unit-test-replay-integration.cpp` | Byte-level stream verification of actual API calls |
+| `unit-test-replay-handles.cpp` | Blob hash serialization, null handles, TypeReflection |
+| `unit-test-replay-filesystem.cpp` | All MutableFileSystemProxy methods |
 
 ### Running Tests
 
@@ -376,115 +464,59 @@ Located in `tools/slang-unit-test/`:
 # Build
 cmake --workflow --preset debug
 
-# Run record-replay tests
-./build/Debug/bin/slang-test.exe "slang-unit-test-tool/RecordReplay"
-./build/Debug/bin/slang-test.exe "slang-unit-test-tool/replayContext"
+# Run all replay tests
+./build/Debug/bin/slang-test.exe "slang-unit-test-tool/replay"
 ```
 
 ## slang-replay Command-Line Tool
 
-The `slang-replay` tool (`tools/slang-replay/main.cpp`) provides a command-line interface for working with recorded API sessions.
-
-### Building
-
-The tool is built as part of the standard Slang build:
-
-```bash
-cmake --workflow --preset debug
-# Binary is at: build/Debug/bin/slang-replay.exe
-```
+The `slang-replay` tool (`tools/slang-replay/main.cpp`) provides a command-line
+interface for working with recorded API sessions.
 
 ### Usage
 
 ```bash
-slang-replay [options] <record-file>
+slang-replay [options] <path>
 ```
 
 ### Options
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--decode` | `-d` | Decode recording to human-readable text (uses index.bin for structured output if available) |
-| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin even if present) |
+| `--decode` | `-d` | Decode recording to human-readable text |
+| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin) |
 | `--replay` | `-r` | Execute the recorded API calls |
 | `--verbose` | `-v` | Enable verbose output during replay |
-| `--output <file>` | `-o` | Write decoded output to file instead of stdout |
+| `--output <file>` | `-o` | Write decoded output to file |
 | `--convert-json` | `-cj` | Convert record file to JSON format |
 | `--help` | `-h` | Show usage information |
 
 ### Examples
 
 ```bash
-# Decode a recording with structured call-by-call output (recommended)
+# Decode with structured call-by-call output (recommended)
 slang-replay -d .slang-replays/2026-02-04_14-30-45-123/
 
 # Decode with raw value-by-value output
 slang-replay -d -R .slang-replays/2026-02-04_14-30-45-123/
 
-# Decode a specific stream.bin file (falls back to raw mode)
-slang-replay -d .slang-replays/2026-02-04_14-30-45-123/stream.bin
-
-# Decode and save to file
-slang-replay -d -o calls.txt .slang-replays/2026-02-04_14-30-45-123/
-
-# Replay a recording (execute all recorded API calls)
+# Replay a recording
 slang-replay -r .slang-replays/2026-02-04_14-30-45-123/
 
 # Replay with verbose logging
 slang-replay -r -v .slang-replays/2026-02-04_14-30-45-123/
 ```
 
-### Decode Output Formats
-
-#### Indexed Mode (default when index.bin is present)
-
-When given a folder containing both `stream.bin` and `index.bin`, the decoder outputs structured call-by-call information:
-
-```
-=== Replay Stream Dump (Indexed) ===
-Data stream size: 4184 bytes
-Index stream size: 9216 bytes
-Total calls: 64
-
-[0] slang_createGlobalSession2, #null (static)
-    [0] UInt32: 80
-    [1] UInt32: 0
-    [2] Handle: #256
-    [3] Int32: 0
-
-[1] GlobalSessionProxy::findCapability, #256
-    [0] String: "hlsl"
-    [1] Int32: 2
-
-...
-```
-
-Each call shows:
-- `[CallIdx]` - The call index number
-- `Signature` - The function/method signature  
-- `#HandleId` - The 'this' pointer handle (or `#null (static)` for static functions)
-- Indented parameters with their types and values
-
-#### Raw Mode (`-R` flag)
-
-Raw mode outputs a simple value-by-value dump without call structure:
-
-```
-=== Replay Stream Dump ===
-Total size: 4184 bytes
-Start position: 0
-
-[0] @0: String: "slang_createGlobalSession2"
-[1] @31: Handle: null
-[2] @40: UInt32: 80
-...
-```
-
 ### Input Formats
 
 The tool accepts either:
 - A folder containing `stream.bin` (e.g., `.slang-replays/2026-02-04_14-30-45-123/`)
-- A direct path to the `stream.bin` file
+- A direct path to a `stream.bin` file
+
+## Thread Safety
+
+The `ReplayContext` uses a recursive mutex. All recording operations acquire the lock
+via `RECORD_CALL()` which calls `ctx.lock()` and stores the RAII guard.
 
 ## Debugging Tips
 
@@ -493,65 +525,206 @@ The tool accepts either:
 Set `SLANG_RECORD_LOG=1` to see API calls as they're recorded:
 
 ```
-[RECORD] GlobalSessionProxy::createSession this=0x100
-[RECORD] SessionProxy::loadModule this=0x101
-```
-
-### Decode Stream Files
-
-Use `ReplayStreamDecoder` to inspect recordings:
-
-```cpp
-String decoded = ReplayStreamDecoder::decodeFile("stream.bin");
-printf("%s\n", decoded.getBuffer());
+[REPLAY] GlobalSessionProxy::createSession [this=0x..., handle=256]
+[REPLAY] SessionProxy::loadModule [this=0x..., handle=258]
 ```
 
 ### Common Issues
 
-1. **Unimplemented proxy method**: If a method throws `SLANG_UNIMPLEMENTED_X`, it needs recording support
-2. **Handle not found**: Object wasn't properly registered during recording
-3. **Type mismatch**: Stream contains different type than expected (version mismatch?)
+1. **Unimplemented proxy method**: Throws `SLANG_UNIMPLEMENTED_X` at runtime —
+   method needs recording support added to the proxy
+2. **Handle not found**: Object wasn't properly registered during recording —
+   throws `HandleNotFoundException`
+3. **Type mismatch**: Stream contains different type than expected —
+   throws `TypeMismatchException`
 
-## Thread Safety
+---
 
-The `ReplayContext` uses a recursive mutex. All recording operations acquire the lock via `RECORD_CALL()` which calls `ctx.lock()`.
+## Current State: Proxy Implementation Coverage
 
-## TypeReflection Serialization
+The following tables document which proxy methods are implemented vs. stubbed
+(`REPLAY_UNIMPLEMENTED_X`). **This is the key area requiring ongoing work.**
 
-`TypeReflection*` pointers require special handling since they are not COM objects with handles. Instead, types are serialized as a reference to their owning module plus the type's full name:
+### GlobalSessionProxy — partially implemented
 
+| Status | Methods |
+|--------|---------|
+| Implemented | `createSession`, `findProfile`, `setDefaultDownstreamCompiler`, `getDefaultDownstreamCompiler`, `setLanguagePrelude`, `getLanguagePrelude`, `createCompileRequest`, `checkCompileTargetSupport`, `checkPassThroughSupport`, `findCapability`, `setDownstreamCompilerForTransition`, `getDownstreamCompilerForTransition`, `getCompilerElapsedTime`, `parseCommandLineArguments` |
+| Pass-through | `getBuildTagString` (not recorded) |
+| Stubbed | `setDownstreamCompilerPath`, `setDownstreamCompilerPrelude`, `getDownstreamCompilerPrelude`, `addBuiltins`, `setSharedLibraryLoader`, `getSharedLibraryLoader`, `compileCoreModule`, `loadCoreModule`, `saveCoreModule`, `setSPIRVCoreGrammar`, `getSessionDescDigest`, `compileBuiltinModule`, `loadBuiltinModule`, `saveBuiltinModule` |
+
+### SessionProxy — partially implemented
+
+| Status | Methods |
+|--------|---------|
+| Implemented | `getGlobalSession`, `loadModule`, `loadModuleFromSource`, `createCompositeComponentType`, `getTypeLayout`, `getTypeConformanceWitnessSequentialID`, `createTypeConformanceComponentType`, `loadModuleFromIRBlob`, `getLoadedModuleCount`, `getLoadedModule`, `isBinaryModuleUpToDate`, `loadModuleFromSourceString`, `loadModuleInfoFromIRBlob`, `addSearchPath` |
+| Stubbed | `specializeType`, `getContainerType`, `getDynamicType`, `getTypeRTTIMangledName`, `getTypeConformanceWitnessMangledName`, `createCompileRequest`, `getDynamicObjectRTTIBytes` |
+
+### ModuleProxy — partially implemented
+
+| Status | Methods |
+|--------|---------|
+| Implemented | `getLayout`, `getSpecializationParamCount`, `specialize`, `link`, `getTargetCode`, `findEntryPointByName`, `getDefinedEntryPointCount`, `getDefinedEntryPoint`, `serialize`, `getName`, `getFilePath`, `findAndCheckEntryPoint`, `getModuleReflection` |
+| Stubbed | `getSession`, `getEntryPointCode`, `getResultAsFileSystem`, `getEntryPointHash`, `getEntryPointHostCallable`, `renameEntryPoint`, `linkWithOptions`, `getTargetMetadata`, `getEntryPointMetadata`, `writeToFile`, `getUniqueIdentity`, `getDependencyFileCount`, `getDependencyFilePath`, `disassemble`, `getTargetCompileResult`, `getEntryPointCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
+
+### ComponentTypeProxy — partially implemented
+
+| Status | Methods |
+|--------|---------|
+| Implemented | `getSession`, `getLayout`, `getSpecializationParamCount`, `getEntryPointCode`, `getEntryPointHash`, `specialize`, `link`, `getEntryPointHostCallable`, `linkWithOptions`, `getTargetCode`, `getTargetMetadata`, `getEntryPointCompileResult` |
+| Stubbed | `getResultAsFileSystem`, `renameEntryPoint`, `getEntryPointMetadata`, `getTargetCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
+
+### EntryPointProxy — mostly stubbed
+
+| Status | Methods |
+|--------|---------|
+| Implemented | `getLayout`, `getSpecializationParamCount`, `specialize`, `link`, `getFunctionReflection` |
+| Stubbed | `getSession`, `getEntryPointCode`, `getResultAsFileSystem`, `getEntryPointHash`, `getEntryPointHostCallable`, `renameEntryPoint`, `linkWithOptions`, `getTargetCode`, `getTargetMetadata`, `getEntryPointMetadata`, `getTargetCompileResult`, `getEntryPointCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
+
+### CompileRequestProxy — partially implemented
+
+Largest proxy with the most methods. Many setter/getter methods for compile options.
+Approximately 35 methods implemented, ~40 stubbed.
+
+### CompileResultProxy / MetadataProxy / TypeConformanceProxy — all stubs
+
+**All methods stubbed.** These are pure stub proxies for type-system compatibility.
+
+### SharedLibraryProxy — mostly stubbed
+
+Only `findSymbolAddressByName` is implemented. `castAs` is stubbed.
+
+### MutableFileSystemProxy — fully implemented
+
+All `ISlangFileSystem`, `ISlangFileSystemExt`, and `ISlangMutableFileSystem` methods
+have recording/playback support.
+
+---
+
+## Known Bugs
+
+1. **`replay-handlers.cpp` registers handlers for methods that are
+   `REPLAY_UNIMPLEMENTED_X` in the proxy.** For example, many `CompileRequestProxy`
+   setters and `GlobalSessionProxy` methods are registered via `REPLAY_REGISTER` but
+   will throw at runtime when called during playback. The handler registration should
+   only include methods that are actually implemented. Mismatches between
+   `replay-handlers.cpp` and the proxy headers cause confusing runtime errors during
+   playback.
+
+2. **Inconsistent recording in some proxy methods:**
+   - `ModuleProxy::getLayout()` and `EntryPointProxy::getLayout()` return raw
+     `ProgramLayout*` without recording the return value. If playback depends on
+     these results, it will diverge.
+   - `EntryPointProxy::getFunctionReflection()` returns a raw pointer without recording.
+   - Some methods use `RECORD_INFO()` + manual `return` instead of `RECORD_RETURN()`.
+   These inconsistencies mean certain methods can record data during recording but
+   produce a stream that can't be played back, because the playback flow expects the
+   stream to contain data that was never written.
+
+3. **`notifyDestroyed()` unconditionally prints to stderr** — should be gated behind
+   `m_ttyLogging`.
+
+4. **`unit-test-replay-record.cpp` uses hardcoded hashes** that include machine-specific
+   file paths. These tests will fail on any machine with different paths.
+
+---
+
+## Proposed Refinements
+
+The following refinements are prioritized by the goals of **simplicity**, **ease of
+maintenance**, **minimal 'clever C++'**, and **consistent COM usage**.
+
+### P0: Correctness Fixes
+
+1. **Audit `replay-handlers.cpp` against actual proxy implementations.** Remove
+   `REPLAY_REGISTER` entries for methods that are `REPLAY_UNIMPLEMENTED_X`. A mismatch
+   here means playback will dispatch to a method that immediately throws. A simple
+   grep can verify 1:1 correspondence.
+
+2. **Fix inconsistent recording patterns.** Methods that return values must use
+   `RECORD_RETURN()` consistently. Create a checklist of every implemented proxy method
+   and verify each follows one of the standard patterns:
+   - `RECORD_CALL()` + `RECORD_INPUT(s)` + call + `RECORD_COM_OUTPUT(s)` + `RECORD_RETURN()`
+   - `RECORD_METHOD_OUTPUT` / `RECORD_METHOD_RETURN` / `RECORD_METHOD_VOID` macros
+
+3. **Gate `notifyDestroyed()` stderr output behind `m_ttyLogging`.** Currently it
+   always prints, polluting stderr in production builds.
+
+### P1: Reduce Template Complexity in proxy-macros.h
+
+The playback infrastructure (`MemberFunctionTraits`, `callWithDefaults`,
+`DefaultValue<T>` specializations, `replayHandler` template, `REPLAY_REGISTER` macro)
+is the most "clever C++" in the system. It uses variadic templates, `std::tuple`,
+`std::index_sequence`, `if constexpr`, and SFINAE-style specializations to auto-generate
+playback handlers from method pointer types.
+
+**Problem:** This works, but is hard to debug, hard to extend (e.g., when a method
+has a non-default-constructible parameter), and produces opaque compiler errors when
+something goes wrong.
+
+**Proposed simplification:** Replace the auto-generated playback dispatch with explicit
+per-method handler lambdas. Each handler would be ~3 lines of straightforward code:
+
+```cpp
+// Instead of REPLAY_REGISTER(GlobalSessionProxy, findProfile):
+ctx.registerHandler("GlobalSessionProxy::findProfile", [](ReplayContext& ctx) {
+    auto* proxy = ctx.getCurrentThis<GlobalSessionProxy>();
+    const char* name = nullptr;  // will be read from stream by RECORD_INPUT
+    proxy->findProfile(name);    // proxy reads from stream via RECORD_INPUT
+});
 ```
-[TypeId::TypeReflectionRef]
-[module handle]       # Handle of the IModule that owns this type
-[type name string]    # Full name from TypeReflection::getFullName()
-```
 
-During playback, the type is recovered by:
-1. Looking up the module from its handle
-2. Calling `module->getLayout()->findTypeByName(typeName)`
+This eliminates all of `MemberFunctionTraits`, `DefaultValue`, `callWithDefaults`,
+and the `replayHandler` template (~100 lines of dense template code), replacing it
+with simple, greppable, debuggable lambdas. The tradeoff is slightly more boilerplate
+per method, but each handler is self-documenting and trivially debuggable.
 
-To ensure builtin types (like `float3`) can be resolved, all loaded modules (including core/stdlib) are registered when a session is created.
+### P2: Consistent COM Usage
 
-### Decoded Output Example
+The proxy layer mixes COM patterns inconsistently:
 
-In the decoded stream, TypeReflection references appear as:
+- `ProxyBase` inherits from `RefObject` (Slang's ref-counting base) in addition to COM
+  interfaces, creating a dual ref-counting path.
+- `toSlangUnknown()` / `toSlangInterface()` manually call `queryInterface` then
+  immediately `release()`, which is a COM anti-pattern (the returned pointer could
+  theoretically be dangled by a concurrent release on another thread, though the
+  mutex protects against this in practice).
+- `ProxyBase::~ProxyBase()` uses a `static_cast` chain instead of `queryInterface`
+  because the ref count is already zero — correct but documents a design tension.
+- `MutableFileSystemProxy` has `PROXY_REFCOUNT_IMPL` commented out, with lifetime
+  managed externally.
 
-```
-[43] ComponentTypeProxy::specialize, #260
-    [0] Array[1]:
-        [0] Int32: 1
-    [1] TypeRef(module=#258): "AddTransformer"
-    [2] Handle: #262
-    ...
-```
+**Proposed:** Document and enforce a single ownership model. If proxies use COM
+ref-counting, they should do so consistently. The `toSlangUnknown()` "borrow" pattern
+(QI + immediate release) should be documented as intentional and safe only under the
+mutex, or replaced with a pattern that doesn't involve transient ownership transfer.
 
-The `TypeRef(module=#258): "AddTransformer"` format shows the module handle and type name.
+### P3: Delete Dead Code
 
-## Future Enhancements
+- **`replay-stream-logger.h`** is empty. Delete it.
+- **`kInlineBlobHandle` (handle value 1)** — if defined anywhere, it's unused. Blobs
+  are serialized by content hash, not by handle. If this was part of an earlier design,
+  remove the constant.
 
-- Support for other reflection types (DeclReflection, etc.)
-- Recording/playback of file system operations
-- Refine the instrumentation macros (need to ensure normal values can be output as well)
-- Full API coverage - should be able to run full slang testing framework
-- Struct begin/end markers to make decoded files a bit easier to read
-- PyQT based viewer
+### P4: Simplify the Test Suite
+
+- **`unit-test-replay-record.cpp` hardcoded hashes** are machine-specific (they
+  include file paths in the decoded output). Either: (a) don't test the decoded-text
+  hash at all (just verify a non-empty decode), or (b) hash only the structural parts
+  (signatures, types) while ignoring path-dependent data.
+- **Temp file cleanup in filesystem tests** should use RAII guards to ensure cleanup
+  on test failure, not just at the happy-path end.
+- **Cleanup in record tests** is commented out (`cleanupRecordFiles`). Either enable it
+  or document why it's disabled.
+
+### P5: Future — Reduce the Proxy Stub Surface
+
+Many proxy classes are pure stubs (`CompileResultProxy`, `MetadataProxy`,
+`TypeConformanceProxy`). For methods that are never called in practice, the
+`REPLAY_UNIMPLEMENTED_X` macro provides a clear error. But the large number of stubs
+makes it hard to know what's actually working.
+
+**Proposed:** Track coverage by running the slang test suite with replay enabled
+and collecting which `REPLAY_UNIMPLEMENTED_X` methods are actually hit. Prioritize
+implementing only those methods, rather than trying to achieve full API coverage
+upfront. See `WORKFLOW.md` for the iterative approach.

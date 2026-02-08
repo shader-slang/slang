@@ -350,7 +350,10 @@ RefPtr<WorkspaceVersion> Workspace::createWorkspaceVersion()
 
     ComPtr<slang::ISession> session;
     slangGlobalSession->createSession(desc, session.writeRef());
-    version->linkage = static_cast<Linkage*>(session.get());
+
+    ComPtr<Linkage> linkage;
+    session->queryInterface(Linkage::getTypeGuid(), (void**)linkage.writeRef());
+    version->linkage = linkage.get();
     version->linkage->contentAssistInfo.checkingMode = ContentAssistCheckingMode::General;
     return version;
 }
