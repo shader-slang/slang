@@ -3010,6 +3010,11 @@ DIAGNOSTIC(
     cannotEmitReflectionWithoutTarget,
     "cannot emit reflection JSON; no compilation target available")
 DIAGNOSTIC(
+    52010,
+    Error,
+    refParamWithInterfaceTypeInDynamicDispatch,
+    "'$0' parameter of type '$1' cannot be used in dynamic dispatch context.")
+DIAGNOSTIC(
     53001,
     Error,
     invalidTypeMarshallingForImportedDLLSymbol,
