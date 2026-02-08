@@ -291,43 +291,43 @@ static SlangResult runTest(
 
 SLANG_UNIT_TEST(replayRecord_cpu_hello_world)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0xe202f9230658face)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "cpu-hello-world", 0xc115139df62d9136)));
 }
 
 SLANG_UNIT_TEST(replayRecord_triangle)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0xb8787b70131b528e)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "triangle", 0x30101d8d245453ee)));
 }
 
 SLANG_UNIT_TEST(replayRecord_ray_tracing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x022f15e5d3bdfca8)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing", 0x50ffba598c9172ff)));
 }
 
 SLANG_UNIT_TEST(replayRecord_ray_tracing_pipeline)
 {
     SLANG_CHECK(
-        SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x3611ba0d5b2fc4b1)));
+        SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x2f89e696d4ef4e0e)));
 }
 
 SLANG_UNIT_TEST(replayRecord_autodiff_texture)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x1f9afad32ce692dc)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "autodiff-texture", 0x0f2c6d16b5c2b6f4)));
 }
 
 SLANG_UNIT_TEST(replayRecord_gpu_printing)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0xdcac985c989c7411)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "gpu-printing", 0xc5a5a43a560e6ba5)));
 }
 
 SLANG_UNIT_TEST(replayRecord_shader_object)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0x75a82f60411e0dde)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "shader-object", 0xcb578eb9257426e1)));
 }
 
 SLANG_UNIT_TEST(replayRecord_model_viewer)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0x5b6fee95a6ca8171)));
+    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "model-viewer", 0xa1806b15253af66d)));
 }
 
 #endif
