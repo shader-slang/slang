@@ -1485,6 +1485,41 @@ bool SemanticsVisitor::_coerce(
         }
         return true;
     }
+
+    // Ptr<T> can be implicitly converted to Ptr<I> if T implements interface I.
+    // This is safe because pointers have fixed size regardless of the pointee type.
+    if (auto fromPtrType = as<PtrType>(fromType))
+    {
+        if (auto toPtrType = as<PtrType>(toType))
+        {
+            auto fromValueType = fromPtrType->getValueType();
+            auto toValueType = toPtrType->getValueType();
+
+            // Only allow this conversion if the target pointee type is an interface.
+            if (isInterfaceType(toValueType))
+            {
+                // Check if the source pointee type implements the target interface.
+                if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
+                {
+                    if (outCost)
+                    {
+                        *outCost = kConversionCost_CastToInterface;
+                    }
+                    if (outToExpr)
+                    {
+                        // Create a cast expression to convert the pointer type.
+                        auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->type = QualType(toType);
+                        castExpr->base = fromExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {
