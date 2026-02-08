@@ -747,6 +747,7 @@ public:
             return m_linkage->isInLanguageServer();
         return false;
     }
+
     /// Get the list of extension declarations that appear to apply to `decl` in this context
     List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -1792,6 +1793,16 @@ public:
     /// when a conversion is being done "for real" so that diagnostics
     /// should be emitted on failure.
     ///
+    /// If `outWitnessOfConversion` is non-null and zero valid conversions are found
+    /// `outWitnessOfConversion` will be set to a `nullptr`.
+    ///
+    /// If `outWitnessOfConversion` is non-null and a conversion is found,
+    /// `outWitnessOfConversion` will either be set to:
+    /// (1) BuiltinTypeCoercionWitness* to signify that Slang casts without
+    /// a user-definition.
+    /// (2) DeclRefTypeCoercionWitness* to signify that Slang will cast
+    /// via a user-definition.
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -1799,7 +1810,8 @@ public:
         QualType fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
-        ConversionCost* outCost);
+        ConversionCost* outCost,
+        TypeCoercionWitness** outWitnessOfConversion);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///

@@ -845,9 +845,9 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-void TypeCoercionWitness::_toTextOverride(StringBuilder& out)
+void BuiltinTypeCoercionWitness::_toTextOverride(StringBuilder& out)
 {
-    out << "TypeCoercionWitness(";
+    out << "BuiltinTypeCoercionWitness(";
     if (getFromType())
         out << getFromType();
     if (getToType())
@@ -855,7 +855,51 @@ void TypeCoercionWitness::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-Val* TypeCoercionWitness::_substituteImplOverride(
+Val* BuiltinTypeCoercionWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    auto substFrom = as<Type>(getFromType()->substituteImpl(astBuilder, subst, &diff));
+    auto substTo = as<Type>(getToType()->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    BuiltinTypeCoercionWitness* substValue =
+        astBuilder->getBuiltinTypeCoercionWitness(substFrom, substTo);
+    return substValue;
+}
+
+Val* BuiltinTypeCoercionWitness::_resolveImplOverride()
+{
+    auto newFrom = as<Type>(getFromType()->resolve());
+    auto newTo = as<Type>(getToType()->resolve());
+
+    if (newFrom != getFromType() || newTo != getToType())
+    {
+        return getCurrentASTBuilder()->getBuiltinTypeCoercionWitness(newFrom, newTo);
+    }
+    return this;
+}
+
+void DeclRefTypeCoercionWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "DeclRefTypeCoercionWitness(";
+    if (getFromType())
+        out << getFromType();
+    if (getToType())
+        out << getToType();
+    if (getDeclRef())
+        out << getDeclRef();
+    out << ")";
+}
+
+Val* DeclRefTypeCoercionWitness::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -871,12 +915,12 @@ Val* TypeCoercionWitness::_substituteImplOverride(
 
     (*ioDiff)++;
 
-    TypeCoercionWitness* substValue =
-        astBuilder->getTypeCoercionWitness(substFrom, substTo, substDeclRef);
+    DeclRefTypeCoercionWitness* substValue =
+        astBuilder->getDeclRefTypeCoercionWitness(substFrom, substTo, substDeclRef);
     return substValue;
 }
 
-Val* TypeCoercionWitness::_resolveImplOverride()
+Val* DeclRefTypeCoercionWitness::_resolveImplOverride()
 {
     Val* resolvedDeclRef = nullptr;
     if (getDeclRef())
@@ -892,7 +936,7 @@ Val* TypeCoercionWitness::_resolveImplOverride()
         newDeclRef = getDeclRef().declRefBase;
     if (newFrom != getFromType() || newTo != getToType() || newDeclRef != getDeclRef())
     {
-        return getCurrentASTBuilder()->getTypeCoercionWitness(newFrom, newTo, newDeclRef);
+        return getCurrentASTBuilder()->getDeclRefTypeCoercionWitness(newFrom, newTo, newDeclRef);
     }
     return this;
 }
