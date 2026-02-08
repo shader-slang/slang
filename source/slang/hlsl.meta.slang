@@ -21353,11 +21353,13 @@ COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_t
 
 ${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
+    const char* kCandidateCommittedMetal[] = {"get_candidate_", "get_committed_"};
 
     // Access Candidate and Committed Matrices.
     for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
     {
         auto ccName = kCandidateCommitted[candidateOrCommitted];
+        auto ccNameMetal = kCandidateCommittedMetal[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
 $}
 
@@ -21460,17 +21462,18 @@ ${
         const char* type;
         const char* hlslName;
         const char* glslName;
+        const char* metalName;
     };
     const RayQueryMethodEntry rayQueryMethods[] = {
-        {"uint", "InstanceIndex", "InstanceId"},
-        {"uint", "InstanceID", "InstanceCustomIndex"},
-        {"uint", "PrimitiveIndex", "PrimitiveIndex"},
-        {"uint", "GeometryIndex", "GeometryIndex"},
-        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset"},
-        {"float3", "ObjectRayOrigin", "ObjectRayOrigin"},
-        {"float3", "ObjectRayDirection", "ObjectRayDirection"},
-        {"bool", "TriangleFrontFace", "FrontFace"},
-        {"float2", "TriangleBarycentrics", "Barycentrics"},
+        {"uint", "InstanceIndex", "InstanceId", "instance_id"},
+        {"uint", "InstanceID", "InstanceCustomIndex", "user_instance_id"},
+        {"uint", "PrimitiveIndex", "PrimitiveIndex", "primitive_id"},
+        {"uint", "GeometryIndex", "GeometryIndex", "geometry_id"},
+        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset", "user_instance_id"},
+        {"float3", "ObjectRayOrigin", "ObjectRayOrigin", "ray_origin"},
+        {"float3", "ObjectRayDirection", "ObjectRayDirection", "ray_direction"},
+        {"bool", "TriangleFrontFace", "FrontFace", "triangle_front_facing"},
+        {"float2", "TriangleBarycentrics", "Barycentrics", "triangle_barycentric_coord"},
     };
     for (auto method : rayQueryMethods) {
 $}
@@ -21478,13 +21481,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     $(method.type) $(ccName)$(method.hlslName)()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
+        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm

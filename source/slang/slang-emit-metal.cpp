@@ -204,7 +204,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             if (as<IRPtrTypeBase>(param->getDataType()) ||
                 as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
                 as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()))
+                as<IRUniformParameterGroupType>(param->getDataType()) ||
+                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
