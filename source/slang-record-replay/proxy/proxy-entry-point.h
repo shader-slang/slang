@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
-
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -11,7 +10,10 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class EntryPointProxy : public ProxyBase<slang::IEntryPoint, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
+class EntryPointProxy : public ProxyBase<
+                            slang::IEntryPoint,
+                            slang::IComponentType2,
+                            slang::IModulePrecompileService_Experimental>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -28,13 +30,13 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(EntryPointProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
-        if (uuid == EntryPointProxy::getTypeGuid() ||
-            uuid == slang::IEntryPoint::getTypeGuid())
+        if (uuid == EntryPointProxy::getTypeGuid() || uuid == slang::IEntryPoint::getTypeGuid())
         {
             addRef();
             *outObject = static_cast<slang::IEntryPoint*>(this);
@@ -43,7 +45,8 @@ public:
         if (uuid == slang::IComponentType::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<slang::IComponentType*>(static_cast<slang::IEntryPoint*>(this));
+            *outObject =
+                static_cast<slang::IComponentType*>(static_cast<slang::IEntryPoint*>(this));
             return SLANG_OK;
         }
         if (uuid == slang::IComponentType2::getTypeGuid())
@@ -81,7 +84,8 @@ public:
 
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
-        slang::ProgramLayout* result = getActual<slang::IEntryPoint>()->getLayout(targetIndex, outDiagnostics);
+        slang::ProgramLayout* result =
+            getActual<slang::IEntryPoint>()->getLayout(targetIndex, outDiagnostics);
 
         RECORD_COM_OUTPUT(outDiagnostics);
         // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
@@ -239,7 +243,8 @@ public:
     virtual SLANG_NO_THROW slang::FunctionReflection* SLANG_MCALL getFunctionReflection() override
     {
         RECORD_CALL();
-        slang::FunctionReflection* result = getActual<slang::IEntryPoint>()->getFunctionReflection();
+        slang::FunctionReflection* result =
+            getActual<slang::IEntryPoint>()->getFunctionReflection();
         return result; // don't capture pointer - reflection data is not wrapped
     }
 

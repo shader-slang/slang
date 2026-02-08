@@ -69,7 +69,7 @@ SLANG_UNIT_TEST(replayContextRecordFindProfileCall)
     ctx().record(RecordFlag::Input, signature);
     SLANG_CHECK(strcmp(signature, "GlobalSessionProxy::findProfile") == 0);
     ctx().recordHandle(RecordFlag::Input, thisHandle);
-     SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
+    SLANG_CHECK(thisHandle >= kFirstValidHandle); // Should be a valid handle
     const char* profileName = nullptr;
     ctx().record(RecordFlag::Input, profileName);
     SLANG_CHECK(profileName != nullptr);
@@ -182,14 +182,14 @@ SLANG_UNIT_TEST(replayContextReplayDirectory)
 
     // Test default directory
     SLANG_CHECK(strcmp(ctx().getReplayDirectory(), ".slang-replays") == 0);
-    
+
     // Test setting custom directory
     ctx().setReplayDirectory("test-replays");
     SLANG_CHECK(strcmp(ctx().getReplayDirectory(), "test-replays") == 0);
-    
+
     // Test that current replay path is nullptr when not recording
     SLANG_CHECK(ctx().getCurrentReplayPath() == nullptr);
-    
+
     // Restore default
     ctx().setReplayDirectory(".slang-replays");
 }
@@ -201,27 +201,27 @@ SLANG_UNIT_TEST(replayContextMirrorFileCreation)
 
     // Use a unique test directory
     ctx().setReplayDirectory(".slang-replays-test");
-    
+
     // Enable recording - this should create the mirror file
     ctx().setMode(Mode::Record);
-    
+
     // Check that we have a current replay path
     const char* replayPath = ctx().getCurrentReplayPath();
     SLANG_CHECK(replayPath != nullptr);
-    
+
     // The path should contain our test directory
     SLANG_CHECK(strstr(replayPath, ".slang-replays-test") != nullptr);
-    
+
     // Record some data
     int32_t value = 42;
     ctx().record(RecordFlag::None, value);
-    
+
     // Disable recording - this should close the mirror file
     ctx().disable();
-    
+
     // Current replay path should be nullptr now
     SLANG_CHECK(ctx().getCurrentReplayPath() == nullptr);
-    
+
     // Restore default directory
     ctx().setReplayDirectory(".slang-replays");
 }
@@ -233,38 +233,38 @@ SLANG_UNIT_TEST(replayContextLoadLatestReplay)
 
     // Use a unique test directory
     ctx().setReplayDirectory(".slang-replays-test");
-    
+
     // Create a recording
     ctx().setMode(Mode::Record);
-    
+
     // Record some data
     int32_t value1 = 123;
     float value2 = 3.14f;
     ctx().record(RecordFlag::None, value1);
     ctx().record(RecordFlag::None, value2);
-    
+
     // Remember the replay path
     const char* firstReplayPath = ctx().getCurrentReplayPath();
     SLANG_CHECK(firstReplayPath != nullptr);
     String savedPath(firstReplayPath);
-    
+
     // Disable recording
     ctx().disable();
-    
+
     // Now load the latest replay
     SlangResult result = ctx().loadLatestReplay();
     SLANG_CHECK(SLANG_SUCCEEDED(result));
     SLANG_CHECK(ctx().isPlayback());
-    
+
     // Read back the values
     int32_t readValue1 = 0;
     float readValue2 = 0.0f;
     ctx().record(RecordFlag::None, readValue1);
     ctx().record(RecordFlag::None, readValue2);
-    
+
     SLANG_CHECK(readValue1 == 123);
     SLANG_CHECK(readValue2 == 3.14f);
-    
+
     // Clean up - reset and restore default directory
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays");
@@ -277,38 +277,37 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
 
     // Test that the timestamp sorting works correctly
     // We'll create two recordings with a small delay between them
-    
+
     ctx().setReplayDirectory(".slang-replays-test");
-    
+
     // First recording
     ctx().setMode(Mode::Record);
     int32_t val1 = 111;
     ctx().record(RecordFlag::None, val1);
     String firstPath(ctx().getCurrentReplayPath());
     ctx().disable();
-    
+
     // Small delay to ensure different timestamp
     // (millisecond precision should be enough)
-    
+
     // Second recording
     ctx().setMode(Mode::Record);
     int32_t val2 = 222;
     ctx().record(RecordFlag::None, val2);
     String secondPath(ctx().getCurrentReplayPath());
     ctx().disable();
-    
+
     // The paths should be different
     SLANG_CHECK(firstPath != secondPath);
-    
+
     // Find latest should return the second one's folder name
     String latest = ReplayContext::findLatestReplayFolder(".slang-replays-test");
     SLANG_CHECK(latest.getLength() > 0);
-    
+
     // The full second path should end with the latest folder name
     SLANG_CHECK(secondPath.endsWith(latest));
-    
+
     // Clean up
     ctx().reset();
     ctx().setReplayDirectory(".slang-replays");
 }
-

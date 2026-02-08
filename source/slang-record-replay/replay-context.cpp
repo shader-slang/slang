@@ -1,13 +1,13 @@
 #include "replay-context.h"
-#include "proxy/proxy-module.h"
 
 #include "../core/slang-blob.h"
 #include "../core/slang-crypto.h"
 #include "../core/slang-io.h"
 #include "../core/slang-platform.h"
 #include "../slang/slang-ast-type.h"
-#include "../slang/slang-syntax.h"
 #include "../slang/slang-compiler-api.h"
+#include "../slang/slang-syntax.h"
+#include "proxy/proxy-module.h"
 
 #include <chrono>
 #include <cstdio>
@@ -16,7 +16,8 @@
 #include <windows.h>
 #endif
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 using Slang::File;
 using Slang::Path;
@@ -29,7 +30,8 @@ static bool isRecordLogRequested()
 {
     Slang::StringBuilder envValue;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
-            Slang::UnownedStringSlice("SLANG_RECORD_LOG"), envValue)))
+            Slang::UnownedStringSlice("SLANG_RECORD_LOG"),
+            envValue)))
     {
         return envValue == "1";
     }
@@ -40,7 +42,8 @@ bool isRecordLayerRequested()
 {
     Slang::StringBuilder envValue;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
-            Slang::UnownedStringSlice("SLANG_RECORD_LAYER"), envValue)))
+            Slang::UnownedStringSlice("SLANG_RECORD_LAYER"),
+            envValue)))
     {
         return (envValue == "1") ? 1 : 0;
     }
@@ -58,38 +61,60 @@ const char* getTypeIdName(TypeId id)
 {
     switch (id)
     {
-    case TypeId::Int8: return "Int8";
-    case TypeId::Int16: return "Int16";
-    case TypeId::Int32: return "Int32";
-    case TypeId::Int64: return "Int64";
-    case TypeId::UInt8: return "UInt8";
-    case TypeId::UInt16: return "UInt16";
-    case TypeId::UInt32: return "UInt32";
-    case TypeId::UInt64: return "UInt64";
-    case TypeId::Float32: return "Float32";
-    case TypeId::Float64: return "Float64";
-    case TypeId::Bool: return "Bool";
-    case TypeId::String: return "String";
-    case TypeId::Blob: return "Blob";
-    case TypeId::Array: return "Array";
-    case TypeId::ObjectHandle: return "ObjectHandle";
-    case TypeId::Null: return "Null";
-    case TypeId::TypeReflectionRef: return "TypeReflectionRef";
-    default: return "Unknown";
+    case TypeId::Int8:
+        return "Int8";
+    case TypeId::Int16:
+        return "Int16";
+    case TypeId::Int32:
+        return "Int32";
+    case TypeId::Int64:
+        return "Int64";
+    case TypeId::UInt8:
+        return "UInt8";
+    case TypeId::UInt16:
+        return "UInt16";
+    case TypeId::UInt32:
+        return "UInt32";
+    case TypeId::UInt64:
+        return "UInt64";
+    case TypeId::Float32:
+        return "Float32";
+    case TypeId::Float64:
+        return "Float64";
+    case TypeId::Bool:
+        return "Bool";
+    case TypeId::String:
+        return "String";
+    case TypeId::Blob:
+        return "Blob";
+    case TypeId::Array:
+        return "Array";
+    case TypeId::ObjectHandle:
+        return "ObjectHandle";
+    case TypeId::Null:
+        return "Null";
+    case TypeId::TypeReflectionRef:
+        return "TypeReflectionRef";
+    default:
+        return "Unknown";
     }
 }
 
 TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
-    : Slang::Exception(Slang::String("Type mismatch: expected ") + 
-                       getTypeIdName(expected) + ", got " + getTypeIdName(actual))
-    , m_expected(expected), m_actual(actual)
+    : Slang::Exception(
+          Slang::String("Type mismatch: expected ") + getTypeIdName(expected) + ", got " +
+          getTypeIdName(actual))
+    , m_expected(expected)
+    , m_actual(actual)
 {
 }
 
 DataMismatchException::DataMismatchException(size_t offset, size_t size)
-    : Slang::Exception(Slang::String("Data mismatch at offset ") + 
-                       Slang::String(offset) + " (size " + Slang::String(size) + " bytes)")
-    , m_offset(offset), m_size(size)
+    : Slang::Exception(
+          Slang::String("Data mismatch at offset ") + Slang::String(offset) + " (size " +
+          Slang::String(size) + " bytes)")
+    , m_offset(offset)
+    , m_size(size)
 {
 }
 
@@ -148,7 +173,7 @@ void ReplayContext::ensureInitialized()
     if (m_initialized)
         return;
     m_initialized = true;
-    
+
     // Now it's safe to use file system operations (CharEncoding is initialized)
     if (m_mode == Mode::Idle && isRecordLayerRequested())
     {
@@ -158,7 +183,7 @@ void ReplayContext::ensureInitialized()
 
 void ReplayContext::reset()
 {
-    closeRecordingMirror();  // Close any active mirror file
+    closeRecordingMirror(); // Close any active mirror file
     m_stream.reset();
     m_indexStream.reset();
     m_referenceStream.reset();
@@ -198,7 +223,7 @@ void ReplayContext::switchToSync()
 {
     // Copy recorded data to reference stream for comparison
     m_referenceStream = ReplayStream(m_stream.getData(), m_stream.getSize());
-    
+
     // Clear local state
     m_arena.reset();
     m_objectToHandle.clear();
@@ -233,7 +258,7 @@ void ReplayContext::setMode(Mode mode)
     {
         closeRecordingMirror();
     }
-    
+
     m_mode = mode;
 }
 
@@ -274,9 +299,8 @@ String ReplayContext::generateTimestampFolderName()
     // Get current time with milliseconds
     auto now = std::chrono::system_clock::now();
     auto time_t_now = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-    
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
     std::tm tm_now;
 #ifdef _WIN32
     localtime_s(&tm_now, &time_t_now);
@@ -286,7 +310,10 @@ String ReplayContext::generateTimestampFolderName()
 
     // Format: YYYY-MM-DD_HH-MM-SS-mmm
     char buffer[32];
-    snprintf(buffer, sizeof(buffer), "%04d-%02d-%02d_%02d-%02d-%02d-%03d",
+    snprintf(
+        buffer,
+        sizeof(buffer),
+        "%04d-%02d-%02d_%02d-%02d-%02d-%03d",
         tm_now.tm_year + 1900,
         tm_now.tm_mon + 1,
         tm_now.tm_mday,
@@ -294,7 +321,7 @@ String ReplayContext::generateTimestampFolderName()
         tm_now.tm_min,
         tm_now.tm_sec,
         static_cast<int>(ms.count()));
-    
+
     return String(buffer);
 }
 
@@ -303,7 +330,9 @@ void ReplayContext::setupRecordingMirror()
     // Check for SLANG_RECORD_PATH environment variable for explicit path
     Slang::StringBuilder envPath;
     if (SLANG_SUCCEEDED(Slang::PlatformUtil::getEnvironmentVariable(
-            Slang::UnownedStringSlice("SLANG_RECORD_PATH"), envPath)) && envPath.getLength() > 0)
+            Slang::UnownedStringSlice("SLANG_RECORD_PATH"),
+            envPath)) &&
+        envPath.getLength() > 0)
     {
         // Use the explicit path directly
         m_currentReplayPath = envPath.toString();
@@ -314,7 +343,7 @@ void ReplayContext::setupRecordingMirror()
         String timestamp = generateTimestampFolderName();
         m_currentReplayPath = Path::combine(m_replayDirectory, timestamp);
     }
-    
+
     // Create the directory structure
     if (!Path::createDirectoryRecursive(m_currentReplayPath))
     {
@@ -322,7 +351,7 @@ void ReplayContext::setupRecordingMirror()
         m_currentReplayPath = String();
         return;
     }
-    
+
     // Set up mirror file for main stream
     String streamPath = Path::combine(m_currentReplayPath, "stream.bin");
     try
@@ -335,7 +364,7 @@ void ReplayContext::setupRecordingMirror()
         m_currentReplayPath = String();
         return;
     }
-    
+
     // Set up mirror file for index stream
     String indexPath = Path::combine(m_currentReplayPath, "index.bin");
     try
@@ -363,20 +392,20 @@ void ReplayContext::writeIndexEntry(const char* signature, uint64_t thisHandle)
     CallIndexEntry entry;
     entry.streamPosition = m_stream.getPosition();
     entry.thisHandle = thisHandle;
-    
+
     // Copy signature, truncating if necessary
     size_t sigLen = signature ? strlen(signature) : 0;
     if (sigLen >= kMaxSignatureLength)
         sigLen = kMaxSignatureLength - 1;
-    
+
     if (signature && sigLen > 0)
         memcpy(entry.signature, signature, sigLen);
     entry.signature[sigLen] = '\0';
-    
+
     // Zero-fill the rest to ensure consistent file format
     if (sigLen + 1 < kMaxSignatureLength)
         memset(entry.signature + sigLen + 1, 0, kMaxSignatureLength - sigLen - 1);
-    
+
     // Write the entry to the index stream
     m_indexStream.write(&entry, sizeof(entry));
 }
@@ -397,7 +426,7 @@ const CallIndexEntry* ReplayContext::getCallIndexEntry(size_t callIndex) const
     size_t count = getCallCount();
     if (callIndex >= count)
         return nullptr;
-    
+
     // The index stream data is a flat array of CallIndexEntry structs
     const uint8_t* data = m_indexStream.getData();
     return reinterpret_cast<const CallIndexEntry*>(data + callIndex * sizeof(CallIndexEntry));
@@ -408,7 +437,7 @@ SlangResult ReplayContext::seekToCall(size_t callIndex)
     const CallIndexEntry* entry = getCallIndexEntry(callIndex);
     if (!entry)
         return SLANG_E_INVALID_ARG;
-    
+
     m_stream.seek(entry->streamPosition);
     return SLANG_OK;
 }
@@ -418,7 +447,7 @@ class DirectoryCollector : public Path::Visitor
 {
 public:
     List<String> directories;
-    
+
     void accept(Path::Type type, const Slang::UnownedStringSlice& filename) override
     {
         if (type == Path::Type::Directory)
@@ -432,13 +461,13 @@ String ReplayContext::findLatestReplayFolder(const char* baseDir)
 {
     DirectoryCollector collector;
     SlangResult result = Path::find(String(baseDir), nullptr, &collector);
-    
+
     if (SLANG_FAILED(result) || collector.directories.getCount() == 0)
         return String();
-    
+
     // Sort alphabetically - timestamps will sort chronologically
     collector.directories.sort();
-    
+
     // Return the last one (most recent)
     return collector.directories.getLast();
 }
@@ -447,16 +476,16 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
 {
     if (!folderPath)
         return SLANG_E_INVALID_ARG;
-    
+
     String streamPath = Path::combine(String(folderPath), "stream.bin");
-    
+
     if (!File::exists(streamPath))
         return SLANG_E_NOT_FOUND;
-    
+
     try
     {
         m_stream = ReplayStream::loadFromFile(streamPath.getBuffer());
-        
+
         // Also try to load the index stream (optional - may not exist for older recordings)
         String indexPath = Path::combine(String(folderPath), "index.bin");
         if (File::exists(indexPath))
@@ -477,7 +506,7 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
             m_indexStream = ReplayStream();
         }
         m_currentReplayPath = folderPath;
-        
+
         m_mode = Mode::Playback;
         return SLANG_OK;
     }
@@ -490,10 +519,10 @@ SlangResult ReplayContext::loadReplay(const char* folderPath)
 SlangResult ReplayContext::loadLatestReplay()
 {
     String latestFolder = findLatestReplayFolder(m_replayDirectory.getBuffer());
-    
+
     if (latestFolder.getLength() == 0)
         return SLANG_E_NOT_FOUND;
-    
+
     String fullPath = Path::combine(m_replayDirectory, latestFolder);
     return loadReplay(fullPath.getBuffer());
 }
@@ -511,10 +540,16 @@ void ReplayContext::logCall(const char* signature, void* thisPtr)
 {
     char buffer[512];
     if (thisPtr)
-        snprintf(buffer, sizeof(buffer), "[REPLAY] %s [this=%p, handle=%llu]\n", signature, thisPtr, m_currentThisHandle);
+        snprintf(
+            buffer,
+            sizeof(buffer),
+            "[REPLAY] %s [this=%p, handle=%llu]\n",
+            signature,
+            thisPtr,
+            m_currentThisHandle);
     else
         snprintf(buffer, sizeof(buffer), "[REPLAY] %s [static]\n", signature);
-    
+
 #ifdef _WIN32
     // Use OutputDebugString on Windows since GUI apps don't have stderr
     OutputDebugStringA(buffer);
@@ -528,16 +563,16 @@ void ReplayContext::recordError(const char* message)
 {
     if (!isActive() || m_mode != Mode::Record)
         return;
-    
+
     // Write an error marker to the stream
     writeTypeId(TypeId::Error);
-    
+
     size_t len = message ? strlen(message) : 0;
     uint32_t len32 = static_cast<uint32_t>(len > 4095 ? 4095 : len);
     m_stream.write(&len32, sizeof(len32));
     if (len32 > 0)
         m_stream.write(message, len32);
-    
+
     // Also log to TTY if enabled
     if (m_ttyLogging)
     {
@@ -569,29 +604,29 @@ const char* ReplayContext::parseSignature(const char* signature, char* buffer, s
     //   "void SlangRecord::SessionProxy::addSearchPath(...)"
     //
     // We want to extract: "GlobalSessionProxy::createSession"
-    
+
     if (!signature || !buffer || bufferSize == 0)
         return signature;
-    
+
     const char* start = signature;
     const char* end = signature + strlen(signature);
-    
+
     // Find the opening parenthesis (marks end of function name)
     const char* parenPos = strchr(signature, '(');
     if (parenPos)
         end = parenPos;
-    
+
     // Walk backwards from end to find the function name
     // Skip any template arguments by counting angle brackets
     const char* funcEnd = end;
     while (funcEnd > start && (funcEnd[-1] == ' ' || funcEnd[-1] == '\t'))
         funcEnd--;
-    
+
     // Find the start of "ClassName::methodName" by looking for SlangRecord::
     // or the second-to-last "::" before the function name
     const char* namespaceMarker = strstr(signature, "SlangRecord::");
     const char* classStart = nullptr;
-    
+
     if (namespaceMarker && namespaceMarker < funcEnd)
     {
         // Skip past "SlangRecord::"
@@ -612,15 +647,15 @@ const char* ReplayContext::parseSignature(const char* signature, char* buffer, s
         else
             classStart = start;
     }
-    
+
     // Copy to buffer
     size_t len = funcEnd - classStart;
     if (len >= bufferSize)
         len = bufferSize - 1;
-    
+
     memcpy(buffer, classStart, len);
     buffer[len] = '\0';
-    
+
     return buffer;
 }
 
@@ -743,30 +778,30 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
     case Mode::Idle:
         // No-op in idle mode
         break;
-        
+
     case Mode::Record:
         // Write data to stream
         m_stream.write(data, size);
         break;
-        
+
     case Mode::Sync:
         {
             // Write data to stream
             m_stream.write(data, size);
-            
+
             // Compare against reference stream using reusable buffer
             size_t offset = m_referenceStream.getPosition();
             if (size_t(m_compareBuffer.getCount()) < size)
                 m_compareBuffer.setCount(Slang::Index(size));
             m_referenceStream.read(m_compareBuffer.getBuffer(), size);
-            
+
             if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
                 throw DataMismatchException(offset, size);
             }
         }
         break;
-        
+
     case Mode::Playback:
         // For output parameters and return values, the user has provided
         // what they expect the output to be. We read the recorded value
@@ -777,11 +812,11 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
             if (size_t(m_compareBuffer.getCount()) < size)
                 m_compareBuffer.setCount(Slang::Index(size));
             memcpy(m_compareBuffer.getBuffer(), data, size);
-            
+
             // Read the recorded value from stream
             size_t offset = m_stream.getPosition();
             m_stream.read(data, size);
-            
+
             // Compare: recorded value (now in data) vs expected value (in buffer)
             if (memcmp(data, m_compareBuffer.getBuffer(), size) != 0)
             {
@@ -853,23 +888,73 @@ void ReplayContext::expectTypeId(TypeId expected)
 // Basic types - integer, floating-point, boolean
 // =============================================================================
 
-void ReplayContext::record(RecordFlag flags, int8_t& value)   { recordTypeId(TypeId::Int8);   recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, int16_t& value)  { recordTypeId(TypeId::Int16);  recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, int32_t& value)  { recordTypeId(TypeId::Int32);  recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, int64_t& value)  { recordTypeId(TypeId::Int64);  recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, uint8_t& value)  { recordTypeId(TypeId::UInt8);  recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, uint16_t& value) { recordTypeId(TypeId::UInt16); recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, uint32_t& value) { recordTypeId(TypeId::UInt32); recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, uint64_t& value) { recordTypeId(TypeId::UInt64); recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, float& value)    { recordTypeId(TypeId::Float32); recordRaw(flags, &value, sizeof(value)); }
-void ReplayContext::record(RecordFlag flags, double& value)   { recordTypeId(TypeId::Float64); recordRaw(flags, &value, sizeof(value)); }
+void ReplayContext::record(RecordFlag flags, int8_t& value)
+{
+    recordTypeId(TypeId::Int8);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, int16_t& value)
+{
+    recordTypeId(TypeId::Int16);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, int32_t& value)
+{
+    recordTypeId(TypeId::Int32);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, int64_t& value)
+{
+    recordTypeId(TypeId::Int64);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, uint8_t& value)
+{
+    recordTypeId(TypeId::UInt8);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, uint16_t& value)
+{
+    recordTypeId(TypeId::UInt16);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, uint32_t& value)
+{
+    recordTypeId(TypeId::UInt32);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, uint64_t& value)
+{
+    recordTypeId(TypeId::UInt64);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, float& value)
+{
+    recordTypeId(TypeId::Float32);
+    recordRaw(flags, &value, sizeof(value));
+}
+void ReplayContext::record(RecordFlag flags, double& value)
+{
+    recordTypeId(TypeId::Float64);
+    recordRaw(flags, &value, sizeof(value));
+}
 
 void ReplayContext::record(RecordFlag flags, bool& value)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     recordTypeId(TypeId::Bool);
-    if (isWriting()) { uint8_t v = value ? 1 : 0; recordRaw(flags, &v, sizeof(v)); }
-    else { uint8_t v; recordRaw(flags, &v, sizeof(v)); value = (v != 0); }
+    if (isWriting())
+    {
+        uint8_t v = value ? 1 : 0;
+        recordRaw(flags, &v, sizeof(v));
+    }
+    else
+    {
+        uint8_t v;
+        recordRaw(flags, &v, sizeof(v));
+        value = (v != 0);
+    }
 }
 
 // =============================================================================
@@ -878,39 +963,51 @@ void ReplayContext::record(RecordFlag flags, bool& value)
 
 void ReplayContext::record(RecordFlag flags, const char*& str)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     if (isWriting())
     {
-        if (str == nullptr) { recordTypeId(TypeId::Null); }
+        if (str == nullptr)
+        {
+            recordTypeId(TypeId::Null);
+        }
         else
         {
             recordTypeId(TypeId::String);
             uint32_t length = static_cast<uint32_t>(strlen(str));
             recordRaw(RecordFlag::None, &length, sizeof(length));
-            if (length > 0) recordRaw(RecordFlag::None, const_cast<char*>(str), length);
+            if (length > 0)
+                recordRaw(RecordFlag::None, const_cast<char*>(str), length);
         }
     }
     else
     {
         TypeId typeId = readTypeId();
-        if (typeId == TypeId::Null) { str = nullptr; }
+        if (typeId == TypeId::Null)
+        {
+            str = nullptr;
+        }
         else if (typeId == TypeId::String)
         {
             uint32_t length;
             recordRaw(RecordFlag::None, &length, sizeof(length));
             char* buf = m_arena.allocateArray<char>(length + 1);
-            if (length > 0) recordRaw(RecordFlag::None, buf, length);
+            if (length > 0)
+                recordRaw(RecordFlag::None, buf, length);
             buf[length] = '\0';
-            if(hasFlag(flags, RecordFlag::Output))
+            if (hasFlag(flags, RecordFlag::Output))
             {
-                if(strcmp(str, buf) != 0)
+                if (strcmp(str, buf) != 0)
                 {
                     throw DataMismatchException(m_stream.getPosition() - length, length);
                 }
             }
             str = buf;
         }
-        else { throw TypeMismatchException(TypeId::String, typeId); }
+        else
+        {
+            throw TypeMismatchException(TypeId::String, typeId);
+        }
     }
 }
 
@@ -921,7 +1018,8 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
 void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 {
     SLANG_UNUSED(flags);
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
 
     if (isWriting())
     {
@@ -1003,7 +1101,8 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 
 void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     recordTypeId(TypeId::ObjectHandle);
     recordRaw(flags, &handleId, sizeof(handleId));
 }
@@ -1012,34 +1111,118 @@ void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 // Slang enum types - all use recordEnum
 // =============================================================================
 
-void ReplayContext::record(RecordFlag flags, SlangSeverity& value)              { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangParameterCategory& value)     { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangBindableResourceType& value)  { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangCompileTarget& value)         { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangContainerFormat& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangPassThrough& value)           { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangArchiveType& value)           { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangFloatingPointMode& value)     { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangFpDenormalMode& value)        { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangLineDirectiveMode& value)     { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangSourceLanguage& value)        { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangProfileID& value)             { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangCapabilityID& value)          { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangMatrixLayoutMode& value)      { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangStage& value)                 { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangDebugInfoLevel& value)        { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangDebugInfoFormat& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangOptimizationLevel& value)     { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangPathType& value)              { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, OSPathKind& value)                 { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangEmitSpirvMethod& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::LayoutRules& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::CompilerOptionName& value)  { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::CompilerOptionValueKind& value) { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::ContainerType& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::SpecializationArg::Kind& value) { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, SlangLanguageVersion& value)       { recordEnum(flags, value); }
-void ReplayContext::record(RecordFlag flags, slang::BuiltinModuleName& value)   { recordEnum(flags, value); }
+void ReplayContext::record(RecordFlag flags, SlangSeverity& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangParameterCategory& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangBindableResourceType& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangCompileTarget& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangContainerFormat& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangPassThrough& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangArchiveType& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangFloatingPointMode& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangFpDenormalMode& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangLineDirectiveMode& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangSourceLanguage& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangProfileID& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangCapabilityID& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangMatrixLayoutMode& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangStage& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangDebugInfoLevel& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangDebugInfoFormat& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangOptimizationLevel& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangPathType& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, OSPathKind& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangEmitSpirvMethod& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::LayoutRules& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionName& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::CompilerOptionValueKind& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::ContainerType& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::SpecializationArg::Kind& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, SlangLanguageVersion& value)
+{
+    recordEnum(flags, value);
+}
+void ReplayContext::record(RecordFlag flags, slang::BuiltinModuleName& value)
+{
+    recordEnum(flags, value);
+}
 
 // =============================================================================
 // POD and complex structs
@@ -1050,7 +1233,8 @@ void ReplayContext::record(RecordFlag flags, SlangUUID& value)
     record(flags, value.data1);
     record(flags, value.data2);
     record(flags, value.data3);
-    for (int i = 0; i < 8; ++i) record(flags, value.data4[i]);
+    for (int i = 0; i < 8; ++i)
+        record(flags, value.data4[i]);
 }
 
 void ReplayContext::record(RecordFlag flags, slang::CompilerOptionValue& value)
@@ -1078,7 +1262,8 @@ void ReplayContext::record(RecordFlag flags, slang::TargetDesc& value)
 {
     uint64_t structureSize = value.structureSize;
     record(flags, structureSize);
-    if (isReading()) value.structureSize = static_cast<size_t>(structureSize);
+    if (isReading())
+        value.structureSize = static_cast<size_t>(structureSize);
 
     record(flags, value.format);
     record(flags, value.profile);
@@ -1093,7 +1278,8 @@ void ReplayContext::record(RecordFlag flags, slang::SessionDesc& value)
 {
     uint64_t structureSize = value.structureSize;
     record(flags, structureSize);
-    if (isReading()) value.structureSize = static_cast<size_t>(structureSize);
+    if (isReading())
+        value.structureSize = static_cast<size_t>(structureSize);
 
     recordArray(flags, value.targets, value.targetCount);
     record(flags, value.flags);
@@ -1104,14 +1290,16 @@ void ReplayContext::record(RecordFlag flags, slang::SessionDesc& value)
     // fileSystem is handled specially - record as null handle for now
     uint64_t fileSystemHandle = 0;
     recordHandle(flags, fileSystemHandle);
-    if (isReading()) value.fileSystem = nullptr;
+    if (isReading())
+        value.fileSystem = nullptr;
 
     record(flags, value.enableEffectAnnotations);
     record(flags, value.allowGLSLSyntax);
 
     const slang::CompilerOptionEntry* entries = value.compilerOptionEntries;
     recordArray(flags, entries, value.compilerOptionEntryCount);
-    if (isReading()) value.compilerOptionEntries = const_cast<slang::CompilerOptionEntry*>(entries);
+    if (isReading())
+        value.compilerOptionEntries = const_cast<slang::CompilerOptionEntry*>(entries);
 
     record(flags, value.skipSPIRVValidation);
 }
@@ -1121,12 +1309,13 @@ void ReplayContext::record(RecordFlag flags, slang::SpecializationArg& value)
     record(flags, value.kind);
     switch (value.kind)
     {
-    case slang::SpecializationArg::Kind::Unknown: break;
-    case slang::SpecializationArg::Kind::Type:
-    {
-        record(flags, value.type);
+    case slang::SpecializationArg::Kind::Unknown:
         break;
-    }
+    case slang::SpecializationArg::Kind::Type:
+        {
+            record(flags, value.type);
+            break;
+        }
     case slang::SpecializationArg::Kind::Expr:
         record(flags, value.expr);
         break;
@@ -1139,7 +1328,8 @@ void ReplayContext::record(RecordFlag flags, SlangGlobalSessionDesc& value)
     record(flags, value.apiVersion);
     record(flags, value.minLanguageVersion);
     record(flags, value.enableGLSL);
-    for (int i = 0; i < 16; ++i) record(flags, value.reserved[i]);
+    for (int i = 0; i < 16; ++i)
+        record(flags, value.reserved[i]);
 }
 
 // =============================================================================
@@ -1226,8 +1416,7 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         // Get the type's full name
         Slang::ComPtr<ISlangBlob> nameBlob;
         type->getFullName(nameBlob.writeRef());
-        const char* typeName =
-            nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
+        const char* typeName = nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
 
         // Go via decl ref to get to the module that owns the type, and from there its module
         Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
@@ -1239,7 +1428,9 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         {
             // Module implements slang::IModule, so we can cast it
             ComPtr<slang::IComponentType> componentTypeInterface;
-            if (owningModule->queryInterface(slang::IComponentType::getTypeGuid(), (void**)componentTypeInterface.writeRef()) == SLANG_OK)
+            if (owningModule->queryInterface(
+                    slang::IComponentType::getTypeGuid(),
+                    (void**)componentTypeInterface.writeRef()) == SLANG_OK)
             {
                 auto proxy = getProxy(componentTypeInterface.get());
                 moduleHandle = getProxyHandle(proxy);
@@ -1249,14 +1440,16 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         // HACK! The module wasn't found, which means this was probably a builtin type that
         // was looked up via a user loaded module's layout. The only way we can currently
         // handle this is to go over our loaded modules and find one that contains it
-        if(!moduleHandle) 
+        if (!moduleHandle)
         {
-            for(auto& kv : m_implToProxy) 
+            for (auto& kv : m_implToProxy)
             {
                 // This 'safe' cast is applied to the proxy, which we know will always be some
                 // valid virtual ISlangUnknown pointer, even if its not a module, so won't break DC.
                 ComPtr<slang::IComponentType> componentTypeInterface;
-                if(kv.first->queryInterface(slang::IComponentType::getTypeGuid(), (void**)componentTypeInterface.writeRef()) == SLANG_OK)
+                if (kv.first->queryInterface(
+                        slang::IComponentType::getTypeGuid(),
+                        (void**)componentTypeInterface.writeRef()) == SLANG_OK)
                 {
                     auto layout = componentTypeInterface->getLayout(0, nullptr);
                     if (layout && layout->findTypeByName(typeName) == type)
@@ -1265,11 +1458,11 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
                         moduleHandle = getProxyHandle(proxy);
                         break;
                     }
-                }                
+                }
             }
         }
 
-        if(!moduleHandle) 
+        if (!moduleHandle)
         {
             // If we still don't have a module handle, we can't record this type reference
             throw UnresolvedTypeException(type);
@@ -1309,7 +1502,9 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         Slang::ComPtr<slang::IComponentType> moduleInterface;
         if (moduleUnknown)
         {
-            moduleUnknown->queryInterface(slang::IComponentType::getTypeGuid(), (void**)moduleInterface.writeRef());
+            moduleUnknown->queryInterface(
+                slang::IComponentType::getTypeGuid(),
+                (void**)moduleInterface.writeRef());
         }
 
         // Get the type via the module's layout
@@ -1366,8 +1561,7 @@ bool ReplayContext::executeNextCall()
     PlaybackHandler* handler = m_handlers.tryGetValue(String(signature));
     if (!handler)
     {
-        throw Slang::Exception(
-            String("No handler registered for function: ") + signature);
+        throw Slang::Exception(String("No handler registered for function: ") + signature);
     }
 
     // Read the 'this' pointer handle (recorded by beginCall)

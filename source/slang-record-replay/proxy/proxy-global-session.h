@@ -1,11 +1,10 @@
 #ifndef SLANG_PROXY_GLOBAL_SESSION_H
 #define SLANG_PROXY_GLOBAL_SESSION_H
 
+#include "../../core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
 #include "proxy-mutable-file-system.h"
-
-#include "../../core/slang-file-system.h"
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -30,10 +29,11 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(GlobalSessionProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
         if (uuid == GlobalSessionProxy::getTypeGuid() ||
             uuid == slang::IGlobalSession::getTypeGuid())
@@ -61,46 +61,56 @@ public:
         // Record the original descriptor (before our modification)
         RECORD_INPUT(desc);
 
-        // This logic handles the fact that a user can supply a custom file system, and we need to make
-        // sure that on playback, we emulate EXACTLY the same behaviour. That means distinguishing,
-        // between calling createSession twice with the same custom file system, or twice with
-        // different ones. To do so, on writing we record a handle that identifies the file system used, 
-        // and on reading we use that to decide whether to look for an existing proxy, wrap the OS, or
-        // wrap a new dummy 'NULL' filesystem.
+        // This logic handles the fact that a user can supply a custom file system, and we need to
+        // make sure that on playback, we emulate EXACTLY the same behaviour. That means
+        // distinguishing, between calling createSession twice with the same custom file system, or
+        // twice with different ones. To do so, on writing we record a handle that identifies the
+        // file system used, and on reading we use that to decide whether to look for an existing
+        // proxy, wrap the OS, or wrap a new dummy 'NULL' filesystem.
         slang::SessionDesc desc2 = desc;
-        if(_ctx.isWriting()) {
+        if (_ctx.isWriting())
+        {
             uint64_t handle = 0;
-            if(desc.fileSystem) {
+            if (desc.fileSystem)
+            {
                 desc.fileSystem->addRef();
-                if(_ctx.isInterfaceRegistered(desc.fileSystem)) {
-                    desc2.fileSystem = wrapObject(desc.fileSystem);   
-                    handle = _ctx.getProxyHandle(desc2.fileSystem);                 
-                } else {
+                if (_ctx.isInterfaceRegistered(desc.fileSystem))
+                {
+                    desc2.fileSystem = wrapObject(desc.fileSystem);
+                    handle = _ctx.getProxyHandle(desc2.fileSystem);
+                }
+                else
+                {
                     desc2.fileSystem = wrapObject(desc.fileSystem);
                     handle = kCustomFileSystemHandle;
                 }
-            } else {
+            }
+            else
+            {
                 desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
                 handle = kDefaultFileSystemHandle;
             }
             RECORD_INFO(handle);
-        } else if(_ctx.isReading()) {
+        }
+        else if (_ctx.isReading())
+        {
             uint64_t handle;
             RECORD_INFO(handle);
-            switch(handle) {
-                case kDefaultFileSystemHandle:
+            switch (handle)
+            {
+            case kDefaultFileSystemHandle:
                 {
                     desc2.fileSystem = wrapObject(OSFileSystem::getMutableSingleton());
                     break;
                 }
-                case kCustomFileSystemHandle:
-                {                    
+            case kCustomFileSystemHandle:
+                {
                     auto nfs = new NULLFileSystem();
                     nfs->addRef();
                     desc2.fileSystem = wrapObject(nfs);
                     break;
                 }
-                default:
+            default:
                 {
                     desc2.fileSystem = toSlangInterface<ISlangFileSystem>(_ctx.getProxy(handle));
                     break;
@@ -183,8 +193,9 @@ public:
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
         RECORD_INPUT(defaultCompiler);
-        auto result =
-            getActual<IGlobalSession>()->setDefaultDownstreamCompiler(sourceLanguage, defaultCompiler);
+        auto result = getActual<IGlobalSession>()->setDefaultDownstreamCompiler(
+            sourceLanguage,
+            defaultCompiler);
         RECORD_RETURN(result);
     }
 
@@ -212,7 +223,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(sourceLanguage);
         ISlangBlob* preludePtr;
-        if(!outPrelude)
+        if (!outPrelude)
             outPrelude = &preludePtr;
         getActual<IGlobalSession>()->getLanguagePrelude(sourceLanguage, outPrelude);
         RECORD_COM_OUTPUT(outPrelude);
@@ -319,7 +330,8 @@ public:
         RECORD_CALL();
         RECORD_INPUT(source);
         RECORD_INPUT(target);
-        auto result = getActual<slang::IGlobalSession>()->getDownstreamCompilerForTransition(source, target);
+        auto result =
+            getActual<slang::IGlobalSession>()->getDownstreamCompilerForTransition(source, target);
         RECORD_RETURN(result);
     }
 
@@ -327,7 +339,7 @@ public:
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
     {
         RECORD_CALL();
-        
+
         double totalTime = 0.0;
         double downstreamTime = 0.0;
         if (!outTotalTime)
@@ -351,7 +363,7 @@ public:
 
     // parseCommandLineArguments is a bit special because tracking the 'aux allocation' is
     // painful, and it only really acts as a holder for memory allocated for the session desc.
-    // Instead, we store/return the session desc directly in the stream, and we ignore 
+    // Instead, we store/return the session desc directly in the stream, and we ignore
     // the aux allocation entirely.
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL parseCommandLineArguments(
         int argc,
@@ -362,13 +374,13 @@ public:
         RECORD_CALL();
         RECORD_INPUT(argc);
         RECORD_INPUT_ARRAY(argv, argc);
-        PREPARE_POINTER_OUTPUT(outSessionDesc);  
+        PREPARE_POINTER_OUTPUT(outSessionDesc);
         SlangResult result = SLANG_OK;
         if (ReplayContext::get().isWriting())
         {
-            result = getActual<slang::IGlobalSession>()->parseCommandLineArguments(
-                argc, argv, outSessionDesc, outAuxAllocation);
-        }        
+            result = getActual<slang::IGlobalSession>()
+                         ->parseCommandLineArguments(argc, argv, outSessionDesc, outAuxAllocation);
+        }
         RECORD_INFO(*outSessionDesc);
         RECORD_RETURN(result);
     }

@@ -116,7 +116,7 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     // Get the replay context and reset it to clean state
     auto& ctx = SlangRecord::ReplayContext::get();
     ctx.reset();
-    //ctx.setTtyLogging(true);
+    // ctx.setTtyLogging(true);
 
     // Load the replay from the recorded folder
     SlangResult res = ctx.loadReplay(recordPath.getBuffer());
@@ -133,7 +133,7 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     try
     {
         ctx.executeAll();
-        
+
         msgBuilder.clear();
         msgBuilder << "Replay completed successfully for '" << testName << "'\n";
         getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
@@ -160,7 +160,10 @@ static SlangResult executeReplay(const char* testName, const String& recordPath)
     return SLANG_OK;
 }
 
-static SlangResult runTest(UnitTestContext* context, const char* testName, uint64_t expectedHash = 0)
+static SlangResult runTest(
+    UnitTestContext* context,
+    const char* testName,
+    uint64_t expectedHash = 0)
 {
     // If the context is already active, it means we're running the testing framework as a replay,
     // so specific replay based test cases have to be ignored.
@@ -178,7 +181,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
 
     // Enable recording via environment variable for child process
     writeEnvironmentVariable("SLANG_RECORD_LAYER", "1");
-    
+
     // Set the explicit recording path
     writeEnvironmentVariable("SLANG_RECORD_PATH", recordPath.getBuffer());
 
@@ -219,31 +222,34 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
     try
     {
         String decoded = SlangRecord::ReplayStreamDecoder::decodeFile(streamPath.getBuffer());
-        
+
         // Compute hash of the decoded content
-        StableHashCode64 hash = getStableHashCode64(
-            decoded.getBuffer(), 
-            decoded.getLength());
-        
+        StableHashCode64 hash = getStableHashCode64(decoded.getBuffer(), decoded.getLength());
+
         // Log the decoded content and hash
         StringBuilder msgBuilder;
-        msgBuilder << "Decoded stream.bin for '" << testName << "' (" 
-                   << decoded.getLength() << " bytes):\n";
+        msgBuilder << "Decoded stream.bin for '" << testName << "' (" << decoded.getLength()
+                   << " bytes):\n";
         msgBuilder << "Recording path: " << recordPath << "\n";
         StringUtil::appendFormat(msgBuilder, "Hash: 0x%016llx\n", (unsigned long long)hash.hash);
         msgBuilder << "--- Begin decoded content ---\n";
         msgBuilder << decoded;
         msgBuilder << "--- End decoded content ---\n";
         getTestReporter()->message(TestMessageType::Info, msgBuilder.toString().getBuffer());
-        
+
         // Verify the hash matches the expected value (if provided)
         if (expectedHash != 0 && hash.hash != expectedHash)
         {
             StringBuilder errBuilder;
-            StringUtil::appendFormat(errBuilder, 
+            StringUtil::appendFormat(
+                errBuilder,
                 "Hash mismatch for '%s': expected 0x%016llx, got 0x%016llx\n",
-                testName, (unsigned long long)expectedHash, (unsigned long long)hash.hash);
-            getTestReporter()->message(TestMessageType::TestFailure, errBuilder.toString().getBuffer());
+                testName,
+                (unsigned long long)expectedHash,
+                (unsigned long long)hash.hash);
+            getTestReporter()->message(
+                TestMessageType::TestFailure,
+                errBuilder.toString().getBuffer());
             cleanupRecordFiles(recordPath);
             return SLANG_FAIL;
         }
@@ -251,8 +257,7 @@ static SlangResult runTest(UnitTestContext* context, const char* testName, uint6
     catch (const Exception& e)
     {
         StringBuilder msgBuilder;
-        msgBuilder << "Failed to decode stream.bin for '" << testName << "': " 
-                   << e.Message << "\n";
+        msgBuilder << "Failed to decode stream.bin for '" << testName << "': " << e.Message << "\n";
         getTestReporter()->message(TestMessageType::TestFailure, msgBuilder.toString().getBuffer());
         cleanupRecordFiles(recordPath);
         return SLANG_FAIL;
@@ -301,7 +306,8 @@ SLANG_UNIT_TEST(replayRecord_ray_tracing)
 
 SLANG_UNIT_TEST(replayRecord_ray_tracing_pipeline)
 {
-    SLANG_CHECK(SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x3611ba0d5b2fc4b1)));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(runTest(unitTestContext, "ray-tracing-pipeline", 0x3611ba0d5b2fc4b1)));
 }
 
 SLANG_UNIT_TEST(replayRecord_autodiff_texture)

@@ -1,22 +1,21 @@
 #pragma once
 
-#include "replay-stream.h"
 #include "../core/slang-blob.h"
 #include "../core/slang-dictionary.h"
 #include "../core/slang-list.h"
 #include "../core/slang-memory-arena.h"
-
-#include <slang.h>
-#include <slang-com-helper.h>
-#include <slang-com-ptr.h>
-
 #include "replay-shared.h"
+#include "replay-stream.h"
 
 #include <cstdint>
 #include <cstring>
 #include <mutex>
+#include <slang-com-helper.h>
+#include <slang-com-ptr.h>
+#include <slang.h>
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 using Slang::Dictionary;
 using Slang::List;
@@ -47,10 +46,12 @@ inline T* unwrapObject(T* obj)
 
 /// Handle constants for interface tracking.
 /// Handles 0-255 are reserved for special meanings.
-constexpr uint64_t kNullHandle = 0;                 ///< Null pointer
-constexpr uint64_t kCustomFileSystemHandle = 2;     ///< User-provided custom file system (that has not yet been registered with a handle)
-constexpr uint64_t kDefaultFileSystemHandle = 3;    ///< Default file system (when user doesn't provide one)
-constexpr uint64_t kFirstValidHandle = 0x100;       ///< First handle for tracked objects
+constexpr uint64_t kNullHandle = 0; ///< Null pointer
+constexpr uint64_t kCustomFileSystemHandle =
+    2; ///< User-provided custom file system (that has not yet been registered with a handle)
+constexpr uint64_t kDefaultFileSystemHandle =
+    3; ///< Default file system (when user doesn't provide one)
+constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
 
 /// Maximum length for function signatures stored in index entries.
 constexpr size_t kMaxSignatureLength = 128;
@@ -61,16 +62,17 @@ constexpr size_t kMaxSignatureLength = 128;
 #pragma pack(push, 1)
 struct CallIndexEntry
 {
-    uint64_t streamPosition;                   ///< Byte offset in stream.bin where call begins
-    uint64_t thisHandle;                       ///< Handle of 'this' pointer (kNullHandle for static)
-    char signature[kMaxSignatureLength];       ///< Null-terminated function signature
-    
+    uint64_t streamPosition;             ///< Byte offset in stream.bin where call begins
+    uint64_t thisHandle;                 ///< Handle of 'this' pointer (kNullHandle for static)
+    char signature[kMaxSignatureLength]; ///< Null-terminated function signature
+
     /// Total size of this struct (must be fixed for file I/O)
     static constexpr size_t kSize = sizeof(uint64_t) + sizeof(uint64_t) + kMaxSignatureLength;
 };
 #pragma pack(pop)
 
-static_assert(sizeof(CallIndexEntry) == CallIndexEntry::kSize, 
+static_assert(
+    sizeof(CallIndexEntry) == CallIndexEntry::kSize,
     "CallIndexEntry must have expected fixed size");
 
 /// Exception thrown when trying to record an untracked interface.
@@ -78,11 +80,11 @@ class UntrackedInterfaceException : public Slang::Exception
 {
 public:
     UntrackedInterfaceException(ISlangUnknown* obj)
-        : Slang::Exception("Attempted to record untracked interface")
-        , m_object(obj)
+        : Slang::Exception("Attempted to record untracked interface"), m_object(obj)
     {
     }
     ISlangUnknown* getObject() const { return m_object; }
+
 private:
     ISlangUnknown* m_object;
 };
@@ -92,11 +94,11 @@ class HandleNotFoundException : public Slang::Exception
 {
 public:
     HandleNotFoundException(uint64_t handle)
-        : Slang::Exception(String("Handle not found: ") + String(handle))
-        , m_handle(handle)
+        : Slang::Exception(String("Handle not found: ") + String(handle)), m_handle(handle)
     {
     }
     uint64_t getHandle() const { return m_handle; }
+
 private:
     uint64_t m_handle;
 };
@@ -106,11 +108,11 @@ class UnresolvedTypeException : public Slang::Exception
 {
 public:
     UnresolvedTypeException(slang::TypeReflection* type)
-        : Slang::Exception(String("Handle not found: ") + String(type->getName()))
-        , m_type(type)
+        : Slang::Exception(String("Handle not found: ") + String(type->getName())), m_type(type)
     {
     }
     slang::TypeReflection* getType() const { return m_type; }
+
 private:
     slang::TypeReflection* m_type;
 };
@@ -118,22 +120,22 @@ private:
 /// Operating mode for the replay system.
 enum class Mode : uint8_t
 {
-    Idle,       ///< No data captured, operations are no-ops
-    Record,     ///< Writing data to a stream
-    Sync,       ///< Writing data and comparing to reference stream for determinism verification
-    Playback,   ///< Reading data from a stream
+    Idle,     ///< No data captured, operations are no-ops
+    Record,   ///< Writing data to a stream
+    Sync,     ///< Writing data and comparing to reference stream for determinism verification
+    Playback, ///< Reading data from a stream
 };
 
 /// Flags indicating the role of a value being recorded.
 /// Used to determine replay verification behavior.
 enum class RecordFlag : uint8_t
 {
-    None = 0,           ///< No special handling
-    Input = 1 << 0,     ///< Function input argument (verify on replay)
-    Output = 1 << 1,    ///< Function output argument (capture on replay)
+    None = 0,               ///< No special handling
+    Input = 1 << 0,         ///< Function input argument (verify on replay)
+    Output = 1 << 1,        ///< Function output argument (capture on replay)
     InOut = Input | Output, ///< Input/output argument
     ReturnValue = 1 << 2,   ///< Function return value (capture on replay)
-    ThisPtr = 1 << 3,   ///< 'this' pointer for method calls
+    ThisPtr = 1 << 3,       ///< 'this' pointer for method calls
 };
 
 inline RecordFlag operator|(RecordFlag a, RecordFlag b)
@@ -154,12 +156,24 @@ inline bool hasFlag(RecordFlag flags, RecordFlag flag)
 /// Type identifiers for serialized values.
 enum class TypeId : uint8_t
 {
-    Int8 = 0x01, Int16 = 0x02, Int32 = 0x03, Int64 = 0x04,
-    UInt8 = 0x05, UInt16 = 0x06, UInt32 = 0x07, UInt64 = 0x08,
-    Float32 = 0x09, Float64 = 0x0A, Bool = 0x0B,
-    String = 0x10, Blob = 0x11, Array = 0x12, ObjectHandle = 0x13, Null = 0x14,
-    TypeReflectionRef = 0x15,  ///< TypeReflection reference (module handle + type name)
-    Error = 0xEE,  ///< Error marker - indicates an exception occurred
+    Int8 = 0x01,
+    Int16 = 0x02,
+    Int32 = 0x03,
+    Int64 = 0x04,
+    UInt8 = 0x05,
+    UInt16 = 0x06,
+    UInt32 = 0x07,
+    UInt64 = 0x08,
+    Float32 = 0x09,
+    Float64 = 0x0A,
+    Bool = 0x0B,
+    String = 0x10,
+    Blob = 0x11,
+    Array = 0x12,
+    ObjectHandle = 0x13,
+    Null = 0x14,
+    TypeReflectionRef = 0x15, ///< TypeReflection reference (module handle + type name)
+    Error = 0xEE,             ///< Error marker - indicates an exception occurred
 };
 
 SLANG_API const char* getTypeIdName(TypeId id);
@@ -171,6 +185,7 @@ public:
     SLANG_API TypeMismatchException(TypeId expected, TypeId actual);
     SLANG_API TypeId getExpected() const { return m_expected; }
     SLANG_API TypeId getActual() const { return m_actual; }
+
 private:
     TypeId m_expected, m_actual;
 };
@@ -182,6 +197,7 @@ public:
     SLANG_API DataMismatchException(size_t offset, size_t size);
     SLANG_API size_t getOffset() const { return m_offset; }
     SLANG_API size_t getSize() const { return m_size; }
+
 private:
     size_t m_offset, m_size;
 };
@@ -189,7 +205,7 @@ private:
 /// Unified serializer for binary I/O during record/replay.
 /// Provides a uniform API for both reading and writing serialized data.
 /// Owns its own ReplayStream and MemoryArena internally.
-/// 
+///
 /// The context operates in one of four modes:
 /// - Idle: No operations performed (default when env var not set)
 /// - Record: Writing data to a stream
@@ -219,10 +235,7 @@ public:
     SLANG_API Mode getMode() const { return m_mode; }
 
     /// Check if the context is active (not Idle).
-    SLANG_API bool isActive() const
-    {
-        return m_mode != Mode::Idle;
-    }
+    SLANG_API bool isActive() const { return m_mode != Mode::Idle; }
 
     /// Set the operating mode.
     /// When entering Record mode, sets up mirror file for crash-safe capture.
@@ -298,7 +311,10 @@ public:
 
     /// Lock the context for thread-safe access.
     /// Returns an RAII lock guard.
-    SLANG_API std::unique_lock<std::recursive_mutex> lock() { return std::unique_lock<std::recursive_mutex>(m_mutex); }
+    SLANG_API std::unique_lock<std::recursive_mutex> lock()
+    {
+        return std::unique_lock<std::recursive_mutex>(m_mutex);
+    }
 
     /// Reset the context to initial state (clears streams and arena, mode becomes Idle).
     SLANG_API void reset();
@@ -339,7 +355,10 @@ public:
     /// Parse a function signature to extract "ClassName::methodName" format.
     /// Works with both MSVC __FUNCSIG__ and GCC/Clang __PRETTY_FUNCTION__.
     /// Returns the normalized signature, or the original if parsing fails.
-    SLANG_API static const char* parseSignature(const char* signature, char* buffer, size_t bufferSize);
+    SLANG_API static const char* parseSignature(
+        const char* signature,
+        char* buffer,
+        size_t bufferSize);
 
     /// Begin recording a method call.
     /// Records the function signature and 'this' pointer as a tracked handle.
@@ -353,11 +372,11 @@ public:
         // Parse and record the normalized signature
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
-        
+
         // Log to TTY if enabled
         if (m_ttyLogging)
             logCall(parsed, thisPtr);
-        
+
         // Write index entry before recording to main stream (for correct position)
         // Get the canonical ISlangUnknown* identity for this proxy
         ISlangUnknown* thisUnknown = toSlangUnknown(thisPtr);
@@ -369,7 +388,7 @@ public:
                 thisHandle = getProxyHandleImpl(thisUnknown);
             writeIndexEntry(parsed, thisHandle);
         }
-        
+
         // Note: the parsed signature is fixed/known, so can be treated as a verifiable output.
         record(RecordFlag::Output, parsed);
         recordInterfaceImpl<ISlangUnknown>(RecordFlag::Input, thisUnknown);
@@ -385,15 +404,15 @@ public:
             return;
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
-        
+
         // Log to TTY if enabled
         if (m_ttyLogging)
             logCall(parsed, nullptr);
-        
+
         // Write index entry before recording to main stream (for correct position)
         if (isWriting())
             writeIndexEntry(parsed, kNullHandle);
-        
+
         record(RecordFlag::Input, parsed);
         uint64_t nh = kNullHandle;
         recordHandle(RecordFlag::Input, nh);
@@ -487,7 +506,8 @@ public:
     SLANG_API ISlangUnknown* getProxy(uint64_t handle) const;
 
     // Enum types - record as int32_t
-    template<typename EnumT> void recordEnum(RecordFlag flags, EnumT& value);
+    template<typename EnumT>
+    void recordEnum(RecordFlag flags, EnumT& value);
 
     // Slang enum types
     SLANG_API void record(RecordFlag flags, SlangSeverity& value);
@@ -592,31 +612,31 @@ private:
     Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
 
     // Replay directory management
-    String m_replayDirectory = ".slang-replays";  ///< Base directory for replays
-    String m_currentReplayPath;                    ///< Current recording session folder
+    String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
+    String m_currentReplayPath;                  ///< Current recording session folder
 
     // TTY logging
-    bool m_ttyLogging = false;  ///< Whether to log calls to stderr
-    
+    bool m_ttyLogging = false; ///< Whether to log calls to stderr
+
     // Deferred initialization (to avoid global init order issues with CharEncoding)
-    bool m_initialized = false;          ///< True after ensureInitialized() has run
-    
+    bool m_initialized = false; ///< True after ensureInitialized() has run
+
     /// Ensure deferred initialization has completed.
     /// Called on first actual use to avoid global init order issues.
     SLANG_API void ensureInitialized();
-    
+
     /// Log a call to stderr (used when m_ttyLogging is enabled).
     SLANG_API void logCall(const char* signature, void* thisPtr);
 
     /// Set up mirror file for crash-safe capture when entering Record mode.
     SLANG_API void setupRecordingMirror();
-    
+
     /// Close mirror file when leaving Record mode.
     SLANG_API void closeRecordingMirror();
-    
+
     /// Generate a timestamp folder name (e.g., "2026-02-04_14-30-45-123").
     SLANG_API static String generateTimestampFolderName();
-    
+
     /// Write an index entry to the index stream.
     /// Called by beginCall/beginStaticCall before writing to main stream.
     SLANG_API void writeIndexEntry(const char* signature, uint64_t thisHandle);
@@ -628,16 +648,16 @@ public:
     /// Get the number of calls in the loaded index.
     /// Returns 0 if no index is loaded.
     SLANG_API size_t getCallCount() const;
-    
+
     /// Get an index entry by call number (0-based).
     /// Returns nullptr if index is not loaded or callIndex is out of range.
     SLANG_API const CallIndexEntry* getCallIndexEntry(size_t callIndex) const;
-    
+
     /// Seek the main stream to a specific call by index.
     /// Returns SLANG_OK on success, SLANG_E_NOT_FOUND if index not loaded,
     /// SLANG_E_INVALID_ARG if callIndex is out of range.
     SLANG_API SlangResult seekToCall(size_t callIndex);
-    
+
     /// Check if the call index is loaded/available.
     SLANG_API bool hasCallIndex() const { return m_indexStream.getSize() > 0; }
 
@@ -648,7 +668,7 @@ public:
     /// Function type for registered playback handlers.
     /// The handler is called in playback mode and should call the appropriate
     /// record() methods to read arguments from the stream, then execute the call.
-    using PlaybackHandler = void(*)(ReplayContext& ctx);
+    using PlaybackHandler = void (*)(ReplayContext& ctx);
 
     /// Register a playback handler for a function signature.
     /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
@@ -687,7 +707,7 @@ public:
 private:
     // Map from function signature to handler
     Dictionary<String, PlaybackHandler> m_handlers;
-    
+
     // Current 'this' handle during playback execution
     uint64_t m_currentThisHandle = kNullHandle;
 };
@@ -697,7 +717,8 @@ private:
 template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     if (isWriting())
     {
         recordTypeId(TypeId::Array);
@@ -732,7 +753,8 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
 template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     if (isWriting())
     {
         recordTypeId(TypeId::Array);
@@ -767,7 +789,8 @@ void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 template<typename EnumT>
 void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
     int32_t v = static_cast<int32_t>(value);
     record(flags, v);
     if (isReading())
@@ -777,7 +800,8 @@ void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 template<typename T>
 void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 {
-    if (m_mode == Mode::Idle) return;
+    if (m_mode == Mode::Idle)
+        return;
 
     bool isInput = hasFlag(flags, RecordFlag::Input) || hasFlag(flags, RecordFlag::ThisPtr);
     bool isOutput = hasFlag(flags, RecordFlag::Output) || hasFlag(flags, RecordFlag::ReturnValue);
@@ -805,12 +829,12 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 
             // Unwrap the proxy to get the underlying implementation
             obj = unwrapObject(obj);
-
         }
         else if (isOutput)
         {
             // An output from a slang api to be handed back to user. Should be an implementation
-            // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
+            // that needs to be wrapped (or the existing wrapped object needs retrieving) and
+            // returned.
 
             // Wrap the implementation in a proxy
             obj = wrapObject(obj);
@@ -849,14 +873,15 @@ void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
         else if (isOutput)
         {
             // An output from a slang api to be handed back to user. Should be an implementation
-            // that needs to be wrapped (or the existing wrapped object needs retrieving) and returned.
+            // that needs to be wrapped (or the existing wrapped object needs retrieving) and
+            // returned.
 
             // Wrap the implementation in a proxy
             obj = wrapObject(obj);
 
             // Output: register object and record handle
             uint64_t handle = getProxyHandle(obj);
-            recordHandle(flags, handle);            
+            recordHandle(flags, handle);
         }
     }
 }

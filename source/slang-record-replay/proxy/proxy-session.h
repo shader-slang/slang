@@ -9,7 +9,7 @@ namespace SlangRecord
 
 class SessionProxy : public ProxyBase<slang::ISession>
 {
-public:    
+public:
     List<ComPtr<slang::IModule>> m_loadedModules;
 
     SLANG_COM_INTERFACE(
@@ -23,7 +23,7 @@ public:
     {
     }
 
-    ~SessionProxy() 
+    ~SessionProxy()
     {
         // Clear loaded modules to release references before the session is released
         SuppressRefCountRecording guard;
@@ -33,13 +33,13 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(SessionProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
-        if (uuid == SessionProxy::getTypeGuid() ||
-            uuid == slang::ISession::getTypeGuid())
+        if (uuid == SessionProxy::getTypeGuid() || uuid == slang::ISession::getTypeGuid())
         {
             addRef();
             *outObject = static_cast<slang::ISession*>(this);
@@ -67,11 +67,12 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(moduleName);
-        
+
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-            
-        slang::IModule* result = getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
-        
+
+        slang::IModule* result =
+            getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
+
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -89,7 +90,11 @@ public:
 
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
-        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSource(moduleName, path, source, outDiagnostics);
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSource(
+            moduleName,
+            path,
+            source,
+            outDiagnostics);
 
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
@@ -107,7 +112,11 @@ public:
         // Call create session
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        auto result = getActual<slang::ISession>()->createCompositeComponentType(componentTypes, componentTypeCount, outCompositeComponentType, outDiagnostics);
+        auto result = getActual<slang::ISession>()->createCompositeComponentType(
+            componentTypes,
+            componentTypeCount,
+            outCompositeComponentType,
+            outDiagnostics);
 
         RECORD_COM_OUTPUT(outCompositeComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -137,13 +146,14 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(targetIndex);
         RECORD_INPUT(rules);
-        
+
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-            
-        slang::TypeLayoutReflection* result = getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
-        
+
+        slang::TypeLayoutReflection* result =
+            getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
+
         RECORD_COM_OUTPUT(outDiagnostics);
-        return result;        
+        return result;
     }
 
     virtual SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL getContainerType(
@@ -190,7 +200,10 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(interfaceType);
         PREPARE_POINTER_OUTPUT(outId);
-        auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(type, interfaceType, outId);
+        auto result = getActual<slang::ISession>()->getTypeConformanceWitnessSequentialID(
+            type,
+            interfaceType,
+            outId);
         RECORD_RETURN(result);
     }
 
@@ -237,11 +250,15 @@ public:
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
         RECORD_INPUT(source);
-        
+
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        
-        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(moduleName, path, source, outDiagnostics);
-        
+
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(
+            moduleName,
+            path,
+            source,
+            outDiagnostics);
+
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -268,9 +285,10 @@ public:
         RECORD_INPUT(modulePath);
         RECORD_INPUT(binaryModuleBlob);
 
-        bool result = getActual<slang::ISession>()->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
+        bool result =
+            getActual<slang::ISession>()->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
 
-        //REPLAY TODO: I can't work out why isBinaryModuleUpToDate is non-deterministic
+        // REPLAY TODO: I can't work out why isBinaryModuleUpToDate is non-deterministic
         RECORD_INFO(result);
         return result;
     }
@@ -285,11 +303,15 @@ public:
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
         RECORD_INPUT(string);
-        
+
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-            
-        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(moduleName, path, string, outDiagnostics);
-        
+
+        slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(
+            moduleName,
+            path,
+            string,
+            outDiagnostics);
+
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -316,7 +338,10 @@ public:
         RECORD_CALL();
         RECORD_INPUT(source);
         auto result = getActual<slang::ISession>()->loadModuleInfoFromIRBlob(
-            source, outModuleVersion, outModuleCompilerVersion, outModuleName);
+            source,
+            outModuleVersion,
+            outModuleCompilerVersion,
+            outModuleName);
         RECORD_RETURN(result);
     }
 };

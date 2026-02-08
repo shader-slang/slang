@@ -10,8 +10,12 @@
 // Simple test interface for replay macro testing
 struct ITestCalculator : public ISlangUnknown
 {
-    SLANG_COM_INTERFACE(0x12345678, 0x1234, 0x1234, {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0});
-    
+    SLANG_COM_INTERFACE(
+        0x12345678,
+        0x1234,
+        0x1234,
+        {0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0});
+
     virtual int32_t SLANG_MCALL add(int32_t a, int32_t b) = 0;
     virtual void SLANG_MCALL setOffset(int32_t offset) = 0;
 };
@@ -27,10 +31,14 @@ static int s_testCalcSetOffsetCalls = 0;
 class TestCalculatorProxy : public ITestCalculator
 {
 public:
-    TestCalculatorProxy(ITestCalculator* actual) : m_actual(actual), m_refCount(1) {}
+    TestCalculatorProxy(ITestCalculator* actual)
+        : m_actual(actual), m_refCount(1)
+    {
+    }
 
     // ISlangUnknown
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) override
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
     {
         if (uuid == ITestCalculator::getTypeGuid() || uuid == ISlangUnknown::getTypeGuid())
         {
@@ -43,10 +51,11 @@ public:
     }
 
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ++m_refCount; }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override 
-    { 
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+    {
         uint32_t count = --m_refCount;
-        if (count == 0) delete this;
+        if (count == 0)
+            delete this;
         return count;
     }
 
@@ -74,7 +83,8 @@ public:
         s_testCalcOffset = offset;
         s_testCalcSetOffsetCalls++;
 
-        if (m_actual) m_actual->setOffset(offset);
+        if (m_actual)
+            m_actual->setOffset(offset);
     }
 
     ITestCalculator* getActual() { return m_actual; }
@@ -88,9 +98,13 @@ private:
 class TestCalculatorImpl : public ITestCalculator
 {
 public:
-    TestCalculatorImpl() : m_offset(0), m_refCount(1) {}
+    TestCalculatorImpl()
+        : m_offset(0), m_refCount(1)
+    {
+    }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject) override
+    SLANG_NO_THROW SlangResult SLANG_MCALL
+    queryInterface(SlangUUID const& uuid, void** outObject) override
     {
         if (uuid == ITestCalculator::getTypeGuid() || uuid == ISlangUnknown::getTypeGuid())
         {
@@ -103,10 +117,11 @@ public:
     }
 
     SLANG_NO_THROW uint32_t SLANG_MCALL addRef() override { return ++m_refCount; }
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() override 
-    { 
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() override
+    {
         uint32_t count = --m_refCount;
-        if (count == 0) delete this;
+        if (count == 0)
+            delete this;
         return count;
     }
 
@@ -140,23 +155,23 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     // Build a recorded stream manually with known signatures
     ctx().reset();
     ctx().setMode(Mode::Record);
-    
+
     // Register the proxy and get its handle
     uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
     SLANG_CHECK(proxyHandle >= kFirstValidHandle);
 
     // Record a call manually with a simple signature we control
     const char* addSignature = "TestCalculatorProxy::add";
-    ctx().record(RecordFlag::Input, addSignature);  // signature
-    
+    ctx().record(RecordFlag::Input, addSignature); // signature
+
     // Record 'this' handle with proper TypeId (what beginCall does via recordHandle)
     ctx().recordHandle(RecordFlag::Input, proxyHandle);
-    
+
     int32_t arg_a = 10;
     int32_t arg_b = 20;
     ctx().record(RecordFlag::Input, arg_a);
     ctx().record(RecordFlag::Input, arg_b);
-    
+
     int32_t returnVal = 30;
     ctx().record(RecordFlag::ReturnValue, returnVal);
 
@@ -165,14 +180,14 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
 
     // Switch to playback
     ctx().switchToPlayback();
-    ctx().testsOnlyRegisterProxy(proxyPtr.get());  // Same handle value
-    
+    ctx().testsOnlyRegisterProxy(proxyPtr.get()); // Same handle value
+
     // Register a handler using the replayHandler template (what REPLAY_REGISTER does internally)
-    auto addHandler = [](ReplayContext& ctxRef) {
+    auto addHandler = [](ReplayContext& ctxRef)
+    {
         SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
             ctxRef,
-            &TestCalculatorProxy::add
-        );
+            &TestCalculatorProxy::add);
     };
     ctx().registerHandler(addSignature, addHandler);
 
@@ -182,18 +197,18 @@ SLANG_UNIT_TEST(replayContextReplayRegisterMacro)
     // 3. Call addHandler which calls replayHandler
     // 4. replayHandler gets 'this' via getCurrentThis and calls proxy->add(default, default)
     // 5. Proxy's add method uses RECORD_* macros which read from stream in Playback mode
-    
+
     // But wait - the proxy's RECORD_CALL uses ctx() singleton, not 'player'
     // We need to test differently - verify the template infrastructure compiles and works
-    
+
     // For this test, just verify the handler dispatch works
     bool executed = ctx().executeNextCall();
     SLANG_CHECK(executed);
-    
+
     // In this test, the proxy's add() was called with default args (0, 0)
     // because we're testing the dispatch, not full bidirectional record/replay
     SLANG_CHECK(s_testCalcAddCalls == 1);
-    
+
     // No more calls
     SLANG_CHECK(!ctx().hasMoreCalls());
 }
@@ -203,23 +218,23 @@ SLANG_UNIT_TEST(replayContextMemberFunctionTraits)
 {
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
-    
+
     // Test arity detection
     using AddTraits = MemberFunctionTraits<decltype(&TestCalculatorProxy::add)>;
     static_assert(AddTraits::Arity == 2, "add should have 2 args");
     static_assert(std::is_same_v<AddTraits::ReturnType, int32_t>, "add returns int32_t");
-    
+
     using SetOffsetTraits = MemberFunctionTraits<decltype(&TestCalculatorProxy::setOffset)>;
     static_assert(SetOffsetTraits::Arity == 1, "setOffset should have 1 arg");
     static_assert(std::is_void_v<SetOffsetTraits::ReturnType>, "setOffset returns void");
-    
+
     // Test DefaultValue
     int32_t defInt = DefaultValue<int32_t>::get();
     SLANG_CHECK(defInt == 0);
-    
+
     int32_t* defPtr = DefaultValue<int32_t*>::get();
     SLANG_CHECK(defPtr == nullptr);
-    
+
     // All checks passed
     SLANG_CHECK(true);
 }
@@ -250,14 +265,14 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     // ========== RECORDING PHASE ==========
     ctx().reset();
     ctx().setMode(Mode::Record);
-    
+
     // Register the proxy (simulates what happens during createSession)
     uint64_t proxyHandle = ctx().testsOnlyRegisterProxy(proxyPtr.get());
     SLANG_CHECK(proxyHandle >= kFirstValidHandle);
 
     // Call methods through proxy - this uses RECORD_CALL() which normalizes the signature
     int32_t result1 = proxy->add(10, 20);
-    SLANG_CHECK(result1 == 30);  // Implementation adds the values
+    SLANG_CHECK(result1 == 30); // Implementation adds the values
     SLANG_CHECK(s_testCalcAddCalls == 1);
     SLANG_CHECK(s_testCalcLastA == 10);
     SLANG_CHECK(s_testCalcLastB == 20);
@@ -267,7 +282,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     SLANG_CHECK(s_testCalcOffset == 5);
 
     int32_t result2 = proxy->add(100, 200);
-    SLANG_CHECK(result2 == 305);  // 100 + 200 + 5 (offset)
+    SLANG_CHECK(result2 == 305); // 100 + 200 + 5 (offset)
     SLANG_CHECK(s_testCalcAddCalls == 2);
 
     // Verify we recorded something
@@ -288,7 +303,7 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
 
     // Switch to playback mode
     ctx().switchToPlayback();
-    
+
     // Re-register with same handle - during real playback, this happens
     // when the creation methods are replayed
     ctx().testsOnlyRegisterProxy(proxyPtr2.get());
@@ -296,19 +311,19 @@ SLANG_UNIT_TEST(replayContextFullRoundTrip)
     // Register handlers - this is what REPLAY_REGISTER does
     // We need to use the signature that parseSignature produces from __FUNCSIG__
     // For TestCalculatorProxy::add, parseSignature extracts "TestCalculatorProxy::add"
-    auto addHandler = [](ReplayContext& ctxRef) {
+    auto addHandler = [](ReplayContext& ctxRef)
+    {
         SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
             ctxRef,
-            &TestCalculatorProxy::add
-        );
+            &TestCalculatorProxy::add);
     };
-    auto setOffsetHandler = [](ReplayContext& ctxRef) {
+    auto setOffsetHandler = [](ReplayContext& ctxRef)
+    {
         SlangRecord::replayHandler<ITestCalculator, TestCalculatorProxy>(
             ctxRef,
-            &TestCalculatorProxy::setOffset
-        );
+            &TestCalculatorProxy::setOffset);
     };
-    
+
     // Use the exact signature that parseSignature will produce
     ctx().registerHandler("TestCalculatorProxy::add", addHandler);
     ctx().registerHandler("TestCalculatorProxy::setOffset", setOffsetHandler);
@@ -340,7 +355,9 @@ SLANG_UNIT_TEST(replayContextParseSignature)
 
     // Test MSVC-style __FUNCSIG__
     {
-        const char* msvcSig = "SlangResult __cdecl SlangRecord::GlobalSessionProxy::createSession(struct slang::SessionDesc const &,struct slang::ISession **)";
+        const char* msvcSig =
+            "SlangResult __cdecl SlangRecord::GlobalSessionProxy::createSession(struct "
+            "slang::SessionDesc const &,struct slang::ISession **)";
         const char* result = ReplayContext::parseSignature(msvcSig, buffer, sizeof(buffer));
         SLANG_CHECK(strcmp(result, "GlobalSessionProxy::createSession") == 0);
     }
@@ -354,7 +371,8 @@ SLANG_UNIT_TEST(replayContextParseSignature)
 
     // Test with virtual and other modifiers
     {
-        const char* virtualSig = "virtual SlangProfileID __cdecl SlangRecord::GlobalSessionProxy::findProfile(char const *)";
+        const char* virtualSig = "virtual SlangProfileID __cdecl "
+                                 "SlangRecord::GlobalSessionProxy::findProfile(char const *)";
         const char* result = ReplayContext::parseSignature(virtualSig, buffer, sizeof(buffer));
         SLANG_CHECK(strcmp(result, "GlobalSessionProxy::findProfile") == 0);
     }
@@ -374,7 +392,7 @@ SLANG_UNIT_TEST(replayContextParseSignature)
 
 // This test validates the full playback process for creating a global session
 // and a session within it. The test has 3 stages:
-// 
+//
 // Stage 1: Without replay system, create objects to establish baseline behavior
 // Stage 2: With recording enabled, create same objects and verify proxy wrapping
 // Stage 3: Playback the recording and verify objects are recreated correctly
@@ -394,14 +412,16 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     {
         SlangGlobalSessionDesc globalDesc = {};
         globalDesc.apiVersion = 0;
-        SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, baselineGlobalSession.writeRef())));
         slang::SessionDesc sessionDesc = {};
         slang::TargetDesc targetDesc = {};
         targetDesc.format = SLANG_SPIRV;
         targetDesc.profile = baselineGlobalSession->findProfile("spirv_1_5");
         sessionDesc.targets = &targetDesc;
         sessionDesc.targetCount = 1;
-        SLANG_CHECK(SLANG_SUCCEEDED(baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            baselineGlobalSession->createSession(sessionDesc, baselineSession.writeRef())));
         baselineProfile = targetDesc.profile;
         SLANG_CHECK(baselineProfile != SLANG_PROFILE_UNKNOWN);
     }
@@ -422,14 +442,16 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     {
         SlangGlobalSessionDesc globalDesc = {};
         globalDesc.apiVersion = 0;
-        SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            slang_createGlobalSession2(&globalDesc, recordedGlobalSession.writeRef())));
         slang::SessionDesc sessionDesc = {};
         slang::TargetDesc targetDesc = {};
         targetDesc.format = SLANG_SPIRV;
         targetDesc.profile = recordedGlobalSession->findProfile("spirv_1_5");
         sessionDesc.targets = &targetDesc;
         sessionDesc.targetCount = 1;
-        SLANG_CHECK(SLANG_SUCCEEDED(recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            recordedGlobalSession->createSession(sessionDesc, recordedSession.writeRef())));
         SLANG_CHECK(baselineProfile == targetDesc.profile);
     }
 
@@ -457,6 +479,6 @@ SLANG_UNIT_TEST(replayContextEndToEndSessionPlayback)
     // Verify we can query the ISession interface
     Slang::ComPtr<slang::ISession> playedBackSession;
     SLANG_CHECK(SLANG_SUCCEEDED(playedBackSessionUnk->queryInterface(
-        slang::ISession::getTypeGuid(), (void**)playedBackSession.writeRef())));
-
+        slang::ISession::getTypeGuid(),
+        (void**)playedBackSession.writeRef())));
 }

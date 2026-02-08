@@ -1,9 +1,9 @@
 #ifndef SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 #define SLANG_PROXY_MUTABLE_FILE_SYSTEM_H
 
+#include "../replay-context.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
-#include "../replay-context.h"
 
 namespace SlangRecord
 {
@@ -28,8 +28,8 @@ public:
         , m_mutableFileSystem(nullptr)
     {
         // Query for extended interfaces
-        m_fileSystemExt = static_cast<ISlangFileSystemExt*>(
-            actual->castAs(ISlangFileSystemExt::getTypeGuid()));
+        m_fileSystemExt =
+            static_cast<ISlangFileSystemExt*>(actual->castAs(ISlangFileSystemExt::getTypeGuid()));
         if (m_fileSystemExt)
         {
             m_mutableFileSystem = static_cast<ISlangMutableFileSystem*>(
@@ -59,10 +59,11 @@ public:
     // Lifetime of FS proxys is just held by the session
     // PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
         if (uuid == MutableFileSystemProxy::getTypeGuid() ||
             uuid == ISlangMutableFileSystem::getTypeGuid())
@@ -74,13 +75,15 @@ public:
         if (uuid == ISlangFileSystemExt::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<ISlangFileSystemExt*>(static_cast<ISlangMutableFileSystem*>(this));
+            *outObject =
+                static_cast<ISlangFileSystemExt*>(static_cast<ISlangMutableFileSystem*>(this));
             return SLANG_OK;
         }
         if (uuid == ISlangFileSystem::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<ISlangFileSystem*>(static_cast<ISlangMutableFileSystem*>(this));
+            *outObject =
+                static_cast<ISlangFileSystem*>(static_cast<ISlangMutableFileSystem*>(this));
             return SLANG_OK;
         }
         if (uuid == ISlangCastable::getTypeGuid())
@@ -149,10 +152,10 @@ public:
         RECORD_INPUT(path);
 
         PREPARE_POINTER_OUTPUT(pathOut);
-        
+
         SlangResult result;
-        if(ReplayContext::get().isWriting()) 
-        {        
+        if (ReplayContext::get().isWriting())
+        {
             result = m_fileSystemExt->calcCombinedPath(fromPathType, fromPath, path, pathOut);
         }
 
@@ -232,14 +235,16 @@ public:
         RECORD_INPUT(path);
 
         SlangResult result = SLANG_OK;
-        
+
         if (ReplayContext::get().isWriting())
         {
             // Wrapper context to capture and record each entry during enumeration
-            struct WrapperContext {
+            struct WrapperContext
+            {
                 FileSystemContentsCallBack originalCallback;
-                void* originalUserData;                
-                static void callback(SlangPathType pathType, const char* name, void* userData) {
+                void* originalUserData;
+                static void callback(SlangPathType pathType, const char* name, void* userData)
+                {
                     auto& _ctx = ReplayContext::get();
                     RECORD_INFO(pathType);
                     RECORD_INFO(name);
@@ -248,31 +253,33 @@ public:
                         wrapper->originalCallback(pathType, name, wrapper->originalUserData);
                 }
             };
-            
-            // Call with wrapper, which records each entry before forwarding to the original callback
-            WrapperContext wrapper = { callback, userData };
-            result = m_fileSystemExt->enumeratePathContents(path, WrapperContext::callback, &wrapper);
-            
+
+            // Call with wrapper, which records each entry before forwarding to the original
+            // callback
+            WrapperContext wrapper = {callback, userData};
+            result =
+                m_fileSystemExt->enumeratePathContents(path, WrapperContext::callback, &wrapper);
+
             // Write sentinel to mark end of entries
             SlangPathType sentinalPathType = static_cast<SlangPathType>(-1);
             RECORD_INFO(sentinalPathType);
         }
-        else 
+        else
         {
             // Read entries from stream and replay callbacks
             while (true)
             {
                 SlangPathType pathType;
                 RECORD_INFO(pathType);
-                if(pathType == static_cast<SlangPathType>(-1))
+                if (pathType == static_cast<SlangPathType>(-1))
                     break; // Sentinel reached, enumeration complete
                 const char* name = nullptr;
                 RECORD_INFO(name);
                 if (callback)
                     callback(pathType, name, userData);
-            }            
+            }
         }
-        
+
         RECORD_INFO(result);
         return result;
     }
@@ -364,8 +371,8 @@ public:
     }
 
 private:
-    ISlangFileSystem* m_fileSystem;           // Always valid
-    ISlangFileSystemExt* m_fileSystemExt;     // May be null
+    ISlangFileSystem* m_fileSystem;               // Always valid
+    ISlangFileSystemExt* m_fileSystemExt;         // May be null
     ISlangMutableFileSystem* m_mutableFileSystem; // May be null
 };
 

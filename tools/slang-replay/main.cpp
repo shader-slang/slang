@@ -24,11 +24,13 @@ void printUsage()
         "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
                        When this option is set, it won't replay the record file.\n");
     printf("  --decode, -d: Decode the binary stream to human-readable text.\n");
-    printf("                If given a folder with index.bin, uses structured call-by-call output.\n");
+    printf(
+        "                If given a folder with index.bin, uses structured call-by-call output.\n");
     printf("  --raw, -R: Force raw value-by-value output (ignore index.bin even if present).\n");
     printf("  --replay, -r: Replay the recorded API calls.\n");
     printf("  --verbose, -v: Enable verbose output during replay.\n");
-    printf("  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
+    printf(
+        "  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
 }
 
 Options parseOption(int argc, char* argv[])
@@ -122,19 +124,20 @@ int main(int argc, char* argv[])
         try
         {
             Slang::String decoded;
-            
+
             if (options.rawDecode)
             {
                 // Raw mode: simple value-by-value dump
                 Slang::String inputPath = options.recordFileName;
-                
-                // If given a folder (check by seeing if stream.bin exists inside), append stream.bin
+
+                // If given a folder (check by seeing if stream.bin exists inside), append
+                // stream.bin
                 Slang::String possibleStreamPath = Slang::Path::combine(inputPath, "stream.bin");
                 if (Slang::File::exists(possibleStreamPath))
                 {
                     inputPath = possibleStreamPath;
                 }
-                
+
                 decoded = SlangRecord::ReplayStreamDecoder::decodeFile(inputPath.getBuffer());
             }
             else
@@ -143,16 +146,19 @@ int main(int argc, char* argv[])
                 decoded = SlangRecord::ReplayStreamDecoder::decodeWithIndex(
                     options.recordFileName.getBuffer());
             }
-            
+
             if (options.outputFileName.getLength() > 0)
             {
                 // Write to file
                 SlangResult res = Slang::File::writeAllText(
-                    options.outputFileName.getBuffer(), 
+                    options.outputFileName.getBuffer(),
                     decoded.getUnownedSlice());
                 if (SLANG_FAILED(res))
                 {
-                    fprintf(stderr, "Error writing to file: %s\n", options.outputFileName.getBuffer());
+                    fprintf(
+                        stderr,
+                        "Error writing to file: %s\n",
+                        options.outputFileName.getBuffer());
                     return 1;
                 }
             }
@@ -176,42 +182,43 @@ int main(int argc, char* argv[])
         try
         {
             auto& ctx = SlangRecord::ReplayContext::get();
-            
+
             // Enable verbose logging if requested
             if (options.verbose)
             {
                 ctx.setTtyLogging(true);
             }
-            
+
             // Load the replay file
-            // The input can be either a folder containing stream.bin or the stream.bin file directly
+            // The input can be either a folder containing stream.bin or the stream.bin file
+            // directly
             Slang::String streamPath = options.recordFileName;
             if (!streamPath.endsWith(".bin"))
             {
                 streamPath = Slang::Path::combine(streamPath, "stream.bin");
             }
-            
+
             if (!Slang::File::exists(streamPath))
             {
                 fprintf(stderr, "Error: stream.bin not found at: %s\n", streamPath.getBuffer());
                 return 1;
             }
-            
+
             printf("Loading replay from: %s\n", streamPath.getBuffer());
-            
+
             // Load and execute the replay
-            SlangResult loadResult = ctx.loadReplay(
-                Slang::Path::getParentDirectory(streamPath).getBuffer());
+            SlangResult loadResult =
+                ctx.loadReplay(Slang::Path::getParentDirectory(streamPath).getBuffer());
             if (SLANG_FAILED(loadResult))
             {
                 fprintf(stderr, "Error loading replay file\n");
                 return 1;
             }
-            
+
             printf("Executing replay...\n");
             ctx.executeAll();
             printf("Replay completed successfully.\n");
-            
+
             return 0;
         }
         catch (const Slang::Exception& e)

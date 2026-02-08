@@ -52,7 +52,8 @@ SLANG_UNIT_TEST(replayContextSessionWrappedWhenActive)
     // The session should be wrapped - verify by checking it's a GlobalSessionProxy
     // and has the correct ref count.
     SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get()) != nullptr);
-    SLANG_CHECK(dynamic_cast<GlobalSessionProxy*>(globalSession.get())->debugGetReferenceCount() == 1);
+    SLANG_CHECK(
+        dynamic_cast<GlobalSessionProxy*>(globalSession.get())->debugGetReferenceCount() == 1);
 
     // Restore original state
     slang_enableRecordLayer(wasActive);

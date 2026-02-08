@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
-
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -11,7 +10,10 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class TypeConformanceProxy : public ProxyBase<slang::ITypeConformance, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
+class TypeConformanceProxy : public ProxyBase<
+                                 slang::ITypeConformance,
+                                 slang::IComponentType2,
+                                 slang::IModulePrecompileService_Experimental>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -28,10 +30,11 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(TypeConformanceProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
         if (uuid == TypeConformanceProxy::getTypeGuid() ||
             uuid == slang::ITypeConformance::getTypeGuid())
@@ -43,7 +46,8 @@ public:
         if (uuid == slang::IComponentType::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<slang::IComponentType*>(static_cast<slang::ITypeConformance*>(this));
+            *outObject =
+                static_cast<slang::IComponentType*>(static_cast<slang::ITypeConformance*>(this));
             return SLANG_OK;
         }
         if (uuid == slang::IComponentType2::getTypeGuid())

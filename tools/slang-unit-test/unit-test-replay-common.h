@@ -4,12 +4,11 @@
 #pragma once
 
 // Include cpp files directly to access internal symbols not exported from slang DLL
-#include "../../source/slang-record-replay/replay-context.h"
-#include "../../source/slang-record-replay/proxy/proxy-base.h"
-#include "../../source/slang-record-replay/proxy/proxy-global-session.h"
 #include "../../source/core/slang-file-system.h"
 #include "../../source/core/slang-io.h"
-
+#include "../../source/slang-record-replay/proxy/proxy-base.h"
+#include "../../source/slang-record-replay/proxy/proxy-global-session.h"
+#include "../../source/slang-record-replay/replay-context.h"
 #include "unit-test/slang-unit-test.h"
 
 #include <cstring>
@@ -25,21 +24,16 @@ inline ReplayContext& ctx()
 class ScopedReplayContext
 {
 public:
-    ScopedReplayContext()
-    {
-        ctx().reset();
-    }
+    ScopedReplayContext() { ctx().reset(); }
 
-    ~ScopedReplayContext()
-    {
-        ctx().reset();
-    }
+    ~ScopedReplayContext() { ctx().reset(); }
 };
 
-#define REPLAY_TEST \
-    if(ReplayContext::get().isActive()) { \
-        SLANG_IGNORE_TEST; \
-    } \
+#define REPLAY_TEST                      \
+    if (ReplayContext::get().isActive()) \
+    {                                    \
+        SLANG_IGNORE_TEST;               \
+    }                                    \
     ScopedReplayContext _scopedReplayContext;
 
 // =============================================================================

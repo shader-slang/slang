@@ -95,7 +95,8 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
 
     // Store the unique ID for comparison
     UnownedStringSlice recordedId(
-        (const char*)uniqueIdBlob->getBufferPointer(), uniqueIdBlob->getBufferSize());
+        (const char*)uniqueIdBlob->getBufferPointer(),
+        uniqueIdBlob->getBufferSize());
 
     // Delete the file
     osFileSystem->remove(testFileName);
@@ -107,13 +108,15 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetFileUniqueIdentity)
 
     // Call getFileUniqueIdentity again - should read from recorded data
     ComPtr<ISlangBlob> replayedIdBlob;
-    SlangResult replayResult = fsProxy->getFileUniqueIdentity(testFileName, replayedIdBlob.writeRef());
+    SlangResult replayResult =
+        fsProxy->getFileUniqueIdentity(testFileName, replayedIdBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
     SLANG_CHECK(replayedIdBlob != nullptr);
 
     // The replayed ID should match the recorded ID
     UnownedStringSlice replayedId(
-        (const char*)replayedIdBlob->getBufferPointer(), replayedIdBlob->getBufferSize());
+        (const char*)replayedIdBlob->getBufferPointer(),
+        replayedIdBlob->getBufferSize());
     SLANG_CHECK(recordedId == replayedId);
 
     // Clean up
@@ -137,13 +140,17 @@ SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
     // Call calcCombinedPath through the proxy
     ComPtr<ISlangBlob> pathBlob;
     SlangResult result = fsProxy->calcCombinedPath(
-        SLANG_PATH_TYPE_DIRECTORY, "/base/dir", "subpath/file.txt", pathBlob.writeRef());
+        SLANG_PATH_TYPE_DIRECTORY,
+        "/base/dir",
+        "subpath/file.txt",
+        pathBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(result));
     SLANG_CHECK(pathBlob != nullptr);
 
     // Store the result for comparison
     UnownedStringSlice recordedPath(
-        (const char*)pathBlob->getBufferPointer(), pathBlob->getBufferSize());
+        (const char*)pathBlob->getBufferPointer(),
+        pathBlob->getBufferSize());
 
     // Switch to playback - the file system proxy should serve from recorded data
     ctx().switchToPlayback();
@@ -153,13 +160,17 @@ SLANG_UNIT_TEST(replayFileSystemProxyCalcCombinedPath)
     // Call calcCombinedPath again - should read from recorded data, not call actual FS
     ComPtr<ISlangBlob> replayedPathBlob;
     SlangResult replayResult = fsProxy->calcCombinedPath(
-        SLANG_PATH_TYPE_DIRECTORY, "/base/dir", "subpath/file.txt", replayedPathBlob.writeRef());
+        SLANG_PATH_TYPE_DIRECTORY,
+        "/base/dir",
+        "subpath/file.txt",
+        replayedPathBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
     SLANG_CHECK(replayedPathBlob != nullptr);
 
     // The replayed path should match the recorded path
     UnownedStringSlice replayedPath(
-        (const char*)replayedPathBlob->getBufferPointer(), replayedPathBlob->getBufferSize());
+        (const char*)replayedPathBlob->getBufferPointer(),
+        replayedPathBlob->getBufferSize());
     SLANG_CHECK(recordedPath == replayedPath);
 
     // Clean up
@@ -224,13 +235,15 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
     // Call getPath through the proxy to simplify a path
     const char* complexPath = "/base/dir/../other/./file.txt";
     ComPtr<ISlangBlob> simplifiedBlob;
-    SlangResult result = fsProxy->getPath(PathKind::Simplified, complexPath, simplifiedBlob.writeRef());
+    SlangResult result =
+        fsProxy->getPath(PathKind::Simplified, complexPath, simplifiedBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(result));
     SLANG_CHECK(simplifiedBlob != nullptr);
 
     // Store the result for comparison
     UnownedStringSlice recordedPath(
-        (const char*)simplifiedBlob->getBufferPointer(), simplifiedBlob->getBufferSize());
+        (const char*)simplifiedBlob->getBufferPointer(),
+        simplifiedBlob->getBufferSize());
 
     // Switch to playback
     ctx().switchToPlayback();
@@ -239,13 +252,15 @@ SLANG_UNIT_TEST(replayFileSystemProxyGetPath)
 
     // Call getPath again - should read from recorded data
     ComPtr<ISlangBlob> replayedBlob;
-    SlangResult replayResult = fsProxy->getPath(PathKind::Simplified, complexPath, replayedBlob.writeRef());
+    SlangResult replayResult =
+        fsProxy->getPath(PathKind::Simplified, complexPath, replayedBlob.writeRef());
     SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
     SLANG_CHECK(replayedBlob != nullptr);
 
     // The replayed path should match the recorded path
     UnownedStringSlice replayedPath(
-        (const char*)replayedBlob->getBufferPointer(), replayedBlob->getBufferSize());
+        (const char*)replayedBlob->getBufferPointer(),
+        replayedBlob->getBufferSize());
     SLANG_CHECK(recordedPath == replayedPath);
 
     // Clean up
@@ -322,7 +337,8 @@ SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
 
     // Call enumeratePathContents through the proxy, capturing results
     EnumerationResults recordedResults;
-    SlangResult result = fsProxy->enumeratePathContents(testDir, testEnumerateCallback, &recordedResults);
+    SlangResult result =
+        fsProxy->enumeratePathContents(testDir, testEnumerateCallback, &recordedResults);
     SLANG_CHECK(SLANG_SUCCEEDED(result));
     SLANG_CHECK(recordedResults.entries.getCount() >= 2); // At least our 2 files
 
@@ -355,9 +371,10 @@ SLANG_UNIT_TEST(replayFileSystemProxyEnumeratePathContents)
 
     // Call enumeratePathContents again - should read from recorded data
     EnumerationResults replayedResults;
-    SlangResult replayResult = fsProxy->enumeratePathContents(testDir, testEnumerateCallback, &replayedResults);
+    SlangResult replayResult =
+        fsProxy->enumeratePathContents(testDir, testEnumerateCallback, &replayedResults);
     SLANG_CHECK(SLANG_SUCCEEDED(replayResult));
-    
+
     // Verify that replayed results exactly match recorded results
     SLANG_CHECK(replayedResults.entries.getCount() == recordedResults.entries.getCount());
     for (Index i = 0; i < recordedResults.entries.getCount(); i++)
@@ -456,7 +473,7 @@ SLANG_UNIT_TEST(replayFileSystemProxySaveFileBlob)
 
     const char* testFileName = ".slang-test-savefileblob-replay.txt";
     const char* testContent = "Test blob content for replay";
-    
+
     // Create a blob with test content
     ComPtr<ISlangBlob> testBlob = Slang::RawBlob::create(testContent, strlen(testContent));
 
