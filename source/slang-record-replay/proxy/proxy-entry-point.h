@@ -81,14 +81,10 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::ProgramLayout* result =
             getActual<slang::IEntryPoint>()->getLayout(targetIndex, outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
-        // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
         return result;
     }
 
@@ -139,19 +135,14 @@ public:
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-
-        // Record the specialization args array
         RECORD_INPUT_ARRAY(specializationArgs, specializationArgCount);
-
         PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IEntryPoint>()->specialize(
             specializationArgs,
             specializationArgCount,
             outSpecializedComponentType,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outSpecializedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -161,12 +152,9 @@ public:
     link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IEntryPoint>()->link(outLinkedComponentType, outDiagnostics);
-
         RECORD_COM_OUTPUT(outLinkedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);

@@ -58,13 +58,11 @@ public:
         REPLAY_UNIMPLEMENTED_X("SharedLibraryProxy::castAs");
     }
 
-    // ISlangSharedLibrary
+    // Note: Don't record return value as it is none-deterministic.
     virtual SLANG_NO_THROW void* SLANG_MCALL findSymbolAddressByName(char const* name) override
     {
         RECORD_CALL();
         RECORD_INPUT(name);
-        // Note: We don't record the return value since it's a raw pointer address
-        // that would be meaningless during replay.
         return getActual<ISlangSharedLibrary>()->findSymbolAddressByName(name);
     }
 };

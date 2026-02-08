@@ -157,19 +157,14 @@ public:
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-
-        // Record the specialization args array
         RECORD_INPUT_ARRAY(specializationArgs, specializationArgCount);
-
         PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IModule>()->specialize(
             specializationArgs,
             specializationArgCount,
             outSpecializedComponentType,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outSpecializedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -265,11 +260,8 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(name);
-
         PREPARE_POINTER_OUTPUT(outEntryPoint);
-
         SlangResult result = getActual<slang::IModule>()->findEntryPointByName(name, outEntryPoint);
-
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
@@ -288,10 +280,8 @@ public:
         RECORD_CALL();
         RECORD_INPUT(index);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
-
         SlangResult result =
             getActual<slang::IModule>()->getDefinedEntryPoint(index, outEntryPoint);
-
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
@@ -338,16 +328,13 @@ public:
         RECORD_CALL();
         RECORD_INPUT(name);
         RECORD_INPUT(stage);
-
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         SlangResult result = getActual<slang::IModule>()->findAndCheckEntryPoint(
             name,
             stage,
             outEntryPoint,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);

@@ -67,12 +67,9 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(moduleName);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::IModule* result =
             getActual<slang::ISession>()->loadModule(moduleName, outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -87,15 +84,12 @@ public:
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
         RECORD_INPUT(source);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSource(
             moduleName,
             path,
             source,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -108,8 +102,6 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT_ARRAY(componentTypes, componentTypeCount);
-
-        // Call create session
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
         auto result = getActual<slang::ISession>()->createCompositeComponentType(
@@ -117,7 +109,6 @@ public:
             componentTypeCount,
             outCompositeComponentType,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outCompositeComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -146,12 +137,9 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(targetIndex);
         RECORD_INPUT(rules);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::TypeLayoutReflection* result =
             getActual<slang::ISession>()->getTypeLayout(type, targetIndex, rules, outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
         return result;
     }
@@ -225,7 +213,6 @@ public:
         RECORD_INPUT(type);
         RECORD_INPUT(interfaceType);
         RECORD_INPUT(conformanceIdOverride);
-
         PREPARE_POINTER_OUTPUT(outConformance);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
         auto result = getActual<slang::ISession>()->createTypeConformanceComponentType(
@@ -234,7 +221,6 @@ public:
             outConformance,
             conformanceIdOverride,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outConformance);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -250,15 +236,12 @@ public:
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
         RECORD_INPUT(source);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromIRBlob(
             moduleName,
             path,
             source,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }
@@ -303,15 +286,12 @@ public:
         RECORD_INPUT(moduleName);
         RECORD_INPUT(path);
         RECORD_INPUT(string);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::IModule* result = getActual<slang::ISession>()->loadModuleFromSourceString(
             moduleName,
             path,
             string,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN_SESSION(result);
     }

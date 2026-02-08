@@ -587,7 +587,6 @@ public:
             outUsed);
         RECORD_INFO(outUsed);
         RECORD_RETURN(result);
-        return result;
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL

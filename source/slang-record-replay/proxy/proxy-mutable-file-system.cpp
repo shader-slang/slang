@@ -11,17 +11,12 @@ SlangResult MutableFileSystemProxy::loadFile(char const* path, ISlangBlob** outB
 {
     RECORD_CALL();
     RECORD_INPUT(path);
-
     PREPARE_POINTER_OUTPUT(outBlob);
-
     SlangResult result = SLANG_OK;
     if (ReplayContext::get().isWriting())
     {
         result = m_fileSystem->loadFile(path, outBlob);
     }
-
-    // recordBlobByHash (via RECORD_BLOB_OUTPUT) handles hashing, writing to disk,
-    // and loading from disk during playback
     RECORD_BLOB_OUTPUT(outBlob);
     RECORD_INFO(result);
     return result;

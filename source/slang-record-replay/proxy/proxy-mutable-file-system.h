@@ -55,10 +55,6 @@ public:
     {
     }
 
-    // Record addRef/release for lifetime tracking during replay
-    // Lifetime of FS proxys is just held by the session
-    // PROXY_REFCOUNT_IMPL(MutableFileSystemProxy)
-
     SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
         SLANG_OVERRIDE
     {
@@ -123,15 +119,12 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         PREPARE_POINTER_OUTPUT(outUniqueIdentity);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getFileUniqueIdentity(path, outUniqueIdentity);
         }
-
         RECORD_INFO(result);
         RECORD_BLOB_OUTPUT(outUniqueIdentity);
         RECORD_RETURN(result);
@@ -150,15 +143,12 @@ public:
         RECORD_INPUT(fromPathType);
         RECORD_INPUT(fromPath);
         RECORD_INPUT(path);
-
         PREPARE_POINTER_OUTPUT(pathOut);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->calcCombinedPath(fromPathType, fromPath, path, pathOut);
         }
-
         RECORD_INFO(result);
         RECORD_BLOB_OUTPUT(pathOut);
         RECORD_RETURN(result);
@@ -172,18 +162,14 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         PREPARE_POINTER_OUTPUT(pathTypeOut);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getPathType(path, pathTypeOut);
         }
-
         RECORD_INFO(*pathTypeOut);
         RECORD_INFO(result);
-
         return result;
     }
 
@@ -197,15 +183,12 @@ public:
         uint8_t kindVal = static_cast<uint8_t>(kind);
         _ctx.record(RecordFlag::Input, kindVal);
         RECORD_INPUT(path);
-
         PREPARE_POINTER_OUTPUT(outPath);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
             result = m_fileSystemExt->getPath(kind, path, outPath);
         }
-
         RECORD_INFO(result);
         RECORD_BLOB_OUTPUT(outPath);
         RECORD_RETURN(result);
@@ -235,7 +218,6 @@ public:
         RECORD_INPUT(path);
 
         SlangResult result = SLANG_OK;
-
         if (ReplayContext::get().isWriting())
         {
             // Wrapper context to capture and record each entry during enumeration
@@ -308,7 +290,6 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -326,7 +307,6 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -343,7 +323,6 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {
@@ -360,7 +339,6 @@ public:
 
         RECORD_CALL();
         RECORD_INPUT(path);
-
         SlangResult result;
         if (ReplayContext::get().isWriting())
         {

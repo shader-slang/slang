@@ -77,14 +77,10 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         slang::ProgramLayout* result =
             getActual<slang::IComponentType>()->getLayout(targetIndex, outDiagnostics);
-
         RECORD_COM_OUTPUT(outDiagnostics);
-        // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
         return result;
     }
 
@@ -104,16 +100,13 @@ public:
         RECORD_CALL();
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IComponentType>()->getEntryPointCode(
             entryPointIndex,
             targetIndex,
             outCode,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -136,14 +129,11 @@ public:
         RECORD_CALL();
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outHash);
-
         getActual<slang::IComponentType>()->getEntryPointHash(
             entryPointIndex,
             targetIndex,
             outHash);
-
         RECORD_COM_OUTPUT(outHash);
     }
 
@@ -154,19 +144,14 @@ public:
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-
-        // Record the specialization args array
         RECORD_INPUT_ARRAY(specializationArgs, specializationArgCount);
-
         PREPARE_POINTER_OUTPUT(outSpecializedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IComponentType>()->specialize(
             specializationArgs,
             specializationArgCount,
             outSpecializedComponentType,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outSpecializedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -176,13 +161,10 @@ public:
     link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
-
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result =
             getActual<slang::IComponentType>()->link(outLinkedComponentType, outDiagnostics);
-
         RECORD_COM_OUTPUT(outLinkedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -197,16 +179,13 @@ public:
         RECORD_CALL();
         RECORD_INPUT(entryPointIndex);
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outSharedLibrary);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IComponentType>()->getEntryPointHostCallable(
             entryPointIndex,
             targetIndex,
             outSharedLibrary,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outSharedLibrary);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -228,16 +207,13 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT_ARRAY(compilerOptionEntries, compilerOptionEntryCount);
-
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result = getActual<slang::IComponentType>()->linkWithOptions(
             outLinkedComponentType,
             compilerOptionEntryCount,
             compilerOptionEntries,
             outDiagnostics);
-
         RECORD_COM_OUTPUT(outLinkedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -248,13 +224,10 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
-
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-
         auto result =
             getActual<slang::IComponentType>()->getTargetCode(targetIndex, outCode, outDiagnostics);
-
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);

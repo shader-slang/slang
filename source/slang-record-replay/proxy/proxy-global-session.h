@@ -126,18 +126,6 @@ public:
         RECORD_RETURN(result);
     }
 
-    /*
-    // We could wrap up createSession in an even simpler way as it fits a very standard pattern
-    // of taking a set of arguments and returning a single output. It would basically just expand
-    // to the above version.
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    createSession(slang::SessionDesc const& desc, slang::ISession** outSession) override
-    {
-        // Single macro that performs the full logic shown above.
-        RECORD_CALL_OUTPUT_OBJECT(slang::IGlobalSession, createSession, desc, outSession);
-    }
-    */
-
     virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(char const* name) override
     {
         RECORD_CALL();
@@ -145,16 +133,6 @@ public:
         auto result = getActual<slang::IGlobalSession>()->findProfile(name);
         RECORD_RETURN(result);
     }
-
-    /*
-    // Another standard pattern is a function that just takes some arguments and returns
-    // a value. This could also be wrapped in a single macro.
-    virtual SLANG_NO_THROW SlangProfileID SLANG_MCALL findProfile(char const* name) override
-    {
-        RECORD_CALL_RETURN(slang::IGlobalSession, findProfile, name);
-    }
-    */
-
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     setDownstreamCompilerPath(SlangPassThrough passThrough, char const* path) override
@@ -182,7 +160,7 @@ public:
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override
     {
-        // No recording - this is just a version string query
+        // REPLAY TODO: Record this (holding off doing so to avoid invalidating existing captures)
         return getActual<slang::IGlobalSession>()->getBuildTagString();
     }
 
@@ -335,23 +313,14 @@ public:
         RECORD_RETURN(result);
     }
 
+    // Note: Records the call, but not results, as they are not deterministic.
     virtual SLANG_NO_THROW void SLANG_MCALL
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
     {
         RECORD_CALL();
-
-        double totalTime = 0.0;
-        double downstreamTime = 0.0;
-        if (!outTotalTime)
-            outTotalTime = &totalTime;
-        if (!outDownstreamTime)
-            outDownstreamTime = &downstreamTime;
-
+        PREPARE_POINTER_OUTPUT(outTotalTime);
+        PREPARE_POINTER_OUTPUT(outDownstreamTime);
         getActual<slang::IGlobalSession>()->getCompilerElapsedTime(outTotalTime, outDownstreamTime);
-
-        // These cause indeterminism
-        // RECORD_INPUT(*outTotalTime);
-        // RECORD_INPUT(*outDownstreamTime);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
