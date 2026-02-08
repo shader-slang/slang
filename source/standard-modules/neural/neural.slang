@@ -42,7 +42,9 @@ __include "buffer-storage";
 __include "accelerate-vector-coopmat";
 __include "vectorized-reader";
 __include "shared-memory-pool";
-
+__include "hash-function";
+__include "permuto-encoder";
+__include "iencoder";
 // Frontend APIs built on the primitives above
 __include "iactivation";
 __include "activations";
