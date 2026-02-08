@@ -5539,6 +5539,15 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        // Add descriptor_handle capability to the target when DescriptorHandle is used.
+        // TODO: add the capability only in the auto-promotion mode.
+        if (context.targetReq)
+        {
+            auto targetCaps = context.targetReq->getTargetCaps();
+            targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+            context.targetReq->setTargetCaps(targetCaps);
+        }
+
         // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
         if (context.targetReq &&
             context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
@@ -6201,6 +6210,15 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
+        // Add descriptor_handle capability to the target when DescriptorHandle is used.
+        // TODO: add the capability only in the auto-promotion mode.
+        if (context.targetReq)
+        {
+            auto targetCaps = context.targetReq->getTargetCaps();
+            targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+            context.targetReq->setTargetCaps(targetCaps);
+        }
+
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type; // Preserve the original DescriptorHandle type
         typeLayout->rules = rules;

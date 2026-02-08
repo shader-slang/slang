@@ -12316,7 +12316,7 @@ T max(T x, T y)
         if (isnan(y)) return x;
         return x > y ? x : y;
 
-    default:    
+    default:
         return __max_impl(x, y);
     }
 }
@@ -26053,16 +26053,14 @@ __magic_type(DescriptorHandleType)
 __intrinsic_type($(kIROp_DescriptorHandleType))
 struct DescriptorHandle<T:IOpaqueDescriptor> : IComparable
 {
-    [require(glsl_spirv)]
-    [require(hlsl, sm_6_6)]
-    [require(wgsl)]
+    [require(glsl_hlsl_spirv_wgsl, descriptor_handle)]
     __intrinsic_op($(kIROp_CastUInt2ToDescriptorHandle))
     __init(uint2 handleValue);
 
     /// Constructor for uint64_t handles
     [ForceInline]
-    [require(spvBindlessTextureNV)]
-    [require(cuda)]
+    [require(spvBindlessTextureNV, descriptor_handle)]
+    [require(cuda, descriptor_handle)]
     __intrinsic_op($(kIROp_CastUInt64ToDescriptorHandle))
     __init(uint64_t handleValue);
 
@@ -26164,6 +26162,7 @@ enum VkMutableBindlessBindings : uint
     Unknown = 3, /// Other
 }
 
+[require(descriptor_handle)]
 __intrinsic_op($(kIROp_GetDynamicResourceHeap))
 T[] __getDynamicResourceHeap<T:IOpaqueDescriptor>(constexpr uint bindingIndex = 0);
 
@@ -26697,7 +26696,7 @@ When using `MemoryScope.Workgroup`, Slang will emit SPIR-V code that uses the
 matrix can use larger matrix shapes that are multiples of 16/32 depending on the target device.
 Workgroup-scope cooperative matrices requires a specific workgroup size setting (specified via
 `[numthreads]`). Use the Vulkan API to query the supported combinations of element type, matrix
-shape and workgroup size settings. 
+shape and workgroup size settings.
 
 @category matrix_types
 */
@@ -27535,7 +27534,7 @@ $}
     //
 
     /// Load a cooperative matrix from memory using tensor layout.
-    /// 
+    ///
     /// @param pointerIn Pointer to the memory location to load from. Address must be 16-byte aligned.
     /// @param buffer The `ByteAddressBuffer` or [RW]`StructuredBuffer` to load from.
     /// @param clippedValue A cooperative matrix value whose value will be used for clipped elements.
@@ -27698,7 +27697,7 @@ $}
             result:$$This = OpCooperativeMatrixLoadTensorNV %pointer $ret $tensorLayout Aligned !alignment None;
         };
     }
-    
+
     [require(cooperative_matrix_tensor_addressing)]
     static This Load<
         let Dim : uint32_t,

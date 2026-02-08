@@ -1372,6 +1372,10 @@ alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReduc
 /// [Compound]
 alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
 
+/// Targets that support DescriptorHandle types for bindless descriptor access.
+/// [Compound]
+alias descriptor_handle = glsl_spirv | _sm_6_6 | cpp | cuda | metal | wgsl;
+
 // Non-internal shader stages
 //
 /// Pixel shader stage
