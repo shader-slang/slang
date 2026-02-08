@@ -57,6 +57,10 @@ public:
     typedef CommandLineDownstreamCompiler Super;
     typedef GCCDownstreamCompilerUtil Util;
 
+    // Override compile to inject SARIF flag when supported
+    virtual SlangResult compile(const CompileOptions& options, IArtifact** outArtifact)
+        SLANG_OVERRIDE;
+
     // CommandLineCPPCompiler impl  - just forwards to the Util
     virtual SlangResult calcArgs(const CompileOptions& options, CommandLine& cmdLine) SLANG_OVERRIDE
     {

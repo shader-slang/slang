@@ -1,0 +1,4 @@
+---
+triple: "arm64-apple-darwin"
+binary-path: "tests/cpp-compiler/c-compile"
+relocations: []
