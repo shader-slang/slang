@@ -105,10 +105,20 @@ public:
     }
 
     // ISlangFileSystem
-    // loadFile is special - it captures file content during recording
-    // and serves from captured files during playback
-    SLANG_API virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    loadFile(char const* path, ISlangBlob** outBlob) override;
+    virtual SLANG_NO_THROW SlangResult loadFile(char const* path, ISlangBlob** outBlob) override
+    {
+        RECORD_CALL();
+        RECORD_INPUT(path);
+        PREPARE_POINTER_OUTPUT(outBlob);
+        SlangResult result = SLANG_OK;
+        if (ReplayContext::get().isWriting())
+        {
+            result = m_fileSystem->loadFile(path, outBlob);
+        }
+        RECORD_BLOB_OUTPUT(outBlob);
+        RECORD_INFO(result);
+        return result;
+    }
 
     // ISlangFileSystemExt
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
