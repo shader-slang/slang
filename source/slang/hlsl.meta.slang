@@ -21277,12 +21277,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CandidateRayObjectToWorld()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_object_to_world_transform()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21297,12 +21298,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CommittedRayObjectToWorld()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_object_to_world_transform()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21317,12 +21319,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CandidateRayWorldToObject()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_world_to_object_transform()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21337,12 +21340,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CommittedRayWorldToObject()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_world_to_object_transform()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21403,11 +21407,17 @@ $}
         }
     };
 
-    // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
-    // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
     ${
-    const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
-    for (auto matName : kRayQueryMatrixNames) {
+    struct RayQueryMatrixMethodEntry
+    {
+        const char* name;
+        const char* metalName;
+    };
+    const RayQueryMatrixMethodEntry rayQueryMatrixMethods[] = {
+        {"ObjectToWorld", "object_to_world_transform"},
+        {"WorldToObject", "world_to_object_transform"},
+    };
+    for (auto method : rayQueryMatrixMethods) {
     $}
 
     /// Gets the object-to-world transform as a 3x4 matrix.
@@ -21416,18 +21426,19 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
-    float3x4 $(ccName)$(matName)3x4()
+    [require(glsl_hlsl_metal_spirv, rayquery)]
+    float3x4 $(ccName)$(method.name)3x4()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(matName)EXT($0, $(ccTF)))";
-        case hlsl: __intrinsic_asm ".$(ccName)$(matName)3x4";
+        case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
+        case metal: __intrinsic_asm "transpose($0->$(ccNameMetal)$(method.metalName)())";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                %m:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+                %m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
                 result:$$float3x4 = OpTranspose %m;
             };
         }
@@ -21439,18 +21450,19 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__readNone]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
-    float4x3 $(ccName)$(matName)4x3()
+    [require(glsl_hlsl_metal_spirv, rayquery)]
+    float4x3 $(ccName)$(method.name)4x3()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "rayQueryGetIntersection$(matName)EXT($0, $(ccTF))";
-        case hlsl: __intrinsic_asm ".$(ccName)$(matName)4x3";
+        case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
+        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                result:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+                result:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
             };
         }
     }
