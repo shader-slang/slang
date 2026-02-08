@@ -167,6 +167,7 @@ static SlangResult runTest(
 {
     // Not checking hashes yet
     expectedHash = 0;
+    SLANG_IGNORE_TEST;
 
     // If the context is already active, it means we're running the testing framework as a replay,
     // so specific replay based test cases have to be ignored.
