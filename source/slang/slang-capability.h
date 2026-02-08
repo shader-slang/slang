@@ -518,6 +518,11 @@ const CapabilityAtomSet& getAtomSetOfStages();
 
 bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom);
 
+/// Check if 'atom' has a known functionally-equivalent alternative capability
+/// that is present in 'targetCapSet'. Used to suppress spurious warnings when
+/// user specifies one vendor variant but code uses the other.
+bool hasAlternativeCapabilityInSet(CapabilityAtom atom, const CapabilityAtomSet& targetCapSet);
+
 void freeCapabilityDefs();
 
 // #define UNIT_TEST_CAPABILITIES

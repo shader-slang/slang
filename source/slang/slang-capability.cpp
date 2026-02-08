@@ -532,6 +532,30 @@ bool hasTargetAtom(const CapabilityAtomSet& setIn, CapabilityAtom& targetAtom)
     return true;
 }
 
+bool hasAlternativeCapabilityInSet(CapabilityAtom atom, const CapabilityAtomSet& targetCapSet)
+{
+    // Check if the atom has a known functionally-equivalent alternative that is present
+    // in the target capability set. This is used to suppress spurious warnings when
+    // user specifies one vendor variant (e.g., EXT) but code uses the other (e.g., NV).
+    // Note: The relationship is symmetric - we check both directions.
+    for (Index i = 0; i < kCapabilityAlternativesCount; ++i)
+    {
+        const auto& pair = kCapabilityAlternatives[i];
+        // If this atom is one of a known pair, check if user specified the other
+        if (atom == CapabilityAtom(pair.capabilityA) &&
+            targetCapSet.contains(UInt(pair.capabilityB)))
+        {
+            return true;
+        }
+        if (atom == CapabilityAtom(pair.capabilityB) &&
+            targetCapSet.contains(UInt(pair.capabilityA)))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool CapabilitySet::implies(CapabilityAtom atom) const
 {
     if (isEmpty() || atom == CapabilityAtom::Invalid)

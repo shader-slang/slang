@@ -1051,16 +1051,35 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
+                auto maybeTargetCapSet = targetCaps.getAtomSets();
+                if (maybeTargetCapSet)
                 {
                     if (auto combinedSet = combinedSets.getAtomSets())
                     {
                         CapabilityAtomSet::calcSubtract(
                             addedAtoms,
                             (*combinedSet),
-                            (*targetCapSet));
+                            (*maybeTargetCapSet));
                     }
                 }
+
+                // Filter out alternative vendor atoms when user specified the alternative.
+                // Only filter known-equivalent pairs (defined in capdef with 'alternative')
+                // to avoid hiding important differences.
+                CapabilityAtomSet filteredAddedAtoms{};
+                for (auto atom : addedAtoms.getElements<CapabilityAtom>())
+                {
+                    bool hasAlternativeInTarget =
+                        maybeTargetCapSet &&
+                        hasAlternativeCapabilityInSet(atom, *maybeTargetCapSet);
+
+                    if (!hasAlternativeInTarget)
+                        filteredAddedAtoms.add(UInt(atom));
+                }
+
+                if (filteredAddedAtoms.isEmpty())
+                    continue;
+
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -1070,7 +1089,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
                     entryPointFuncDecl,
                     target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    filteredAddedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
