@@ -21107,12 +21107,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float2 CandidateRayBarycentrics()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_triangle_barycentric_coord()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21127,12 +21128,13 @@ uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float2 CommittedRayBarycentrics()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_triangle_barycentric_coord()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
