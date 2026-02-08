@@ -100,9 +100,6 @@ class ComponentType : public RefObject,
                       public slang::IModulePrecompileService_Experimental
 {
 public:
-
-    virtual ~ComponentType();
-
     //
     // ISlangUnknown interface
     //

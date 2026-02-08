@@ -621,10 +621,7 @@ have recording/playback support.
    produce a stream that can't be played back, because the playback flow expects the
    stream to contain data that was never written.
 
-3. **`notifyDestroyed()` unconditionally prints to stderr** — should be gated behind
-   `m_ttyLogging`.
-
-4. **`unit-test-replay-record.cpp` uses hardcoded hashes** that include machine-specific
+3. **`unit-test-replay-record.cpp` uses hardcoded hashes** that include machine-specific
    file paths. These tests will fail on any machine with different paths.
 
 ---
@@ -646,9 +643,6 @@ maintenance**, **minimal 'clever C++'**, and **consistent COM usage**.
    and verify each follows one of the standard patterns:
    - `RECORD_CALL()` + `RECORD_INPUT(s)` + call + `RECORD_COM_OUTPUT(s)` + `RECORD_RETURN()`
    - `RECORD_METHOD_OUTPUT` / `RECORD_METHOD_RETURN` / `RECORD_METHOD_VOID` macros
-
-3. **Gate `notifyDestroyed()` stderr output behind `m_ttyLogging`.** Currently it
-   always prints, polluting stderr in production builds.
 
 ### P1: Reduce Template Complexity in proxy-macros.h
 

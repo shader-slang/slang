@@ -241,9 +241,6 @@ public:
     /// Disable recording (sets mode to Idle).
     SLANG_API void disable();
 
-    /// Notify external object destryoed
-    SLANG_API void notifyDestroyed(ISlangUnknown* obj);
-
     // =========================================================================
     // TTY Logging (Live Trace)
     // =========================================================================

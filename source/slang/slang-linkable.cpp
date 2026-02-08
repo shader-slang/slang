@@ -10,7 +10,6 @@
 #include "slang-compiler.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
-#include "slang-record-replay/replay-context.h"
 
 namespace Slang
 {
@@ -82,12 +81,6 @@ ComponentType::ComponentType(Linkage* linkage)
     : m_linkage(linkage)
 {
 }
-
-ComponentType::~ComponentType()
-{
-    SlangRecord::ReplayContext::get().notifyDestroyed(asExternal(this));
-}
-
 
 ComponentType* asInternal(slang::IComponentType* inComponentType)
 {

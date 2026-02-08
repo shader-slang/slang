@@ -5022,27 +5022,6 @@ SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
  */
 SLANG_EXTERN_C SLANG_API bool slang_isRecordLayerEnabled();
 
-/* Get the recorded data from the record layer as a blob.
-   Returns the start pointer and size of the recorded stream.
-   The data remains valid until the next record layer operation or slang_clearRecordLayer is called.
-   @param outData (out) Pointer to the start of the recorded data.
-   @param outSize (out) Size of the recorded data in bytes.
- */
-SLANG_EXTERN_C SLANG_API void slang_getRecordLayerData(const void** outData, size_t* outSize);
-
-/* Clear the recorded data in the record layer, resetting it to empty state.
-   The record layer remains enabled/disabled as it was.
- */
-SLANG_EXTERN_C SLANG_API void slang_clearRecordLayer();
-
-/* Get a pointer to the internal ReplayContext for testing purposes.
-   This returns the actual singleton used by the DLL, not a copy.
-   @return Opaque pointer to the ReplayContext. Cast to SlangRecord::ReplayContext* to use.
-   
-   NOTE: This is for internal testing only and should not be used in production code.
- */
-SLANG_EXTERN_C SLANG_API void* slang_getReplayContext();
-
 /* Set the base directory for replay files (default: ".slang-replays").
    Must be called before enabling recording.
    @param path Path to the replay directory.

@@ -736,36 +736,6 @@ ISlangUnknown* ReplayContext::getProxy(uint64_t handle) const
     return *obj;
 }
 
-void ReplayContext::notifyDestroyed(ISlangUnknown* obj)
-{
-    if (obj == nullptr)
-        return;
-
-    uint64_t* handle = m_objectToHandle.tryGetValue(obj);
-    if (handle)
-    {
-        fprintf(stderr, "[REPLAY] Object destroyed: handle=%llu, ptr=%p\n", *handle, obj);
-        m_handleToObject.remove(*handle);
-        m_objectToHandle.remove(obj);
-    }
-
-    ISlangUnknown** impl = m_proxyToImpl.tryGetValue(obj);
-    if (impl)
-    {
-        fprintf(stderr, "[REPLAY] Proxy-impl association removed: proxy=%p, impl=%p\n", obj, *impl);
-        m_proxyToImpl.remove(obj);
-        m_implToProxy.remove(*impl);
-    }
-
-    ISlangUnknown** proxy = m_implToProxy.tryGetValue(obj);
-    if (proxy)
-    {
-        fprintf(stderr, "[REPLAY] Impl-proxy association removed: impl=%p, proxy=%p\n", obj, *proxy);
-        m_implToProxy.remove(obj);
-        m_proxyToImpl.remove(*proxy);
-    }
-}
-
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
     switch (m_mode)

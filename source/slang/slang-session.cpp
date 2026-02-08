@@ -14,7 +14,6 @@
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
 #include "slang-standard-module-config.h"
-#include "slang-record-replay/replay-context.h"
 
 namespace Slang
 {
@@ -101,8 +100,6 @@ Linkage::queryInterface(SlangUUID const& uuid, void** outObject)
 
 Linkage::~Linkage()
 {
-    SlangRecord::ReplayContext::get().notifyDestroyed(asExternal(this));
-
     // Upstream type checking cache.
     if (m_typeCheckingCache)
     {
