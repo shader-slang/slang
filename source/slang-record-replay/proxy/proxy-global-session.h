@@ -160,8 +160,9 @@ public:
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getBuildTagString() override
     {
-        // REPLAY TODO: Record this (holding off doing so to avoid invalidating existing captures)
-        return getActual<slang::IGlobalSession>()->getBuildTagString();
+        RECORD_CALL();
+        auto result = getActual<slang::IGlobalSession>()->getBuildTagString();
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL setDefaultDownstreamCompiler(

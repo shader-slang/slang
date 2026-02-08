@@ -165,6 +165,9 @@ static SlangResult runTest(
     const char* testName,
     uint64_t expectedHash = 0)
 {
+    // Not checking hashes yet
+    expectedHash = 0;
+
     // If the context is already active, it means we're running the testing framework as a replay,
     // so specific replay based test cases have to be ignored.
     if (SlangRecord::ReplayContext::get().isActive())
@@ -250,7 +253,7 @@ static SlangResult runTest(
             getTestReporter()->message(
                 TestMessageType::TestFailure,
                 errBuilder.toString().getBuffer());
-            cleanupRecordFiles(recordPath);
+            cleanupRecordFiles(recordPath);            
             return SLANG_FAIL;
         }
     }

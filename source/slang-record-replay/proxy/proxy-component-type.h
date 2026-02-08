@@ -43,6 +43,7 @@ public:
         , m_typeConformance(nullptr)
         , m_hasRegisteredCoreModule(false)
     {
+
         // IComponentType is always expected to be supported
         actual->queryInterface(
             slang::IComponentType::getTypeGuid(),
@@ -64,6 +65,13 @@ public:
             (void**)&m_typeConformance);
         if (m_typeConformance)
             m_typeConformance->release();
+    }
+
+    ~ComponentTypeProxy()
+    {
+        // Clear returned entry points to release references before the component is released
+        SuppressRefCountRecording guard;
+        m_returnedEntryPoints.clear();
     }
 
     void tryRegisterCoreModule()
@@ -372,7 +380,7 @@ public:
         RECORD_INPUT(name);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         SlangResult result = m_module->findEntryPointByName(name, outEntryPoint);
-        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
 
@@ -395,7 +403,7 @@ public:
         RECORD_INPUT(index);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         SlangResult result = m_module->getDefinedEntryPoint(index, outEntryPoint);
-        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
 
@@ -456,7 +464,7 @@ public:
             stage,
             outEntryPoint,
             outDiagnostics);
-        RECORD_COM_OUTPUT(outEntryPoint);
+        RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
     }
@@ -592,6 +600,7 @@ private:
     slang::IEntryPoint* m_entryPoint;             // May be null
     slang::ITypeConformance* m_typeConformance;   // May be null
     bool m_hasRegisteredCoreModule;
+    List<ComPtr<slang::IEntryPoint>> m_returnedEntryPoints;
 };
 
 } // namespace SlangRecord

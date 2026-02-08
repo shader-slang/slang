@@ -66,6 +66,21 @@ namespace SlangRecord
 // Record an output parameter (for T** style outputs, dereferences and wraps)
 #define RECORD_COM_OUTPUT(arg) _ctx.record(RecordFlag::Output, *arg)
 
+// Record an entry-point output parameter and keep it alive.
+// Wraps the returned object via RECORD_COM_OUTPUT, then stores a reference in
+// m_returnedEntryPoints so the proxy outlives user code that doesn't properly
+// track the reference (matching Slang's internal lifetime behaviour).
+// Requires: RECORD_CALL() has been called (provides _ctx), and the class has
+//           m_returnedEntryPoints.
+// Usage: RECORD_ENTRYPOINT_OUTPUT(outEntryPoint)
+#define RECORD_ENTRYPOINT_OUTPUT(arg)                                        \
+    RECORD_COM_OUTPUT(arg);                                                  \
+    if (*arg)                                                                \
+    {                                                                        \
+        SuppressRefCountRecording _guard;                                    \
+        m_returnedEntryPoints.add(Slang::ComPtr<slang::IEntryPoint>(*arg)); \
+    }
+
 // Record a blob output parameter (ISlangBlob**)
 // Serializes blob by content hash to disk. During playback, loads from disk.
 // No proxy wrapping is needed for blobs.

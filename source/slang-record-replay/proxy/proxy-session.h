@@ -272,6 +272,7 @@ public:
             getActual<slang::ISession>()->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
 
         // REPLAY TODO: I can't work out why isBinaryModuleUpToDate is non-deterministic
+        // For now just recording the call without raising error when different.
         RECORD_INFO(result);
         return result;
     }
