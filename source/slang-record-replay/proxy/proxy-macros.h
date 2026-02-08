@@ -73,11 +73,11 @@ namespace SlangRecord
 // Requires: RECORD_CALL() has been called (provides _ctx), and the class has
 //           m_returnedEntryPoints.
 // Usage: RECORD_ENTRYPOINT_OUTPUT(outEntryPoint)
-#define RECORD_ENTRYPOINT_OUTPUT(arg)                                        \
-    RECORD_COM_OUTPUT(arg);                                                  \
-    if (*arg)                                                                \
-    {                                                                        \
-        SuppressRefCountRecording _guard;                                    \
+#define RECORD_ENTRYPOINT_OUTPUT(arg)                                       \
+    RECORD_COM_OUTPUT(arg);                                                 \
+    if (*arg)                                                               \
+    {                                                                       \
+        SuppressRefCountRecording _guard;                                   \
         m_returnedEntryPoints.add(Slang::ComPtr<slang::IEntryPoint>(*arg)); \
     }
 
