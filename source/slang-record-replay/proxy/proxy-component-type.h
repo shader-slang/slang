@@ -220,11 +220,21 @@ public:
         slang::CompilerOptionEntry* compilerOptionEntries,
         ISlangBlob** outDiagnostics) override
     {
-        SLANG_UNUSED(outLinkedComponentType);
-        SLANG_UNUSED(compilerOptionEntryCount);
-        SLANG_UNUSED(compilerOptionEntries);
-        SLANG_UNUSED(outDiagnostics);
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::linkWithOptions");
+        RECORD_CALL();
+        RECORD_INPUT_ARRAY(compilerOptionEntries, compilerOptionEntryCount);
+
+        PREPARE_POINTER_OUTPUT(outLinkedComponentType);
+        PREPARE_POINTER_OUTPUT(outDiagnostics);
+
+        auto result = getActual<slang::IComponentType>()->linkWithOptions(
+            outLinkedComponentType,
+            compilerOptionEntryCount,
+            compilerOptionEntries,
+            outDiagnostics);
+
+        RECORD_COM_OUTPUT(outLinkedComponentType);
+        RECORD_COM_OUTPUT(outDiagnostics);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

@@ -97,6 +97,8 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
 
     // File system - ISlangMutableFileSystem derives from ISlangFileSystemExt
     TRY_WRAP(ISlangMutableFileSystem, MutableFileSystemProxy)
+    TRY_WRAP(ISlangFileSystemExt, MutableFileSystemProxy)
+    TRY_WRAP(ISlangFileSystem, MutableFileSystemProxy)
 
     // Other types
     TRY_WRAP(ISlangSharedLibrary, SharedLibraryProxy)

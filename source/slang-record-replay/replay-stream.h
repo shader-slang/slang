@@ -103,9 +103,12 @@ public:
             throw Slang::Exception("Cannot write to a reading stream");
 
         size_t newSize = m_position + size;
-        if (newSize > size_t(m_buffer.getCount()))
+        if (newSize > size_t(m_buffer.getCapacity()))
         {
             m_buffer.reserve(Slang::Index(newSize)*2);
+        }
+        if (newSize > size_t(m_buffer.getCount()))
+        {
             m_buffer.setCount(Slang::Index(newSize));
         }
 

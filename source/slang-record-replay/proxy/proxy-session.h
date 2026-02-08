@@ -306,9 +306,15 @@ public:
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override
     {
-        SLANG_UNUSED(modulePath);
-        SLANG_UNUSED(binaryModuleBlob);
-        REPLAY_UNIMPLEMENTED_X("SessionProxy::isBinaryModuleUpToDate");
+        RECORD_CALL();
+        RECORD_INPUT(modulePath);
+        RECORD_INPUT(binaryModuleBlob);
+
+        bool result = getActual<slang::ISession>()->isBinaryModuleUpToDate(modulePath, binaryModuleBlob);
+
+        //REPLAY TODO: I can't work out why isBinaryModuleUpToDate is non-deterministic
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL loadModuleFromSourceString(

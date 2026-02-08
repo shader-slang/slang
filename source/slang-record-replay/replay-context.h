@@ -335,6 +335,8 @@ public:
 
     // Arrays with count - calls record() on each element
     template<typename T, typename CountT>
+    void recordArray(RecordFlag flags, T*& arr, CountT& count);
+    template<typename T, typename CountT>
     void recordArray(RecordFlag flags, const T*& arr, CountT& count);
 
     /// Parse a function signature to extract "ClassName::methodName" format.
@@ -694,6 +696,41 @@ private:
 };
 
 // Template implementations
+
+template<typename T, typename CountT>
+void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
+{
+    if (m_mode == Mode::Idle) return;
+    if (isWriting())
+    {
+        recordTypeId(TypeId::Array);
+        uint64_t arrayCount = static_cast<uint64_t>(count);
+        record(flags, arrayCount);
+        for (uint64_t i = 0; i < arrayCount; ++i)
+            record(flags, arr[i]);
+    }
+    else
+    {
+        expectTypeId(TypeId::Array);
+        uint64_t arrayCount;
+        record(flags, arrayCount);
+        count = static_cast<CountT>(arrayCount);
+        if (arrayCount > 0)
+        {
+            T* buf = m_arena.allocateArray<T>(static_cast<size_t>(arrayCount));
+            for (uint64_t i = 0; i < arrayCount; ++i)
+            {
+                new (&buf[i]) T{};
+                record(flags, buf[i]);
+            }
+            arr = buf;
+        }
+        else
+        {
+            arr = nullptr;
+        }
+    }
+}
 
 template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
