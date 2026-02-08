@@ -4356,6 +4356,15 @@ struct ISession : public ISlangUnknown
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
 
+    struct SourceLocation
+    {
+        const char* filePath = nullptr;
+        SlangInt line = -1;
+        SlangInt column = -1;
+    };
+    virtual SLANG_NO_THROW SourceLocation SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* Decl) = 0;
+
     /** Load a module from a string.
      */
     virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSourceString(

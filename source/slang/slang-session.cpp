@@ -1786,6 +1786,27 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
     return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
+SLANG_NO_THROW slang::ISession::SourceLocation SLANG_MCALL
+Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
+{
+    Decl* decl = (Decl*)inDecl;
+    SourceManager* sourceManager = getSourceManager();
+    auto sourceView = sourceManager->findSourceViewRecursively(decl->getNameLoc());
+    if (sourceView)
+    {
+        auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
+        slang::ISession::SourceLocation loc;
+        
+        if (humaneLoc.pathInfo.hasFoundPath())
+            loc.filePath = humaneLoc.pathInfo.foundPath.getBuffer();
+
+        loc.line = humaneLoc.line;
+        loc.column = humaneLoc.column;
+        return loc;
+    }
+    return slang::ISession::SourceLocation();
+}
+
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
 {
     auto impl = [&](bool translateUnderScore) -> SourceFile*
