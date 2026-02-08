@@ -739,6 +739,42 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
             return;
         }
     }
+
+    // If we didn't find a DescriptorTableSlot offset directly on the layout,
+    // check if the type layout is a parameterGroupTypeLayout (e.g., from ParameterBlock).
+    // In that case, the binding info is in the element var layout.
+    auto typeLayout = layout->getTypeLayout();
+    if (!typeLayout)
+        return;
+    auto parameterGroupTypeLayout = as<IRParameterGroupTypeLayout>(typeLayout->unwrapArray());
+    if (!parameterGroupTypeLayout)
+        return;
+    auto elementVarLayout = parameterGroupTypeLayout->getElementVarLayout();
+    if (!elementVarLayout)
+        return;
+
+    for (auto attr : elementVarLayout->getOffsetAttrs())
+    {
+        LayoutResourceKind kind = attr->getResourceKind();
+        if (kind == LayoutResourceKind::DescriptorTableSlot)
+        {
+            m_writer->emit("@binding(");
+            m_writer->emit(attr->getOffset());
+            m_writer->emit(") ");
+
+            // For the group/space, we need to use the outer layout's space info
+            EmitVarChain chain = {};
+            chain.varLayout = layout;
+            auto space = getBindingSpaceForKinds(
+                &chain,
+                LayoutResourceKindFlag::make(LayoutResourceKind::SubElementRegisterSpace));
+            m_writer->emit("@group(");
+            m_writer->emit(space);
+            m_writer->emit(") ");
+
+            return;
+        }
+    }
 }
 
 static bool isStaticConst(IRInst* inst)
