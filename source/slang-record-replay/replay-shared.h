@@ -6,6 +6,18 @@
 namespace SlangRecord
 {
 
+#ifndef SLANG_FUNC_SIG
+#ifdef __FUNCSIG__
+#define SLANG_FUNC_SIG __FUNCSIG__
+#elif defined(__PRETTY_FUNCTION__)
+#define SLANG_FUNC_SIG __PRETTY_FUNCTION__
+#elif defined(__FUNCTION__)
+#define SLANG_FUNC_SIG __FUNCTION__
+#else
+#define SLANG_FUNC_SIG "UnknownFunction"
+#endif
+#endif
+
 // =============================================================================
 // Ref-count recording suppression
 // =============================================================================

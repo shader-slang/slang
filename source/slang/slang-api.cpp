@@ -262,7 +262,7 @@ SLANG_API SlangResult slang_createGlobalSession2(
     // Replay system code is manually written here for simplicity. It does nothing if replays aren't active.
     using namespace SlangRecord;
     auto& _ctx = ReplayContext::get();
-    _ctx.beginStaticCall(__FUNCSIG__);
+    _ctx.beginStaticCall(SLANG_FUNC_SIG);
     _ctx.record(RecordFlag::Input, *const_cast<SlangGlobalSessionDesc*>(desc));
 
     // Main internal call (regardless of replay state)

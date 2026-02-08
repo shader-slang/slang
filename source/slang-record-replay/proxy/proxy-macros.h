@@ -20,30 +20,16 @@ namespace SlangRecord {
 
 // Begins a recorded instance method call - locks context, records signature and 'this'
 // Uses compiler-specific macro for full signature including type name
-#ifdef _MSC_VER
 #define RECORD_CALL() \
     auto& _ctx = ReplayContext::get(); \
     auto _lock = _ctx.lock(); \
-    _ctx.beginCall(__FUNCSIG__, this)
-#else
-#define RECORD_CALL() \
-    auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock(); \
-    _ctx.beginCall(__PRETTY_FUNCTION__, this)
-#endif
+    _ctx.beginCall(SLANG_FUNC_SIG, this)
 
 // For static/free functions (no 'this' pointer)
-#ifdef _MSC_VER
 #define RECORD_STATIC_CALL() \
     auto& _ctx = ReplayContext::get(); \
     auto _lock = _ctx.lock(); \
-    _ctx.beginStaticCall(__FUNCSIG__)
-#else
-#define RECORD_STATIC_CALL() \
-    auto& _ctx = ReplayContext::get(); \
-    auto _lock = _ctx.lock(); \
-    _ctx.beginStaticCall(__PRETTY_FUNCTION__)
-#endif
+    _ctx.beginStaticCall(SLANG_FUNC_SIG)
 
 // Record an input parameter
 // Note: We cast away const for inputs since recording only reads the value
@@ -179,6 +165,48 @@ inline void recordInputs(ReplayContext&) {}
     RECORD_CALL(); \
     auto _result = ProxyBase::getActual()->method(); \
     RECORD_RETURN(_result)
+
+// =============================================================================
+// Session-specific Macros
+// =============================================================================
+
+// Pattern: Return a module from the session, wrapping it in a proxy and keeping
+// a reference in m_loadedModules to manage its lifetime. The proxy created by
+// wrapObject already has refcount 1 so we use INIT_ATTACH to avoid double addRef.
+// Requires: RECORD_CALL() has been called (provides _ctx), and method has m_loadedModules.
+// Usage: RECORD_RETURN_SESSION(result)  where result is slang::IModule*
+#define RECORD_RETURN_SESSION(result) \
+    { \
+        uint64_t _handle = kNullHandle; \
+        if (result) \
+        { \
+            SuppressRefCountRecording _guard; \
+            result = wrapObject(result); \
+            m_loadedModules.add( \
+                Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, result)); \
+            _handle = _ctx.getProxyHandle(result); \
+        } \
+        _ctx.recordHandle(RecordFlag::ReturnValue, _handle); \
+        return result; \
+    }
+
+// Pattern: Return a COM object that is already known to have a proxy registered.
+// Uses getProxy instead of wrapObject — the proxy must already exist.
+// Requires: RECORD_CALL() has been called (provides _ctx).
+// Usage: RECORD_RETURN_EXISTING_PROXY(result)
+#define RECORD_RETURN_EXISTING_PROXY(result) \
+    { \
+        uint64_t _handle = kNullHandle; \
+        if (result) \
+        { \
+            auto* _proxy = _ctx.getProxy(result); \
+            result = toSlangInterface< \
+                std::remove_pointer_t<decltype(result)>>(_proxy); \
+            _handle = _ctx.getProxyHandle(_proxy); \
+        } \
+        _ctx.recordHandle(RecordFlag::ReturnValue, _handle); \
+        return result; \
+    }
 
 // =============================================================================
 // Playback Registration Macros

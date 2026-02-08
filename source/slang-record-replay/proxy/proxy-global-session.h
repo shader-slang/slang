@@ -218,6 +218,7 @@ public:
         RECORD_COM_OUTPUT(outPrelude);
     }
 
+    SLANG_ALLOW_DEPRECATED_BEGIN
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     createCompileRequest(slang::ICompileRequest** outCompileRequest) override
     {
@@ -227,6 +228,7 @@ public:
         RECORD_COM_OUTPUT(outCompileRequest);
         RECORD_RETURN(result);
     }
+    SLANG_ALLOW_DEPRECATED_END
 
     virtual SLANG_NO_THROW void SLANG_MCALL
     addBuiltins(char const* sourcePath, char const* sourceString) override
