@@ -5,8 +5,8 @@
 #include "../core/slang-rtti-info.h"
 #include "../core/slang-shared-library.h"
 #include "../core/slang-signal.h"
-#include "../slang-record-replay/record/slang-global-session.h"
-#include "../slang-record-replay/util/record-utility.h"
+#include "../slang-record-replay/proxy/proxy-base.h"
+#include "../slang-record-replay/replay-context.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
 #include "slang-internal.h"
@@ -245,18 +245,7 @@ SLANG_API SlangResult slang_createGlobalSessionImpl(
         }
     }
 
-    // Check if the SLANG_CAPTURE_ENABLE_ENV is enabled
-    if (SlangRecord::isRecordLayerEnabled())
-    {
-        SlangRecord::GlobalSessionRecorder* globalSessionRecorder =
-            new SlangRecord::GlobalSessionRecorder(desc, globalSession.detach());
-        Slang::ComPtr<SlangRecord::GlobalSessionRecorder> result(globalSessionRecorder);
-        *outGlobalSession = result.detach();
-    }
-    else
-    {
-        *outGlobalSession = globalSession.detach();
-    }
+    *outGlobalSession = globalSession.detach();
 
 #ifdef SLANG_ENABLE_IR_BREAK_ALLOC
     // Reset inst debug alloc counter to 0 so IRInsts for user code always starts from 0.
@@ -270,8 +259,24 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
+    // Replay system code is manually written here for simplicity. It does nothing if replays aren't
+    // active.
+    using namespace SlangRecord;
+    auto& _ctx = ReplayContext::get();
+    _ctx.beginStaticCall(SLANG_FUNC_SIG);
+    _ctx.record(RecordFlag::Input, *const_cast<SlangGlobalSessionDesc*>(desc));
+
+    // Main internal call (regardless of replay state)
     Slang::GlobalSessionInternalDesc internalDesc = {};
-    return slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+    SlangResult result = slang_createGlobalSessionImpl(desc, &internalDesc, outGlobalSession);
+
+    // If replay system active, wrap output and record it
+    auto* wrapped = wrapObject(*outGlobalSession);
+    *outGlobalSession = static_cast<slang::IGlobalSession*>(wrapped);
+    _ctx.record(RecordFlag::Output, *outGlobalSession);
+    _ctx.record(RecordFlag::ReturnValue, result);
+
+    return result;
 }
 
 SLANG_API void slang_shutdown()
@@ -280,6 +285,49 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+}
+
+SLANG_API void slang_enableRecordLayer(bool enable)
+{
+    if (enable)
+        SlangRecord::ReplayContext::get().setMode(SlangRecord::Mode::Record);
+    else
+        SlangRecord::ReplayContext::get().disable();
+}
+
+SLANG_API bool slang_isRecordLayerEnabled()
+{
+    return SlangRecord::ReplayContext::get().isActive();
+}
+
+SLANG_API void slang_setReplayDirectory(const char* path)
+{
+    SlangRecord::ReplayContext::get().setReplayDirectory(path);
+}
+
+SLANG_API const char* slang_getReplayDirectory()
+{
+    return SlangRecord::ReplayContext::get().getReplayDirectory();
+}
+
+SLANG_API const char* slang_getCurrentReplayPath()
+{
+    return SlangRecord::ReplayContext::get().getCurrentReplayPath();
+}
+
+SLANG_API SlangResult slang_loadReplay(const char* folderPath)
+{
+    return SlangRecord::ReplayContext::get().loadReplay(folderPath);
+}
+
+SLANG_API SlangResult slang_loadLatestReplay()
+{
+    return SlangRecord::ReplayContext::get().loadLatestReplay();
+}
+
+SLANG_API void slang_replayMarker(const char* label)
+{
+    SlangRecord::ReplayContext::get().marker(label);
 }
 
 SLANG_API SlangResult slang_createGlobalSessionWithoutCoreModule(
@@ -311,12 +359,17 @@ SLANG_API void spDestroySession(SlangSession* inSession)
     if (!inSession)
         return;
 
-    Slang::Session* session = Slang::asInternal(inSession);
+#ifdef _DEBUG
     // It is assumed there is only a single reference on the session (the one placed
-    // with spCreateSession) if this function is called
-    SLANG_ASSERT(session->debugGetReferenceCount() == 1);
+    // with spCreateSession) if this function is called.
+    // NOTE: When a replay is activate Slang::asInternal skips the proxy, so this
+    // line checks the ref count on the internal object only.
+    Slang::Session* internalSession = Slang::asInternal(inSession);
+    SLANG_ASSERT(internalSession->debugGetReferenceCount() == 1);
+#endif
+
     // Release
-    session->release();
+    inSession->release();
 }
 
 SLANG_API const char* spGetBuildTagString()

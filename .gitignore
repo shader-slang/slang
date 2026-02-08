@@ -133,3 +133,7 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+
+.slang-replays*
+log*.txt
+replay-capture

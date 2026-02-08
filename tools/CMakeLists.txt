@@ -418,9 +418,8 @@ if(SLANG_ENABLE_REPLAYER)
     slang_add_target(
         slang-replay
         EXECUTABLE
-        EXTRA_SOURCE_DIRS
-            ${slang_SOURCE_DIR}/source/slang-record-replay/replay
-            ${slang_SOURCE_DIR}/source/slang-record-replay/util
+        # Note: replay-context sources are already compiled into the slang library,
+        # so we only add include directories here, not EXTRA_SOURCE_DIRS
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}/source/slang-record-replay

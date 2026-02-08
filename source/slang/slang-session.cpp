@@ -78,12 +78,24 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
     return m_semanticsForReflection.get();
 }
 
-ISlangUnknown* Linkage::getInterface(const Guid& guid)
+SLANG_NO_THROW SlangResult SLANG_MCALL
+Linkage::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
-        return asExternal(this);
+    if (uuid == Linkage::getTypeGuid())
+    {
+        addReference();
+        *outObject = static_cast<Linkage*>(this);
+        return SLANG_OK;
+    }
 
-    return nullptr;
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISession::getTypeGuid())
+    {
+        addReference();
+        *outObject = static_cast<slang::ISession*>(this);
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NO_INTERFACE;
 }
 
 Linkage::~Linkage()
