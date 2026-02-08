@@ -43,12 +43,12 @@ Member list:
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
 - *`identifier`* is an optional name of the declared struct type
 - *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
-- *`bases-clause`* is an optional list of inherited [interfaces](04-types-interface.md).
+- *`bases-clause`* is an optional list of inherited [interfaces](types-interface.md).
 - *`type-expr`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
 - *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
 - *`member-list`* is a list of struct members. A member is one of:
   - *`var-decl`* is a member variable declaration. See [Variables (TODO)](TODO)
-  - *`type-decl`* is a nested [type declaration](04-types.md).
+  - *`type-decl`* is a nested [type declaration](types.md).
   - *`function-decl`* is a member function declaration. See [Functions (TODO)](TODO)
   - *`constructor-decl`* is a [constructor declaration](#constructor).
   - *`property-decl`* is a [property declaration](#property).
@@ -68,7 +68,7 @@ forms:
 - The *no-body* declaration specifies an existence of a structure type. The declaration simply specifies that
   a structure type with the specified name exists. This enables its use in type expressions without the member
   declarations.
-- The *with-members* declaration defines the structure type with a layout and an [extensible](04-types-extension.md)
+- The *with-members* declaration defines the structure type with a layout and an [extensible](types-extension.md)
   list of non-layout members.
 - The *link-time extern type* declaration specifies the existence of a structure type that is defined in
   another module. See [Modules (TODO)](TODO).
@@ -118,9 +118,9 @@ allocated. See [Variables (TODO)](TODO).
 
 A nested type is a regular type enclosed within the scope of the outer `struct`.
 
-A structure may conform to one or more [interface](04-types-interface.md) types.
+A structure may conform to one or more [interface](types-interface.md) types.
 
-A structure may be extended with a [type extension](04-types-extension.md).
+A structure may be extended with a [type extension](types-extension.md).
 
 `struct` members may be declared with access control specifiers `public`, `internal`, or `private` (specified
 in *`modifier-list`*). The default member visibility is `internal`. Nested `struct` members have access to
@@ -134,7 +134,7 @@ in *`modifier-list`*). The default member visibility is `internal`. Nested `stru
 
 An object is an *instance* of a `struct`. An instance consists of all non-static data members defined in a
 `struct`. The data members may be initialized using an initializer list or a constructor. For details, see
-[variable declarations](07-declarations.md).
+[variable declarations](declarations.md).
 
 ## Constructors {#constructor}
 
@@ -307,7 +307,7 @@ specified in the declaration, parameter `newValue` with the same type as the pro
 body.
 
 The property declaration forms without accessor or accessor body declarations are useful only in
-[interface](04-interface.md) declarations.
+[interface](types-interface.md) declarations.
 
 > ⚠️ **Warning:** Property reference accessor `ref` is a Slang internal language feature. It is subject to
 > change and may not work as expected.
@@ -351,7 +351,7 @@ void main(uint3 id : SV_DispatchThreadID)
 > be added systematically to data member access. This can avoid refactoring call sites.
 
 > 📝 **Remark 2:** A non-static data member can be used to implement an interface property requirement. See
-> [interfaces](04-types-interface.md) for details.
+> [interfaces](types-interface.md) for details.
 
 > 📝 **Remark 3:** In the example above, the property could have also been declared as:
 >

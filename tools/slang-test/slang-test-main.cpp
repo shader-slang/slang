@@ -25,6 +25,7 @@
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
 #include "../render-test/slang-support.h"
+#include "diagnostic-annotation-util.h"
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
@@ -91,6 +92,11 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("filecheck-buffer", prefix);
     }
+    bool getDiagTestPrefix(String& prefix) const
+    {
+        return commandOptions.tryGetValue("diag", prefix);
+    }
+    bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
     Type type = Type::Normal;
 
@@ -817,6 +823,66 @@ static TestResult _fileCheckTest(
         coloredOutput);
 }
 
+//
+// Check diagnostic annotations in the source file
+//
+static TestResult _diagnosticAnnotationTest(
+    TestContext& context,
+    const TestInput& input,
+    const String& diagPrefix,
+    const String& outputToCheck)
+{
+    auto& testReporter = *context.getTestReporter();
+
+    // Read the source file to get annotations
+    String sourceText;
+    if (SLANG_FAILED(File::readAllText(input.filePath, sourceText)))
+    {
+        testReporter.messageFormat(
+            TestMessageType::RunError,
+            "Failed to read source file for diagnostic annotations: '%s'",
+            input.filePath.getBuffer());
+        return TestResult::Fail;
+    }
+
+    // Extract standard error from the formatted output
+    // Format: "result code = X\nstandard error = {\n<content>\n}\n..."
+    String standardError;
+    {
+        UnownedStringSlice output = outputToCheck.getUnownedSlice();
+        Index stderrStart = output.indexOf(UnownedStringSlice::fromLiteral("standard error = {\n"));
+        if (stderrStart != -1)
+        {
+            stderrStart += strlen("standard error = {\n");
+            // Search for "\n}" after stderrStart
+            UnownedStringSlice remaining = output.tail(stderrStart);
+            Index stderrEnd = remaining.indexOf(UnownedStringSlice::fromLiteral("\n}"));
+            if (stderrEnd != -1)
+            {
+                standardError = String(remaining.head(stderrEnd));
+            }
+        }
+    }
+
+    // Check if exhaustive mode (default) or non-exhaustive
+    bool exhaustive = !input.testOptions->isNonExhaustiveDiagTest();
+
+    // Check diagnostic annotations
+    String errorMessage;
+    if (!DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
+            sourceText.getUnownedSlice(),
+            diagPrefix.getUnownedSlice(),
+            standardError.getUnownedSlice(),
+            exhaustive,
+            errorMessage))
+    {
+        testReporter.message(TestMessageType::TestFailure, errorMessage.getBuffer());
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
 template<typename Compare>
 static TestResult _fileComparisonTest(
     TestContext& context,
@@ -859,7 +925,7 @@ static bool _areLinesEqual(const String& a, const String& e)
     return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());
 }
 
-// Either run FileCheck over the result, or read and compare with a .expected file
+// Either run diagnostic annotation check, FileCheck, or compare with a .expected file
 // On a comparison failure, dump the difference
 // On any failure, write a .actual file.
 template<typename Compare = decltype(_areLinesEqual)>
@@ -871,17 +937,28 @@ static TestResult _validateOutput(
     const char* defaultExpectedContent = nullptr,
     const Compare compare = _areLinesEqual)
 {
-    String fileCheckPrefix;
-    const TestResult result =
-        input.testOptions->getFileCheckPrefix(fileCheckPrefix)
-            ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
-            : _fileComparisonTest(
-                  *context,
-                  input,
-                  defaultExpectedContent,
-                  ".expected",
-                  actualOutput,
-                  compare);
+    TestResult result = TestResult::Fail;
+
+    // Check for diagnostic annotations first
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        result = _diagnosticAnnotationTest(*context, input, diagPrefix, actualOutput);
+    }
+    else
+    {
+        // Fall back to filecheck or file comparison
+        String fileCheckPrefix;
+        result = input.testOptions->getFileCheckPrefix(fileCheckPrefix)
+                     ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
+                     : _fileComparisonTest(
+                           *context,
+                           input,
+                           defaultExpectedContent,
+                           ".expected",
+                           actualOutput,
+                           compare);
+    }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
@@ -2556,6 +2633,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         if (arg == kPreserveEmbeddedSourceOption)
             continue;
         cmdLine.addArg(arg);
+    }
+
+    // Enable machine-readable diagnostics if diag option is specified
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
     // If we can't set up for simple compilation, it's because some external resource isn't

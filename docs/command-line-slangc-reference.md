@@ -895,6 +895,11 @@ Enable experimental features (loading builtin neural module)
 Enable experimental rich diagnostics with enhanced formatting and details 
 
 
+<a id="enable-machine-readable-diagnostics"></a>
+### -enable-machine-readable-diagnostics
+Enable machine-readable diagnostic output in tab-separated format 
+
+
 
 <a id="Internal"></a>
 ## Internal
@@ -981,6 +986,11 @@ Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output 
 <a id="loop-inversion"></a>
 ### -loop-inversion
 Enable loop inversion in the code-gen optimization. Default is off 
+
+
+<a id="whole-program"></a>
+### -whole-program
+Generate code for all entry points in a single output (library mode). 
 
 
 

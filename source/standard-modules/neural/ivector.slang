@@ -47,17 +47,6 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     public __init(This other);
 
     /**
-    Element access operator.
-    @param[in] index The element index (0-based).
-    @return Reference to the element at the given index.
-    */
-    public __subscript(int index)->T
-    {
-        get;
-        set;
-    }
-
-    /**
     Evaluates a linear transformation: output = W * input.
     Performs matrix-vector multiplication.
     Supports automatic differentiation for backpropagation.
