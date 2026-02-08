@@ -15,6 +15,7 @@ jobs:
     runs-on: slang-larger-runner-1
 
     permissions:
+      id-token: write # Required for Workload Identity (GCS auth)
       contents: read
       pull-requests: write
       checks: write
@@ -29,6 +30,18 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 2
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+          gcs-bucket: slang-ci-cache
 
       - name: Install build dependencies
         run: |
@@ -52,7 +65,6 @@ jobs:
             spirv-tools \
             glslang-tools \
             ca-certificates \
-            libzstd-dev \
             clang-format-17 \
             npm
 
@@ -106,35 +118,16 @@ jobs:
           echo "=== CUDA version ==="
           nvcc --version
 
-      # LLVM caching support - restore cached LLVM build if available
-      - name: Restore cached LLVM
-        uses: actions/cache/restore@v4
-        id: cache-llvm
+      # Setup LLVM from GCS (or build if missing)
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
         with:
-          path: build/llvm-project-install
-          key: llvm-linux-gcc-x86_64-${{ hashFiles('external/build-llvm.sh') }}
-
-      # Build LLVM from source if cache miss (takes 15-25 minutes)
-      - name: Build LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          ./external/build-llvm.sh \
-            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
-
-      # Save LLVM cache only on master branch to avoid cache pollution
-      - name: Save LLVM cache
-        uses: actions/cache/save@v4
-        if: steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
-        with:
-          path: build/llvm-project-install
-          key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
-
-      # Set LLVM paths for CMake to find the installation
-      - name: Set LLVM paths
-        run: |
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
 
       # Verify LLVM installation
       - name: Verify LLVM installation
@@ -155,9 +148,15 @@ jobs:
           export PATH=/usr/local/cuda-13.0/bin:$PATH
           export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
+          # Show sccache stats before build
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats
+
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
       - name: Build Slang
         run: |
@@ -165,3 +164,6 @@ jobs:
           export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
           cmake --build --preset debug -j$(nproc)
+
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats
