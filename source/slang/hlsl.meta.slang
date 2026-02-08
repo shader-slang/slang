@@ -20718,10 +20718,9 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         case metal:
             __requirePrelude(R"(
-typedef uint CANDIDATE_TYPE;
-CANDIDATE_TYPE _candidate_intersection_type_to_uint(raytracing::intersection_type type){
-    const CANDIDATE_TYPE CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
-    const CANDIDATE_TYPE CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
+uint _candidate_intersection_type_to_uint(raytracing::intersection_type type){
+    const uint CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
+    const uint CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
     switch(type){
         case raytracing::intersection_type::none:
             return 0;
@@ -20761,11 +20760,10 @@ CANDIDATE_TYPE _candidate_intersection_type_to_uint(raytracing::intersection_typ
             };
         case metal:
         __requirePrelude(R"(
-typedef uint COMMITTED_STATUS;
-COMMITTED_STATUS _committed_intersection_type_to_uint(raytracing::intersection_type type){
-    const COMMITTED_STATUS COMMITTED_NOTHING = 0;
-    const COMMITTED_STATUS COMMITTED_TRIANGLE_HIT = 1;
-    const COMMITTED_STATUS COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
+uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
+    const uint COMMITTED_NOTHING = 0;
+    const uint COMMITTED_TRIANGLE_HIT = 1;
+    const uint COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
     switch(type){
         case raytracing::intersection_type::none:
             return COMMITTED_NOTHING;
@@ -21469,7 +21467,7 @@ ${
         {"uint", "InstanceID", "InstanceCustomIndex", "user_instance_id"},
         {"uint", "PrimitiveIndex", "PrimitiveIndex", "primitive_id"},
         {"uint", "GeometryIndex", "GeometryIndex", "geometry_id"},
-        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset", "user_instance_id"},
+        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset", "user_instance_id"}, // should be removed for metal
         {"float3", "ObjectRayOrigin", "ObjectRayOrigin", "ray_origin"},
         {"float3", "ObjectRayDirection", "ObjectRayDirection", "ray_direction"},
         {"bool", "TriangleFrontFace", "FrontFace", "triangle_front_facing"},
@@ -21507,13 +21505,18 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     uint RayFlags()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
+        case metal: __intrinsic_asm R"(
+            raytracing::intersection_params params = $0->get_intersection_params();
+            uint flags = 0;
+            return flags;
+        )";
         case spirv:
             return spirv_asm
             {
@@ -21527,13 +21530,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayOrigin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".WorldRayOrigin";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayOriginEXT";
+        case metal: __intrinsic_asm "$0->get_world_space_ray_origin()";
         case spirv:
             return spirv_asm
             {
@@ -21547,13 +21551,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayDirection()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".WorldRayDirection";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayDirectionEXT";
+        case metal: __intrinsic_asm "$0->get_world_space_ray_direction()";
         case spirv:
             return spirv_asm
             {
@@ -21568,13 +21573,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float RayTMin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".RayTMin";
         case glsl: __intrinsic_asm "rayQueryGetRayTMinEXT";
+        case metal: __intrinsic_asm "$0->get_ray_min_distance()";
         case spirv:
             return spirv_asm
             {
