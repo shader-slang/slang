@@ -10,6 +10,7 @@
 #include "proxy/proxy-module.h"
 
 #include <chrono>
+#include <cinttypes>
 #include <cstdio>
 
 #ifdef _WIN32
@@ -111,8 +112,8 @@ TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)
 
 DataMismatchException::DataMismatchException(size_t offset, size_t size)
     : Slang::Exception(
-          Slang::String("Data mismatch at offset ") + Slang::String(offset) + " (size " +
-          Slang::String(size) + " bytes)")
+          Slang::String("Data mismatch at offset ") + Slang::String((uint64_t)offset) + " (size " +
+          Slang::String((uint64_t)size) + " bytes)")
     , m_offset(offset)
     , m_size(size)
 {
@@ -309,7 +310,7 @@ String ReplayContext::generateTimestampFolderName()
 #endif
 
     // Format: YYYY-MM-DD_HH-MM-SS-mmm
-    char buffer[32];
+    char buffer[64];
     snprintf(
         buffer,
         sizeof(buffer),
@@ -543,7 +544,7 @@ void ReplayContext::logCall(const char* signature, void* thisPtr)
         snprintf(
             buffer,
             sizeof(buffer),
-            "[REPLAY] %s [this=%p, handle=%llu]\n",
+            "[REPLAY] %s [this=%p, handle=%" PRIu64 "]\n",
             signature,
             thisPtr,
             m_currentThisHandle);

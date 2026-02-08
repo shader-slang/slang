@@ -62,9 +62,9 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
     size_t dataSize = dataStream.getSize();
 
     output << "=== Replay Stream Dump (Indexed) ===\n";
-    output << "Data stream size: " << dataSize << " bytes\n";
-    output << "Index stream size: " << indexSize << " bytes\n";
-    output << "Total calls: " << callCount << "\n\n";
+    output << "Data stream size: " << (uint64_t)dataSize << " bytes\n";
+    output << "Index stream size: " << (uint64_t)indexSize << " bytes\n";
+    output << "Total calls: " << (uint64_t)callCount << "\n\n";
 
     // Read all index entries into memory for easy access
     Slang::List<CallIndexEntry> entries;
@@ -93,7 +93,7 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
         }
 
         // Output the call header
-        output << "[" << callIdx << "] " << entry.signature;
+        output << "[" << (uint64_t)callIdx << "] " << entry.signature;
         if (entry.thisHandle == kNullHandle)
             output << ", #null (static)";
         else
@@ -113,7 +113,7 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
         output << "\n";
     }
 
-    output << "=== End of Stream (" << callCount << " calls) ===\n";
+    output << "=== End of Stream (" << (uint64_t)callCount << " calls) ===\n";
     return output.produceString();
 }
 
@@ -668,8 +668,8 @@ void ReplayStreamDecoder::decodeAll(size_t maxBytes)
     size_t endPosition = (maxBytes > 0) ? m_startPosition + maxBytes : m_stream.getSize();
 
     m_output << "=== Replay Stream Dump ===\n";
-    m_output << "Total size: " << m_stream.getSize() << " bytes\n";
-    m_output << "Start position: " << m_startPosition << "\n\n";
+    m_output << "Total size: " << (uint64_t)m_stream.getSize() << " bytes\n";
+    m_output << "Start position: " << (uint64_t)m_startPosition << "\n\n";
 
     int valueNumber = 0;
     while (m_stream.getPosition() < endPosition && m_stream.getPosition() < m_stream.getSize())
@@ -678,14 +678,14 @@ void ReplayStreamDecoder::decodeAll(size_t maxBytes)
 
         try
         {
-            m_output << "[" << valueNumber++ << "] @" << offset << ": ";
+            m_output << "[" << valueNumber++ << "] @" << (uint64_t)offset << ": ";
             decodeValueFromStream(m_stream, m_output, 0);
             m_output << "\n";
         }
         catch (const Slang::Exception& e)
         {
             m_output << "ERROR: " << e.Message.getBuffer() << "\n";
-            m_output << "(stopped at offset " << m_stream.getPosition() << ")\n";
+            m_output << "(stopped at offset " << (uint64_t)m_stream.getPosition() << ")\n";
             break;
         }
     }
