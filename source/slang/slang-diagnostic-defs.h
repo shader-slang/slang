@@ -966,6 +966,11 @@ DIAGNOSTIC(
     Error,
     cannotConformGenericToDynInterface,
     "cannot conform generic type '$0' to dyn interface '$1'.")
+DIAGNOSTIC(
+    33083,
+    Error,
+    cannotHaveInterfaceMemberWhenConformingToInterface,
+    "cannot have interface-typed member '$0' when conforming to interface '$1'.")
 
 DIAGNOSTIC(
     -1,

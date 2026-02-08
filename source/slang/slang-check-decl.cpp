@@ -1661,6 +1661,89 @@ bool isInterfaceType(Type* type)
     return false;
 }
 
+// Check if a type contains the specific interface type (for self-reference detection).
+// This is used to catch infinite recursion in existential representation (issue #9835).
+// Checks both direct interface references and indirect references through struct fields.
+static bool _containsSpecificInterfaceType(
+    Type* type,
+    InterfaceDecl* targetInterface,
+    HashSet<Decl*>& visited)
+{
+    if (!type || !targetInterface)
+        return false;
+
+    type = type->getCanonicalType();
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto decl = declRefType->getDeclRef().getDecl();
+
+        // Check if this type is the target interface (direct reference)
+        if (auto interfaceDecl = as<InterfaceDecl>(decl))
+        {
+            if (interfaceDecl == targetInterface)
+                return true;
+        }
+
+        // For aggregate types (struct/class), recursively check fields (indirect reference)
+        if (auto aggTypeDecl = as<AggTypeDecl>(decl))
+        {
+            // Skip interfaces - we only check concrete struct fields
+            if (as<InterfaceDecl>(decl))
+                return false;
+
+            // Avoid infinite recursion for recursive struct types
+            if (visited.contains(aggTypeDecl))
+                return false;
+            visited.add(aggTypeDecl);
+
+            for (auto varDecl : aggTypeDecl->getMembersOfType<VarDecl>())
+            {
+                if (_containsSpecificInterfaceType(varDecl->getType(), targetInterface, visited))
+                    return true;
+            }
+        }
+    }
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return _containsSpecificInterfaceType(
+            arrayType->getElementType(),
+            targetInterface,
+            visited);
+
+    if (auto optionalType = as<OptionalType>(type))
+        return _containsSpecificInterfaceType(
+            optionalType->getValueType(),
+            targetInterface,
+            visited);
+
+    if (auto conditionalType = as<ConditionalType>(type))
+        return _containsSpecificInterfaceType(
+            conditionalType->getValueType(),
+            targetInterface,
+            visited);
+
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); ++i)
+        {
+            if (_containsSpecificInterfaceType(tupleType->getMember(i), targetInterface, visited))
+                return true;
+        }
+    }
+
+    if (auto eachType = as<EachType>(type))
+        return _containsSpecificInterfaceType(eachType->getElementType(), targetInterface, visited);
+
+    if (auto expandType = as<ExpandType>(type))
+        return _containsSpecificInterfaceType(
+            expandType->getPatternType(),
+            targetInterface,
+            visited);
+
+    return false;
+}
+
 EnumDecl* isEnumType(Type* type)
 {
     if (auto declRefType = as<DeclRefType>(type))
@@ -7628,6 +7711,32 @@ bool SemanticsVisitor::checkConformance(
         if (auto superDeclRefType = as<DeclRefType>(superType))
         {
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
+            if (auto superInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+            {
+                // Check for self-referential interface fields (issue #9835).
+                // A struct implementing IFoo cannot have IFoo or IFoo[] fields
+                // (directly or indirectly through nested structs), as this causes
+                // infinite recursion in existential representation.
+                if (auto aggTypeDecl = as<AggTypeDecl>(declRef.getDecl()))
+                {
+                    for (auto varDecl : aggTypeDecl->getDirectMemberDeclsOfType<VarDecl>())
+                    {
+                        ensureDecl(varDecl, DeclCheckState::ReadyForLookup);
+                        HashSet<Decl*> visited;
+                        if (_containsSpecificInterfaceType(
+                                varDecl->getType(),
+                                superInterfaceDecl,
+                                visited))
+                        {
+                            getSink()->diagnose(
+                                varDecl,
+                                Diagnostics::cannotHaveInterfaceMemberWhenConformingToInterface,
+                                varDecl,
+                                superInterfaceDecl);
+                        }
+                    }
+                }
+            }
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
                 // A struct cannot implement a COM Interface.

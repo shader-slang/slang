@@ -181,7 +181,9 @@ jobs:
 
       - name: Run slang-rhi tests
         run: |
-          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
+          # compute-smoke and shader-cache-specialization excluded due to issue #9835
+          # (self-referential interface fields in CompositeTransformer)
+          export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*,compute-smoke*,shader-cache-specialization*"
           "$bin_dir/slang-rhi-tests" -check-devices -tce="$SLANG_RHI_EXCLUDE_TESTS"
 
       - name: Run slang-rhi tests (OptiX 8.0)
