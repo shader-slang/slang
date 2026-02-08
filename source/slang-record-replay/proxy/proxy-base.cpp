@@ -1,5 +1,7 @@
 #include "proxy-base.h"
 
+#include "../replay-context.h"
+#include "../replay-shared.h"
 #include "proxy-compile-request.h"
 #include "proxy-compile-result.h"
 #include "proxy-component-type.h"
@@ -11,8 +13,6 @@
 #include "proxy-session.h"
 #include "proxy-shared-library.h"
 #include "proxy-type-conformance.h"
-#include "../replay-context.h"
-#include "../replay-shared.h"
 
 namespace SlangRecord
 {
@@ -25,13 +25,13 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
     if (SLANG_SUCCEEDED(obj->queryInterface(T::getTypeGuid(), (void**)queried.writeRef())))
     {
         ProxyT* proxy = new ProxyT(queried.get());
-        
+
         // Use addRefImpl to avoid recording this internal reference
         proxy->addRefImpl();
 
         // Release the original reference since the proxy now owns it
         obj->release();
-        
+
         // Register the proxy with the ReplayContext so it can be tracked as a handle.
         // Use the free-function toSlangUnknown for canonical identity.
         auto& ctx = ReplayContext::get();
@@ -39,27 +39,28 @@ ISlangUnknown* tryWrap(ISlangUnknown* obj)
         {
             ctx.registerProxy(proxy, queried.get());
         }
-        
+
         return toSlangUnknown(proxy);
     }
     return nullptr;
 }
 
 // Macro to make the try-wrap pattern cleaner
-#define TRY_WRAP(InterfaceType, ProxyType)          \
+#define TRY_WRAP(InterfaceType, ProxyType)                      \
     if (auto* wrapped = tryWrap<InterfaceType, ProxyType>(obj)) \
         return wrapped;
 
 ISlangUnknown* wrapObject(ISlangUnknown* obj)
 {
-    if(!ReplayContext::get().isActive())
+    if (!ReplayContext::get().isActive())
         return obj;
     if (!obj)
         return nullptr;
-    
+
     // If already wrapped, return it - can happen if slang api returns
     // the same things twice (eg for loadModule)
-    if(auto existing = ReplayContext::get().getProxy(obj)) {
+    if (auto existing = ReplayContext::get().getProxy(obj))
+    {
         // Use suppression so the addRef isn't recorded in the replay stream
         SuppressRefCountRecording guard;
         existing->addRef();
@@ -68,7 +69,7 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
 
     // If we've already got a proxy, just return it. Not sure
     // this should ever happen.
-    if(ReplayContext::get().getImplementation(obj))
+    if (ReplayContext::get().getImplementation(obj))
         return obj;
 
     // Order matters due to inheritance!
@@ -127,7 +128,6 @@ ISlangUnknown* unwrapObject(ISlangUnknown* proxy)
 
     // Not a registered proxy, return as-is
     return proxy;
-
 }
 
 

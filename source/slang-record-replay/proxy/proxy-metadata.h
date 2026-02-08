@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
-
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -28,13 +27,13 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(MetadataProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
-        if (uuid == MetadataProxy::getTypeGuid() ||
-            uuid == slang::IMetadata::getTypeGuid())
+        if (uuid == MetadataProxy::getTypeGuid() || uuid == slang::IMetadata::getTypeGuid())
         {
             addRef();
             *outObject = static_cast<slang::IMetadata*>(this);

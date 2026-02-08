@@ -1,7 +1,8 @@
 #pragma once
 
-#include <slang.h>
 #include "slang-com-ptr.h"
+
+#include <slang.h>
 
 namespace SlangRecord
 {

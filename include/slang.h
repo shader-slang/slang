@@ -5010,7 +5010,7 @@ SLANG_EXTERN_C SLANG_API void slang_shutdown();
 /* Enable or disable the record layer for API call recording.
    When enabled, API calls are captured for later replay.
    The record layer can also be enabled by setting the SLANG_RECORD_LAYER=1 environment variable.
-   
+
    Environment variables:
    - SLANG_RECORD_LAYER=1: Enable recording on startup
    - SLANG_RECORD_PATH=<path>: Use the exact path specified for recording output

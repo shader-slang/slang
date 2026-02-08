@@ -1,14 +1,12 @@
 #ifndef SLANG_PROXY_COMPILE_REQUEST_H
 #define SLANG_PROXY_COMPILE_REQUEST_H
 
+#include "../../core/slang-file-system.h"
 #include "proxy-base.h"
 #include "proxy-macros.h"
-
 #include "slang-com-helper.h"
 #include "slang-deprecated.h"
 #include "slang.h"
-#include "../../core/slang-file-system.h"
-#include "slang-com-helper.h"
 
 namespace SlangRecord
 {
@@ -35,10 +33,11 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(CompileRequestProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
         if (uuid == CompileRequestProxy::getTypeGuid() ||
             uuid == slang::ICompileRequest::getTypeGuid())
@@ -220,7 +219,8 @@ public:
         RECORD_CALL();
         RECORD_INPUT(argCount);
         RECORD_INPUT_ARRAY(args, argCount);
-        auto result = getActual<slang::ICompileRequest>()->processCommandLineArguments(args, argCount);
+        auto result =
+            getActual<slang::ICompileRequest>()->processCommandLineArguments(args, argCount);
         RECORD_RETURN(result);
     }
 
@@ -258,7 +258,9 @@ public:
         RECORD_CALL();
         RECORD_INPUT(translationUnitIndex);
         RECORD_INPUT(path);
-        getActual<slang::ICompileRequest>()->addTranslationUnitSourceFile(translationUnitIndex, path);
+        getActual<slang::ICompileRequest>()->addTranslationUnitSourceFile(
+            translationUnitIndex,
+            path);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL addTranslationUnitSourceString(
@@ -270,7 +272,10 @@ public:
         RECORD_INPUT(translationUnitIndex);
         RECORD_INPUT(path);
         RECORD_INPUT(source);
-        getActual<slang::ICompileRequest>()->addTranslationUnitSourceString(translationUnitIndex, path, source);
+        getActual<slang::ICompileRequest>()->addTranslationUnitSourceString(
+            translationUnitIndex,
+            path,
+            source);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -458,7 +463,9 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outSharedLibrary);
-        auto result = getActual<slang::ICompileRequest>()->getTargetHostCallable(targetIndex, outSharedLibrary);
+        auto result = getActual<slang::ICompileRequest>()->getTargetHostCallable(
+            targetIndex,
+            outSharedLibrary);
         RECORD_COM_OUTPUT(outSharedLibrary);
         RECORD_RETURN(result);
     }
@@ -572,7 +579,12 @@ public:
         RECORD_INPUT(spaceIndex);
         RECORD_INPUT(registerIndex);
         auto result = getActual<slang::ICompileRequest>()->isParameterLocationUsed(
-            entryPointIndex, targetIndex, category, spaceIndex, registerIndex, outUsed);
+            entryPointIndex,
+            targetIndex,
+            category,
+            spaceIndex,
+            registerIndex,
+            outUsed);
         RECORD_INFO(outUsed);
         RECORD_RETURN(result);
         return result;

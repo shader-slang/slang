@@ -1,10 +1,10 @@
 #pragma once
 
 #include "../../core/slang-smart-pointer.h"
-#include "slang-com-ptr.h"
-#include "slang.h"
 #include "../replay-context.h"
 #include "../replay-shared.h"
+#include "slang-com-ptr.h"
+#include "slang.h"
 
 namespace SlangRecord
 {
@@ -39,30 +39,18 @@ public:
 
     // ISlangUnknown implementation - these are virtual so derived classes can override
     // to record the calls for replay
-    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE
-    {
-        return addRefImpl();
-    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return addRefImpl(); }
 
-    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE
-    {
-        return releaseImpl();
-    }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return releaseImpl(); }
 
     /// Internal addRef - used by the replay system to hold references without recording
-    uint32_t addRefImpl()
-    {
-        return (uint32_t)RefObject::addReference();
-    }
+    uint32_t addRefImpl() { return (uint32_t)RefObject::addReference(); }
 
     /// Internal release - used by the replay system to release references without recording
-    uint32_t releaseImpl()
-    {
-        return (uint32_t)RefObject::releaseReference();
-    }
+    uint32_t releaseImpl() { return (uint32_t)RefObject::releaseReference(); }
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
         // Delegate to the underlying object to check if it supports the interface
         ComPtr<ISlangUnknown> ptr;
@@ -106,14 +94,14 @@ SLANG_API ISlangUnknown* unwrapObject(ISlangUnknown* proxy);
 
 /// Macro to mark unimplemented methods in proxy classes.
 /// Records "UNIMPLEMENTED: <message>" to the replay stream, then calls SLANG_UNIMPLEMENTED_X.
-#define REPLAY_UNIMPLEMENTED_X(message) \
-    do { \
-        auto& ctx = SlangRecord::ReplayContext::get(); \
-        if (ctx.isActive()) \
-        { \
-            const char* unimplementedMsg = "UNIMPLEMENTED: " message; \
+#define REPLAY_UNIMPLEMENTED_X(message)                                  \
+    do                                                                   \
+    {                                                                    \
+        auto& ctx = SlangRecord::ReplayContext::get();                   \
+        if (ctx.isActive())                                              \
+        {                                                                \
+            const char* unimplementedMsg = "UNIMPLEMENTED: " message;    \
             ctx.record(SlangRecord::RecordFlag::None, unimplementedMsg); \
-        } \
-        SLANG_UNIMPLEMENTED_X(message); \
+        }                                                                \
+        SLANG_UNIMPLEMENTED_X(message);                                  \
     } while (0)
-

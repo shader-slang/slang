@@ -259,7 +259,8 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
-    // Replay system code is manually written here for simplicity. It does nothing if replays aren't active.
+    // Replay system code is manually written here for simplicity. It does nothing if replays aren't
+    // active.
     using namespace SlangRecord;
     auto& _ctx = ReplayContext::get();
     _ctx.beginStaticCall(SLANG_FUNC_SIG);
@@ -358,9 +359,9 @@ SLANG_API void spDestroySession(SlangSession* inSession)
     if (!inSession)
         return;
 
-#ifdef _DEBUG        
+#ifdef _DEBUG
     // It is assumed there is only a single reference on the session (the one placed
-    // with spCreateSession) if this function is called. 
+    // with spCreateSession) if this function is called.
     // NOTE: When a replay is activate Slang::asInternal skips the proxy, so this
     // line checks the ref count on the internal object only.
     Slang::Session* internalSession = Slang::asInternal(inSession);

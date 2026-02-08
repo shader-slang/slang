@@ -4,7 +4,8 @@
 
 #include <cstdio>
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 using Slang::String;
 using Slang::StringBuilder;
@@ -40,28 +41,26 @@ String ReplayStreamDecoder::decodeWithIndex(const char* folderPath)
         // Try to decode just the stream.bin
         if (Slang::File::exists(streamPath))
             return decodeFile(streamPath.getBuffer());
-        
+
         // Maybe the path itself is the stream.bin file
         return decodeFile(folderPath);
     }
 
     ReplayStream dataStream = ReplayStream::loadFromFile(streamPath.getBuffer());
     ReplayStream indexStream = ReplayStream::loadFromFile(indexPath.getBuffer());
-    
+
     return decodeWithIndex(dataStream, indexStream);
 }
 
-String ReplayStreamDecoder::decodeWithIndex(
-    ReplayStream& dataStream,
-    ReplayStream& indexStream)
+String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStream& indexStream)
 {
     StringBuilder output;
-    
+
     // Calculate number of calls from index stream size
     size_t indexSize = indexStream.getSize();
     size_t callCount = indexSize / CallIndexEntry::kSize;
     size_t dataSize = dataStream.getSize();
-    
+
     output << "=== Replay Stream Dump (Indexed) ===\n";
     output << "Data stream size: " << dataSize << " bytes\n";
     output << "Index stream size: " << indexSize << " bytes\n";
@@ -80,7 +79,7 @@ String ReplayStreamDecoder::decodeWithIndex(
     for (size_t callIdx = 0; callIdx < callCount; callIdx++)
     {
         const CallIndexEntry& entry = entries[Slang::Index(callIdx)];
-        
+
         // Determine the end position for this call's data
         size_t startOffset = entry.streamPosition;
         size_t endOffset;
@@ -110,7 +109,7 @@ String ReplayStreamDecoder::decodeWithIndex(
         {
             output << "    ERROR decoding call: " << e.Message.getBuffer() << "\n";
         }
-        
+
         output << "\n";
     }
 
@@ -134,7 +133,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
     int indentLevel)
 {
     TypeId type = readTypeId(stream);
-    
+
     switch (type)
     {
     case TypeId::Int8:
@@ -229,7 +228,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
         {
             uint32_t len;
             stream.read(&len, sizeof(len));
-            
+
             if (len == 0)
             {
                 output << "String: \"\"";
@@ -313,22 +312,22 @@ void ReplayStreamDecoder::decodeValueFromStream(
         {
             // TypeReflectionRef: module handle + type name
             uint64_t moduleHandle;
-            stream.skip(1);  // Skip ObjectHandle TypeId for module
+            stream.skip(1); // Skip ObjectHandle TypeId for module
             stream.read(&moduleHandle, sizeof(moduleHandle));
-            
+
             // Read type name
             uint8_t stringTypeId;
             stream.read(&stringTypeId, 1);
-            
+
             if (stringTypeId == static_cast<uint8_t>(TypeId::String))
             {
                 uint32_t len;
                 stream.read(&len, sizeof(len));
-                
+
                 if (moduleHandle == kNullHandle)
                 {
                     output << "TypeRef: null";
-                    stream.skip(len);  // Skip the string content
+                    stream.skip(len); // Skip the string content
                 }
                 else if (len == 0)
                 {
@@ -347,7 +346,8 @@ void ReplayStreamDecoder::decodeValueFromStream(
                     stream.read(buffer, 127);
                     buffer[127] = '\0';
                     stream.skip(len - 127);
-                    output << "TypeRef(module=#" << moduleHandle << ", len=" << len << "): \"" << buffer << "...\"";
+                    output << "TypeRef(module=#" << moduleHandle << ", len=" << len << "): \""
+                           << buffer << "...\"";
                 }
             }
             else
@@ -429,7 +429,7 @@ void ReplayStreamDecoder::decodeByteRange(
     int indentLevel)
 {
     stream.seek(startOffset);
-    
+
     // Skip the call signature and this handle (already shown in header)
     // First value should be the signature string
     TypeId sigType = peekTypeId(stream);
@@ -437,7 +437,7 @@ void ReplayStreamDecoder::decodeByteRange(
     {
         skipValueInStream(stream); // Skip signature
     }
-    
+
     // Next should be the this handle
     TypeId handleType = peekTypeId(stream);
     if (handleType == TypeId::ObjectHandle)
@@ -451,7 +451,7 @@ void ReplayStreamDecoder::decodeByteRange(
     {
         indent(output, indentLevel);
         output << "[" << argNum++ << "] ";
-        
+
         try
         {
             decodeValueFromStream(stream, output, indentLevel);
@@ -461,7 +461,7 @@ void ReplayStreamDecoder::decodeByteRange(
             output << "ERROR: " << e.Message.getBuffer();
             break;
         }
-        
+
         output << "\n";
     }
 }
@@ -469,7 +469,7 @@ void ReplayStreamDecoder::decodeByteRange(
 void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 {
     TypeId type = readTypeId(stream);
-    
+
     switch (type)
     {
     case TypeId::Int8:
@@ -524,13 +524,14 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
 
     case TypeId::TypeReflectionRef:
         {
-            // TypeReflectionRef: ObjectHandle TypeId + module handle + String TypeId + string length + string data
-            stream.skip(1);  // ObjectHandle TypeId
-            stream.skip(8);  // module handle
-            stream.skip(1);  // String TypeId
+            // TypeReflectionRef: ObjectHandle TypeId + module handle + String TypeId + string
+            // length + string data
+            stream.skip(1); // ObjectHandle TypeId
+            stream.skip(8); // module handle
+            stream.skip(1); // String TypeId
             uint32_t len;
             stream.read(&len, sizeof(len));
-            stream.skip(len);  // type name string
+            stream.skip(len); // type name string
         }
         break;
 
@@ -558,9 +559,7 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
     }
 }
 
-bool ReplayStreamDecoder::decodeCallHeader(
-    ReplayStream& stream,
-    StringBuilder& output)
+bool ReplayStreamDecoder::decodeCallHeader(ReplayStream& stream, StringBuilder& output)
 {
     if (stream.getPosition() >= stream.getSize())
         return false;
@@ -575,13 +574,13 @@ bool ReplayStreamDecoder::decodeCallHeader(
 
     uint32_t sigLen;
     stream.read(&sigLen, sizeof(sigLen));
-    
+
     char sigBuffer[512];
     size_t readLen = (sigLen < sizeof(sigBuffer) - 1) ? sigLen : sizeof(sigBuffer) - 1;
     if (readLen > 0)
         stream.read(sigBuffer, readLen);
     sigBuffer[readLen] = '\0';
-    
+
     // Skip remaining signature bytes if truncated
     if (sigLen > readLen)
         stream.skip(sigLen - readLen);
@@ -610,25 +609,44 @@ const char* ReplayStreamDecoder::getTypeIdName(TypeId type)
 {
     switch (type)
     {
-    case TypeId::Int8:          return "Int8";
-    case TypeId::Int16:         return "Int16";
-    case TypeId::Int32:         return "Int32";
-    case TypeId::Int64:         return "Int64";
-    case TypeId::UInt8:         return "UInt8";
-    case TypeId::UInt16:        return "UInt16";
-    case TypeId::UInt32:        return "UInt32";
-    case TypeId::UInt64:        return "UInt64";
-    case TypeId::Float32:       return "Float32";
-    case TypeId::Float64:       return "Float64";
-    case TypeId::Bool:          return "Bool";
-    case TypeId::String:        return "String";
-    case TypeId::Blob:          return "Blob";
-    case TypeId::ObjectHandle:  return "ObjectHandle";
-    case TypeId::Null:          return "Null";
-    case TypeId::TypeReflectionRef: return "TypeReflectionRef";
-    case TypeId::Array:         return "Array";
-    case TypeId::Error:         return "Error";
-    default:                    return "Unknown";
+    case TypeId::Int8:
+        return "Int8";
+    case TypeId::Int16:
+        return "Int16";
+    case TypeId::Int32:
+        return "Int32";
+    case TypeId::Int64:
+        return "Int64";
+    case TypeId::UInt8:
+        return "UInt8";
+    case TypeId::UInt16:
+        return "UInt16";
+    case TypeId::UInt32:
+        return "UInt32";
+    case TypeId::UInt64:
+        return "UInt64";
+    case TypeId::Float32:
+        return "Float32";
+    case TypeId::Float64:
+        return "Float64";
+    case TypeId::Bool:
+        return "Bool";
+    case TypeId::String:
+        return "String";
+    case TypeId::Blob:
+        return "Blob";
+    case TypeId::ObjectHandle:
+        return "ObjectHandle";
+    case TypeId::Null:
+        return "Null";
+    case TypeId::TypeReflectionRef:
+        return "TypeReflectionRef";
+    case TypeId::Array:
+        return "Array";
+    case TypeId::Error:
+        return "Error";
+    default:
+        return "Unknown";
     }
 }
 
@@ -637,9 +655,7 @@ const char* ReplayStreamDecoder::getTypeIdName(TypeId type)
 // =============================================================================
 
 ReplayStreamDecoder::ReplayStreamDecoder(ReplayStream& stream, StringBuilder& output)
-    : m_stream(stream)
-    , m_output(output)
-    , m_startPosition(stream.getPosition())
+    : m_stream(stream), m_output(output), m_startPosition(stream.getPosition())
 {
 }
 
@@ -649,9 +665,7 @@ ReplayStreamDecoder::ReplayStreamDecoder(ReplayStream& stream, StringBuilder& ou
 
 void ReplayStreamDecoder::decodeAll(size_t maxBytes)
 {
-    size_t endPosition = (maxBytes > 0) 
-        ? m_startPosition + maxBytes 
-        : m_stream.getSize();
+    size_t endPosition = (maxBytes > 0) ? m_startPosition + maxBytes : m_stream.getSize();
 
     m_output << "=== Replay Stream Dump ===\n";
     m_output << "Total size: " << m_stream.getSize() << " bytes\n";
@@ -661,7 +675,7 @@ void ReplayStreamDecoder::decodeAll(size_t maxBytes)
     while (m_stream.getPosition() < endPosition && m_stream.getPosition() < m_stream.getSize())
     {
         size_t offset = m_stream.getPosition();
-        
+
         try
         {
             m_output << "[" << valueNumber++ << "] @" << offset << ": ";
@@ -713,47 +727,47 @@ bool ReplayStreamDecoder::tryRecoverToNextCall()
 {
     // Try to find the next valid call by scanning for TypeId::String followed
     // by a reasonable-looking string length and then TypeId::ObjectHandle
-    
+
     const size_t maxScan = 4096; // Don't scan forever
     size_t startPos = m_stream.getPosition();
     size_t endPos = m_stream.getSize();
-    
+
     for (size_t i = 0; i < maxScan && startPos + i + 1 < endPos; i++)
     {
         m_stream.seek(startPos + i);
-        
+
         // Check for TypeId::String
         uint8_t typeVal;
         m_stream.read(&typeVal, sizeof(typeVal));
         if (static_cast<TypeId>(typeVal) != TypeId::String)
             continue;
-        
+
         // Check for reasonable string length (function names are typically < 256 chars)
         if (startPos + i + 5 >= endPos)
             break;
-            
+
         uint32_t strLen;
         m_stream.read(&strLen, sizeof(strLen));
         if (strLen == 0 || strLen > 512)
             continue;
-        
+
         // Check we have enough bytes for the string + handle type + handle
         if (startPos + i + 5 + strLen + 1 + 8 >= endPos)
             break;
-        
+
         // Skip the string and check for ObjectHandle
         m_stream.skip(strLen);
-        
+
         uint8_t handleType;
         m_stream.read(&handleType, sizeof(handleType));
         if (static_cast<TypeId>(handleType) != TypeId::ObjectHandle)
             continue;
-        
+
         // Looks like a valid call header - rewind to the start
         m_stream.seek(startPos + i);
         return true;
     }
-    
+
     // Could not find a valid call header
     m_stream.seek(endPos);
     return false;
@@ -792,14 +806,14 @@ void ReplayStreamDecoder::appendHexDump(
 {
     const uint8_t* bytes = static_cast<const uint8_t*>(data);
     size_t showBytes = (size < maxBytes) ? size : maxBytes;
-    
+
     for (size_t i = 0; i < showBytes; i++)
     {
         char hex[4];
         snprintf(hex, sizeof(hex), "%02X ", bytes[i]);
         output << hex;
     }
-    
+
     if (size > maxBytes)
         output << "...";
 }

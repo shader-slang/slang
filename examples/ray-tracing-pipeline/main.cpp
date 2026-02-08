@@ -182,11 +182,13 @@ struct RayTracing : public WindowedAppBase
             SLANG_RETURN_ON_FAIL(
                 module->findEntryPointByName("missShader", missShaderEntryPoint.writeRef()));
             componentTypes.add(missShaderEntryPoint);
-            SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("closestHitShader", closestHitShaderEntryPoint.writeRef()));
+            SLANG_RETURN_ON_FAIL(module->findEntryPointByName(
+                "closestHitShader",
+                closestHitShaderEntryPoint.writeRef()));
             componentTypes.add(closestHitShaderEntryPoint);
-            SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("shadowRayHitShader", shadowRayHitShaderEntryPoint.writeRef()));
+            SLANG_RETURN_ON_FAIL(module->findEntryPointByName(
+                "shadowRayHitShader",
+                shadowRayHitShaderEntryPoint.writeRef()));
             componentTypes.add(shadowRayHitShaderEntryPoint);
         }
         else

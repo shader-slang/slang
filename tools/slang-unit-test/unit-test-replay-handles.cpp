@@ -15,36 +15,36 @@ SLANG_UNIT_TEST(replayContextHandle)
     // This test verifies that blob content survives a record/playback round-trip
     // using hash-based serialization. Blobs are serialized by content hash to disk,
     // not tracked as COM interface proxies.
-    
+
     const char* testData = "original data";
     size_t testDataSize = 13;
 
     // === RECORDING PHASE ===
     ctx().reset();
     ctx().setMode(Mode::Record);
-    
+
     // Simulate: API creates a blob and returns it as output
     Slang::ComPtr<ISlangBlob> recordedBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* outputBlob = recordedBlob.get();
-    ctx().record(RecordFlag::Output, outputBlob);  // Hashes content, stores to disk
-    
+    ctx().record(RecordFlag::Output, outputBlob); // Hashes content, stores to disk
+
     // Simulate: The output is passed as input to another call
     ISlangBlob* inputBlob = recordedBlob.get();
-    ctx().record(RecordFlag::Input, inputBlob);  // Hashes content, stores hash to stream
-    
+    ctx().record(RecordFlag::Input, inputBlob); // Hashes content, stores hash to stream
+
     // Verify recording produced data
     SLANG_CHECK(ctx().getStream().getSize() > 0);
-    
+
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
-    
+
     // Playback: First call outputs the blob - reads hash, loads from disk
     ISlangBlob* playbackOutput = nullptr;
     ctx().record(RecordFlag::Output, playbackOutput);
     SLANG_CHECK(playbackOutput != nullptr);
     SLANG_CHECK(playbackOutput->getBufferSize() == testDataSize);
     SLANG_CHECK(memcmp(playbackOutput->getBufferPointer(), testData, testDataSize) == 0);
-    
+
     // Playback: Second call inputs the blob - reads hash, loads from disk
     ISlangBlob* playbackInput = nullptr;
     ctx().record(RecordFlag::Input, playbackInput);
@@ -64,7 +64,7 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
 
     // Test with multiple blobs with different content to ensure hash-based
     // serialization correctly distinguishes them by content
-    
+
     const char* data1 = "blob one";
     const char* data2 = "blob two";
     size_t size1 = 8;
@@ -73,42 +73,42 @@ SLANG_UNIT_TEST(replayContextHandleMultipleBlobs)
     // === RECORDING PHASE ===
     ctx().reset();
     ctx().setMode(Mode::Record);
-    
+
     // Create and output two different blobs
     Slang::ComPtr<ISlangBlob> blob1 = Slang::RawBlob::create(data1, size1);
     Slang::ComPtr<ISlangBlob> blob2 = Slang::RawBlob::create(data2, size2);
-    
+
     ISlangBlob* out1 = blob1.get();
     ISlangBlob* out2 = blob2.get();
     ctx().record(RecordFlag::Output, out1);
     ctx().record(RecordFlag::Output, out2);
-    
+
     // Now input them in reverse order
     ISlangBlob* in2 = blob2.get();
     ISlangBlob* in1 = blob1.get();
     ctx().record(RecordFlag::Input, in2);
     ctx().record(RecordFlag::Input, in1);
-    
+
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
-    
+
     // Playback outputs - each creates a blob from disk
     ISlangBlob* playOut1 = nullptr;
     ISlangBlob* playOut2 = nullptr;
     ctx().record(RecordFlag::Output, playOut1);
     ctx().record(RecordFlag::Output, playOut2);
-    
+
     SLANG_CHECK(playOut1 != nullptr);
     SLANG_CHECK(playOut2 != nullptr);
     SLANG_CHECK(memcmp(playOut1->getBufferPointer(), data1, size1) == 0);
     SLANG_CHECK(memcmp(playOut2->getBufferPointer(), data2, size2) == 0);
-    
+
     // Playback inputs (reverse order, matching recording)
     ISlangBlob* playIn2 = nullptr;
     ISlangBlob* playIn1 = nullptr;
     ctx().record(RecordFlag::Input, playIn2);
     ctx().record(RecordFlag::Input, playIn1);
-    
+
     // Verify correct blob content resolution
     SLANG_CHECK(playIn1 != nullptr);
     SLANG_CHECK(playIn2 != nullptr);
@@ -128,20 +128,20 @@ SLANG_UNIT_TEST(replayContextHandleNull)
     SLANG_UNUSED(unitTestContext);
 
     // Test that null pointers are handled correctly
-    
+
     // === RECORDING PHASE ===
     ctx().reset();
     ctx().setMode(Mode::Record);
-    
+
     ISlangBlob* nullBlob = nullptr;
     ctx().record(RecordFlag::Input, nullBlob);
-    
+
     // === PLAYBACK PHASE ===
     ctx().switchToPlayback();
-    
-    ISlangBlob* readBlob = reinterpret_cast<ISlangBlob*>(0xDEADBEEF);  // Non-null sentinel
+
+    ISlangBlob* readBlob = reinterpret_cast<ISlangBlob*>(0xDEADBEEF); // Non-null sentinel
     ctx().record(RecordFlag::Input, readBlob);
-    
+
     // Should be null after playback
     SLANG_CHECK(readBlob == nullptr);
 }
@@ -156,7 +156,7 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
     // during playback.
 
     const char* testData = "Hello, inline blob world!";
-    size_t testDataSize = strlen(testData) + 1;  // Include null terminator
+    size_t testDataSize = strlen(testData) + 1; // Include null terminator
 
     // === RECORDING PHASE ===
     ctx().reset();
@@ -165,7 +165,7 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
     // Create a user-provided blob that is NOT registered/tracked
     Slang::ComPtr<ISlangBlob> userBlob = Slang::RawBlob::create(testData, testDataSize);
     ISlangBlob* inputBlob = userBlob.get();
-    
+
     // Record it as input - since it's not tracked, it should serialize inline
     ctx().record(RecordFlag::Input, inputBlob);
 
@@ -181,7 +181,7 @@ SLANG_UNIT_TEST(replayContextInlineBlob)
 
     // Verify the blob was created
     SLANG_CHECK(readBlob != nullptr);
-    
+
     // Verify the data matches
     SLANG_CHECK(readBlob->getBufferSize() == testDataSize);
     SLANG_CHECK(memcmp(readBlob->getBufferPointer(), testData, testDataSize) == 0);
@@ -280,7 +280,8 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
 
     // Create a global session and session to load a module
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
     slang::SessionDesc sessionDesc = {};
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
@@ -314,14 +315,14 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBasic)
     // Switch to playback and execute the calls that get us to the point
     // at which the type was recorded.
     ctx().switchToPlayback();
-    ctx().executeNextCall(); //slang_createGlobalSession
-    ctx().executeNextCall(); //globalSession->findProfile
-    ctx().executeNextCall(); //globalSession->createSession
-    ctx().executeNextCall(); //session->loadModuleFromSourceString
-    ctx().executeNextCall(); //module->getLayout
+    ctx().executeNextCall(); // slang_createGlobalSession
+    ctx().executeNextCall(); // globalSession->findProfile
+    ctx().executeNextCall(); // globalSession->createSession
+    ctx().executeNextCall(); // session->loadModuleFromSourceString
+    ctx().executeNextCall(); // module->getLayout
 
     //<layout->findTypeByName not captured>
- 
+
     // Now at the point we recorded a type
     slang::TypeReflection* readType = nullptr;
     ctx().record(RecordFlag::Input, readType);
@@ -352,7 +353,8 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
 
     // Create a global session and session
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK(SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
+    SLANG_CHECK(
+        SLANG_SUCCEEDED(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef())));
 
     slang::SessionDesc sessionDesc = {};
     slang::TargetDesc targetDesc = {};
@@ -395,11 +397,11 @@ SLANG_UNIT_TEST(replayContextTypeReflectionBuiltinType)
     // Switch to playback and execute the calls that get us to the point
     // at which the type was recorded.
     ctx().switchToPlayback();
-    ctx().executeNextCall(); //slang_createGlobalSession
-    ctx().executeNextCall(); //globalSession->findProfile
-    ctx().executeNextCall(); //globalSession->createSession
-    ctx().executeNextCall(); //session->loadModuleFromSourceString
-    ctx().executeNextCall(); //module->getLayout
+    ctx().executeNextCall(); // slang_createGlobalSession
+    ctx().executeNextCall(); // globalSession->findProfile
+    ctx().executeNextCall(); // globalSession->createSession
+    ctx().executeNextCall(); // session->loadModuleFromSourceString
+    ctx().executeNextCall(); // module->getLayout
 
     //<layout->findTypeByName not captured>
 

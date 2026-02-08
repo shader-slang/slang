@@ -10,7 +10,8 @@
 #include <cstdint>
 #include <cstring>
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 using Slang::File;
 using Slang::FileAccess;
@@ -39,8 +40,7 @@ public:
 
     /// Create an empty stream for writing (capture mode).
     ReplayStream()
-        : m_isReading(false)
-        , m_position(0)
+        : m_isReading(false), m_position(0)
     {
     }
 
@@ -49,8 +49,7 @@ public:
     /// @param data Pointer to the data.
     /// @param size Size of the data in bytes.
     ReplayStream(const void* data, size_t size)
-        : m_isReading(true)
-        , m_position(0)
+        : m_isReading(true), m_position(0)
     {
         if (data && size > 0)
         {
@@ -105,7 +104,7 @@ public:
         size_t newSize = m_position + size;
         if (newSize > size_t(m_buffer.getCapacity()))
         {
-            m_buffer.reserve(Slang::Index(newSize)*2);
+            m_buffer.reserve(Slang::Index(newSize) * 2);
         }
         if (newSize > size_t(m_buffer.getCount()))
         {
@@ -207,7 +206,10 @@ public:
             return false;
         if (offset + size > size_t(other.m_buffer.getCount()))
             return false;
-        return std::memcmp(m_buffer.getBuffer() + offset, other.m_buffer.getBuffer() + offset, size) == 0;
+        return std::memcmp(
+                   m_buffer.getBuffer() + offset,
+                   other.m_buffer.getBuffer() + offset,
+                   size) == 0;
     }
 
     /// Get a byte at a specific offset (for sync comparison).
@@ -258,10 +260,8 @@ public:
     /// @throws Slang::Exception if file cannot be opened or written.
     void saveToFile(const char* path) const
     {
-        SlangResult result = File::writeAllBytes(
-            String(path),
-            m_buffer.getBuffer(),
-            m_buffer.getCount());
+        SlangResult result =
+            File::writeAllBytes(String(path), m_buffer.getBuffer(), m_buffer.getCount());
         if (SLANG_FAILED(result))
             throw Slang::Exception(String("Failed to write to file: ") + path);
     }
@@ -285,7 +285,10 @@ public:
 
     /// Create a reading stream from this stream's data.
     /// Makes a copy of the current data.
-    ReplayStream createReader() const { return ReplayStream(m_buffer.getBuffer(), m_buffer.getCount()); }
+    ReplayStream createReader() const
+    {
+        return ReplayStream(m_buffer.getBuffer(), m_buffer.getCount());
+    }
 
     /// Clear the stream and reset to writing mode.
     void clear()

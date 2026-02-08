@@ -376,8 +376,8 @@ public:
     }
 
     // ISlangFileSystem
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    loadFile(char const* path, ISlangBlob** outBlob) SLANG_OVERRIDE
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob)
+        SLANG_OVERRIDE
     {
         SLANG_UNUSED(path);
         SLANG_UNUSED(outBlob);
@@ -468,7 +468,6 @@ public:
 private:
     ISlangUnknown* getInterface(const Guid& guid);
     void* getObject(const Guid& guid);
-
 };
 
 } // namespace Slang

@@ -1,22 +1,23 @@
 #ifndef SLANG_PROXY_MODULE_H
 #define SLANG_PROXY_MODULE_H
 
-#include "proxy-base.h"
-#include "proxy-macros.h"
-
-#include "slang-com-helper.h"
-#include "slang.h"
 #include "../slang/slang-ast-type.h"
 #include "../slang/slang-compiler-api.h"
+#include "proxy-base.h"
+#include "proxy-macros.h"
+#include "slang-com-helper.h"
+#include "slang.h"
 
 namespace SlangRecord
 {
 using namespace Slang;
 
-class ModuleProxy : public ProxyBase<slang::IModule, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
+class ModuleProxy : public ProxyBase<
+                        slang::IModule,
+                        slang::IComponentType2,
+                        slang::IModulePrecompileService_Experimental>
 {
 public:
-
     bool m_hasRegisteredCoreModule;
 
     SLANG_COM_INTERFACE(
@@ -26,19 +27,20 @@ public:
         {0x04, 0xf5, 0xe0, 0xb1, 0xa2, 0x93, 0x84, 0x15})
 
     explicit ModuleProxy(slang::IModule* actual)
-        : ProxyBase(actual)
-        , m_hasRegisteredCoreModule(false)
+        : ProxyBase(actual), m_hasRegisteredCoreModule(false)
     {
     }
 
     void tryRegisterCoreModule()
     {
-        if(m_hasRegisteredCoreModule)
+        if (m_hasRegisteredCoreModule)
             return;
         auto layout = getActual<slang::IModule>()->getLayout(0, nullptr);
-        if(layout) {
+        if (layout)
+        {
             slang::TypeReflection* coreType = layout->findTypeByName("int");
-            Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(coreType));
+            Slang::DeclRefType* declRefType =
+                Slang::as<Slang::DeclRefType>(Slang::asInternal(coreType));
             IModule* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
             wrapObject(owningModule);
             m_hasRegisteredCoreModule = true;
@@ -48,13 +50,13 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(ModuleProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
-        if (uuid == ModuleProxy::getTypeGuid() ||
-            uuid == slang::IModule::getTypeGuid())
+        if (uuid == ModuleProxy::getTypeGuid() || uuid == slang::IModule::getTypeGuid())
         {
             addRef();
             *outObject = static_cast<slang::IModule*>(this);
@@ -98,11 +100,12 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
-        
+
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-            
-        slang::ProgramLayout* result = getActual<slang::IModule>()->getLayout(targetIndex, outDiagnostics);
-        
+
+        slang::ProgramLayout* result =
+            getActual<slang::IModule>()->getLayout(targetIndex, outDiagnostics);
+
         RECORD_COM_OUTPUT(outDiagnostics);
         return result; // don't capture pointer
     }
@@ -225,7 +228,8 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        auto result = getActual<slang::IModule>()->getTargetCode(targetIndex, outCode, outDiagnostics);
+        auto result =
+            getActual<slang::IModule>()->getTargetCode(targetIndex, outCode, outDiagnostics);
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -261,11 +265,11 @@ public:
     {
         RECORD_CALL();
         RECORD_INPUT(name);
-        
+
         PREPARE_POINTER_OUTPUT(outEntryPoint);
-            
+
         SlangResult result = getActual<slang::IModule>()->findEntryPointByName(name, outEntryPoint);
-        
+
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
@@ -284,14 +288,16 @@ public:
         RECORD_CALL();
         RECORD_INPUT(index);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
-        
-        SlangResult result = getActual<slang::IModule>()->getDefinedEntryPoint(index, outEntryPoint);
-        
+
+        SlangResult result =
+            getActual<slang::IModule>()->getDefinedEntryPoint(index, outEntryPoint);
+
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_RETURN(result);
     }
 
-    virtual SLANG_NO_THROW SlangResult SLANG_MCALL serialize(ISlangBlob** outSerializedBlob) override
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    serialize(ISlangBlob** outSerializedBlob) override
     {
         RECORD_CALL();
         PREPARE_POINTER_OUTPUT(outSerializedBlob);
@@ -332,13 +338,16 @@ public:
         RECORD_CALL();
         RECORD_INPUT(name);
         RECORD_INPUT(stage);
-        
+
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-            
+
         SlangResult result = getActual<slang::IModule>()->findAndCheckEntryPoint(
-            name, stage, outEntryPoint, outDiagnostics);
-        
+            name,
+            stage,
+            outEntryPoint,
+            outDiagnostics);
+
         RECORD_COM_OUTPUT(outEntryPoint);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);

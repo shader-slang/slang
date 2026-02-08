@@ -1,5 +1,5 @@
 // replay-handlers.cpp
-// 
+//
 // This file registers all replay handlers for proxy methods.
 // It is included in the slang library to enable automatic registration
 // of handlers when the library is loaded.
@@ -8,24 +8,25 @@
 // 1. Implement the proxy method with RECORD_CALL(), RECORD_INPUT(), etc.
 // 2. Add REPLAY_REGISTER(ProxyType, methodName) in registerAllHandlers()
 
-#include "replay-context.h"
 #include "proxy/proxy-macros.h"
+#include "replay-context.h"
 
 // Include all proxy headers
-#include "proxy/proxy-global-session.h"
-#include "proxy/proxy-session.h"
-#include "proxy/proxy-module.h"
+#include "../slang/slang-internal.h"
+#include "proxy/proxy-compile-request.h"
 #include "proxy/proxy-component-type.h"
 #include "proxy/proxy-entry-point.h"
-#include "proxy/proxy-type-conformance.h"
-#include "proxy/proxy-compile-request.h"
-#include "proxy/proxy-shared-library.h"
+#include "proxy/proxy-global-session.h"
+#include "proxy/proxy-module.h"
 #include "proxy/proxy-mutable-file-system.h"
+#include "proxy/proxy-session.h"
+#include "proxy/proxy-shared-library.h"
+#include "proxy/proxy-type-conformance.h"
 
 #include <slang.h>
-#include "../slang/slang-internal.h"
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 // =============================================================================
 // Static/Free Function Handlers
@@ -51,14 +52,14 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
     Slang::GlobalSessionInternalDesc internalDesc = {};
     slang::IGlobalSession* globalSession = nullptr;
     SlangResult result = slang_createGlobalSessionImpl(&desc, &internalDesc, &globalSession);
-    
+
     // Wrap the session in a proxy (just like slang_createGlobalSession2 does during recording)
     if (SLANG_SUCCEEDED(result) && globalSession)
         globalSession = wrapObject(globalSession);
-    
+
     // Read and verify the output (this will register the created session in the handle table)
     ctx.record(RecordFlag::Output, globalSession);
-    
+
     // Read and verify the return value
     ctx.record(RecordFlag::ReturnValue, result);
 }
@@ -70,26 +71,31 @@ static void registerAllHandlers()
     // =========================================================================
     // Static/Free Function handlers
     // =========================================================================
-    
+
     // __marker__ - user-inserted marker for debugging replay streams
-    ReplayContext::get().registerHandler("__marker__", [](ReplayContext& ctx) {
-        const char* sig = nullptr;
-        ctx.record(RecordFlag::Input, sig);
-        uint64_t thisHandle = 0;
-        ctx.recordHandle(RecordFlag::Input, thisHandle);
-        const char* label = nullptr;
-        ctx.record(RecordFlag::Input, label);
-        if (ctx.isTtyLogging())
-            fprintf(stderr, "[REPLAY] *** MARKER: %s ***\n", label ? label : "(null)");
-    });
+    ReplayContext::get().registerHandler(
+        "__marker__",
+        [](ReplayContext& ctx)
+        {
+            const char* sig = nullptr;
+            ctx.record(RecordFlag::Input, sig);
+            uint64_t thisHandle = 0;
+            ctx.recordHandle(RecordFlag::Input, thisHandle);
+            const char* label = nullptr;
+            ctx.record(RecordFlag::Input, label);
+            if (ctx.isTtyLogging())
+                fprintf(stderr, "[REPLAY] *** MARKER: %s ***\n", label ? label : "(null)");
+        });
 
     // slang_createGlobalSession2 - the entry point for creating global sessions
-    ReplayContext::get().registerHandler("slang_createGlobalSession2", handle_slang_createGlobalSession2);
-    
+    ReplayContext::get().registerHandler(
+        "slang_createGlobalSession2",
+        handle_slang_createGlobalSession2);
+
     // =========================================================================
     // GlobalSessionProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(GlobalSessionProxy, addRef);
     REPLAY_REGISTER(GlobalSessionProxy, release);
     REPLAY_REGISTER(GlobalSessionProxy, createSession);
@@ -121,11 +127,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(GlobalSessionProxy, compileBuiltinModule);
     REPLAY_REGISTER(GlobalSessionProxy, loadBuiltinModule);
     REPLAY_REGISTER(GlobalSessionProxy, saveBuiltinModule);
-    
+
     // =========================================================================
     // SessionProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(SessionProxy, addRef);
     REPLAY_REGISTER(SessionProxy, release);
     REPLAY_REGISTER(SessionProxy, getGlobalSession);
@@ -148,11 +154,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, getLoadedModuleCount);
     REPLAY_REGISTER(SessionProxy, getLoadedModule);
     REPLAY_REGISTER(SessionProxy, loadModuleFromSource);
-    
+
     // =========================================================================
-    // ModuleProxy handlers  
+    // ModuleProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(ModuleProxy, addRef);
     REPLAY_REGISTER(ModuleProxy, release);
     REPLAY_REGISTER(ModuleProxy, getLayout);
@@ -173,11 +179,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ModuleProxy, getModuleReflection);
     REPLAY_REGISTER(ModuleProxy, precompileForTarget);
     REPLAY_REGISTER(ModuleProxy, getTargetCode);
-    
+
     // =========================================================================
     // ComponentTypeProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(ComponentTypeProxy, addRef);
     REPLAY_REGISTER(ComponentTypeProxy, release);
     REPLAY_REGISTER(ComponentTypeProxy, getSession);
@@ -196,11 +202,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointMetadata);
     REPLAY_REGISTER(ComponentTypeProxy, getTargetMetadata);
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointCompileResult);
-    
+
     // =========================================================================
     // EntryPointProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(EntryPointProxy, addRef);
     REPLAY_REGISTER(EntryPointProxy, release);
     REPLAY_REGISTER(EntryPointProxy, getSession);
@@ -216,11 +222,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(EntryPointProxy, renameEntryPoint);
     REPLAY_REGISTER(EntryPointProxy, linkWithOptions);
     REPLAY_REGISTER(EntryPointProxy, getFunctionReflection);
-    
+
     // =========================================================================
     // TypeConformanceProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(TypeConformanceProxy, addRef);
     REPLAY_REGISTER(TypeConformanceProxy, release);
     REPLAY_REGISTER(TypeConformanceProxy, getSession);
@@ -235,11 +241,11 @@ static void registerAllHandlers()
     REPLAY_REGISTER(TypeConformanceProxy, getEntryPointHostCallable);
     REPLAY_REGISTER(TypeConformanceProxy, renameEntryPoint);
     REPLAY_REGISTER(TypeConformanceProxy, linkWithOptions);
-    
+
     // =========================================================================
     // CompileRequestProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(CompileRequestProxy, addRef);
     REPLAY_REGISTER(CompileRequestProxy, release);
     REPLAY_REGISTER(CompileRequestProxy, setFileSystem);
@@ -316,23 +322,23 @@ static void registerAllHandlers()
     REPLAY_REGISTER(CompileRequestProxy, getSession);
     REPLAY_REGISTER(CompileRequestProxy, getEntryPoint);
     // setEmitSpirvDirectly not implemented in proxy
-    
+
     // =========================================================================
     // Blobs are serialized by content hash, not tracked as proxies
     // =========================================================================
-    
+
     // =========================================================================
     // SharedLibraryProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(SharedLibraryProxy, addRef);
     REPLAY_REGISTER(SharedLibraryProxy, release);
     REPLAY_REGISTER(SharedLibraryProxy, findSymbolAddressByName);
-    
+
     // =========================================================================
     // MutableFileSystemProxy handlers
     // =========================================================================
-    
+
     REPLAY_REGISTER(MutableFileSystemProxy, addRef);
     REPLAY_REGISTER(MutableFileSystemProxy, release);
     REPLAY_REGISTER(MutableFileSystemProxy, loadFile);
@@ -351,13 +357,13 @@ static void registerAllHandlers()
 }
 
 // Static initialization - register handlers when library loads
-namespace {
-    struct HandlerRegistrar {
-        HandlerRegistrar() {
-            registerAllHandlers();
-        }
-    };
-    static HandlerRegistrar s_registrar;
-}
+namespace
+{
+struct HandlerRegistrar
+{
+    HandlerRegistrar() { registerAllHandlers(); }
+};
+static HandlerRegistrar s_registrar;
+} // namespace
 
 } // namespace SlangRecord

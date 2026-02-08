@@ -3,7 +3,6 @@
 
 #include "proxy-base.h"
 #include "proxy-macros.h"
-
 #include "slang-com-helper.h"
 #include "slang.h"
 
@@ -11,7 +10,10 @@ namespace SlangRecord
 {
 using namespace Slang;
 
-class ComponentTypeProxy :  public ProxyBase<slang::IComponentType, slang::IComponentType2, slang::IModulePrecompileService_Experimental>
+class ComponentTypeProxy : public ProxyBase<
+                               slang::IComponentType,
+                               slang::IComponentType2,
+                               slang::IModulePrecompileService_Experimental>
 {
 public:
     SLANG_COM_INTERFACE(
@@ -28,10 +30,11 @@ public:
     // Record addRef/release for lifetime tracking during replay
     PROXY_REFCOUNT_IMPL(ComponentTypeProxy)
 
-    SLANG_NO_THROW SlangResult SLANG_MCALL
-    queryInterface(SlangUUID const& uuid, void** outObject) SLANG_OVERRIDE
+    SLANG_NO_THROW SlangResult SLANG_MCALL queryInterface(SlangUUID const& uuid, void** outObject)
+        SLANG_OVERRIDE
     {
-        if (!outObject) return SLANG_E_INVALID_ARG;
+        if (!outObject)
+            return SLANG_E_INVALID_ARG;
 
         if (uuid == ComponentTypeProxy::getTypeGuid() ||
             uuid == slang::IComponentType::getTypeGuid())
@@ -77,7 +80,8 @@ public:
 
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
-        slang::ProgramLayout* result = getActual<slang::IComponentType>()->getLayout(targetIndex, outDiagnostics);
+        slang::ProgramLayout* result =
+            getActual<slang::IComponentType>()->getLayout(targetIndex, outDiagnostics);
 
         RECORD_COM_OUTPUT(outDiagnostics);
         // Note: ProgramLayout* is a raw pointer to reflection data, not a COM object
@@ -135,7 +139,10 @@ public:
 
         PREPARE_POINTER_OUTPUT(outHash);
 
-        getActual<slang::IComponentType>()->getEntryPointHash(entryPointIndex, targetIndex, outHash);
+        getActual<slang::IComponentType>()->getEntryPointHash(
+            entryPointIndex,
+            targetIndex,
+            outHash);
 
         RECORD_COM_OUTPUT(outHash);
     }
@@ -173,9 +180,8 @@ public:
         PREPARE_POINTER_OUTPUT(outLinkedComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
-        auto result = getActual<slang::IComponentType>()->link(
-            outLinkedComponentType,
-            outDiagnostics);
+        auto result =
+            getActual<slang::IComponentType>()->link(outLinkedComponentType, outDiagnostics);
 
         RECORD_COM_OUTPUT(outLinkedComponentType);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -246,7 +252,8 @@ public:
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
 
-        auto result = getActual<slang::IComponentType>()->getTargetCode(targetIndex, outCode, outDiagnostics);
+        auto result =
+            getActual<slang::IComponentType>()->getTargetCode(targetIndex, outCode, outDiagnostics);
 
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
@@ -262,7 +269,10 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outMetadata);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        auto result = getActual<slang::IComponentType>()->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
+        auto result = getActual<slang::IComponentType>()->getTargetMetadata(
+            targetIndex,
+            outMetadata,
+            outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
     }
@@ -304,7 +314,10 @@ public:
         PREPARE_POINTER_OUTPUT(outCompileResult);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
         auto result = getActual<slang::IComponentType2>()->getEntryPointCompileResult(
-            entryPointIndex, targetIndex, outCompileResult, outDiagnostics);
+            entryPointIndex,
+            targetIndex,
+            outCompileResult,
+            outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
     }

@@ -176,7 +176,8 @@ struct RayTracing : public WindowedAppBase
         }
         else
         {
-            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
+            SLANG_RETURN_ON_FAIL(
+                module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
             componentTypes.add(vertexEntryPoint);
             SLANG_RETURN_ON_FAIL(
                 module->findEntryPointByName("fragmentMain", fragmentEntryPoint.writeRef()));

@@ -1,10 +1,11 @@
 #pragma once
 
-#include "replay-stream.h"
-#include "replay-context.h"
 #include "../core/slang-string.h"
+#include "replay-context.h"
+#include "replay-stream.h"
 
-namespace SlangRecord {
+namespace SlangRecord
+{
 
 /// Decodes a binary replay stream to human-readable text format.
 /// Can be used to:
@@ -87,9 +88,7 @@ public:
     /// @param stream The stream to read from.
     /// @param output StringBuilder to append the decoded text to.
     /// @return true if a call header was decoded, false if end of stream.
-    SLANG_API static bool decodeCallHeader(
-        ReplayStream& stream,
-        Slang::StringBuilder& output);
+    SLANG_API static bool decodeCallHeader(ReplayStream& stream, Slang::StringBuilder& output);
 
     /// Get human-readable name for a TypeId.
     SLANG_API static const char* getTypeIdName(TypeId type);
@@ -99,14 +98,14 @@ private:
 
     void decodeAll(size_t maxBytes);
     void decodeCall();
-    
+
     /// Try to recover from a decoding error by finding the next valid call.
     /// @return true if recovery was successful, false if end of stream.
     bool tryRecoverToNextCall();
 
     static TypeId peekTypeId(ReplayStream& stream);
     static TypeId readTypeId(ReplayStream& stream);
-    
+
     static void indent(Slang::StringBuilder& output, int level);
     static void appendHexDump(
         Slang::StringBuilder& output,
