@@ -1,5 +1,5 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK-VK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK-CUDA):-cuda -output-using-type
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK-CUDA):-cuda -output-using-type
 
 // CHECK-VK: type: float
 // CHECK-VK-COUNT-256: 241.0

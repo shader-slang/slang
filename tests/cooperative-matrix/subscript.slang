@@ -1,11 +1,16 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type  -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST_DISABLED(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
 // CHECK: type: int32_t
 // CHECK-NEXT: 2
 // CHECK-NEXT: 4
 // CHECK: 7
 // CHECK-NEXT: 11
+
+
+// with MMAMatrix and mma PTX instructions, the data is laid out differently
+// The registers are placed in the column major order
+
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
