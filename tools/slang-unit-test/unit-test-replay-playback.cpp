@@ -35,6 +35,7 @@ public:
         : m_actual(actual), m_refCount(1)
     {
     }
+    virtual ~TestCalculatorProxy() = default;
 
     // ISlangUnknown
     SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -102,6 +103,7 @@ public:
         : m_offset(0), m_refCount(1)
     {
     }
+    virtual ~TestCalculatorImpl() = default;
 
     SLANG_NO_THROW SlangResult SLANG_MCALL
     queryInterface(SlangUUID const& uuid, void** outObject) override

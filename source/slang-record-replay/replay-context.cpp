@@ -7,7 +7,7 @@
 #include "../slang/slang-ast-type.h"
 #include "../slang/slang-compiler-api.h"
 #include "../slang/slang-syntax.h"
-#include "proxy/proxy-module.h"
+#include "proxy/proxy-component-type.h"
 
 #include <chrono>
 #include <cinttypes>

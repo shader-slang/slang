@@ -5,14 +5,11 @@
 #include "proxy-compile-request.h"
 #include "proxy-compile-result.h"
 #include "proxy-component-type.h"
-#include "proxy-entry-point.h"
 #include "proxy-global-session.h"
 #include "proxy-metadata.h"
-#include "proxy-module.h"
 #include "proxy-mutable-file-system.h"
 #include "proxy-session.h"
 #include "proxy-shared-library.h"
-#include "proxy-type-conformance.h"
 
 namespace SlangRecord
 {
@@ -72,19 +69,8 @@ ISlangUnknown* wrapObject(ISlangUnknown* obj)
     if (ReplayContext::get().getImplementation(obj))
         return obj;
 
-    // Order matters due to inheritance!
-    // Check more derived types before base types.
-
-    // IModule derives from IComponentType
-    TRY_WRAP(slang::IModule, ModuleProxy)
-
-    // IEntryPoint derives from IComponentType
-    TRY_WRAP(slang::IEntryPoint, EntryPointProxy)
-
-    // ITypeConformance derives from IComponentType
-    TRY_WRAP(slang::ITypeConformance, TypeConformanceProxy)
-
-    // IComponentType (base for Module, EntryPoint, TypeConformance)
+    // IComponentType and all derived types (IModule, IEntryPoint, ITypeConformance)
+    // are handled by a single unified ComponentTypeProxy that probes for supported interfaces.
     TRY_WRAP(slang::IComponentType, ComponentTypeProxy)
 
     // Session types

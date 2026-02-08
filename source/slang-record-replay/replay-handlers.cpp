@@ -15,13 +15,10 @@
 #include "../slang/slang-internal.h"
 #include "proxy/proxy-compile-request.h"
 #include "proxy/proxy-component-type.h"
-#include "proxy/proxy-entry-point.h"
 #include "proxy/proxy-global-session.h"
-#include "proxy/proxy-module.h"
 #include "proxy/proxy-mutable-file-system.h"
 #include "proxy/proxy-session.h"
 #include "proxy/proxy-shared-library.h"
-#include "proxy/proxy-type-conformance.h"
 
 #include <slang.h>
 
@@ -156,34 +153,10 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, loadModuleFromSource);
 
     // =========================================================================
-    // ModuleProxy handlers
+    // ComponentTypeProxy handlers (unified: IComponentType, IModule, IEntryPoint, ITypeConformance)
     // =========================================================================
 
-    REPLAY_REGISTER(ModuleProxy, addRef);
-    REPLAY_REGISTER(ModuleProxy, release);
-    REPLAY_REGISTER(ModuleProxy, getLayout);
-    REPLAY_REGISTER(ModuleProxy, getSpecializationParamCount);
-    REPLAY_REGISTER(ModuleProxy, specialize);
-    REPLAY_REGISTER(ModuleProxy, link);
-    REPLAY_REGISTER(ModuleProxy, findEntryPointByName);
-    REPLAY_REGISTER(ModuleProxy, getDefinedEntryPointCount);
-    REPLAY_REGISTER(ModuleProxy, getDefinedEntryPoint);
-    REPLAY_REGISTER(ModuleProxy, serialize);
-    REPLAY_REGISTER(ModuleProxy, writeToFile);
-    REPLAY_REGISTER(ModuleProxy, getName);
-    REPLAY_REGISTER(ModuleProxy, getFilePath);
-    REPLAY_REGISTER(ModuleProxy, getUniqueIdentity);
-    REPLAY_REGISTER(ModuleProxy, findAndCheckEntryPoint);
-    REPLAY_REGISTER(ModuleProxy, getDependencyFileCount);
-    REPLAY_REGISTER(ModuleProxy, getDependencyFilePath);
-    REPLAY_REGISTER(ModuleProxy, getModuleReflection);
-    REPLAY_REGISTER(ModuleProxy, precompileForTarget);
-    REPLAY_REGISTER(ModuleProxy, getTargetCode);
-
-    // =========================================================================
-    // ComponentTypeProxy handlers
-    // =========================================================================
-
+    // IComponentType
     REPLAY_REGISTER(ComponentTypeProxy, addRef);
     REPLAY_REGISTER(ComponentTypeProxy, release);
     REPLAY_REGISTER(ComponentTypeProxy, getSession);
@@ -203,44 +176,24 @@ static void registerAllHandlers()
     REPLAY_REGISTER(ComponentTypeProxy, getTargetMetadata);
     REPLAY_REGISTER(ComponentTypeProxy, getEntryPointCompileResult);
 
-    // =========================================================================
-    // EntryPointProxy handlers
-    // =========================================================================
+    // IModule
+    REPLAY_REGISTER(ComponentTypeProxy, findEntryPointByName);
+    REPLAY_REGISTER(ComponentTypeProxy, getDefinedEntryPointCount);
+    REPLAY_REGISTER(ComponentTypeProxy, getDefinedEntryPoint);
+    REPLAY_REGISTER(ComponentTypeProxy, serialize);
+    REPLAY_REGISTER(ComponentTypeProxy, writeToFile);
+    REPLAY_REGISTER(ComponentTypeProxy, getName);
+    REPLAY_REGISTER(ComponentTypeProxy, getFilePath);
+    REPLAY_REGISTER(ComponentTypeProxy, getUniqueIdentity);
+    REPLAY_REGISTER(ComponentTypeProxy, findAndCheckEntryPoint);
+    REPLAY_REGISTER(ComponentTypeProxy, getDependencyFileCount);
+    REPLAY_REGISTER(ComponentTypeProxy, getDependencyFilePath);
+    REPLAY_REGISTER(ComponentTypeProxy, getModuleReflection);
+    REPLAY_REGISTER(ComponentTypeProxy, precompileForTarget);
+    REPLAY_REGISTER(ComponentTypeProxy, disassemble);
 
-    REPLAY_REGISTER(EntryPointProxy, addRef);
-    REPLAY_REGISTER(EntryPointProxy, release);
-    REPLAY_REGISTER(EntryPointProxy, getSession);
-    REPLAY_REGISTER(EntryPointProxy, getLayout);
-    REPLAY_REGISTER(EntryPointProxy, getSpecializationParamCount);
-    REPLAY_REGISTER(EntryPointProxy, getEntryPointCode);
-    REPLAY_REGISTER(EntryPointProxy, getTargetCode);
-    REPLAY_REGISTER(EntryPointProxy, getResultAsFileSystem);
-    REPLAY_REGISTER(EntryPointProxy, getEntryPointHash);
-    REPLAY_REGISTER(EntryPointProxy, specialize);
-    REPLAY_REGISTER(EntryPointProxy, link);
-    REPLAY_REGISTER(EntryPointProxy, getEntryPointHostCallable);
-    REPLAY_REGISTER(EntryPointProxy, renameEntryPoint);
-    REPLAY_REGISTER(EntryPointProxy, linkWithOptions);
-    REPLAY_REGISTER(EntryPointProxy, getFunctionReflection);
-
-    // =========================================================================
-    // TypeConformanceProxy handlers
-    // =========================================================================
-
-    REPLAY_REGISTER(TypeConformanceProxy, addRef);
-    REPLAY_REGISTER(TypeConformanceProxy, release);
-    REPLAY_REGISTER(TypeConformanceProxy, getSession);
-    REPLAY_REGISTER(TypeConformanceProxy, getLayout);
-    REPLAY_REGISTER(TypeConformanceProxy, getSpecializationParamCount);
-    REPLAY_REGISTER(TypeConformanceProxy, getEntryPointCode);
-    REPLAY_REGISTER(TypeConformanceProxy, getTargetCode);
-    REPLAY_REGISTER(TypeConformanceProxy, getResultAsFileSystem);
-    REPLAY_REGISTER(TypeConformanceProxy, getEntryPointHash);
-    REPLAY_REGISTER(TypeConformanceProxy, specialize);
-    REPLAY_REGISTER(TypeConformanceProxy, link);
-    REPLAY_REGISTER(TypeConformanceProxy, getEntryPointHostCallable);
-    REPLAY_REGISTER(TypeConformanceProxy, renameEntryPoint);
-    REPLAY_REGISTER(TypeConformanceProxy, linkWithOptions);
+    // IEntryPoint
+    REPLAY_REGISTER(ComponentTypeProxy, getFunctionReflection);
 
     // =========================================================================
     // CompileRequestProxy handlers
