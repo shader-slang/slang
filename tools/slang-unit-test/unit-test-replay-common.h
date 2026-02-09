@@ -29,7 +29,7 @@ public:
     ~ScopedReplayContext() { ctx().reset(); }
 };
 
-/*
+
 // Replays tests can't run single threaded or they reset their own
 // streams so disable for first PR
 #define REPLAY_TEST                      \
@@ -38,8 +38,8 @@ public:
         SLANG_IGNORE_TEST;               \
     }                                    \
     ScopedReplayContext _scopedReplayContext;
-*/
-#define REPLAY_TEST SLANG_IGNORE_TEST
+
+//#define REPLAY_TEST SLANG_IGNORE_TEST
 
 // =============================================================================
 // Helper: Round-trip test template

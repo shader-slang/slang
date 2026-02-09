@@ -66,7 +66,7 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
     output << "Index stream size: " << (uint64_t)indexSize << " bytes\n";
     output << "Total calls: " << (uint64_t)callCount << "\n\n";
 
-    // Read all index entries into memory for easy access
+    // Read all index entries (offset-only) into memory for easy access
     Slang::List<CallIndexEntry> entries;
     entries.setCount(Slang::Index(callCount));
     indexStream.seek(0);
@@ -92,18 +92,29 @@ String ReplayStreamDecoder::decodeWithIndex(ReplayStream& dataStream, ReplayStre
             endOffset = dataSize;
         }
 
-        // Output the call header
-        output << "[" << (uint64_t)callIdx << "] " << entry.signature;
-        if (entry.thisHandle == kNullHandle)
-            output << ", #null (static)";
-        else
-            output << ", #" << entry.thisHandle;
-        output << "\n";
+        // Read call signature and this-handle from the main data stream
+        dataStream.seek(startOffset);
+        StringBuilder headerBuf;
+        if (!decodeCallHeader(dataStream, headerBuf))
+        {
+            output << "[" << (uint64_t)callIdx << "] <failed to read call header>\n\n";
+            continue;
+        }
 
-        // Decode the call's data with indentation
+        output << "[" << (uint64_t)callIdx << "] " << headerBuf << "\n";
+
+        // Decode the remaining arguments (stream is already positioned past the header)
+        int argNum = 0;
         try
         {
-            decodeByteRange(dataStream, output, startOffset, endOffset, 1);
+            while (dataStream.getPosition() < endOffset &&
+                   dataStream.getPosition() < dataStream.getSize())
+            {
+                indent(output, 1);
+                output << "[" << argNum++ << "] ";
+                decodeValueFromStream(dataStream, output, 1);
+                output << "\n";
+            }
         }
         catch (const Slang::Exception& e)
         {

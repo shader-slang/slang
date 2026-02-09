@@ -53,21 +53,16 @@ constexpr uint64_t kDefaultFileSystemHandle =
     3; ///< Default file system (when user doesn't provide one)
 constexpr uint64_t kFirstValidHandle = 0x100; ///< First handle for tracked objects
 
-/// Maximum length for function signatures stored in index entries.
-constexpr size_t kMaxSignatureLength = 128;
-
 /// Fixed-size index entry for the call index stream.
-/// Each entry records metadata about a function call to enable quick navigation.
-/// The index stream (index.bin) is written alongside stream.bin during recording.
+/// Each entry stores only the byte offset of a call in stream.bin.
+/// The signature and this-handle are read from the main stream on demand.
 #pragma pack(push, 1)
 struct CallIndexEntry
 {
-    uint64_t streamPosition;             ///< Byte offset in stream.bin where call begins
-    uint64_t thisHandle;                 ///< Handle of 'this' pointer (kNullHandle for static)
-    char signature[kMaxSignatureLength]; ///< Null-terminated function signature
+    uint64_t streamPosition; ///< Byte offset in stream.bin where call begins
 
     /// Total size of this struct (must be fixed for file I/O)
-    static constexpr size_t kSize = sizeof(uint64_t) + sizeof(uint64_t) + kMaxSignatureLength;
+    static constexpr size_t kSize = sizeof(uint64_t);
 };
 #pragma pack(pop)
 
@@ -383,10 +378,7 @@ public:
 
         if (isWriting())
         {
-            uint64_t thisHandle = kNullHandle;
-            if (thisUnknown && isInterfaceRegisteredImpl(thisUnknown))
-                thisHandle = getProxyHandleImpl(thisUnknown);
-            writeIndexEntry(parsed, thisHandle);
+            writeIndexEntry();
         }
 
         // Note: the parsed signature is fixed/known, so can be treated as a verifiable output.
@@ -411,7 +403,7 @@ public:
 
         // Write index entry before recording to main stream (for correct position)
         if (isWriting())
-            writeIndexEntry(parsed, kNullHandle);
+            writeIndexEntry();
 
         record(RecordFlag::Input, parsed);
         uint64_t nh = kNullHandle;
@@ -650,7 +642,7 @@ private:
     SLANG_API TypeId readTypeId();
     SLANG_API TypeId readTypeIdFromReference();
     SLANG_API void expectTypeId(TypeId expected);
-    SLANG_API void writeIndexEntry(const char* signature, uint64_t thisHandle);
+    SLANG_API void writeIndexEntry();
 
     // Internal registeration using canonical ISlangUnknown* identities
     SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);

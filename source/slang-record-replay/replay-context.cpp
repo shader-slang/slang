@@ -387,27 +387,10 @@ void ReplayContext::closeRecordingMirror()
     m_currentReplayPath = String();
 }
 
-void ReplayContext::writeIndexEntry(const char* signature, uint64_t thisHandle)
+void ReplayContext::writeIndexEntry()
 {
-    // Create a fixed-size index entry
     CallIndexEntry entry;
     entry.streamPosition = m_stream.getPosition();
-    entry.thisHandle = thisHandle;
-
-    // Copy signature, truncating if necessary
-    size_t sigLen = signature ? strlen(signature) : 0;
-    if (sigLen >= kMaxSignatureLength)
-        sigLen = kMaxSignatureLength - 1;
-
-    if (signature && sigLen > 0)
-        memcpy(entry.signature, signature, sigLen);
-    entry.signature[sigLen] = '\0';
-
-    // Zero-fill the rest to ensure consistent file format
-    if (sigLen + 1 < kMaxSignatureLength)
-        memset(entry.signature + sigLen + 1, 0, kMaxSignatureLength - sigLen - 1);
-
-    // Write the entry to the index stream
     m_indexStream.write(&entry, sizeof(entry));
 }
 
