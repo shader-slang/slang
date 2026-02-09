@@ -135,39 +135,50 @@ When enabled, recordings are saved to timestamped folders under `.slang-replays/
     └── files/        # Content-addressed blob storage (SHA1 hashes)
 ```
 
-## Call Index Stream
+## slang-replay Command-Line Tool
 
-The `index.bin` file is a secondary stream written alongside `stream.bin` during
-recording. It contains fixed-size entries that allow quick navigation through a replay
-without parsing the entire main stream.
-
-### Index Entry Format
-
-Each entry is a `CallIndexEntry` struct (fixed 144 bytes):
-
-| Field | Type | Size | Description |
-|-------|------|------|-------------|
-| `streamPosition` | uint64_t | 8 bytes | Byte offset in stream.bin where call begins |
-| `thisHandle` | uint64_t | 8 bytes | Handle of 'this' pointer (0 for static calls) |
-| `signature` | char[] | 128 bytes | Null-terminated function signature |
+The `slang-replay` tool (`tools/slang-replay/main.cpp`) provides a command-line
+interface for working with recorded API sessions.
 
 ### Usage
 
-```cpp
-// Load a replay with index
-ctx.loadReplay("/path/to/recording");
-
-// Get total number of calls
-size_t count = ctx.getCallCount();
-
-// Get info about a specific call
-const CallIndexEntry* entry = ctx.getCallIndexEntry(5);
-printf("Call 5: %s at offset %llu\n", entry->signature, entry->streamPosition);
-
-// Skip to a specific call
-ctx.seekToCall(10);  // Position stream at call #10
-ctx.executeNextCall();
+```bash
+slang-replay [options] <path>
 ```
+
+### Options
+
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--decode` | `-d` | Decode recording to human-readable text |
+| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin) |
+| `--replay` | `-r` | Execute the recorded API calls |
+| `--verbose` | `-v` | Enable verbose output during replay |
+| `--output <file>` | `-o` | Write decoded output to file |
+| `--convert-json` | `-cj` | Convert record file to JSON format |
+| `--help` | `-h` | Show usage information |
+
+### Examples
+
+```bash
+# Decode with structured call-by-call output (recommended)
+slang-replay -d .slang-replays/2026-02-04_14-30-45-123/
+
+# Decode with raw value-by-value output
+slang-replay -d -R .slang-replays/2026-02-04_14-30-45-123/
+
+# Replay a recording
+slang-replay -r .slang-replays/2026-02-04_14-30-45-123/
+
+# Replay with verbose logging
+slang-replay -r -v .slang-replays/2026-02-04_14-30-45-123/
+```
+
+### Input Formats
+
+The tool accepts either:
+- A folder containing `stream.bin` (e.g., `.slang-replays/2026-02-04_14-30-45-123/`)
+- A direct path to a `stream.bin` file
 
 ## Proxy Pattern
 
@@ -232,15 +243,6 @@ RECORD_COM_RESULT(result)        // Wrap COM result and record it
 RECORD_RETURN(result)            // Record return value and return
 RECORD_RETURN_VOID()             // No-op for void returns
 PROXY_REFCOUNT_IMPL(ProxyType)   // addRef/release overrides that record
-```
-
-### Higher-Level Macros
-
-```cpp
-RECORD_METHOD_OUTPUT(method, outParam, inputs...)  // SlangResult method(inputs..., T** out)
-RECORD_METHOD_RETURN(method, inputs...)            // T method(inputs...)
-RECORD_METHOD_VOID(method, inputs...)              // void method(inputs...)
-RECORD_METHOD_RETURN_NOARGS(method)                // T method()
 ```
 
 ### Playback Registration
@@ -442,9 +444,7 @@ void ReplayContext::record(RecordFlag flags, NewStructType& value)
 }
 ```
 
-## Testing
-
-### Unit Tests
+## Unit Tests
 
 Located in `tools/slang-unit-test/`:
 
@@ -468,257 +468,7 @@ cmake --workflow --preset debug
 ./build/Debug/bin/slang-test.exe "slang-unit-test-tool/replay"
 ```
 
-## slang-replay Command-Line Tool
-
-The `slang-replay` tool (`tools/slang-replay/main.cpp`) provides a command-line
-interface for working with recorded API sessions.
-
-### Usage
-
-```bash
-slang-replay [options] <path>
-```
-
-### Options
-
-| Option | Short | Description |
-|--------|-------|-------------|
-| `--decode` | `-d` | Decode recording to human-readable text |
-| `--raw` | `-R` | Force raw value-by-value output (ignore index.bin) |
-| `--replay` | `-r` | Execute the recorded API calls |
-| `--verbose` | `-v` | Enable verbose output during replay |
-| `--output <file>` | `-o` | Write decoded output to file |
-| `--convert-json` | `-cj` | Convert record file to JSON format |
-| `--help` | `-h` | Show usage information |
-
-### Examples
-
-```bash
-# Decode with structured call-by-call output (recommended)
-slang-replay -d .slang-replays/2026-02-04_14-30-45-123/
-
-# Decode with raw value-by-value output
-slang-replay -d -R .slang-replays/2026-02-04_14-30-45-123/
-
-# Replay a recording
-slang-replay -r .slang-replays/2026-02-04_14-30-45-123/
-
-# Replay with verbose logging
-slang-replay -r -v .slang-replays/2026-02-04_14-30-45-123/
-```
-
-### Input Formats
-
-The tool accepts either:
-- A folder containing `stream.bin` (e.g., `.slang-replays/2026-02-04_14-30-45-123/`)
-- A direct path to a `stream.bin` file
-
 ## Thread Safety
 
 The `ReplayContext` uses a recursive mutex. All recording operations acquire the lock
 via `RECORD_CALL()` which calls `ctx.lock()` and stores the RAII guard.
-
-## Debugging Tips
-
-### Enable TTY Logging
-
-Set `SLANG_RECORD_LOG=1` to see API calls as they're recorded:
-
-```
-[REPLAY] GlobalSessionProxy::createSession [this=0x..., handle=256]
-[REPLAY] SessionProxy::loadModule [this=0x..., handle=258]
-```
-
-### Common Issues
-
-1. **Unimplemented proxy method**: Throws `SLANG_UNIMPLEMENTED_X` at runtime —
-   method needs recording support added to the proxy
-2. **Handle not found**: Object wasn't properly registered during recording —
-   throws `HandleNotFoundException`
-3. **Type mismatch**: Stream contains different type than expected —
-   throws `TypeMismatchException`
-
----
-
-## Current State: Proxy Implementation Coverage
-
-The following tables document which proxy methods are implemented vs. stubbed
-(`REPLAY_UNIMPLEMENTED_X`). **This is the key area requiring ongoing work.**
-
-### GlobalSessionProxy — partially implemented
-
-| Status | Methods |
-|--------|---------|
-| Implemented | `createSession`, `findProfile`, `setDefaultDownstreamCompiler`, `getDefaultDownstreamCompiler`, `setLanguagePrelude`, `getLanguagePrelude`, `createCompileRequest`, `checkCompileTargetSupport`, `checkPassThroughSupport`, `findCapability`, `setDownstreamCompilerForTransition`, `getDownstreamCompilerForTransition`, `getCompilerElapsedTime`, `parseCommandLineArguments` |
-| Pass-through | `getBuildTagString` (not recorded) |
-| Stubbed | `setDownstreamCompilerPath`, `setDownstreamCompilerPrelude`, `getDownstreamCompilerPrelude`, `addBuiltins`, `setSharedLibraryLoader`, `getSharedLibraryLoader`, `compileCoreModule`, `loadCoreModule`, `saveCoreModule`, `setSPIRVCoreGrammar`, `getSessionDescDigest`, `compileBuiltinModule`, `loadBuiltinModule`, `saveBuiltinModule` |
-
-### SessionProxy — partially implemented
-
-| Status | Methods |
-|--------|---------|
-| Implemented | `getGlobalSession`, `loadModule`, `loadModuleFromSource`, `createCompositeComponentType`, `getTypeLayout`, `getTypeConformanceWitnessSequentialID`, `createTypeConformanceComponentType`, `loadModuleFromIRBlob`, `getLoadedModuleCount`, `getLoadedModule`, `isBinaryModuleUpToDate`, `loadModuleFromSourceString`, `loadModuleInfoFromIRBlob`, `addSearchPath` |
-| Stubbed | `specializeType`, `getContainerType`, `getDynamicType`, `getTypeRTTIMangledName`, `getTypeConformanceWitnessMangledName`, `createCompileRequest`, `getDynamicObjectRTTIBytes` |
-
-### ModuleProxy — partially implemented
-
-| Status | Methods |
-|--------|---------|
-| Implemented | `getLayout`, `getSpecializationParamCount`, `specialize`, `link`, `getTargetCode`, `findEntryPointByName`, `getDefinedEntryPointCount`, `getDefinedEntryPoint`, `serialize`, `getName`, `getFilePath`, `findAndCheckEntryPoint`, `getModuleReflection` |
-| Stubbed | `getSession`, `getEntryPointCode`, `getResultAsFileSystem`, `getEntryPointHash`, `getEntryPointHostCallable`, `renameEntryPoint`, `linkWithOptions`, `getTargetMetadata`, `getEntryPointMetadata`, `writeToFile`, `getUniqueIdentity`, `getDependencyFileCount`, `getDependencyFilePath`, `disassemble`, `getTargetCompileResult`, `getEntryPointCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
-
-### ComponentTypeProxy — partially implemented
-
-| Status | Methods |
-|--------|---------|
-| Implemented | `getSession`, `getLayout`, `getSpecializationParamCount`, `getEntryPointCode`, `getEntryPointHash`, `specialize`, `link`, `getEntryPointHostCallable`, `linkWithOptions`, `getTargetCode`, `getTargetMetadata`, `getEntryPointCompileResult` |
-| Stubbed | `getResultAsFileSystem`, `renameEntryPoint`, `getEntryPointMetadata`, `getTargetCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
-
-### EntryPointProxy — mostly stubbed
-
-| Status | Methods |
-|--------|---------|
-| Implemented | `getLayout`, `getSpecializationParamCount`, `specialize`, `link`, `getFunctionReflection` |
-| Stubbed | `getSession`, `getEntryPointCode`, `getResultAsFileSystem`, `getEntryPointHash`, `getEntryPointHostCallable`, `renameEntryPoint`, `linkWithOptions`, `getTargetCode`, `getTargetMetadata`, `getEntryPointMetadata`, `getTargetCompileResult`, `getEntryPointCompileResult`, `getTargetHostCallable`, `precompileForTarget`, `getPrecompiledTargetCode`, `getModuleDependencyCount`, `getModuleDependency` |
-
-### CompileRequestProxy — partially implemented
-
-Largest proxy with the most methods. Many setter/getter methods for compile options.
-Approximately 35 methods implemented, ~40 stubbed.
-
-### CompileResultProxy / MetadataProxy / TypeConformanceProxy — all stubs
-
-**All methods stubbed.** These are pure stub proxies for type-system compatibility.
-
-### SharedLibraryProxy — mostly stubbed
-
-Only `findSymbolAddressByName` is implemented. `castAs` is stubbed.
-
-### MutableFileSystemProxy — fully implemented
-
-All `ISlangFileSystem`, `ISlangFileSystemExt`, and `ISlangMutableFileSystem` methods
-have recording/playback support.
-
----
-
-## Known Bugs
-
-1. **`replay-handlers.cpp` registers handlers for methods that are
-   `REPLAY_UNIMPLEMENTED_X` in the proxy.** For example, many `CompileRequestProxy`
-   setters and `GlobalSessionProxy` methods are registered via `REPLAY_REGISTER` but
-   will throw at runtime when called during playback. The handler registration should
-   only include methods that are actually implemented. Mismatches between
-   `replay-handlers.cpp` and the proxy headers cause confusing runtime errors during
-   playback.
-
-2. **Inconsistent recording in some proxy methods:**
-   - `ModuleProxy::getLayout()` and `EntryPointProxy::getLayout()` return raw
-     `ProgramLayout*` without recording the return value. If playback depends on
-     these results, it will diverge.
-   - `EntryPointProxy::getFunctionReflection()` returns a raw pointer without recording.
-   - Some methods use `RECORD_INFO()` + manual `return` instead of `RECORD_RETURN()`.
-   These inconsistencies mean certain methods can record data during recording but
-   produce a stream that can't be played back, because the playback flow expects the
-   stream to contain data that was never written.
-
-3. **`unit-test-replay-record.cpp` uses hardcoded hashes** that include machine-specific
-   file paths. These tests will fail on any machine with different paths.
-
----
-
-## Proposed Refinements
-
-The following refinements are prioritized by the goals of **simplicity**, **ease of
-maintenance**, **minimal 'clever C++'**, and **consistent COM usage**.
-
-### P0: Correctness Fixes
-
-1. **Audit `replay-handlers.cpp` against actual proxy implementations.** Remove
-   `REPLAY_REGISTER` entries for methods that are `REPLAY_UNIMPLEMENTED_X`. A mismatch
-   here means playback will dispatch to a method that immediately throws. A simple
-   grep can verify 1:1 correspondence.
-
-2. **Fix inconsistent recording patterns.** Methods that return values must use
-   `RECORD_RETURN()` consistently. Create a checklist of every implemented proxy method
-   and verify each follows one of the standard patterns:
-   - `RECORD_CALL()` + `RECORD_INPUT(s)` + call + `RECORD_COM_OUTPUT(s)` + `RECORD_RETURN()`
-   - `RECORD_METHOD_OUTPUT` / `RECORD_METHOD_RETURN` / `RECORD_METHOD_VOID` macros
-
-### P1: Reduce Template Complexity in proxy-macros.h
-
-The playback infrastructure (`MemberFunctionTraits`, `callWithDefaults`,
-`DefaultValue<T>` specializations, `replayHandler` template, `REPLAY_REGISTER` macro)
-is the most "clever C++" in the system. It uses variadic templates, `std::tuple`,
-`std::index_sequence`, `if constexpr`, and SFINAE-style specializations to auto-generate
-playback handlers from method pointer types.
-
-**Problem:** This works, but is hard to debug, hard to extend (e.g., when a method
-has a non-default-constructible parameter), and produces opaque compiler errors when
-something goes wrong.
-
-**Proposed simplification:** Replace the auto-generated playback dispatch with explicit
-per-method handler lambdas. Each handler would be ~3 lines of straightforward code:
-
-```cpp
-// Instead of REPLAY_REGISTER(GlobalSessionProxy, findProfile):
-ctx.registerHandler("GlobalSessionProxy::findProfile", [](ReplayContext& ctx) {
-    auto* proxy = ctx.getCurrentThis<GlobalSessionProxy>();
-    const char* name = nullptr;  // will be read from stream by RECORD_INPUT
-    proxy->findProfile(name);    // proxy reads from stream via RECORD_INPUT
-});
-```
-
-This eliminates all of `MemberFunctionTraits`, `DefaultValue`, `callWithDefaults`,
-and the `replayHandler` template (~100 lines of dense template code), replacing it
-with simple, greppable, debuggable lambdas. The tradeoff is slightly more boilerplate
-per method, but each handler is self-documenting and trivially debuggable.
-
-### P2: Consistent COM Usage
-
-The proxy layer mixes COM patterns inconsistently:
-
-- `ProxyBase` inherits from `RefObject` (Slang's ref-counting base) in addition to COM
-  interfaces, creating a dual ref-counting path.
-- `toSlangUnknown()` / `toSlangInterface()` manually call `queryInterface` then
-  immediately `release()`, which is a COM anti-pattern (the returned pointer could
-  theoretically be dangled by a concurrent release on another thread, though the
-  mutex protects against this in practice).
-- `ProxyBase::~ProxyBase()` uses a `static_cast` chain instead of `queryInterface`
-  because the ref count is already zero — correct but documents a design tension.
-- `MutableFileSystemProxy` has `PROXY_REFCOUNT_IMPL` commented out, with lifetime
-  managed externally.
-
-**Proposed:** Document and enforce a single ownership model. If proxies use COM
-ref-counting, they should do so consistently. The `toSlangUnknown()` "borrow" pattern
-(QI + immediate release) should be documented as intentional and safe only under the
-mutex, or replaced with a pattern that doesn't involve transient ownership transfer.
-
-### P3: Delete Dead Code
-
-- **`replay-stream-logger.h`** is empty. Delete it.
-- **`kInlineBlobHandle` (handle value 1)** — if defined anywhere, it's unused. Blobs
-  are serialized by content hash, not by handle. If this was part of an earlier design,
-  remove the constant.
-
-### P4: Simplify the Test Suite
-
-- **`unit-test-replay-record.cpp` hardcoded hashes** are machine-specific (they
-  include file paths in the decoded output). Either: (a) don't test the decoded-text
-  hash at all (just verify a non-empty decode), or (b) hash only the structural parts
-  (signatures, types) while ignoring path-dependent data.
-- **Temp file cleanup in filesystem tests** should use RAII guards to ensure cleanup
-  on test failure, not just at the happy-path end.
-- **Cleanup in record tests** is commented out (`cleanupRecordFiles`). Either enable it
-  or document why it's disabled.
-
-### P5: Future — Reduce the Proxy Stub Surface
-
-Many proxy classes are pure stubs (`CompileResultProxy`, `MetadataProxy`,
-`TypeConformanceProxy`). For methods that are never called in practice, the
-`REPLAY_UNIMPLEMENTED_X` macro provides a clear error. But the large number of stubs
-makes it hard to know what's actually working.
-
-**Proposed:** Track coverage by running the slang test suite with replay enabled
-and collecting which `REPLAY_UNIMPLEMENTED_X` methods are actually hit. Prioritize
-implementing only those methods, rather than trying to achieve full API coverage
-upfront. See `WORKFLOW.md` for the iterative approach.
