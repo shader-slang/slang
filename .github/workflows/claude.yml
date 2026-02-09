@@ -194,45 +194,24 @@ jobs:
             echo "Environment setup completed"
 
           # Custom instructions for Slang
+          # Note: CLAUDE.md is auto-loaded and covers build, test, CLI conventions, and debugging.
+          # These instructions cover ONLY environment-specific and workflow-specific context.
           custom-instructions: |
             ### **Environment**
             Check `RUNNER_OS` to determine platform capabilities:
 
             **Windows (self-hosted, GPU):**
-            - OS: Windows Server 2022 with NVIDIA T4 GPU
-            - Build: `cmake.exe --preset vs2022`, then `cmake.exe --build --preset release`
-            - Test: `./build/Release/bin/slang-test.exe tests/path/to/test.slang`
-            - GPU tests: Use `-api dx12` or `-api vk` flags for D3D12/Vulkan
-            - Use `cmake.exe` (not `cmake`) on Windows
+            - NVIDIA T4 GPU available — GPU tests work with `-api dx12` or `-api vk`
+            - Always use `.exe` suffix: `cmake.exe`, `gh.exe`, `python.exe`, `slang-test.exe`
 
             **Linux (GitHub-hosted, no GPU):**
-            - Build: `cmake --preset default`, then `cmake --build --preset release`
-            - Test: `./build/Release/bin/slang-test tests/path/to/test.slang`
-            - CPU/interpreter tests only (`-cpu` or `INTERPRET` mode)
-            - No GPU tests (D3D12, Vulkan, Metal, WGSL unavailable)
+            - CPU/interpreter tests ONLY — no D3D12, Vulkan, Metal, or WGSL
 
-            ### **Repository Knowledge**
-            Use `mcp__deepwiki__ask_question` with repoName "shader-slang/slang" when you need deep
-            understanding of Slang's architecture, IR system, compilation pipeline, or code patterns.
-            Read CLAUDE.md in the repo root for build, test, and debugging guidance.
+            For review events, the project is NOT pre-built. Build on-demand if needed.
 
-            ### **Capabilities**
-            - Read, analyze, write, and modify source code
-            - Build and test the project (GPU tests on Windows only)
-            - Create branches, commit changes, push, and manage PRs via `gh`
-            - Review PRs with inline comments via MCP tools
-            - Search code, check git history, analyze patterns
-            - Run `./extras/formatting.sh` before committing changes
-
-            ### **Conditional Build**
-            For review events (pull_request_review, pull_request_review_comment), the project
-            is NOT pre-built to save time. If you need to compile or run tests, build first:
-            - Windows: `cmake.exe --preset vs2022 --fresh && cmake.exe --build --preset release`
-            - Linux: `cmake --preset default && cmake --build --preset release`
-
-            ### **Test-Driven Development**
-            Write failing tests in `tests/` directory, implement fixes, and verify both
-            tests and builds succeed before submitting. On Linux, use CPU or INTERPRET mode.
+            ### **Workflow Rules**
+            - Write failing tests as `.slang` files under `tests/`, implement fixes, verify both pass
+            - Use `mcp__deepwiki__ask_question` with repoName "shader-slang/slang" for architecture questions not answered by source
 
           # MCP configuration for deepwiki
           mcp-config: |
@@ -260,7 +239,7 @@ jobs:
           # - DeepWiki MCP: codebase understanding
           # - Web search for external references
           allowed-tools: |
-            View,GlobTool,GrepTool,BatchTool,Write,WebSearch,
+            View,Edit,GlobTool,GrepTool,BatchTool,Write,WebSearch,
             Bash(cmake*),Bash(cmake.exe*),
             Bash(./build/*slangc*),
             Bash(./build/*slang-test*),
