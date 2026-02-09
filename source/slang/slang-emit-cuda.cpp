@@ -1339,10 +1339,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     outStr << typeName << ", ";
     outStr << rowCount << ", " << colCount;
     
-    // Layout: Choose based on matrix use to match CUDA tensor core expectations
-    // MatrixA: RowMajor (matches PTX mma.sync .row format)
-    // MatrixB: ColMajor (matches PTX mma.sync .col format)
-    // MatrixC/Accumulator: RowMajor (output format)
+    // TODO: We can't decide the layout just based on matrix use. Instead, the
+    // layout should be inferred from the Load/Store operations or the Matrix
+    // struct template argument.
     if (matrixUse == 1) // MatrixB
     {
         outStr << ", Slang_CUDA_MMA::Layout::ColMajor>";

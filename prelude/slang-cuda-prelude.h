@@ -7152,8 +7152,6 @@ struct WmmaFragment
     // MapElement: Apply a per-element operation to the cooperative matrix
     // This iterates through all elements in this thread's portion of the matrix,
     // computes the logical row/column coordinates, and applies the map function.
-    // Note: WMMA fragments distribute elements across threads in a warp, so we
-    // compute logical coordinates based on thread ID and element index.
     template<typename TFunc>
     __device__ This MapElement(TFunc mapOp)
     {
@@ -7166,22 +7164,22 @@ struct WmmaFragment
         // Iterate through all elements in this thread's fragment
         for (int i = 0; i < GetLength(); i++)
         {
-            // Compute the global linear index across all threads in the warp
-            // Each thread holds elements_per_thread elements
+            // TODO: The row/col calculation below is incorrect. We cannot assume
+            // that data is laid out linearly across warps (laneId * GetLength() + i).
+            // The actual mapping from (laneId, element index) to (row, col) depends
+            // on the specific matrix shape and is defined by the hardware.
+            // Need to consult the PTX/CUDA documentation for the correct mapping
+            // for each supported shape (e.g. m16n16k16, m8n32k16, etc.).
             uint32_t globalIndex = laneId * GetLength() + i;
             
-            // Compute logical row and column from global linear index
-            // Based on the matrix layout
             uint32_t row, col;
             if (m_layout == Layout::RowMajor)
             {
-                // For row-major: elements are laid out row by row
                 row = globalIndex / N;
                 col = globalIndex % N;
             }
             else
             {
-                // For column-major: elements are laid out column by column
                 row = globalIndex % M;
                 col = globalIndex / M;
             }
@@ -8377,6 +8375,10 @@ public:
         Store<storeLayout>(reinterpret_cast<T*>(buffer), 0, stride * sizeof(U) / sizeof(T));
     }
 
+    // TODO: This load implementation is not efficient. We should consider full
+    // cache line utilization and memory access locality, and potentially use
+    // warp-level thread shuffle (__shfl_sync) to redistribute data after
+    // coalesced loads.
     template<Layout loadLayout>
     static __device__ MMAMatrix<T, M, N, layout> Load(const T* buffer, uint element, uint stride)
     {
