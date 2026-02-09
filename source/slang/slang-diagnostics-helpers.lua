@@ -3,7 +3,20 @@
 local diagnostics = {}
 
 -- Helper function to create a span
+-- Accepts positional: span(location, message?)
+-- Or named: span({loc = location, message = message})
 local function span(location, message)
+  -- Normalize named arguments to positional
+  if type(location) == "table" and not location.location then
+    -- Named argument format
+    local args = location
+    location = args.loc or args.location
+    message = args.message
+    if not location then
+      error("span() requires 'loc' or 'location' field in named argument format")
+    end
+  end
+
   return {
     location = location,
     message = message or "",  -- Default to empty string if not provided
@@ -13,8 +26,25 @@ local function span(location, message)
 end
 
 -- Helper function to create a note with message and spans
+-- Accepts positional: note(message, span1, span2, ...)
+-- Or named: note({message = message, span1, span2, ...})
 local function note(message, ...)
   local all_spans = {...}
+
+  -- Normalize named arguments to positional
+  if type(message) == "table" and not message.is_note then
+    -- Named argument format
+    local args = message
+    message = args.message
+    if not message then
+      error("note() requires 'message' field in named argument format")
+    end
+    -- Extract spans from the table (all non-string-key entries)
+    all_spans = {}
+    for i, v in ipairs(args) do
+      table.insert(all_spans, v)
+    end
+  end
 
   if type(message) ~= "string" then
     error("note() first argument must be a message (string)")
@@ -51,8 +81,27 @@ local function note(message, ...)
 end
 
 -- Helper function to create a variadic span (generates a nested struct and List<>)
--- struct_name: Name for the struct (e.g., "Error" -> struct Error, List<Error> errors)
+-- Accepts positional: variadic_span(struct_name, location, message)
+-- Or named: variadic_span({cpp_name = struct_name, loc = location, message = message})
 local function variadic_span(struct_name, location, message)
+  -- Normalize named arguments to positional
+  if type(struct_name) == "table" and not struct_name.location then
+    -- Named argument format
+    local args = struct_name
+    struct_name = args.cpp_name or args.struct_name
+    location = args.loc or args.location
+    message = args.message
+    if not struct_name then
+      error("variadic_span() requires 'cpp_name' or 'struct_name' field in named argument format")
+    end
+    if not location then
+      error("variadic_span() requires 'loc' or 'location' field in named argument format")
+    end
+    if not message then
+      error("variadic_span() requires 'message' field in named argument format")
+    end
+  end
+
   return {
     location = location,
     message = message,
@@ -63,9 +112,29 @@ local function variadic_span(struct_name, location, message)
 end
 
 -- Helper function to create a variadic note (generates a nested struct and List<>)
--- struct_name: Name for the struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
+-- Accepts positional: variadic_note(struct_name, message, span1, span2, ...)
+-- Or named: variadic_note({cpp_name = struct_name, message = message, span1, span2, ...})
 local function variadic_note(struct_name, message, ...)
   local all_spans = {...}
+
+  -- Normalize named arguments to positional
+  if type(struct_name) == "table" and not struct_name.is_note then
+    -- Named argument format
+    local args = struct_name
+    struct_name = args.cpp_name or args.struct_name
+    message = args.message
+    if not struct_name then
+      error("variadic_note() requires 'cpp_name' or 'struct_name' field in named argument format")
+    end
+    if not message then
+      error("variadic_note() requires 'message' field in named argument format")
+    end
+    -- Extract spans from the table (all non-string-key entries)
+    all_spans = {}
+    for i, v in ipairs(args) do
+      table.insert(all_spans, v)
+    end
+  end
 
   if type(struct_name) ~= "string" then
     error("variadic_note() first argument must be a struct name (string)")
