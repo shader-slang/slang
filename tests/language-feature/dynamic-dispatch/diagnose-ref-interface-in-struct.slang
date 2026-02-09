@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // Test that __ref and __constref parameters with struct types
 // containing interface members produce diagnostic errors in

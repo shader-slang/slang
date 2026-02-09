@@ -1,4 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // Test that __ref and __constref parameters with interface types
 // in dynamic dispatch contexts produce diagnostic errors.
