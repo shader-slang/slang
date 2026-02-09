@@ -1272,7 +1272,6 @@ public:
     ///   -1 = Bindless resources not used (no GetDynamicResourceHeap in IR)
     ///   >= 0 = Allocated space index for the bindless resource heap
     Int bindlessSpaceIndex = -1;
-
 };
 
 StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);
