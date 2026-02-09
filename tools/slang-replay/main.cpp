@@ -7,7 +7,6 @@
 
 struct Options
 {
-    bool convertToJson{false};
     bool decode{false};
     bool rawDecode{false};
     bool replay{false};
@@ -21,9 +20,7 @@ void printUsage()
     printf("Usage: slang-replay [options] <record-file>\n");
     printf("Options:\n");
     printf(
-        "  --convert-json, -cj: Convert the record file to a JSON file in the same directory with record file.\n\
-                       When this option is set, it won't replay the record file.\n");
-    printf("  --decode, -d: Decode the binary stream to human-readable text.\n");
+        "  --decode, -d: Decode the binary stream to human-readable text.\n");
     printf(
         "                If given a folder with index.bin, uses structured call-by-call output.\n");
     printf("  --raw, -R: Force raw value-by-value output (ignore index.bin even if present).\n");
@@ -52,11 +49,6 @@ Options parseOption(int argc, char* argv[])
         if (arg[0] != '-')
         {
             option.recordFileName = arg;
-            argIndex++;
-        }
-        else if ((strcmp("--convert-json", arg) == 0) || (strcmp("-cj", arg) == 0))
-        {
-            option.convertToJson = true;
             argIndex++;
         }
         else if ((strcmp("--decode", arg) == 0) || (strcmp("-d", arg) == 0))

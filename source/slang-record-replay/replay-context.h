@@ -574,77 +574,11 @@ public:
     // Public for testing purposes
     SLANG_API void recordHandle(RecordFlag flags, uint64_t& handleId);
 
-private:
-    void recordRaw(RecordFlag flags, void* data, size_t size);
-    void recordTypeId(TypeId id);
-    void writeTypeId(TypeId id);
-    TypeId readTypeId();
-    TypeId readTypeIdFromReference();
-    void expectTypeId(TypeId expected);
-
-    SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
-    SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
-    SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
-    SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
-    SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
-    SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
-    SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
-
-    /// Record a COM interface pointer (internal implementation).
-    template<typename T>
-    void recordInterfaceImpl(RecordFlag flags, T*& obj);
-
-    std::recursive_mutex m_mutex;
-    ReplayStream m_stream;          ///< Main stream for record/playback
-    ReplayStream m_indexStream;     ///< Index stream for call navigation (index.bin)
-    ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
-    MemoryArena m_arena;
-    Mode m_mode;
-    List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
-
-    // Handle tracking: maps objects to handles and back
-    Dictionary<ISlangUnknown*, uint64_t> m_objectToHandle;
-    Dictionary<uint64_t, ISlangUnknown*> m_handleToObject;
-    uint64_t m_nextHandle = kFirstValidHandle;
-
-    // Proxy tracking: maps proxies to implementations and back
-    Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
-    Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
-
-    // Replay directory management
-    String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
-    String m_currentReplayPath;                  ///< Current recording session folder
-
-    // TTY logging
-    bool m_ttyLogging = false; ///< Whether to log calls to stderr
-
-    // Deferred initialization (to avoid global init order issues with CharEncoding)
-    bool m_initialized = false; ///< True after ensureInitialized() has run
-
-    /// Ensure deferred initialization has completed.
-    /// Called on first actual use to avoid global init order issues.
-    SLANG_API void ensureInitialized();
-
-    /// Log a call to stderr (used when m_ttyLogging is enabled).
-    SLANG_API void logCall(const char* signature, void* thisPtr);
-
-    /// Set up mirror file for crash-safe capture when entering Record mode.
-    SLANG_API void setupRecordingMirror();
-
-    /// Close mirror file when leaving Record mode.
-    SLANG_API void closeRecordingMirror();
-
-    /// Generate a timestamp folder name (e.g., "2026-02-04_14-30-45-123").
-    SLANG_API static String generateTimestampFolderName();
-
-    /// Write an index entry to the index stream.
-    /// Called by beginCall/beginStaticCall before writing to main stream.
-    SLANG_API void writeIndexEntry(const char* signature, uint64_t thisHandle);
 
     // ==========================================================================
     // Call Index Access
     // ==========================================================================
-public:
+
     /// Get the number of calls in the loaded index.
     /// Returns 0 if no index is loaded.
     SLANG_API size_t getCallCount() const;
@@ -664,7 +598,7 @@ public:
     // ==========================================================================
     // Playback Dispatcher
     // ==========================================================================
-public:
+
     /// Function type for registered playback handlers.
     /// The handler is called in playback mode and should call the appropriate
     /// record() methods to read arguments from the stream, then execute the call.
@@ -705,6 +639,64 @@ public:
     }
 
 private:
+
+    // Internal recording functions
+    SLANG_API void recordRaw(RecordFlag flags, void* data, size_t size);
+    SLANG_API void recordTypeId(TypeId id);
+    SLANG_API void writeTypeId(TypeId id);
+    SLANG_API TypeId readTypeId();
+    SLANG_API TypeId readTypeIdFromReference();
+    SLANG_API void expectTypeId(TypeId expected);
+    SLANG_API void writeIndexEntry(const char* signature, uint64_t thisHandle);
+
+    // Internal registeration using canonical ISlangUnknown* identities
+    SLANG_API uint64_t registerProxyImpl(ISlangUnknown* proxy, ISlangUnknown* implementation);
+    SLANG_API void unregisterProxyImpl(ISlangUnknown* proxy);
+    SLANG_API ISlangUnknown* getProxyImpl(ISlangUnknown* implementation);
+    SLANG_API ISlangUnknown* getImplementationImpl(ISlangUnknown* proxy);
+    SLANG_API uint64_t testOnlyRegisterProxyImpl(ISlangUnknown* obj);
+    SLANG_API uint64_t getProxyHandleImpl(ISlangUnknown* obj) const;
+    SLANG_API bool isInterfaceRegisteredImpl(ISlangUnknown* obj) const;
+
+    // Initialization and logging
+    SLANG_API void ensureInitialized();
+    SLANG_API void logCall(const char* signature, void* thisPtr);
+    SLANG_API void setupRecordingMirror();
+    SLANG_API void closeRecordingMirror();
+    SLANG_API static String generateTimestampFolderName();
+
+    /// Record a COM interface pointer (internal implementation).
+    template<typename T>
+    void recordInterfaceImpl(RecordFlag flags, T*& obj);
+
+    // Core streams + mutex
+    std::recursive_mutex m_mutex;
+    ReplayStream m_stream;          ///< Main stream for record/playback
+    ReplayStream m_indexStream;     ///< Index stream for call navigation (index.bin)
+    ReplayStream m_referenceStream; ///< Reference stream for sync mode comparison
+    MemoryArena m_arena;
+    Mode m_mode;
+    List<uint8_t> m_compareBuffer; ///< Reusable buffer for sync comparisons
+
+    // Handle tracking: maps objects to handles and back
+    Dictionary<ISlangUnknown*, uint64_t> m_objectToHandle;
+    Dictionary<uint64_t, ISlangUnknown*> m_handleToObject;
+    uint64_t m_nextHandle = kFirstValidHandle;
+
+    // Proxy tracking: maps proxies to implementations and back
+    Dictionary<ISlangUnknown*, ISlangUnknown*> m_proxyToImpl;
+    Dictionary<ISlangUnknown*, ISlangUnknown*> m_implToProxy;
+
+    // Replay directory management
+    String m_replayDirectory = ".slang-replays"; ///< Base directory for replays
+    String m_currentReplayPath;                  ///< Current recording session folder
+
+    // TTY logging
+    bool m_ttyLogging = false; ///< Whether to log calls to stderr
+
+    // Deferred initialization (to avoid global init order issues with CharEncoding)
+    bool m_initialized = false; ///< True after ensureInitialized() has run
+
     // Map from function signature to handler
     Dictionary<String, PlaybackHandler> m_handlers;
 
