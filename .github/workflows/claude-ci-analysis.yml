@@ -151,59 +151,51 @@ jobs:
           show-debug-output: ${{ vars.SLANG_CLAUDE_DEBUG_ENV || 'false' }}
           max-turns: "500"
           prompt: |
+            /fix-ci
             Failed CI Run: ${{ steps.failure_details.outputs.run_url }}
             Failed Jobs: ${{ steps.failure_details.outputs.failed_jobs }}
             PR Number: ${{ steps.failure_details.outputs.pr_number }}
             Fix Branch: ${{ steps.branch.outputs.branch_name }}
             Base Branch: ${{ steps.failure_details.outputs.head_branch }}
             Repository: ${{ github.repository }}
-            Run ID: ${{ steps.failure_details.outputs.run_id }}
 
             Error logs from each failed job:
             ${{ steps.failure_details.outputs.error_logs }}
 
-            ### Steps
-            1. **Analyze**: Read the error logs above. If truncated, get full logs:
-               `gh run view ${{ steps.failure_details.outputs.run_id }} --log-failed`
-               For a specific job: `gh api repos/${{ github.repository }}/actions/jobs/{JOB_ID}/logs`
-            2. **Understand the PR**: `gh pr diff ${{ steps.failure_details.outputs.pr_number }}`
-            3. **Diagnose**: Determine if the failure is a compilation error, test failure, formatting issue,
-               or platform-specific problem. Check if the same failure affects multiple jobs.
-            4. **Fix**: Apply minimal, targeted changes to resolve the root cause.
-               For formatting failures, just run `./extras/formatting.sh`.
-            5. **Commit and push** on the current branch (${{ steps.branch.outputs.branch_name }})
-            6. **Merge back**: Merge the fix into the original PR branch:
-               ```
-               git checkout ${{ steps.failure_details.outputs.head_branch }}
-               git merge ${{ steps.branch.outputs.branch_name }}
-               git push origin ${{ steps.failure_details.outputs.head_branch }}
-               ```
-            7. **Comment** on PR #${{ steps.failure_details.outputs.pr_number }} explaining what failed and why,
-               what you fixed, and any remaining concerns.
+            Steps:
+            1. Analyze the error logs above to identify the root cause of each failure
+            2. If logs are truncated, download full logs with `gh run view ${{ steps.failure_details.outputs.run_id }} --log-failed`
+               or for a specific job: `gh api repos/${{ github.repository }}/actions/jobs/{job_id}/logs`
+            3. Check the PR diff with `gh pr diff ${{ steps.failure_details.outputs.pr_number }}` to understand the changes
+            4. Fix the code — apply the necessary changes to resolve the CI failure
+            5. Run `./extras/formatting.sh` if the failure is formatting-related
+            6. Commit the fix on the current branch (${{ steps.branch.outputs.branch_name }})
+            7. Push the fix branch
+            8. Merge the fix branch back into the original PR branch:
+               `git checkout ${{ steps.failure_details.outputs.head_branch }} && git merge ${{ steps.branch.outputs.branch_name }} && git push origin ${{ steps.failure_details.outputs.head_branch }}`
+            9. Comment on PR #${{ steps.failure_details.outputs.pr_number }} explaining what was fixed and why
 
-          # Note: CLAUDE.md is auto-loaded and covers build commands, CLI conventions, and debugging.
-          # These instructions cover ONLY CI-specific context and failure patterns.
           custom-instructions: |
             ### **Environment**
-            - Linux (ubuntu-latest), no GPU — use `gh` CLI for ALL GitHub API calls, never `curl`
+            - This workflow runs on Linux (ubuntu-latest) — use `gh` (not `gh.exe`)
+            - Do NOT use `curl` for GitHub API calls — use `gh` CLI instead
+            - Build: `cmake --preset default`, then `cmake --build --preset release`
 
             ### **Slang CI Context**
-            - CI runs up to 41 jobs across Windows, Linux, macOS with various GPU/API combinations
-            - Check if failure is platform-specific (one job) or systemic (multiple jobs)
-
-            ### **Common Failure Patterns**
-            - **Formatting**: Run `./extras/formatting.sh` and commit. Often the only fix needed.
-            - **Compilation errors**: Usually a missing include, type mismatch, or platform-specific API.
-              Check if the error is Windows-only (MSVC) vs Linux (GCC/Clang) — they have different strictness.
-            - **Test failures**: Compare expected vs actual output. Check if a test directive uses a
-              GPU API unavailable on the failing platform.
-            - **SPIRV validation**: Set `SLANG_RUN_SPIRV_VALIDATION=1` to reproduce locally with slangc.
-            - **Linker errors**: Often caused by missing FIDDLE annotations or new files not added to CMakeLists.txt.
+            - Slang CI builds on multiple platforms (Windows, Linux, macOS) with up to 41 jobs
+            - Common failures: compilation errors, test failures, SPIRV validation, formatting
+            - Build uses CMake presets; tests run via slang-test
+            - Check if failure is platform-specific or affects all platforms
+            - Error logs are truncated — use `gh run view <run_id> --log-failed` for full logs
+            - For individual job logs: `gh api repos/{owner}/{repo}/actions/jobs/{job_id}/logs`
 
             ### **Fix Guidelines**
-            - Fix the root cause with minimal targeted changes — don't refactor surrounding code
-            - Always commit on the fix branch first, then merge back to the PR branch
-            - Comment on the PR explaining what failed, why, and what you changed
+            - Fix the root cause, not symptoms — apply minimal targeted changes
+            - For formatting failures: run `./extras/formatting.sh` and commit
+            - For compilation errors: fix the code and verify it builds
+            - For test failures: fix the test or the code that broke it
+            - Always commit fixes on the fix branch first, then merge back to the PR branch
+            - Comment on the PR explaining the fix
 
           mcp-config: |
             {
@@ -216,7 +208,7 @@ jobs:
             }
 
           allowed-tools: |
-            View,Edit,GlobTool,GrepTool,BatchTool,Write,WebSearch,
+            View,GlobTool,GrepTool,BatchTool,Write,WebSearch,
             Bash(cmake*),
             Bash(./build/*slangc*),
             Bash(./build/*slang-test*),
@@ -233,9 +225,6 @@ jobs:
             Bash(chmod *),
             mcp__deepwiki__ask_question,
             mcp__github__add_issue_comment,
-            mcp__github__get_pull_request,
-            mcp__github__get_pull_request_diff,
-            mcp__github__get_pull_request_files,
             mcp__github_ci__get_ci_status,
             mcp__github_ci__get_workflow_run_details,
             mcp__github_ci__download_job_log

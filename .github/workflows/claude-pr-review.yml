@@ -68,40 +68,44 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
-            Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
+            Review this PR for the Slang shader compiler. Focus on:
+            1. IR consistency: ensure IR passes maintain type invariants and don't break SSA form
+            2. Target correctness: check that code generation changes work across SPIRV, HLSL, GLSL, Metal, CUDA targets
+            3. Bugs and security issues: look for null dereferences, use-after-free, missing error handling
+            4. Test coverage: verify new code has tests (CPU or INTERPRET mode for non-GPU features)
+            5. API compatibility: flag changes to public headers (include/slang.h, slang-gfx.h) as potentially breaking
 
             ### Review workflow
             1. Fetch the PR diff and changed files list
-            2. Read each changed file IN FULL in the repository (not just the diff) to understand context
+            2. Read and analyze each changed file in the repository
             3. Create a PENDING review with mcp__github__create_pending_pull_request_review
-            4. Add inline comments using mcp__github__add_comment_to_pending_review for every bug,
-               issue, suggestion, or non-trivial observation. Aim for at least one inline comment per
-               changed file when there is something worth noting. Do NOT use inline comments for praise.
+            4. Add inline comments to the pending review using mcp__github__add_comment_to_pending_review
+               for every bug, issue, suggestion, question, or non-trivial observation you find.
+               Aim for at least one inline comment per changed file when there is something worth noting.
+               Do NOT use inline comments for praise — save that for the summary.
             5. Submit the review with mcp__github__create_and_submit_pull_request_review including
-               a summary with overall assessment, positive feedback, and approval/request-changes decision.
-            6. ALWAYS post a PR comment via mcp__github__add_issue_comment summarizing what the PR does,
-               key findings, and verdict. This ensures notification even if the review submission fails.
+               a top-level summary with overall assessment, positive feedback, and approval/request-changes decision.
+            6. ALWAYS post a PR comment using mcp__github__add_issue_comment summarizing:
+               - What the PR does
+               - Key findings (bugs, risks, suggestions)
+               - Verdict (approve / request changes)
+               This ensures the author gets a visible notification even if the review submission fails.
 
-            Inline comments are the most valuable part. Be specific and line-level, not vague.
+            Inline comments are the most valuable part of the review. Be thorough — reviewers prefer
+            specific, line-level feedback over vague top-level summaries.
 
-          # Note: CLAUDE.md is auto-loaded and covers compiler pipeline, IR system, CLI conventions, etc.
-          # These instructions cover ONLY review-specific priorities and patterns.
           custom-instructions: |
-            ### **Review Priorities**
-            - IR pass changes: verify SSA form and type invariants are maintained
-            - Emit changes: all target backends (SPIRV, HLSL, GLSL, Metal, CUDA, WGSL) should be consistent;
-              emit logic should be simple — flag complex transforms that belong in IR passes
-            - Semantic check changes (slang-check-*.cpp): verify overload resolution and type coercion
-            - New IR instructions: must be in slang-ir-insts.lua with proper FIDDLE annotations
-            - Public API changes (include/slang.h): flag as potentially ABI-breaking, need "pr: breaking" label
-            - Test coverage: bug fixes need regression tests; non-GPU features use CPU or INTERPRET mode
+            ### **Slang Compiler Context**
+            - Slang is an SSA-based shader compiler with custom IR (not LLVM)
+            - Pipeline: Lexer -> Parser -> Semantic Check -> IR Gen -> IR Passes -> Code Emission
+            - Key source dirs: source/slang/ (compiler), source/core/ (utilities), source/compiler-core/ (infra)
+            - IR instructions defined in slang-ir-insts.lua, generated code in build/source/slang/fiddle/
 
-            ### **Common Patterns to Flag**
-            - Unchecked `as<T>()` casts on IRInst* (should check for null or use dynamicCast)
-            - Missing cases in switch statements over IROp enums
-            - IR passes that modify instructions without updating uses/users correctly
-            - Emit code doing complex transforms instead of delegating to IR passes
-            - Missing `break` or `return` in exhaustive IROp switches
+            ### **Review Priorities**
+            - IR pass changes: verify input/output IR invariants are maintained
+            - Emit changes: ensure all target backends are updated consistently
+            - Keep emit logic simple; heavy transforms belong in IR passes
+            - Check for proper use of FIDDLE macros in AST nodes
 
           mcp-config: |
             {
