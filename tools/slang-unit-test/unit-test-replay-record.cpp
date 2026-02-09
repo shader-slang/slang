@@ -254,7 +254,7 @@ static SlangResult runTest(
             getTestReporter()->message(
                 TestMessageType::TestFailure,
                 errBuilder.toString().getBuffer());
-            cleanupRecordFiles(recordPath);            
+            cleanupRecordFiles(recordPath);
             return SLANG_FAIL;
         }
     }
