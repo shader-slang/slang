@@ -137,9 +137,10 @@ public:
     virtual SLANG_NO_THROW void SLANG_MCALL
     setDownstreamCompilerPath(SlangPassThrough passThrough, char const* path) override
     {
-        SLANG_UNUSED(passThrough);
-        SLANG_UNUSED(path);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::setDownstreamCompilerPath");
+        RECORD_CALL();
+        RECORD_INPUT(passThrough);
+        RECORD_INPUT(path);
+        getActual<slang::IGlobalSession>()->setDownstreamCompilerPath(passThrough, path);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL
@@ -358,9 +359,15 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob) override
     {
-        SLANG_UNUSED(sessionDesc);
-        SLANG_UNUSED(outBlob);
-        REPLAY_UNIMPLEMENTED_X("GlobalSessionProxy::getSessionDescDigest");
+        RECORD_CALL();
+        RECORD_INPUT(*sessionDesc);
+        ISlangBlob* blobPtr;
+        if (!outBlob)
+            outBlob = &blobPtr;
+        auto result =
+            getActual<slang::IGlobalSession>()->getSessionDescDigest(sessionDesc, outBlob);
+        RECORD_COM_OUTPUT(outBlob);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL compileBuiltinModule(

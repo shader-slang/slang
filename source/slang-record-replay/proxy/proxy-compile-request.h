@@ -395,13 +395,18 @@ public:
 
     virtual SLANG_NO_THROW int SLANG_MCALL getDependencyFileCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getDependencyFileCount");
+        RECORD_CALL();
+        auto result = getActual<slang::ICompileRequest>()->getDependencyFileCount();
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(int index) override
     {
-        SLANG_UNUSED(index);
-        REPLAY_UNIMPLEMENTED_X("CompileRequestProxy::getDependencyFilePath");
+        RECORD_CALL();
+        RECORD_INPUT(index);
+        auto result = getActual<slang::ICompileRequest>()->getDependencyFilePath(index);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW int SLANG_MCALL getTranslationUnitCount() override

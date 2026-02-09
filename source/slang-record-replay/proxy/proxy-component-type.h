@@ -421,8 +421,12 @@ public:
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL writeToFile(char const* fileName) override
     {
-        SLANG_UNUSED(fileName);
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::writeToFile");
+        if (!m_module)
+            return SLANG_E_NOT_IMPLEMENTED;
+        RECORD_CALL();
+        RECORD_INPUT(fileName);
+        auto result = m_module->writeToFile(fileName);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW const char* SLANG_MCALL getName() override
@@ -471,13 +475,22 @@ public:
 
     virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override
     {
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::getDependencyFileCount");
+         if (!m_module)
+            return 0;
+        RECORD_CALL();
+        auto result = m_module->getDependencyFileCount();
+        RECORD_INFO(result);
+        return result;
     }
 
     virtual SLANG_NO_THROW char const* SLANG_MCALL getDependencyFilePath(SlangInt32 index) override
     {
-        SLANG_UNUSED(index);
-        REPLAY_UNIMPLEMENTED_X("ComponentTypeProxy::getDependencyFilePath");
+        if (!m_module)
+            return nullptr;
+        RECORD_CALL();
+        RECORD_INPUT(index);
+        auto result = m_module->getDependencyFilePath(index);
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW slang::DeclReflection* SLANG_MCALL getModuleReflection() override
