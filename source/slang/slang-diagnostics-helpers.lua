@@ -431,9 +431,11 @@ local function process_diagnostics(diagnostics_table)
       local param_contexts = {}
       local seen_params = {} -- name -> type mapping
       local seen_locations = {} -- name -> {type, variadic, struct_name}
+      local param_order = {} -- Array tracking order of first appearance
 
       -- Variadic structs: struct_name -> { params = {}, locations = {}, container_type = "span"|"note" }
       local variadic_structs = {}
+      local variadic_structs_order = {} -- Array tracking order of variadic struct registration
 
       -- First pass: collect all locations to build the known_params map
       local function collect_location(container)
@@ -456,6 +458,7 @@ local function process_diagnostics(diagnostics_table)
           -- Track context (variadic vs non-variadic)
           if not param_contexts[loc_name] then
             param_contexts[loc_name] = { variadic_structs = {}, non_variadic = false, is_location = true }
+            table.insert(param_order, loc_name) -- Track order of first appearance
           end
           if container.variadic and container.struct_name then
             param_contexts[loc_name].variadic_structs[container.struct_name] = true
@@ -476,6 +479,7 @@ local function process_diagnostics(diagnostics_table)
           if span.variadic and span.struct_name then
             if not variadic_structs[span.struct_name] then
               variadic_structs[span.struct_name] = { params = {}, locations = {}, container_type = "span", container = span }
+              table.insert(variadic_structs_order, span.struct_name) -- Track order
             end
           end
         end
@@ -489,6 +493,7 @@ local function process_diagnostics(diagnostics_table)
           if note.variadic and note.struct_name then
             if not variadic_structs[note.struct_name] then
               variadic_structs[note.struct_name] = { params = {}, locations = {}, container_type = "note", container = note }
+              table.insert(variadic_structs_order, note.struct_name) -- Track order
             end
           end
           -- Collect locations from spans within notes
@@ -535,6 +540,7 @@ local function process_diagnostics(diagnostics_table)
             if not part.member_name then
               if not param_contexts[param_name] then
                 param_contexts[param_name] = { variadic_structs = {}, non_variadic = false, is_location = false }
+                table.insert(param_order, param_name) -- Track order of first appearance
               end
               if container.variadic and container.struct_name then
                 param_contexts[param_name].variadic_structs[container.struct_name] = true
@@ -589,7 +595,9 @@ local function process_diagnostics(diagnostics_table)
       local direct_params = {}
       local direct_locations = {}
 
-      for param_name, ctx in pairs(param_contexts) do
+      -- Iterate in order of first appearance
+      for _, param_name in ipairs(param_order) do
+        local ctx = param_contexts[param_name]
         local variadic_count = 0
         local single_struct = nil
         for struct_name, _ in pairs(ctx.variadic_structs) do
@@ -615,9 +623,10 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- Convert variadic_structs map to list and add list_name
+      -- Convert variadic_structs map to list and add list_name (in order of registration)
       local variadic_structs_list = {}
-      for struct_name, vs in pairs(variadic_structs) do
+      for _, struct_name in ipairs(variadic_structs_order) do
+        local vs = variadic_structs[struct_name]
         vs.struct_name = struct_name
         vs.list_name = pluralize(struct_name:sub(1,1):lower() .. struct_name:sub(2))
         table.insert(variadic_structs_list, vs)
