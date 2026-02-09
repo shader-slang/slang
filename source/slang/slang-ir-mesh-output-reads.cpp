@@ -23,9 +23,26 @@ void checkForMeshOutputReadsRecursive(IRInst* inst, DiagnosticSink* sink)
                 switch (opInst->getOp())
                 {
                 case kIROp_Load:
-                    if (as<IRMeshOutputRef>(as<IRLoad>(opInst)->getPtr()))
+                    IRInst* next = as<IRLoad>(opInst)->getPtr();
+                    for (;;)
                     {
-                        sink->diagnose(opInst, Diagnostics::attemptToReadFromMeshShaderOutput);
+                        if (as<IRMeshOutputRef>(next))
+                        {
+                            sink->diagnose(next, Diagnostics::attemptToReadFromMeshShaderOutput);
+                            break;
+                        }
+                        else if (auto gep = as<IRGetElementPtr>(next))
+                        {
+                            next = gep->getBase();
+                        }
+                        else if (auto fieldAddress = as<IRFieldAddress>(next))
+                        {
+                            next = fieldAddress->getBase();
+                        }
+                        else
+                        {
+                            break;
+                        }
                     }
                     break;
                 }
