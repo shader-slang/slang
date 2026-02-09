@@ -22,14 +22,14 @@ typealias Storage = StructuredBufferStorage<float>;
 typealias XVec = InlineVector<float, 4>;
 typealias YVec = InlineVector<float, 2>;
 typealias Act = ReLU<float>;
-typealias Layer = FFLayer<float, XVec, YVec, Storage, Act, true>;
+typealias Layer = FFLayer<float, XVec, YVec, Storage, LinearLayout, Act, true>;
 
 // Test: evaluate layer through ILayer constraint
 InlineVector<float, 2> evalAsLayer<L>(
     L layer,
     Storage storage,
     InlineVector<float, 4> input)
-    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Storage, Act>
+    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Storage, LinearLayout, Act>
 {
     return layer.eval<Storage>(storage, input);
 }
