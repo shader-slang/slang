@@ -153,41 +153,6 @@ inline void recordInputs(ReplayContext& ctx, Args&... args)
 inline void recordInputs(ReplayContext&) {}
 
 // =============================================================================
-// Higher-level Macros - Common patterns
-// =============================================================================
-
-// Pattern: SlangResult method(inputs..., T** outObject)
-// Usage: RECORD_METHOD_OUTPUT(createSession, outSession, desc)
-//        - outSession is the T** output parameter
-//        - desc, etc. are the input parameters
-#define RECORD_METHOD_OUTPUT(method, outParam, ...)                         \
-    RECORD_CALL();                                                          \
-    recordInputs(_ctx, __VA_ARGS__);                                        \
-    auto _result = ProxyBase::getActual() -> method(__VA_ARGS__, outParam); \
-    RECORD_COM_OUTPUT(outParam);                                            \
-    RECORD_RETURN(_result)
-
-// Pattern: T method(inputs...) - method with inputs and return value
-#define RECORD_METHOD_RETURN(method, ...)                         \
-    RECORD_CALL();                                                \
-    recordInputs(_ctx, __VA_ARGS__);                              \
-    auto _result = ProxyBase::getActual() -> method(__VA_ARGS__); \
-    RECORD_RETURN(_result)
-
-// Pattern: void method(inputs...) - void method with only inputs
-#define RECORD_METHOD_VOID(method, ...)          \
-    RECORD_CALL();                               \
-    recordInputs(_ctx, __VA_ARGS__);             \
-    ProxyBase::getActual()->method(__VA_ARGS__); \
-    RECORD_RETURN_VOID()
-
-// Pattern: T method() - no-arg method with return value
-#define RECORD_METHOD_RETURN_NOARGS(method)            \
-    RECORD_CALL();                                     \
-    auto _result = ProxyBase::getActual() -> method(); \
-    RECORD_RETURN(_result)
-
-// =============================================================================
 // Session-specific Macros
 // =============================================================================
 
