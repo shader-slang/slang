@@ -45,9 +45,7 @@ public:
     {
 
         // IComponentType is always expected to be supported
-        actual->queryInterface(
-            slang::IComponentType::getTypeGuid(),
-            (void**)&m_componentType);
+        actual->queryInterface(slang::IComponentType::getTypeGuid(), (void**)&m_componentType);
         if (m_componentType)
             m_componentType->release(); // undo addRef - m_actual holds the ref
 
@@ -60,9 +58,7 @@ public:
         if (m_entryPoint)
             m_entryPoint->release();
 
-        actual->queryInterface(
-            slang::ITypeConformance::getTypeGuid(),
-            (void**)&m_typeConformance);
+        actual->queryInterface(slang::ITypeConformance::getTypeGuid(), (void**)&m_typeConformance);
         if (m_typeConformance)
             m_typeConformance->release();
     }
@@ -103,8 +99,7 @@ public:
         if (uuid == ComponentTypeProxy::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<slang::IComponentType*>(
-                static_cast<slang::IModule*>(this));
+            *outObject = static_cast<slang::IComponentType*>(static_cast<slang::IModule*>(this));
             return SLANG_OK;
         }
 
@@ -136,8 +131,7 @@ public:
         if (uuid == slang::IComponentType::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<slang::IComponentType*>(
-                static_cast<slang::IModule*>(this));
+            *outObject = static_cast<slang::IComponentType*>(static_cast<slang::IModule*>(this));
             return SLANG_OK;
         }
 
@@ -161,8 +155,7 @@ public:
         if (uuid == ISlangUnknown::getTypeGuid())
         {
             addRef();
-            *outObject = static_cast<ISlangUnknown*>(
-                static_cast<slang::IModule*>(this));
+            *outObject = static_cast<ISlangUnknown*>(static_cast<slang::IModule*>(this));
             return SLANG_OK;
         }
 
@@ -186,8 +179,7 @@ public:
         RECORD_CALL();
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        slang::ProgramLayout* result =
-            m_componentType->getLayout(targetIndex, outDiagnostics);
+        slang::ProgramLayout* result = m_componentType->getLayout(targetIndex, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         return result;
     }
@@ -330,8 +322,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outCode);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        auto result =
-            m_componentType->getTargetCode(targetIndex, outCode, outDiagnostics);
+        auto result = m_componentType->getTargetCode(targetIndex, outCode, outDiagnostics);
         RECORD_COM_OUTPUT(outCode);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -346,10 +337,7 @@ public:
         RECORD_INPUT(targetIndex);
         PREPARE_POINTER_OUTPUT(outMetadata);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        auto result = m_componentType->getTargetMetadata(
-            targetIndex,
-            outMetadata,
-            outDiagnostics);
+        auto result = m_componentType->getTargetMetadata(targetIndex, outMetadata, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
     }
@@ -463,11 +451,8 @@ public:
         RECORD_INPUT(stage);
         PREPARE_POINTER_OUTPUT(outEntryPoint);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
-        SlangResult result = m_module->findAndCheckEntryPoint(
-            name,
-            stage,
-            outEntryPoint,
-            outDiagnostics);
+        SlangResult result =
+            m_module->findAndCheckEntryPoint(name, stage, outEntryPoint, outDiagnostics);
         RECORD_ENTRYPOINT_OUTPUT(outEntryPoint);
         RECORD_COM_OUTPUT(outDiagnostics);
         RECORD_RETURN(result);
@@ -608,10 +593,10 @@ public:
     }
 
 private:
-    slang::IComponentType* m_componentType;       // Always valid
-    slang::IModule* m_module;                     // May be null
-    slang::IEntryPoint* m_entryPoint;             // May be null
-    slang::ITypeConformance* m_typeConformance;   // May be null
+    slang::IComponentType* m_componentType;     // Always valid
+    slang::IModule* m_module;                   // May be null
+    slang::IEntryPoint* m_entryPoint;           // May be null
+    slang::ITypeConformance* m_typeConformance; // May be null
     bool m_hasRegisteredCoreModule;
     List<ComPtr<slang::IEntryPoint>> m_returnedEntryPoints;
 };
