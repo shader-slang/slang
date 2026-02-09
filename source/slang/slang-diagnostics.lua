@@ -136,11 +136,11 @@ err(
 )
 
 err(
-  39999,
   "ambiguous overload for name with args",
+  39999,
   "ambiguous call to '~name' with arguments of type ~args",
-  span({ loc = "expr:Expr", message = "in call expression" }),
-  variadic_note({ cpp_name = "Candidate", message = "candidate: ~candidate_signature", span("candidate:Decl") })
+  span("expr:Expr", "in call expression"),
+  variadic_note("Candidate", "candidate: ~candidate_signature", span("candidate:Decl"))
 )
 
 err(
@@ -156,7 +156,14 @@ err(
   )
 )
 
-err("subscript non array", 30013, "no subscript operation found for type '~type:Type'", span("expr:Expr", "here"))
+err(
+  "subscript non array",
+  30013,
+  "invalid subscript expression",
+  span("expr:Expr", "no subscript declarations found for type '~type:Type'"),
+  span("parent:Expr", "parent is here!")
+  -- note("consider adding one to the type here", span("base_type:Decl"))
+)
 
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
