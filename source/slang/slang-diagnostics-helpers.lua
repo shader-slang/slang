@@ -574,6 +574,37 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
+      -- Helper to extract all required parameters from a container (for null checking)
+      -- Only includes pointer types (not strings or ints) since those can be null-checked
+      local function extract_required_params(container)
+        local required = {}
+        local required_set = {}
+
+        -- Add location parameter if it's typed (locations are always pointers or SourceLoc)
+        if container.location_name and container.location_type then
+          table.insert(required, container.location_name)
+          required_set[container.location_name] = true
+        end
+
+        -- Add all pointer-type parameters from message (excluding member accesses and non-pointer types)
+        if container.message_parts then
+          for _, part in ipairs(container.message_parts) do
+            if part.type == "interpolation" and not part.member_name then
+              local param_type = seen_params[part.param_name]
+              -- Only add pointer types (type, decl, expr, stmt, val, name - not string or int)
+              if param_type and param_type ~= "string" and param_type ~= "int" then
+                if not required_set[part.param_name] then
+                  table.insert(required, part.param_name)
+                  required_set[part.param_name] = true
+                end
+              end
+            end
+          end
+        end
+
+        return required
+      end
+
       -- Second pass: process messages now that we know all the location parameters
       local function process_message_container(container, context_path)
         local success, parts = pcall(parse_message, container.message, seen_params)
@@ -629,13 +660,59 @@ local function process_diagnostics(diagnostics_table)
       local main_msg_container = { message = diag.message }
       local main_parts = process_message_container(main_msg_container, diagnostic_name .. ".message")
 
+      -- Extract required params from main message for assertions (only pointer types)
+      main_msg_container.message_parts = main_parts
+      local main_required = {}
+      if main_parts then
+        for _, part in ipairs(main_parts) do
+          if part.type == "interpolation" and not part.member_name then
+            local param_type = seen_params[part.param_name]
+            -- Only add pointer types (not string or int)
+            if param_type and param_type ~= "string" and param_type ~= "int" then
+              table.insert(main_required, part.param_name)
+            end
+          end
+        end
+      end
+
       -- 2. Process primary span
       process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
+
+      -- Extract required params from primary span for assertions (only pointer types)
+      local primary_span_required = {}
+      if diag.primary_span.location_name and diag.primary_span.location_type then
+        table.insert(primary_span_required, diag.primary_span.location_name)
+      end
+      if diag.primary_span.message_parts then
+        for _, part in ipairs(diag.primary_span.message_parts) do
+          if part.type == "interpolation" and not part.member_name then
+            local param_type = seen_params[part.param_name]
+            -- Only add pointer types (not string or int)
+            if param_type and param_type ~= "string" and param_type ~= "int" then
+              -- Avoid duplicates
+              local found = false
+              for _, existing in ipairs(primary_span_required) do
+                if existing == part.param_name then
+                  found = true
+                  break
+                end
+              end
+              if not found then
+                table.insert(primary_span_required, part.param_name)
+              end
+            end
+          end
+        end
+      end
 
       -- 3. Process secondary spans
       if diag.secondary_spans then
         for j, span in ipairs(diag.secondary_spans) do
           process_message_container(span, diagnostic_name .. ".secondary_spans[" .. j .. "]")
+          -- Extract required params for null checking (skip variadic spans, they're handled per-item)
+          if not span.variadic then
+            span.required_params = extract_required_params(span)
+          end
         end
       end
 
@@ -653,7 +730,13 @@ local function process_diagnostics(diagnostics_table)
           if note.spans then
             for k, span in ipairs(note.spans) do
               process_message_container(span, diagnostic_name .. ".notes[" .. j .. "].spans[" .. k .. "]")
+              -- Extract required params for additional spans
+              span.required_params = extract_required_params(span)
             end
+          end
+          -- Extract required params for null checking (skip variadic notes, they're handled per-item)
+          if not note.variadic then
+            note.required_params = extract_required_params(note)
           end
         end
       end
@@ -698,6 +781,8 @@ local function process_diagnostics(diagnostics_table)
         local vs = variadic_structs[struct_name]
         vs.struct_name = struct_name
         vs.list_name = pluralize(struct_name:sub(1,1):lower() .. struct_name:sub(2))
+        -- Extract required params for the variadic container
+        vs.required_params = extract_required_params(vs.container)
         table.insert(variadic_structs_list, vs)
       end
 
@@ -707,6 +792,8 @@ local function process_diagnostics(diagnostics_table)
         severity = diag.severity,
         message = diag.message,
         message_parts = main_parts,
+        message_required_params = main_required,
+        primary_span_required_params = primary_span_required,
         params = direct_params,
         locations = direct_locations,
         variadic_structs = variadic_structs_list,
