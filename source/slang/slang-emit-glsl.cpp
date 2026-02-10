@@ -3472,13 +3472,13 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             // Emit appropriate HitObject type based on capability
             // User must explicitly specify which extension to use
             auto targetCaps = getTargetCaps();
-            if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
-            {
-                m_writer->emit("hitObjectEXT");
-            }
-            else if (targetCaps.implies(CapabilityAtom::_GL_NV_shader_invocation_reorder))
+            if (targetCaps.implies(CapabilityAtom::_GL_NV_shader_invocation_reorder))
             {
                 m_writer->emit("hitObjectNV");
+            }
+            else if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectEXT");
             }
             else
             {

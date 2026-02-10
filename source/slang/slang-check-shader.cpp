@@ -1063,31 +1063,28 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     }
                 }
 
-                // Filter out vendor-variant atoms that derive from capabilities
-                // the user already specified. For example, if the user specified
-                // spvShaderInvocationReorderEXT and the compiler inferred
-                // spvShaderInvocationReorderNV (because __target_switch has an NV
-                // branch), we suppress the NV atom from the warning since NV
-                // inherits from EXT and the EXT path will be used.
+                // Filter out vendor-variant atoms that derive from SPIR-V
+                // extension capabilities the user already specified. For
+                // example, if the user specified spvShaderInvocationReorderEXT,
+                // suppress spvShaderInvocationReorderNV (which derives from
+                // SPV_EXT_shader_invocation_reorder in the capability hierarchy)
+                // from the warning.
+                // We only check derivation against SPIR-V extension atoms
+                // (names starting with "SPV_") in the target set. This avoids
+                // false-positive suppression of legitimate version-upgrade
+                // warnings (e.g., sm_4_0->sm_6_0, GLSL_130->GLSL_450).
                 CapabilityAtomSet filteredAddedAtoms{};
                 if (maybeTargetCapSet)
                 {
-                    auto& targetsSet = getAtomSetOfTargets();
-                    auto& stagesSet = getAtomSetOfStages();
                     for (auto atom : addedAtoms.getElements<CapabilityAtom>())
                     {
                         bool isDerivedFromTarget = false;
                         for (auto targetAtom :
                              (*maybeTargetCapSet).getElements<CapabilityAtom>())
                         {
-                            // Skip target and stage atoms (spirv, hlsl, vertex, etc.)
-                            if (targetsSet.contains(UInt(targetAtom)) ||
-                                stagesSet.contains(UInt(targetAtom)))
+                            if (!isSpirvExtensionAtom(targetAtom))
                                 continue;
-                            // Skip internal/version atoms (e.g., _spirv_1_5, _GLSL_460)
-                            if (isInternalCapabilityName(CapabilityName(targetAtom)))
-                                continue;
-                            if (isCapabilityDerivedFrom(atom, (CapabilityAtom)targetAtom))
+                            if (isCapabilityDerivedFrom(atom, targetAtom))
                             {
                                 isDerivedFromTarget = true;
                                 break;
