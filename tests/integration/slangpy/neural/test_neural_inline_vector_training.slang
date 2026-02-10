@@ -16,7 +16,7 @@ typealias Act = IdentityActivation<float>;
 
 // Linear layer: Input=2 (x, x^2), Output=1 (y), with bias
 // Parameters: weights (1x2) + bias (1) = 3 params
-typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+typealias LinearLayer = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
 static const int PARAM_COUNT = LinearLayer.ParameterCount;
 

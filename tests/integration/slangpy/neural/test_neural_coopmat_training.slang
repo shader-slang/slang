@@ -48,7 +48,7 @@ void compute_forward_pass(
     typealias V2 = WaveTangledVector<float, ShMemPool, InputSize, SubgroupSize>;
     typealias V1 = WaveTangledVector<float, ShMemPool, OutputSize, SubgroupSize>;
     typealias Act = IdentityActivation<float>;
-    typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+    typealias LinearLayer = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
     let storage = Storage(params);
     let layer = LinearLayer(0, 2);  // weights at 0, bias at 2
@@ -81,7 +81,7 @@ void compute_eval_loss(
     typealias V2 = WaveTangledVector<float, ShMemPool, InputSize, SubgroupSize>;
     typealias V1 = WaveTangledVector<float, ShMemPool, OutputSize, SubgroupSize>;
     typealias Act = IdentityActivation<float>;
-    typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+    typealias LinearLayer = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
     let storage = Storage(params);
     let layer = LinearLayer(0, 2);
@@ -125,7 +125,7 @@ void compute_train_step(
     typealias V2 = WaveTangledVector<float, ShMemPool, InputSize, SubgroupSize>;
     typealias V1 = WaveTangledVector<float, ShMemPool, OutputSize, SubgroupSize>;
     typealias Act = IdentityActivation<float>;
-    typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+    typealias LinearLayer = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
     let storage = Storage(params);
     let layer = LinearLayer(0, 2);
@@ -199,7 +199,7 @@ void compute_grad_multiworkgroup(
     typealias V2 = WaveTangledVector<float, ShMemPool, InputSize, SubgroupSize>;
     typealias V1 = WaveTangledVector<float, ShMemPool, OutputSize, SubgroupSize>;
     typealias Act = IdentityActivation<float>;
-    typealias LinearLayer = FFLayer<float, V2, V1, Storage, Act, true>;
+    typealias LinearLayer = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
     // Each workgroup processes one sample (using gtid=0 for the computation)
     let idx = int(gid.x);
