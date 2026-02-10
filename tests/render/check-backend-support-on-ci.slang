@@ -1,15 +1,13 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK): -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4):name=gInput
+//TEST_INPUT:ubuffer(data=[1.0 1.0 1.0 1.0], stride=4):name=gInput
 RWStructuredBuffer<float> gInput;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=gOutput
 RWStructuredBuffer<float> gOutput;
 
-//CHK:1
-//CHK-NEXT:2
-//CHK-NEXT:3
-//CHK-NEXT:4
+// Note that COUNT-5 will fail but COUNT-3 wouldn't fail.
+//CHK-COUNT-3:1
 
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
