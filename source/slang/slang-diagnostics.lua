@@ -172,9 +172,7 @@ err(
     "subscript non array",
     30013,
     "invalid subscript expression",
-    span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" },
-    span { loc = "parent:Expr", message = "parent is here!" },
-    note { message = "consider adding one to the type here", span { loc = "base_type:Decl" } }
+    span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" }
 )
 
 -- Process and validate all diagnostics

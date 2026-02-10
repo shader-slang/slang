@@ -7,13 +7,14 @@ local diagnostics = {}
 -- Or named: span({loc = location, message = message})
 local function span(location, message)
   -- Normalize named arguments to positional
-  if type(location) == "table" and not location.location then
+  -- Detect named argument table by checking it's not an already-built span (which has is_note field)
+  if type(location) == "table" and location.is_note == nil then
     -- Named argument format
     local args = location
-    location = args.loc or args.location
+    location = args.loc
     message = args.message
     if not location then
-      error("span() requires 'loc' or 'location' field in named argument format")
+      error("span() requires 'loc' field in named argument format")
     end
   end
 
@@ -85,17 +86,18 @@ end
 -- Or named: variadic_span({cpp_name = struct_name, loc = location, message = message})
 local function variadic_span(struct_name, location, message)
   -- Normalize named arguments to positional
-  if type(struct_name) == "table" and not struct_name.location then
+  -- Detect named argument table by checking it's not an already-built span (which has is_note field)
+  if type(struct_name) == "table" and struct_name.is_note == nil then
     -- Named argument format
     local args = struct_name
-    struct_name = args.cpp_name or args.struct_name
-    location = args.loc or args.location
+    struct_name = args.cpp_name
+    location = args.loc
     message = args.message
     if not struct_name then
-      error("variadic_span() requires 'cpp_name' or 'struct_name' field in named argument format")
+      error("variadic_span() requires 'cpp_name' field in named argument format")
     end
     if not location then
-      error("variadic_span() requires 'loc' or 'location' field in named argument format")
+      error("variadic_span() requires 'loc' field in named argument format")
     end
     if not message then
       error("variadic_span() requires 'message' field in named argument format")

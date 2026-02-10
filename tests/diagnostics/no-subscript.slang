@@ -1,7 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
-// Test that use of empty statement after an `if` leads to a warning.
-
 int foo(){
     int x;
     return x[0];
