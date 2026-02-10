@@ -167,8 +167,8 @@ static void foldThreadGroupSizeExtents(
         // Try to fold extents[i] into a ConstIntVal. If that failed, we should
         // report the size as 0 to indicate that its value is not known yet.
         outSizeAlongAxis[i] = 0;
-        auto substExtent = as<IntVal>(
-            extents[i]->substitute(astBuilder, SubstitutionSet(entryPointFunc)));
+        auto substExtent =
+            as<IntVal>(extents[i]->substitute(astBuilder, SubstitutionSet(entryPointFunc)));
         if (!substExtent)
             continue;
         if (auto cint = program->tryFoldIntVal(substExtent))
