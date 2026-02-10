@@ -5,6 +5,14 @@ on:
     - cron: "*/30 * * * *" # Every 30 minutes
   workflow_dispatch: # Allow manual trigger
 
+concurrency:
+  group: populate-fork-cache
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   check-changes:
     runs-on: ubuntu-latest
@@ -29,7 +37,10 @@ jobs:
 
           echo "Checking for existing cache marker: ${MARKER_KEY}"
 
-          if gh api repos/${{ github.repository }}/actions/caches --jq ".actions_caches[] | select(.key == \"${MARKER_KEY}\") | .key" 2>/dev/null | grep -q "${MARKER_KEY}"; then
+          # Use key query parameter to check for specific cache (avoids pagination issues)
+          CACHE_COUNT=$(gh api "repos/${{ github.repository }}/actions/caches?key=${MARKER_KEY}" --jq '.total_count' 2>/dev/null || echo "0")
+
+          if [ "$CACHE_COUNT" -gt 0 ]; then
             echo "✅ Cache already populated for commit ${CURRENT_COMMIT}"
             echo "should-build=false" >> $GITHUB_OUTPUT
           else
@@ -67,7 +78,7 @@ jobs:
 
   mark-cached:
     needs: [check-changes, build-linux-release, build-macos-release]
-    if: always() && needs.check-changes.outputs.should-build == 'true'
+    if: needs.check-changes.outputs.should-build == 'true' && needs.build-linux-release.result == 'success' && needs.build-macos-release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,8 +86,13 @@ jobs:
           ref: master
           fetch-depth: 1
 
+      - name: Create cache marker file
+        run: |
+          mkdir -p .cache-markers
+          echo "fork-cache-marker for commit ${{ needs.check-changes.outputs.last-commit }}" > .cache-markers/fork-cache-marker.txt
+
       - name: Save cache marker
         uses: actions/cache/save@v4
         with:
-          path: .github/workflows
+          path: .cache-markers/fork-cache-marker.txt
           key: fork-cache-marker-${{ needs.check-changes.outputs.last-commit }}
