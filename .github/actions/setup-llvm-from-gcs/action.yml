@@ -1,0 +1,122 @@
+name: Setup LLVM from GCS
+description: Download LLVM prebuilts from Google Cloud Storage, build if missing
+
+inputs:
+  os:
+    required: true
+  compiler:
+    required: true
+  platform:
+    required: true
+  llvm-hash:
+    description: "Hash of build-llvm.sh for cache key"
+    required: true
+  build-if-missing:
+    description: "Build LLVM if not found in GCS"
+    required: false
+    default: "true"
+  github-token:
+    description: "GitHub token for LLVM repo access"
+    required: false
+
+outputs:
+  cache-hit:
+    description: "Whether LLVM was found in GCS"
+    value: ${{ steps.download.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup gcloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Download LLVM from GCS
+      id: download
+      shell: bash
+      run: |
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
+
+        echo "🔍 Checking for LLVM prebuilt: ${GCS_PATH}"
+
+        # Try to download (works without auth if object is public, or with Workload Identity if authenticated)
+        if gcloud storage ls "${GCS_PATH}" 2>/dev/null; then
+          echo "✅ Found LLVM prebuilt in GCS, downloading..."
+          gcloud storage cp "${GCS_PATH}" /tmp/llvm-prebuilt.tar.gz
+
+          echo "📦 Extracting LLVM..."
+          mkdir -p build/llvm-project-install
+          tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
+          rm /tmp/llvm-prebuilt.tar.gz
+
+          echo "cache-hit=true" >> $GITHUB_OUTPUT
+          echo "✅ LLVM restored from GCS"
+
+          echo "📊 LLVM installation size:"
+          du -sh build/llvm-project-install
+
+          # Set environment variables for CMake
+          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        else
+          echo "⚠️  LLVM prebuilt not found in GCS"
+          echo "cache-hit=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Build LLVM from source
+      if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'
+      shell: bash
+      run: |
+        echo "🔨 Building LLVM from source (this takes 20-40 minutes)..."
+
+        # Use provided token or fallback to GITHUB_TOKEN
+        REPO_URL="https://github.com/llvm/llvm-project"
+        if [ -n "${{ inputs.github-token }}" ]; then
+          REPO_URL="https://${{ inputs.github-token }}@github.com/llvm/llvm-project"
+        fi
+
+        ./external/build-llvm.sh \
+          --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+          --repo "${REPO_URL}"
+
+        echo "✅ LLVM build complete"
+
+        # Set environment variables for CMake
+        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+
+    - name: Upload LLVM to GCS
+      if: steps.download.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
+      shell: bash
+      run: |
+        LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
+        GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
+        LLVM_DIR="${{ github.workspace }}/build/llvm-project-install"
+
+        if [ ! -d "${LLVM_DIR}" ]; then
+          echo "ERROR: LLVM directory not found at ${LLVM_DIR}"
+          exit 1
+        fi
+
+        echo "📦 Compressing LLVM for upload..."
+        echo "📊 Size before compression:"
+        du -sh "${LLVM_DIR}"
+
+        cd "${LLVM_DIR}"
+        tar -czf /tmp/${LLVM_KEY}.tar.gz .
+        cd -
+
+        echo "📊 Compressed size:"
+        ls -lh /tmp/${LLVM_KEY}.tar.gz
+
+        echo "📤 Uploading to GCS: ${GCS_PATH}"
+
+        # Disable parallel composite uploads to avoid scope/permission issues
+        # See: https://cloud.google.com/storage/docs/parallel-composite-uploads
+        gcloud config set storage/parallel_composite_upload_enabled False
+        gcloud storage cp /tmp/${LLVM_KEY}.tar.gz "${GCS_PATH}"
+
+        echo "✅ LLVM uploaded to GCS (publicly readable via bucket-level access)"
+
+        # Cleanup
+        rm /tmp/${LLVM_KEY}.tar.gz
