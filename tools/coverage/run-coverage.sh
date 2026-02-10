@@ -87,6 +87,26 @@ else
   cd "$REPO_ROOT"
   "$SLANG_TEST" "${TEST_ARGS[@]}"
 
+  # Run record-replay API tests with recording enabled to capture record-replay coverage
+  # This runs only the focused RecordReplayApi* tests with SLANG_RECORD_LAYER=1 to
+  # exercise the record-replay code paths. The profraw files accumulate with the main run.
+  echo
+  echo "Running record-replay API tests with recording enabled..."
+  RECORD_DIR="$COVERAGE_DIR/slang-record"
+  mkdir -p "$RECORD_DIR"
+
+  export SLANG_RECORD_LAYER=1
+  export SLANG_RECORD_DIRECTORY="$RECORD_DIR"
+
+  # Run only the RecordReplayApi tests (fast, focused coverage)
+  "$SLANG_TEST" slang-unit-test-tool/RecordReplayApi || true
+
+  unset SLANG_RECORD_LAYER
+  unset SLANG_RECORD_DIRECTORY
+
+  # Clean up recording files (only need coverage data)
+  rm -rf "$RECORD_DIR"
+
   # Check if any profraw files were generated
   if ! ls "$COVERAGE_DIR"/slang-test-*.profraw >/dev/null 2>&1; then
     echo
