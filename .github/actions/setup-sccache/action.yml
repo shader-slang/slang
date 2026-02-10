@@ -1,5 +1,5 @@
 name: Setup sccache
-description: Install and configure sccache with GCS backend for Linux and macOS
+description: Install and configure sccache with GCS backend (if bucket provided) or local disk backend for Linux and macOS
 
 inputs:
   gcs-bucket:
@@ -69,6 +69,12 @@ runs:
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
         echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
         echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
+
+        # Limit cache size to prevent unbounded growth in GitHub Actions cache
+        # Only applies to local disk backend (GCS has unlimited storage)
+        if [[ -z "${{ inputs.gcs-bucket }}" ]]; then
+          echo "SCCACHE_CACHE_SIZE=5G" >> $GITHUB_ENV
+        fi
 
         # Get sccache path for CMake
         sccache_path=$(which sccache)

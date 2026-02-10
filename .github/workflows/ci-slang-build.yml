@@ -39,6 +39,9 @@ jobs:
       id-token: write # Required for Workload Identity
       contents: read
 
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
     defaults:
       run:
         shell: bash
@@ -51,7 +54,7 @@ jobs:
 
       # Restore sccache local cache for fork PRs (unidirectional from master)
       - name: Restore sccache cache (fork PRs only)
-        if: runner.environment != 'self-hosted' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
+        if: runner.environment != 'self-hosted' && env.IS_FORK_PR == 'true'
         uses: actions/cache/restore@v4
         with:
           path: ~/.cache/sccache
@@ -62,7 +65,7 @@ jobs:
 
       # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
       - name: Authenticate to Google Cloud
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
@@ -75,7 +78,7 @@ jobs:
         with:
           platform: ${{ inputs.os }}
           # Only provide GCS bucket for non-fork PRs (empty = local disk backend)
-          gcs-bucket: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && 'slang-ci-cache' || '' }}
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Setup
         uses: ./.github/actions/common-setup

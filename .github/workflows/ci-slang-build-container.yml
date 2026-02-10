@@ -23,6 +23,9 @@ jobs:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       options: --user root
 
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
     defaults:
       run:
         shell: bash
@@ -38,7 +41,7 @@ jobs:
 
       # Restore sccache cache for fork PRs
       - name: Restore sccache cache (fork PRs only)
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
+        if: env.IS_FORK_PR == 'true'
         uses: actions/cache/restore@v4
         with:
           path: /github/home/.cache/sccache
@@ -49,7 +52,7 @@ jobs:
 
       # Authenticate to Google Cloud (skip for fork PRs)
       - name: Authenticate to Google Cloud
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
+        if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
@@ -60,7 +63,7 @@ jobs:
         uses: ./.github/actions/setup-sccache
         with:
           platform: linux
-          gcs-bucket: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && 'slang-ci-cache' || '' }}
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
