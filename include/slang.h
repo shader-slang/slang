@@ -911,6 +911,13 @@ typedef uint32_t SlangSizeT;
         SLANG_EMIT_CPU_VIA_LLVM,
     };
 
+    enum SlangDiagnosticColor
+    {
+        SLANG_DIAGNOSTIC_COLOR_AUTO = 0,   // Use color if stderr is a tty
+        SLANG_DIAGNOSTIC_COLOR_ALWAYS,     // Always use color
+        SLANG_DIAGNOSTIC_COLOR_NEVER,      // Never use color
+    };
+
     // All compiler option names supported by Slang.
     namespace slang
     {
@@ -1110,6 +1117,8 @@ typedef uint32_t SlangSizeT;
 
         EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
                                           // (implies EnableRichDiagnostics)
+
+        DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
 
         CountOf,
     };

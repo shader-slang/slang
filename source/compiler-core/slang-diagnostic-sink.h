@@ -281,6 +281,14 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
+    /// Set whether to enable terminal colors in rich diagnostics
+    void setEnableTerminalColors(bool enable) { m_enableTerminalColors = enable; }
+    bool getEnableTerminalColors() const { return m_enableTerminalColors; }
+
+    /// Set whether to enable unicode in rich diagnostics
+    void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
+    bool getEnableUnicode() const { return m_enableUnicode; }
+
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
@@ -361,6 +369,10 @@ protected:
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    // Rich diagnostics rendering options
+    bool m_enableTerminalColors = false;
+    bool m_enableUnicode = true; // Enable unicode unconditionally
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.
