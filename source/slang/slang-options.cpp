@@ -45,6 +45,8 @@ struct Option
     const char* name;
     const char* usage = nullptr;
     const char* description = nullptr;
+    const CommandOptions::InputLink* links = nullptr;
+    Count linkCount = 0;
 };
 
 enum class ValueCategory
@@ -100,8 +102,13 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
 {
     for (auto& opt : options)
     {
-        cmdOptions
-            .add(opt.name, opt.usage, opt.description, CommandOptions::UserValue(opt.optionKind));
+        cmdOptions.add(
+            opt.name,
+            opt.usage,
+            opt.description,
+            opt.links,
+            opt.linkCount,
+            CommandOptions::UserValue(opt.optionKind));
     }
 }
 
@@ -604,6 +611,21 @@ void initCommandOptions(CommandOptions& options)
         vkShiftNames.reduceLength(vkShiftNames.getLength() - 1);
     }
 
+    static const CommandOptions::InputLink kVulkanBindShiftLinks[] = {
+        {"DXC description",
+         "https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/"
+         "SPIR-V.rst#implicit-binding-number-assignment"},
+        {"GLSL wiki",
+         "https://github.com/KhronosGroup/glslang/wiki/"
+         "HLSL-FAQ#auto-mapped-binding-numbers"},
+    };
+
+    static const CommandOptions::InputLink kVulkanBindGlobalsLinks[] = {
+        {"DXC description",
+         "https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/"
+         "SPIR-V.rst#implicit-binding-number-assignment"},
+    };
+
     const Option targetOpts[] = {
         {OptionKind::Capability,
          "-capability",
@@ -690,22 +712,16 @@ void initCommandOptions(CommandOptions& options)
          "shift the "
          "inferred binding numbers for more than one space, provide more than one such option. "
          "If more than one such option is provided for the same space, the last one takes effect. "
-         "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>. "
-         "\n"
-         "* [DXC "
-         "description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/"
-         "SPIR-V.rst#implicit-binding-number-assignment)\n"
-         "* [GLSL "
-         "wiki](https://github.com/KhronosGroup/glslang/wiki/"
-         "HLSL-FAQ#auto-mapped-binding-numbers)\n"},
+         "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>.",
+         kVulkanBindShiftLinks,
+         SLANG_COUNT_OF(kVulkanBindShiftLinks)},
         {OptionKind::VulkanBindGlobals,
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
          "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.\n"
-         "It lets you specify the descriptor for the source at a certain register.\n"
-         "* [DXC "
-         "description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/"
-         "SPIR-V.rst#implicit-binding-number-assignment)\n"},
+         "It lets you specify the descriptor for the source at a certain register.",
+         kVulkanBindGlobalsLinks,
+         SLANG_COUNT_OF(kVulkanBindGlobalsLinks)},
         {OptionKind::VulkanInvertY,
          "-fvk-invert-y",
          nullptr,

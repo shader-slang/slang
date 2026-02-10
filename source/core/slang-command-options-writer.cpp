@@ -409,6 +409,18 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
             }
         }
 
+        {
+            auto links = options.getLinksForOption(option);
+            if (links.getCount() > 0)
+            {
+                for (const auto& link : links)
+                {
+                    m_builder << "* [" << link.text << "](" << link.url << ")\n";
+                }
+                m_builder << "\n";
+            }
+        }
+
         m_builder << "\n";
     }
 
@@ -604,6 +616,18 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
                 m_builder << "To get a list of values that can be used for <" << usageCat.name
                           << ">, ";
                 m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
+            }
+        }
+
+        {
+            auto links = options.getLinksForOption(option);
+            if (links.getCount() > 0)
+            {
+                for (const auto& link : links)
+                {
+                    m_builder << m_options.indent << m_options.indent;
+                    m_builder << "* " << link.text << ": " << link.url << "\n";
+                }
             }
         }
     }

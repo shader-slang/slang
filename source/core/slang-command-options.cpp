@@ -235,10 +235,39 @@ static void _handlePostFix(UnownedStringSlice& ioSlice, CommandOptions::Flags& i
     }
 }
 
+void CommandOptions::_addLinks(const InputLink* inputLinks, Count linkCount, Option& option)
+{
+    if (linkCount == 0 || inputLinks == nullptr)
+    {
+        return;
+    }
+
+    option.linkStartIndex = m_links.getCount();
+    for (Index i = 0; i < linkCount; ++i)
+    {
+        Link link;
+        link.text = _addString(inputLinks[i].text);
+        link.url = _addString(inputLinks[i].url);
+        m_links.add(link);
+    }
+    option.linkEndIndex = m_links.getCount();
+}
+
 void CommandOptions::add(
     const char* inName,
     const char* usage,
     const char* description,
+    UserValue userValue)
+{
+    add(inName, usage, description, nullptr, 0, userValue);
+}
+
+void CommandOptions::add(
+    const char* inName,
+    const char* usage,
+    const char* description,
+    const InputLink* inputLinks,
+    Count linkCount,
     UserValue userValue)
 {
     UnownedStringSlice nameSlice(inName);
@@ -247,6 +276,7 @@ void CommandOptions::add(
     option.categoryIndex = m_currentCategoryIndex;
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
+    _addLinks(inputLinks, linkCount, option);
     option.userValue = userValue;
     option.flags = 0;
 
