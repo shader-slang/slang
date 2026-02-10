@@ -1079,8 +1079,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     for (auto atom : addedAtoms.getElements<CapabilityAtom>())
                     {
                         bool isDerivedFromTarget = false;
-                        for (auto targetAtom :
-                             (*maybeTargetCapSet).getElements<CapabilityAtom>())
+                        for (auto targetAtom : (*maybeTargetCapSet).getElements<CapabilityAtom>())
                         {
                             if (!isSpirvExtensionAtom(targetAtom))
                                 continue;

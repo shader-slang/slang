@@ -2531,8 +2531,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
                     return emitOpTypeHitObject(inst);
                 }
-                else if (targetCaps.implies(
-                             CapabilityAtom::spvShaderInvocationReorderEXT))
+                else if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
                 {
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
@@ -5922,30 +5921,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             isRayTracingObject = true;
             break;
         case kIROp_VulkanHitObjectAttributesDecoration:
-        {
-            // needed since GLSL will not set optypes accordingly, but will keep the decoration
-            auto caps = m_targetProgram->getTargetReq()->getTargetCaps();
-            if (caps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
             {
-                ensureExtensionDeclaration(
-                    UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                // needed since GLSL will not set optypes accordingly, but will keep the decoration
+                auto caps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (caps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                }
+                else if (caps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                }
+                else
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                }
+                isRayTracingObject = true;
+                break;
             }
-            else if (caps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
-            {
-                ensureExtensionDeclaration(
-                    UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
-                requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
-            }
-            else
-            {
-                ensureExtensionDeclaration(
-                    UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-                requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-            }
-            isRayTracingObject = true;
-            break;
-        }
         case kIROp_VulkanRayPayloadDecoration:
         case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration
