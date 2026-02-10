@@ -28,35 +28,8 @@ import slangpy as spy
 from slangpy.core.calldata import SLANG_PATH
 from slangpy.testing import helpers
 
-
-def _get_device_with_native_neural(device_type: spy.DeviceType) -> spy.Device:
-    if helpers.should_skip_test_for_device(device_type):
-        pytest.skip(f"Device type {device_type.name} not selected for this test run")
-
-    test_dir = Path(__file__).resolve().parent
-
-    # Try to enable experimental features (required for neural module)
-    compiler_options_dict = {
-        "include_paths": [test_dir, SLANG_PATH],
-        "debug_info": spy.SlangDebugInfoLevel.standard,
-    }
-    
-    try:
-        # Try with experimental features enabled (newer slangpy)
-        compiler_options_dict["enable_experimental_features"] = True
-        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
-    except (RuntimeError, TypeError):
-        # Fall back without experimental features (older slangpy)
-        del compiler_options_dict["enable_experimental_features"]
-        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
-        pytest.skip("slangpy version does not support enable_experimental_features (required for neural module)")
-
-    return spy.Device(
-        type=device_type,
-        enable_debug_layers=True,
-        compiler_options=compiler_options,
-        label=f"uncached-slangpy-neural-coopmat-frontend-{device_type.name}",
-    )
+# Directory containing test .slang files
+TEST_DIR = Path(__file__).resolve().parent
 
 
 # CoopMat only supported on Vulkan (and CUDA with SM 7.0+, but we focus on Vulkan here)
@@ -82,7 +55,17 @@ def test_neural_coopmat_frontend_training_converges(device_type: spy.DeviceType)
     checks that the CoopMat execution path produces numerically consistent training
     behavior with the standard frontend training test.
     """
-    device = _get_device_with_native_neural(device_type)
+    if helpers.should_skip_test_for_device(device_type):
+        pytest.skip(f"Device type {device_type.name} not selected for this test run")
+
+    device = spy.Device(
+        type=device_type,
+        enable_debug_layers=True,
+        compiler_options=spy.SlangCompilerOptions({
+            "include_paths": [TEST_DIR, SLANG_PATH],
+            "enable_experimental_features": True,
+        }),
+    )
     try:
         # Check for cooperative matrix support
         if not device.has_feature(spy.Feature.cooperative_matrix):
@@ -184,7 +167,17 @@ def test_neural_coopmat_fflayer_forward_pass(device_type: spy.DeviceType) -> Non
     """
     Test FFLayer forward pass with WaveTangledVector produces correct output.
     """
-    device = _get_device_with_native_neural(device_type)
+    if helpers.should_skip_test_for_device(device_type):
+        pytest.skip(f"Device type {device_type.name} not selected for this test run")
+
+    device = spy.Device(
+        type=device_type,
+        enable_debug_layers=True,
+        compiler_options=spy.SlangCompilerOptions({
+            "include_paths": [TEST_DIR, SLANG_PATH],
+            "enable_experimental_features": True,
+        }),
+    )
     try:
         if not device.has_feature(spy.Feature.cooperative_matrix):
             pytest.skip("Cooperative matrix not supported on this device.")
@@ -236,7 +229,17 @@ def test_neural_coopmat_multiworkgroup_atomicadd(device_type: spy.DeviceType) ->
     This test verifies that gradient accumulation via atomicAdd produces
     correct results when dispatched across multiple workgroups.
     """
-    device = _get_device_with_native_neural(device_type)
+    if helpers.should_skip_test_for_device(device_type):
+        pytest.skip(f"Device type {device_type.name} not selected for this test run")
+
+    device = spy.Device(
+        type=device_type,
+        enable_debug_layers=True,
+        compiler_options=spy.SlangCompilerOptions({
+            "include_paths": [TEST_DIR, SLANG_PATH],
+            "enable_experimental_features": True,
+        }),
+    )
     try:
         if not device.has_feature(spy.Feature.cooperative_matrix):
             pytest.skip("Cooperative matrix not supported on this device.")

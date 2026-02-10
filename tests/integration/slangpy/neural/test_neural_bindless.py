@@ -19,37 +19,8 @@ import slangpy as spy
 from slangpy.core.calldata import SLANG_PATH
 from slangpy.testing import helpers
 
-
-def _get_device_with_native_neural(device_type: spy.DeviceType) -> spy.Device:
-    if helpers.should_skip_test_for_device(device_type):
-        pytest.skip(f"Device type {device_type.name} not selected for this test run")
-
-    test_dir = Path(__file__).resolve().parent
-
-    # Try to enable experimental features (required for neural module)
-    # This option may not be available in older slangpy versions
-    compiler_options_dict = {
-        "include_paths": [test_dir, SLANG_PATH],
-        "debug_info": spy.SlangDebugInfoLevel.standard,
-    }
-    
-    try:
-        # Try with experimental features enabled (newer slangpy)
-        compiler_options_dict["enable_experimental_features"] = True
-        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
-    except (RuntimeError, TypeError):
-        # Fall back without experimental features (older slangpy)
-        # Note: This will likely fail when loading neural module
-        del compiler_options_dict["enable_experimental_features"]
-        compiler_options = spy.SlangCompilerOptions(compiler_options_dict)
-        pytest.skip("slangpy version does not support enable_experimental_features (required for neural module)")
-
-    return spy.Device(
-        type=device_type,
-        enable_debug_layers=True,
-        compiler_options=compiler_options,
-        label=f"uncached-slangpy-neural-bindless-{device_type.name}",
-    )
+# Directory containing test .slang files
+TEST_DIR = Path(__file__).resolve().parent
 
 
 # Pointer-style bindless params are supported on Vulkan. Keep this test on Vulkan only
@@ -61,7 +32,17 @@ POINTER_DEVICE_TYPES: list[spy.DeviceType] = [
 
 @pytest.mark.parametrize("device_type", POINTER_DEVICE_TYPES)
 def test_neural_bindless_pointer_type(device_type: spy.DeviceType) -> None:
-    device = _get_device_with_native_neural(device_type)
+    if helpers.should_skip_test_for_device(device_type):
+        pytest.skip(f"Device type {device_type.name} not selected for this test run")
+
+    device = spy.Device(
+        type=device_type,
+        enable_debug_layers=True,
+        compiler_options=spy.SlangCompilerOptions({
+            "include_paths": [TEST_DIR, SLANG_PATH],
+            "enable_experimental_features": True,
+        }),
+    )
     try:
         module = spy.Module(device.load_module("test_neural_bindless_pointer.slang"))
 
@@ -82,7 +63,17 @@ def test_neural_bindless_descriptor_handle_type(device_type: spy.DeviceType) -> 
     if device_type == spy.DeviceType.cuda:
         pytest.skip("Bindless DescriptorHandle resources not supported with CUDA yet.")
 
-    device = _get_device_with_native_neural(device_type)
+    if helpers.should_skip_test_for_device(device_type):
+        pytest.skip(f"Device type {device_type.name} not selected for this test run")
+
+    device = spy.Device(
+        type=device_type,
+        enable_debug_layers=True,
+        compiler_options=spy.SlangCompilerOptions({
+            "include_paths": [TEST_DIR, SLANG_PATH],
+            "enable_experimental_features": True,
+        }),
+    )
     try:
         if not device.has_feature(spy.Feature.bindless):
             pytest.skip("Bindless not supported on this device.")
