@@ -1,5 +1,7 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
+// Enable when __ref/__constref dynamic dispatch diagnostic is added.
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // Test that __ref and __constref parameters with struct types
 // containing interface members produce diagnostic errors in

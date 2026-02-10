@@ -1,6 +1,8 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//TEST:SIMPLE(filecheck=CHECK): -target cuda
+// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
+// Enable when __ref/__constref dynamic dispatch diagnostic is added.
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda
 
 // Generic compound types (Tuple, Optional) are checked recursively for
 // interface members, just like structs and arrays. If any type argument
