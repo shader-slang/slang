@@ -144,6 +144,54 @@ static inline ProgramLayout* convert(SlangReflection* program)
     return (SlangReflection*)program;
 }
 
+// Fold thread group size extents from an attribute's extents/specConstExtents arrays.
+// Shared by both HLSL NumThreadsAttribute and GLSL GLSLLayoutLocalSizeAttribute paths.
+static void foldThreadGroupSizeExtents(
+    IntVal* const* extents,
+    DeclRef<VarDeclBase> const* specConstExtents,
+    ASTBuilder* astBuilder,
+    DeclRef<FuncDecl> const& entryPointFunc,
+    ComponentType* program,
+    SlangUInt outSizeAlongAxis[3])
+{
+    for (int i = 0; i < 3; ++i)
+    {
+        if (!extents[i])
+        {
+            // If the size is specified by a specialization constant, its value is
+            // unknown right now, and we should return 0 to indicate this.
+            if (specConstExtents[i])
+                outSizeAlongAxis[i] = 0;
+            continue;
+        }
+        // Try to fold extents[i] into a ConstIntVal. If that failed, we should
+        // report the size as 0 to indicate that its value is not known yet.
+        outSizeAlongAxis[i] = 0;
+        auto substExtent = as<IntVal>(
+            extents[i]->substitute(astBuilder, SubstitutionSet(entryPointFunc)));
+        if (!substExtent)
+            continue;
+        if (auto cint = program->tryFoldIntVal(substExtent))
+            outSizeAlongAxis[i] = (SlangUInt)cint->getValue();
+    }
+}
+
+// Find a GLSLLayoutLocalSizeAttribute on a sibling EmptyDecl in the entry
+// point's parent scope. GLSL layout(local_size_x = N) is parsed onto an
+// EmptyDecl rather than the entry point function itself.
+static GLSLLayoutLocalSizeAttribute* findGLSLLocalSizeAttribute(Decl* entryPointDecl)
+{
+    auto parentDecl = entryPointDecl->parentDecl;
+    if (!parentDecl)
+        return nullptr;
+    for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+    {
+        if (auto attr = emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>())
+            return attr;
+    }
+    return nullptr;
+}
+
 // user attribute
 
 static unsigned int getUserAttributeCount(Decl* decl)
@@ -4298,27 +4346,29 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
-        for (int i = 0; i < 3; ++i)
+        foldThreadGroupSizeExtents(
+            numThreadsAttribute->extents,
+            numThreadsAttribute->specConstExtents,
+            astBuilder,
+            entryPointFunc,
+            entryPointLayout->program,
+            sizeAlongAxis);
+    }
+
+    // If no HLSL [numthreads] was found, check for the GLSL case where
+    // layout(local_size_x = N) is attached to a sibling EmptyDecl in the
+    // same parent scope.
+    if (!numThreadsAttribute)
+    {
+        if (auto localSizeAttr = findGLSLLocalSizeAttribute(entryPointFunc.getDecl()))
         {
-            if (!numThreadsAttribute->extents[i])
-            {
-                // If the size is specified by a specialization constant, its value is
-                // unknown right now, and we should return 0 to indicate this.
-                if (numThreadsAttribute->specConstExtents[i])
-                    sizeAlongAxis[i] = 0;
-                continue;
-            }
-            // Try to fold numThreadsAttribute->extents[i] into a ConstIntVal. If that
-            // failed, we should report the size as 0 to indicate that its value is not
-            // known yet.
-            sizeAlongAxis[i] = 0;
-            auto substExtent = as<IntVal>(numThreadsAttribute->extents[i]->substitute(
+            foldThreadGroupSizeExtents(
+                localSizeAttr->extents,
+                localSizeAttr->specConstExtents,
                 astBuilder,
-                SubstitutionSet(entryPointFunc)));
-            if (!substExtent)
-                continue;
-            if (auto cint = entryPointLayout->program->tryFoldIntVal(substExtent))
-                sizeAlongAxis[i] = (SlangUInt)cint->getValue();
+                entryPointFunc,
+                entryPointLayout->program,
+                sizeAlongAxis);
         }
     }
 
