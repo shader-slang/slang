@@ -1,10 +1,10 @@
 name: Setup sccache
-description: Install and configure sccache with GCS backend for Linux and macOS
+description: Install and configure sccache with GCS backend (if bucket provided) or local disk backend for Linux and macOS
 
 inputs:
   gcs-bucket:
-    description: "GCS bucket name for sccache"
-    required: true
+    description: "GCS bucket name for sccache (optional - uses local disk if not provided)"
+    required: false
   platform:
     description: "Platform: linux or macos"
     required: true
@@ -49,23 +49,33 @@ runs:
         brew install sccache
         sccache --version
 
-    # Configure sccache - Always READ_WRITE mode
+    # Configure sccache backend (GCS or local disk)
     - name: Configure sccache
       shell: bash
       run: |
-        echo "SCCACHE_GCS_BUCKET=${{ inputs.gcs-bucket }}" >> $GITHUB_ENV
-        echo "SCCACHE_GCS_RW_MODE=READ_WRITE" >> $GITHUB_ENV
+        # Configure backend based on whether GCS bucket is provided
+        if [[ -n "${{ inputs.gcs-bucket }}" ]]; then
+          # GCS backend (internal PRs with authentication)
+          echo "SCCACHE_GCS_BUCKET=${{ inputs.gcs-bucket }}" >> $GITHUB_ENV
+          echo "SCCACHE_GCS_RW_MODE=READ_WRITE" >> $GITHUB_ENV
+          echo "🔧 sccache configured for GCS backend: ${{ inputs.gcs-bucket }}"
+        else
+          # Local disk backend (fork PRs without GCS access)
+          echo "🔧 sccache configured for local disk backend"
+        fi
+
         echo "SCCACHE_CACHE_ZSTD_LEVEL=3" >> $GITHUB_ENV
         echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
         echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
-
-        # Set base directory to normalize paths across different environments
-        # This makes cache keys consistent between container and non-container builds
         echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
+
+        # Limit cache size to prevent unbounded growth in GitHub Actions cache
+        # Only applies to local disk backend (GCS has unlimited storage)
+        if [[ -z "${{ inputs.gcs-bucket }}" ]]; then
+          echo "SCCACHE_CACHE_SIZE=5G" >> $GITHUB_ENV
+        fi
 
         # Get sccache path for CMake
         sccache_path=$(which sccache)
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
-
-        echo "🔧 sccache configured for GCS bucket: ${{ inputs.gcs-bucket }}"
