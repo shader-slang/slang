@@ -62,9 +62,8 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
     if (workList.getCount() > 0)
     {
         auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
-        if (targetCaps.atLeastOneSetImpliedInOther(
-                CapabilitySet(CapabilityName::descriptor_handle)) !=
-            CapabilitySet::ImpliesReturnFlags::Implied)
+        if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::descriptor_handle)) != CapabilitySet::ImpliesReturnFlags::Implied)
         {
             sink->diagnose(SourceLoc(), Diagnostics::targetDoesNotSupportDescriptorHandle);
             return;
