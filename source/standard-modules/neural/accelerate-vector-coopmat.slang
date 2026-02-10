@@ -1287,16 +1287,16 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         // of the mma operation.
         // dIn = W^T * dOut;
 #if 1
-        // let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
-        //                 >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
-        // This.Differential dInput = This.Differential(outArray);
-        // dthis = DifferentialPair<This>(dthis.p, dInput);
+        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
+        This.Differential dInput = This.Differential(outArray);
+        dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
-        // MMA.outerProductAccumulate<T.Differential, Storage.Differential,
-        //                            T.Differential, OutputVector.Differential,
-        //                            T, T[Uint4AlignedInputSize]
-        //                           >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
+        MMA.outerProductAccumulate<T.Differential, Storage.Differential,
+                                   T.Differential, OutputVector.Differential,
+                                   T, T[Uint4AlignedInputSize]
+                                  >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
 #else
         let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
                         >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
