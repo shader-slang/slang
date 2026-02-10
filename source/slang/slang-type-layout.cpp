@@ -3461,6 +3461,37 @@ bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
     return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
+/// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
+/// types are encountered, but only when no specific profile or capability was requested
+/// by the user (auto-promotion mode).
+static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
+{
+    if (!targetReq)
+        return;
+
+    auto& targetOptionSet = targetReq->getOptionSet();
+    bool specificProfileRequested =
+        targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+        (targetOptionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
+    bool specificCapabilityRequested = false;
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        if ((atomVal.kind == CompilerOptionValueKind::Int &&
+             atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
+            atomVal.kind == CompilerOptionValueKind::String)
+        {
+            specificCapabilityRequested = true;
+            break;
+        }
+    }
+    if (!specificProfileRequested && !specificCapabilityRequested)
+    {
+        auto targetCaps = targetReq->getTargetCaps();
+        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+        targetReq->setTargetCaps(targetCaps);
+    }
+}
+
 static bool isD3D11Target(TargetRequest*)
 {
     // We aren't officially supporting D3D11 right now
@@ -5539,14 +5570,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
-        // Add descriptor_handle capability to the target when DescriptorHandle is used.
-        // TODO: add the capability only in the auto-promotion mode.
-        if (context.targetReq)
-        {
-            auto targetCaps = context.targetReq->getTargetCaps();
-            targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
-            context.targetReq->setTargetCaps(targetCaps);
-        }
+        maybePromoteDescriptorHandleCapability(context.targetReq);
 
         // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
         if (context.targetReq &&
@@ -6210,14 +6234,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
-        // Add descriptor_handle capability to the target when DescriptorHandle is used.
-        // TODO: add the capability only in the auto-promotion mode.
-        if (context.targetReq)
-        {
-            auto targetCaps = context.targetReq->getTargetCaps();
-            targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
-            context.targetReq->setTargetCaps(targetCaps);
-        }
+        maybePromoteDescriptorHandleCapability(context.targetReq);
 
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type; // Preserve the original DescriptorHandle type

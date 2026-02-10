@@ -1,6 +1,7 @@
 #include "slang-ir-lower-dynamic-resource-heap.h"
 
 #include "compiler-core/slang-artifact-associated-impl.h"
+#include "slang-capability.h"
 #include "slang-ir-util.h"
 #include "slang-target-program.h"
 #include "slang-type-layout.h"
@@ -49,11 +50,6 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
 
 void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    // TODO: Check capability and print an error if it doesn't match:
-    // if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle))
-    //     != CapabilitySet::ImpliesReturnFlags::Implied)
-    //     print error;
-
     // Get the bindless space index that was allocated during layout generation.
     // This is done before DCE, so it correctly accounts for all declared parameters.
     auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram, sink);
@@ -63,6 +59,20 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         if (globalInst->getOp() == kIROp_GetDynamicResourceHeap)
         {
             workList.add(globalInst);
+        }
+    }
+
+    // If there are GetDynamicResourceHeap instructions, verify that the target
+    // supports descriptor_handle capability.
+    if (workList.getCount() > 0)
+    {
+        auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
+        if (targetCaps.atLeastOneSetImpliedInOther(
+                CapabilitySet(CapabilityName::descriptor_handle)) !=
+            CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            sink->diagnose(SourceLoc(), Diagnostics::targetDoesNotSupportDescriptorHandle);
+            return;
         }
     }
     for (auto inst : workList)
