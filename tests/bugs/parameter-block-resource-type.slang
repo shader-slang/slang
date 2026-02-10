@@ -14,8 +14,8 @@ ParameterBlock<RWStructuredBuffer<int>> buffer;
 
 // WGSL: @binding(0) @group(0) var<storage, read_write> buffer
 
-// SPIRV-DAG: OpDecorate %buffer Binding 0
-// SPIRV-DAG: OpDecorate %buffer DescriptorSet 0
+// SPIRV-DAG: OpDecorate %buffer{{.*}} Binding 0
+// SPIRV-DAG: OpDecorate %buffer{{.*}} DescriptorSet 0
 
 [shader("compute")]
 [numthreads(1,1,1)]
