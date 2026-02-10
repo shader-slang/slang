@@ -795,13 +795,14 @@ def spvRayQueryKHR : SPV_KHR_ray_query;
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
 
-/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
-/// [EXT]
-def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
-
 /// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
 /// [EXT]
 def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+/// Inherits from spvShaderInvocationReorderEXT to ensure NV implies EXT.
+/// [EXT]
+def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder + spvShaderInvocationReorderEXT;
 
 /// Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
 /// Used for motion blur variants of SER functions that require both extensions.
