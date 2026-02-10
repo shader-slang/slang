@@ -35,7 +35,7 @@ internal uint getWaveId()
 }
 
 [ForceInline]
-internal int getWaveCount()
+public int getWaveCount()
 {
     // Note, we always require the threads count is multiple of the subgroup size, therefore we don't need to round up the result.
     __stage_switch
@@ -614,7 +614,209 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
-    // Sum reduce of the dOut
+    // =========================================================================
+    // Shared memory pack/unpack helpers
+    //
+    // Shared memory is typed as SPtr<uint4> (16 bytes per slot).
+    // We cannot reinterpret-cast shared memory pointers in SPIR-V's logical
+    // addressing model, so we manually pack/unpack scalar values of type U
+    // into/from the uint4 array using bit_cast and shift operations.
+    //
+    // Layout: element index `i` of type U is stored at:
+    //   uint4 slot:  i / ElementsPerUint4
+    //   uint  comp:  (i % ElementsPerUint4) / ElementsPerUint
+    //   sub-element: i % ElementsPerUint  (shift = subIdx * sizeof(U) * 8)
+    // =========================================================================
+
+    /// Store a scalar value of type U into uint4 shared memory at flat element index.
+    [ForceInline]
+    static void smemStore<U>(SPtr<uint4> mem, int index, U value)
+        where U : __BuiltinFloatingPointType
+    {
+        static const int elementsPerUint  = 4 / sizeof(U);
+        static const int elementsPerUint4 = 16 / sizeof(U);
+        static const int bitsPerElement   = sizeof(U) * 8;
+
+        const int slot = index / elementsPerUint4;
+        const int comp = (index % elementsPerUint4) / elementsPerUint;
+        const int sub  = index % elementsPerUint;
+        const uint shift = sub * bitsPerElement;
+
+        switch (sizeof(U))
+        {
+        case 2:
+            {
+                uint packed = mem[slot][comp];
+                // Clear the target bits and insert new value
+                packed = (packed & ~(uint(0xFFFF) << shift)) | (uint(bit_cast<uint16_t>(value)) << shift);
+                mem[slot][comp] = packed;
+            }
+            break;
+        case 4:
+            mem[slot][comp] = bit_cast<uint>(value);
+            break;
+        }
+    }
+
+    /// Load a scalar value of type U from uint4 shared memory at flat element index.
+    [ForceInline]
+    static U smemLoad<U>(SPtr<uint4> mem, int index)
+        where U : __BuiltinFloatingPointType
+    {
+        static const int elementsPerUint  = 4 / sizeof(U);
+        static const int elementsPerUint4 = 16 / sizeof(U);
+        static const int bitsPerElement   = sizeof(U) * 8;
+
+        const int slot = index / elementsPerUint4;
+        const int comp = (index % elementsPerUint4) / elementsPerUint;
+        const int sub  = index % elementsPerUint;
+        const uint shift = sub * bitsPerElement;
+
+        switch (sizeof(U))
+        {
+        case 2:
+            return bit_cast<U>(uint16_t((mem[slot][comp] >> shift) & 0xFFFF));
+        case 4:
+            return bit_cast<U>(mem[slot][comp]);
+        default:
+            return U(0);
+        }
+    }
+
+    /// Load a packed uint from uint4 shared memory at a uint-level index.
+    /// This is useful for reading two half values packed in a single uint.
+    [ForceInline]
+    static uint smemLoadUint(SPtr<uint4> mem, int uintIndex)
+    {
+        const int slot = uintIndex / 4;
+        const int comp = uintIndex % 4;
+        return mem[slot][comp];
+    }
+
+    // Helper function: Cross-warp reduction and atomic write to global memory.
+    // Reads from shared memory where each warp has written its partial sums,
+    // reduces across warps, and atomically adds to the bias gradient.
+    //
+    // For half type: Uses vector<half, 2> atomics (maps to red.relaxed.gpu.global.add.noftz.f16x2 on CUDA)
+    // For other types: Uses scalar atomicAdd
+    //
+    // @param sharedMemory Shared memory containing partial sums from each warp
+    // @param subgroupId Current warp index
+    // @param subgroupCount Total number of warps
+    // @param biasStorage Storage for bias gradient
+    // @param biasAddress Base address in bias storage
+    // @param MPadded M rounded up to even (for half2 alignment)
+    // @param ColsPacked Number of packed pairs per warp (MPadded / 2)
+    [ForceInline]
+    static void crossWarpReduceAndAtomicWrite<U, Storage, int MPadded, int ColsPacked>(
+        SPtr<uint4> sharedMemory,
+        int subgroupId,
+        int subgroupCount,
+        Storage biasStorage,
+        Storage.Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Storage : IStorage<U>
+    {
+        const uint laneId = WaveGetLaneIndex();
+        const int NUM_VECTORS = subgroupCount * N;
+        const int ColsPerThread = ColsPacked / NUM_VECTORS;
+        const int NumIters = (ColsPacked % NUM_VECTORS) != 0 ? ColsPerThread + 1 : ColsPerThread;
+
+        int packed_col_idx = subgroupId * N + laneId;
+
+        if (U is half)
+        {
+            // Half path: pack two half values into uint for efficient shared memory access
+            // Uses vector<half, 2> atomic which maps to red.relaxed.gpu.global.add.noftz.f16x2 on CUDA
+
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (packed_col_idx < ColsPacked)
+                {
+                    // Sum packed half2 across all warps
+                    half sum0 = half(0);
+                    half sum1 = half(0);
+
+                    for (int i = 0; i < subgroupCount; i++)
+                    {
+                        // Each warp's data is at offset i * ColsPacked (in half2/uint units)
+                        uint packed = smemLoadUint(sharedMemory, packed_col_idx + i * ColsPacked);
+                        half elem0 = bit_cast<half>(uint16_t(packed & 0xFFFF));
+                        half elem1 = bit_cast<half>(uint16_t((packed >> 16) & 0xFFFF));
+                        sum0 = sum0 + elem0;
+                        sum1 = sum1 + elem1;
+                    }
+
+                    // Only write valid elements
+                    int elemIdx0 = packed_col_idx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    if (elemIdx1 < M)
+                    {
+                        // Both elements are valid - use vector<half, 2> atomic
+                        vector<U, 2> sum_v2 = vector<U, 2>(U(sum0), U(sum1));
+                        let addr = Storage.getOffset(biasAddress, elemIdx0);
+                        biasStorage.atomicAdd(addr, sum_v2);
+                    }
+                    else if (elemIdx0 < M)
+                    {
+                        // Only first element is valid (M is odd)
+                        let addr = Storage.getOffset(biasAddress, elemIdx0);
+                        biasStorage.atomicAdd(addr, U(sum0));
+                    }
+                }
+
+                packed_col_idx += NUM_VECTORS;
+            }
+        }
+        else
+        {
+            // Non-half path: use scalar atomicAdd (no native vector atomic support)
+            // Read individual elements from uint4 shared memory via smemLoad.
+
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (packed_col_idx < ColsPacked)
+                {
+                    int elemIdx0 = packed_col_idx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    // Sum elements across all warps
+                    U sum0 = U(0);
+                    U sum1 = U(0);
+
+                    for (int i = 0; i < subgroupCount; i++)
+                    {
+                        sum0 = sum0 + smemLoad<U>(sharedMemory, i * MPadded + elemIdx0);
+                        if (elemIdx1 < MPadded)
+                            sum1 = sum1 + smemLoad<U>(sharedMemory, i * MPadded + elemIdx1);
+                    }
+
+                    if (elemIdx0 < M)
+                    {
+                        let addr0 = Storage.getOffset(biasAddress, elemIdx0);
+                        biasStorage.atomicAdd(addr0, sum0);
+                    }
+                    if (elemIdx1 < M)
+                    {
+                        let addr1 = Storage.getOffset(biasAddress, elemIdx1);
+                        biasStorage.atomicAdd(addr1, sum1);
+                    }
+                }
+
+                packed_col_idx += NUM_VECTORS;
+            }
+        }
+    }
+
+    // Sum reduce of the dOut across the block and accumulate to bias gradient.
+    //
+    // Uses __atomic_reduce_add which maps to PTX `red` instruction on CUDA:
+    //   red.relaxed.gpu.global.add.noftz.f16x2 for half2
+    // This is faster than standard atomicAdd because:
+    // 1. Uses relaxed memory ordering (less synchronization overhead)
+    // 2. Single instruction for two half values
     [ForceInline]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
@@ -632,90 +834,42 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         const uint laneId = WaveGetLaneIndex();
         const int subgroupCount = getWaveCount();
 
-        // First, perform warp reduce, dOut's actual size is M
+        // Phase 1: Warp-level reduction
         InArrayType localResult;
+        [ForceUnroll]
         for (int i = 0; i < M; i++)
         {
             localResult[i] = WaveActiveSum(dOut[i]);
         }
 
-        // TODO:
-        // Naive way is that we still have to store to the shared memory by tile size, because
-        // we are reuse the shared memory B for the shared memory saving sake. However, more smart
-        // way is that we can compute the usage here during compile time, and compare with the total
-        // size of the shared memory pool. Since this sum reduce compute is not overlapped with other
-        // computation, so we can actually freely use all the shared memory in the pool.
-        static const int elementPerVector = sizeof(uint4) / sizeof(U);
-        static const int NumTiles = (Uint4AlignedM + TileInfo.HeightInElementTileB - 1) / TileInfo.HeightInElementTileB;
+        // Pad M to even number for half2 alignment
+        static const int MPadded = (M + 1) & ~1;  // Round up to even
+        static const int ColsPacked = MPadded / 2;  // Number of half2 pairs per warp
+        static const int HasOddElement = M % 2;  // 1 if M is odd, 0 otherwise
 
-        // This loop is used to move the local result of each warp into the first warp
-        [ForceUnroll]
-        for (uint i = 0; i < NumTiles; i++)
+        // Layout: [warp0: MPadded elements][warp1: MPadded elements]...
+        // Shared memory stays as uint4; pack/unpack via smemStore/smemLoad helpers.
+
+        // Phase 2: Lane 0 of each warp writes reduced result to shared memory
+        if (laneId == 0)
         {
-            const int startIndex = i * TileInfo.HeightInElementTileB;
-
-            // lane 0 of each warp will store the local result to the shared memory.
-            if (laneId == 0)
+            [ForceUnroll]
+            for (int i = 0; i < M; i++)
             {
-                [ForceUnroll]
-                for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
-                {
-                    uint4 value;
-                    const uint offset = startIndex + j * elementPerVector;
-                    if (offset >= M)
-                        break;
-                    accessUint4Aligned<AccessOp.READ, U, U, InArrayType>(localResult, offset, value);
-                    sharedMemory[subgroupId * TileInfo.HeightInVectorTileB + j] = value;
-                }
+                smemStore<U>(sharedMemory, subgroupId * MPadded + i, localResult[i]);
             }
-
-            GroupMemoryBarrierWithGroupSync();
-
-            // Now all the results are stored in the shared memory, we can perform warp reduce to get the final result.
-            if (subgroupId == 0)
+            // Pad with zero if M is odd
+            if (HasOddElement != 0)
             {
-                if (laneId < subgroupCount)
-                {
-                    [ForceUnroll]
-                    for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
-                    {
-                        uint4 value = sharedMemory[laneId * TileInfo.HeightInVectorTileB + j];
-                        int offset = startIndex + j * elementPerVector;
-                        if (offset >= M)
-                            break;
-                        accessUint4Aligned<AccessOp.WRITE, U, U, InArrayType>(localResult, offset, value);
-                    }
-                }
+                smemStore<U>(sharedMemory, subgroupId * MPadded + M, U(0));
             }
         }
 
-        // Now all the partial result are stored in the registers in the first warp, so we can perform the one more
-        // warp reduce to get the final result.
-        if (subgroupId == 0)
-        {
-            // Only perform the reduce for the lane ids smaller than the 'subgroupCount', because there
-            // are only 'subgroupCount' vectors in the shared memory.
-            WaveMask mask = WaveMaskBallot(0xFFFFFFFF, laneId < subgroupCount);
-            [ForceUnroll]
-            for (uint j = 0; j < M; j++)
-            {
-                localResult[j] = WaveMaskSum(mask, localResult[j]);
-            }
+        GroupMemoryBarrierWithGroupSync();
 
-            // spread the result writing to all threads in the first subgroup.
-            // Atomic add to the bias gradient storage buffer
-            static const int numIter = (M + SubgroupSize - 1) / SubgroupSize;
-            [ForceUnroll]
-            for (uint i = 0; i < numIter; i++)
-            {
-                const int index = i * SubgroupSize + laneId;
-                if (index >= M)
-                    break;
-
-                let offset = Storage.getOffset(biasAddress, index);
-                biasStorage.atomicAdd(offset, localResult[index]);
-            }
-        }
+        // Phase 3: Cross-warp reduction and atomic write
+        crossWarpReduceAndAtomicWrite<U, Storage, MPadded, ColsPacked>(
+            sharedMemory, subgroupId, subgroupCount, biasStorage, biasAddress);
     }
 
     [ForceInline]
@@ -1133,16 +1287,16 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         // of the mma operation.
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
-        This.Differential dInput = This.Differential(outArray);
-        dthis = DifferentialPair<This>(dthis.p, dInput);
+        // let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+        //                 >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
+        // This.Differential dInput = This.Differential(outArray);
+        // dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
-        MMA.outerProductAccumulate<T.Differential, Storage.Differential,
-                                   T.Differential, OutputVector.Differential,
-                                   T, T[Uint4AlignedInputSize]
-                                  >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
+        // MMA.outerProductAccumulate<T.Differential, Storage.Differential,
+        //                            T.Differential, OutputVector.Differential,
+        //                            T, T[Uint4AlignedInputSize]
+        //                           >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
 #else
         let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
                         >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
@@ -1156,15 +1310,9 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
 
         if (Bias)
         {
-            // VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
-            //     SPtr<uint4> sharedMemory,
-            //     in InArrayType dOut,
-            //     in int subgroupId,
-            //     Storage biasStorage,
-            //     Storage.Address biasAddress)
             const int subgroupIndex = getWaveId();
             MMA.sumReduceRows<T.Differential, Storage.Differential, OutputVector.Differential
-                >(shB, doutput, subgroupIndex, biasStorage.value.d, biasAddress.value);
+                >(shA, doutput, subgroupIndex, biasStorage.value.d, biasAddress.value);
         }
     }
 

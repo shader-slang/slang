@@ -910,6 +910,9 @@ Compound Capabilities
 `atomic64`
 > Capabilities needed for int64/uint64 atomic operations
 
+`atomic_bfloat16`
+> Atomic operations on BFloat16 types. Requires SM 9.0 (Hopper) or higher on CUDA.
+
 `atomic_glsl`
 > (GLSL/SPIRV) Capabilities required to use GLSL-400 atomic operations
 
