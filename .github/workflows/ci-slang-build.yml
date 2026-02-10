@@ -281,9 +281,9 @@ jobs:
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache local cache for fork PRs to restore from (master only)
-      - name: Save sccache cache (master only)
-        if: runner.environment != 'self-hosted' && github.ref == 'refs/heads/master'
+      # Save sccache local cache for fork PRs to restore from (merge queue only)
+      - name: Save sccache cache (merge queue)
+        if: runner.environment != 'self-hosted' && github.event_name == 'merge_group'
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/sccache

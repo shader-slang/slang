@@ -160,9 +160,9 @@ jobs:
             exit 1
           fi
 
-      # Save sccache cache for fork PRs (master only)
-      - name: Save sccache cache (master only)
-        if: github.ref == 'refs/heads/master'
+      # Save sccache cache for fork PRs (merge queue only)
+      - name: Save sccache cache (merge queue)
+        if: github.event_name == 'merge_group'
         uses: actions/cache/save@v4
         with:
           path: /github/home/.cache/sccache
