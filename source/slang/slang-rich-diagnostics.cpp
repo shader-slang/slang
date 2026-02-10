@@ -16,9 +16,9 @@ UnownedStringSlice nameToPrintableString(Name* name)
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
 }
 
-UnownedStringSlice typeToPrintableString(Type* type)
+String typeToPrintableString(Type* type)
 {
-    return type ? type->toString().getUnownedSlice() : UnownedStringSlice{"<unknown type>"};
+    return type ? type->toString() : "<unknown type>";
 }
 
 // Generate member function implementations
