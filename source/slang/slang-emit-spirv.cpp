@@ -1526,6 +1526,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case AddressSpace::HitObjectAttribute:
             {
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
+                    return SpvStorageClassHitObjectAttributeNV;
                 if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
                     return SpvStorageClassHitObjectAttributeEXT;
                 return SpvStorageClassHitObjectAttributeNV;
@@ -2517,10 +2519,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         case kIROp_HitObjectType:
             {
-                // Use EXT if target has spvShaderInvocationReorderEXT capability,
-                // otherwise fall back to NV for backward compatibility
+                // Check NV first (more specific) since NV derives from EXT in the
+                // capability hierarchy. If we checked EXT first, it would always
+                // match when NV is specified, causing a type/op mismatch
+                // (OpTypeHitObjectEXT=5313 vs OpTypeHitObjectNV=5281).
                 auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
-                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                    return emitOpTypeHitObject(inst);
+                }
+                else if (targetCaps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
                 {
                     ensureExtensionDeclaration(
                         UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
@@ -5910,11 +5921,30 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             isRayTracingObject = true;
             break;
         case kIROp_VulkanHitObjectAttributesDecoration:
-            // needed since GLSL will not set optypes accordingly, but will keep the decoration
-            ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
-            requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
-            isRayTracingObject = true;
-            break;
+            {
+                // needed since GLSL will not set optypes accordingly, but will keep the decoration
+                auto caps = m_targetProgram->getTargetReq()->getTargetCaps();
+                if (caps.implies(CapabilityAtom::spvShaderInvocationReorderNV))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                }
+                else if (caps.implies(CapabilityAtom::spvShaderInvocationReorderEXT))
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_EXT_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderEXT);
+                }
+                else
+                {
+                    ensureExtensionDeclaration(
+                        UnownedStringSlice("SPV_NV_shader_invocation_reorder"));
+                    requireSPIRVCapability(SpvCapabilityShaderInvocationReorderNV);
+                }
+                isRayTracingObject = true;
+                break;
+            }
         case kIROp_VulkanRayPayloadDecoration:
         case kIROp_VulkanRayPayloadInDecoration:
             // needed since GLSL will not set optypes accordingly, but will keep the decoration
