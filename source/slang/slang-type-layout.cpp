@@ -5363,6 +5363,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (as<TensorViewType>(type))
+    {
+        // TensorView<T> is a __magic_type whose layout is defined in the CUDA prelude
+        // (slang-cuda-prelude.h) as: uint8_t* data (8) + uint32_t strides[5] (20) +
+        // uint32_t sizes[5] (20) + uint32_t dimensionCount (4) + padding (4) = 56 bytes.
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::Uniform, 56, 8),
+            type,
+            rules);
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
