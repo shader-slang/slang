@@ -1051,16 +1051,60 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
-                if (auto targetCapSet = targetCaps.getAtomSets())
+                auto maybeTargetCapSet = targetCaps.getAtomSets();
+                if (maybeTargetCapSet)
                 {
                     if (auto combinedSet = combinedSets.getAtomSets())
                     {
                         CapabilityAtomSet::calcSubtract(
                             addedAtoms,
                             (*combinedSet),
-                            (*targetCapSet));
+                            (*maybeTargetCapSet));
                     }
                 }
+
+                // Filter out vendor-variant atoms that derive from capabilities
+                // the user already specified. For example, if the user specified
+                // spvShaderInvocationReorderEXT and the compiler inferred
+                // spvShaderInvocationReorderNV (because __target_switch has an NV
+                // branch), we suppress the NV atom from the warning since NV
+                // inherits from EXT and the EXT path will be used.
+                CapabilityAtomSet filteredAddedAtoms{};
+                if (maybeTargetCapSet)
+                {
+                    auto& targetsSet = getAtomSetOfTargets();
+                    auto& stagesSet = getAtomSetOfStages();
+                    for (auto atom : addedAtoms.getElements<CapabilityAtom>())
+                    {
+                        bool isDerivedFromTarget = false;
+                        for (auto targetAtom :
+                             (*maybeTargetCapSet).getElements<CapabilityAtom>())
+                        {
+                            // Skip target and stage atoms (spirv, hlsl, vertex, etc.)
+                            if (targetsSet.contains(UInt(targetAtom)) ||
+                                stagesSet.contains(UInt(targetAtom)))
+                                continue;
+                            // Skip internal/version atoms (e.g., _spirv_1_5, _GLSL_460)
+                            if (isInternalCapabilityName(CapabilityName(targetAtom)))
+                                continue;
+                            if (isCapabilityDerivedFrom(atom, (CapabilityAtom)targetAtom))
+                            {
+                                isDerivedFromTarget = true;
+                                break;
+                            }
+                        }
+                        if (!isDerivedFromTarget)
+                            filteredAddedAtoms.add(UInt(atom));
+                    }
+                }
+                else
+                {
+                    filteredAddedAtoms = addedAtoms;
+                }
+
+                if (filteredAddedAtoms.isEmpty())
+                    continue;
+
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -1070,7 +1114,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
                     entryPointFuncDecl,
                     target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    filteredAddedAtoms.getElements<CapabilityAtom>());
             }
         }
     }

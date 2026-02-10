@@ -683,7 +683,7 @@ Extensions
 
 `SPV_NV_shader_invocation_reorder`
 > Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
-> Requires SPV_KHR_ray_tracing.
+> Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
 
 `SPV_NV_shader_subgroup_partitioned`
 > Represents the SPIR-V extension for shader subgroup partitioned.
@@ -851,6 +851,7 @@ Extensions
 
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+> Inherits from spvShaderInvocationReorderEXT so that NV implies EXT capability.
 
 `spvShaderNonUniform`
 > Represents the SPIR-V capability for non-uniform resource indexing.
