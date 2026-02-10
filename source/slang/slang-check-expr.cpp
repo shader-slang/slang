@@ -6496,8 +6496,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 else if (operand.flavor == SPIRVAsmOperand::BuiltinVar)
                 {
                     operand.type = CheckProperType(operand.type);
-                    auto builtinVarKind = spirvInfo->allEnums.lookup(
-                        SPIRVCoreGrammarInfo::QualifiedEnumName{
+                    auto builtinVarKind =
+                        spirvInfo->allEnums.lookup(SPIRVCoreGrammarInfo::QualifiedEnumName{
                             spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(),
                             operand.token.getContent()});
                     if (!builtinVarKind)
