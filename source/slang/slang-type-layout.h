@@ -1265,12 +1265,9 @@ public:
     StringSlicePool hashedStringLiteralPool;
 
     /// The descriptor set/space index allocated for the bindless resource heap.
-    /// This is determined after IR generation by scanning for kIROp_GetDynamicResourceHeap,
-    /// ensuring consistency with reflection data (before DCE).
     ///
-    /// Values:
-    ///   -1 = Bindless resources not used (no GetDynamicResourceHeap in IR)
-    ///   >= 0 = Allocated space index for the bindless resource heap
+    /// Return: -1 means Bindless resources not used
+    /// Return: >= 0 means Allocated space index for the bindless resource heap
     Int bindlessSpaceIndex = -1;
 };
 

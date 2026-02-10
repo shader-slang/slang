@@ -4609,7 +4609,7 @@ SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* inProgram
 {
     auto program = convert(inProgram);
     if (!program)
-        return 0;
+        return -1; // -1 means bindless resource heap is not used.
     return program->bindlessSpaceIndex;
 }
 

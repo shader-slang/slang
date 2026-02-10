@@ -12,10 +12,8 @@ namespace Slang
 /// Get the bindless descriptor set/space index from the program layout.
 /// This index was allocated during layout generation (before DCE),
 /// ensuring consistency with reflection data.
-UInt getBindlessSpaceIndex(TargetProgram* targetProgram, DiagnosticSink* sink)
+UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
-    SLANG_UNUSED(sink);
-
     // Get the bindless space index from the program layout.
     // This is always allocated during generateParameterBindings().
     if (auto programLayout = targetProgram->getExistingLayout())
@@ -50,9 +48,6 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
 
 void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    // Get the bindless space index that was allocated during layout generation.
-    // This is done before DCE, so it correctly accounts for all declared parameters.
-    auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram, sink);
     List<IRInst*> workList;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -75,6 +70,9 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
             return;
         }
     }
+
+    auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram);
+
     for (auto inst : workList)
     {
         auto arrayType = as<IRArrayTypeBase>(inst->getDataType());

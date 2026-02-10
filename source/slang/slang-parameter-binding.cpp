@@ -4353,8 +4353,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
                 availableIndex);
         }
 
-        programLayout->bindlessSpaceIndex = availableIndex;
         markSpaceUsed(&context, nullptr, availableIndex);
+        programLayout->bindlessSpaceIndex = availableIndex;
     }
 
     return programLayout;
