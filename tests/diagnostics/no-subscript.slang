@@ -1,10 +1,10 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=foo):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 // Test that use of empty statement after an `if` leads to a warning.
 
 int foo(){
     int x;
     return x[0];
-//foo       ^ no subscript operation found for type 'int'
-//foo      ^ type 'int'
+//diag      ^ invalid subscript expression
+//diag      ^ no subscript operation found for type 'int'
 }

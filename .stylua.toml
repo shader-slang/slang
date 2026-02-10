@@ -1,13 +1,3 @@
-# syntax = "All"
-# column_width = 120
-# line_endings = "Unix"
 indent_type = "Spaces"
 indent_width = 4
-# quote_style = "AutoPreferDouble"
 call_parentheses = "NoSingleTable"
-# collapse_simple_statement = "Never"
-# space_after_function_names = "Never"
-# block_newline_gaps = "Never"
-#
-# [sort_requires]
-# enabled = false

@@ -2712,10 +2712,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
                 if (getOptionSet().shouldEmitRichDiagnostics())
                 {
                     getSink()->diagnose(
-                        Diagnostics::SubscriptNonArray{
-                            .type = baseType,
-                            .expr = subscriptExpr,
-                            .parent = subscriptExpr->baseExpression});
+                        Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
                 }
                 else
                 {
