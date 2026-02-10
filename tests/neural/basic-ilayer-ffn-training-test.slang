@@ -31,8 +31,8 @@ typealias Storage = StructuredBufferStorage<float>;
 typealias V2 = InlineVector<float, 2>;
 typealias V1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer1 = FFLayer<float, V2, V2, Storage, Act, true>;
-typealias Layer2 = FFLayer<float, V2, V1, Storage, Act, true>;
+typealias Layer1 = FFLayer<float, V2, V2, Storage, LinearLayout, Act, true>;
+typealias Layer2 = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
 
 static const uint Base0 = 0;
 
