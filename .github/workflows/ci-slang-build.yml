@@ -49,20 +49,33 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
-      # Authenticate to Google Cloud for sccache and LLVM (all runners)
+      # Restore sccache local cache for fork PRs (unidirectional from master)
+      - name: Restore sccache cache (fork PRs only)
+        if: runner.environment != 'self-hosted' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
+
+      # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
       - name: Authenticate to Google Cloud
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
-      # Setup sccache for macOS and Linux GitHub-hosted runners
+      # Setup sccache (GCS for internal, local disk for fork PRs)
       - name: Setup sccache
         if: runner.environment != 'self-hosted'
         uses: ./.github/actions/setup-sccache
         with:
           platform: ${{ inputs.os }}
-          gcs-bucket: slang-ci-cache
+          # Only provide GCS bucket for non-fork PRs (empty = local disk backend)
+          gcs-bucket: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork != true) && 'slang-ci-cache' || '' }}
 
       - name: Setup
         uses: ./.github/actions/common-setup
@@ -264,3 +277,11 @@ jobs:
           name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
           path: artifacts-staging/
           retention-days: 1
+
+      # Save sccache local cache for fork PRs to restore from (master only)
+      - name: Save sccache cache (master only)
+        if: runner.environment != 'self-hosted' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
