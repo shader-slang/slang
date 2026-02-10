@@ -25,17 +25,19 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  actions: read # Required for Claude to read CI check results on PRs
 
 jobs:
   review:
-    # Skip draft PRs, bot PRs, and Claude's own branches (loop prevention)
+    # Skip draft PRs, bot PRs, fork PRs, and Claude's own branches (loop prevention)
+    # Fork PRs are skipped because GitHub does not expose secrets to fork PR workflows.
+    # Use workflow_dispatch with pr_number to review fork PRs manually.
     # workflow_dispatch bypasses these checks (manual trigger = intentional)
     if: |
       github.event_name == 'workflow_dispatch' || (
         github.event.pull_request.draft == false &&
         !contains(github.event.pull_request.user.login, '[bot]') &&
-        !startsWith(github.event.pull_request.head.ref, 'claude/')
+        !startsWith(github.event.pull_request.head.ref, 'claude/') &&
+        github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -117,9 +119,11 @@ jobs:
           # - Built-in MCP servers: github_inline_comment, deepwiki
           # - GitHub MCP server (ghcr.io/github/github-mcp-server v0.17.1): mcp__github__*
           # - Full tool list from: docker run ... github-mcp-server stdio + tools/list
+          # Security: git permissions are read-only (no checkout/fetch of fork code).
+          # Claude reads PR content via GitHub MCP tools and gh CLI, not git checkout.
           allowed-tools: |
             View,GlobTool,GrepTool,BatchTool,
-            Bash(git *),
+            Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git status*),Bash(git branch*),
             Bash(grep *),Bash(grep -*),
             Bash(cat *),Bash(head *),Bash(tail *),
             Bash(ls *),Bash(find *),Bash(wc *),

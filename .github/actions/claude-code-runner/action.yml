@@ -285,13 +285,17 @@ runs:
 
           # Generate token with comprehensive error handling (using Basic auth)
           # Note: Use 'base64 | tr -d' instead of 'base64 -w0' for Windows Git Bash compatibility
+          # Security: Mask the encoded credentials before use to prevent leaking in error output
+          ENCODED_CREDS=$(echo -n "$LLMGW_ID:$LLMGW_SECRET" | base64 | tr -d '\n\r')
+          echo "::add-mask::$ENCODED_CREDS"
+
           HTTP_CODE=$(curl -s -w "%{http_code}" -o "$TOKEN_FILE" --fail-with-body \
             --max-time 30 \
             --retry 3 \
             --retry-delay 2 \
             --location "$LLMGW_TOKEN_URL" \
             --header 'Content-Type: application/x-www-form-urlencoded' \
-            --header "Authorization: Basic $(echo -n $LLMGW_ID:$LLMGW_SECRET | base64 | tr -d '\n\r')" \
+            --header "Authorization: Basic $ENCODED_CREDS" \
             --data-urlencode 'grant_type=client_credentials' \
             --data-urlencode 'scope=awsanthropic-readwrite azureopenai-readwrite' \
             2>/dev/null)

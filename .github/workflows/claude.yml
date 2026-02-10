@@ -21,19 +21,23 @@ on:
     types: [opened, assigned, labeled]
   pull_request_review:
     types: [submitted]
-  pull_request:
-    types: [labeled]
+  # Note: pull_request: [labeled] was removed for security. That trigger loads the workflow
+  # from the merge commit, allowing a PR to modify the workflow itself and bypass protections.
+  # Use @claude in a comment or assign the "claude" label on an issue instead.
 
 jobs:
   claude:
     name: Claude Code Assistant
     # Intelligent mode detection: The action auto-detects @claude mentions.
     # We only need explicit conditions for non-standard triggers (workflow_dispatch, labels, assignee).
+    #
+    # Security: All remaining triggers (issue_comment, pull_request_review_comment, issues,
+    # pull_request_review, workflow_dispatch) load the workflow from the default branch,
+    # so the composite action and workflow steps cannot be tampered with by PRs.
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.action == 'assigned' && github.event.assignee.login == 'claude') ||
       (github.event_name == 'issues' && github.event.action == 'labeled' && github.event.label.name == 'claude') ||
-      (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name == 'claude') ||
       contains(github.event.comment.body || github.event.review.body || github.event.issue.body || '', '@claude')
 
     runs-on: ${{ fromJSON(vars.CLAUDE_RUNNER || '["Windows", "self-hosted", "GCP-T4"]') }}
@@ -238,12 +242,16 @@ jobs:
           # - GitHub MCP: issues, PRs, inline comments, CI status/logs
           # - DeepWiki MCP: codebase understanding
           # - Web search for external references
+          # Security: git permissions restrict checkout/fetch to prevent loading untrusted fork code.
+          # Claude reads PR diffs via gh CLI and GitHub MCP tools.
           allowed-tools: |
             View,Edit,GlobTool,GrepTool,BatchTool,Write,WebSearch,
             Bash(cmake*),Bash(cmake.exe*),
             Bash(./build/*slangc*),
             Bash(./build/*slang-test*),
-            Bash(git *),
+            Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git status*),
+            Bash(git add*),Bash(git commit*),Bash(git push*),Bash(git branch*),
+            Bash(git config*),Bash(git checkout -b*),Bash(git merge*),Bash(git stash*),
             Bash(grep *),Bash(grep -*),
             Bash(cat *),Bash(head *),Bash(tail *),
             Bash(ls *),Bash(find *),Bash(wc *),
