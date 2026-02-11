@@ -782,4 +782,20 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
     }
 }
 
+void ReplayContext::record(RecordFlag flags, slang::ProgramLayout*& type)
+{
+     if (m_mode == Mode::Idle)
+        return;
+
+    if (isWriting())
+    {
+    }
+    else
+    {
+        
+    }
+   
+}
+
+
 } // namespace SlangRecord

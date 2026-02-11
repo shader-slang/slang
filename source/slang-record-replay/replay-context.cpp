@@ -816,10 +816,43 @@ bool ReplayContext::executeNextCall()
 
 void ReplayContext::executeAll()
 {
+    const size_t totalSize = m_stream.getSize();
+    auto startTime = std::chrono::steady_clock::now();
+    auto lastPrintTime = startTime;
+    
     while (executeNextCall())
     {
-        // Continue until end of stream or error
+        auto now = std::chrono::steady_clock::now();
+        auto timeSinceLastPrint = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPrintTime).count();   
+        if (timeSinceLastPrint >= 1000)
+        {
+            size_t currentPos = m_stream.getPosition();
+            double percentComplete = totalSize > 0 ? (double)currentPos / (double)totalSize * 100.0 : 0.0;       
+            auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - startTime).count();
+            double eta = 0.0; 
+            if (currentPos > 0 && elapsed > 0)
+            {
+                double bytesPerSecond = 1000.0 *(double)currentPos / (double)elapsed;
+                size_t remainingBytes = totalSize - currentPos;
+                eta = (double)remainingBytes / bytesPerSecond;
+            }
+            lastPrintTime = now;
+            
+            printf("Progress: %.1f%% (%zu / %zu bytes)", percentComplete, currentPos, totalSize);
+            if (eta > 0)
+            {
+                int etaMinutes = (int)(eta / 60);
+                int etaSeconds = (int)eta % 60;
+                printf(" - ETA: %dm %ds", etaMinutes, etaSeconds);
+            }
+            printf("\n");
+        }
     }
+    
+    // Print final completion message
+    auto endTime = std::chrono::steady_clock::now();
+    auto totalElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    printf("Replay complete: %zu bytes in %f seconds\n", totalSize, totalElapsed / 1000.0);
 }
 
 } // namespace SlangRecord

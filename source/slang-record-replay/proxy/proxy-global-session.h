@@ -360,10 +360,9 @@ public:
     getSessionDescDigest(slang::SessionDesc* sessionDesc, ISlangBlob** outBlob) override
     {
         RECORD_CALL();
+        PREPARE_POINTER_OUTPUT(sessionDesc);
+        PREPARE_POINTER_OUTPUT(outBlob);
         RECORD_INPUT(*sessionDesc);
-        ISlangBlob* blobPtr;
-        if (!outBlob)
-            outBlob = &blobPtr;
         auto result =
             getActual<slang::IGlobalSession>()->getSessionDescDigest(sessionDesc, outBlob);
         RECORD_COM_OUTPUT(outBlob);

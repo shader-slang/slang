@@ -545,7 +545,8 @@ public:
     virtual SLANG_NO_THROW SlangReflection* SLANG_MCALL getReflection() override
     {
         RECORD_CALL();
-        return getActual<slang::ICompileRequest>()->getReflection();
+        SlangReflection* refl = getActual<slang::ICompileRequest>()->getReflection();
+        RECORD_RETURN(refl);
     }
 
     virtual SLANG_NO_THROW void SLANG_MCALL setCommandLineCompilerMode() override

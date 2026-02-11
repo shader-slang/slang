@@ -485,10 +485,16 @@ public:
     SLANG_API void record(RecordFlag flags, slang::ITypeConformance*& obj);
     SLANG_API void record(RecordFlag flags, slang::ICompileRequest*& obj);
 
-    // TypeReflection - stored as module handle + type name
+    // Reflection types - stored as module handle + identifier
     // Unlike COM interfaces, TypeReflection cannot be wrapped, so we identify
     // them by their owning module and full type name.
     SLANG_API void record(RecordFlag flags, slang::TypeReflection*& type);
+    SLANG_API void record(RecordFlag flags, slang::ProgramLayout*& pl);
+    SLANG_API void record(RecordFlag flags, SlangReflection*& pl)
+    {
+        // SlangReflection is typedef'd to ProgramLayout, so we can reuse the same recording logic.
+        record(flags, (slang::ProgramLayout*&)pl);
+    }
 
     // Object handles (COM interface pointers mapped to IDs)
     // Public for testing purposes

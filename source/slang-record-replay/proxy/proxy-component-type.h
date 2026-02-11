@@ -181,7 +181,7 @@ public:
         PREPARE_POINTER_OUTPUT(outDiagnostics);
         slang::ProgramLayout* result = m_componentType->getLayout(targetIndex, outDiagnostics);
         RECORD_COM_OUTPUT(outDiagnostics);
-        return result;
+        RECORD_RETURN(result);
     }
 
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() override
