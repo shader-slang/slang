@@ -187,6 +187,14 @@ public:
         InputTextureDesc textureDesc;
     };
 
+    // Represents a pending reference to another buffer's device address.
+    // The address will be resolved after all buffers are created.
+    struct BufferAddressReference
+    {
+        Slang::String bufferName; // Name of the buffer to get address from
+        uint32_t offsetInData;    // Offset in bufferData (in uint32 units) where address goes
+    };
+
     class DataValBase : public Val
     {
     public:
@@ -196,6 +204,8 @@ public:
         }
 
         Slang::List<unsigned int> bufferData;
+        // Pending buffer address references to be resolved after resource creation
+        Slang::List<BufferAddressReference> pendingAddressRefs;
     };
 
     class BufferVal : public DataValBase
@@ -320,6 +330,9 @@ public:
     Slang::RefPtr<AggVal> rootVal;
     Slang::List<Slang::String> globalSpecializationArgs;
     Slang::List<Slang::String> entryPointSpecializationArgs;
+
+    // Named buffers that can be referenced by other buffers for address embedding
+    Slang::Dictionary<Slang::String, Slang::RefPtr<BufferVal>> namedBuffers;
 
     class TypeConformanceVal
     {
