@@ -138,13 +138,27 @@ void specializeStageSwitch(IRModule* module)
             continue;
         if (func->findDecoration<IREntryPointDecoration>())
             continue;
+        // CUDAKernel functions are effectively compute stage entry points,
+        // skip them from cloning (they'll be specialized in-place below).
+        if (func->findDecoration<IRCudaKernelDecoration>())
+            continue;
         Dictionary<Stage, IRInst*> specializedFuncs;
         for (auto entryPoint : *referencingEntryPoints)
         {
-            auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>();
-            if (!entryPointDecor)
+            Stage stage;
+            if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+            {
+                stage = entryPointDecor->getProfile().getStage();
+            }
+            else if (entryPoint->findDecoration<IRCudaKernelDecoration>())
+            {
+                // CUDAKernel functions are effectively compute shaders.
+                stage = Stage::Compute;
+            }
+            else
+            {
                 continue;
-            auto stage = entryPointDecor->getProfile().getStage();
+            }
             auto stageSpecializedFunc = specializedFuncs.tryGetValue(stage);
             if (stageSpecializedFunc)
                 continue;
@@ -167,6 +181,14 @@ void specializeStageSwitch(IRModule* module)
             auto stage = entryPointDecor->getProfile().getStage();
             specializeFuncToStage(
                 stage,
+                as<IRGlobalValueWithCode>(func),
+                mapFuncToStageSpecializedFunc);
+        }
+        // Is this a CUDAKernel? Treat as compute stage.
+        else if (func->findDecoration<IRCudaKernelDecoration>())
+        {
+            specializeFuncToStage(
+                Stage::Compute,
                 as<IRGlobalValueWithCode>(func),
                 mapFuncToStageSpecializedFunc);
         }
