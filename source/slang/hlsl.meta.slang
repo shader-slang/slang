@@ -20858,7 +20858,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     /// Gets the custom index of the instance containing the candidate hit.
     /// @return User-provided instance identifier
-    /// @remarks GLSL/SPIRV only
+    /// @remarks GLSL/METAL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [require(glsl_metal_spirv, rayquery)]
