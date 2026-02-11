@@ -1,15 +1,14 @@
-// Test that specifying one vendor variant (EXT or NV) doesn't produce
-// a spurious warning about the alternative vendor variant.
+// Test that specifying both vendor variants (NV+EXT) or just NV doesn't
+// produce a spurious warning about the alternative vendor variant.
 // Regression test for https://github.com/shader-slang/slang/issues/9756
 
-// Test 1: Specifying EXT should not warn about NV
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_EXT): -target spirv -capability spvShaderInvocationReorderEXT
+// Test 1: Specifying NV+EXT together should not warn
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_BOTH): -target spirv -capability spvShaderInvocationReorderNV+spvShaderInvocationReorderEXT
 
-// Test 2: Specifying NV should not warn about EXT
+// Test 2: Specifying NV should not warn about EXT (NV is superset of EXT)
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_NV): -target spirv -capability spvShaderInvocationReorderNV
 
-// CHECK_EXT-NOT: warning 41012{{.*}}spvShaderInvocationReorderNV
-// CHECK_EXT-NOT: warning 41012{{.*}}SPV_NV_shader_invocation_reorder
+// CHECK_BOTH-NOT: warning 41012
 
 // CHECK_NV-NOT: warning 41012{{.*}}spvShaderInvocationReorderEXT
 // CHECK_NV-NOT: warning 41012{{.*}}SPV_EXT_shader_invocation_reorder

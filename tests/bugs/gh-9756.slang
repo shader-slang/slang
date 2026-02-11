@@ -1,5 +1,5 @@
 // Test for issues #9756 and #9936: SER NV/EXT capability hierarchy fix.
-// Verify that using EXT capability emits EXT instructions (not NV) and produces no warnings.
+// Verify that using EXT capability emits EXT instructions and NOT NV instructions.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -capability spvShaderInvocationReorderEXT -entry main -stage raygeneration -line-directive-mode none
 
@@ -22,7 +22,10 @@ void main()
     Payload payload;
     HitObject hitObj = HitObject::TraceRay(tlas, 0, 0xFF, 0, 0, 0, ray, payload);
 
-    // CHECK-NOT: warning
+    // CHECK: OpCapability ShaderInvocationReorderEXT
+    // CHECK: OpExtension "SPV_EXT_shader_invocation_reorder"
+    // CHECK: OpTypeHitObjectEXT
     // CHECK: OpHitObjectTraceRayEXT
     // CHECK-NOT: OpHitObjectTraceRayNV
+    // CHECK-NOT: OpTypeHitObjectNV
 }

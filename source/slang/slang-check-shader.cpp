@@ -1051,49 +1051,16 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 combinedSets.join(
                     CapabilitySet{entryPointFuncDecl->inferredCapabilityRequirements});
                 CapabilityAtomSet addedAtoms{};
-                auto maybeTargetCapSet = targetCaps.getAtomSets();
-                if (maybeTargetCapSet)
+                if (auto targetCapSet = targetCaps.getAtomSets())
                 {
                     if (auto combinedSet = combinedSets.getAtomSets())
                     {
                         CapabilityAtomSet::calcSubtract(
                             addedAtoms,
                             (*combinedSet),
-                            (*maybeTargetCapSet));
+                            (*targetCapSet));
                     }
                 }
-
-                // Filter out atoms that derive from SPV_ extension atoms
-                // already in the target set, to suppress vendor-variant
-                // warnings (e.g., NV atom derived from EXT).
-                CapabilityAtomSet filteredAddedAtoms{};
-                if (maybeTargetCapSet)
-                {
-                    for (auto atom : addedAtoms.getElements<CapabilityAtom>())
-                    {
-                        bool isDerivedFromTarget = false;
-                        for (auto targetAtom : (*maybeTargetCapSet).getElements<CapabilityAtom>())
-                        {
-                            if (!isSpirvExtensionAtom(targetAtom))
-                                continue;
-                            if (isCapabilityDerivedFrom(atom, targetAtom))
-                            {
-                                isDerivedFromTarget = true;
-                                break;
-                            }
-                        }
-                        if (!isDerivedFromTarget)
-                            filteredAddedAtoms.add(UInt(atom));
-                    }
-                }
-                else
-                {
-                    filteredAddedAtoms = addedAtoms;
-                }
-
-                if (filteredAddedAtoms.isEmpty())
-                    continue;
-
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
@@ -1103,7 +1070,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                     Diagnostics::profileImplicitlyUpgradedRestrictive,
                     entryPointFuncDecl,
                     target->getOptionSet().getProfile().getName(),
-                    filteredAddedAtoms.getElements<CapabilityAtom>());
+                    addedAtoms.getElements<CapabilityAtom>());
             }
         }
     }
