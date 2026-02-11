@@ -201,7 +201,6 @@ jobs:
             cmake --build --preset release >/dev/null 2>&1 || cmake --build --preset release
             echo "Build completed"
           continue-on-setup-error: "true"
-
           prompt: |
             Failed CI Run: ${{ steps.failure_details.outputs.run_url }}
             Failed Jobs: ${{ steps.failure_details.outputs.failed_jobs }}
