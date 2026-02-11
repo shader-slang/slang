@@ -61,6 +61,13 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
     ctx.record(RecordFlag::ReturnValue, result);
 }
 
+/// Handler for spReflection_FindTypeByName
+static void handle_spReflection_FindTypeByName(ReplayContext& ctx)
+{
+    SLANG_UNUSED(ctx);
+    spReflection_FindTypeByName(nullptr,nullptr);
+}
+
 /// Register all replay handlers.
 /// This function is called during static initialization.
 static void registerAllHandlers()
@@ -88,6 +95,11 @@ static void registerAllHandlers()
     ReplayContext::get().registerHandler(
         "slang_createGlobalSession2",
         handle_slang_createGlobalSession2);
+
+    // spReflection_FindTypeByName - reflection API for finding types by name
+    ReplayContext::get().registerHandler(
+        "spReflection_FindTypeByName",
+        handle_spReflection_FindTypeByName);
 
     // =========================================================================
     // GlobalSessionProxy handlers

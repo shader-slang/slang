@@ -375,6 +375,19 @@ public:
     {
         RECORD_CALL();
         auto result = getActual<slang::ICompileRequest>()->compile();
+
+        // For reflection to work correctly, we need to capture the generated module, so it 
+        // can be used during replay as a potential source of reflection information.
+        ComPtr<slang::IComponentType> program;
+        if(SLANG_SUCCEEDED(result))
+        {
+            if(SLANG_SUCCEEDED(getActual<slang::ICompileRequest>()->getProgram(program.writeRef())))
+            {
+                auto ptr = program.get();
+                RECORD_COM_OUTPUT(&ptr);
+            }
+        }
+
         RECORD_RETURN(result);
     }
 

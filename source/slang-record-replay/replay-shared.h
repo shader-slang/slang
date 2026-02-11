@@ -56,6 +56,41 @@ struct SuppressRefCountRecording
 };
 
 // =============================================================================
+// General recording suppression
+// =============================================================================
+// Thread-local counter that, when > 0, tells ReplayContext to skip all
+// recording operations. This prevents re-entrant captures when recording
+// operations trigger additional API calls that would normally be recorded.
+//
+// Use the RAII guard `SuppressRecording` rather than manipulating
+// the counter directly.
+
+/// Access the raw recording suppression counter (for internal use by the RAII guard).
+inline int& recordingSuppressionCounter()
+{
+    thread_local int counter = 0;
+    return counter;
+}
+
+/// Check if recording is currently suppressed on this thread.
+inline bool isRecordingSuppressed()
+{
+    return recordingSuppressionCounter() > 0;
+}
+
+/// RAII guard that suppresses all recording for its lifetime.
+/// Nestable — uses a counter, not a boolean.
+struct SuppressRecording
+{
+    SuppressRecording() { ++recordingSuppressionCounter(); }
+    ~SuppressRecording() { --recordingSuppressionCounter(); }
+
+    // Non-copyable, non-movable
+    SuppressRecording(const SuppressRecording&) = delete;
+    SuppressRecording& operator=(const SuppressRecording&) = delete;
+};
+
+// =============================================================================
 // Canonical identity helpers using queryInterface
 // =============================================================================
 

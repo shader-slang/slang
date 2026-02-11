@@ -168,6 +168,7 @@ enum class TypeId : uint8_t
     ObjectHandle = 0x13,
     Null = 0x14,
     TypeReflectionRef = 0x15, ///< TypeReflection reference (module handle + type name)
+    ProgramLayoutRef = 0x16,  ///< ProgramLayout reference (component handle + target index)
     Error = 0xEE,             ///< Error marker - indicates an exception occurred
 };
 
@@ -231,6 +232,9 @@ public:
 
     /// Check if the context is active (not Idle).
     SLANG_API bool isActive() const { return m_mode != Mode::Idle; }
+
+    /// Check if recording is suppressed for the current thread.
+    SLANG_API bool isRecordingSuppressed() const;
 
     /// Set the operating mode.
     /// When entering Record mode, sets up mirror file for crash-safe capture.
@@ -364,6 +368,9 @@ public:
         ensureInitialized();
         if (!isActive())
             return;
+        if (isRecordingSuppressed())
+            return;
+
         // Parse and record the normalized signature
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
@@ -394,6 +401,9 @@ public:
         ensureInitialized();
         if (!isActive())
             return;
+        if (isRecordingSuppressed())
+            return;
+
         char normalizedSig[256];
         const char* parsed = parseSignature(signature, normalizedSig, sizeof(normalizedSig));
 
@@ -417,6 +427,8 @@ public:
     {
         ensureInitialized();
         if (!isActive())
+            return;
+        if (isRecordingSuppressed())
             return;
         const char* sig = "__marker__";
         record(RecordFlag::Input, sig);
@@ -490,9 +502,15 @@ public:
     // them by their owning module and full type name.
     SLANG_API void record(RecordFlag flags, slang::TypeReflection*& type);
     SLANG_API void record(RecordFlag flags, slang::ProgramLayout*& pl);
+
+
+    // Helpers to handle old type defs for reflection
+    SLANG_API void record(RecordFlag flags, SlangReflectionType*& type)
+    {
+        record(flags, (slang::TypeReflection*&)type);
+    }
     SLANG_API void record(RecordFlag flags, SlangReflection*& pl)
     {
-        // SlangReflection is typedef'd to ProgramLayout, so we can reuse the same recording logic.
         record(flags, (slang::ProgramLayout*&)pl);
     }
 
@@ -712,6 +730,8 @@ void ReplayContext::recordArray(RecordFlag flags, T*& arr, CountT& count)
 {
     if (m_mode == Mode::Idle)
         return;
+    if (isRecordingSuppressed())
+        return;
     if (isWriting())
     {
         recordTypeId(TypeId::Array);
@@ -747,6 +767,8 @@ template<typename T, typename CountT>
 void ReplayContext::recordArray(RecordFlag flags, const T*& arr, CountT& count)
 {
     if (m_mode == Mode::Idle)
+        return;
+    if (isRecordingSuppressed())
         return;
     if (isWriting())
     {
@@ -784,6 +806,8 @@ void ReplayContext::recordEnum(RecordFlag flags, EnumT& value)
 {
     if (m_mode == Mode::Idle)
         return;
+    if (isRecordingSuppressed())
+        return;
     int32_t v = static_cast<int32_t>(value);
     record(flags, v);
     if (isReading())
@@ -794,6 +818,8 @@ template<typename T>
 void ReplayContext::recordInterfaceImpl(RecordFlag flags, T*& obj)
 {
     if (m_mode == Mode::Idle)
+        return;
+    if (isRecordingSuppressed())
         return;
 
     bool isInput = hasFlag(flags, RecordFlag::Input) || hasFlag(flags, RecordFlag::ThisPtr);

@@ -10,6 +10,10 @@
 #include "slang-type-layout.h"
 #include "slang.h"
 
+#include "../slang-record-replay/replay-context.h"
+#include "../slang-record-replay/proxy/proxy-macros.h"
+
+
 #include <assert.h>
 
 // Don't signal errors for stuff we don't implement here,
@@ -20,6 +24,8 @@
     do                                \
     {                                 \
     } while (0)
+
+using namespace SlangRecord;
 
 namespace Slang
 {
@@ -1094,6 +1100,10 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
     SlangReflection* reflection,
     char const* name)
 {
+    RECORD_STATIC_CALL();
+    RECORD_INPUT(reflection);
+    RECORD_INPUT(name);
+
     auto programLayout = convert(reflection);
     auto program = programLayout->getProgram();
 
@@ -1104,6 +1114,7 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
         programLayout->getTargetReq()->getLinkage()->getSourceManager(),
         Lexer::sourceLocationLexer);
 
+    SlangReflectionType* retVal = nullptr;
     try
     {
         Type* result = program->getTypeFromString(name, &sink);
@@ -1119,18 +1130,19 @@ SLANG_API SlangReflectionType* spReflection_FindTypeByName(
                 genericDeclRef.getDecl()->inner);
             if (as<AggTypeDecl>(innerDeclRef.getDecl()) ||
                 as<SimpleTypeDecl>(innerDeclRef.getDecl()))
-                return convert(DeclRefType::create(astBuilder, innerDeclRef));
-            return nullptr;
+                retVal = convert(DeclRefType::create(astBuilder, innerDeclRef));
         }
-
-        if (as<ErrorType>(result))
-            return nullptr;
-        return convert(result);
+        else
+        {
+            if (!as<ErrorType>(result))
+                retVal = convert(result);
+        }
     }
     catch (...)
     {
-        return nullptr;
+        // leave retVal as nullptr
     }
+    RECORD_RETURN(retVal);
 }
 
 

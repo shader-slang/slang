@@ -368,6 +368,30 @@ void ReplayStreamDecoder::decodeValueFromStream(
         }
         break;
 
+    case TypeId::ProgramLayoutRef:
+        {
+            // ProgramLayoutRef: component handle + target index
+            uint64_t componentHandle;
+            stream.skip(1); // Skip ObjectHandle TypeId for component
+            stream.read(&componentHandle, sizeof(componentHandle));
+
+            // Read target index
+            SlangInt targetIndex;
+            stream.skip(1); // Skip Int64 TypeId for target index
+            stream.read(&targetIndex, sizeof(targetIndex));
+
+            if (componentHandle == kNullHandle || targetIndex == -1)
+            {
+                output << "ProgramLayoutRef: null";
+            }
+            else
+            {
+                output << "ProgramLayoutRef(component=#" << componentHandle
+                       << ", target=" << targetIndex << ")";
+            }
+        }
+        break;
+
     case TypeId::Array:
         {
             uint64_t count;
@@ -546,6 +570,16 @@ void ReplayStreamDecoder::skipValueInStream(ReplayStream& stream)
         }
         break;
 
+    case TypeId::ProgramLayoutRef:
+        {
+            // ProgramLayoutRef: ObjectHandle TypeId + component handle + Int64 TypeId + target index
+            stream.skip(1); // ObjectHandle TypeId
+            stream.skip(8); // component handle
+            stream.skip(1); // Int64 TypeId  
+            stream.skip(8); // target index
+        }
+        break;
+
     case TypeId::Array:
         {
             uint64_t count;
@@ -652,6 +686,8 @@ const char* ReplayStreamDecoder::getTypeIdName(TypeId type)
         return "Null";
     case TypeId::TypeReflectionRef:
         return "TypeReflectionRef";
+    case TypeId::ProgramLayoutRef:
+        return "ProgramLayoutRef";
     case TypeId::Array:
         return "Array";
     case TypeId::Error:

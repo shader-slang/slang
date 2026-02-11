@@ -96,9 +96,20 @@ const char* getTypeIdName(TypeId id)
         return "Null";
     case TypeId::TypeReflectionRef:
         return "TypeReflectionRef";
+    case TypeId::ProgramLayoutRef:
+        return "ProgramLayoutRef";
     default:
         return "Unknown";
     }
+}
+
+// =============================================================================
+// ReplayContext implementation
+// =============================================================================
+
+bool ReplayContext::isRecordingSuppressed() const
+{
+    return SlangRecord::isRecordingSuppressed();
 }
 
 TypeMismatchException::TypeMismatchException(TypeId expected, TypeId actual)

@@ -7,6 +7,9 @@
 #include "../slang/slang-ast-type.h"
 #include "../slang/slang-compiler-api.h"
 #include "../slang/slang-syntax.h"
+#include "../slang/slang-type-layout.h"
+#include "../slang/slang-target-program.h"
+#include "../slang/slang-session.h"
 #include "proxy/proxy-component-type.h"
 
 #include <chrono>
@@ -26,6 +29,10 @@ using Slang::Path;
 
 void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 {
+    // Skip recording if suppressed (e.g., during re-entrant calls)
+    if (isRecordingSuppressed())
+        return;
+
     switch (m_mode)
     {
     case Mode::Idle:
@@ -87,6 +94,10 @@ void ReplayContext::recordRaw(RecordFlag flags, void* data, size_t size)
 
 void ReplayContext::recordTypeId(TypeId id)
 {
+    // Skip recording if suppressed (e.g., during re-entrant calls)
+    if (isRecordingSuppressed())
+        return;
+
     switch (m_mode)
     {
     case Mode::Idle:
@@ -218,6 +229,8 @@ void ReplayContext::record(RecordFlag flags, const char*& str)
 {
     if (m_mode == Mode::Idle)
         return;
+    if (isRecordingSuppressed())
+        return;
     if (isWriting())
     {
         if (str == nullptr)
@@ -272,6 +285,8 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 {
     SLANG_UNUSED(flags);
     if (m_mode == Mode::Idle)
+        return;
+    if (isRecordingSuppressed())
         return;
 
     if (isWriting())
@@ -355,6 +370,8 @@ void ReplayContext::recordBlobByHash(RecordFlag flags, ISlangBlob*& blob)
 void ReplayContext::recordHandle(RecordFlag flags, uint64_t& handleId)
 {
     if (m_mode == Mode::Idle)
+        return;
+    if (isRecordingSuppressed())
         return;
     recordTypeId(TypeId::ObjectHandle);
     recordRaw(flags, &handleId, sizeof(handleId));
@@ -651,6 +668,8 @@ void ReplayContext::record(RecordFlag flags, slang::ICompileRequest*& obj)
 
 void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
 {
+    if (isRecordingSuppressed())
+        return;
     if (m_mode == Mode::Idle)
         return;
 
@@ -666,59 +685,63 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
             return;
         }
 
-        // Get the type's full name
-        Slang::ComPtr<ISlangBlob> nameBlob;
-        type->getFullName(nameBlob.writeRef());
-        const char* typeName = nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
-
-        // Go via decl ref to get to the module that owns the type, and from there its module
-        Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
-        Slang::Module* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
-
-        // Get the module handle (the module should already be registered)
         uint64_t moduleHandle = kNullHandle;
-        if (owningModule)
+        const char* typeName = nullptr;
+        Slang::ComPtr<ISlangBlob> nameBlob;
         {
-            // Module implements slang::IModule, so we can cast it
-            ComPtr<slang::IComponentType> componentTypeInterface;
-            if (owningModule->queryInterface(
-                    slang::IComponentType::getTypeGuid(),
-                    (void**)componentTypeInterface.writeRef()) == SLANG_OK)
-            {
-                auto proxy = getProxy(componentTypeInterface.get());
-                moduleHandle = getProxyHandle(proxy);
-            }
-        }
+            SuppressRecording suppressGuard;
+            // Get the type's full name
+            type->getFullName(nameBlob.writeRef());
+            typeName = nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
 
-        // HACK! The module wasn't found, which means this was probably a builtin type that
-        // was looked up via a user loaded module's layout. The only way we can currently
-        // handle this is to go over our loaded modules and find one that contains it
-        if (!moduleHandle)
-        {
-            for (auto& kv : m_implToProxy)
+            // Go via decl ref to get to the module that owns the type, and from there its module
+            Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
+            Slang::Module* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
+
+            // Get the module handle (the module should already be registered)
+            if (owningModule)
             {
-                // This 'safe' cast is applied to the proxy, which we know will always be some
-                // valid virtual ISlangUnknown pointer, even if its not a module, so won't break DC.
+                // Module implements slang::IModule, so we can cast it
                 ComPtr<slang::IComponentType> componentTypeInterface;
-                if (kv.first->queryInterface(
+                if (owningModule->queryInterface(
                         slang::IComponentType::getTypeGuid(),
                         (void**)componentTypeInterface.writeRef()) == SLANG_OK)
                 {
-                    auto layout = componentTypeInterface->getLayout(0, nullptr);
-                    if (layout && layout->findTypeByName(typeName) == type)
+                    auto proxy = getProxy(componentTypeInterface.get());
+                    moduleHandle = getProxyHandle(proxy);
+                }
+            }
+
+            // HACK! The module wasn't found, which means this was probably a builtin type that
+            // was looked up via a user loaded module's layout. The only way we can currently
+            // handle this is to go over our loaded modules and find one that contains it
+            if (!moduleHandle)
+            {
+                for (auto& kv : m_implToProxy)
+                {
+                    // This 'safe' cast is applied to the proxy, which we know will always be some
+                    // valid virtual ISlangUnknown pointer, even if its not a module, so won't break DC.
+                    ComPtr<slang::IComponentType> componentTypeInterface;
+                    if (kv.first->queryInterface(
+                            slang::IComponentType::getTypeGuid(),
+                            (void**)componentTypeInterface.writeRef()) == SLANG_OK)
                     {
-                        auto proxy = getProxy(componentTypeInterface.get());
-                        moduleHandle = getProxyHandle(proxy);
-                        break;
+                        auto layout = componentTypeInterface->getLayout(0, nullptr);
+                        if (layout && layout->findTypeByName(typeName) == type)
+                        {
+                            auto proxy = getProxy(componentTypeInterface.get());
+                            moduleHandle = getProxyHandle(proxy);
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        if (!moduleHandle)
-        {
-            // If we still don't have a module handle, we can't record this type reference
-            throw UnresolvedTypeException(type);
+            if (!moduleHandle)
+            {
+                // If we still don't have a module handle, we can't record this type reference
+                throw UnresolvedTypeException(type);
+            }
         }
 
         // Record the module handle and type name
@@ -731,7 +754,7 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         expectTypeId(TypeId::TypeReflectionRef);
 
         uint64_t moduleHandle = kNullHandle;
-        recordHandle(flags, moduleHandle);
+        recordHandle(RecordFlag::None, moduleHandle);
 
         if (moduleHandle == kNullHandle)
         {
@@ -741,32 +764,40 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
 
         // Read the type name
         const char* typeName = nullptr;
-        record(flags, typeName);
+        record(RecordFlag::None, typeName);
 
-        // Look up the module from the handle
-        ISlangUnknown* moduleUnknown = getProxy(moduleHandle);
-
-        // Unwrap proxy if needed
-        ISlangUnknown* impl = getImplementation(moduleUnknown);
-        if (impl)
-            moduleUnknown = impl;
-
-        // Query for IModule interface properly (handles multiple inheritance)
-        Slang::ComPtr<slang::IComponentType> moduleInterface;
-        if (moduleUnknown)
         {
-            moduleUnknown->queryInterface(
-                slang::IComponentType::getTypeGuid(),
-                (void**)moduleInterface.writeRef());
-        }
+            SuppressRecording suppressGuard;
+            // Look up the module from the handle
+            ISlangUnknown* moduleUnknown = getProxy(moduleHandle);
 
-        // Get the type via the module's layout
-        if (moduleInterface && typeName)
-        {
-            auto* layout = moduleInterface->getLayout(0, nullptr);
-            if (layout)
+            // Unwrap proxy if needed
+            ISlangUnknown* impl = getImplementation(moduleUnknown);
+            if (impl)
+                moduleUnknown = impl;
+
+            // Query for IModule interface properly (handles multiple inheritance)
+            Slang::ComPtr<slang::IComponentType> moduleInterface;
+            if (moduleUnknown)
             {
-                type = layout->findTypeByName(typeName);
+                moduleUnknown->queryInterface(
+                    slang::IComponentType::getTypeGuid(),
+                    (void**)moduleInterface.writeRef());
+            }
+
+            // Get the type via the module's layout
+            if (moduleInterface && typeName)
+            {
+                auto* layout = moduleInterface->getLayout(0, nullptr);
+                if (layout)
+                {
+                    type = layout->findTypeByName(typeName);
+                }
+                else
+                {
+                    type = nullptr;
+                    throw UnresolvedTypeException(type);
+                }
             }
             else
             {
@@ -774,27 +805,125 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
                 throw UnresolvedTypeException(type);
             }
         }
-        else
-        {
-            type = nullptr;
-            throw UnresolvedTypeException(type);
-        }
     }
 }
 
-void ReplayContext::record(RecordFlag flags, slang::ProgramLayout*& type)
+void ReplayContext::record(RecordFlag flags, slang::ProgramLayout*& layout)
 {
-     if (m_mode == Mode::Idle)
+    if (isRecordingSuppressed())
+        return;
+    if (m_mode == Mode::Idle)
         return;
 
     if (isWriting())
     {
+        recordTypeId(TypeId::ProgramLayoutRef);
+
+        // Handle null layout
+        if (layout == nullptr)
+        {
+            uint64_t nullHandle = kNullHandle;
+            recordHandle(flags, nullHandle);
+            SlangInt invalidIndex = -1;
+            record(flags, invalidIndex);
+            return;
+        }
+
+        uint64_t componentHandle;
+        SlangInt targetIndex;
+
+        // Suppress recording during internal operations to prevent re-entrant captures
+        {
+            SuppressRecording suppressGuard;
+
+            // Cast to internal type to access fields
+            Slang::ProgramLayout* internalLayout = reinterpret_cast<Slang::ProgramLayout*>(layout);
+            
+            // Get the target program and component type
+            Slang::TargetProgram* targetProg = internalLayout->getTargetProgram();
+            Slang::ComponentType* component = targetProg->getProgram();
+            Slang::TargetRequest* targetReq = targetProg->getTargetReq();
+            
+            // Find the component handle
+            ComPtr<slang::IComponentType> componentInterface;
+            component->queryInterface(
+                slang::IComponentType::getTypeGuid(),
+                (void**)componentInterface.writeRef());
+            
+            auto proxy = getProxy(componentInterface.get());
+            componentHandle = getProxyHandle(proxy);
+
+            // Find the target index by searching the linkage's targets list
+            Slang::Linkage* linkage = component->getLinkage();
+            targetIndex = -1;
+            for (Index i = 0; i < linkage->targets.getCount(); i++)
+            {
+                if (linkage->targets[i].get() == targetReq)
+                {
+                    targetIndex = i;
+                    break;
+                }
+            }
+            
+            if (targetIndex == -1)
+            {
+                // This shouldn't happen, but handle it gracefully
+                throw Slang::Exception("Failed to find target index for ProgramLayout");
+            }
+        }
+
+        // Record: component handle + target index (suppression ended)
+        recordHandle(flags, componentHandle);
+        record(flags, targetIndex);
     }
     else
     {
+        // Playback mode
+        expectTypeId(TypeId::ProgramLayoutRef);
+
+        // Read component handle
+        uint64_t componentHandle = kNullHandle;
+        recordHandle(RecordFlag::None, componentHandle);
         
+        // Read target index
+        SlangInt targetIndex = -1;
+        record(RecordFlag::None, targetIndex);
+
+        // Handle null
+        if (componentHandle == kNullHandle || targetIndex == -1)
+        {
+            layout = nullptr;
+            return;
+        }
+
+        // Look up the component from handle
+        ISlangUnknown* componentUnknown = getProxy(componentHandle);
+        
+        // Unwrap proxy if needed
+        ISlangUnknown* impl = getImplementation(componentUnknown);
+        if (impl)
+            componentUnknown = impl;
+
+        // Query for IComponentType interface
+        ComPtr<slang::IComponentType> component;
+        if (componentUnknown)
+        {
+            componentUnknown->queryInterface(
+                slang::IComponentType::getTypeGuid(),
+                (void**)component.writeRef());
+        }
+        
+        if (!component)
+        {
+            throw HandleNotFoundException(componentHandle);
+        }
+
+        // Call getLayout to recreate the ProgramLayout
+        {
+            SuppressRecording suppressGuard;
+            layout = component->getLayout(targetIndex, nullptr);
+        }
     }
-   
 }
 
 
