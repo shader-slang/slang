@@ -2599,6 +2599,11 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(41000, Warning, unreachableCode, "unreachable code detected")
 DIAGNOSTIC(41001, Error, recursiveType, "type '$0' contains cyclic reference to itself.")
+DIAGNOSTIC(
+    41002,
+    Error,
+    cyclicInterfaceDependency,
+    "interface '$0' has cyclic dependency on itself through its implementations.")
 
 DIAGNOSTIC(
     41009,
