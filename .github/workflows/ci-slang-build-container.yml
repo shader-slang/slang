@@ -44,7 +44,7 @@ jobs:
         if: env.IS_FORK_PR == 'true'
         uses: actions/cache/restore@v4
         with:
-          path: /github/home/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-linux-gcc-x86_64-${{ inputs.config }}-
@@ -165,7 +165,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
-          path: /github/home/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v4
