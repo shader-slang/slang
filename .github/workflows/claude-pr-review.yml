@@ -1,0 +1,139 @@
+name: Claude PR Review
+
+# Automated PR review for the Slang compiler
+# Triggers on PRs to master that touch core source, tests, build, or tools
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: number
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths:
+      - "source/**"
+      - "tests/**"
+      - "prelude/**"
+      - "include/**"
+      - "tools/**"
+      - "CMakeLists.txt"
+      - "cmake/**"
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  review:
+    # Skip draft PRs, bot PRs, fork PRs, and Claude's own branches (loop prevention)
+    # Fork PRs are skipped because GitHub does not expose secrets to fork PR workflows.
+    # Use workflow_dispatch with pr_number to review fork PRs manually.
+    # workflow_dispatch bypasses these checks (manual trigger = intentional)
+    if: |
+      github.event_name == 'workflow_dispatch' || (
+        github.event.pull_request.draft == false &&
+        !contains(github.event.pull_request.user.login, '[bot]') &&
+        !startsWith(github.event.pull_request.head.ref, 'claude/') &&
+        github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    # Centralized auth configuration
+    env:
+      CLAUDE_AUTH_PROVIDER: ${{ vars.CLAUDE_AUTH_PROVIDER || 'llmgw' }}
+      LLMGW_ID: ${{ secrets.LLMGW_ID }}
+      LLMGW_SECRET: ${{ secrets.LLMGW_SECRET }}
+      LLMGW_TOKEN_URL: ${{ secrets.LLMGW_TOKEN_URL }}
+      NV_INFERENCE_TOKEN: ${{ secrets.NV_INFERENCE_TOKEN }}
+
+    concurrency:
+      group: claude-review-${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: PR Review with Progress Tracking
+        uses: ./.github/actions/claude-code-runner
+        with:
+          show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
+          nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
+          nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
+          nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
+          max-turns: "300"
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
+
+            Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
+            IMPORTANT: The repo is checked out locally. Use View/GlobTool/GrepTool for file reads. Use `gh pr diff` for the diff. Do NOT fetch files remotely via `gh api`.
+            IMPORTANT: For inline comments use mcp__github_inline_comment__create_inline_comment. For the summary use mcp__github__add_issue_comment. These are the only comment tools available.
+
+            ### How to review
+            1. Fetch the PR diff with `gh pr diff <number>` and the changed files list
+            2. Read each changed file IN FULL in the repository (not just the diff) to understand context
+            3. Use mcp__github_inline_comment__create_inline_comment ONLY for high-confidence bugs,
+               correctness issues, or important flags that warrant line-level attention.
+               Keep signal-to-noise ratio high — do NOT use inline comments for praise, style nits,
+               or low-confidence suggestions.
+            4. Post a top-level summary comment using `mcp__github__add_issue_comment` with:
+               - What the PR does
+               - Key findings (bugs, issues, suggestions, style observations)
+               - Overall assessment
+
+          # Note: CLAUDE.md is auto-loaded and covers compiler pipeline, IR system, CLI conventions, etc.
+          # These instructions cover ONLY review-specific priorities and patterns.
+          custom-instructions: |
+            ### **Review Priorities**
+            - IR pass changes: verify SSA form and type invariants are maintained
+            - Emit changes: all target backends (SPIRV, HLSL, GLSL, Metal, CUDA, WGSL) should be consistent;
+              emit logic should be simple — flag complex transforms that belong in IR passes
+            - Semantic check changes (slang-check-*.cpp): verify overload resolution and type coercion
+            - New IR instructions: must be in slang-ir-insts.lua with proper FIDDLE annotations
+            - Public API changes (include/slang.h): flag as potentially ABI-breaking, need "pr: breaking" label
+            - Test coverage: bug fixes need regression tests; non-GPU features use CPU or INTERPRET mode
+
+            ### **Common Patterns to Flag**
+            - Unchecked `as<T>()` casts on IRInst* (should check for null or use dynamicCast)
+            - Missing cases in switch statements over IROp enums
+            - IR passes that modify instructions without updating uses/users correctly
+            - Emit code doing complex transforms instead of delegating to IR passes
+            - Missing `break` or `return` in exhaustive IROp switches
+
+          mcp-config: |
+            {
+              "mcpServers": {
+                "deepwiki": {
+                  "type": "http",
+                  "url": "https://mcp.deepwiki.com/mcp"
+                }
+              }
+            }
+
+          # Security: read-only git, no checkout/fetch of fork code, no PR approval capability.
+          # Claude reads PR content via gh CLI and GitHub MCP tools.
+          # Note: Bash glob '*' does NOT match newlines, so multi-line commands are blocked.
+          # Use MCP tools (add_issue_comment) for multi-line content like review summaries.
+          allowed-tools: |
+            View,GlobTool,GrepTool,BatchTool,
+            Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git status*),
+            Bash(grep *),Bash(grep -*),
+            Bash(cat *),Bash(head *),Bash(tail *),
+            Bash(ls *),Bash(find *),Bash(wc *),
+            Bash(gh pr diff*),Bash(gh pr view*),
+            mcp__github_inline_comment__create_inline_comment,
+            mcp__github__add_issue_comment,
+            mcp__github__get_pull_request,
+            mcp__github__get_pull_request_files,
+            mcp__github__get_issue,
+            mcp__github__get_issue_comments,
+            mcp__deepwiki__ask_question
