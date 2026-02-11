@@ -170,7 +170,7 @@ void specializeStageSwitch(IRModule* module)
         mapFuncToStageSpecializedFunc.add(func, _Move(specializedFuncs));
     }
 
-    // Rewrite entrypoint and cloned functions to replace `GetCurrentStage` with the stage they are
+    // Rewrite entrypoint, CUDA kernels, and cloned functions to replace `GetCurrentStage` with the stage they are
     // specialized to.
     for (auto func : stageSpecificFunctions)
     {
