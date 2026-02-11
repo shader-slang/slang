@@ -20560,7 +20560,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         RAY_FLAG rayFlags)
     {
         __requirePrelude(R"(
-            raytracing::intersection_params _ray_flags_to_intersection_params(uint flags){
+            raytracing::intersection_params _slang_ray_flags_to_intersection_params(uint flags){
                 raytracing::intersection_params params;
                 if (flags & 0x01) /* RAY_FLAG_FORCE_OPAQUE */
                     params.force_opacity(raytracing::forced_opacity::opaque);
@@ -20581,7 +20581,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 return params;
             }
         )");
-        __intrinsic_asm "$0->reset({ $1, $2, $3, $4 }, $5, $6, _ray_flags_to_intersection_params($7))";
+        __intrinsic_asm "$0->reset({ $1, $2, $3, $4 }, $5, $6, _slang_ray_flags_to_intersection_params($7))";
     }
 
     /// Initialize a ray-tracing query.
@@ -20735,7 +20735,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         case metal:
             __requirePrelude(R"(
-                uint _candidate_intersection_type_to_uint(raytracing::intersection_type type){
+                uint _slang_candidate_intersection_type_to_uint(raytracing::intersection_type type){
                     switch(type){
                         case raytracing::intersection_type::triangle:
                             return 0; /* CANDIDATE_NON_OPAQUE_TRIANGLE */
@@ -20747,7 +20747,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 }
             )");
             __intrinsic_asm R"(
-                _candidate_intersection_type_to_uint($0->get_candidate_intersection_type())
+                _slang_candidate_intersection_type_to_uint($0->get_candidate_intersection_type())
             )";
         }
     }
@@ -20773,7 +20773,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         case metal:
             __requirePrelude(R"(
-                uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
+                uint _slang_committed_intersection_type_to_uint(raytracing::intersection_type type){
                     switch(type){
                         case raytracing::intersection_type::none:
                             return 0; /* COMMITTED_NOTHING */
@@ -20786,7 +20786,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                     }
                 }
             )");
-            __intrinsic_asm "_committed_intersection_type_to_uint($0->get_committed_intersection_type())";
+            __intrinsic_asm "_slang_committed_intersection_type_to_uint($0->get_committed_intersection_type())";
         }
     }
 
