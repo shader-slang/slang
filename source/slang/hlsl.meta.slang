@@ -21370,6 +21370,25 @@ ${
 $}
 
     __glsl_extension(GL_EXT_ray_query)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
+    uint $(ccName)InstanceContributionToHitGroupIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".$(ccName)InstanceContributionToHitGroupIndex";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, $(ccTF))";
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm
+            {
+                result:$$uint = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
     [require(glsl, rayquery_position)]
     [__NoSideEffect]
@@ -21483,7 +21502,6 @@ ${
         {"uint", "InstanceID", "InstanceCustomIndex", "user_instance_id"},
         {"uint", "PrimitiveIndex", "PrimitiveIndex", "primitive_id"},
         {"uint", "GeometryIndex", "GeometryIndex", "geometry_id"},
-        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset", "user_instance_id"}, // should be removed for metal
         {"float3", "ObjectRayOrigin", "ObjectRayOrigin", "ray_origin"},
         {"float3", "ObjectRayDirection", "ObjectRayDirection", "ray_direction"},
         {"bool", "TriangleFrontFace", "FrontFace", "triangle_front_facing"},
