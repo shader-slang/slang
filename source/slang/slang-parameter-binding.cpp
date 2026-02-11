@@ -4323,6 +4323,40 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         }
     }
 
+    // Allocate a space for the bindless resource descriptor heap if the target
+    // is compatible with the `descriptor_handle` capability. This alias covers
+    // all targets that support DescriptorHandle types (glsl_spirv, sm_6_6, cpp,
+    // cuda, metal, wgsl).
+    auto targetCaps = targetReq->getTargetCaps();
+    if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle)) ==
+        CapabilitySet::ImpliesReturnFlags::Implied)
+    {
+        // Check if user has specified a preferred bindless space index
+        int requestedIndex =
+            targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+
+        // Try to use the requested index, or find the next available one
+        int availableIndex = requestedIndex;
+        while (sharedContext.usedSpaces.contains(availableIndex))
+        {
+            availableIndex++;
+        }
+
+        // Warn if we had to use a different index than requested
+        if (availableIndex != requestedIndex &&
+            targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+        {
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::requestedBindlessSpaceIndexUnavailable,
+                requestedIndex,
+                availableIndex);
+        }
+
+        markSpaceUsed(&context, nullptr, availableIndex);
+        programLayout->bindlessSpaceIndex = availableIndex;
+    }
+
     return programLayout;
 }
 

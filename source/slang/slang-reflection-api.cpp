@@ -4604,6 +4604,14 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     return getReflectionSize(uniform->count);
 }
 
+SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if (!program)
+        return -1; // -1 means bindless resource heap is not used.
+    return program->bindlessSpaceIndex;
+}
+
 SLANG_API SlangReflectionType* spReflection_specializeType(
     SlangReflection* inProgramLayout,
     SlangReflectionType* inType,
