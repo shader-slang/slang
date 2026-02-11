@@ -955,6 +955,10 @@ Compound Capabilities
 `atomic_hlsl_sm_6_6`
 > (hlsl only) Capabilities required to use hlsl sm_6_6 atomics
 
+`atomic_reduce`
+> Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
+> On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
+
 `atomicfloat`
 > Capabilities needed to use GLSL-tier-1 float-atomic operations
 

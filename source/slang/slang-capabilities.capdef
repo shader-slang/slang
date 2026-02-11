@@ -2133,6 +2133,11 @@ alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
 /// [Version]
 alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_0 | sm_5_0;
 
+/// Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
+/// On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
+/// [Compound]
+alias atomic_reduce = _cuda_sm_7_0 | glsl | hlsl | metal | spirv | wgsl | cpp | llvm;
+
 /// Atomic operations on BFloat16 types. Requires SM 9.0 (Hopper) or higher on CUDA.
 /// [Compound]
 alias atomic_bfloat16 = _cuda_sm_9_0;
