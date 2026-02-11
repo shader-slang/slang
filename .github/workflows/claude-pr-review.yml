@@ -25,6 +25,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
+  actions: read
   issues: write
   id-token: write
 
@@ -69,7 +70,7 @@ jobs:
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
-          max-turns: "300"
+          max-turns: "500"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
@@ -80,16 +81,15 @@ jobs:
             1. Fetch the PR diff with `gh pr diff <number>` and the changed files list
             2. Read each changed file IN FULL in the repository (not just the diff) to understand context
             3. Create a PENDING review with mcp__github__create_pending_pull_request_review
-            4. Add inline comments using mcp__github__add_comment_to_pending_review for:
-               - High-confidence bugs and correctness issues
-               - Design concerns or potential issues (even if not blocking)
-               - Important flags that warrant line-level attention
-               Do NOT use inline comments for praise, style nits, or trivial suggestions.
-            5. Submit the review with mcp__github__submit_pending_pull_request_review with event "COMMENT".
-            6. Post a PR comment via mcp__github__add_issue_comment with:
-               - What the PR does
-               - Key findings (bugs, issues, suggestions, style observations)
-               - Overall assessment
+            4. Add inline comments using mcp__github__add_comment_to_pending_review for every bug,
+               issue, suggestion, or non-trivial observation. Aim for at least one inline comment per
+               changed file when there is something worth noting. Do NOT use inline comments for praise.
+            5. Submit the review with mcp__github__submit_pending_pull_request_review with event "COMMENT",
+               including a summary with overall assessment, positive feedback, and key findings.
+            6. ALWAYS post a PR comment via mcp__github__add_issue_comment summarizing what the PR does,
+               key findings, and verdict. This ensures notification even if the review submission fails.
+
+            Inline comments are the most valuable part. Be specific and line-level, not vague.
 
           # Note: CLAUDE.md is auto-loaded and covers compiler pipeline, IR system, CLI conventions, etc.
           # These instructions cover ONLY review-specific priorities and patterns.
@@ -132,6 +132,11 @@ jobs:
             Bash(ls *),Bash(find *),Bash(wc *),
             Bash(gh pr diff*),Bash(gh pr view*),Bash(gh pr list*),Bash(gh pr checks*),
             mcp__github__get_pull_request,
+            mcp__github__get_pull_request_files,
+            mcp__github__get_pull_request_reviews,
+            mcp__github__get_pull_request_status,
+            mcp__github__get_issue,
+            mcp__github__get_issue_comments,
             mcp__github__create_pending_pull_request_review,
             mcp__github__add_comment_to_pending_review,
             mcp__github__delete_pending_pull_request_review,
