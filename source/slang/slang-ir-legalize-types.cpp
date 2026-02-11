@@ -3301,6 +3301,7 @@ static LegalVal declareVars(
                 }
             }
 
+            // This constructor does nothing if `elementVarLayout` is still null.
             LegalVarChainLink varChainWithElement(varChain, elementVarLayout);
 
             // Declare a variable of the pointed-to type,
