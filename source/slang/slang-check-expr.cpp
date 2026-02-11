@@ -20,6 +20,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2106,11 +2107,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (opName == getName("!"))
         {
-            resultValue = constArgVals[0] != 0;
+            resultValue = constArgVals[0] == 0;
         }
         else if (opName == getName("~"))
         {
             resultValue = ~constArgVals[0];
+        }
+        else if (opName == getName("&&"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
+        }
+        else if (opName == getName("||"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
         // simple binary operators
@@ -2707,7 +2720,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         if (!diagnosed)
         {
             if (!maybeDiagnoseAmbiguousReference(baseExpr))
-                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+            {
+                if (getOptionSet().shouldEmitRichDiagnostics())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
+                }
+                else
+                {
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+                }
+            }
         }
         return CreateErrorExpr(subscriptExpr);
     }
