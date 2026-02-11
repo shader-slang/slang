@@ -42,6 +42,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
     defaults:
       run:
         shell: bash
@@ -52,6 +54,7 @@ jobs:
           fetch-depth: "0"
 
       - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
