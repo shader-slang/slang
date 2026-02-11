@@ -2,11 +2,7 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
-#ifdef UNIT_TEST
-#define VISIBILITY_LEVEL public
-#else
-#define VISIBILITY_LEVEL internal
-#endif
+#include "common-def.slang"
 
 #define Max(A, B) ((A) > (B) ? (A) : (B))
 

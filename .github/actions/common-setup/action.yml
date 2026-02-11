@@ -93,26 +93,17 @@ runs:
         echo "bin_dir=$bin_dir" >> "$GITHUB_ENV"
         echo "lib_dir=$lib_dir" >> "$GITHUB_ENV"
 
-    # Try to restore an LLVM install, or build it otherwise
-    - uses: actions/cache/restore@v4
-      id: cache-llvm
+    # Setup LLVM from GCS (or build if missing)
+    - name: Setup LLVM from GCS
       if: inputs.build-llvm == 'true' && inputs.use-cached-llvm == 'true'
+      uses: ./.github/actions/setup-llvm-from-gcs
       with:
-        path: build/llvm-project-install
-        # Use os*compiler*platform in lieu of an ABI key here, which is what we really want
-        key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
-    - name: Build LLVM
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true'
-      shell: bash
-      run: |
-        ./external/build-llvm.sh \
-          --install-prefix "${{github.workspace}}/build/llvm-project-install" \
-          --repo "https://${{github.token}}@github.com/llvm/llvm-project"
-    - uses: actions/cache/save@v4
-      if: inputs.build-llvm == 'true' && steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master' && inputs.use-cached-llvm == 'true'
-      with:
-        path: build/llvm-project-install
-        key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
+        os: ${{ inputs.os }}
+        compiler: ${{ inputs.compiler }}
+        platform: ${{ inputs.platform }}
+        llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+        build-if-missing: "true"
+        github-token: ${{ github.token }}
 
     - name: Set environment variable for CMake
       shell: bash

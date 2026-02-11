@@ -607,10 +607,13 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
     // Output primary diagnostic
     outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
 
+    // Output primary span message
+    outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
+
     // Output secondary spans
     for (const auto& secondarySpan : diag.secondarySpans)
     {
-        outputSpan(secondarySpan, "secondary", secondarySpan.message);
+        outputSpan(secondarySpan, "span", secondarySpan.message);
     }
 
     // Output notes
@@ -622,7 +625,7 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         // Output any secondary spans attached to the note
         for (const auto& secondarySpan : note.secondarySpans)
         {
-            outputSpan(secondarySpan, "note-secondary", secondarySpan.message);
+            outputSpan(secondarySpan, "note-span", secondarySpan.message);
         }
     }
 
