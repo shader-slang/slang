@@ -2,6 +2,7 @@
 #ifndef SLANG_COMPILER_H_INCLUDED
 #define SLANG_COMPILER_H_INCLUDED
 
+// Test cache functionality
 //
 // This file provides an umbrella header that ties together
 // the headers for a bunch of the core types used by the
