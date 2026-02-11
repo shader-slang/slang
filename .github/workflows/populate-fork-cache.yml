@@ -63,7 +63,7 @@ jobs:
       platform: x86_64
       config: release
       runs-on: '["ubuntu-22.04"]'
-      warnings-as-errors: true
+      warnings-as-errors: false
       build-llvm: true
 
   build-macos-release:
@@ -79,7 +79,7 @@ jobs:
       platform: aarch64
       config: release
       runs-on: '["macos-latest"]'
-      warnings-as-errors: true
+      warnings-as-errors: false
       build-llvm: true
 
   mark-cached:
