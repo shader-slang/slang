@@ -138,8 +138,7 @@ void specializeStageSwitch(IRModule* module)
             continue;
         if (func->findDecoration<IREntryPointDecoration>())
             continue;
-        // CUDAKernel functions are effectively compute stage entry points,
-        // skip them from cloning (they'll be specialized in-place below).
+        // CUDAKernel functions are effectively compute stage entry points
         if (func->findDecoration<IRCudaKernelDecoration>())
             continue;
         Dictionary<Stage, IRInst*> specializedFuncs;
