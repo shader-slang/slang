@@ -75,7 +75,7 @@ jobs:
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
             Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
-            IMPORTANT: The repo is checked out locally. Use View/GlobTool/GrepTool for file reads. Use `gh pr diff` for the diff. Do NOT fetch files remotely via `gh api`.
+            IMPORTANT: The repo is checked out locally. Use View/GlobTool/GrepTool for file reads and `gh pr diff` for the diff. You may use `gh api` for metadata, but do not use it to fetch repository file contents (read files from the local checkout instead).
             IMPORTANT: For inline comments use mcp__github_inline_comment__create_inline_comment. For the summary use mcp__github__add_issue_comment. These are the only comment tools available.
 
             ### How to review
