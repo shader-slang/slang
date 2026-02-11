@@ -5561,6 +5561,8 @@ typedef unsigned long long OptixTraversableHandle;
 static const int kSlangTorchTensorMaxDim = 5;
 
 // TensorView
+// NOTE: If you change this struct's layout, also update the hard-coded size/alignment
+// in _createTypeLayout() in slang-type-layout.cpp.
 struct TensorView
 {
     uint8_t* data;
