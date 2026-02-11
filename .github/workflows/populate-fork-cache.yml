@@ -138,7 +138,7 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: /tmp/.cache/sccache
+          path: ~/.cache/sccache
           key: sccache-linux-gcc-x86_64-debug-${{ needs.check-changes.outputs.last-commit }}
 
   build-macos-release:
@@ -230,7 +230,7 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: /tmp/.cache/sccache
+          path: ~/.cache/sccache
           key: sccache-macos-clang-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
 
   build-linux-aarch64-release:
@@ -274,7 +274,7 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: /tmp/.cache/sccache
+          path: ~/.cache/sccache
           key: sccache-linux-gcc-aarch64-release-${{ needs.check-changes.outputs.last-commit }}
 
   build-linux-aarch64-debug:
@@ -318,7 +318,7 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: /tmp/.cache/sccache
+          path: ~/.cache/sccache
           key: sccache-linux-gcc-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
 
   mark-cached:
