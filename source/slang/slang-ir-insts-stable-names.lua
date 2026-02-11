@@ -726,4 +726,8 @@ return {
 	["IsCoopFloat"] = 724,
 	["Type.OptionalNoneType"] = 725,
 	["ReinterpretOptional"] = 726,
+	["Type.D3DConstantBufferLayout"] = 727,
+	["Type.MetalParameterBlockLayout"] = 728,
+	["Type.CUDALayout"] = 729,
+	["Type.LLVMLayout"] = 730,
 }

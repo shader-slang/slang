@@ -6,9 +6,11 @@
 namespace Slang
 {
 struct IRModule;
+struct IRBuilder;
 class TargetProgram;
 struct IRTypeLayoutRules;
 struct IRType;
+struct IRPtrType;
 enum class IRTypeLayoutRuleName;
 
 enum class BufferElementTypeLoweringPolicyKind
@@ -43,6 +45,8 @@ void lowerBufferElementTypeToStorageType(
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType);
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType);
 IRTypeLayoutRules* getTypeLayoutRuleForPointer(TargetProgram* target, IRType* pointerType);
+
+IRPtrType* getPointerTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType);
 
 } // namespace Slang
 

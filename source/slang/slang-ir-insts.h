@@ -4175,6 +4175,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+    IRInst* emitRWStructuredBufferGetElementPtr(IRType* pointerType, IRInst* structuredBuffer, IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
 

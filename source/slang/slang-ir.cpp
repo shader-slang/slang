@@ -6431,11 +6431,18 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer,
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     SLANG_ASSERT(sbt);
     const auto t = getPtrType(sbt->getElementType());
+    return emitRWStructuredBufferGetElementPtr(t->getCanonicalType(), structuredBuffer, index);
+}
+
+IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRType* pointerType, IRInst* structuredBuffer, IRInst* index)
+{
+    const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
+    SLANG_ASSERT(sbt);
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
         this,
         kIROp_RWStructuredBufferGetElementPtr,
-        t,
+        pointerType,
         2,
         operands);
     addInst(i);

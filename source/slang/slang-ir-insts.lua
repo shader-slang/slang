@@ -339,6 +339,10 @@ local insts = {
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
 			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
+			{ D3DConstantBufferLayout = { struct_name = "D3DConstantBufferLayoutType", hoistable = true } },
+			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
+			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
+			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {
 					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },
