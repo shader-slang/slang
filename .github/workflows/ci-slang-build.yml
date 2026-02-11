@@ -57,7 +57,7 @@ jobs:
         if: runner.environment != 'self-hosted' && env.IS_FORK_PR == 'true'
         uses: actions/cache/restore@v4
         with:
-          path: ~/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
@@ -286,5 +286,5 @@ jobs:
         if: runner.environment != 'self-hosted' && github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
