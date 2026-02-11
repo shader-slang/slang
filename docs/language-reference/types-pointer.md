@@ -8,8 +8,7 @@ Current limitations include:
 - Pointers to local memory are supported only on CUDA and CPU targets.
 - Slang does not support pointers to opaque handle types such as `Texture2D`.
   For handle pointers, use `DescriptorHandle<T>` instead.
-- Slang does not currently support `const` pointers with the [declaration syntax](#syntax). Pointers to
-  read-only and immutable values are supported using [generic pointer types](#generic-pointer).
+- Slang does not currently support `const` pointers.
 - Slang does not support custom alignment specification. Functions
   [loadAligned()](../../../core-module-reference/global-decls/loadaligned-4.html) and
   [storeAligned()](../../../core-module-reference/global-decls/storealigned-5.html) may be used for loads and

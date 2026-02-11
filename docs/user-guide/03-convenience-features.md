@@ -577,7 +577,11 @@ int invalidTest()
 }
 ```
 
-Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax
+`Ptr<MyType, AccessMode=Access.ReadWrite, AddressSpace=AddressSpace.Device>`. The generic syntax allows
+declaring pointers to read-only and immutable values, and pointers to address spaces other than
+`Device`. Pointers to immutable values can also be declared with type alias
+`ImmutablePtr<T, AddressSpace>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
@@ -592,8 +596,7 @@ Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr
 - Slang doesn't support custom alignment specification. Functions
   `loadAligned()` and `storeAligned()` may be used for loads and stores using pointers with known alignment.
 
-- Slang currently does not support `const` pointers. Pointers to read-only and immutable values are supported using
-  type aliases `Ptr<T, AccessMode, AddressSpace>` and `ImmutablePtr<T, AddressSpace>`.
+- Slang currently does not support `const` pointers.
 
 ## `DescriptorHandle` for Bindless Descriptor Access
 
