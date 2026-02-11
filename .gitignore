@@ -133,3 +133,4 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+*.tar.gz
