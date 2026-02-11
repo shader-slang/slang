@@ -87,11 +87,11 @@ SlangResult CommandLineDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
     ArtifactUtil::addAssociated(resultArtifact, diagnostics);
 
-    // If Slang was built using Clang or GCC and with sanitizers, the same `-fsanitize=...` flag
-    // must be used when linking an executable, or it will fail to link. We can't instrument
-    // Slang-generated C++ with sanitizers as they might report errors that can't be fixed, so we
-    // separate compilation and linking into two commands to enable sanitizers only during linking.
-    bool shouldSeparateCompileAndLink = options.targetType == SLANG_HOST_EXECUTABLE;
+    // Separate compilation and linking into two stages for all targets that require linking.
+    // This is needed so that when Slang is built with sanitizers (ASan), the sanitizer runtime
+    // is linked only during the link stage without instrumenting the Slang-generated C++ code.
+    // SLANG_OBJECT_CODE is already compile-only (no linking), so no split is needed.
+    bool shouldSeparateCompileAndLink = options.targetType != SLANG_OBJECT_CODE;
 
     auto helper = DefaultArtifactHelper::getSingleton();
 

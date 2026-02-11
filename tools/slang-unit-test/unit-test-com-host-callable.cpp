@@ -130,6 +130,9 @@ struct ComTestContext
         SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
 
         {
+#if (defined(__has_feature) && __has_feature(address_sanitizer)) || defined(__SANITIZE_ADDRESS__)
+            // When ASan is active, only test the compiler that was used to build Slang,
+            // as mixing sanitizer runtimes from different compilers is not supported.
             const SlangPassThrough currentCppCompiler =
 #if SLANG_VC
                 SLANG_PASS_THROUGH_VISUAL_STUDIO
@@ -141,11 +144,26 @@ struct ComTestContext
 #error "Unsupported compiler"
 #endif
                 ;
-            // Do we have a C++ compiler
             if (SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(currentCppCompiler)))
             {
                 cppCompiler = currentCppCompiler;
             }
+#else
+            const SlangPassThrough cppCompilers[] = {
+                SLANG_PASS_THROUGH_VISUAL_STUDIO,
+                SLANG_PASS_THROUGH_GCC,
+                SLANG_PASS_THROUGH_CLANG,
+            };
+            // Do we have a C++ compiler
+            for (const auto compiler : cppCompilers)
+            {
+                if (SLANG_SUCCEEDED(slangSession->checkPassThroughSupport(compiler)))
+                {
+                    cppCompiler = compiler;
+                    break;
+                }
+            }
+#endif
         }
 
         // If we have an *actual* C++ compile rtest on that first

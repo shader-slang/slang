@@ -467,6 +467,9 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
+    // Using `static char empty[]` instead of `(char*)""` to avoid ASan reporting
+    // a stack-use-after-scope error. This is an ASan runtime error (not a compiler
+    // warning), so it cannot be suppressed with pragmas.
     char* getData() const
     {
         static char empty[] = "";
