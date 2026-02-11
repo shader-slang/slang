@@ -2687,7 +2687,7 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
 // =====================================================================
 
 // Atomic reduction ADD operations
-__device__ __forceinline__ void __slang_atomic_reduce_add(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.s32 [%0], %1;"
                  :
@@ -2695,7 +2695,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(int32_t* addr, int32_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.u32 [%0], %1;"
                  :
@@ -2703,7 +2703,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(uint32_t* addr, uint32
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.s64 [%0], %1;"
                  :
@@ -2711,7 +2711,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(int64_t* addr, int64_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.u64 [%0], %1;"
                  :
@@ -2719,7 +2719,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(uint64_t* addr, uint64
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(float* addr, float val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(float* addr, float val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.f32 [%0], %1;"
                  :
@@ -2727,7 +2727,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(float* addr, float val
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(double* addr, double val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(double* addr, double val, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.f64 [%0], %1;"
                  :
@@ -2736,7 +2736,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(double* addr, double v
 }
 
 #if SLANG_CUDA_ENABLE_HALF
-__device__ __forceinline__ void __slang_atomic_reduce_add(__half* addr, __half val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half* addr, __half val, int order)
 {
     unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
     asm volatile("red.relaxed.gpu.global.add.noftz.f16 [%0], %1;"
@@ -2745,7 +2745,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(__half* addr, __half v
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(__half2* addr, __half2 val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half2* addr, __half2 val, int order)
 {
     unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
     asm volatile("red.relaxed.gpu.global.add.noftz.f16x2 [%0], %1;"
@@ -2756,7 +2756,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(__half2* addr, __half2
 #endif
 
 #if SLANG_CUDA_ENABLE_BF16
-__device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat16* addr, __nv_bfloat16 val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat16* addr, __nv_bfloat16 val, int order)
 {
     unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
     asm volatile("red.relaxed.gpu.global.add.noftz.bf16 [%0], %1;"
@@ -2765,7 +2765,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat16* addr, _
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat162* addr, __nv_bfloat162 val)
+__device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat162* addr, __nv_bfloat162 val, int order)
 {
     unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
     asm volatile("red.relaxed.gpu.global.add.noftz.bf16x2 [%0], %1;"
@@ -2776,7 +2776,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_add(__nv_bfloat162* addr, 
 #endif
 
 // Atomic reduction MIN operations
-__device__ __forceinline__ void __slang_atomic_reduce_min(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_min(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.min.s32 [%0], %1;"
                  :
@@ -2784,7 +2784,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(int32_t* addr, int32_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_min(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.min.u32 [%0], %1;"
                  :
@@ -2792,7 +2792,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(uint32_t* addr, uint32
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_min(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_min(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.min.s64 [%0], %1;"
                  :
@@ -2800,7 +2800,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(int64_t* addr, int64_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.min.u64 [%0], %1;"
                  :
@@ -2813,7 +2813,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64
 // For floating-point min/max atomics, use the regular `atom` instruction via __atomic_min/__atomic_max.
 
 // Atomic reduction MAX operations
-__device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.max.s32 [%0], %1;"
                  :
@@ -2821,7 +2821,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_max(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.max.u32 [%0], %1;"
                  :
@@ -2829,7 +2829,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(uint32_t* addr, uint32
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_max(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_max(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.max.s64 [%0], %1;"
                  :
@@ -2837,7 +2837,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(int64_t* addr, int64_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.max.u64 [%0], %1;"
                  :
@@ -2850,7 +2850,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64
 // For floating-point min/max atomics, use the regular `atom` instruction via __atomic_min/__atomic_max.
 
 // Atomic reduction AND operations (bitwise, integers only)
-__device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;"
                  :
@@ -2858,7 +2858,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_and(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;"
                  :
@@ -2866,7 +2866,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_and(uint32_t* addr, uint32
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_and(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_and(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;"
                  :
@@ -2874,7 +2874,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_and(int64_t* addr, int64_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_and(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;"
                  :
@@ -2883,7 +2883,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_and(uint64_t* addr, uint64
 }
 
 // Atomic reduction OR operations (bitwise, integers only)
-__device__ __forceinline__ void __slang_atomic_reduce_or(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_or(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;"
                  :
@@ -2891,7 +2891,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_or(int32_t* addr, int32_t 
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_or(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;"
                  :
@@ -2899,7 +2899,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_or(uint32_t* addr, uint32_
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_or(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_or(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;"
                  :
@@ -2907,7 +2907,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_or(int64_t* addr, int64_t 
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_or(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;"
                  :
@@ -2916,7 +2916,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_or(uint64_t* addr, uint64_
 }
 
 // Atomic reduction XOR operations (bitwise, integers only)
-__device__ __forceinline__ void __slang_atomic_reduce_xor(int32_t* addr, int32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int32_t* addr, int32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;"
                  :
@@ -2924,7 +2924,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_xor(int32_t* addr, int32_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_xor(uint32_t* addr, uint32_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint32_t* addr, uint32_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;"
                  :
@@ -2932,7 +2932,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_xor(uint32_t* addr, uint32
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_xor(int64_t* addr, int64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int64_t* addr, int64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;"
                  :
@@ -2940,7 +2940,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_xor(int64_t* addr, int64_t
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_xor(uint64_t* addr, uint64_t val)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint64_t* addr, uint64_t val, int order)
 {
     asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;"
                  :
@@ -2953,7 +2953,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_xor(uint64_t* addr, uint64
 //   inc: d = (old >= b) ? 0 : old + 1
 //   dec: d = ((old == 0) || (old > b)) ? b : old - 1
 // For simple increment by 1, we use add instead
-__device__ __forceinline__ void __slang_atomic_reduce_inc(uint32_t* addr)
+__device__ __forceinline__ void __slang_atomic_reduce_inc(uint32_t* addr, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.u32 [%0], 1;"
                  :
@@ -2961,7 +2961,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_inc(uint32_t* addr)
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_inc(int32_t* addr)
+__device__ __forceinline__ void __slang_atomic_reduce_inc(int32_t* addr, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.s32 [%0], 1;"
                  :
@@ -2969,7 +2969,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_inc(int32_t* addr)
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_dec(uint32_t* addr)
+__device__ __forceinline__ void __slang_atomic_reduce_dec(uint32_t* addr, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.u32 [%0], -1;"
                  :
@@ -2977,7 +2977,7 @@ __device__ __forceinline__ void __slang_atomic_reduce_dec(uint32_t* addr)
                  : "memory");
 }
 
-__device__ __forceinline__ void __slang_atomic_reduce_dec(int32_t* addr)
+__device__ __forceinline__ void __slang_atomic_reduce_dec(int32_t* addr, int order)
 {
     asm volatile("red.relaxed.gpu.global.add.s32 [%0], -1;"
                  :

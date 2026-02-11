@@ -5376,13 +5376,14 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 /// Atomic add reduction. On CUDA, uses PTX `red.add` instruction.
 /// @param val The target memory location.
 /// @param value The value to add.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_add<T>(__ref T val, T value)
+void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1)";
-    default: __atomic_add(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+    default: __atomic_add(val, value, order);
     }
 }
 
@@ -5390,122 +5391,132 @@ void __atomic_reduce_add<T>(__ref T val, T value)
 /// On CUDA, uses PTX `red.add.noftz.bf16` instruction.
 /// @param val The target memory location.
 /// @param value The value to add.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
-void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value)
+void __atomic_reduce_add(__ref BFloat16 val, BFloat16 value, MemoryOrder order = MemoryOrder.Relaxed)
 {
-    __intrinsic_asm "__slang_atomic_reduce_add($0, $1)";
+    __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
 }
 
 /// Atomic add reduction for vector<BFloat16, 2>. Requires SM 9.0 (Hopper) or newer.
 /// On CUDA, uses PTX `red.add.noftz.bf16x2` instruction.
 /// @param val The target memory location.
 /// @param value The value to add.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_bfloat16)]
-void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> value)
+void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> value, MemoryOrder order = MemoryOrder.Relaxed)
 {
-    __intrinsic_asm "__slang_atomic_reduce_add($0, $1)";
+    __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
 }
 
 /// Atomic subtract reduction. On CUDA, uses PTX `red.add` with negated value.
 /// @param val The target memory location.
 /// @param value The value to subtract.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_sub<T>(__ref T val, T value)
+void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1))";
-    default: __atomic_sub(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+    default: __atomic_sub(val, value, order);
     }
 }
 
 /// Atomic min reduction. On CUDA, uses PTX `red.min` instruction.
 /// @param val The target memory location.
 /// @param value The value to compare.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_min<T>(__ref T val, T value)
+void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1)";
-    default: __atomic_min(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+    default: __atomic_min(val, value, order);
     }
 }
 
 /// Atomic max reduction. On CUDA, uses PTX `red.max` instruction.
 /// @param val The target memory location.
 /// @param value The value to compare.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_max<T>(__ref T val, T value)
+void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1)";
-    default: __atomic_max(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+    default: __atomic_max(val, value, order);
     }
 }
 
 /// Atomic bitwise AND reduction. On CUDA, uses PTX `red.and` instruction.
 /// @param val The target memory location.
 /// @param value The value to AND.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_and<T>(__ref T val, T value)
+void __atomic_reduce_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1)";
-    default: __atomic_and(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+    default: __atomic_and(val, value, order);
     }
 }
 
 /// Atomic bitwise OR reduction. On CUDA, uses PTX `red.or` instruction.
 /// @param val The target memory location.
 /// @param value The value to OR.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_or<T>(__ref T val, T value)
+void __atomic_reduce_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1)";
-    default: __atomic_or(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+    default: __atomic_or(val, value, order);
     }
 }
 
 /// Atomic bitwise XOR reduction. On CUDA, uses PTX `red.xor` instruction.
 /// @param val The target memory location.
 /// @param value The value to XOR.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_xor<T>(__ref T val, T value)
+void __atomic_reduce_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1)";
-    default: __atomic_xor(val, value);
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+    default: __atomic_xor(val, value, order);
     }
 }
 
 /// Atomic increment reduction. On CUDA, uses PTX `red.inc` instruction.
 /// @param val The target memory location.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_inc<T>(__ref T val)
+void __atomic_reduce_inc<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
     default: __atomic_increment(val);
     }
 }
 
 /// Atomic decrement reduction. On CUDA, uses PTX `red.dec` instruction.
 /// @param val The target memory location.
+/// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
-void __atomic_reduce_dec<T>(__ref T val)
+void __atomic_reduce_dec<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
     {
-    case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0)";
+    case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
     default: __atomic_decrement(val);
     }
 }
