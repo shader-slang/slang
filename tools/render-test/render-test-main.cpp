@@ -280,6 +280,10 @@ struct AssignValsFromLayoutContext
     TestResourceContext& resourceContext;
     IAccelerationStructure* accelerationStructure;
 
+    // Map from named buffer names to their device addresses
+    // Used for resolving buffer address references in TEST_INPUT data
+    Dictionary<String, uint64_t> namedBufferAddresses;
+
     AssignValsFromLayoutContext(
         IDevice* device,
         slang::IComponentType* slangComponent,
@@ -405,10 +409,39 @@ struct AssignValsFromLayoutContext
         }
     }
 
-    SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
+    SlangResult assignBuffer(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::BufferVal* srcVal,
+        const String& bufferName = String())
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
+
+        // Resolve any pending buffer address references
+        for (const auto& ref : srcVal->pendingAddressRefs)
+        {
+            uint64_t addr = 0;
+            if (namedBufferAddresses.tryGetValue(ref.bufferName, addr))
+            {
+                // Patch the 64-bit address into the buffer data (2 uint32 slots)
+                if (ref.offsetInData + 1 < (uint32_t)bufferData.getCount())
+                {
+                    bufferData[ref.offsetInData] = (uint32_t)(addr & 0xFFFFFFFF);
+                    bufferData[ref.offsetInData + 1] = (uint32_t)(addr >> 32);
+                }
+            }
+            else
+            {
+                // Referenced buffer not found - this is an error
+                fprintf(
+                    stderr,
+                    "Error: Buffer '%s' referenced but not found. "
+                    "Make sure it is defined before the referencing buffer.\n",
+                    ref.bufferName.getBuffer());
+                return SLANG_FAIL;
+            }
+        }
+
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
@@ -424,6 +457,13 @@ struct AssignValsFromLayoutContext
             bufferData.getBuffer(),
             device,
             bufferResource));
+
+        // Store this buffer's address for potential future references
+        if (bufferName.getLength() > 0)
+        {
+            uint64_t addr = bufferResource->getDeviceAddress();
+            namedBufferAddresses[bufferName] = addr;
+        }
 
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
@@ -673,7 +713,7 @@ struct AssignValsFromLayoutContext
                         (int)fieldIndex);
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
             else
             {
@@ -685,7 +725,7 @@ struct AssignValsFromLayoutContext
                         field.name.begin());
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
         }
         return SLANG_OK;
@@ -780,7 +820,10 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
-    SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
+    SlangResult assign(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::ValPtr const& srcVal,
+        const String& valName = String())
     {
         auto& entryCursor = dstCursor;
         switch (srcVal->kind)
@@ -789,7 +832,7 @@ struct AssignValsFromLayoutContext
             return assignData(dstCursor, (ShaderInputLayout::DataVal*)srcVal.Ptr());
 
         case ShaderInputType::Buffer:
-            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr());
+            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr(), valName);
 
         case ShaderInputType::CombinedTextureSampler:
             return assignCombinedTextureSampler(
