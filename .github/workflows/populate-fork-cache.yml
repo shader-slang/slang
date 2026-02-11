@@ -1,0 +1,98 @@
+name: Populate Fork PR Cache
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # Every 30 minutes
+  workflow_dispatch: # Allow manual trigger
+
+concurrency:
+  group: populate-fork-cache
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should-build: ${{ steps.check.outputs.should-build }}
+      last-commit: ${{ steps.check.outputs.last-commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 10
+
+      - name: Check if source changed since last cache
+        id: check
+        run: |
+          # Get current master HEAD
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "last-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+
+          # Check if we already have a cache marker for this commit
+          MARKER_KEY="fork-cache-marker-${CURRENT_COMMIT}"
+
+          echo "Checking for existing cache marker: ${MARKER_KEY}"
+
+          # Use key query parameter to check for specific cache (avoids pagination issues)
+          CACHE_COUNT=$(gh api "repos/${{ github.repository }}/actions/caches?key=${MARKER_KEY}" --jq '.total_count' 2>/dev/null || echo "0")
+
+          if [ "$CACHE_COUNT" -gt 0 ]; then
+            echo "✅ Cache already populated for commit ${CURRENT_COMMIT}"
+            echo "should-build=false" >> $GITHUB_OUTPUT
+          else
+            echo "🔨 Building to populate fork PR cache for commit ${CURRENT_COMMIT}"
+            echo "should-build=true" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build-linux-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: x86_64
+      config: release
+      runs-on: '["ubuntu-22.04"]'
+      warnings-as-errors: true
+      build-llvm: true
+
+  build-macos-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: macos
+      compiler: clang
+      platform: aarch64
+      config: release
+      runs-on: '["macos-latest"]'
+      warnings-as-errors: true
+      build-llvm: true
+
+  mark-cached:
+    needs: [check-changes, build-linux-release, build-macos-release]
+    if: needs.check-changes.outputs.should-build == 'true' && needs.build-linux-release.result == 'success' && needs.build-macos-release.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+
+      - name: Create cache marker file
+        run: |
+          mkdir -p .cache-markers
+          echo "fork-cache-marker for commit ${{ needs.check-changes.outputs.last-commit }}" > .cache-markers/fork-cache-marker.txt
+
+      - name: Save cache marker
+        uses: actions/cache/save@v4
+        with:
+          path: .cache-markers/fork-cache-marker.txt
+          key: fork-cache-marker-${{ needs.check-changes.outputs.last-commit }}
