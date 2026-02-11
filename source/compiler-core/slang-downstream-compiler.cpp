@@ -87,11 +87,16 @@ SlangResult CommandLineDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
     ArtifactUtil::addAssociated(resultArtifact, diagnostics);
 
-    // Separate compilation and linking into two stages for all targets that require linking.
+    // Separate compilation and linking into two stages for C++ host targets.
     // This is needed so that when Slang is built with sanitizers (ASan), the sanitizer runtime
     // is linked only during the link stage without instrumenting the Slang-generated C++ code.
-    // SLANG_OBJECT_CODE is already compile-only (no linking), so no split is needed.
-    bool shouldSeparateCompileAndLink = options.targetType != SLANG_OBJECT_CODE;
+    // Only applies to targets that go through a C++ compile+link flow; shader targets (e.g.
+    // Metal) must not be split as they have their own single-stage compilation model.
+    bool shouldSeparateCompileAndLink =
+        options.targetType == SLANG_HOST_EXECUTABLE ||
+        options.targetType == SLANG_SHADER_SHARED_LIBRARY ||
+        options.targetType == SLANG_HOST_SHARED_LIBRARY ||
+        options.targetType == SLANG_SHADER_HOST_CALLABLE;
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
