@@ -1137,6 +1137,9 @@ Compound Capabilities
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets
 
+`descriptor_handle`
+> Targets that support DescriptorHandle types for bindless descriptor access.
+
 `domain_hull`
 > Collection of shader stages
 

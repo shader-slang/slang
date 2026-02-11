@@ -20,6 +20,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2719,7 +2720,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         if (!diagnosed)
         {
             if (!maybeDiagnoseAmbiguousReference(baseExpr))
-                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+            {
+                if (getOptionSet().shouldEmitRichDiagnostics())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
+                }
+                else
+                {
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+                }
+            }
         }
         return CreateErrorExpr(subscriptExpr);
     }
