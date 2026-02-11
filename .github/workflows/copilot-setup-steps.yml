@@ -15,10 +15,13 @@ jobs:
     runs-on: slang-larger-runner-1
 
     permissions:
-      id-token: write # Required for Workload Identity (GCS auth)
+      id-token: write # Required for Workload Identity (unused by fork PRs)
       contents: read
       pull-requests: write
       checks: write
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
 
     # No container - Copilot does not support containers
     # Known issue: https://github.com/orgs/community/discussions/170315
@@ -32,6 +35,7 @@ jobs:
           fetch-depth: 2
 
       - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
