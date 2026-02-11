@@ -5379,6 +5379,7 @@ T __atomic_decrement<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed);
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_add<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5418,6 +5419,7 @@ void __atomic_reduce_add(__ref vector<BFloat16, 2> val, vector<BFloat16, 2> valu
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5433,6 +5435,7 @@ void __atomic_reduce_sub<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5448,6 +5451,7 @@ void __atomic_reduce_min<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5463,6 +5467,7 @@ void __atomic_reduce_max<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5478,6 +5483,7 @@ void __atomic_reduce_and<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5493,6 +5499,7 @@ void __atomic_reduce_or<T>(__ref T val, T value, MemoryOrder order = MemoryOrder
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5507,6 +5514,7 @@ void __atomic_reduce_xor<T>(__ref T val, T value, MemoryOrder order = MemoryOrde
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_inc<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
@@ -5521,6 +5529,7 @@ void __atomic_reduce_inc<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed
 /// @param order The memory ordering (currently only Relaxed is supported on CUDA).
 [ForceInline]
 [require(atomic_reduce)]
+__cuda_sm_version(7.0)
 void __atomic_reduce_dec<T>(__ref T val, MemoryOrder order = MemoryOrder.Relaxed)
 {
     __target_switch
