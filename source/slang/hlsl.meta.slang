@@ -20559,12 +20559,29 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         uint instanceInclusionMask,
         RAY_FLAG rayFlags)
     {
-        __intrinsic_asm R"(
-            raytracing::intersection_params params;
-            if (($7 & 0x100 /*RAY_FLAG_SKIP_TRIANGLES*/) == 0) params.assume_geometry_type(raytracing::geometry_type::triangle);
-            if (($7 & 0x200 /*RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES*/) == 0) params.assume_geometry_type(raytracing::geometry_type::bounding_box);
-            $0->reset({ $1, $2, $3, $4 }, $5, $6, params)
-        )";
+        __requirePrelude(R"(
+            raytracing::intersection_params _ray_flags_to_intersection_params(uint flags){
+                raytracing::intersection_params params;
+                if (flags & 0x01) /* RAY_FLAG_FORCE_OPAQUE */
+                    params.force_opacity(raytracing::forced_opacity::opaque);
+                if (flags & 0x02) /* RAY_FLAG_FORCE_NON_OPAQUE */
+                    params.force_opacity(raytracing::forced_opacity::non_opaque);
+                if (flags & 0x10) /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
+                    params.set_triangle_cull_mode(raytracing::triangle_cull_mode::back);
+                if (flags & 0x20) /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
+                    params.set_triangle_cull_mode(raytracing::triangle_cull_mode::front);
+                if (flags & 0x40) /* RAY_FLAG_CULL_OPAQUE */
+                    params.set_opacity_cull_mode(raytracing::opacity_cull_mode::opaque);
+                if (flags & 0x80) /* RAY_FLAG_CULL_NON_OPAQUE */
+                    params.set_opacity_cull_mode(raytracing::opacity_cull_mode::non_opaque);
+                if (flags & 0x100) /* RAY_FLAG_SKIP_TRIANGLES */
+                    params.set_geometry_cull_mode(raytracing::geometry_cull_mode::triangle);
+                if (flags & 0x200) /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
+                    params.set_geometry_cull_mode(raytracing::geometry_cull_mode::bounding_box);
+                return params;
+            }
+        )");
+        __intrinsic_asm "$0->reset({ $1, $2, $3, $4 }, $5, $6, _ray_flags_to_intersection_params($7))";
     }
 
     /// Initialize a ray-tracing query.
@@ -20606,7 +20623,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 ray.Direction,
                 ray.TMax);
         case metal:
-            __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags);
+            __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags | rayFlagsGeneric);
         }
     }
 
@@ -20718,20 +20735,16 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             };
         case metal:
             __requirePrelude(R"(
-uint _candidate_intersection_type_to_uint(raytracing::intersection_type type){
-    const uint CANDIDATE_NON_OPAQUE_TRIANGLE = 0;
-    const uint CANDIDATE_PROCEDURAL_PRIMITIVE = 1;
-    switch(type){
-        case raytracing::intersection_type::none:
-            return 0;
-        case raytracing::intersection_type::triangle:
-            return CANDIDATE_NON_OPAQUE_TRIANGLE;
-        case raytracing::intersection_type::bounding_box:
-            return CANDIDATE_PROCEDURAL_PRIMITIVE;
-        default:
-            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
-    }
-}
+                uint _candidate_intersection_type_to_uint(raytracing::intersection_type type){
+                    switch(type){
+                        case raytracing::intersection_type::triangle:
+                            return 0; /* CANDIDATE_NON_OPAQUE_TRIANGLE */
+                        case raytracing::intersection_type::bounding_box:
+                            return 1; /* CANDIDATE_PROCEDURAL_PRIMITIVE */
+                        default:
+                            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+                    }
+                }
             )");
             __intrinsic_asm R"(
                 _candidate_intersection_type_to_uint($0->get_candidate_intersection_type())
@@ -20759,22 +20772,19 @@ uint _candidate_intersection_type_to_uint(raytracing::intersection_type type){
                 result:$$COMMITTED_STATUS = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCommittedIntersectionKHR;
             };
         case metal:
-        __requirePrelude(R"(
-uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
-    const uint COMMITTED_NOTHING = 0;
-    const uint COMMITTED_TRIANGLE_HIT = 1;
-    const uint COMMITTED_PROCEDURAL_PRIMITIVE_HIT = 2;
-    switch(type){
-        case raytracing::intersection_type::none:
-            return COMMITTED_NOTHING;
-        case raytracing::intersection_type::triangle:
-            return COMMITTED_TRIANGLE_HIT;
-        case raytracing::intersection_type::bounding_box:
-            return COMMITTED_PROCEDURAL_PRIMITIVE_HIT;
-        default:
-            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
-    }
-}
+            __requirePrelude(R"(
+                uint _committed_intersection_type_to_uint(raytracing::intersection_type type){
+                    switch(type){
+                        case raytracing::intersection_type::none:
+                            return 0; /* COMMITTED_NOTHING */
+                        case raytracing::intersection_type::triangle:
+                            return 1; /* COMMITTED_TRIANGLE_HIT */
+                        case raytracing::intersection_type::bounding_box:
+                            return 2; /* COMMITTED_PROCEDURAL_PRIMITIVE_HIT */
+                        default:
+                            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+                    }
+                }
             )");
             __intrinsic_asm "_committed_intersection_type_to_uint($0->get_committed_intersection_type())";
         }
@@ -21547,10 +21557,34 @@ $}
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
         case metal: __intrinsic_asm R"(
-            raytracing::intersection_params params = $0->get_intersection_params();
-            uint flags = 0;
-            return flags;
-        )";
+                raytracing::intersection_params params = $0->get_intersection_params();
+                uint flags = 0;
+
+                const auto forced = params.get_forced_opacity();
+                if (forced == raytracing::forced_opacity::opaque)
+                    flags |= 0x01; /* RAY_FLAG_FORCE_OPAQUE */
+                if (forced == raytracing::forced_opacity::non_opaque)
+                    flags |= 0x02; /* RAY_FLAG_FORCE_NON_OPAQUE */
+
+                const auto tri_cull = params.get_triangle_cull_mode();
+                if (tri_cull == raytracing::triangle_cull_mode::back)
+                    flags |= 0x10; /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
+                if (tri_cull == raytracing::triangle_cull_mode::front)
+                    flags |= 0x20; /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
+
+                const auto opac_cull = params.get_opacity_cull_mode();
+                if (opac_cull == raytracing::opacity_cull_mode::opaque)
+                    flags |= 0x40; /* RAY_FLAG_CULL_OPAQUE */
+                if (opac_cull == raytracing::opacity_cull_mode::non_opaque)
+                    flags |= 0x80; /* RAY_FLAG_CULL_NON_OPAQUE */
+
+                const auto geo_cull = params.get_geometry_cull_mode();
+                if (geo_cull == raytracing::geometry_cull_mode::triangle)
+                    flags |= 0x100; /* RAY_FLAG_SKIP_TRIANGLES */
+                if (geo_cull == raytracing::geometry_cull_mode::bounding_box)
+                    flags |= 0x200; /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
+                return flags;
+            )";
         case spirv:
             return spirv_asm
             {
