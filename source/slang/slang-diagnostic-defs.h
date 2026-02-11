@@ -2413,6 +2413,11 @@ DIAGNOSTIC(
     requestedBindlessSpaceIndexUnavailable,
     "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
 DIAGNOSTIC(
+    39029,
+    Error,
+    targetDoesNotSupportDescriptorHandle,
+    "the current compilation target does not support 'DescriptorHandle' types.")
+DIAGNOSTIC(
     39013,
     Warning,
     registerModifierButNoVulkanLayout,
