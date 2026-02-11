@@ -81,15 +81,24 @@ jobs:
             1. Fetch the PR diff with `gh pr diff <number>` and the changed files list
             2. Read each changed file IN FULL in the repository (not just the diff) to understand context
             3. Create a PENDING review with mcp__github__create_pending_pull_request_review
-            4. Add inline comments using mcp__github__add_comment_to_pending_review for every bug,
-               issue, suggestion, or non-trivial observation. Aim for at least one inline comment per
-               changed file when there is something worth noting. Do NOT use inline comments for praise.
-            5. Submit the review with mcp__github__submit_pending_pull_request_review with event "COMMENT",
-               including a summary with overall assessment, positive feedback, and key findings.
-            6. ALWAYS post a PR comment via mcp__github__add_issue_comment summarizing what the PR does,
-               key findings, and verdict. This ensures notification even if the review submission fails.
+            4. Add inline comments using mcp__github__add_comment_to_pending_review ONLY for:
+               - Bugs or correctness issues (high confidence)
+               - Design concerns that could cause problems
+               - Missing error handling or edge cases that matter
+               Do NOT add inline comments for: praise, style preferences, minor naming suggestions,
+               obvious observations, or anything the author likely already considered.
+               Fewer high-signal comments are better than many low-signal ones. Zero inline comments
+               is fine if the code is solid.
+            5. Submit the review with mcp__github__submit_pending_pull_request_review with event "COMMENT".
+               The review body MUST include:
+               - Summary of what the PR does
+               - Key findings (bugs, design concerns, suggestions)
+               - Positive aspects worth noting
+               - Overall assessment and verdict
+            6. (Optional) If the review submission fails or you have additional context that didn't fit
+               in inline comments, post a PR comment via mcp__github__add_issue_comment as a fallback.
 
-            Inline comments are the most valuable part. Be specific and line-level, not vague.
+            Quality over quantity: only comment inline when you have something the author needs to act on or consider.
 
           # Note: CLAUDE.md is auto-loaded and covers compiler pipeline, IR system, CLI conventions, etc.
           # These instructions cover ONLY review-specific priorities and patterns.
