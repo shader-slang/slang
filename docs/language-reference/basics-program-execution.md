@@ -46,7 +46,7 @@ more in common than that they belong in the same pipeline stage using the same e
 wave in a fragment stage may process fragments from different geometric primitives.
 
 In compute dispatches, a wave is subdivided from a thread group in a target-defined manner. Usually, a wave
-consists of adjacent invocations but, in general, the application should not make any assumptions about the
+consists of adjacent invocations, but in general, the application should not make any assumptions about the
 wave shapes.
 
 Some waves may be only partially filled when the compute thread group or the graphics launch does not align
@@ -82,9 +82,11 @@ path](basics-execution-divergence-reconvergence.md).
 
 The threads within a wave belong to one of the following classes:
 - *active thread*---a thread that participates in producing a result.
-- *inactive thread*---a thread that does not produce any side effects. A thread can be inactive because the
-  wave could not be fully utilized when assigning threads. A thread can also be inactive because an active
-  thread executed the `discard` statement, which disables the thread (fragment shaders only).
+- *inactive thread*---a thread that does not produce any side effects. A thread can be inactive for one of the
+  following reasons:
+  - The thread is not executing the [current path](basics-execution-divergence-reconvergence.md#divergence).
+  - The wave could not be fully utilized when assigning threads.
+  - The thread has executed a `discard` statement, which disables the thread (fragment shaders only).
 - *helper thread*---a thread that is used to compute derivatives, typically for fragment quads. A helper
   thread does not produce any other side effects, and it does not participate in wave-tangled functions unless
   otherwise stated.
