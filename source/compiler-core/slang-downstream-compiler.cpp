@@ -92,11 +92,10 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // is linked only during the link stage without instrumenting the Slang-generated C++ code.
     // Only applies to targets that go through a C++ compile+link flow; shader targets (e.g.
     // Metal) must not be split as they have their own single-stage compilation model.
-    bool shouldSeparateCompileAndLink =
-        options.targetType == SLANG_HOST_EXECUTABLE ||
-        options.targetType == SLANG_SHADER_SHARED_LIBRARY ||
-        options.targetType == SLANG_HOST_SHARED_LIBRARY ||
-        options.targetType == SLANG_SHADER_HOST_CALLABLE;
+    bool shouldSeparateCompileAndLink = options.targetType == SLANG_HOST_EXECUTABLE ||
+                                        options.targetType == SLANG_SHADER_SHARED_LIBRARY ||
+                                        options.targetType == SLANG_HOST_SHARED_LIBRARY ||
+                                        options.targetType == SLANG_SHADER_HOST_CALLABLE;
 
     auto helper = DefaultArtifactHelper::getSingleton();
 
