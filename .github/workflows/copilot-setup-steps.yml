@@ -45,7 +45,7 @@ jobs:
         uses: ./.github/actions/setup-sccache
         with:
           platform: linux
-          gcs-bucket: slang-ci-cache
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Install build dependencies
         run: |
