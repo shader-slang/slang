@@ -127,8 +127,8 @@ protected:
         nvrtcProgram m_program;
     };
 
-    SlangResult _findCUDAIncludePath(String& outPath);
-    SlangResult _getCUDAIncludePath(String& outIncludePath);
+    SlangResult _findCUDAIncludePath(String& outPath, UnownedStringSlice headerFileName);
+    SlangResult _getCUDAIncludePath(String& outIncludePath, UnownedStringSlice headerFileName);
 
     SlangResult _findOptixIncludePath(String& outIncludePath);
     SlangResult _getOptixIncludePath(String& outIncludePath);
@@ -138,6 +138,10 @@ protected:
         CommandLine& ioCmdLine,
         IArtifactDiagnostics* diagnostics);
     SlangResult _maybeAddOptixSupport(
+        const CompileOptions& options,
+        CommandLine& ioCmdLine,
+        IArtifactDiagnostics* diagnostics);
+    SlangResult _maybeAddFp8Bf16Support(
         const CompileOptions& options,
         CommandLine& ioCmdLine,
         IArtifactDiagnostics* diagnostics);
@@ -157,6 +161,9 @@ protected:
     // Holds list of paths passed in where optix.h is found. Does *NOT* include
     // optix.h.
     List<String> m_optixFoundPaths;
+
+    List<String> m_fp8FoundPaths;
+    List<String> m_bf16FoundPaths;
 
     bool m_optixIncludeSearched = false;
     // Holds location of where include (for optix.h) is found.
@@ -551,6 +558,7 @@ static UnownedStringSlice _getNVRTCBaseName()
 // newest (in version number)
 static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
 {
+#if SLANG_WINDOWS_FAMILY && SLANG_PTR_IS_64
     // First try the instance path (if supported on platform)
     {
         StringBuilder instancePath;
@@ -570,6 +578,13 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
         {
             // Look for candidates in the directory
             visitor.findInDirectory(Path::combine(buf, "bin"));
+
+            // Since CUDA 13.0, cuda dlls have been moved to bin\x64
+            String bin64Dir = Path::combine(buf, "bin\\x64");
+            if (File::exists(bin64Dir))
+            {
+                visitor.findInDirectory(bin64Dir);
+            }
         }
     }
 
@@ -609,6 +624,13 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
                     {
                         // Okay lets search it
                         visitor.findInDirectory(path);
+
+                        // Since CUDA 13.0, cuda dlls have been moved to bin\x64
+                        String bin64Dir = Path::combine(buf, "bin\\x64");
+                        if (File::exists(bin64Dir))
+                        {
+                            visitor.findInDirectory(bin64Dir);
+                        }
                     }
                 }
             }
@@ -619,10 +641,18 @@ static SlangResult _findNVRTC(NVRTCPathVisitor& visitor)
     visitor.sortCandidates();
 
     return SLANG_OK;
+#else
+    SLANG_UNUSED(visitor);
+
+    return SLANG_E_NOT_FOUND;
+#endif
 }
 
 static const UnownedStringSlice g_fp16HeaderName = UnownedStringSlice::fromLiteral("cuda_fp16.h");
+static const UnownedStringSlice g_fp8HeaderName = UnownedStringSlice::fromLiteral("cuda_fp8.h");
+static const UnownedStringSlice g_bf16HeaderName = UnownedStringSlice::fromLiteral("cuda_bf16.h");
 static const UnownedStringSlice g_optixHeaderName = UnownedStringSlice::fromLiteral("optix.h");
+
 
 SlangResult _findFileInIncludePath(
     const String& path,
@@ -656,7 +686,9 @@ SlangResult _findFileInIncludePath(
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
+SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(
+    String& outPath,
+    UnownedStringSlice headerFileName)
 {
     outPath = String();
 
@@ -668,33 +700,82 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
         {
             String parentPath = Path::getParentDirectory(libPath);
 
-            if (SLANG_SUCCEEDED(_findFileInIncludePath(parentPath, g_fp16HeaderName, outPath)))
+            if (SLANG_SUCCEEDED(_findFileInIncludePath(parentPath, headerFileName, outPath)))
             {
                 return SLANG_OK;
             }
 
-            // See if the shared library is in the SDK, as if so we know how to find
-            // the includes
-            // TODO(JS):
-            // This directory structure is correct for windows perhaps could be
-            // different elsewhere.
+            // See if the shared library is in the CUDA SDK install path as, if so, we know how to
+            // find the includes from there
             {
                 List<UnownedStringSlice> pathSlices;
                 Path::split(parentPath.getUnownedSlice(), pathSlices);
-
-                // This -2 split holds the version number.
                 const auto pathSplitCount = pathSlices.getCount();
-                if (pathSplitCount >= 3 && pathSlices[pathSplitCount - 1] == toSlice("bin") &&
-                    pathSlices[pathSplitCount - 3] == toSlice("CUDA"))
-                {
-                    // We want to make sure that one of these paths is CUDA...
-                    const auto sdkPath = Path::getParentDirectory(parentPath);
 
-                    if (SLANG_SUCCEEDED(_findFileInIncludePath(sdkPath, g_fp16HeaderName, outPath)))
+#if SLANG_WINDOWS_FAMILY
+                // Expected sequence on Windows:
+                // CUDA / <version> / bin [ / x64 ]
+                if (pathSplitCount >= 3)
+                {
+                    // Figure out if this is 13.0+ and in an x64 subdirectory
+                    auto pathOffset = 0;
+                    if (pathSplitCount >= 4 && pathSlices[pathSplitCount - 1] == toSlice("x64"))
                     {
-                        return SLANG_OK;
+                        pathOffset = 1;
+                    }
+                    // Check for CUDA directory pattern
+                    if (pathSlices[pathSplitCount - pathOffset - 1] == toSlice("bin") &&
+                        pathSlices[pathSplitCount - pathOffset - 3] == toSlice("CUDA"))
+                    {
+                        auto sdkPath = Path::getParentDirectory(parentPath);
+                        if (pathOffset == 1)
+                        {
+                            sdkPath = Path::getParentDirectory(sdkPath);
+                        }
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, headerFileName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
                     }
                 }
+#else
+                // Expected sequence on Linux for cuda 13+:
+                // cuda-<version> / targets / <arch> / lib
+                if (pathSplitCount >= 4)
+                {
+                    if (pathSlices[pathSplitCount - 1] == toSlice("lib") &&
+                        pathSlices[pathSplitCount - 3] == toSlice("targets") &&
+                        pathSlices[pathSplitCount - 4].subString(0, 4) == toSlice("cuda"))
+                    {
+                        // Headers are under <arch> / include
+                        const auto sdkPath = Path::getParentDirectory(parentPath);
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, headerFileName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
+                    }
+                }
+                // Expected sequence on Linux for cuda 12:
+                // cuda-<version> / lib[64]
+                if (pathSplitCount >= 2)
+                {
+                    if (pathSlices[pathSplitCount - 1].subString(0, 3) == toSlice("lib") &&
+                        pathSlices[pathSplitCount - 2].subString(0, 4) == toSlice("cuda"))
+                    {
+                        const auto sdkPath = Path::getParentDirectory(parentPath);
+
+                        if (SLANG_SUCCEEDED(
+                                _findFileInIncludePath(sdkPath, headerFileName, outPath)))
+                        {
+                            return SLANG_OK;
+                        }
+                    }
+                }
+#endif
             }
         }
     }
@@ -708,7 +789,7 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
         {
             String includePath = Path::combine(buf, "include");
 
-            if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
+            if (File::exists(Path::combine(includePath, headerFileName)))
             {
                 outPath = includePath;
                 return SLANG_OK;
@@ -724,7 +805,7 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
 
     for (const String& includePath : candidatePaths)
     {
-        if (File::exists(Path::combine(includePath, g_fp16HeaderName)))
+        if (File::exists(Path::combine(includePath, headerFileName)))
         {
             outPath = includePath;
             return SLANG_OK;
@@ -734,7 +815,9 @@ SlangResult NVRTCDownstreamCompiler::_findCUDAIncludePath(String& outPath)
     return SLANG_E_NOT_FOUND;
 }
 
-SlangResult NVRTCDownstreamCompiler::_getCUDAIncludePath(String& outPath)
+SlangResult NVRTCDownstreamCompiler::_getCUDAIncludePath(
+    String& outPath,
+    UnownedStringSlice headerFileName)
 {
     if (!m_cudaIncludeSearched)
     {
@@ -742,7 +825,7 @@ SlangResult NVRTCDownstreamCompiler::_getCUDAIncludePath(String& outPath)
 
         SLANG_ASSERT(m_cudaIncludePath.getLength() == 0);
 
-        _findCUDAIncludePath(m_cudaIncludePath);
+        _findCUDAIncludePath(m_cudaIncludePath, headerFileName);
     }
 
     outPath = m_cudaIncludePath;
@@ -825,10 +908,10 @@ SlangResult NVRTCDownstreamCompiler::_findOptixIncludePath(String& outPath)
             // Paths are expected to look like ".\OptiX SDK X.X.X"
             auto versionString = path.subString(path.lastIndexOf(' ') + 1, path.getLength());
 #else
-            // Paths are expected to look like "./NVIDIA-OptiX-SDK-X.X.X-suffix"
-            auto versionString = path.subString(0, path.lastIndexOf('-'));
-            versionString =
-                versionString.subString(path.lastIndexOf('-') + 1, versionString.getLength());
+            // Paths are expected to look like "NVIDIA-OptiX-SDK-X.X.X-suffix"
+            const UnownedStringSlice pathPrefix("NVIDIA-OptiX-SDK-");
+            auto versionString = path.tail(pathPrefix.getLength());
+            versionString = versionString.head(versionString.indexOf('-'));
 #endif
             if (SLANG_SUCCEEDED(SemanticVersion::parse(versionString, '.', optixPath.version)))
             {
@@ -921,7 +1004,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
     }
 
     String includePath;
-    if (SLANG_FAILED(_getCUDAIncludePath(includePath)))
+    if (SLANG_FAILED(_getCUDAIncludePath(includePath, g_fp16HeaderName)))
     {
         String msg = "Failed to locate CUDA headers (cuda_fp16.h) required for half/float16 "
                      "support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
@@ -929,13 +1012,7 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddHalfSupport(
         diagnostics->requireErrorDiagnostic();
         return SLANG_E_NOT_FOUND;
     }
-
-    // Add the found include path
-    ioCmdLine.addArg("-I");
-    ioCmdLine.addArg(includePath);
-
     ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_HALF");
-
     return SLANG_OK;
 }
 
@@ -986,6 +1063,79 @@ SlangResult NVRTCDownstreamCompiler::_maybeAddOptixSupport(
 
     ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_OPTIX");
 
+    return SLANG_OK;
+}
+
+SlangResult NVRTCDownstreamCompiler::_maybeAddFp8Bf16Support(
+    const DownstreamCompileOptions& options,
+    CommandLine& ioCmdLine,
+    IArtifactDiagnostics* diagnostics)
+{
+    if ((options.flags & DownstreamCompileOptions::Flag::EnableFloat8) == 0 &&
+        (options.flags & DownstreamCompileOptions::Flag::EnableBfloat16) == 0)
+    {
+        return SLANG_OK;
+    }
+
+    // First check if we know if one of the include paths contains cu_fp8.h/cu_bf16.h
+    bool foundFp8 = false;
+    bool foundBf16 = false;
+    for (const auto& includePath : options.includePaths)
+    {
+        if (m_fp8FoundPaths.indexOf(includePath) >= 0)
+        {
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_FP8");
+            foundFp8 = true;
+        }
+        if (m_bf16FoundPaths.indexOf(includePath) >= 0)
+        {
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_BF16");
+            foundBf16 = true;
+        }
+        if (foundFp8 && foundBf16)
+            return SLANG_OK;
+    }
+
+    // Let's see if one of the paths finds optix.h
+    for (const auto& curIncludePath : options.includePaths)
+    {
+        const String includePath = asString(curIncludePath);
+        const String checkFp8Path = Path::combine(includePath, g_fp8HeaderName);
+        const String checkBf16Path = Path::combine(includePath, g_bf16HeaderName);
+        if (!foundFp8 && File::exists(checkFp8Path))
+        {
+            m_fp8FoundPaths.add(includePath);
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_FP8");
+            foundFp8 = true;
+        }
+        if (!foundBf16 && File::exists(checkBf16Path))
+        {
+            m_fp8FoundPaths.add(includePath);
+            ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_BF16");
+            foundBf16 = true;
+        }
+        if (foundFp8 && foundBf16)
+            return SLANG_OK;
+    }
+    String includePath;
+    if (!foundFp8 && SLANG_FAILED(_getCUDAIncludePath(includePath, g_fp8HeaderName)))
+    {
+        String msg = "Failed to locate CUDA headers (cuda_fp8.h) required for fp8 "
+                     "support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
+        diagnostics->setRaw(SliceUtil::asCharSlice(msg));
+        diagnostics->requireErrorDiagnostic();
+        return SLANG_E_NOT_FOUND;
+    }
+    if (!foundBf16 && SLANG_FAILED(_getCUDAIncludePath(includePath, g_bf16HeaderName)))
+    {
+        String msg = "Failed to locate CUDA headers (cuda_bf16.h) required for bfloat16 "
+                     "support. Please install CUDA Toolkit or set CUDA_PATH environment variable.";
+        diagnostics->setRaw(SliceUtil::asCharSlice(msg));
+        diagnostics->requireErrorDiagnostic();
+        return SLANG_E_NOT_FOUND;
+    }
+    ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_BF16");
+    ioCmdLine.addArg("-DSLANG_CUDA_ENABLE_FP8");
     return SLANG_OK;
 }
 
@@ -1095,11 +1245,18 @@ SlangResult NVRTCDownstreamCompiler::compile(
         return SLANG_FAIL;
     }
 
+    if (SLANG_FAILED(_maybeAddFp8Bf16Support(options, cmdLine, diagnostics)))
+    {
+        diagnostics->setResult(SLANG_FAIL);
+        *outArtifact = artifact.detach();
+        return SLANG_FAIL;
+    }
+
     // Previously, we relied on `_maybeAddHalfSupport` to find the cuda include path, but
     // that was incorrect. Because if there is no half support needed, we will not add the
     // CUDA include path at all. So we always try to find and add the CUDA include path here.
     String includePath;
-    if (_getCUDAIncludePath(includePath) == SLANG_OK)
+    if (_getCUDAIncludePath(includePath, g_fp16HeaderName) == SLANG_OK)
     {
         // Add the found include path
         cmdLine.addArg("-I");

@@ -874,6 +874,11 @@ DIAGNOSTIC(
     Error,
     cannotDereferenceType,
     "cannot dereference type '$0', do you mean to use '.'?")
+DIAGNOSTIC(
+    30102,
+    Error,
+    staticRefToThis,
+    "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
 DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
@@ -1031,6 +1036,14 @@ DIAGNOSTIC(
     Error,
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
+
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
+
+DIAGNOSTIC(
+    30085,
+    Error,
+    floatBitCastRequiresConstant,
+    "'__floatAsInt' requires a compile-time constant floating-point expression")
 
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
@@ -1340,7 +1353,11 @@ DIAGNOSTIC(
 
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
-
+DIAGNOSTIC(
+    31125,
+    Error,
+    attributeUsageAttributeMustBeOnNonGenericStruct,
+    "[__AttributeUsage] can only be applied to non-generic struct definitions")
 DIAGNOSTIC(31121, Error, anyValueSizeExceedsLimit, "'anyValueSize' cannot exceed $0")
 
 DIAGNOSTIC(
@@ -1771,6 +1788,12 @@ DIAGNOSTIC(
     Error,
     cannotUseInitializerListForCoopVectorOfUnknownSize,
     "cannot use initializer list for CoopVector of statically unknown size '$0'")
+DIAGNOSTIC(
+    30506,
+    Warning,
+    interfaceDefaultInitializer,
+    "initializing an interface variable with defaults is deprecated and may cause unexpected "
+    "behavior. Please provide a compatible initializer or leave the variable uninitialized")
 
 // 3062x: variables
 DIAGNOSTIC(
@@ -1778,6 +1801,11 @@ DIAGNOSTIC(
     Error,
     varWithoutTypeMustHaveInitializer,
     "a variable declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(
+    30621,
+    Error,
+    paramWithoutTypeMustHaveInitializer,
+    "a parameter declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(
     30622,
     Error,
@@ -1801,6 +1829,16 @@ DIAGNOSTIC(
     Error,
     outputParameterCannotHaveDefaultValue,
     "an 'out' or 'inout' parameter cannot have a default-value expression")
+DIAGNOSTIC(
+    30701,
+    Error,
+    systemValueSemanticInvalidType,
+    "type '$0' is not valid for system value semantic '$1'; expected '$2'")
+DIAGNOSTIC(
+    30702,
+    Error,
+    systemValueSemanticInvalidDirection,
+    "system value semantic '$0' cannot be used as $1 in '$2' shader stage")
 
 // 308xx: inheritance
 DIAGNOSTIC(
@@ -2375,6 +2413,11 @@ DIAGNOSTIC(
     requestedBindlessSpaceIndexUnavailable,
     "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
 DIAGNOSTIC(
+    39029,
+    Error,
+    targetDoesNotSupportDescriptorHandle,
+    "the current compilation target does not support 'DescriptorHandle' types.")
+DIAGNOSTIC(
     39013,
     Warning,
     registerModifierButNoVulkanLayout,
@@ -2624,6 +2667,13 @@ DIAGNOSTIC(
     Warning,
     commaOperatorUsedInExpression,
     "comma operator used in expression (may be unintended)")
+
+DIAGNOSTIC(
+    41026,
+    Warning,
+    switchFallthroughRestructured,
+    "switch fall-through is not supported by this target and will be restructured; "
+    "this may affect wave/subgroup convergence if the duplicated code contains wave operations")
 
 DIAGNOSTIC(
     41024,
@@ -2908,6 +2958,17 @@ DIAGNOSTIC(
     Error,
     dynamicDispatchOnPotentiallyUninitializedExistential,
     "Cannot dynamically dispatch on potentially uninitialized interface object '$0'.")
+DIAGNOSTIC(
+    50102,
+    Note,
+    dynamicDispatchCodeGeneratedHere,
+    "generated dynamic dispatch code for this site. $0 possible types: '$1'")
+DIAGNOSTIC(
+    50103,
+    Note,
+    specializedDynamicDispatchCodeGeneratedHere,
+    "generated specialized dynamic dispatch code for this site. $0 possible types: '$1'. "
+    "specialization arguments: '$2'.")
 
 DIAGNOSTIC(
     52000,
@@ -3213,4 +3274,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC

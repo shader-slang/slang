@@ -1,0 +1,175 @@
+name: CI Container Build Workflow
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+      runs-on:
+        required: true
+        type: string
+
+jobs:
+  # Uses nvidia/cuda container for CUDA support.
+  build:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+    permissions:
+      id-token: write # Required for Workload Identity
+      contents: read
+      packages: read # Required to pull container from ghcr.io
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      options: --user root
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      # Restore sccache cache for fork PRs
+      - name: Restore sccache cache (fork PRs only)
+        if: env.IS_FORK_PR == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-linux-gcc-x86_64-${{ inputs.config }}-
+            sccache-linux-gcc-x86_64-
+
+      # Authenticate to Google Cloud (skip for fork PRs)
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      # Setup sccache (GCS for internal, local disk for fork PRs)
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
+
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Build Slang with CUDA
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "CUDA version: $(nvcc --version)"
+
+          # Show sccache status
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats
+
+          # Set cmake_config for artifact preparation
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          # Configure with CUDA support, use LLVM from GCS, use sccache
+          cmake --preset default --fresh \
+            -DSLANG_ENABLE_CUDA=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
+
+          # Build
+          cmake --build --preset ${{ inputs.config }} -j$(nproc)
+
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats
+
+          echo "Build complete. Checking CUDA support in render-test-tool:"
+          if ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null | grep -q cuda; then
+            echo "✅ render-test-tool has CUDA support!"
+          else
+            echo "⚠️ render-test-tool may not have CUDA linked"
+            ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null || true
+          fi
+
+      - name: Prepare artifacts for upload
+        run: |
+          # Create a staging directory for artifacts with config-specific subdirectory
+          mkdir -p "artifacts-staging/${cmake_config}"
+
+          # Copy artifacts from the specific configuration directory
+          if [ -d "build/${cmake_config}" ]; then
+            echo "Copying artifacts from build/${cmake_config} to artifacts-staging/${cmake_config}..."
+
+            # Copy bin directory excluding debug files
+            if [ -d "build/${cmake_config}/bin" ]; then
+              mkdir -p "artifacts-staging/${cmake_config}/bin"
+              find "build/${cmake_config}/bin" -maxdepth 1 -type f ! -name "*.pdb" ! -name "*.ilk" ! -name "*.dwarf" ! -name "*.debug" ! -name "*.dSYM" -exec cp {} "artifacts-staging/${cmake_config}/bin/" \; || echo "Failed to copy bin directory"
+
+              cp -r "build/${cmake_config}/bin/D3D12" "artifacts-staging/${cmake_config}/bin/" 2>/dev/null || echo "No D3D12 directory (expected on Linux)"
+              cp -r "build/${cmake_config}/bin/optix" "artifacts-staging/${cmake_config}/bin/" || echo "Failed to copy bin/optix directory"
+            fi
+
+            # Copy everything from lib directory
+            if [ -d "build/${cmake_config}/lib" ]; then
+              cp -r "build/${cmake_config}/lib" "artifacts-staging/${cmake_config}/" || echo "Failed to copy lib directory"
+            fi
+
+            # Copy share directory if it exists
+            if [ -d "build/${cmake_config}/share" ]; then
+              cp -r "build/${cmake_config}/share" "artifacts-staging/${cmake_config}/" || echo "Failed to copy share directory"
+            fi
+
+            # Copy include directory if it exists
+            if [ -d "build/${cmake_config}/include" ]; then
+              cp -r "build/${cmake_config}/include" "artifacts-staging/${cmake_config}/" || echo "Failed to copy include directory"
+            fi
+
+            # Copy examples directory if it exists
+            if [ -d "build/examples" ]; then
+              cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
+            fi
+
+            echo "Artifacts staging directory contents:"
+            ls -laR artifacts-staging/
+          else
+            echo "Configuration directory build/${cmake_config} not found!"
+            echo "Available build directories:"
+            ls -la build/ || echo "No build directory found"
+            exit 1
+          fi
+
+      # Save sccache cache for fork PRs (master only)
+      - name: Save sccache cache (master only)
+        if: github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: /github/home/.cache/sccache
+          key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
+          path: artifacts-staging/
+          retention-days: 1

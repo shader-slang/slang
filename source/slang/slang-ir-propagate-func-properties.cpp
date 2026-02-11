@@ -104,7 +104,7 @@ public:
             for (auto inst : block->getChildren())
             {
                 // Is this inst known to not have global side effect/analyzable?
-                if (!isKnownOpCodeWithSideEffect(inst->getOp()) && !isDebugInst(inst))
+                if (!isKnownOpCodeWithSideEffect(inst->getOp()))
                 {
                     if (inst->mightHaveSideEffects() || isResourceLoad(inst->getOp()))
                     {
@@ -136,12 +136,6 @@ public:
                     }
                 }
 
-                // If the inst is a debug instruction, skip it.
-                // these are only annotations
-                //
-                if (isDebugInst(inst)) // TODO: May not need this
-                    continue;
-
                 // Do any operands defined have pointer type of global or
                 // unknown source? Passing them into a readNone callee may cause
                 // side effects that breaks the readNone property.
@@ -157,7 +151,6 @@ public:
                         hasReadNoneCall = true;
                         break;
                     }
-                    break;
                 }
             }
             if (hasReadNoneCall)

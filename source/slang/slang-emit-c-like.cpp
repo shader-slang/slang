@@ -1378,27 +1378,33 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::IntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("int64_t(");
-                        m_writer->emitInt64(int64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit("int(");
-                        m_writer->emit(int(litInst->value.intVal));
-                        m_writer->emit(")");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("int64_t(");
+                            m_writer->emitInt64(int64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit("int(");
+                            m_writer->emit(int(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
                         break;
                     }
                 case BaseType::UIntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("uint64_t(");
-                        m_writer->emitUInt64(uint64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
-                        m_writer->emit("U");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("uint64_t(");
+                            m_writer->emitUInt64(uint64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
+                            m_writer->emit("U");
+                        }
                         break;
                     }
                 }
@@ -3229,6 +3235,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_SetOptiXPayloadRegister:
         emitInstStmt(inst);
         break;
 
@@ -3751,7 +3758,12 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     // Compute a structured region tree that can represent
     // the control flow of our function.
     //
-    RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(code, getSink());
+    // Pass whether this target supports fall-through in switch statements.
+    // Targets like HLSL/WGSL don't support fall-through, so the restructure
+    // pass will use legacy behavior that doesn't preserve fall-through.
+    //
+    RefPtr<RegionTree> regionTree =
+        generateRegionTreeForFunc(code, getSink(), supportsSwitchFallThrough());
 
     // Now that we've computed the region tree, we have
     // an opportunity to perform some last-minute transformations

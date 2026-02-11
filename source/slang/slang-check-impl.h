@@ -55,7 +55,15 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
-    uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    uint64_t v = val > 0 ? (uint64_t)val : -(uint64_t)val;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     int result = 1;
     while (v >>= 1)
     {
@@ -64,7 +72,10 @@ inline int getIntValueBitSize(IntegerLiteralValue val)
     return result;
 }
 
-int getTypeBitSize(Type* t);
+// This returns the number of bits that the type could be. The only exceptional
+// cases are IntPtr and UIntPtr, whose sizes are not known during checking, and
+// the maximum supported value of 64 is returned instead.
+int getMaximumTypeBitSize(Type* t);
 
 // A flat representation of basic types (scalars, vectors and matrices)
 // that can be used as lookup key in caches
@@ -700,6 +711,8 @@ struct SharedSemanticsContext : public RefObject
     GLSLBindingOffsetTracker m_glslBindingOffsetTracker;
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
+
+    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
@@ -1852,6 +1865,9 @@ public:
         UncheckedAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);
 
+    AttributeDecl* findOrSynthesizeAttributeDeclFromUserDefinedAttributeStruct(
+        StructDecl* attributeTypeDecl);
+
     AttributeBase* checkGLSLLayoutAttribute(
         UncheckedGLSLLayoutAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);
@@ -2415,6 +2431,11 @@ public:
         // Additional subtype witnesses available to the currentt constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
+
+        // Accumulated conversion cost from type promotions during constraint solving.
+        // This tracks costs when a type parameter is promoted to satisfy an interface
+        // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+        ConversionCost typePromotionCost = kConversionCost_None;
     };
 
     Type* TryJoinVectorAndScalarType(
@@ -3043,6 +3064,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr);
     Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);

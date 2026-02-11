@@ -14,6 +14,10 @@ inputs:
   config:
     required: true
     description: "Build configuration"
+  artifact-suffix:
+    required: false
+    description: "Optional suffix for artifact name (e.g., '-cuda')"
+    default: ""
 
 runs:
   using: "composite"
@@ -29,7 +33,7 @@ runs:
 
     - uses: actions/download-artifact@v4
       with:
-        name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
+        name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
         path: github_artifact
 
     - name: Setup environment
@@ -56,10 +60,11 @@ runs:
           # On Windows, DLLs should be in the same directory as executables or in PATH
           # Use $GITHUB_PATH instead of $PATH for preservation across steps and
           # avoid unix-like/windows-like path issues
-          # echo "$bin_dir" >> $GITHUB_PATH
-          # echo "$lib_dir" >> $GITHUB_PATH
-          echo "skipping setting PATH in Windows"
+          :
         fi
+
+        # Make slangc available
+        echo "$bin_dir" >> $GITHUB_PATH
 
         # List directory contents
         echo "Contents of bin_dir ($bin_dir):"

@@ -162,6 +162,9 @@ Most applications should not need to touch this section.
     #ifndef SLANG_WIIU
         #define SLANG_WIIU 0
     #endif
+    #ifndef SLANG_WASM
+        #define SLANG_WASM 0
+    #endif
 #endif /* SLANG_PLATFORM */
 
 /* Shorthands for "families" of compilers/platforms */
@@ -450,6 +453,10 @@ convention for interface methods.
     #define SLANG_PROCESSOR_POWER_PC_64 0
 #endif
 
+#ifndef SLANG_PROCESSOR_WASM
+    #define SLANG_PROCESSOR_WASM 0
+#endif
+
 // Processor families
 
 #define SLANG_PROCESSOR_FAMILY_X86 (SLANG_PROCESSOR_X86_64 | SLANG_PROCESSOR_X86)
@@ -627,21 +634,26 @@ typedef uint32_t SlangSizeT;
         SLANG_CUDA_SOURCE,           ///< Cuda source
         SLANG_PTX,                   ///< PTX
         SLANG_CUDA_OBJECT_CODE,      ///< Object code that contains CUDA functions.
-        SLANG_OBJECT_CODE,           ///< Object code that can be used for later linking
-        SLANG_HOST_CPP_SOURCE,       ///< C++ code for host library or executable.
-        SLANG_HOST_HOST_CALLABLE,    ///< Host callable host code (ie non kernel/shader)
-        SLANG_CPP_PYTORCH_BINDING,   ///< C++ PyTorch binding code.
-        SLANG_METAL,                 ///< Metal shading language
-        SLANG_METAL_LIB,             ///< Metal library
-        SLANG_METAL_LIB_ASM,         ///< Metal library assembly
-        SLANG_HOST_SHARED_LIBRARY,   ///< A shared library/Dll for host code (for hosting CPU/OS)
-        SLANG_WGSL,                  ///< WebGPU shading language
-        SLANG_WGSL_SPIRV_ASM,        ///< SPIR-V assembly via WebGPU shading language
-        SLANG_WGSL_SPIRV,            ///< SPIR-V via WebGPU shading language
+        SLANG_OBJECT_CODE,     ///< Object code that can be used for later linking (kernel/shader)
+        SLANG_HOST_CPP_SOURCE, ///< C++ code for host library or executable.
+        SLANG_HOST_HOST_CALLABLE,  ///< Host callable host code (ie non kernel/shader)
+        SLANG_CPP_PYTORCH_BINDING, ///< C++ PyTorch binding code.
+        SLANG_METAL,               ///< Metal shading language
+        SLANG_METAL_LIB,           ///< Metal library
+        SLANG_METAL_LIB_ASM,       ///< Metal library assembly
+        SLANG_HOST_SHARED_LIBRARY, ///< A shared library/Dll for host code (for hosting CPU/OS)
+        SLANG_WGSL,                ///< WebGPU shading language
+        SLANG_WGSL_SPIRV_ASM,      ///< SPIR-V assembly via WebGPU shading language
+        SLANG_WGSL_SPIRV,          ///< SPIR-V via WebGPU shading language
 
         SLANG_HOST_VM,     ///< Bytecode that can be interpreted by the Slang VM
         SLANG_CPP_HEADER,  ///< C++ header for shader kernels.
         SLANG_CUDA_HEADER, ///< Cuda header
+
+        SLANG_HOST_OBJECT_CODE, ///< Host object code
+        SLANG_HOST_LLVM_IR,     ///< Host LLVM IR assembly
+        SLANG_SHADER_LLVM_IR,   ///< Host LLVM IR assembly (kernel/shader)
+
         SLANG_TARGET_COUNT_OF,
     };
 
@@ -794,6 +806,7 @@ typedef uint32_t SlangSizeT;
         SLANG_SOURCE_LANGUAGE_SPIRV,
         SLANG_SOURCE_LANGUAGE_METAL,
         SLANG_SOURCE_LANGUAGE_WGSL,
+        SLANG_SOURCE_LANGUAGE_LLVM,
         SLANG_SOURCE_LANGUAGE_COUNT_OF,
     };
 
@@ -889,6 +902,13 @@ typedef uint32_t SlangSizeT;
         SLANG_EMIT_SPIRV_DEFAULT = 0,
         SLANG_EMIT_SPIRV_VIA_GLSL,
         SLANG_EMIT_SPIRV_DIRECTLY,
+    };
+
+    enum SlangEmitCPUMethod
+    {
+        SLANG_EMIT_CPU_DEFAULT = 0,
+        SLANG_EMIT_CPU_VIA_CPP,
+        SLANG_EMIT_CPU_VIA_LLVM,
     };
 
     // All compiler option names supported by Slang.
@@ -1076,6 +1096,20 @@ typedef uint32_t SlangSizeT;
         ValidateIRDetailed,          // bool, enable detailed IR validation
         DumpIRBefore,                // string, pass name to dump IR before
         DumpIRAfter,                 // string, pass name to dump IR after
+
+        EmitCPUMethod,    // enum SlangEmitCPUMethod
+        EmitCPUViaCPP,    // bool
+        EmitCPUViaLLVM,   // bool
+        LLVMTargetTriple, // string
+        LLVMCPU,          // string
+        LLVMFeatures,     // string
+
+        EnableRichDiagnostics, // bool, enable the experimental rich diagnostics
+
+        ReportDynamicDispatchSites, // bool
+
+        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
+                                          // (implies EnableRichDiagnostics)
 
         CountOf,
     };
@@ -1897,6 +1931,7 @@ public:                                                              \
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
         SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        SLANG_TYPE_KIND_ENUM,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1931,7 +1966,8 @@ public:                                                              \
         SLANG_DECL_KIND_MODULE,
         SLANG_DECL_KIND_GENERIC,
         SLANG_DECL_KIND_VARIABLE,
-        SLANG_DECL_KIND_NAMESPACE
+        SLANG_DECL_KIND_NAMESPACE,
+        SLANG_DECL_KIND_ENUM,
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2148,6 +2184,8 @@ public:                                                              \
     {
         SLANG_LAYOUT_RULES_DEFAULT,
         SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+        SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+        SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
@@ -2281,6 +2319,7 @@ struct TypeReflection
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
+        Enum = SLANG_TYPE_KIND_ENUM,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
@@ -2993,6 +3032,11 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
+    SlangResult getDefaultValueFloat(float* value)
+    {
+        return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
+    }
+
     GenericReflection* getGenericContainer()
     {
         return (GenericReflection*)spReflectionVariable_GetGenericContainer(
@@ -3015,7 +3059,12 @@ struct VariableLayoutReflection
             (SlangReflectionVariableLayout*)this);
     }
 
-    char const* getName() { return getVariable()->getName(); }
+    char const* getName()
+    {
+        if (auto var = getVariable())
+            return var->getName();
+        return nullptr;
+    }
 
     Modifier* findModifier(Modifier::ID id) { return getVariable()->findModifier(id); }
 
@@ -3404,6 +3453,8 @@ enum class LayoutRules : SlangLayoutRulesIntegral
 {
     Default = SLANG_LAYOUT_RULES_DEFAULT,
     MetalArgumentBufferTier2 = SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+    DefaultStructuredBuffer = SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+    DefaultConstantBuffer = SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
 };
 
 typedef struct ShaderReflection ProgramLayout;
@@ -3593,6 +3644,14 @@ struct ShaderReflection
     {
         return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
     }
+
+    /** Get the descriptor set/space index allocated for the bindless resource heap.
+     *  Returns -1 if the program does not use bindless resource heap.
+     */
+    SlangInt getBindlessSpaceIndex()
+    {
+        return spReflection_getBindlessSpaceIndex((SlangReflection*)this);
+    }
 };
 
 
@@ -3607,6 +3666,7 @@ struct DeclReflection
         Generic = SLANG_DECL_KIND_GENERIC,
         Variable = SLANG_DECL_KIND_VARIABLE,
         Namespace = SLANG_DECL_KIND_NAMESPACE,
+        Enum = SLANG_DECL_KIND_ENUM,
     };
 
     char const* getName() { return spReflectionDecl_getName((SlangReflectionDecl*)this); }
@@ -4657,6 +4717,21 @@ struct IComponentType2 : public ISlangUnknown
         SlangInt targetIndex,
         ICompileResult** outCompileResult,
         IBlob** outDiagnostics = nullptr) = 0;
+    /** Get functions accessible through the ISlangSharedLibrary interface.
+
+    The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+
+    NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+
+    @param targetIndex      The index of the target to get code for (default: zero).
+    @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried
+    on.
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = 0) = 0;
 };
     #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 

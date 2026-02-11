@@ -3,6 +3,8 @@
 
 #include "slang-fiddle-script.h"
 
+#include <cstdio>
+
 namespace fiddle
 {
 struct TextTemplateParserBase
@@ -157,7 +159,7 @@ public:
                 {
                     addScriptStmtLine(currentSpanBegin, currentSpanEnd);
                     isInScriptLine = false;
-                    currentSpanBegin = currentSpanEnd;
+                    currentSpanBegin = currentLineBegin;
                 }
                 break;
 
@@ -201,6 +203,7 @@ public:
                     currentSpanBegin = _cursor;
                     break;
                 }
+
                 break;
 
             case '(':
@@ -388,6 +391,7 @@ public:
         char const* originalFileRawSpanStart = _templateFile->originalFileContent.begin();
         for (auto t : _templateFile->textTemplates)
         {
+            _builder.append("\n\n");
             flushOriginalFileRawSpan(originalFileRawSpanStart, t->templateSource.begin());
 
             evaluateTextTemplate(t);
@@ -453,16 +457,11 @@ private:
         else if (auto rawStmt = as<TextTemplateRawStmt>(stmt))
         {
             auto rawContent = rawStmt->text;
-            if (isEntirelyWhitespace(rawContent))
-            {
-                _builder.append(rawContent);
-            }
-            else
-            {
-                _builder.append("RAW [==[");
-                _builder.append(rawContent);
-                _builder.append("]==]");
-            }
+            // Strictly speaking, raw string literals in lua strip the
+            // first chrarcter if it's a newline so add it here
+            _builder.append("RAW [==[\n");
+            _builder.append(rawContent);
+            _builder.append("]==]");
         }
         else if (auto scriptStmt = as<TextTemplateScriptStmt>(stmt))
         {
@@ -480,6 +479,7 @@ private:
             SLANG_ABORT_COMPILATION(
                 "fiddle encountered an unknown construct when converting a text template to Lua");
         }
+        _builder.append("\n");
     }
 };
 

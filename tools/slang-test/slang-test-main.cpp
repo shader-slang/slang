@@ -25,6 +25,7 @@
 #include "../../source/compiler-core/slang-language-server-protocol.h"
 #include "../../source/compiler-core/slang-nvrtc-compiler.h"
 #include "../render-test/slang-support.h"
+#include "diagnostic-annotation-util.h"
 #include "directory-util.h"
 #include "options.h"
 #include "parse-diagnostic-util.h"
@@ -91,6 +92,11 @@ struct TestOptions
     {
         return commandOptions.tryGetValue("filecheck-buffer", prefix);
     }
+    bool getDiagTestPrefix(String& prefix) const
+    {
+        return commandOptions.tryGetValue("diag", prefix);
+    }
+    bool isNonExhaustiveDiagTest() const { return commandOptions.containsKey("non-exhaustive"); }
 
     Type type = Type::Normal;
 
@@ -817,6 +823,66 @@ static TestResult _fileCheckTest(
         coloredOutput);
 }
 
+//
+// Check diagnostic annotations in the source file
+//
+static TestResult _diagnosticAnnotationTest(
+    TestContext& context,
+    const TestInput& input,
+    const String& diagPrefix,
+    const String& outputToCheck)
+{
+    auto& testReporter = *context.getTestReporter();
+
+    // Read the source file to get annotations
+    String sourceText;
+    if (SLANG_FAILED(File::readAllText(input.filePath, sourceText)))
+    {
+        testReporter.messageFormat(
+            TestMessageType::RunError,
+            "Failed to read source file for diagnostic annotations: '%s'",
+            input.filePath.getBuffer());
+        return TestResult::Fail;
+    }
+
+    // Extract standard error from the formatted output
+    // Format: "result code = X\nstandard error = {\n<content>\n}\n..."
+    String standardError;
+    {
+        UnownedStringSlice output = outputToCheck.getUnownedSlice();
+        Index stderrStart = output.indexOf(UnownedStringSlice::fromLiteral("standard error = {\n"));
+        if (stderrStart != -1)
+        {
+            stderrStart += strlen("standard error = {\n");
+            // Search for "\n}" after stderrStart
+            UnownedStringSlice remaining = output.tail(stderrStart);
+            Index stderrEnd = remaining.indexOf(UnownedStringSlice::fromLiteral("\n}"));
+            if (stderrEnd != -1)
+            {
+                standardError = String(remaining.head(stderrEnd));
+            }
+        }
+    }
+
+    // Check if exhaustive mode (default) or non-exhaustive
+    bool exhaustive = !input.testOptions->isNonExhaustiveDiagTest();
+
+    // Check diagnostic annotations
+    String errorMessage;
+    if (!DiagnosticAnnotationUtil::checkDiagnosticAnnotations(
+            sourceText.getUnownedSlice(),
+            diagPrefix.getUnownedSlice(),
+            standardError.getUnownedSlice(),
+            exhaustive,
+            errorMessage))
+    {
+        testReporter.message(TestMessageType::TestFailure, errorMessage.getBuffer());
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
 template<typename Compare>
 static TestResult _fileComparisonTest(
     TestContext& context,
@@ -859,7 +925,7 @@ static bool _areLinesEqual(const String& a, const String& e)
     return StringUtil::areLinesEqual(a.getUnownedSlice(), e.getUnownedSlice());
 }
 
-// Either run FileCheck over the result, or read and compare with a .expected file
+// Either run diagnostic annotation check, FileCheck, or compare with a .expected file
 // On a comparison failure, dump the difference
 // On any failure, write a .actual file.
 template<typename Compare = decltype(_areLinesEqual)>
@@ -871,17 +937,28 @@ static TestResult _validateOutput(
     const char* defaultExpectedContent = nullptr,
     const Compare compare = _areLinesEqual)
 {
-    String fileCheckPrefix;
-    const TestResult result =
-        input.testOptions->getFileCheckPrefix(fileCheckPrefix)
-            ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
-            : _fileComparisonTest(
-                  *context,
-                  input,
-                  defaultExpectedContent,
-                  ".expected",
-                  actualOutput,
-                  compare);
+    TestResult result = TestResult::Fail;
+
+    // Check for diagnostic annotations first
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        result = _diagnosticAnnotationTest(*context, input, diagPrefix, actualOutput);
+    }
+    else
+    {
+        // Fall back to filecheck or file comparison
+        String fileCheckPrefix;
+        result = input.testOptions->getFileCheckPrefix(fileCheckPrefix)
+                     ? _fileCheckTest(*context, input.filePath, fileCheckPrefix, actualOutput)
+                     : _fileComparisonTest(
+                           *context,
+                           input,
+                           defaultExpectedContent,
+                           ".expected",
+                           actualOutput,
+                           compare);
+    }
 
     // If the test failed, then we write the actual output to a file
     // so that we can easily diff it from the command line and
@@ -1216,6 +1293,10 @@ static PassThroughFlags _getPassThroughFlagsForTarget(SlangCompileTarget target)
     case SLANG_METAL:
     case SLANG_WGSL:
     case SLANG_HOST_VM:
+    case SLANG_HOST_LLVM_IR:
+    case SLANG_HOST_OBJECT_CODE:
+    case SLANG_SHADER_LLVM_IR:
+    case SLANG_OBJECT_CODE:
         {
             return 0;
         }
@@ -1380,6 +1461,11 @@ static SlangResult _extractRenderTestRequirements(
         target = SLANG_WGSL;
         nativeLanguage = SLANG_SOURCE_LANGUAGE_WGSL;
         passThru = SLANG_PASS_THROUGH_TINT;
+        break;
+    case RenderApiType::LLVM:
+        target = SLANG_SHADER_HOST_CALLABLE;
+        nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+        passThru = SLANG_PASS_THROUGH_NONE;
         break;
     }
 
@@ -1957,6 +2043,7 @@ static bool _areDiagnosticsEqual(const UnownedStringSlice& a, const UnownedStrin
     if (SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(a, outA)) ||
         SLANG_FAILED(ParseDiagnosticUtil::parseOutputInfo(b, outB)))
     {
+        fprintf(stderr, "Error: Unable to parse diagnostics for diagnostic test\n");
         return false;
     }
 
@@ -2546,6 +2633,13 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         if (arg == kPreserveEmbeddedSourceOption)
             continue;
         cmdLine.addArg(arg);
+    }
+
+    // Enable machine-readable diagnostics if diag option is specified
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
     // If we can't set up for simple compilation, it's because some external resource isn't
@@ -3141,19 +3235,27 @@ static TestResult runCPPCompilerExecute(TestContext* context, TestInput& input)
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    SlangResult compileResult = compiler->compile(options, artifact.writeRef());
 
     String actualOutput;
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    // Check if artifact is valid before trying to find diagnostics
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
     // If the actual compilation failed, then the output will be the summary
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileResult) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
-        actualOutput = _calcSummary(diagnostics);
+        // Generate summary from diagnostics if available
+        if (diagnostics)
+        {
+            actualOutput = _calcSummary(diagnostics);
+        }
+        else
+        {
+            // No diagnostics available, but compile failed
+            actualOutput = "Compile: Error\n";
+        }
     }
     else
     {
@@ -4823,6 +4925,22 @@ static bool shouldRunTest(TestContext* context, String filePath)
                     TestMessageType::Info,
                     "%s file is excluded from the test because it is found from the exclusion "
                     "list\n",
+                    filePath.getBuffer());
+            }
+            return false;
+        }
+    }
+
+    // Check skip list - if any entry matches, skip the test
+    for (auto& skipEntry : context->options.skipList)
+    {
+        if (filePath.startsWith(skipEntry))
+        {
+            if (context->options.verbosity == VerbosityLevel::Verbose)
+            {
+                context->getTestReporter()->messageFormat(
+                    TestMessageType::Info,
+                    "%s file is skipped because it is found in the skip list\n",
                     filePath.getBuffer());
             }
             return false;

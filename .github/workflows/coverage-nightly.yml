@@ -147,6 +147,12 @@ jobs:
           cp ../coverage-reports/macos/coverage-summary.json reports/latest/macos/
           cp ../coverage-reports/combined-summary.json reports/latest/
 
+          # Cleanup old reports (keep last 7 days + monthly snapshots)
+          if [ -f "tools/cleanup-old-reports.sh" ]; then
+            echo "Running cleanup to maintain repository size..."
+            bash tools/cleanup-old-reports.sh
+          fi
+
           # Generate historical index
           bash ../tools/coverage/generate-history-index.sh reports/history
 

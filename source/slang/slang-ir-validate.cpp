@@ -551,13 +551,14 @@ static void validateVectorOrMatrixElementType(
     SourceLoc sourceLoc,
     IRType* elementType,
     uint32_t allowedWidths,
-    const DiagnosticInfo& disallowedElementTypeEncountered)
+    const DiagnosticInfo& disallowedElementTypeEncountered,
+    TargetRequest* targetRequest)
 {
-    if (!isFloatingType(elementType))
+    if (!isFloatingType(elementType) && !isPackedFloatType(elementType))
     {
         if (isIntegralType(elementType))
         {
-            IntInfo info = getIntTypeInfo(elementType);
+            IntInfo info = getIntTypeInfo(targetRequest, elementType);
             if (allowedWidths == 0U)
             {
                 sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
@@ -592,7 +593,8 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
 
     // 1-vectors are supported and are legalized/transformed properly when targetting unsupported
     // backends.
-    const IRIntegerValue minCount = 1;
+    // 0-vectors are used internally to represent conditional varying values.
+    const IRIntegerValue minCount = 0;
     const IRIntegerValue maxCount = 4;
     if ((elementCount < minCount) || (elementCount > maxCount))
     {
@@ -647,7 +649,8 @@ void validateVectorsAndMatrices(
                 vectorType->sourceLoc,
                 elementType,
                 allowedWidths,
-                Diagnostics::vectorWithDisallowedElementTypeEncountered);
+                Diagnostics::vectorWithDisallowedElementTypeEncountered,
+                targetRequest);
 
             validateVectorElementCount(sink, vectorType);
         }

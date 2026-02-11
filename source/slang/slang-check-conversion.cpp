@@ -1111,7 +1111,7 @@ static bool isSigned(Type* t)
     }
 }
 
-int getTypeBitSize(Type* t)
+int getMaximumTypeBitSize(Type* t)
 {
     auto basicType = as<BasicExpressionType>(t);
     if (!basicType)
@@ -1133,11 +1133,7 @@ int getTypeBitSize(Type* t)
         return 64;
     case BaseType::IntPtr:
     case BaseType::UIntPtr:
-#if SLANG_PTR_IS_32
-        return 32;
-#else
         return 64;
-#endif
     default:
         return 0;
     }
@@ -1173,7 +1169,7 @@ ConversionCost SemanticsVisitor::getImplicitConversionCostWithKnownArg(
         auto knownVal = as<IntegerLiteralExpr>(arg);
         if (!knownVal)
             return candidateCost;
-        if (getIntValueBitSize(knownVal->value) <= getTypeBitSize(toType))
+        if (getIntValueBitSize(knownVal->value) <= getMaximumTypeBitSize(toType))
         {
             bool toTypeIsSigned = isSigned(toType);
             bool fromTypeIsSigned = isSigned(knownVal->type);
@@ -1265,6 +1261,60 @@ bool SemanticsVisitor::_coerce(
         if (outCost)
             *outCost = kConversionCost_None;
         return true;
+    }
+
+    // Fallback: Check if types are structurally identical but differ only in
+    // their subtype witness arguments. This can happen when generic specialization
+    // creates types through different inheritance paths
+    // (e.g., int -> __BuiltinIntegerType -> __BuiltinArithmeticType vs
+    // int -> __BuiltinSignedArithmeticType -> __BuiltinArithmeticType).
+    //
+    // We only apply this fallback for DeclRefType with GenericAppDeclRef where:
+    // 1. The base declarations are the same
+    // 2. All non-witness type arguments are equal
+    //
+    if (auto toDeclRefType = as<DeclRefType>(toType))
+    {
+        if (auto fromDeclRefType = as<DeclRefType>(fromType))
+        {
+            auto toGenApp = as<GenericAppDeclRef>(toDeclRefType->getDeclRefBase());
+            auto fromGenApp = as<GenericAppDeclRef>(fromDeclRefType->getDeclRefBase());
+            if (toGenApp && fromGenApp)
+            {
+                // Check if base declarations are the same
+                if (toGenApp->getBase() == fromGenApp->getBase())
+                {
+                    auto toArgs = toGenApp->getArgs();
+                    auto fromArgs = fromGenApp->getArgs();
+                    if (toArgs.getCount() == fromArgs.getCount())
+                    {
+                        bool allNonWitnessArgsEqual = true;
+                        for (Index i = 0; i < toArgs.getCount(); i++)
+                        {
+                            auto toArg = toArgs[i];
+                            auto fromArg = fromArgs[i];
+                            // Skip witness arguments (SubtypeWitness)
+                            if (as<SubtypeWitness>(toArg) && as<SubtypeWitness>(fromArg))
+                                continue;
+                            // Non-witness arguments must be equal
+                            if (!toArg->equals(fromArg))
+                            {
+                                allNonWitnessArgsEqual = false;
+                                break;
+                            }
+                        }
+                        if (allNonWitnessArgsEqual)
+                        {
+                            if (outToExpr)
+                                *outToExpr = fromExpr;
+                            if (outCost)
+                                *outCost = kConversionCost_None;
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Assume string literals are convertible to any string type.
@@ -2197,7 +2247,7 @@ bool SemanticsVisitor::canCoerce(
     // for basic types such as scalars and vectors.
     //
 
-    bool shouldAddToCache = false;
+    bool shouldAddToGlobalCache = false;
     ConversionCost cost;
     TypeCheckingCache* typeCheckingCache = getLinkage()->getTypeCheckingCache();
 
@@ -2214,8 +2264,25 @@ bool SemanticsVisitor::canCoerce(
             return cost != kConversionCost_Impossible;
         }
         else
-            shouldAddToCache = true;
+            shouldAddToGlobalCache = true;
     }
+
+    // If this type pair isn't covered by the global cache, use
+    // the cache that is local to the module.
+    if (getShared()->m_typeConversionCostCache.tryGetValue(TypePair{toType, fromType.type}, cost))
+    {
+        if (outCost)
+            *outCost = cost;
+        return cost != kConversionCost_Impossible;
+    }
+
+
+    // Store "impossible" to conversion cost cache to prevent infinite recursion in case
+    // checking for coercion between toType and fromType requires checking itself again via
+    // extensions/overloads.
+    getShared()->m_typeConversionCostCache.add(
+        TypePair{toType, fromType.type},
+        kConversionCost_Impossible);
 
     // If there was no suitable entry in the cache,
     // then we fall back to the general-purpose
@@ -2226,16 +2293,22 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
+
     bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
 
     if (outCost)
         *outCost = cost;
 
-    if (shouldAddToCache)
+    if (!rs)
+        cost = kConversionCost_Impossible;
+    if (shouldAddToGlobalCache)
     {
-        if (!rs)
-            cost = kConversionCost_Impossible;
         typeCheckingCache->conversionCostCache[cacheKey] = cost;
+        getShared()->m_typeConversionCostCache.remove(TypePair{toType, fromType.type});
+    }
+    else
+    {
+        getShared()->m_typeConversionCostCache[TypePair{toType, fromType.type}] = cost;
     }
 
     return rs;

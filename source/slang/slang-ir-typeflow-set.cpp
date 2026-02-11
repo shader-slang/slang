@@ -26,6 +26,23 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     if (!argInfo || !destInfo)
         return arg;
 
+    // If we are upcasting a default-constructed value and the destination type differs,
+    // we should materialize a default value of the destination type instead of trying to
+    // reinterpret/cast the old default value.
+    //
+    // This is important when earlier specialization/lowering changes the effective type of
+    // a phi/block-parameter, but a predecessor edge still passes a `defaultConstruct` of the
+    // pre-specialization type.
+    if (argInfo != destInfo)
+    {
+        if (as<IRDefaultConstruct>(arg))
+        {
+            if (auto newDefault =
+                    builder->emitDefaultConstruct((IRType*)destInfo, /*fallback*/ true))
+                return newDefault;
+        }
+    }
+
     if (as<IRTaggedUnionType>(argInfo) && as<IRTaggedUnionType>(destInfo))
     {
         // A tagged union is essentially a tuple(TagType(tableSet),
@@ -111,6 +128,83 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
         // of a type-set that contains T.
         //
         return builder->emitPackAnyValue((IRType*)destInfo, arg);
+    }
+    else if (as<IRArrayType>(argInfo) && as<IRArrayType>(destInfo))
+    {
+        // If both arg and dest are arrays, we need to upcast each element.
+        //
+        auto argArrayType = as<IRArrayType>(argInfo);
+        auto destArrayType = as<IRArrayType>(destInfo);
+        auto argElementType = argArrayType->getElementType();
+        auto destElementType = destArrayType->getElementType();
+
+        if (argElementType != destElementType)
+        {
+            auto arraySize = getIntVal(argArrayType->getElementCount());
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)arraySize);
+            for (IRIntegerValue i = 0; i < arraySize; i++)
+            {
+                auto argElement = builder->emitGetElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeArray(
+                destArrayType,
+                upcastedElements.getCount(),
+                upcastedElements.getBuffer());
+        }
+    }
+    else if (as<IRTupleType>(argInfo) && as<IRTupleType>(destInfo))
+    {
+        // If both arg and dest are tuples, we need to upcast each element.
+        //
+        auto argTupleType = as<IRTupleType>(argInfo);
+        auto destTupleType = as<IRTupleType>(destInfo);
+
+        if (argTupleType != destTupleType)
+        {
+            UInt argElementCount = argTupleType->getOperandCount();
+
+            List<IRInst*> upcastedElements;
+            upcastedElements.setCount((Index)argElementCount);
+            for (UInt i = 0; i < argElementCount; i++)
+            {
+                auto argElementType = (IRType*)argTupleType->getOperand(i);
+                auto destElementType = (IRType*)destTupleType->getOperand(i);
+                auto argElement = builder->emitGetTupleElement(argElementType, arg, i);
+                auto upcastedElement = upcastSet(builder, argElement, destElementType);
+                upcastedElements[(Index)i] = upcastedElement;
+            }
+
+            return builder->emitMakeTuple(destTupleType, upcastedElements);
+        }
+    }
+    else if (as<IROptionalType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // If both arg and dest are optionals, we need to upcast the value type.
+        //
+        auto argOptionalType = as<IROptionalType>(argInfo);
+        auto destOptionalType = as<IROptionalType>(destInfo);
+        auto argValueType = (IRType*)argOptionalType->getValueType();
+        auto destValueType = (IRType*)destOptionalType->getValueType();
+
+        if (argValueType != destValueType)
+        {
+            // We emit a ReinterpretOptional instruction that will be lowered
+            // later in lowerReinterpret to an if-else block with proper control flow.
+            //
+            return builder
+                ->emitIntrinsicInst((IRType*)destOptionalType, kIROp_ReinterpretOptional, 1, &arg);
+        }
+    }
+    else if (as<IROptionalNoneType>(argInfo) && as<IROptionalType>(destInfo))
+    {
+        // Special case: upcasting from `none_t` to `optional<T>` means
+        // creating a `none` value.
+        return builder->emitMakeOptionalNone((IRType*)destInfo);
     }
 
     return arg; // Can use as-is.

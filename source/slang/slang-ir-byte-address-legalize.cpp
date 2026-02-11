@@ -38,6 +38,11 @@ struct ByteAddressBufferLegalizationContext
     IRModule* m_module;
     IRBuilder m_builder;
 
+    // Track ByteAddressBuffer parameters that have been replaced by StructuredBuffer.
+    // These need to be removed at the end to avoid leaving invalid types in the IR
+    // for targets like SPIR-V that don't support ByteAddressBuffer directly.
+    HashSet<IRGlobalParam*> m_replacedByteAddressBufferParams;
+
     // Everything starts with a request to process a module,
     // which delegates to the central recursive walk of the IR.
     //
@@ -47,6 +52,19 @@ struct ByteAddressBufferLegalizationContext
         m_builder = IRBuilder(m_module);
 
         processInstRec(module->getModuleInst());
+
+        // After processing, remove ByteAddressBuffer parameters that have been
+        // replaced by StructuredBuffer parameters. These are no longer needed
+        // and would cause errors in backends like SPIR-V that don't support
+        // ByteAddressBuffer types directly.
+        for (auto param : m_replacedByteAddressBufferParams)
+        {
+            // Only remove if it has no uses (its uses should have been replaced)
+            if (!param->hasUses())
+            {
+                param->removeAndDeallocate();
+            }
+        }
     }
 
     // We recursively walk the entire IR structure (except
@@ -261,9 +279,9 @@ struct ByteAddressBufferLegalizationContext
         if (target->getHLSLToVulkanLayoutOptions() &&
             target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430Offset(target->getOptionSet(), field, outOffset);
+            return getStd430Offset(target->getTargetReq(), field, outOffset);
         }
-        return getNaturalOffset(target->getOptionSet(), field, outOffset);
+        return getNaturalOffset(target->getTargetReq(), field, outOffset);
     }
 
     SlangResult getSizeAndAlignment(
@@ -274,9 +292,9 @@ struct ByteAddressBufferLegalizationContext
         if (target->getHLSLToVulkanLayoutOptions() &&
             target->getHLSLToVulkanLayoutOptions()->shouldUseGLLayout())
         {
-            return getStd430SizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
+            return getStd430SizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
         }
-        return getNaturalSizeAndAlignment(target->getOptionSet(), type, outSizeAlignment);
+        return getNaturalSizeAndAlignment(target->getTargetReq(), type, outSizeAlignment);
     }
 
     // The core workhorse routine for the load case is `emitLegalLoad`,
@@ -384,7 +402,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -482,7 +500,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the loads.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     vecType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -604,10 +622,8 @@ struct ByteAddressBufferLegalizationContext
         // the "stride" of the element type.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(
-            m_targetProgram->getOptionSet(),
-            elementType,
-            &elementLayout));
+        SLANG_RETURN_NULL_ON_FAIL(
+            getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         // We will collect all the element values into an array so
@@ -707,8 +723,7 @@ struct ByteAddressBufferLegalizationContext
                 auto offsetType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_NULL_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
+                SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
                 auto typeStrideVal = typeLayout.getStride();
 
                 auto typeStrideInst = m_builder.getIntValue(offsetType, typeStrideVal);
@@ -725,8 +740,7 @@ struct ByteAddressBufferLegalizationContext
             // Some platforms e.g. Metal does not allow loading basic types that are not 4-byte
             // sized. We need to lower such loads.
             IRSizeAndAlignment sizeAlignment;
-            SLANG_RETURN_NULL_ON_FAIL(
-                getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            SLANG_RETURN_NULL_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to load the value as two 4-byte values and then combine them.
@@ -1036,6 +1050,7 @@ struct ByteAddressBufferLegalizationContext
 
     void cloneBufferDecorations(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
+        List<IRDecoration*> decorationsToRemove;
         for (auto decoration : src->getDecorations())
         {
             switch (decoration->getOp())
@@ -1045,9 +1060,29 @@ struct ByteAddressBufferLegalizationContext
                     dest,
                     as<IRMemoryQualifierSetDecoration>(decoration)->getMemoryQualifierBit());
                 break;
+            case kIROp_KeepAliveDecoration:
+                // Transfer KeepAlive to the new buffer and mark for removal from original
+                // This is needed when -preserve-params is used: the original ByteAddressBuffer
+                // should not be kept alive since it's replaced by the StructuredBuffer.
+                builder.addKeepAliveDecoration(dest);
+                decorationsToRemove.add(decoration);
+                break;
+            case kIROp_ExportDecoration:
+                // Transfer Export decoration to the new buffer and mark for removal from original
+                {
+                    auto exportDecor = as<IRExportDecoration>(decoration);
+                    builder.addExportDecoration(dest, exportDecor->getMangledName());
+                    decorationsToRemove.add(decoration);
+                }
+                break;
             default:
                 break;
             }
+        }
+        // Remove decorations from the original that were transferred to the new buffer
+        for (auto decoration : decorationsToRemove)
+        {
+            decoration->removeAndDeallocate();
         }
     }
 
@@ -1093,6 +1128,11 @@ struct ByteAddressBufferLegalizationContext
             paramBuilder.addLayoutDecoration(structuredBufferParam, layoutDecoration->getLayout());
         }
         cloneBufferDecorations(paramBuilder, structuredBufferParam, byteAddressBufferParam);
+
+        // Track that this ByteAddressBuffer parameter has been replaced.
+        // It will be removed at the end of the pass if it has no remaining uses.
+        m_replacedByteAddressBufferParams.add(byteAddressBufferParam);
+
         return structuredBufferParam;
     }
 
@@ -1234,7 +1274,7 @@ struct ByteAddressBufferLegalizationContext
                 // Else, fallback to scalarizing the stores.
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     arrayType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -1327,7 +1367,7 @@ struct ByteAddressBufferLegalizationContext
 
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(!getNaturalSizeAndAlignment(
-                    m_targetProgram->getOptionSet(),
+                    m_target,
                     vecType->getElementType(),
                     &elementLayout));
                 IRIntegerValue elementStride = elementLayout.getStride();
@@ -1419,8 +1459,7 @@ struct ByteAddressBufferLegalizationContext
                 auto indexType = offset->getDataType();
 
                 IRSizeAndAlignment typeLayout;
-                SLANG_RETURN_ON_FAIL(
-                    getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &typeLayout));
+                SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &typeLayout));
 
                 auto typeStride = m_builder.getIntValue(indexType, typeLayout.getStride());
 
@@ -1437,8 +1476,7 @@ struct ByteAddressBufferLegalizationContext
             // Some platforms e.g. Metal does not allow storing basic types that are not 4-byte
             // sized. We need to lower such stores.
             IRSizeAndAlignment sizeAlignment;
-            SLANG_RETURN_ON_FAIL(
-                getNaturalSizeAndAlignment(m_targetProgram->getOptionSet(), type, &sizeAlignment));
+            SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, type, &sizeAlignment));
             if (sizeAlignment.size == 8)
             {
                 // We need to store the value as two 4-byte values.
@@ -1538,10 +1576,7 @@ struct ByteAddressBufferLegalizationContext
         // We iterate over the elements and fetch then store each one.
         //
         IRSizeAndAlignment elementLayout;
-        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(
-            m_targetProgram->getOptionSet(),
-            elementType,
-            &elementLayout));
+        SLANG_RETURN_ON_FAIL(getNaturalSizeAndAlignment(m_target, elementType, &elementLayout));
         IRIntegerValue elementStride = elementLayout.getStride();
 
         auto indexType = m_builder.getIntType();

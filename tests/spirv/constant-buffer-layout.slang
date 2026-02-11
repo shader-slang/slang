@@ -1,6 +1,5 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv -emit-spirv-directly
 
-//SPIRV: ArrayStride 12
 
 struct Test
 {
@@ -9,6 +8,7 @@ struct Test
 
 //SPIRV: Offset 4
 // matrix always start on a new register
+//SPIRV: MatrixStride 12
     float3x3 v1;
 //SPIRV: Offset 40
 // Non-matrix can pack with a partially filled register

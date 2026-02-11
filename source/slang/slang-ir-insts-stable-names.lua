@@ -715,5 +715,15 @@ return {
 	["UninitializedWitnessTableElement"] = 713,
 	["NoneTypeElement"] = 714,
 	["NoneWitnessTableElement"] = 715,
-	["GetTagForSubSet"] = 716
+	["GetTagForSubSet"] = 716,
+	["Decoration.DisallowSpecializationWithExistentialsDecoration"] = 717,
+	["makeCoopMatrixFromScalar"] = 718,
+	["getOptiXPayloadRegister"] = 719,
+	["setOptiXPayloadRegister"] = 720,
+	["Type.PackedFloatType.FloatE4M3Type"] = 721,
+	["Type.PackedFloatType.FloatE5M2Type"] = 722,
+	["Type.PackedFloatType.BFloat16Type"] = 723,
+	["IsCoopFloat"] = 724,
+	["Type.OptionalNoneType"] = 725,
+	["ReinterpretOptional"] = 726,
 }

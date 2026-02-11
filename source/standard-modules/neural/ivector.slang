@@ -12,7 +12,7 @@ and linear algebra operations for neural network computations.
 @see `InlineVector`
 @category neural
 */
-public interface IVector<T, int N> : IDifferentiable
+public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -21,7 +21,7 @@ public interface IVector<T, int N> : IDifferentiable
 
     /// The differential type for automatic differentiation.
     /// @remarks Ensures the differential is also a vector with the same structure.
-    public associatedtype Differential : IVector<T.Differential, N>;
+    public associatedtype Differential : IVector<T.Differential>;
 
     /// Default constructor - initializes vector to zero.
     public __init();
@@ -36,24 +36,15 @@ public interface IVector<T, int N> : IDifferentiable
     Array constructor - initializes from an array.
     @param[in] data Array of N elements to initialize the vector.
     */
-    public __init(T[N] data);
+    public __init(T[This.Size] data);
+
+    public __init<InputArray : IArray<T>>(InputArray data);
 
     /**
     Copy constructor.
     @param[in] other The vector to copy from.
     */
     public __init(This other);
-
-    /**
-    Element access operator.
-    @param[in] index The element index (0-based).
-    @return Reference to the element at the given index.
-    */
-    public __subscript(int index)->T
-    {
-        get;
-        set;
-    }
 
     /**
     Evaluates a linear transformation: output = W * input.
@@ -72,16 +63,17 @@ public interface IVector<T, int N> : IDifferentiable
     - `Storage` must conform to `IStorage<T>`
     - `Storage.Differential` must conform to `IStorage<T.Differential>`
     - `Storage.Address` must equal `Storage.Differential.Address` (same address type)
-    - `OutputVector` must conform to `IVector<T, OutputSize>`
+    - `OutputVector` must conform to `IVector<T>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-        where OutputVector : IVector<T, OutputSize>;
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 
     /**
     Evaluates a linear transformation: output = W * this + bias.
@@ -107,7 +99,7 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Storage, OutputVector>(
+    public OutputVector linearTransform<Storage, Layout, OutputVector>(
         Storage weightStorage,
         Storage biasStorage,
         no_diff Storage.Address weightAddress,
@@ -115,7 +107,8 @@ public interface IVector<T, int N> : IDifferentiable
             where Storage : IStorage<T>
             where Storage.Differential : IStorage<T.Differential>
             where Storage.Address == Storage.Differential.Address
-            where OutputVector : IVector<T, OutputSize>;
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 
     /**
     Evaluates a linear transformation: output = W * this.
@@ -135,10 +128,11 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(Address weightAddress)
+    public OutputVector linearTransform<Address, Layout, OutputVector>(Address weightAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>;
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 
     /**
     Evaluates a linear transformation: output = W * this + bias.
@@ -163,9 +157,10 @@ public interface IVector<T, int N> : IDifferentiable
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
-    public OutputVector linearTransform<int OutputSize, Address, OutputVector>(
+    public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
-            where OutputVector : IVector<T, OutputSize>;
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>;
 }

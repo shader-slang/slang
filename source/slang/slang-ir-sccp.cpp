@@ -16,6 +16,7 @@ namespace Slang
 struct SharedSCCPContext
 {
     IRModule* module;
+    TargetProgram* targetProgram;
     DiagnosticSink* sink;
 };
 //
@@ -125,6 +126,8 @@ struct SCCPContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -329,6 +332,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
@@ -388,6 +394,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
             break;
 
@@ -400,12 +409,13 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
-    template<typename TIntFunc, typename TFloatFunc>
+    template<typename TIntFunc, typename TUintFunc, typename TFloatFunc>
     LatticeVal evalBinaryImpl(
         IRType* type,
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
+        const TUintFunc& uintFunc,
         const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -415,17 +425,20 @@ struct SCCPContext
         IRInst* resultVal = nullptr;
         switch (type->getOp())
         {
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
-        case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
+            resultVal =
+                getBuilder()->getIntValue(type, uintFunc(c0->value.uintVal, c1->value.uintVal));
+            break;
         case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_IntPtrType:
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
             break;
@@ -565,6 +578,7 @@ struct SCCPContext
                     static_cast<IRUnsignedIntegerValue>(c0) +
                     static_cast<IRUnsignedIntegerValue>(c1));
             },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 + c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
     LatticeVal evalSub(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -579,6 +593,7 @@ struct SCCPContext
                     static_cast<IRUnsignedIntegerValue>(c0) -
                     static_cast<IRUnsignedIntegerValue>(c1));
             },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 - c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
     LatticeVal evalMul(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -593,6 +608,7 @@ struct SCCPContext
                     static_cast<IRUnsignedIntegerValue>(c0) *
                     static_cast<IRUnsignedIntegerValue>(c1));
             },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -602,6 +618,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
     LatticeVal evalRem(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -611,6 +628,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
     LatticeVal evalEql(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -717,8 +735,8 @@ struct SCCPContext
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
@@ -744,8 +762,8 @@ struct SCCPContext
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
-        IntInfo info = getIntTypeInfo(type);
-        if (info.isSigned == false)
+        bool isSigned = getIntTypeSigned(type);
+        if (isSigned == false)
         {
             return evalBinaryIntImpl(
                 type,
@@ -841,19 +859,24 @@ struct SCCPContext
         {
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             resultVal = getBuilder()->getIntValue(type, sourceValueBits);
             break;
         case kIROp_IntType:
         case kIROp_UIntType:
-#if SLANG_PTR_IS_32
+            resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            break;
         case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
-#endif
-            resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            // If running without targetProgram, we can't propagate
+            // pointer-sized types because we don't know what the pointer size
+            // is.
+            if (shared->targetProgram)
+            {
+                if (getPointerSize(shared->targetProgram->getTargetReq()) == sizeof(uint64_t))
+                    resultVal = getBuilder()->getIntValue(type, sourceValueBits);
+                else
+                    resultVal = getBuilder()->getIntValue(type, (uint32_t)sourceValueBits);
+            }
             break;
         case kIROp_FloatType:
             {
@@ -948,7 +971,7 @@ struct SCCPContext
         //
         // For now we implement only basic folding operations for
         // scalar values.
-        if (!as<IRBasicType>(inst->getDataType()))
+        if (!as<IRBasicType>(inst->getDataType()) && !as<IRPackedFloatType>(inst->getDataType()))
             return LatticeVal::getAny();
 
         switch (inst->getOp())
@@ -1833,13 +1856,17 @@ static bool applySparseConditionalConstantPropagationRec(
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRModule* module, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
 
     // First we fold constants at global scope.
@@ -1854,13 +1881,17 @@ bool applySparseConditionalConstantPropagation(IRModule* module, DiagnosticSink*
     return changed;
 }
 
-bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagationForGlobalScope(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
     SCCPContext globalContext;
     globalContext.shared = &shared;
@@ -1869,13 +1900,17 @@ bool applySparseConditionalConstantPropagationForGlobalScope(IRModule* module, D
     return changed;
 }
 
-bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sink)
+bool applySparseConditionalConstantPropagation(
+    IRInst* func,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     if (sink && sink->getErrorCount())
         return false;
 
     SharedSCCPContext shared;
     shared.module = func->getModule();
+    shared.targetProgram = targetProgram;
     shared.sink = sink;
 
     SCCPContext globalContext;
@@ -1886,10 +1921,11 @@ bool applySparseConditionalConstantPropagation(IRInst* func, DiagnosticSink* sin
     return applySparseConditionalConstantPropagationRec(globalContext, func);
 }
 
-IRInst* tryConstantFoldInst(IRModule* module, IRInst* inst)
+IRInst* tryConstantFoldInst(IRModule* module, TargetProgram* targetProgram, IRInst* inst)
 {
     SharedSCCPContext shared;
     shared.module = module;
+    shared.targetProgram = targetProgram;
     SCCPContext instContext;
     instContext.shared = &shared;
     instContext.code = nullptr;

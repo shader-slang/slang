@@ -610,6 +610,15 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
+    {
+        sb << "__floatAsInt(";
+        if (floatBitCastExpr->value)
+        {
+            addExpr(floatBitCastExpr->value);
+        }
+        sb << ")";
+    }
     else if (const auto addressOfExpr = as<AddressOfExpr>(expr))
     {
         sb << "__getAddress(";
@@ -682,6 +691,14 @@ void ASTPrinter::addExpr(Expr* expr)
     else if (as<ReturnValExpr>(expr))
     {
         sb << "__return_val";
+    }
+    else if (as<SharedTypeExpr>(expr))
+    {
+        auto typeType = as<TypeType>(expr->type);
+        if (typeType)
+            sb << typeType->getType();
+        else
+            sb << expr->type;
     }
     else if (const auto letExpr = as<LetExpr>(expr))
     {

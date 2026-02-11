@@ -75,6 +75,8 @@ public:
     {
     }
 
+    ~UnixPipeStream() SLANG_OVERRIDE { close(); }
+
 protected:
     /// This read file descriptor non blocking. Doing so will change the behavior of
     /// read - it can fail and return an error indicating there is no data, instead of blocking.

@@ -63,17 +63,6 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      # Cache Slang build artifacts to speed up subsequent runs
-      - name: Cache Slang build
-        uses: actions/cache@v4
-        with:
-          path: |
-            build/
-          key: slang-build-${{ runner.os }}-${{ hashFiles('source/**', 'CMakeLists.txt', 'cmake/**') }}
-          restore-keys: |
-            slang-build-${{ runner.os }}-
-          enableCrossOsArchive: false
-
       # Build Slang from checked-out source
       # Note: We only need slangc.exe, so skip the packaging step to avoid CPack errors
       - name: Build Slang
@@ -298,12 +287,22 @@ jobs:
         env:
           BUILD_RESULT: ${{ job.status }}
 
-      # Slack notification on failure (for scheduled runs only)
-      # Temporarily disabled with "&& false" due to known incompatibility with RTX Remix shaders
-      # Re-enable once RTX Remix updates their shader code and Slang version
+      # Slack notifications (for scheduled runs only)
+      - name: Success notification
+        id: slack-notify-success
+        if: ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "RTX-Remix-Nightly": ":green-check-mark: RTX Remix nightly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}
+
       - name: Failure notification
         id: slack-notify-failure
-        if: ${{ github.event_name == 'schedule' && !success() && false }}
+        if: ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -311,4 +310,4 @@ jobs:
               "RTX-Remix-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nRTX Remix nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RTX_REMIX }}

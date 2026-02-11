@@ -146,6 +146,7 @@ jobs:
             -DSLANG_GENERATORS_PATH=build-platform-generators/bin \
             -DSLANG_ENABLE_EXAMPLES=OFF \
             -DSLANG_ENABLE_RELEASE_LTO=ON \
+            -DSLANG_STANDARD_MODULE_DEVELOP_BUILD=OFF \
             "-DSLANG_SLANG_LLVM_FLAVOR=$(
               [[ "${{matrix.build-slang-llvm}}" = "true" ]] && echo "USE_SYSTEM_LLVM" || echo "DISABLE")" \
             ${{matrix.extra-cmake-flags}}
@@ -280,6 +281,16 @@ jobs:
             cp build.em/Release/bin/interface.d.ts "${base}/interface.d.ts"
             (cd "${base}" && zip -r "../${base}.zip" .)
             echo "SLANG_BINARY_ARCHIVE_ZIP=${base}.zip" >> "$GITHUB_OUTPUT"
+
+            # Package static libraries for C++ WASM development
+            base_libs=slang-${version}-${{matrix.platform}}-libs
+            mkdir -p "${base_libs}/lib"
+            mkdir -p "${base_libs}/include"
+            cp build.em/Release/lib/*.a "${base_libs}/lib/" 2>/dev/null || echo "No .a files in lib/"
+            cp build.em/Release/include/*.h "${base_libs}/include/"
+            (cd "${base_libs}" && zip -r "../${base_libs}.zip" .)
+            echo "SLANG_WASM_LIBS_ARCHIVE=${base_libs}.zip" >> "$GITHUB_OUTPUT"
+
             exit 0
           fi
 
@@ -340,6 +351,7 @@ jobs:
             ${{ steps.package.outputs.SLANG_BINARY_ARCHIVE_TAR }}
             ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_ZIP }}
             ${{ steps.package.outputs.SLANG_DEBUG_INFO_ARCHIVE_TAR }}
+            ${{ steps.package.outputs.SLANG_WASM_LIBS_ARCHIVE }}
             ${{ steps.notarize.outputs.SLANG_NOTARIZED_DIST }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

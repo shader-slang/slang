@@ -248,6 +248,157 @@ inline float HalfToFloat(unsigned short input)
     return o.fvalue;
 }
 
+inline unsigned short FloatToBFloat16(float val)
+{
+    unsigned int x = FloatAsInt(val);
+
+    // Check for NaN: If exponent is 0xFF and mantissa != 0
+    if ((x & 0x7F800000) == 0x7F800000 && (x & 0x007FFFFF) != 0)
+    {
+        return static_cast<unsigned short>((x >> 16) | 0x0040); // Quiet NaN
+    }
+
+    // Round to Nearest Even
+    // Add 0x7FFF + ((x >> 16) & 1) to force round-to-even on ties
+    unsigned int lsb = (x >> 16) & 1;
+    unsigned int bias = 0x7FFF + lsb;
+    x += bias;
+
+    return static_cast<unsigned short>(x >> 16);
+}
+
+inline float BFloat16ToFloat(unsigned short val)
+{
+    // Standard upcast: pad with 16 zeros
+    unsigned int x = static_cast<unsigned int>(val) << 16;
+    return IntAsFloat(x);
+}
+
+inline unsigned int FloatToFloatE4M3(float val)
+{
+    unsigned int x = FloatAsInt(val);
+    unsigned int sign = (x >> 24) & 0x80;
+    unsigned int abs_val = x & 0x7FFFFFFF;
+
+    // Range limits for E4M3 (Bias 7)
+    // Max finite: 448.0f
+    if (abs_val > 0x43E00000)
+        return sign | 0x7F; // Saturate to NaN
+    // Underflow / Subnormal
+    if (abs_val < 0x38800000)
+        return sign;
+
+    // Extract FP32 components
+    int exp = (abs_val >> 23) - 127;
+    unsigned int mant = abs_val & 0x007FFFFF;
+
+    // Re-bias to 7 and align mantissa
+    unsigned int e8 = static_cast<unsigned int>(exp + 7);
+    unsigned int m8 = mant >> 20;
+
+    // Robust Rounding (RNE)
+    unsigned int remainder = mant & 0x000FFFFF;
+    if (remainder > 0x00080000 || (remainder == 0x00080000 && (m8 & 1)))
+    {
+        m8++;
+        if (m8 > 7)
+        { // Mantissa overflow
+            m8 = 0;
+            e8++;
+        }
+    }
+
+    if (e8 >= 15)
+        return sign | 0x7E; // Clamp to max finite (448.0f, 0x43E00000)
+    return sign | (e8 << 3) | m8;
+}
+
+inline unsigned int FloatToFloatE5M2(float val)
+{
+    unsigned int x = FloatAsInt(val);
+    unsigned int sign = (x >> 24) & 0x80;
+    unsigned int abs_val = x & 0x7FFFFFFF;
+
+    // Handle NaN / Inf
+    if (abs_val >= 0x7F800000)
+    {
+        return sign | 0x7C | (abs_val > 0x7F800000 ? 1 : 0);
+    }
+
+    // Underflow
+    if (abs_val < 0x35800000)
+        return sign;
+
+    int exp = (abs_val >> 23) - 127;
+    unsigned int mant = abs_val & 0x007FFFFF;
+
+    unsigned int e8 = static_cast<unsigned int>(exp + 15);
+    unsigned int m8 = mant >> 21;
+
+    // RNE Rounding
+    unsigned int remainder = mant & 0x001FFFFF;
+    if (remainder > 0x00100000 || (remainder == 0x00100000 && (m8 & 1)))
+    {
+        m8++;
+        if (m8 > 3)
+        {
+            m8 = 0;
+            e8++;
+        }
+    }
+
+    if (e8 >= 31)
+        return sign | 0x7C; // Infinity
+    return sign | (e8 << 2) | m8;
+}
+
+inline float FloatE4M3ToFloat(unsigned int input)
+{
+    unsigned int sign = (input & 0x80) << 24;
+    if (input == 0x7F || input == 0xFF)
+    {
+        // Preserve the sign bit when converting NaN encodings.
+        return IntAsFloat(sign | 0x7FC00000);
+    }
+    unsigned int exp = (input & 0x78) >> 3;
+    unsigned int mant = (input & 0x07);
+
+    if (exp == 0)
+    {
+        if (mant == 0)
+            return IntAsFloat(sign);
+        // Subnormal
+        float res = IntAsFloat(sign | 0x38800000) * (mant / 8.0f);
+        return res;
+    }
+
+    unsigned int res_exp = (exp - 7 + 127) << 23;
+    unsigned int res_mant = mant << 20;
+    return IntAsFloat(sign | res_exp | res_mant);
+}
+
+inline float FloatE5M2ToFloat(unsigned int input)
+{
+    unsigned int sign = (input & 0x80) << 24;
+    unsigned int exp = (input & 0x7C) >> 2;
+    unsigned int mant = (input & 0x03);
+
+    if (exp == 0)
+    {
+        if (mant == 0)
+            return IntAsFloat(sign);
+        return IntAsFloat(sign | 0x35800000) * (mant / 4.0f);
+    }
+    if (exp == 31)
+    {
+        return IntAsFloat(sign | 0x7F800000 | (mant << 21));
+    }
+
+    unsigned int res_exp = (exp - 15 + 127) << 23;
+    unsigned int res_mant = mant << 21;
+    return IntAsFloat(sign | res_exp | res_mant);
+}
+
 class Random
 {
 private:

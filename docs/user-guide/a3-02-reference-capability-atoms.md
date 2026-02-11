@@ -30,11 +30,11 @@ Targets
 `glsl`
 > Represents the GLSL code generation target.
 
-`glsl_nv`
-> Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-
 `hlsl`
 > Represents the HLSL code generation target.
+
+`llvm`
+> Represents the LLVM IR target.
 
 `metal`
 > Represents the Metal programming language code generation target.
@@ -44,9 +44,6 @@ Targets
 
 `spirv`
 > Represents the SPIR-V code generation target.
-
-`spirv_nv`
-> Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
 
 `textualTarget`
 > Represents a non-assembly code generation target.
@@ -484,6 +481,10 @@ Extensions
 `GL_EXT_shader_invocation_reorder`
 > Represents the GL_EXT_shader_invocation_reorder extension (cross-vendor standard).
 
+`GL_EXT_shader_invocation_reorder_motion`
+> Represents the GL_EXT_shader_invocation_reorder + motion blur combined extension (cross-vendor SER with NV motion blur).
+> Used for motion blur variants of EXT SER functions.
+
 `GL_EXT_shader_quad_control`
 > Represents the GL_EXT_shader_quad_control extension.
 
@@ -562,6 +563,10 @@ Extensions
 `GL_NV_shader_invocation_reorder`
 > Represents the GL_NV_shader_invocation_reorder extension (NVIDIA-specific).
 
+`GL_NV_shader_invocation_reorder_motion`
+> Represents the GL_NV_shader_invocation_reorder + motion blur combined extension (NVIDIA-specific).
+> Used for motion blur variants of SER functions that require both extensions.
+
 `GL_NV_shader_subgroup_partitioned`
 > Represents the GL_NV_shader_subgroup_partitioned extension.
 
@@ -573,6 +578,9 @@ Extensions
 
 `SPV_EXT_descriptor_indexing`
 > Represents the SPIR-V extension for descriptor indexing.
+
+`SPV_EXT_float8`
+> Represents the SPIR-V extension for SPV_EXT_float8.
 
 `SPV_EXT_fragment_fully_covered`
 > Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
@@ -605,6 +613,9 @@ Extensions
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
+
+`SPV_KHR_bfloat16`
+> Represents the SPIR-V extension for BFloat16 types.
 
 `SPV_KHR_compute_shader_derivatives`
 > Represents the SPIR-V extension for compute shader derivatives.
@@ -701,6 +712,9 @@ Extensions
 `spvAtomicFloat64MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 64 min/max operations.
 
+`spvBFloat16KHR`
+> Represents the SPIR-V capability for using bf16 floating point type.
+
 `spvBindlessTextureNV`
 > Represents the SPIR-V capability for the bindless texture.
 
@@ -739,6 +753,9 @@ Extensions
 
 `spvDeviceGroup`
 > Represents the SPIR-V capability for DeviceGroup.
+
+`spvFloat8EXT`
+> Represents the SPIR-V capability for using 8-bit floating point types.
 
 `spvFragmentBarycentricKHR`
 > Represents the SPIR-V capability for using SPV_KHR_fragment_shader_barycentric.
@@ -823,6 +840,14 @@ Extensions
 
 `spvShaderInvocationReorderEXT`
 > Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
+
+`spvShaderInvocationReorderMotionEXT`
+> Represents the SPIR-V capability for shader invocation reorder EXT + motion blur (cross-vendor SER with NV motion blur).
+> Used for motion blur variants of EXT SER functions.
+
+`spvShaderInvocationReorderMotionNV`
+> Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
+> Used for motion blur variants of SER functions that require both extensions.
 
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
@@ -998,17 +1023,32 @@ Compound Capabilities
 `cpp_cuda_glsl_hlsl`
 > CPP, CUDA, GLSL, and HLSL code-gen targets
 
+`cpp_cuda_glsl_hlsl_llvm`
+> CPP, CUDA, GLSL, HLSL, and LLVM code-gen targets
+
 `cpp_cuda_glsl_hlsl_metal_spirv`
 > CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
+
+`cpp_cuda_glsl_hlsl_metal_spirv_llvm`
+> CPP, CUDA, GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
 
 `cpp_cuda_glsl_hlsl_metal_spirv_wgsl`
 > CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 
+`cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm`
+> CPP, CUDA, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+
 `cpp_cuda_glsl_hlsl_spirv`
 > CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 
+`cpp_cuda_glsl_hlsl_spirv_llvm`
+> CPP, CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+
 `cpp_cuda_glsl_hlsl_spirv_wgsl`
 > CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
+
+`cpp_cuda_glsl_hlsl_spirv_wgsl_llvm`
+> CPP, CUDA, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
 
 `cpp_cuda_glsl_spirv`
 > CPP, CUDA, GLSL and SPIRV code-gen targets
@@ -1022,11 +1062,17 @@ Compound Capabilities
 `cpp_cuda_hlsl_spirv`
 > CPP, CUDA, HLSL, and SPIRV code-gen targets
 
+`cpp_cuda_llvm`
+> CPP, CUDA and LLVM code-gen targets
+
 `cpp_cuda_metal_spirv`
 > CPP, CUDA, Metal, and SPIRV code-gen targets
 
 `cpp_cuda_spirv`
 > CPP, CUDA and SPIRV code-gen targets
+
+`cpp_cuda_spirv_llvm`
+> CPP, CUDA, SPIRV and LLVM code-gen targets
 
 `cpp_glsl`
 > CPP, and GLSL code-gen targets
@@ -1046,6 +1092,9 @@ Compound Capabilities
 `cpp_hlsl`
 > CPP, and HLSL code-gen targets
 
+`cpp_llvm`
+> CPP and LLVM code-gen targets
+
 `cuda_glsl_hlsl`
 > CUDA, GLSL, and HLSL code-gen targets
 
@@ -1058,6 +1107,9 @@ Compound Capabilities
 `cuda_glsl_hlsl_spirv`
 > CUDA, GLSL, HLSL, and SPIRV code-gen targets
 
+`cuda_glsl_hlsl_spirv_llvm`
+> CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+
 `cuda_glsl_hlsl_spirv_wgsl`
 > CUDA, GLSL, HLSL, SPIRV, and WGSL code-gen targets
 
@@ -1066,6 +1118,9 @@ Compound Capabilities
 
 `cuda_glsl_metal_spirv_wgsl`
 > CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
+
+`cuda_glsl_metal_spirv_wgsl_llvm`
+> CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
 
 `cuda_glsl_spirv`
 > CUDA, GLSL, and SPIRV code-gen targets
@@ -1081,6 +1136,9 @@ Compound Capabilities
 
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets
+
+`descriptor_handle`
+> Targets that support DescriptorHandle types for bindless descriptor access.
 
 `domain_hull`
 > Collection of shader stages
@@ -1159,8 +1217,8 @@ Compound Capabilities
 `meshshading`
 > Ccapabilities required to use mesh shading features
 
-`motionblur`
-> Capabilities needed for raytracing-motionblur
+`motionblur_nv`
+> Capabilities needed for raytracing-motionblur (NVIDIA-specific)
 
 `nonuniformqualifier`
 > Capabilities required to use NonUniform qualifier
@@ -1288,6 +1346,22 @@ Compound Capabilities
 
 `ser_motion_raygen_closesthit_miss`
 > Collection of capabilities for raytracing + motion blur + shader execution reordering and the shader stages of raygen, closesthit, and miss.
+
+`ser_nv`
+> NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
+> Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
+
+`ser_nv_motion`
+> NVIDIA-specific SER + motion blur
+
+`ser_nv_motion_raygen_closesthit_miss`
+> NVIDIA-specific SER + motion blur for raygen, closesthit, miss stages
+
+`ser_nv_raygen`
+> NVIDIA-specific SER for raygen stage (GLSL/SPIRV NV paths)
+
+`ser_nv_raygen_closesthit_miss`
+> NVIDIA-specific SER for raygen, closesthit, miss stages (GLSL/SPIRV NV paths)
 
 `ser_nvapi`
 > Capabilities needed for shader-execution-reordering (NVAPI path for HLSL)

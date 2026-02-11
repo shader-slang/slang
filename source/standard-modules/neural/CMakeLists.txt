@@ -35,15 +35,26 @@ if(SLANG_GENERATORS_PATH)
     endif()
     set(SLANG_COMPILER "${SLANG_GENERATORS_PATH}/slang-bootstrap${CMAKE_HOST_EXECUTABLE_SUFFIX}")
     set(SLANG_COMPILER_DEPENDENCY)
-else()
+elseif(SLANG_ENABLE_SLANGC)
     set(SLANG_COMPILER slangc)
     set(SLANG_COMPILER_DEPENDENCY slangc)
+else()
+    # As a fallback, use the system-installed `slangc` compiler
+    set(SLANG_COMPILER slangc)
+    set(SLANG_COMPILER_DEPENDENCY)
+endif()
+
+# Determine compiler flags based on build type
+if(SLANG_STANDARD_MODULE_DEVELOP_BUILD)
+    set(NEURAL_MODULE_DEFINES "-DUNIT_TEST")
+else()
+    set(NEURAL_MODULE_DEFINES "")
 endif()
 
 # Build neural.slang-module and output to the output directory
 add_custom_command(
     OUTPUT ${neural_module_file}
-    COMMAND ${SLANG_COMPILER} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+    COMMAND ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
     DEPENDS ${neural_copied_files} ${SLANG_COMPILER_DEPENDENCY}
     WORKING_DIRECTORY ${neural_output_dir}
     VERBATIM

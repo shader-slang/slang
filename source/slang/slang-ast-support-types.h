@@ -1277,6 +1277,7 @@ FIDDLE() namespace Slang
         Value = 0x4,
         Attribute = 0x8,
         SyntaxDecl = 0x10,
+        Semantic = 0x20,
         Default = type | Function | Value | SyntaxDecl,
     };
 
@@ -1642,6 +1643,7 @@ FIDDLE() namespace Slang
     {
         Val* val = nullptr;
         Expr* expr = nullptr;
+        String toString();
     };
     typedef List<SpecializationArg> SpecializationArgs;
 

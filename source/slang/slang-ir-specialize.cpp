@@ -89,6 +89,8 @@ struct SpecializationContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -299,7 +301,7 @@ struct SpecializationContext
             {
                 IRUse* argUse = specializeInst->getArgOperand(ii);
                 auto originalArg = argUse->get();
-                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                IRInst* foldedArg = tryConstantFoldInst(module, targetProgram, originalArg);
                 if (foldedArg == originalArg)
                     continue;
 
@@ -1237,7 +1239,11 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
+                applySparseConditionalConstantPropagationForGlobalScope(
+                    this->module,
+                    targetProgram,
+                    this->sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1256,7 +1262,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink);
+                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
                 }
             }
 
@@ -3455,7 +3461,7 @@ IRInst* specializeGenericImpl(
 
         // We will iterate over the non-parameter ("ordinary")
         // instructions only, because parameters were dealt
-        // with explictly at an earlier point.
+        // with explicitly at an earlier point.
         //
         for (auto ii : bb->getOrdinaryInsts())
         {

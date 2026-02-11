@@ -166,6 +166,21 @@ int myGenericMethod<T>(T arg) where optional T: IFoo
 }
 ```
 
+### Using Generic Parameters in Attributes
+
+Slang allows referencing generic parameters in bracket attributes. This is particularly useful for shader entry points where you want to control attributes like workgroup sizes at compile time.
+
+For example:
+```csharp
+[numthreads(blockSize, blockSize, 1)]
+void computeMain<int blockSize>() 
+{
+    // Shader implementation
+}
+```
+
+In this example, the generic parameter `blockSize` is used in the `numthreads` attribute. This allows the host application to control the workgroup size by compiling a specialization of the entry point with a specific value for `blockSize`, instead of by resorting to preprocessor macros.
+
 Supported Constructs in Interface Definitions
 -----------------------------------------------------
 
@@ -531,7 +546,7 @@ Note that the biggest difference between C++ templates and generics is that temp
 
 ### Similarity to Swift and Rust
 
-Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`, except that Slang currently does not support the more general `where` clause in these languages. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
+Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
 
 Generic Value Parameters
 -------------------------------

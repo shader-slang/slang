@@ -694,13 +694,19 @@ struct AssignValsFromLayoutContext
     SlangResult assignObject(ShaderCursor const& dstCursor, ShaderInputLayout::ObjectVal* srcVal)
     {
         auto typeName = srcVal->typeName;
-        slang::TypeReflection* slangType = nullptr;
+        ComPtr<IShaderObject> shaderObject;
+
         if (typeName.getLength() != 0)
         {
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
             //
-            slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
         else
         {
@@ -724,15 +730,9 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
-            slangType = slangTypeLayout->getType();
+            auto slangType = slangTypeLayout->getType();
+            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
         }
-
-        ComPtr<IShaderObject> shaderObject;
-        device->createShaderObject(
-            slangSession(),
-            slangType,
-            ShaderObjectContainerType::None,
-            shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();
@@ -1277,11 +1277,24 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
             if (!blob)
             {
+                printf("Missing output blob\n");
                 return SLANG_FAIL;
             }
+
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            if (m_options.outputUsingType)
+            {
+                // TODO: always output using type
+                typeLayout = outputItem.typeLayout;
+                if (typeLayout == nullptr)
+                {
+                    printf("Output using type layout requested but type layout was null\n");
+                    return SLANG_FAIL;
+                }
+            }
+
             const SlangResult res = ShaderInputLayout::writeBinding(
-                m_options.outputUsingType ? outputItem.typeLayout
-                                          : nullptr, // TODO: always output using type
+                typeLayout,
                 blob->getBufferPointer(),
                 bufferSize,
                 &writer);
@@ -1598,8 +1611,16 @@ static SlangResult _innerMain(
     case DeviceType::CPU:
         input.target = SLANG_SHADER_HOST_CALLABLE;
         input.profile = "";
-        nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
-        slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        if (options.useLLVMDirectly)
+        {
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_LLVM;
+            slangPassThrough = SLANG_PASS_THROUGH_NONE;
+        }
+        else
+        {
+            nativeLanguage = SLANG_SOURCE_LANGUAGE_CPP;
+            slangPassThrough = SLANG_PASS_THROUGH_GENERIC_C_CPP;
+        }
         break;
     case DeviceType::CUDA:
         input.target = SLANG_PTX;
@@ -1671,10 +1692,13 @@ static SlangResult _innerMain(
 #endif
             }
         case DeviceType::CPU:
+            if (!options.useLLVMDirectly)
             {
                 // As long as we have CPU, then this should work
                 return spSessionCheckPassThroughSupport(session, SLANG_PASS_THROUGH_GENERIC_C_CPP);
             }
+            else
+                return SLANG_OK;
         default:
             break;
         }

@@ -20,6 +20,7 @@ enum class BaseType;
 class Type;
 
 struct IRLayout;
+struct TypeLayoutContext;
 
 //
 
@@ -1262,6 +1263,12 @@ public:
 
     /// Holds all of the string literals that have been hashed
     StringSlicePool hashedStringLiteralPool;
+
+    /// The descriptor set/space index allocated for the bindless resource heap.
+    ///
+    /// Return: -1 means Bindless resources not used
+    /// Return: >= 0 means Allocated space index for the bindless resource heap
+    Int bindlessSpaceIndex = -1;
 };
 
 StructTypeLayout* getGlobalStructLayout(ProgramLayout* programLayout);
@@ -1317,15 +1324,17 @@ enum class ShaderParameterKind
 struct SimpleLayoutRulesImpl
 {
     // Get size and alignment for a single value of base type.
-    virtual SimpleLayoutInfo GetScalarLayout(BaseType baseType) = 0;
+    virtual SimpleLayoutInfo GetScalarLayout(
+        BaseType baseType,
+        const TypeLayoutContext& context) = 0;
 
     // Get size and alignment for an array of elements
     virtual SimpleArrayLayoutInfo GetArrayLayout(
         SimpleLayoutInfo elementInfo,
         LayoutSize elementCount) = 0;
 
-    /// Get pointer layout
-    virtual SimpleLayoutInfo GetPointerLayout() = 0;
+    /// Get pointer layout, which can depend on the target.
+    virtual SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context) = 0;
 
     // Get layout for a vector or matrix type
     virtual SimpleLayoutInfo GetVectorLayout(
@@ -1352,6 +1361,12 @@ struct SimpleLayoutRulesImpl
     // Do structured buffers need a separate binding for the counter buffer?
     // (DirectX is the exception in managing these together)
     virtual bool DoStructuredBuffersNeedSeparateCounterBuffer() = 0;
+
+    // Get layout for DescriptorHandle<T>
+    virtual ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context) = 0;
 };
 
 struct ObjectLayoutRulesImpl
@@ -1373,11 +1388,14 @@ struct LayoutRulesImpl
 
     // Forward `SimpleLayoutRulesImpl` interface
 
-    SimpleLayoutInfo GetScalarLayout(BaseType baseType)
+    SimpleLayoutInfo GetScalarLayout(BaseType baseType, const TypeLayoutContext& context)
     {
-        return simpleRules->GetScalarLayout(baseType);
+        return simpleRules->GetScalarLayout(baseType, context);
     }
-    SimpleLayoutInfo GetPointerLayout() { return simpleRules->GetPointerLayout(); }
+    SimpleLayoutInfo GetPointerLayout(const TypeLayoutContext& context)
+    {
+        return simpleRules->GetPointerLayout(context);
+    }
     SimpleArrayLayoutInfo GetArrayLayout(SimpleLayoutInfo elementInfo, LayoutSize elementCount)
     {
         return simpleRules->GetArrayLayout(elementInfo, elementCount);
@@ -1423,6 +1441,14 @@ struct LayoutRulesImpl
     bool DoStructuredBuffersNeedSeparateCounterBuffer()
     {
         return simpleRules->DoStructuredBuffersNeedSeparateCounterBuffer();
+    }
+
+    ObjectLayoutInfo GetDescriptorHandleLayout(
+        LayoutResourceKind kind,
+        Type* elementType,
+        const TypeLayoutContext& context)
+    {
+        return simpleRules->GetDescriptorHandleLayout(kind, elementType, context);
     }
 
     // Forward `ObjectLayoutRulesImpl` interface
@@ -1556,7 +1582,7 @@ struct TypeLayoutContext
     TypeLayoutContext withSpecializationArgsOffsetBy(Int offset) const
     {
         TypeLayoutContext result = *this;
-        if (offset < specializationArgCount)
+        if (offset >= 0 && offset < specializationArgCount)
         {
             result.specializationArgCount = specializationArgCount - offset;
             result.specializationArgs = specializationArgs + offset;

@@ -119,6 +119,10 @@ def wgsl : target + textualTarget;
 /// [Target]
 def slangvm : target;
 
+/// Represents the LLVM IR target.
+/// [Target]
+def llvm : target;
+
 // Capabilities that stand for target SPIR-V versions for the GLSL backend.
 // These are not compilation targets. We will convert `_spirv_*` to `glsl_spirv_*` during compilation.
 
@@ -247,7 +251,7 @@ def optix_multilevel_traversal : _cuda_sm_5_0;
 
 /// All code-gen targets
 /// [Compound]
-alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl;
+alias any_target = hlsl | metal | glsl | c | cpp | cuda | spirv | wgsl | llvm;
 
 /// All non-asm code-gen targets
 /// [Compound]
@@ -265,9 +269,21 @@ alias any_cpp_target = cpp | cuda;
 /// [Compound]
 alias cpp_cuda = cpp | cuda;
 
+/// CPP and LLVM code-gen targets
+/// [Compound]
+alias cpp_llvm = cpp | llvm;
+
+/// CPP, CUDA and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_llvm = cpp | cuda | llvm;
+
 /// CPP, CUDA and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_spirv = cpp | cuda | spirv;
+
+/// CPP, CUDA, SPIRV and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_spirv_llvm = cpp | cuda | spirv | llvm;
 
 /// CPP, CUDA, Metal, and SPIRV code-gen targets
 /// [Compound]
@@ -285,21 +301,41 @@ alias cpp_cuda_glsl_spirv = cpp | cuda | glsl | spirv;
 /// [Compound]
 alias cpp_cuda_glsl_hlsl = cpp | cuda | glsl | hlsl;
 
+/// CPP, CUDA, GLSL, HLSL, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_llvm = cpp | cuda | glsl | hlsl | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv = cpp | cuda | glsl | hlsl | spirv;
+
+/// CPP, CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_llvm = cpp | cuda | glsl | hlsl | spirv | llvm;
 
 /// CPP, CUDA, GLSL, HLSL, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_spirv_wgsl = cpp | cuda | glsl | hlsl | spirv | wgsl;
 
+/// CPP, CUDA, GLSL, HLSL, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_spirv_wgsl_llvm = cpp | cuda | glsl | hlsl | spirv | wgsl | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, Metal and SPIRV code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv = cpp | cuda | glsl | hlsl | metal | spirv;
 
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_llvm = cpp | cuda | glsl | hlsl | metal | spirv | llvm;
+
 /// CPP, CUDA, GLSL, HLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl = cpp | cuda | glsl | hlsl | metal | spirv | wgsl;
+
+/// CPP, CUDA, GLSL, HLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cpp_cuda_glsl_hlsl_metal_spirv_wgsl_llvm = cpp | cuda | glsl | hlsl | metal | spirv | wgsl | llvm;
 
 /// CPP, CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -349,6 +385,10 @@ alias cuda_hlsl_metal_spirv = cuda | hlsl | metal | spirv;
 /// [Compound]
 alias cuda_glsl_hlsl_spirv = cuda | glsl | hlsl | spirv;
 
+/// CUDA, GLSL, HLSL, SPIRV, and LLVM code-gen targets
+/// [Compound]
+alias cuda_glsl_hlsl_spirv_llvm = cuda | glsl | hlsl | spirv | llvm;
+
 /// CUDA, GLSL, HLSL, SPIRV, and WGSL code-gen targets
 /// [Compound]
 alias cuda_glsl_hlsl_spirv_wgsl = cuda | glsl | hlsl | spirv | wgsl;
@@ -372,6 +412,10 @@ alias cuda_glsl_metal_spirv = cuda | glsl | metal | spirv;
 /// CUDA, GLSL, Metal, SPIRV and WGSL code-gen targets
 /// [Compound]
 alias cuda_glsl_metal_spirv_wgsl = cuda | glsl | metal | spirv | wgsl;
+
+/// CUDA, GLSL, Metal, SPIRV, WGSL and LLVM code-gen targets
+/// [Compound]
+alias cuda_glsl_metal_spirv_wgsl_llvm = cuda | glsl | metal | spirv | wgsl | llvm;
 
 /// CUDA, and HLSL code-gen targets
 /// [Compound]
@@ -612,6 +656,14 @@ def SPV_NV_cooperative_matrix2 : SPV_NV_tensor_addressing + SPV_KHR_cooperative_
 /// [EXT]
 def SPV_NV_bindless_texture: _spirv_1_0;
 
+/// Represents the SPIR-V extension for SPV_EXT_float8.
+/// [EXT]
+def SPV_EXT_float8: _spirv_1_0;
+
+/// Represents the SPIR-V extension for BFloat16 types.
+/// [EXT]
+def SPV_KHR_bfloat16: _spirv_1_0;
+
 // SPIRV Capabilities.
 
 /// Represents the SPIR-V capability for DeviceGroup.
@@ -669,6 +721,15 @@ def spvImageFootprintNV : SPV_NV_shader_image_footprint;
 /// Represents the SPIR-V capability for using minimum LOD operations.
 /// [EXT]
 def spvMinLod : _spirv_1_0;
+
+
+/// Represents the SPIR-V capability for using 8-bit floating point types.
+/// [EXT]
+def spvFloat8EXT : SPV_EXT_float8;
+
+/// Represents the SPIR-V capability for using bf16 floating point type.
+/// [EXT]
+def spvBFloat16KHR : SPV_KHR_bfloat16;
 
 /// Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 /// [EXT]
@@ -741,6 +802,16 @@ def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
 /// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
 /// [EXT]
 def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
+/// Used for motion blur variants of SER functions that require both extensions.
+/// [EXT]
+alias spvShaderInvocationReorderMotionNV = spvShaderInvocationReorderNV + spvRayTracingMotionBlurNV;
+
+/// Represents the SPIR-V capability for shader invocation reorder EXT + motion blur (cross-vendor SER with NV motion blur).
+/// Used for motion blur variants of EXT SER functions.
+/// [EXT]
+alias spvShaderInvocationReorderMotionEXT = spvShaderInvocationReorderEXT + spvRayTracingMotionBlurNV;
 
 /// Represents the SPIR-V capability for cluster acceleration structure.
 /// [EXT]
@@ -907,6 +978,8 @@ def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
 def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_EXT_shader_invocation_reorder : _GLSL_460;
+alias _GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
+alias _GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
 def _GL_NV_shader_texture_footprint : _GLSL_450;
 def _GL_NV_cluster_acceleration_structure : _GLSL_460;
@@ -1159,13 +1232,15 @@ alias GL_NV_shader_invocation_reorder = _GL_NV_shader_invocation_reorder + _GL_E
 /// [EXT]
 alias GL_EXT_shader_invocation_reorder = _GL_EXT_shader_invocation_reorder + _GL_EXT_buffer_reference_uvec2 | spvShaderInvocationReorderEXT;
 
-/// Represents GLSL targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def glsl_nv : glsl + GL_NV_shader_invocation_reorder;
+/// Represents the GL_NV_shader_invocation_reorder + motion blur combined extension (NVIDIA-specific).
+/// Used for motion blur variants of SER functions that require both extensions.
+/// [EXT]
+alias GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder_motion | spvShaderInvocationReorderMotionNV;
 
-/// Represents SPIRV targeting NVIDIA-specific SER (for backward compatibility).
-/// [Target]
-def spirv_nv : spirv + spvShaderInvocationReorderNV;
+/// Represents the GL_EXT_shader_invocation_reorder + motion blur combined extension (cross-vendor SER with NV motion blur).
+/// Used for motion blur variants of EXT SER functions.
+/// [EXT]
+alias GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder_motion | spvShaderInvocationReorderMotionEXT;
 
 /// Represents the GL_NV_shader_subgroup_partitioned extension.
 /// [EXT]
@@ -1209,18 +1284,26 @@ alias ser_dxr = raytracing + ser_hlsl_native;
 /// [Compound]
 alias ser = raytracing + GL_NV_shader_invocation_reorder | raytracing + GL_EXT_shader_invocation_reorder | ser_nvapi | ser_dxr | cuda;
 
-/// Capabilities needed for raytracing-motionblur
+/// NVIDIA-specific SER capabilities (excludes cross-vendor EXT)
+/// Includes GL_NV_shader_invocation_reorder (GLSL/SPIRV) and CUDA paths
 /// [Compound]
-alias motionblur = GL_NV_ray_tracing_motion_blur | cuda;
+alias ser_nv = raytracing + GL_NV_shader_invocation_reorder | cuda;
+
+/// Capabilities needed for raytracing-motionblur (NVIDIA-specific)
+/// [Compound]
+alias motionblur_nv = GL_NV_ray_tracing_motion_blur | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
 alias rayquery = GL_EXT_ray_query | _sm_6_3;
 /// Capabilities needed for compute-shader rayquery and motion-blur
 /// [Compound]
-alias raytracing_motionblur =  raytracing + motionblur | cuda;
+alias raytracing_motionblur =  raytracing + motionblur_nv | cuda;
 /// Capabilities needed for shader-execution-reordering and motion-blur
 /// [Compound]
-alias ser_motion = ser + motionblur;
+alias ser_motion = ser + motionblur_nv;
+/// NVIDIA-specific SER + motion blur
+/// [Compound]
+alias ser_nv_motion = ser_nv + motionblur_nv;
 /// Capabilities needed for realtime clocks
 /// [Compound]
 alias shaderclock = GL_EXT_shader_realtime_clock | hlsl_nvapi | cpp | cuda;
@@ -1288,6 +1371,10 @@ alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReduc
 /// Capabilities needed to use vulkan memory model
 /// [Compound]
 alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
+
+/// Targets that support DescriptorHandle types for bindless descriptor access.
+/// [Compound]
+alias descriptor_handle = glsl_spirv | _sm_6_6 | cpp | cuda | metal | wgsl;
 
 // Non-internal shader stages
 //
@@ -1523,6 +1610,7 @@ alias sm_4_0_version = _sm_4_0
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 
 
@@ -1544,6 +1632,7 @@ alias sm_4_1_version = _sm_4_1
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 /// HLSL shader model 4.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1564,6 +1653,7 @@ alias sm_5_0_version = _sm_5_0
              | metal
              | wgsl
              | cpp
+             | llvm
              ;
 /// HLSL shader model 5.0 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1584,6 +1674,7 @@ alias sm_5_1_version = _sm_5_1
              | _cuda_sm_6_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 5.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1603,6 +1694,7 @@ alias sm_6_0_version = _sm_6_0
              | _cuda_sm_6_0 
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.0 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1622,6 +1714,7 @@ alias sm_6_1_version = _sm_6_1
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1641,6 +1734,7 @@ alias sm_6_2_version = _sm_6_2
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.2 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1659,6 +1753,7 @@ alias sm_6_3_version = _sm_6_3
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.3 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1678,6 +1773,7 @@ alias sm_6_4_version = _sm_6_4
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.4 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1696,6 +1792,7 @@ alias sm_6_5_version = _sm_6_5
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.5 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1716,6 +1813,7 @@ alias sm_6_6_version = _sm_6_6
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.6 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1734,6 +1832,7 @@ alias sm_6_7_version = _sm_6_7
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 /// HLSL shader model 6.7 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
@@ -1751,6 +1850,7 @@ alias sm_6_8_version = _sm_6_8
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 
 /// HLSL shader model 6.8 and related capabilities of other targets.
@@ -1769,6 +1869,7 @@ alias sm_6_9_version = _sm_6_9
              | _cuda_sm_7_0
              | metal
              | cpp
+             | llvm
              ;
 
 /// HLSL shader model 6.9 and related capabilities of other targets.
@@ -1845,6 +1946,7 @@ alias GLSL_130 = _GLSL_130
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                ;
 /// GLSL 140 and related capabilities of other targets.
 /// [Version]
@@ -1854,6 +1956,7 @@ alias GLSL_140 = _GLSL_140
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_130
                ;
@@ -1865,6 +1968,7 @@ alias GLSL_150 = _GLSL_150
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_texture_multisample
                // previous
@@ -1878,6 +1982,7 @@ alias GLSL_330 = _GLSL_330
                | spirv_1_0
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_150
                ;
@@ -1889,6 +1994,7 @@ alias GLSL_400 = _GLSL_400
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_gpu_shader5 + GL_ARB_texture_gather
                // previous
@@ -1902,6 +2008,7 @@ alias GLSL_410 = _GLSL_410
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_400
                ;
@@ -1913,6 +2020,7 @@ alias GLSL_420 = _GLSL_420
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_shader_image_load_store
                // previous
@@ -1926,6 +2034,7 @@ alias GLSL_430 = _GLSL_430
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_shader_image_size + GL_ARB_texture_query_levels
                // previous
@@ -1939,6 +2048,7 @@ alias GLSL_440 = _GLSL_440
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_430
                ;
@@ -1950,6 +2060,7 @@ alias GLSL_450 = _GLSL_450
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // extensions to propagate
                | glsl_spirv + GL_ARB_derivative_control + GL_ARB_shader_texture_image_samples
                // previous
@@ -1963,6 +2074,7 @@ alias GLSL_460 = _GLSL_460
                | spirv_1_3
                | metal
                | cpp
+               | llvm
                // previous
                | GLSL_450
                ;
@@ -2093,6 +2205,7 @@ alias fragmentprocessing = fragment + _sm_5_0
                          | raytracingstages_compute_amplification_mesh + GL_NV_compute_shader_derivatives
                          | fragment + metal
                          | fragment + cpp
+                         | fragment + llvm
                          | fragment + cuda
                          | fragment + wgsl
                          ;
@@ -2191,7 +2304,7 @@ alias image_loadstore = GL_EXT_shader_image_load_store + GLSL_420;
 alias nonuniformqualifier = sm_5_1;
 /// Capabilities required to use 'printf'
 /// [Compound]
-alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp;
+alias printf = GL_EXT_debug_printf | _sm_4_0 | _cuda_sm_2_0 | cpp | llvm;
 /// Capabilities required to use basic TextureFootprint operations
 /// [Compound]
 alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi + _sm_4_0;
@@ -2214,6 +2327,7 @@ alias pack_vector = GL_ARB_gpu_shader5
                   | wgsl
                   | metal
                   | cpp
+                  | llvm
                   ;
 
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_basic'
@@ -2348,7 +2462,7 @@ alias quad_control = _sm_6_7
 
 /// Capabilities required to enable shader breakpoints
 /// [Compound]
-alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp;
+alias breakpoint = GL_EXT_debug_printf | hlsl | _cuda_sm_8_0 | cpp | llvm;
 
 /// Collection of capabilities for raytracing with all raytracing stages.
 /// [Compound]
@@ -2421,6 +2535,18 @@ alias ser_raygen = raygen + ser;
 /// Collection of capabilities for raytracing + shader execution reordering and the shader stages of raygen, closesthit, and miss.
 /// [Compound]
 alias ser_raygen_closesthit_miss = raygen_closesthit_miss + ser;
+
+/// NVIDIA-specific SER for raygen stage (GLSL/SPIRV NV paths)
+/// [Compound]
+alias ser_nv_raygen = raygen + ser_nv;
+
+/// NVIDIA-specific SER for raygen, closesthit, miss stages (GLSL/SPIRV NV paths)
+/// [Compound]
+alias ser_nv_raygen_closesthit_miss = raygen_closesthit_miss + ser_nv;
+
+/// NVIDIA-specific SER + motion blur for raygen, closesthit, miss stages
+/// [Compound]
+alias ser_nv_motion_raygen_closesthit_miss = raygen_closesthit_miss + ser_nv_motion;
 
 /// Collection of capabilities for raytracing + shader execution reordering and the shader stages of anyhit, closesthit, intersection, and miss.
 /// [Compound]

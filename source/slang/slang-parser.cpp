@@ -1517,6 +1517,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     {
         // default case is a type parameter
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
+        parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1820,6 +1821,11 @@ public:
             dispatch(expr->typeExpr);
     }
     void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        if (expr->value)
+            dispatch(expr->value);
+    }
+    void visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
         if (expr->value)
             dispatch(expr->value);
@@ -4235,6 +4241,86 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
+// Parse a typed accessor for a semantic declaration:
+// "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
+static Decl* parseSemanticAccessorDecl(Parser* parser)
+{
+    Modifiers modifiers = ParseModifiers(parser);
+
+    Decl* decl = nullptr;
+    auto loc = peekToken(parser).loc;
+    auto name = peekToken(parser).getName();
+
+    if (AdvanceIf(parser, "get"))
+    {
+        auto getter = parser->astBuilder->create<SemanticGetterDecl>();
+        expect(parser, TokenType::Colon);
+        getter->type = parser->ParseTypeExp();
+        decl = getter;
+    }
+    else if (AdvanceIf(parser, "set"))
+    {
+        auto setter = parser->astBuilder->create<SemanticSetterDecl>();
+        expect(parser, TokenType::Colon);
+        setter->type = parser->ParseTypeExp();
+        decl = setter;
+    }
+    else
+    {
+        Unexpected(parser);
+        return nullptr;
+    }
+
+    decl->loc = loc;
+    decl->nameAndLoc.name = name;
+    decl->nameAndLoc.loc = loc;
+
+    _addModifiers(decl, modifiers);
+
+    parser->ReadToken(TokenType::Semicolon);
+
+    return decl;
+}
+
+// Parse the body of a semantic declaration: { [accessor]* }
+static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::LBrace))
+    {
+        Token closingToken;
+        while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
+        {
+            auto accessor = parseSemanticAccessorDecl(parser);
+            if (accessor)
+                AddMember(decl, accessor);
+        }
+        decl->closingSourceLoc = closingToken.loc;
+    }
+    else
+    {
+        parser->sink->diagnose(
+            parser->tokenReader.peekLoc(),
+            Diagnostics::unexpectedToken,
+            peekToken(parser));
+    }
+}
+
+// Parse a semantic declaration: "semantic <name> { [accessor]* }"
+static NodeBase* parseSemanticDecl(Parser* parser, void* /*userData*/)
+{
+    SemanticDecl* decl = parser->astBuilder->create<SemanticDecl>();
+    parser->FillPosition(decl);
+    parser->PushScope(decl);
+
+    // Expect an identifier for the semantic name
+    decl->nameAndLoc = expectIdentifier(parser);
+
+    parseSemanticDeclBody(parser, decl);
+
+    parser->PopScope();
+    return decl;
+}
+
 static void parseModernVarDeclBaseCommon(Parser* parser, VarDeclBase* decl)
 {
     parser->FillPosition(decl);
@@ -6396,6 +6482,7 @@ Stmt* Parser::parseIfLetStatement()
     auto tempVarDecl = astBuilder->create<LetDecl>();
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
+    tempVarDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(currentScope->containerDecl, tempVarDecl);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
@@ -6412,10 +6499,25 @@ Stmt* Parser::parseIfLetStatement()
 
     ReadToken(TokenType::RParent);
 
-    // Create a new scope surrounding the positive statement, will be used for
-    // the variable declared in the if_let syntax
+    // Create scope for the positive statement containing the unwrapped variable.
+    // The variable must be added to scope BEFORE parsing the body, because during
+    // deferred parsing tryParseGenericApp may call CheckTerm which needs to find
+    // the variable.
     ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
     pushScopeAndSetParent(positiveScopeDecl);
+
+    // Create 'let <user_var> = $OptVar.value'
+    MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
+    memberExpr->baseExpression = tempVarExpr;
+    memberExpr->name = getName(this, "value");
+
+    auto varDecl = astBuilder->create<LetDecl>();
+    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->initExpr = memberExpr;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
+    AddMember(positiveScopeDecl, varDecl);
+
+    // Now parse the body with the variable in scope
     ifStatement->positiveStatement = ParseStatement(ifStatement);
     PopScope();
 
@@ -6433,20 +6535,8 @@ Stmt* Parser::parseIfLetStatement()
             seqPositiveStmt = astBuilder->create<SeqStmt>();
         }
 
-        MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
-        memberExpr->baseExpression = tempVarExpr;
-        memberExpr->name = getName(this, "value");
-
-        auto varDecl = astBuilder->create<LetDecl>();
-        varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
-        varDecl->initExpr = memberExpr;
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
         varDeclrStatement->decl = varDecl;
-
-        // Add scope to the variable declared in the if_let syntax such
-        // that this variable cannot be used outside the positive statement
-        AddMember(positiveScopeDecl, varDecl);
 
         seqPositiveStmt->stmts.add(varDeclrStatement);
         seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
@@ -6473,6 +6563,8 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
     }
+    ifStatement->afterLoc = tokenReader.peekLoc();
+
     return ifStatement;
 }
 
@@ -7087,6 +7179,21 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     parser->ReadMatchingToken(TokenType::RParent);
 
     return countOfExpr;
+}
+
+static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
+{
+    FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+
+    // Parse the argument expression
+    // The result type will be determined during semantic checking based on the input type
+    expr->value = parser->ParseExpression();
+
+    parser->ReadMatchingToken(TokenType::RParent);
+
+    return expr;
 }
 
 static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
@@ -8255,7 +8362,7 @@ static Expr* parsePostfixExpr(Parser* parser)
     }
 }
 
-static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+static IntegerLiteralValue _foldIntegerPrefixOp(TokenType tokenType, IntegerLiteralValue value)
 {
     switch (tokenType)
     {
@@ -8264,7 +8371,15 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        return -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8492,7 +8607,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
@@ -8588,7 +8703,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
+        ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -8758,7 +8873,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                 // Need to get the basic type, so we can fit to underlying type
                 if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
@@ -9589,6 +9704,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
+    _makeParseDecl("semantic", parseSemanticDecl),
     _makeParseDecl("interface", parseInterfaceDecl),
     _makeParseDecl("syntax", parseSyntaxDecl),
     _makeParseDecl("attribute_syntax", parseAttributeSyntaxDecl),
@@ -9726,6 +9842,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
+    _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

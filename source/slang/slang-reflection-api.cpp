@@ -502,6 +502,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             // This is a reference to an entry point
             return SLANG_TYPE_KIND_STRUCT;
         }
+        else if (declRef.is<EnumDecl>())
+        {
+            return SLANG_TYPE_KIND_ENUM;
+        }
     }
     else if (const auto specializedType = as<ExistentialSpecializedType>(type))
     {
@@ -536,6 +540,10 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
                        MemberFilterStyle::Instance)
                 .getCount();
         }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            return (unsigned int)enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>().getCount();
+        }
     }
 
     return 0;
@@ -562,6 +570,12 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
                 MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
             return convert(fieldDeclRef);
+        }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            auto cases = enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>();
+            auto caseDecl = cases[index];
+            return convert(DeclRef(caseDecl));
         }
     }
 
@@ -637,6 +651,18 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
         return convert(matrixType->getElementType());
+    }
+    else if (auto declRefType = as<DeclRefType>(type))
+    {
+        const auto& declRef = declRefType->getDeclRef();
+        if (auto enumDecl = declRef.as<EnumDecl>())
+        {
+            return convert(enumDecl.getDecl()->tagType);
+        }
+    }
+    else if (auto streamType = as<HLSLStreamOutputType>(type))
+    {
+        return convert(streamType->getElementType());
     }
 
     return nullptr;
@@ -1366,6 +1392,49 @@ SLANG_API SlangReflectionVariableLayout* spReflectionTypeLayout_GetFieldByIndex(
     return nullptr;
 }
 
+// Return true if the variable declaration's qualified name matches the given name slice.
+bool matchName(VarDeclBase* varDecl, UnownedStringSlice name)
+{
+    ShortList<UnownedStringSlice> nameParts;
+    // Split `name` by `.` or `::` into parts.
+    Index start = 0;
+    for (Index i = 0; i < name.getLength(); ++i)
+    {
+        if (name[i] == '.' || (name[i] == ':' && i + 1 < name.getLength() && name[i + 1] == ':'))
+        {
+            if (i > start)
+            {
+                nameParts.add(name.subString(start, i - start));
+            }
+            start = (name[i] == ':') ? i + 2 : i + 1;
+            if (name[i] == ':')
+                ++i; // Skip the next ':'
+        }
+    }
+    if (start >= name.getLength())
+        return false;
+
+    auto lastPart = name.tail(start);
+    if (getText(getReflectionName(varDecl)) != lastPart)
+        return false;
+
+    // If `name` is prefixed with qualifiers, continue matching parent declarations.
+    Decl* decl = varDecl;
+
+    for (Index i = nameParts.getCount() - 1; i >= 0; --i)
+    {
+        decl = getParentDecl(decl);
+        if (!decl)
+            return false;
+        auto part = nameParts[i];
+        if (getText(decl->getName()) != part)
+            return false;
+    }
+
+    // All name parts matched.
+    return true;
+}
+
 SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
     SlangReflectionTypeLayout* inTypeLayout,
     const char* nameBegin,
@@ -1384,7 +1453,7 @@ SLANG_API SlangInt spReflectionTypeLayout_findFieldIndexByName(
         for (Index f = 0; f < fieldCount; ++f)
         {
             auto field = structTypeLayout->fields[f];
-            if (getReflectionName(field->getVariable())->text.getUnownedSlice() == name)
+            if (matchName(field->getVariable(), name))
                 return f;
         }
     }
@@ -1482,6 +1551,10 @@ SLANG_API SlangReflectionTypeLayout* spReflectionTypeLayout_GetElementTypeLayout
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
         return convert(ptrTypeLayout->valueTypeLayout.Ptr());
+    }
+    else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
+    {
+        return convert(streamOutputTypeLayout->elementTypeLayout.Ptr());
     }
     return nullptr;
 }
@@ -3207,6 +3280,11 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     {
         return varDecl->initExpr != nullptr;
     }
+    if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal);
+        return constantVal != nullptr;
+    }
 
     return false;
 }
@@ -3221,6 +3299,63 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
         {
             *rs = constantVal->getValue();
             return 0;
+        }
+        else if (auto cexpr = as<IntegerLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (int64_t)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (int64_t)floatLit->value;
+                return 0;
+            }
+        }
+    }
+    else if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        if (auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal))
+        {
+            *rs = constantVal->getValue();
+            return 0;
+        }
+    }
+
+    return SLANG_E_INVALID_ARG;
+}
+
+SLANG_API SlangResult
+spReflectionVariable_GetDefaultValueFloat(SlangReflectionVariable* inVar, float* rs)
+{
+    auto decl = convert(inVar).getDecl();
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        if (auto cexpr = as<FloatingPointLiteralExpr>(varDecl->initExpr))
+        {
+            *rs = (float)cexpr->value;
+            return 0;
+        }
+        else if (auto implicitCastExpr = as<ImplicitCastExpr>(varDecl->initExpr))
+        {
+            auto base = implicitCastExpr->arguments[0];
+            if (auto intLit = as<IntegerLiteralExpr>(base))
+            {
+                *rs = (float)intLit->value;
+                return 0;
+            }
+            else if (auto floatLit = as<FloatingPointLiteralExpr>(base))
+            {
+                *rs = (float)floatLit->value;
+                return 0;
+            }
         }
     }
 
@@ -3734,6 +3869,10 @@ SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
     else if (as<NamespaceDecl>(slangDecl))
     {
         return SLANG_DECL_KIND_NAMESPACE;
+    }
+    else if (as<EnumDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_ENUM;
     }
     else
         return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
@@ -4464,6 +4603,14 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     if (!uniform)
         return 0;
     return getReflectionSize(uniform->count);
+}
+
+SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if (!program)
+        return -1; // -1 means bindless resource heap is not used.
+    return program->bindlessSpaceIndex;
 }
 
 SLANG_API SlangReflectionType* spReflection_specializeType(

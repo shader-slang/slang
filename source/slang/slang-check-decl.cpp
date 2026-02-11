@@ -17,6 +17,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <limits>
@@ -347,6 +348,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
+    void deriveVarTypeFromInitExpr(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
@@ -403,6 +405,10 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void visitSubscriptDecl(SubscriptDecl* decl);
 
     void visitPropertyDecl(PropertyDecl* decl);
+
+    void visitSemanticDecl(SemanticDecl* decl);
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl);
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl);
 
     void visitStructDecl(StructDecl* decl);
 
@@ -526,6 +532,15 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     }
 
     void visitPropertyDecl(PropertyDecl* decl) { visitTypeExp(decl->type); }
+
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl) { visitTypeExp(decl->type); }
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl) { visitTypeExp(decl->type); }
+
+    void visitSemanticDecl(SemanticDecl* decl)
+    {
+        for (auto member : decl->getMembers())
+            dispatch(member);
+    }
 };
 
 struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
@@ -2111,6 +2126,40 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
     }
 }
 
+void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
+{
+    SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
+
+    auto initExpr = varDecl->initExpr;
+
+    // If the parent function is differentiable, use withParentFunc to ensure
+    // the differentiable context is preserved.
+    // This ensures that calls in the initializer (like `dot`) get properly marked
+    // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
+    // the differentiableCallDecoration, also allows us to properly check the lambda
+    // expressions nested in AST locations like: `let x = someFunc((int y)=>{...});
+    // (checking of lambda exprs requires parentFunc to be available).
+    auto parentFunc = getParentFunc(varDecl);
+    if (parentFunc != m_parentFunc)
+        contextToUse = contextToUse.withParentFunc(parentFunc);
+
+    SemanticsVisitor subVisitor(contextToUse);
+    initExpr = subVisitor.CheckExpr(initExpr);
+    initExpr = maybeOpenRef(initExpr);
+
+    // TODO: We might need some additional steps here to ensure
+    // that the type of the expression is one we are okay with
+    // inferring. E.g., if we ever decide that integer and floating-point
+    // literals have a distinct type from the standard int/float types,
+    // then we would need to "decay" a literal to an explicit type here.
+
+    varDecl->initExpr = initExpr;
+    varDecl->type.type = initExpr->type;
+
+    varDecl->setCheckState(DeclCheckState::DefinitionChecked);
+    _validateCircularVarDefinition(varDecl);
+}
+
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -2140,32 +2189,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
         else
         {
-            SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
-
-            // If the parent function is differentiable, use withParentFunc to ensure
-            // the differentiable context is preserved.
-            // This ensures that calls in the initializer (like `dot`) get properly marked
-            // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
-            // the differentiableCallDecoration
-            auto parentFunc = getParentFunc(varDecl);
-            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
-                contextToUse = contextToUse.withParentFunc(parentFunc);
-
-            SemanticsVisitor subVisitor(contextToUse);
-            initExpr = subVisitor.CheckExpr(initExpr);
-            initExpr = maybeOpenRef(initExpr);
-
-            // TODO: We might need some additional steps here to ensure
-            // that the type of the expression is one we are okay with
-            // inferring. E.g., if we ever decide that integer and floating-point
-            // literals have a distinct type from the standard int/float types,
-            // then we would need to "decay" a literal to an explicit type here.
-
-            varDecl->initExpr = initExpr;
-            varDecl->type.type = initExpr->type;
-
-            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-            _validateCircularVarDefinition(varDecl);
+            deriveVarTypeFromInitExpr(varDecl);
         }
 
         // If we've gone down this path, then the variable
@@ -2790,6 +2814,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         overloadContext.loc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
+
+        // Overload resolution can give us a valid expression with >0 arguments when the type has
+        // parameter pack arguments. This is primarily relevant for Tuple<>
+        List<Expr*> argExprs;
+        overloadContext.args = &argExprs;
 
         auto type = varDecl->getType();
         ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
@@ -5692,6 +5721,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         {
             if (auto callee = as<CallableDecl>(declRefExpr->declRef))
             {
+                synFuncDecl->loc = callee.getDecl()->loc;
                 auto synParams = synFuncDecl->getParameters();
                 auto calleeParams = callee.getDecl()->getParameters();
                 auto synParamIter = synParams.begin();
@@ -8311,14 +8341,12 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
     case BaseType::UInt16:
         return (value >= 0 && value <= std::numeric_limits<uint16_t>::max()) || (value == -1);
     case BaseType::UInt:
-#if SLANG_PTR_IS_32
-    case BaseType::UIntPtr:
-#endif
         return (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) || (value == -1);
     case BaseType::UInt64:
-#if SLANG_PTR_IS_64
+        // IntPtr & UIntPtr are assumed to be 64-bit, because we don't want
+        // spurious warnings from assuming a smaller size than what's possible
+        // at this point during compilation.
     case BaseType::UIntPtr:
-#endif
         return true;
     case BaseType::Int8:
         return value >= std::numeric_limits<int8_t>::min() &&
@@ -8327,15 +8355,10 @@ bool SemanticsVisitor::isIntValueInRangeOfType(IntegerLiteralValue value, Type* 
         return value >= std::numeric_limits<int16_t>::min() &&
                value <= std::numeric_limits<int16_t>::max();
     case BaseType::Int:
-#if SLANG_PTR_IS_32
-    case BaseType::IntPtr:
-#endif
         return value >= std::numeric_limits<int32_t>::min() &&
                value <= std::numeric_limits<int32_t>::max();
     case BaseType::Int64:
-#if SLANG_PTR_IS_64
     case BaseType::IntPtr:
-#endif
         return value >= std::numeric_limits<int64_t>::min() &&
                value <= std::numeric_limits<int64_t>::max();
 
@@ -9396,31 +9419,56 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
         _addTargetModifiers(newDecl, newTargets);
 
         bool hasConflict = false;
+
+        //
+        // Example testcase for new diagnostics, the flow below is very much as
+        // it was except instead of emitting diagnostics as we go, we build up
+        // this Diagnositcs::FunctionRedefinition struct and emit it at the end
+        //
+        Diagnostics::FunctionRedefinition diagnostic;
+
         for (auto& [target, value] : newTargets)
         {
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                // Redefinition
-                if (!hasConflict)
+                if (getOptionSet().shouldEmitRichDiagnostics())
                 {
+                    if (!hasConflict)
+                    {
+                        diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
+                    }
+                    auto prevDecl = *found;
+                    diagnostic.original = prevDecl;
+                }
+                else
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(
+                            newDecl,
+                            Diagnostics::functionRedefinition,
+                            newDecl->getName());
+                    }
+
+                    auto prevDecl = *found;
                     getSink()->diagnose(
-                        newDecl,
-                        Diagnostics::functionRedefinition,
-                        newDecl->getName());
-                    hasConflict = true;
+                        prevDecl,
+                        Diagnostics::seePreviousDefinitionOf,
+                        prevDecl->getName());
                 }
 
-                auto prevDecl = *found;
-                getSink()->diagnose(
-                    prevDecl,
-                    Diagnostics::seePreviousDefinitionOf,
-                    prevDecl->getName());
+                hasConflict = true;
             }
         }
 
         if (hasConflict)
         {
+            if (getOptionSet().shouldEmitRichDiagnostics())
+            {
+                getSink()->diagnose(diagnostic);
+            }
             return SLANG_FAIL;
         }
     }
@@ -9556,12 +9604,6 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 
 void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 {
-    // TODO: This logic should be shared with the other cases of
-    // variable declarations. The main reason I am not doing it
-    // yet is that we use a `ParamDecl` with a null type as a
-    // special case in attribute declarations, and that could
-    // trip up the ordinary variable checks.
-
     auto typeExpr = paramDecl->type;
     if (typeExpr.exp)
     {
@@ -9569,6 +9611,18 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
         paramDecl->type = typeExpr;
         checkMeshOutputDecl(paramDecl);
+    }
+
+    if (!paramDecl->type && paramDecl->initExpr)
+    {
+        // If paramDecl doesn't have a type but have an initExpr, derive the type
+        // from the expr.
+        deriveVarTypeFromInitExpr(paramDecl);
+    }
+
+    if (!paramDecl->type && !as<AttributeDecl>(getParentDecl(paramDecl)))
+    {
+        getSink()->diagnose(paramDecl, Diagnostics::paramWithoutTypeMustHaveInitializer);
     }
 
     if (isTypePack(paramDecl->type.type))
@@ -10820,6 +10874,22 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticDecl(SemanticDecl* decl)
+{
+    for (auto member : decl->getMembers())
+        dispatch(member);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticGetterDecl(SemanticGetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticSetterDecl(SemanticSetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
 }
 
 Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
@@ -12773,7 +12843,8 @@ void checkDerivativeAttributeImpl(
                 // `this` type matches the expected type. This will ensure that after lowering
                 // to IR, the two functions are compatible.
                 //
-                if (!areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
+                if (funcThisType &&
+                    !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
                         attr,
@@ -13848,7 +13919,7 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
 
         // The bit width of this member, and the member type width
         const auto thisFieldWidth = bfm->width;
-        const auto thisFieldTypeWidth = getTypeBitSize(b);
+        const auto thisFieldTypeWidth = getMaximumTypeBitSize(b);
         SLANG_ASSERT(thisFieldTypeWidth != 0);
         if (thisFieldWidth > thisFieldTypeWidth)
         {

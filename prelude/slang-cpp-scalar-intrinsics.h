@@ -1032,7 +1032,6 @@ SLANG_FORCE_INLINE double U32_asdouble(uint32_t low, uint32_t hi)
     return u.d;
 }
 
-
 SLANG_FORCE_INLINE uint32_t U32_countbits(uint32_t v)
 {
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
@@ -1073,8 +1072,6 @@ SLANG_FORCE_INLINE uint32_t U32_firstbitlow(uint32_t v)
 
 SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
 {
-    if ((int32_t)v < 0)
-        v = ~v;
     if (v == 0)
         return ~0u;
 #if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
@@ -1092,6 +1089,16 @@ SLANG_FORCE_INLINE uint32_t U32_firstbithigh(uint32_t v)
         result--;
     return result;
 #endif
+}
+
+SLANG_FORCE_INLINE uint32_t U32_reversebits(uint32_t v)
+{
+    v = ((v >> 1) & 0x55555555u) | ((v & 0x55555555u) << 1);
+    v = ((v >> 2) & 0x33333333u) | ((v & 0x33333333u) << 2);
+    v = ((v >> 4) & 0x0F0F0F0Fu) | ((v & 0x0F0F0F0Fu) << 4);
+    v = ((v >> 8) & 0x00FF00FFu) | ((v & 0x00FF00FFu) << 8);
+    v = (v >> 16) | (v << 16);
+    return v;
 }
 
 // ----------------------------- I32 -----------------------------------------
@@ -1139,7 +1146,14 @@ SLANG_FORCE_INLINE uint32_t I32_firstbitlow(int32_t v)
 
 SLANG_FORCE_INLINE uint32_t I32_firstbithigh(int32_t v)
 {
+    if (v < 0)
+        v = ~v;
     return U32_firstbithigh(uint32_t(v));
+}
+
+SLANG_FORCE_INLINE int32_t I32_reversebits(int32_t v)
+{
+    return U32_reversebits(int32_t(v));
 }
 
 // ----------------------------- U64 -----------------------------------------
@@ -1175,6 +1189,60 @@ SLANG_FORCE_INLINE uint32_t U64_countbits(uint64_t v)
 #endif
 }
 
+SLANG_FORCE_INLINE uint32_t U64_firstbitlow(uint64_t v)
+{
+    if (v == 0)
+        return ~uint32_t(0);
+
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_ctz returns number of trailing zeros, which is the 0-based index of first set bit
+    return __builtin_ctz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanForward returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanForward64(&index, v) ? index : ~uint32_t(0);
+#else
+    // Generic implementation - find first set bit
+    uint32_t result = 0;
+    while (result < 64 && !(v & (uint64_t(1) << result)))
+        result++;
+    return result;
+#endif
+}
+
+SLANG_FORCE_INLINE uint32_t U64_firstbithigh(uint64_t v)
+{
+    if (v == 0)
+        return ~uint32_t(0);
+
+#if SLANG_GCC_FAMILY && !defined(SLANG_LLVM)
+    // __builtin_clz returns number of leading zeros
+    // firstbithigh should return 0-based bit position of MSB
+    return 63 - __builtin_clz(v);
+#elif SLANG_PROCESSOR_X86_64 && SLANG_VC
+    // _BitScanReverse returns 1 on success, 0 on failure, and sets index
+    unsigned long index;
+    return _BitScanReverse64(&index, v) ? index : ~uint32_t(0);
+#else
+    // Generic implementation - find highest set bit
+    int result = 63;
+    while (result >= 0 && !(v & (uint64_t(1) << result)))
+        result--;
+    return result;
+#endif
+}
+
+SLANG_FORCE_INLINE uint64_t U64_reversebits(uint64_t v)
+{
+    v = ((v >> 1) & 0x5555555555555555ull) | ((v & 0x5555555555555555ull) << 1);
+    v = ((v >> 2) & 0x3333333333333333ull) | ((v & 0x3333333333333333ull) << 2);
+    v = ((v >> 4) & 0x0F0F0F0F0F0F0F0Full) | ((v & 0x0F0F0F0F0F0F0F0Full) << 4);
+    v = ((v >> 8) & 0x00FF00FF00FF00FFull) | ((v & 0x00FF00FF00FF00FFull) << 8);
+    v = ((v >> 16) & 0x0000FFFF0000FFFFull) | ((v & 0x0000FFFF0000FFFFull) << 16);
+    v = (v >> 32) | (v << 32);
+    return v;
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE int64_t I64_abs(int64_t f)
@@ -1194,6 +1262,23 @@ SLANG_FORCE_INLINE int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t I64_firstbitlow(int64_t v)
+{
+    return U64_firstbitlow(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE uint32_t I64_firstbithigh(int64_t v)
+{
+    if (v < 0)
+        v = ~v;
+    return U64_firstbithigh(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE int64_t I64_reversebits(int64_t v)
+{
+    return int64_t(U64_reversebits(uint64_t(v)));
 }
 
 // ----------------------------- UPTR -----------------------------------------

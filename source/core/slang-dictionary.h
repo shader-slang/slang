@@ -528,7 +528,7 @@ private:
             OrderedDictionary<TKey, TValue> newDict;
             newDict.m_bucketCountMinusOne = newSize - 1;
             newDict.m_hashMap = new LinkedNode<KeyValuePair<TKey, TValue>>*[newSize];
-            newDict.m_marks.resizeAndClear(newSize * 2);
+            newDict.m_marks.resizeAndUnsetAll(newSize * 2);
             if (m_hashMap)
             {
                 for (auto& kvPair : *this)
@@ -621,7 +621,7 @@ public:
     {
         m_count = 0;
         m_kvPairs.clear();
-        m_marks.clear();
+        m_marks.resize(0);
     }
     template<typename T>
     bool containsKey(const T& key) const

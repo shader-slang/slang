@@ -1,4 +1,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type
+// Disabled on LLVM due to lack of barrier support
+//DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -llvm
 struct Ty<T>
 {
     static int x[2];
