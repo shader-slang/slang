@@ -1186,6 +1186,7 @@ struct LoweredElementTypeContext
                                 auto logicalBaseType = castInst->getDataType();
                                 auto logicalType = user->getDataType();
                                 IRInst* storageBaseAddr = ptrVal;
+                                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(storageBaseAddr->getDataType());
                                 auto originalBaseValueType =
                                     tryGetPointedToOrBufferElementType(&builder, logicalBaseType);
                                 if (user->getOp() == kIROp_GetElementPtr)
@@ -1205,7 +1206,7 @@ struct LoweredElementTypeContext
                                                 args.add(user->getOperand(i));
                                             storageBaseAddr = builder.emitFieldAddress(
                                                 builder.getPtrType(
-                                                    arrayLowerInfo.loweredInnerArrayType),
+                                                    arrayLowerInfo.loweredInnerArrayType, ptrType),
                                                 ptrVal,
                                                 arrayLowerInfo.loweredInnerStructKey);
                                         }
@@ -1256,7 +1257,7 @@ struct LoweredElementTypeContext
                                         auto storageTypeInfo =
                                             getLoweredTypeInfo(logicalValueType, config);
                                         storageGEP = builder.emitIntrinsicInst(
-                                            builder.getPtrType(storageTypeInfo.loweredType),
+                                            builder.getPtrType(storageTypeInfo.loweredType, ptrType),
                                             user->getOp(),
                                             newArgs.getCount(),
                                             newArgs.getArrayView().getBuffer());
@@ -2267,6 +2268,21 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
 {
     auto ruleName = getTypeLayoutRuleNameForBuffer(target, bufferType);
+    return IRTypeLayoutRules::get(ruleName);
+}
+
+IRTypeLayoutRules* getTypeLayoutRuleForPointer(TargetProgram*, IRType* pointerType)
+{
+    IRInst* dataLayout = nullptr;
+    if (auto paramGroup = as<IRUniformParameterGroupType>(pointerType))
+        dataLayout = paramGroup->getDataLayout();
+    else if (auto ptrType = as<IRPtrTypeBase>(pointerType))
+        dataLayout = ptrType->getDataLayout();
+
+    IRTypeLayoutRuleName ruleName = IRTypeLayoutRuleName::Natural;
+    if (dataLayout)
+        ruleName = getTypeLayoutRulesFromOp(dataLayout->getOp(), ruleName);
+
     return IRTypeLayoutRules::get(ruleName);
 }
 

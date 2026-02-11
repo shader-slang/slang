@@ -1555,39 +1555,9 @@ struct LLVMEmitter
         return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
     }
 
-    // Tries to find which layout rules apply to the given pointer, based on
-    // "provenance": we track the pointer to where we got it and check if the
-    // source is a buffer with a specific layout.
     IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
     {
-        // Check if the pointer is actually based on an buffer with an explicit
-        // layout. If so, we need to take that layout into account.
-        if (auto structuredBufferInst = as<IRRWStructuredBufferGetElementPtr>(ptr))
-        {
-            auto baseType = cast<IRHLSLStructuredBufferTypeBase>(
-                structuredBufferInst->getBase()->getDataType());
-            return getBufferLayoutRules(baseType);
-        }
-        else if (auto cbufType = as<IRConstantBufferType>(ptr->getDataType()))
-        {
-            return getBufferLayoutRules(cbufType);
-        }
-        else if (auto gep = as<IRGetElementPtr>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(gep->getBase());
-        }
-        else if (auto off = as<IRGetOffsetPtr>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(off->getBase());
-        }
-        else if (auto fieldAddr = as<IRFieldAddress>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(fieldAddr->getBase());
-        }
-        return defaultPointerRules;
+        return getTypeLayoutRuleForPointer(codeGenContext->getTargetProgram(), ptr->getDataType());
     }
 
     static LLVMInst* _defaultOnReturnHandler(IRReturn*)

@@ -2864,7 +2864,12 @@ IRPtrType* IRBuilder::getPtrType(
     IRInst* addressSpace,
     IRType* dataLayoutType)
 {
-    IRInst* operands[] = {valueType, accessQualifier, addressSpace, dataLayoutType};
+    IRInst* operands[] = {
+        valueType,
+        accessQualifier,
+        addressSpace,
+        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()
+    };
     return (IRPtrType*)getType(op, addressSpace ? (dataLayoutType ? 4 : 3) : 1, operands);
 }
 
