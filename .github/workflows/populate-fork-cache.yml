@@ -94,8 +94,52 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-release-${{ needs.check-changes.outputs.last-commit }}
+
+  build-linux-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: debug
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          if [ -z "${sccache_path}" ]; then
+            echo "ERROR: sccache_path not set"
+            exit 1
+          fi
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset debug -j$(nproc)
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-gcc-x86_64-debug-${{ needs.check-changes.outputs.last-commit }}
 
   build-macos-release:
     needs: check-changes
@@ -108,7 +152,6 @@ jobs:
           submodules: recursive
           fetch-depth: 1
 
-      # Setup sccache with LOCAL backend only (no GCS bucket = local disk)
       - name: Setup sccache (local backend)
         uses: ./.github/actions/setup-sccache
         with:
@@ -143,12 +186,160 @@ jobs:
       - name: Save sccache cache for fork PRs
         uses: actions/cache/save@v4
         with:
-          path: ~/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-macos-clang-aarch64-release-${{ needs.check-changes.outputs.last-commit }}
 
+  build-macos-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: macos
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: macos
+          compiler: clang
+          platform: aarch64
+          config: debug
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          if [ -z "${sccache_path}" ]; then
+            echo "ERROR: sccache_path not set"
+            exit 1
+          fi
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset debug -j"$(sysctl -n hw.ncpu)"
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-macos-clang-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
+
+  build-linux-aarch64-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: aarch64
+          config: release
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          if [ -z "${sccache_path}" ]; then
+            echo "ERROR: sccache_path not set"
+            exit 1
+          fi
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset release -j$(nproc)
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-gcc-aarch64-release-${{ needs.check-changes.outputs.last-commit }}
+
+  build-linux-aarch64-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: aarch64
+          config: debug
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          if [ -z "${sccache_path}" ]; then
+            echo "ERROR: sccache_path not set"
+            exit 1
+          fi
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset debug -j$(nproc)
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-gcc-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
+
   mark-cached:
-    needs: [check-changes, build-linux-release, build-macos-release]
-    if: needs.check-changes.outputs.should-build == 'true' && needs.build-linux-release.result == 'success' && needs.build-macos-release.result == 'success'
+    needs:
+      [
+        check-changes,
+        build-linux-release,
+        build-linux-debug,
+        build-macos-release,
+        build-macos-debug,
+        build-linux-aarch64-release,
+        build-linux-aarch64-debug,
+      ]
+    if: |
+      needs.check-changes.outputs.should-build == 'true' &&
+      needs.build-linux-release.result == 'success' &&
+      needs.build-linux-debug.result == 'success' &&
+      needs.build-macos-release.result == 'success' &&
+      needs.build-macos-debug.result == 'success' &&
+      needs.build-linux-aarch64-release.result == 'success' &&
+      needs.build-linux-aarch64-debug.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
