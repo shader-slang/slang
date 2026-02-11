@@ -17,10 +17,10 @@ jobs:
   build:
     runs-on: [Windows, self-hosted, benchmark]
     permissions:
-      id-token: write
+      id-token: write # Required for Workload Identity (unused by fork PRs)
       contents: read
     env:
-      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
     steps:
       - uses: actions/checkout@v4
         with:
