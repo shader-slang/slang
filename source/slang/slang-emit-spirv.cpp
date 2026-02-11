@@ -2052,6 +2052,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_Int8Type:
         case kIROp_IntType:
         case kIROp_Int64Type:
+        case kIROp_UIntPtrType:
+        case kIROp_IntPtrType:
             {
                 const IntInfo i = getIntTypeInfo(m_targetRequest, as<IRType>(inst));
                 if (i.width == 16)
@@ -2648,6 +2650,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return emitSpecializationConstantOp(inst);
 
                 else if (as<IRSPIRVAsmOperand>(inst))
+                    return nullptr;
+
+                // Decorations are not emitted as separate instructions in SPIRV,
+                // so we return nullptr when encountering them at global scope.
+                else if (as<IRDecoration>(inst))
                     return nullptr;
 
                 String e = "Unhandled global inst in spirv-emit:\n" +
