@@ -53,34 +53,84 @@ jobs:
   build-linux-release:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    permissions:
-      id-token: write
-      contents: read
-    uses: ./.github/workflows/ci-slang-build.yml
-    with:
-      os: linux
-      compiler: gcc
-      platform: x86_64
-      config: release
-      runs-on: '["ubuntu-22.04"]'
-      warnings-as-errors: false
-      build-llvm: true
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          submodules: recursive
+          fetch-depth: 1
+
+      # Setup sccache with LOCAL backend only (no GCS bucket = local disk)
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          config: release
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset release -j$(nproc)
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-linux-gcc-x86_64-release-${{ github.sha }}
 
   build-macos-release:
     needs: check-changes
     if: needs.check-changes.outputs.should-build == 'true'
-    permissions:
-      id-token: write
-      contents: read
-    uses: ./.github/workflows/ci-slang-build.yml
-    with:
-      os: macos
-      compiler: clang
-      platform: aarch64
-      config: release
-      runs-on: '["macos-latest"]'
-      warnings-as-errors: false
-      build-llvm: true
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          submodules: recursive
+          fetch-depth: 1
+
+      # Setup sccache with LOCAL backend only (no GCS bucket = local disk)
+      - name: Setup sccache (local backend)
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: macos
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: macos
+          compiler: clang
+          platform: aarch64
+          config: release
+          build-llvm: true
+
+      - name: Build Slang
+        run: |
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+          cmake --build --preset release -j$(nproc)
+
+      - name: Save sccache cache for fork PRs
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/sccache
+          key: sccache-macos-clang-aarch64-release-${{ github.sha }}
 
   mark-cached:
     needs: [check-changes, build-linux-release, build-macos-release]
