@@ -130,7 +130,17 @@ struct ComTestContext
         SlangPassThrough cppCompiler = SLANG_PASS_THROUGH_NONE;
 
         {
-#if (defined(__has_feature) && __has_feature(address_sanitizer)) || defined(__SANITIZE_ADDRESS__)
+// Detect ASan at compile time using nested #if to avoid GCC preprocessor errors.
+// __has_feature is Clang-only; __SANITIZE_ADDRESS__ is defined by GCC and MSVC.
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SLANG_ASAN_ACTIVE 1
+#endif
+#elif defined(__SANITIZE_ADDRESS__)
+#define SLANG_ASAN_ACTIVE 1
+#endif
+
+#if SLANG_ASAN_ACTIVE
             // When ASan is active, only test the compiler that was used to build Slang,
             // as mixing sanitizer runtimes from different compilers is not supported.
             const SlangPassThrough currentCppCompiler =
@@ -164,6 +174,7 @@ struct ComTestContext
                 }
             }
 #endif
+#undef SLANG_ASAN_ACTIVE
         }
 
         // If we have an *actual* C++ compile rtest on that first
