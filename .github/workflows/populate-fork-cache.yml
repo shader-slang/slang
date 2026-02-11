@@ -61,6 +61,7 @@ jobs:
     with:
       config: release
       runs-on: '["ubuntu-22.04"]'
+      use-local-sccache: true
 
   build-linux-debug:
     needs: check-changes
@@ -73,6 +74,7 @@ jobs:
     with:
       config: debug
       runs-on: '["ubuntu-22.04"]'
+      use-local-sccache: true
 
   build-macos-release:
     needs: check-changes
