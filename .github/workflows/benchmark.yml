@@ -16,11 +16,21 @@ concurrency:
 jobs:
   build:
     runs-on: [Windows, self-hosted, benchmark]
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "0"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
       - name: Common setup
         uses: ./.github/actions/common-setup
         with:

@@ -90,7 +90,7 @@ private:
         const char* arrow;
         const char* noteDash;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", "-->", "---"};
+    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
     constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
     const Glyphs& m_glyphs;
 
@@ -503,6 +503,9 @@ private:
 
             List<LayoutSpan> noteSpans;
             noteSpans.add(makeLayoutSpan(note.span, false));
+            // Add additional spans attached to the note
+            for (const auto& additionalSpan : note.secondarySpans)
+                noteSpans.add(makeLayoutSpan(additionalSpan, false));
             noteEntry.section = buildSectionLayout(noteSpans);
             noteEntry.loc.gutterIndent = noteEntry.section.maxGutterWidth;
             layout.notes.add(std::move(noteEntry));
@@ -571,6 +574,62 @@ String renderDiagnostic(
 {
     DiagnosticRenderer renderer(sm, sll, options);
     return renderer.render(diag);
+}
+
+String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+{
+    StringBuilder sb;
+
+    // Format:
+    // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+
+    // Format the error code as E#### (e.g., E0001, E1234)
+    String codeStr = String(diag.code);
+    while (codeStr.getLength() < 4)
+        codeStr = "0" + codeStr;
+
+    // Helper lambda to output a span in the machine-readable format
+    auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
+    {
+        HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        sb << "E" << codeStr << "\t";
+        sb << severity << "\t";
+        sb << beginLoc.pathInfo.foundPath << "\t";
+        sb << beginLoc.line << "\t";
+        sb << beginLoc.column << "\t";
+        sb << endLoc.line << "\t";
+        sb << endLoc.column << "\t";
+        sb << message << "\n";
+    };
+
+    // Output primary diagnostic
+    outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
+
+    // Output primary span message
+    outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
+
+    // Output secondary spans
+    for (const auto& secondarySpan : diag.secondarySpans)
+    {
+        outputSpan(secondarySpan, "span", secondarySpan.message);
+    }
+
+    // Output notes
+    for (const auto& note : diag.notes)
+    {
+        // Output the note's primary span
+        outputSpan(note.span, "note", note.message);
+
+        // Output any secondary spans attached to the note
+        for (const auto& secondarySpan : note.secondarySpans)
+        {
+            outputSpan(secondarySpan, "note-span", secondarySpan.message);
+        }
+    }
+
+    return sb.produceString();
 }
 
 } // namespace Slang

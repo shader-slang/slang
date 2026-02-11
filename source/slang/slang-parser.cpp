@@ -1517,6 +1517,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     {
         // default case is a type parameter
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
+        parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1820,6 +1821,11 @@ public:
             dispatch(expr->typeExpr);
     }
     void visitSizeOfLikeExpr(SizeOfLikeExpr* expr)
+    {
+        if (expr->value)
+            dispatch(expr->value);
+    }
+    void visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
         if (expr->value)
             dispatch(expr->value);
@@ -4230,6 +4236,86 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     }
 
     parseStorageDeclBody(parser, decl);
+
+    parser->PopScope();
+    return decl;
+}
+
+// Parse a typed accessor for a semantic declaration:
+// "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
+static Decl* parseSemanticAccessorDecl(Parser* parser)
+{
+    Modifiers modifiers = ParseModifiers(parser);
+
+    Decl* decl = nullptr;
+    auto loc = peekToken(parser).loc;
+    auto name = peekToken(parser).getName();
+
+    if (AdvanceIf(parser, "get"))
+    {
+        auto getter = parser->astBuilder->create<SemanticGetterDecl>();
+        expect(parser, TokenType::Colon);
+        getter->type = parser->ParseTypeExp();
+        decl = getter;
+    }
+    else if (AdvanceIf(parser, "set"))
+    {
+        auto setter = parser->astBuilder->create<SemanticSetterDecl>();
+        expect(parser, TokenType::Colon);
+        setter->type = parser->ParseTypeExp();
+        decl = setter;
+    }
+    else
+    {
+        Unexpected(parser);
+        return nullptr;
+    }
+
+    decl->loc = loc;
+    decl->nameAndLoc.name = name;
+    decl->nameAndLoc.loc = loc;
+
+    _addModifiers(decl, modifiers);
+
+    parser->ReadToken(TokenType::Semicolon);
+
+    return decl;
+}
+
+// Parse the body of a semantic declaration: { [accessor]* }
+static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::LBrace))
+    {
+        Token closingToken;
+        while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
+        {
+            auto accessor = parseSemanticAccessorDecl(parser);
+            if (accessor)
+                AddMember(decl, accessor);
+        }
+        decl->closingSourceLoc = closingToken.loc;
+    }
+    else
+    {
+        parser->sink->diagnose(
+            parser->tokenReader.peekLoc(),
+            Diagnostics::unexpectedToken,
+            peekToken(parser));
+    }
+}
+
+// Parse a semantic declaration: "semantic <name> { [accessor]* }"
+static NodeBase* parseSemanticDecl(Parser* parser, void* /*userData*/)
+{
+    SemanticDecl* decl = parser->astBuilder->create<SemanticDecl>();
+    parser->FillPosition(decl);
+    parser->PushScope(decl);
+
+    // Expect an identifier for the semantic name
+    decl->nameAndLoc = expectIdentifier(parser);
+
+    parseSemanticDeclBody(parser, decl);
 
     parser->PopScope();
     return decl;
@@ -7095,6 +7181,21 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     return countOfExpr;
 }
 
+static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
+{
+    FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+
+    // Parse the argument expression
+    // The result type will be determined during semantic checking based on the input type
+    expr->value = parser->ParseExpression();
+
+    parser->ReadMatchingToken(TokenType::RParent);
+
+    return expr;
+}
+
 static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -9603,6 +9704,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
+    _makeParseDecl("semantic", parseSemanticDecl),
     _makeParseDecl("interface", parseInterfaceDecl),
     _makeParseDecl("syntax", parseSyntaxDecl),
     _makeParseDecl("attribute_syntax", parseAttributeSyntaxDecl),
@@ -9740,6 +9842,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
+    _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

@@ -348,6 +348,7 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void checkExtensionExternVarAttribute(VarDeclBase* varDecl, ExtensionExternVarModifier* m);
     void checkMeshOutputDecl(VarDeclBase* varDecl);
     void maybeApplyLayoutModifier(VarDeclBase* varDecl);
+    void deriveVarTypeFromInitExpr(VarDeclBase* varDecl);
     void checkVarDeclCommon(VarDeclBase* varDecl);
     void checkPushConstantBufferType(VarDeclBase* varDecl);
 
@@ -404,6 +405,10 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     void visitSubscriptDecl(SubscriptDecl* decl);
 
     void visitPropertyDecl(PropertyDecl* decl);
+
+    void visitSemanticDecl(SemanticDecl* decl);
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl);
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl);
 
     void visitStructDecl(StructDecl* decl);
 
@@ -527,6 +532,15 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     }
 
     void visitPropertyDecl(PropertyDecl* decl) { visitTypeExp(decl->type); }
+
+    void visitSemanticGetterDecl(SemanticGetterDecl* decl) { visitTypeExp(decl->type); }
+    void visitSemanticSetterDecl(SemanticSetterDecl* decl) { visitTypeExp(decl->type); }
+
+    void visitSemanticDecl(SemanticDecl* decl)
+    {
+        for (auto member : decl->getMembers())
+            dispatch(member);
+    }
 };
 
 struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
@@ -2112,6 +2126,40 @@ void SemanticsDeclHeaderVisitor::checkPushConstantBufferType(VarDeclBase* varDec
     }
 }
 
+void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
+{
+    SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
+
+    auto initExpr = varDecl->initExpr;
+
+    // If the parent function is differentiable, use withParentFunc to ensure
+    // the differentiable context is preserved.
+    // This ensures that calls in the initializer (like `dot`) get properly marked
+    // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
+    // the differentiableCallDecoration, also allows us to properly check the lambda
+    // expressions nested in AST locations like: `let x = someFunc((int y)=>{...});
+    // (checking of lambda exprs requires parentFunc to be available).
+    auto parentFunc = getParentFunc(varDecl);
+    if (parentFunc != m_parentFunc)
+        contextToUse = contextToUse.withParentFunc(parentFunc);
+
+    SemanticsVisitor subVisitor(contextToUse);
+    initExpr = subVisitor.CheckExpr(initExpr);
+    initExpr = maybeOpenRef(initExpr);
+
+    // TODO: We might need some additional steps here to ensure
+    // that the type of the expression is one we are okay with
+    // inferring. E.g., if we ever decide that integer and floating-point
+    // literals have a distinct type from the standard int/float types,
+    // then we would need to "decay" a literal to an explicit type here.
+
+    varDecl->initExpr = initExpr;
+    varDecl->type.type = initExpr->type;
+
+    varDecl->setCheckState(DeclCheckState::DefinitionChecked);
+    _validateCircularVarDefinition(varDecl);
+}
+
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -2141,32 +2189,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         }
         else
         {
-            SemanticsContext contextToUse = withDeclToExcludeFromLookup(varDecl);
-
-            // If the parent function is differentiable, use withParentFunc to ensure
-            // the differentiable context is preserved.
-            // This ensures that calls in the initializer (like `dot`) get properly marked
-            // with TreatAsDifferentiableExpr, which is needed for the IR lowering to add
-            // the differentiableCallDecoration
-            auto parentFunc = getParentFunc(varDecl);
-            if (parentFunc && parentFunc->findModifier<DifferentiableAttribute>())
-                contextToUse = contextToUse.withParentFunc(parentFunc);
-
-            SemanticsVisitor subVisitor(contextToUse);
-            initExpr = subVisitor.CheckExpr(initExpr);
-            initExpr = maybeOpenRef(initExpr);
-
-            // TODO: We might need some additional steps here to ensure
-            // that the type of the expression is one we are okay with
-            // inferring. E.g., if we ever decide that integer and floating-point
-            // literals have a distinct type from the standard int/float types,
-            // then we would need to "decay" a literal to an explicit type here.
-
-            varDecl->initExpr = initExpr;
-            varDecl->type.type = initExpr->type;
-
-            varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-            _validateCircularVarDefinition(varDecl);
+            deriveVarTypeFromInitExpr(varDecl);
         }
 
         // If we've gone down this path, then the variable
@@ -2791,6 +2814,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         overloadContext.loc = varDecl->nameAndLoc.loc;
         overloadContext.mode = OverloadResolveContext::Mode::JustTrying;
         overloadContext.sourceScope = m_outerScope;
+
+        // Overload resolution can give us a valid expression with >0 arguments when the type has
+        // parameter pack arguments. This is primarily relevant for Tuple<>
+        List<Expr*> argExprs;
+        overloadContext.args = &argExprs;
 
         auto type = varDecl->getType();
         ImplicitCastMethodKey key = ImplicitCastMethodKey(QualType(), type, nullptr);
@@ -5693,6 +5721,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
         {
             if (auto callee = as<CallableDecl>(declRefExpr->declRef))
             {
+                synFuncDecl->loc = callee.getDecl()->loc;
                 auto synParams = synFuncDecl->getParameters();
                 auto calleeParams = callee.getDecl()->getParameters();
                 auto synParamIter = synParams.begin();
@@ -9575,12 +9604,6 @@ void SemanticsVisitor::checkForRedeclaration(Decl* decl)
 
 void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
 {
-    // TODO: This logic should be shared with the other cases of
-    // variable declarations. The main reason I am not doing it
-    // yet is that we use a `ParamDecl` with a null type as a
-    // special case in attribute declarations, and that could
-    // trip up the ordinary variable checks.
-
     auto typeExpr = paramDecl->type;
     if (typeExpr.exp)
     {
@@ -9588,6 +9611,18 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         typeExpr = subVisitor.CheckUsableType(typeExpr, paramDecl);
         paramDecl->type = typeExpr;
         checkMeshOutputDecl(paramDecl);
+    }
+
+    if (!paramDecl->type && paramDecl->initExpr)
+    {
+        // If paramDecl doesn't have a type but have an initExpr, derive the type
+        // from the expr.
+        deriveVarTypeFromInitExpr(paramDecl);
+    }
+
+    if (!paramDecl->type && !as<AttributeDecl>(getParentDecl(paramDecl)))
+    {
+        getSink()->diagnose(paramDecl, Diagnostics::paramWithoutTypeMustHaveInitializer);
     }
 
     if (isTypePack(paramDecl->type.type))
@@ -10839,6 +10874,22 @@ void SemanticsDeclHeaderVisitor::visitPropertyDecl(PropertyDecl* decl)
     decl->type = subVisitor.CheckUsableType(decl->type, decl);
     visitAbstractStorageDeclCommon(decl);
     checkVisibility(decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticDecl(SemanticDecl* decl)
+{
+    for (auto member : decl->getMembers())
+        dispatch(member);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticGetterDecl(SemanticGetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
+}
+
+void SemanticsDeclHeaderVisitor::visitSemanticSetterDecl(SemanticSetterDecl* decl)
+{
+    decl->type = CheckUsableType(decl->type, decl);
 }
 
 Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)

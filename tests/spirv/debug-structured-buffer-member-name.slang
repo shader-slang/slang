@@ -2,7 +2,7 @@
 
 // This test verifies that StructuredBuffer debug info does not name its array member, which is
 // what's expected by debuggers when resolving StructuredBuffer accesses e.g.,
-// ssbo[n] -> ssbo.unnamed[n] .
+// ssbo[n] -> ssbo.__member0[n] .
 
 struct SSBOData
 {
@@ -16,9 +16,9 @@ StructuredBuffer<SSBOData> ssbo;
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// SPV: OpString "unnamed"
-// SPV-NOT: OpMemberName %RWStructuredBuffer 0
-// SPV-NOT: OpMemberName %StructuredBuffer 0
+// SPV: OpString "__member0"
+// SPV: OpMemberName %RWStructuredBuffer 0
+// SPV: OpMemberName %StructuredBuffer 0
 
 [numthreads(1,1,1)]
 void computeMain()

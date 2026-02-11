@@ -18,7 +18,7 @@ S1 pc;
 
 struct VertexOutput
 {
-    float3 position : SV_Position;
+    float4 position : SV_Position;
 }
 
 // CHECK_SPV: OpDecorate [[STRUCT:%[a-zA-Z0-9_]+]] Block
@@ -36,7 +36,7 @@ struct VertexOutput
 VertexOutput vertexMain()
 {
     VertexOutput output;
-    output.position = float3(pc.a.x, pc.b.y, pc.c.z);
+    output.position = float4(pc.a.x, pc.b.y, pc.c.z, 1.0);
     return output;
 }
 

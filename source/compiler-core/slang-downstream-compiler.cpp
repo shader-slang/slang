@@ -236,19 +236,27 @@ SlangResult CommandLineDownstreamCompiler::compile(
     }
 #endif
 
-    if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)) ||
-        SLANG_FAILED(parseOutput(exeRes, diagnostics)))
-    {
-        // If the process failed or the output parsing failed, return the diagnostics
-        *outArtifact = resultArtifact.detach();
-        return SLANG_FAIL;
-    }
+    // Execute the compiler
+    // Note: Don't use SLANG_RETURN_ON_FAIL here because we want to parse diagnostics
+    // even if the compiler exits with non-zero code (e.g., link errors)
+    SlangResult executeResult = ProcessUtil::execute(cmdLine, exeRes);
 
 #if 0
     {
         printf("stdout=\"%s\"\nstderr=\"%s\"\nret=%d\n", exeRes.standardOutput.getBuffer(), exeRes.standardError.getBuffer(), int(exeRes.resultCode));
     }
 #endif
+
+    // If execute completely failed (couldn't run the process), return failure
+    if (SLANG_FAILED(executeResult))
+    {
+        *outArtifact = resultArtifact.detach();
+        return executeResult;
+    }
+
+    // Parse output into diagnostics (created earlier, before execution).
+    // We always parse even if the compiler returned non-zero, so diagnostics are available.
+    parseOutput(exeRes, diagnostics);
 
     // Go through the list of artifacts in the artifactList and check if they exist.
     //

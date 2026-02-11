@@ -694,13 +694,19 @@ struct AssignValsFromLayoutContext
     SlangResult assignObject(ShaderCursor const& dstCursor, ShaderInputLayout::ObjectVal* srcVal)
     {
         auto typeName = srcVal->typeName;
-        slang::TypeReflection* slangType = nullptr;
+        ComPtr<IShaderObject> shaderObject;
+
         if (typeName.getLength() != 0)
         {
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
             //
-            slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
         else
         {
@@ -724,15 +730,9 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
-            slangType = slangTypeLayout->getType();
+            auto slangType = slangTypeLayout->getType();
+            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
         }
-
-        ComPtr<IShaderObject> shaderObject;
-        device->createShaderObject(
-            slangSession(),
-            slangType,
-            ShaderObjectContainerType::None,
-            shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();

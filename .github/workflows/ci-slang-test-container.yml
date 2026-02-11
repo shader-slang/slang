@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -75,13 +75,8 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-          # Verify GPU is accessible
-          echo "=== GPU Info ==="
-          nvidia-smi
-
-          # Check CUDA
-          echo "=== CUDA libraries ==="
-          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
+          # Display environment configuration
+          print-env-info
 
       - name: Test Slang
         run: |
@@ -120,8 +115,8 @@ jobs:
             -emit-spirv-via-glsl \
             -ignore-abort-msg \
             -api vk \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
-            -expected-failure-list tests/expected-glsl-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
   test-slang-rhi:
@@ -133,7 +128,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -181,6 +176,9 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
+          # Display environment configuration
+          print-env-info
+
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
@@ -204,7 +202,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:12.5.1
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -250,6 +248,9 @@ jobs:
 
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # Display environment configuration
+          print-env-info
 
       - name: Run slangpy tests
         run: |
@@ -309,4 +310,20 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          # First attempt: run with parallel execution
+          if python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi

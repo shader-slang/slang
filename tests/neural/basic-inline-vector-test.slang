@@ -1,10 +1,10 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
 
 // Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
 import neural;
 
 #if TEST_HALF
@@ -41,10 +41,10 @@ OutputVector TestInlineVectorMatMul<InputVector, OutputVector>(
     InputVector input,
     BufferStorage weightStorage,
     BufferStorage.Address weightAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, BufferStorage, OutputVector>(weightStorage, weightAddress);
+    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, weightAddress);
     return outputVec;
 }
 
@@ -55,10 +55,10 @@ OutputVector TestInlineVectorMatMulAdd<InputVector, OutputVector>(
     BufferStorage biasStorage,
     BufferStorage.Address weightAddress,
     BufferStorage.Address biasAddress)
-    where InputVector : IVector<ElementType, 4>
-    where OutputVector : IVector<ElementType, 2>
+    where InputVector : IVector<ElementType>
+    where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<2, BufferStorage, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
+    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
     return outputVec;
 }
 
@@ -85,12 +85,12 @@ bool BasicTestWithoutBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMul<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, weightAddress, dRes);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]
@@ -132,12 +132,12 @@ bool BasicTestWithBias()
 
     // Run the backward pass
     // dInput = W^T * dOutput
-    // dInput = {3, 7, 11, 15}
+    // dInput = {6, 8, 10, 12}
     bwd_diff(TestInlineVectorMatMulAdd<InlineVector<ElementType, 4>, InlineVector<ElementType, 2>>)
                 (dPair, weightDiffPair, biasDiffPair, weightAddress, biasAddress, dOutput);
 
     isPassed = isPassed &&
-        dPair.d[0] == 3.0 && dPair.d[1] == 7.0 && dPair.d[2] == 11.0 && dPair.d[3] == 15.0;
+        dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
 
     // dW = dOutput * dInput^T
     // dW = [1, 1]^T * [1, 2, 3, 4]

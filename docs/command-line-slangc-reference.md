@@ -895,6 +895,11 @@ Enable experimental features (loading builtin neural module)
 Enable experimental rich diagnostics with enhanced formatting and details 
 
 
+<a id="enable-machine-readable-diagnostics"></a>
+### -enable-machine-readable-diagnostics
+Enable machine-readable diagnostic output in tab-separated format 
+
+
 
 <a id="Internal"></a>
 ## Internal
@@ -981,6 +986,11 @@ Enable liveness tracking. Places SLANG_LIVE_START, and SLANG_LIVE_END in output 
 <a id="loop-inversion"></a>
 ### -loop-inversion
 Enable loop inversion in the code-gen optimization. Default is off 
+
+
+<a id="whole-program"></a>
+### -whole-program
+Generate code for all entry points in a single output (library mode). 
 
 
 
@@ -1291,6 +1301,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_tensor_addressing` : enables the SPV_NV_tensor_addressing extension 
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
+* `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
+* `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
 * `spvAtomicFloat16AddEXT` 
@@ -1305,6 +1317,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvSparseResidency` 
 * `spvImageFootprintNV` 
 * `spvMinLod` 
+* `spvFloat8EXT` 
+* `spvBFloat16KHR` 
 * `spvFragmentShaderPixelInterlockEXT` 
 * `spvFragmentBarycentricKHR` 
 * `spvFragmentFullyCoveredEXT` 
@@ -1501,6 +1515,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 

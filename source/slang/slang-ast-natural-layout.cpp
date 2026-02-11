@@ -138,6 +138,14 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
     {
         return NaturalSize::makeFromBaseType(basicType->getBaseType());
     }
+    else if (as<BFloat16Type>(type))
+    {
+        return NaturalSize::make(2, 2);
+    }
+    else if (as<Fp8Type>(type))
+    {
+        return NaturalSize::make(1, 1);
+    }
     else if (as<PtrTypeBase>(type) || as<NullPtrType>(type))
     {
         // We can't know the size of pointer types at the AST level, as it is
@@ -208,6 +216,13 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         size.append(calcSize(m_astBuilder->getBoolType()));
         size.append(calcSize(optionalType->getValueType()));
         return size;
+    }
+    else if (as<DescriptorHandleType>(type))
+    {
+        // DescriptorHandleType has target-dependent size/alignment.
+        // Return invalid so that sizeof/alignof gets lowered to IR instructions
+        // which can be resolved later with target information.
+        return NaturalSize::makeInvalid();
     }
     else if (auto declRefType = as<DeclRefType>(type))
     {
