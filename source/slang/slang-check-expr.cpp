@@ -2127,19 +2127,18 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
 
         // simple binary operators
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
+#define CASE(OP)                                                                              \
+    else if (opName == getName(#OP)) do                                                       \
+    {                                                                                         \
+        if (argCount != 2)                                                                    \
+            return nullptr;                                                                   \
+        resultValue =                                                                         \
+            static_cast<uint64_t>(constArgVals[0]) OP static_cast<uint64_t>(constArgVals[1]); \
+    }                                                                                         \
     while (0)
 
         CASE(+); // TODO: this can also be unary...
         CASE(*);
-        CASE(<<);
-        CASE(>>);
         CASE(&);
         CASE(|);
         CASE(^);
@@ -2149,6 +2148,18 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         CASE(<=);
         CASE(<);
         CASE(>);
+#undef CASE
+#define CASE(OP)                                                                                  \
+    else if (opName == getName(#OP)) do                                                           \
+    {                                                                                             \
+        if (argCount != 2)                                                                        \
+            return nullptr;                                                                       \
+        resultValue = constArgVals[0] OP(                                                         \
+            constArgVals[1] % std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits); \
+    }                                                                                             \
+    while (0)
+        CASE(<<);
+        CASE(>>);
 #undef CASE
         // binary operators with chance of divide-by-zero
         // TODO: issue a suitable error in that case

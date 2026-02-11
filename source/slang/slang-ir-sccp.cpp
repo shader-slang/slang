@@ -572,7 +572,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 + c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) +
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 + c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
@@ -582,7 +587,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 - c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) -
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 - c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
@@ -592,7 +602,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 * c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) *
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
@@ -727,13 +742,23 @@ struct SCCPContext
                 type,
                 v0,
                 v1,
-                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 << c1; });
+                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
+                {
+                    return c0
+                           << (static_cast<IRUnsignedIntegerValue>(c1) %
+                               std::numeric_limits<IRUnsignedIntegerValue>::digits);
+                });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 << c1; });
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return c0
+                       << (static_cast<IRUnsignedIntegerValue>(c1) %
+                           std::numeric_limits<IRUnsignedIntegerValue>::digits);
+            });
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -744,13 +769,21 @@ struct SCCPContext
                 type,
                 v0,
                 v1,
-                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 >> c1; });
+                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
+                {
+                    return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) %
+                                  std::numeric_limits<IRUnsignedIntegerValue>::digits);
+                });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >> c1; });
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) %
+                              std::numeric_limits<IRUnsignedIntegerValue>::digits);
+            });
     }
     LatticeVal evalNeg(IRType* type, LatticeVal v0)
     {
