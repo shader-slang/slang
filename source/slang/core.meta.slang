@@ -1013,6 +1013,11 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
 }
 
+// Cast between any two floating point types, including substandard floating point types
+// like FloatE4M3, FloatE5M2, BFloat16, etc.
+__intrinsic_op($(kIROp_FloatCast))
+T floatCast<T:IFloatingPointCoopElement, U:IFloatingPointCoopElement>(U val);
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))

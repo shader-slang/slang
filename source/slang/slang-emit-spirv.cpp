@@ -8024,6 +8024,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return inner;
         }
 
+        maybeRequireCoopMatConversionNV(fromType, toType);
+
         const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
         const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
@@ -8095,6 +8097,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitCompositeConstruct(parent, inst, toTypeM, rowVectorsConverted);
     }
 
+    void maybeRequireCoopMatConversionNV(IRType* fromType, IRType* toType)
+    {
+        // When converting between different cooperative matrix types that have different matrix
+        // use, we need to require the SPIRV capability and extension for cooperative matrix
+        // conversions.
+        if (auto fromCoopMatType = as<IRCoopMatrixType>(fromType))
+        {
+            if (auto toCoopMatType = as<IRCoopMatrixType>(toType))
+            {
+                if (fromCoopMatType->getMatrixUse() != toCoopMatType->getMatrixUse())
+                {
+                    requireSPIRVCapability(SpvCapabilityCooperativeMatrixConversionsNV);
+                    ensureExtensionDeclaration(toSlice("SPV_NV_cooperative_matrix2"));
+                }
+            }
+        }
+    }
+
     SpvInst* emitFloatCast(SpvInstParent* parent, IRFloatCast* inst)
     {
         const auto fromTypeV = inst->getOperand(0)->getDataType();
@@ -8154,6 +8174,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 as<IRMatrixType>(toTypeV));
         }
 
+        maybeRequireCoopMatConversionNV(fromType, toType);
+
         return emitOpFConvert(parent, inst, toTypeV, inst->getOperand(0));
     }
 
@@ -8170,6 +8192,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (isIntegralType(fromType))
         {
             const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
+            maybeRequireCoopMatConversionNV(fromType, toType);
 
             return fromInfo.isSigned
                        ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
@@ -8242,6 +8265,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     zero);
             }
         }
+
+        maybeRequireCoopMatConversionNV(fromType, toType);
 
         SLANG_ASSERT(isIntegralType(toType));
 
