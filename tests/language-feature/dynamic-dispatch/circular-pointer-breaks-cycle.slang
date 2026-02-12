@@ -1,6 +1,6 @@
 // Pointers to interface types break circular dependencies in dynamic dispatch.
 //
-// When a struct conforms to a dyn/anyValueSize interface, it must be packable
+// When a struct conforms to an interface used for dynamic dispatch, it must be packable
 // into a fixed-size tagged union for dynamic dispatch. Self-referential structs
 // containing the interface type directly would create infinite recursion during
 // packing. However, pointers have a fixed size regardless of their target type,
