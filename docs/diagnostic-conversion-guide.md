@@ -165,7 +165,6 @@ sink->diagnose(oldMacro->getLoc(), Diagnostics::seePreviousDefinitionOf, name);
 **New:**
 
 ```lua
--- uses notes
 warning(
     "macro redefinition",
     15400,
@@ -237,7 +236,6 @@ getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
 **New:**
 
 ```lua
--- uses notes
 err(
     "expected prefix operator",
     39999,
@@ -328,8 +326,6 @@ err(
 
 ## Notes Handling
 
-When diagnostics in the old system emit a diagnostic and then immediately emit some notes, add a comment `-- uses notes` above the diagnostic in the lua file. This marks them for later review and proper integration.
-
 The pattern to look for in C++ code:
 
 ```cpp
@@ -340,7 +336,6 @@ getSink()->diagnose(loc2, Diagnostics::seeDefinitionOf, ...);  // Note follows i
 Becomes:
 
 ```lua
--- uses notes
 err(
     "some error",
     code,
@@ -601,7 +596,13 @@ Some diagnostics have call sites that pass different types. For example, `typeMi
 If a diagnostic has mixed usage, you have options:
 
 1. Create separate diagnostics for different use cases
-2. Use the most general type that covers all cases
-3. Keep string-based call sites on the old system temporarily
+2. Use the most general type that covers all cases (string is the ultimate fallback)
+3. Convert types, for example QualType can be made into a Type (although this loses information)
 
 The `TypeMismatch` struct in this codebase uses `Type*` for expected and `QualType` for actual, covering the common case. Call sites passing string literals would need to use a different approach.
+
+##
+
+Please insert newly converted diagnostics at the end of the definitions in the new lua file. This is essential in preserving the order. Also make sure to preserve the comments in the diagnostic def file
+
+Some diagnostics have many call sites, you will have to read all of these and the context before processing the diagnostic. the old diagnostic can only be removed once the new diagnostic is implemented and all the call sites converted. It's critical that the old diagnostic isn't left in the old file, each job must be completed.
