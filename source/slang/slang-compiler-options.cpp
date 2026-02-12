@@ -420,25 +420,9 @@ void applySettingsToDiagnosticSink(
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
-    // Handle diagnostic color setting (default is auto)
-    {
-        SlangDiagnosticColor colorMode =
-            (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor);
-        bool enableColors = false;
-        switch (colorMode)
-        {
-        case SLANG_DIAGNOSTIC_COLOR_ALWAYS:
-            enableColors = true;
-            break;
-        case SLANG_DIAGNOSTIC_COLOR_NEVER:
-            enableColors = false;
-            break;
-        case SLANG_DIAGNOSTIC_COLOR_AUTO:
-        default:
-            enableColors = targetSink && targetSink->writer && targetSink->writer->isConsole();
-            break;
-        }
-        targetSink->setEnableTerminalColors(enableColors);
-    }
+    // Handle diagnostic color setting
+    // The sink will handle AUTO by checking writer->isConsole()
+    targetSink->setDiagnosticColorMode(
+        (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor));
 }
 } // namespace Slang

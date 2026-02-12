@@ -281,9 +281,25 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
-    /// Set whether to enable terminal colors in rich diagnostics
-    void setEnableTerminalColors(bool enable) { m_enableTerminalColors = enable; }
-    bool getEnableTerminalColors() const { return m_enableTerminalColors; }
+    /// Set the diagnostic color mode for rich diagnostics
+    /// AUTO will check writer->isConsole() to determine if colors should be used
+    void setDiagnosticColorMode(SlangDiagnosticColor mode) { m_diagnosticColorMode = mode; }
+    SlangDiagnosticColor getDiagnosticColorMode() const { return m_diagnosticColorMode; }
+
+    /// Returns true if terminal colors should be enabled based on color mode and writer
+    bool shouldEnableTerminalColors() const
+    {
+        switch (m_diagnosticColorMode)
+        {
+        case SLANG_DIAGNOSTIC_COLOR_ALWAYS:
+            return true;
+        case SLANG_DIAGNOSTIC_COLOR_NEVER:
+            return false;
+        case SLANG_DIAGNOSTIC_COLOR_AUTO:
+        default:
+            return writer && writer->isConsole();
+        }
+    }
 
     /// Set whether to enable unicode in rich diagnostics
     void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
@@ -371,7 +387,7 @@ protected:
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 
     // Rich diagnostics rendering options
-    bool m_enableTerminalColors = false;
+    SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
     bool m_enableUnicode = true; // Enable unicode unconditionally
 };
 
