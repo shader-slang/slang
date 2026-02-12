@@ -3922,6 +3922,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     /// Atomically adds the given value to the stored value without returning
     /// the original value. On CUDA, maps to the PTX `red` instruction for
     /// potentially better performance than `add()`.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceAdd(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -3934,6 +3936,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
 
     /// Atomically subtracts the given value from the stored value without
     /// returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceSub(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -3946,6 +3950,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
 
     /// Atomically computes the maximum of the stored value and the given value
     /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceMax(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -3958,6 +3964,8 @@ extension<T : IArithmeticAtomicable> Atomic<T>
 
     /// Atomically computes the minimum of the stored value and the given value
     /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceMin(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -4002,6 +4010,8 @@ extension<T : IBitAtomicable> Atomic<T>
 
     /// Atomically performs a bitwise AND without returning the original value.
     /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceAnd(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -4014,6 +4024,8 @@ extension<T : IBitAtomicable> Atomic<T>
 
     /// Atomically performs a bitwise OR without returning the original value.
     /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceOr(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -4026,6 +4038,8 @@ extension<T : IBitAtomicable> Atomic<T>
 
     /// Atomically performs a bitwise XOR without returning the original value.
     /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceXor(T value, MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -4038,6 +4052,8 @@ extension<T : IBitAtomicable> Atomic<T>
 
     /// Atomically increments the stored value without returning the original value.
     /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceInc(MemoryOrder order = MemoryOrder.Relaxed)
     {
@@ -4050,6 +4066,8 @@ extension<T : IBitAtomicable> Atomic<T>
 
     /// Atomically decrements the stored value without returning the original value.
     /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
     [ForceInline]
     [__ref] void reduceDec(MemoryOrder order = MemoryOrder.Relaxed)
     {
