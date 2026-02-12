@@ -1108,6 +1108,9 @@ typedef uint32_t SlangSizeT;
 
         ReportDynamicDispatchSites, // bool
 
+        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
+                                          // (implies EnableRichDiagnostics)
+
         CountOf,
     };
 
@@ -3640,6 +3643,14 @@ struct ShaderReflection
     SlangResult toJson(ISlangBlob** outBlob)
     {
         return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
+    }
+
+    /** Get the descriptor set/space index allocated for the bindless resource heap.
+     *  Returns -1 if the program does not use bindless resource heap.
+     */
+    SlangInt getBindlessSpaceIndex()
+    {
+        return spReflection_getBindlessSpaceIndex((SlangReflection*)this);
     }
 };
 

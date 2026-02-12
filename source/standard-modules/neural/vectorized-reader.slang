@@ -1,10 +1,6 @@
 implementing neural;
 
-#ifdef UNIT_TEST
-#define VISIBILITY_LEVEL public
-#else
-#define VISIBILITY_LEVEL internal
-#endif
+#include "common-def.slang"
 
 
 internal interface IArrayAccessor<T> : IRWArray<T>
@@ -20,7 +16,7 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
     [ForceInline]
     override internal void atomicAdd(int index, T value)
     {
-        __atomic_add(this[index], value);
+        __atomic_reduce_add(this[index], value);
     }
 }
 

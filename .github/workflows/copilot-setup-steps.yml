@@ -15,9 +15,13 @@ jobs:
     runs-on: slang-larger-runner-1
 
     permissions:
+      id-token: write # Required for Workload Identity (unused by fork PRs)
       contents: read
       pull-requests: write
       checks: write
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
 
     # No container - Copilot does not support containers
     # Known issue: https://github.com/orgs/community/discussions/170315
@@ -29,6 +33,19 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 2
+
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Install build dependencies
         run: |
@@ -52,7 +69,6 @@ jobs:
             spirv-tools \
             glslang-tools \
             ca-certificates \
-            libzstd-dev \
             clang-format-17 \
             npm
 
@@ -75,29 +91,29 @@ jobs:
           sudo ln -sf /tmp/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
           rm -f cmake-3.30.0-linux-x86_64.tar.gz
 
-          # Install CUDA Toolkit 12.5.1 (matching container image)
-          wget -q https://developer.download.nvidia.com/compute/cuda/12.5.1/local_installers/cuda_12.5.1_555.42.06_linux.run
-          sudo sh cuda_12.5.1_555.42.06_linux.run --silent --toolkit --no-opengl-libs --no-drm --no-man-page || echo "CUDA install returned error but may have partially succeeded"
+          # Install CUDA Toolkit 13.0.0 (matching container image)
+          wget -q https://developer.download.nvidia.com/compute/cuda/13.0.0/local_installers/cuda_13.0.0_580.65.06_linux.run
+          sudo sh cuda_13.0.0_580.65.06_linux.run --silent --toolkit --no-opengl-libs --no-drm --no-man-page || echo "CUDA install returned error but may have partially succeeded"
           # Remove installer (4GB file) to prevent it from being committed
-          rm -f cuda_12.5.1_555.42.06_linux.run
+          rm -f cuda_13.0.0_580.65.06_linux.run
 
           # Verify and configure CUDA paths
-          if [ -d /usr/local/cuda-12.5 ]; then
+          if [ -d /usr/local/cuda-13.0 ]; then
             echo "CUDA installed successfully"
             # Fix permissions - installer creates files with restrictive permissions
-            sudo chmod -R a+rX /usr/local/cuda-12.5
-            ls -la /usr/local/cuda-12.5/bin/nvcc
-            echo "/usr/local/cuda-12.5/bin" >> $GITHUB_PATH
-            echo "LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
+            sudo chmod -R a+rX /usr/local/cuda-13.0
+            ls -la /usr/local/cuda-13.0/bin/nvcc
+            echo "/usr/local/cuda-13.0/bin" >> $GITHUB_PATH
+            echo "LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
           else
-            echo "WARNING: CUDA not installed at /usr/local/cuda-12.5"
+            echo "WARNING: CUDA not installed at /usr/local/cuda-13.0"
             ls -la /usr/local/ | grep cuda || echo "No CUDA directories found"
           fi
 
       - name: Verify GPU access
         run: |
-          export PATH=/usr/local/cuda-12.5/bin:$PATH
-          export LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64:$LD_LIBRARY_PATH
+          export PATH=/usr/local/cuda-13.0/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
           echo "=== GPU Information ==="
           nvidia-smi
@@ -106,35 +122,16 @@ jobs:
           echo "=== CUDA version ==="
           nvcc --version
 
-      # LLVM caching support - restore cached LLVM build if available
-      - name: Restore cached LLVM
-        uses: actions/cache/restore@v4
-        id: cache-llvm
+      # Setup LLVM from GCS (or build if missing)
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
         with:
-          path: build/llvm-project-install
-          key: llvm-linux-gcc-x86_64-${{ hashFiles('external/build-llvm.sh') }}
-
-      # Build LLVM from source if cache miss (takes 15-25 minutes)
-      - name: Build LLVM
-        if: steps.cache-llvm.outputs.cache-hit != 'true'
-        run: |
-          ./external/build-llvm.sh \
-            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
-            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
-
-      # Save LLVM cache only on master branch to avoid cache pollution
-      - name: Save LLVM cache
-        uses: actions/cache/save@v4
-        if: steps.cache-llvm.outputs.cache-hit != 'true' && github.ref == 'refs/heads/master'
-        with:
-          path: build/llvm-project-install
-          key: ${{ steps.cache-llvm.outputs.cache-primary-key }}
-
-      # Set LLVM paths for CMake to find the installation
-      - name: Set LLVM paths
-        run: |
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
 
       # Verify LLVM installation
       - name: Verify LLVM installation
@@ -152,16 +149,25 @@ jobs:
 
       - name: Configure CMake
         run: |
-          export PATH=/usr/local/cuda-12.5/bin:$PATH
-          export LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64:$LD_LIBRARY_PATH
+          export PATH=/usr/local/cuda-13.0/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
+
+          # Show sccache stats before build
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats
 
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
       - name: Build Slang
         run: |
-          export PATH=/usr/local/cuda-12.5/bin:$PATH
-          export LD_LIBRARY_PATH=/usr/local/cuda-12.5/lib64:$LD_LIBRARY_PATH
+          export PATH=/usr/local/cuda-13.0/bin:$PATH
+          export LD_LIBRARY_PATH=/usr/local/cuda-13.0/lib64:$LD_LIBRARY_PATH
 
           cmake --build --preset debug -j$(nproc)
+
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats
