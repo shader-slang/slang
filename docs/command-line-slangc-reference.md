@@ -1515,6 +1515,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 
@@ -1623,6 +1624,8 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_sm_7_0` 
 * `cuda_sm_8_0` 
 * `cuda_sm_9_0` 
+* `atomic_reduce` 
+* `atomic_bfloat16` 
 * `METAL_2_3` 
 * `METAL_2_4` 
 * `METAL_3_0` 
