@@ -17,8 +17,10 @@ jobs:
   build:
     runs-on: [Windows, self-hosted, benchmark]
     permissions:
-      id-token: write
+      id-token: write # Required for Workload Identity (unused by fork PRs)
       contents: read
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -26,6 +28,7 @@ jobs:
           fetch-depth: "0"
 
       - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"

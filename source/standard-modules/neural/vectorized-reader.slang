@@ -16,7 +16,7 @@ internal extension<T> RWStructuredBuffer<T> : IArrayAccessor<T>
     [ForceInline]
     override internal void atomicAdd(int index, T value)
     {
-        __atomic_add(this[index], value);
+        __atomic_reduce_add(this[index], value);
     }
 }
 
