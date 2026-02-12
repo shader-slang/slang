@@ -3804,7 +3804,11 @@ void GLSLSourceEmitter::emitVarDecorationsImpl(IRInst* varDecl)
                 break;
             case kIROp_VulkanHitObjectAttributesDecoration:
                 prefix = toSlice("hitObjectAttribute");
-                postfix = toSlice("NV");
+                {
+                    auto targetCaps = getTargetCaps();
+                    if (targetCaps.implies(CapabilityAtom::_GL_NV_shader_invocation_reorder))
+                        postfix = toSlice("NV");
+                }
                 locationValue = getIntVal(decoration->getOperand(0));
                 break;
             default:

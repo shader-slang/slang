@@ -22,6 +22,18 @@ void main()
     Payload payload;
     HitObject hitObj = HitObject::TraceRay(tlas, 0, 0xFF, 0, 0, 0, ray, payload);
 
+    // Test accessor functions emit NV opcodes (not EXT)
+    float tmin = hitObj.GetRayTMin();
+    float3 origin = hitObj.GetWorldRayOrigin();
+    float3 direction = hitObj.GetWorldRayDirection();
+
+    // CHECK: OpCapability ShaderInvocationReorderNV
+    // CHECK: OpExtension "SPV_NV_shader_invocation_reorder"
+    // CHECK: OpTypeHitObjectNV
     // CHECK: OpHitObjectTraceRayNV
+    // CHECK: OpHitObjectGetRayTMinNV
+    // CHECK: OpHitObjectGetWorldRayOriginNV
+    // CHECK: OpHitObjectGetWorldRayDirectionNV
     // CHECK-NOT: OpHitObjectTraceRayEXT
+    // CHECK-NOT: OpTypeHitObjectEXT
 }
