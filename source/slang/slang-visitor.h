@@ -182,9 +182,11 @@ struct ExprVisitorWithArg
 /// themselves unchanged.
 ///
 /// IMPORTANT: This visitor must provide visit methods for all `Expr` subclasses that
-/// have child `Expr*` pointers. When adding new expression types to the AST, ensure
-/// corresponding visit methods are added here. Use `ASTIteratorExprVisitor` in
-/// `slang-ast-iterator.h` as a reference for coverage.
+/// have child `Expr*` pointers that are part of the semantic checking process. When
+/// adding new expression types to the AST, ensure corresponding visit methods are added
+/// here. Use `ASTIteratorExprVisitor` in `slang-ast-iterator.h` as a reference for
+/// coverage, but note that `originalExpr` and `originalFunctionExpr` fields are for
+/// language server support only and should NOT be traversed during checking.
 ///
 /// Inherits dispatch machinery from `ExprVisitor<Derived, Expr*>`.
 template<typename Derived>
@@ -219,6 +221,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     // --- Call / generic application ---
     // AppExprBase is the common base for InvokeExpr, GenericAppExpr, TypeCastExpr,
     // OperatorExpr, etc. All share functionExpr + arguments.
+    // Note: originalFunctionExpr is for language server only and not traversed.
     Expr* visitAppExprBase(AppExprBase* e)
     {
         e->functionExpr = dispatchIfNotNull(e->functionExpr);
@@ -302,6 +305,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitOverloadedExpr(OverloadedExpr* e)
     {
         e->base = dispatchIfNotNull(e->base);
+        // Note: originalExpr is for language server only and not traversed.
         return e;
     }
     Expr* visitOverloadedExpr2(OverloadedExpr2* e)
@@ -330,6 +334,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitIsTypeExpr(IsTypeExpr* e)
     {
         e->value = dispatchIfNotNull(e->value);
+        e->typeExpr.exp = dispatchIfNotNull(e->typeExpr.exp);
         return e;
     }
     Expr* visitAsTypeExpr(AsTypeExpr* e)
@@ -346,6 +351,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     }
 
     // --- Existential ---
+    // Note: ExtractExistentialValueExpr has originalExpr for language server only (not traversed)
     Expr* visitExtractExistentialValueExpr(ExtractExistentialValueExpr* e) { return e; }
 
     // --- Pack / expand ---
@@ -372,9 +378,19 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         e->originalExpr = dispatchIfNotNull(e->originalExpr);
         return e;
     }
-    Expr* visitSPIRVAsmExpr(SPIRVAsmExpr* e) { return e; }
+    Expr* visitSPIRVAsmExpr(SPIRVAsmExpr* e)
+    {
+        for (auto& inst : e->insts)
+        {
+            inst.opcode.expr = dispatchIfNotNull(inst.opcode.expr);
+            for (auto& operand : inst.operands)
+                operand.expr = dispatchIfNotNull(operand.expr);
+        }
+        return e;
+    }
     Expr* visitAggTypeCtorExpr(AggTypeCtorExpr* e)
     {
+        e->base.exp = dispatchIfNotNull(e->base.exp);
         for (auto& arg : e->arguments)
             arg = dispatchIfNotNull(arg);
         return e;
@@ -427,11 +443,8 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     }
 
     // --- Variable/Decl references ---
-    Expr* visitVarExpr(VarExpr* e)
-    {
-        e->originalExpr = dispatchIfNotNull(e->originalExpr);
-        return e;
-    }
+    // Note: VarExpr has originalExpr for language server only (not traversed)
+    Expr* visitVarExpr(VarExpr* e) { return e; }
 
     // --- Type expressions ---
     Expr* visitSharedTypeExpr(SharedTypeExpr* e)
