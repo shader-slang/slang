@@ -86,6 +86,17 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
+      - name: Setup LLVM from GCS
+        if: inputs.build-llvm == 'true'
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{ inputs.os }}
+          compiler: ${{ inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -94,6 +105,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           build-llvm: ${{ inputs.build-llvm }}
+          use-cached-llvm: false
 
       - name: Build Slang with Coverage
         run: |
