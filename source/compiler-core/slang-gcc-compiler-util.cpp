@@ -12,7 +12,11 @@
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
+#include "slang-json-lexer.h"
+#include "slang-json-parser.h"
+#include "slang-json-value.h"
 
+#include <cstdio>
 #include <mutex>
 
 namespace Slang
@@ -578,6 +582,334 @@ static SlangResult _parseStandardCompileError(
     return SLANG_OK;
 }
 
+// ============================================================================
+// SARIF Format Support - Helper Functions
+// ============================================================================
+
+// Runtime SARIF detection - Currently disabled to avoid unused function warning
+// Uncomment when enabling runtime detection in supportsSARIF()
+/*
+// Test if compiler supports SARIF at runtime by attempting to compile with the flag
+// This is more robust than version checks as it works with any compiler that supports SARIF
+static bool testSARIFSupport(const ExecutableLocation& exe, SlangPassThrough compilerType)
+{
+    // Determine which SARIF flag to test based on compiler type
+    const char* sarifFlag = nullptr;
+    if (compilerType == SLANG_PASS_THROUGH_GCC)
+        sarifFlag = "-fdiagnostics-format=sarif-stderr";
+    else if (compilerType == SLANG_PASS_THROUGH_CLANG)
+        sarifFlag = "-fdiagnostics-format=sarif";
+    else
+        return false;
+
+    // Test by running compiler with SARIF flag and --version
+    // If the flag is unrecognized, compiler will complain
+    // If recognized, it will just print version info (SARIF doesn't apply to --version)
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(exe);
+    cmdLine.addArg(sarifFlag);
+    cmdLine.addArg("--version");
+
+    ExecuteResult exeRes;
+    if (SLANG_FAILED(ProcessUtil::execute(cmdLine, exeRes)))
+    {
+        return false; // Execution failed
+    }
+
+    // Check if stderr contains JSON (SARIF) or an error about unrecognized option
+    UnownedStringSlice stderrText = exeRes.standardError.getUnownedSlice();
+
+    // If compiler doesn't support SARIF, it will output error like:
+    // "error: unrecognized command line option '-fdiagnostics-format=sarif-stderr'"
+    if (stderrText.indexOf(UnownedStringSlice::fromLiteral("unrecognized")) != -1 ||
+        stderrText.indexOf(UnownedStringSlice::fromLiteral("unknown")) != -1)
+    {
+        return false;
+    }
+
+    // If SARIF is supported, output should contain JSON (starts with '{')
+    // Even if there are warnings before the JSON, the '{' indicates SARIF worked
+    return stderrText.indexOf('{') != -1;
+}
+*/
+
+// Check if compiler supports SARIF output format
+// Uses runtime detection with caching to avoid repeated testing
+// Note: Currently disabled by default because:
+// 1. Linkers (ld, lld) don't produce SARIF, causing link errors to be lost
+// 2. Runtime detection adds overhead on first compilation
+// Can be force-enabled via SLANG_USE_SARIF_DIAGNOSTICS=1
+static bool supportsSARIF(const DownstreamCompilerDesc& desc, const ExecutableLocation& exe)
+{
+    SLANG_UNUSED(desc);
+    SLANG_UNUSED(exe);
+
+    // Disabled by default - return false to skip auto-detection
+    // TODO: Enable when linker SARIF support is available or when we handle mixed output
+    return false;
+
+    // Uncomment below to enable runtime SARIF detection:
+    /*
+    // Cache results per compiler executable path
+    // This avoids repeated runtime tests which can be expensive
+    static std::mutex s_cacheMutex;
+    static Dictionary<String, bool> s_sarifSupportCache;
+
+    String exePath = exe.m_pathOrName;
+
+    // Check cache first
+    {
+        std::lock_guard<std::mutex> lock(s_cacheMutex);
+        bool* cached = s_sarifSupportCache.tryGetValue(exePath);
+        if (cached)
+            return *cached;
+    }
+
+    // Runtime test
+    bool supported = testSARIFSupport(exe, desc.type);
+
+    // Cache result
+    {
+        std::lock_guard<std::mutex> lock(s_cacheMutex);
+        s_sarifSupportCache.add(exePath, supported);
+    }
+
+    return supported;
+    */
+}
+
+// Get the SARIF format flag for the compiler
+static const char* getSARIFFlag(const DownstreamCompilerDesc& desc)
+{
+    if (desc.type == SLANG_PASS_THROUGH_GCC)
+        return "-fdiagnostics-format=sarif-stderr";
+    if (desc.type == SLANG_PASS_THROUGH_CLANG)
+        return "-fdiagnostics-format=sarif";
+    return nullptr;
+}
+
+// Parse SARIF level field to Slang severity
+static SlangResult _parseSARIFLevel(
+    const UnownedStringSlice& level,
+    ArtifactDiagnostic::Severity& outSeverity)
+{
+    if (level == "error")
+        outSeverity = ArtifactDiagnostic::Severity::Error;
+    else if (level == "warning")
+        outSeverity = ArtifactDiagnostic::Severity::Warning;
+    else if (level == "note" || level == "none")
+        outSeverity = ArtifactDiagnostic::Severity::Info;
+    else
+        return SLANG_FAIL;
+    return SLANG_OK;
+}
+
+// Infer compile vs link stage from message content
+// SARIF doesn't distinguish stages, so we use heuristics
+static ArtifactDiagnostic::Stage _inferStageFromMessage(const UnownedStringSlice& message)
+{
+    // Link error indicators
+    if (message.indexOf(UnownedStringSlice(GCCPatternStrings::UNDEFINED_REF)) != -1 ||
+        message.indexOf(UnownedStringSlice(GCCPatternStrings::LINKER_FAILED)) != -1 ||
+        message.indexOf(UnownedStringSlice(GCCPatternStrings::LD_RETURNED)) != -1)
+    {
+        return ArtifactDiagnostic::Stage::Link;
+    }
+    return ArtifactDiagnostic::Stage::Compile;
+}
+
+// Strip file:// or file:/// URI prefix
+static UnownedStringSlice _stripFileURIPrefix(const UnownedStringSlice& uri)
+{
+    if (uri.startsWith(UnownedStringSlice::fromLiteral("file:///")))
+        return UnownedStringSlice(uri.begin() + 8, uri.end());
+    if (uri.startsWith(UnownedStringSlice::fromLiteral("file://")))
+        return UnownedStringSlice(uri.begin() + 7, uri.end());
+    return uri;
+}
+
+// Parse SARIF JSON output from GCC 13+ or Clang 15+
+// SARIF 2.1.0 format: https://docs.oasis-open.org/sarif/sarif/v2.1.0/
+static SlangResult parseSARIFOutput(
+    const UnownedStringSlice& sarifJSON,
+    IArtifactDiagnostics* diagnostics)
+{
+    // Setup JSON parsing infrastructure
+    SourceManager sourceManager;
+    sourceManager.initialize(nullptr, nullptr);
+    DiagnosticSink sink(&sourceManager, nullptr);
+    RefPtr<JSONContainer> container = new JSONContainer(&sourceManager);
+
+    // Create source file and view for JSON parsing
+    String contents(sarifJSON);
+    SourceFile* sourceFile =
+        sourceManager.createSourceFileWithString(PathInfo::makeUnknown(), contents);
+    SourceView* sourceView = sourceManager.createSourceView(sourceFile, nullptr, SourceLoc());
+
+    // Initialize lexer and builder
+    JSONLexer lexer;
+    lexer.init(sourceView, &sink);
+    JSONBuilder builder(container);
+
+    // Parse JSON
+    JSONParser parser;
+    if (SLANG_FAILED(parser.parse(&lexer, sourceView, &builder, &sink)))
+    {
+#ifdef SLANG_GCC_PARSER_DEBUG_VERBOSE
+        fprintf(stderr, "[SARIF] JSON parse failed\n");
+#endif
+        return SLANG_FAIL; // Malformed JSON
+    }
+
+    const JSONValue& root = builder.getRootValue();
+    if (root.getKind() != JSONValue::Kind::Object)
+    {
+#ifdef SLANG_GCC_PARSER_DEBUG_VERBOSE
+        fprintf(stderr, "[SARIF] Root is not an object\n");
+#endif
+        return SLANG_FAIL;
+    }
+
+    // Navigate to runs[0].results[]
+    JSONKey runsKey = container->getKey(UnownedStringSlice::fromLiteral("runs"));
+    JSONValue runsValue = container->findObjectValue(root, runsKey);
+    if (runsValue.getKind() != JSONValue::Kind::Array)
+        return SLANG_FAIL;
+
+    auto runs = container->getArray(runsValue);
+    if (runs.getCount() == 0)
+        return SLANG_OK; // No runs, no diagnostics (valid SARIF)
+
+    const JSONValue& run = runs[0];
+    if (run.getKind() != JSONValue::Kind::Object)
+        return SLANG_FAIL;
+
+    JSONKey resultsKey = container->getKey(UnownedStringSlice::fromLiteral("results"));
+    JSONValue resultsValue = container->findObjectValue(run, resultsKey);
+    if (resultsValue.getKind() != JSONValue::Kind::Array)
+        return SLANG_OK; // No results (valid, just no diagnostics)
+
+    auto results = container->getArray(resultsValue);
+
+    // Extract each diagnostic
+    SliceAllocator allocator;
+    List<ArtifactDiagnostic> workDiagnostics;
+
+    for (Index i = 0; i < results.getCount(); ++i)
+    {
+        const JSONValue& result = results[i];
+        if (result.getKind() != JSONValue::Kind::Object)
+            continue; // Skip malformed result
+
+        ArtifactDiagnostic diagnostic;
+        diagnostic.location.line = 0;
+        diagnostic.location.column = 0;
+        diagnostic.severity = ArtifactDiagnostic::Severity::Error; // Default
+        diagnostic.stage = ArtifactDiagnostic::Stage::Compile;     // Default
+
+        // Extract level (severity)
+        JSONKey levelKey = container->getKey(UnownedStringSlice::fromLiteral("level"));
+        JSONValue levelValue = container->findObjectValue(result, levelKey);
+        if (levelValue.getKind() == JSONValue::Kind::String)
+        {
+            UnownedStringSlice level = container->getString(levelValue);
+            _parseSARIFLevel(level, diagnostic.severity); // Ignore failure, use default
+        }
+
+        // Extract message.text
+        JSONKey messageKey = container->getKey(UnownedStringSlice::fromLiteral("message"));
+        JSONValue messageValue = container->findObjectValue(result, messageKey);
+        if (messageValue.getKind() == JSONValue::Kind::Object)
+        {
+            JSONKey textKey = container->getKey(UnownedStringSlice::fromLiteral("text"));
+            JSONValue textValue = container->findObjectValue(messageValue, textKey);
+            if (textValue.getKind() == JSONValue::Kind::String)
+            {
+                UnownedStringSlice text = container->getString(textValue);
+                diagnostic.text = allocator.allocate(text);
+                diagnostic.stage = _inferStageFromMessage(text);
+            }
+        }
+
+        // Extract locations[0].physicalLocation
+        JSONKey locationsKey = container->getKey(UnownedStringSlice::fromLiteral("locations"));
+        JSONValue locationsValue = container->findObjectValue(result, locationsKey);
+        if (locationsValue.getKind() == JSONValue::Kind::Array)
+        {
+            auto locations = container->getArray(locationsValue);
+            if (locations.getCount() > 0)
+            {
+                const JSONValue& location = locations[0];
+                if (location.getKind() == JSONValue::Kind::Object)
+                {
+                    // Extract physicalLocation
+                    JSONKey physicalKey =
+                        container->getKey(UnownedStringSlice::fromLiteral("physicalLocation"));
+                    JSONValue physicalValue = container->findObjectValue(location, physicalKey);
+                    if (physicalValue.getKind() == JSONValue::Kind::Object)
+                    {
+                        // Extract artifactLocation.uri
+                        JSONKey artifactKey =
+                            container->getKey(UnownedStringSlice::fromLiteral("artifactLocation"));
+                        JSONValue artifactValue =
+                            container->findObjectValue(physicalValue, artifactKey);
+                        if (artifactValue.getKind() == JSONValue::Kind::Object)
+                        {
+                            JSONKey uriKey =
+                                container->getKey(UnownedStringSlice::fromLiteral("uri"));
+                            JSONValue uriValue = container->findObjectValue(artifactValue, uriKey);
+                            if (uriValue.getKind() == JSONValue::Kind::String)
+                            {
+                                UnownedStringSlice uri = container->getString(uriValue);
+                                diagnostic.filePath = allocator.allocate(_stripFileURIPrefix(uri));
+                            }
+                        }
+
+                        // Extract region.startLine and startColumn
+                        JSONKey regionKey =
+                            container->getKey(UnownedStringSlice::fromLiteral("region"));
+                        JSONValue regionValue =
+                            container->findObjectValue(physicalValue, regionKey);
+                        if (regionValue.getKind() == JSONValue::Kind::Object)
+                        {
+                            JSONKey lineKey =
+                                container->getKey(UnownedStringSlice::fromLiteral("startLine"));
+                            JSONValue lineValue = container->findObjectValue(regionValue, lineKey);
+                            if (lineValue.getKind() == JSONValue::Kind::Integer)
+                            {
+                                diagnostic.location.line = Int(container->asInteger(lineValue));
+                            }
+
+                            JSONKey colKey =
+                                container->getKey(UnownedStringSlice::fromLiteral("startColumn"));
+                            JSONValue colValue = container->findObjectValue(regionValue, colKey);
+                            if (colValue.getKind() == JSONValue::Kind::Integer)
+                            {
+                                diagnostic.location.column = Int(container->asInteger(colValue));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add to working list
+        workDiagnostics.add(diagnostic);
+    }
+
+    // Transfer to output diagnostics
+    for (const auto& diag : workDiagnostics)
+    {
+        diagnostics->add(diag);
+    }
+
+#ifdef SLANG_GCC_PARSER_DEBUG_VERBOSE
+    fprintf(stderr, "[SARIF] Extracted %d diagnostics\n", int(workDiagnostics.getCount()));
+#endif
+
+    return SLANG_OK;
+}
+
 namespace
 { // anonymous
 
@@ -738,6 +1070,69 @@ static SlangResult _parseGCCFamilyLine(
             }
         });
 
+    // Auto-detect SARIF format
+    // Clang may output warnings before the JSON, so search for the first '{'
+    UnownedStringSlice stderrText = exeRes.standardError.getUnownedSlice();
+    Index jsonStart = stderrText.indexOf('{');
+
+    if (jsonStart != -1)
+    {
+        // Find the end of the JSON by finding the matching '}'
+        // For now, search for newline after the last '}' as SARIF is typically one line
+        Index jsonEnd = stderrText.lastIndexOf('}');
+        if (jsonEnd != -1)
+        {
+            // Include the closing brace
+            jsonEnd++;
+
+            // Extract JSON portion
+            UnownedStringSlice sarifJSON(
+                stderrText.begin() + jsonStart,
+                stderrText.begin() + jsonEnd);
+
+            if (s_debugEnabled)
+            {
+                fprintf(stderr, "\n=== Detected SARIF JSON output ===\n");
+                fprintf(stderr, "JSON length: %d bytes\n", int(sarifJSON.getLength()));
+                fprintf(stderr, "First 100 chars: %.100s...\n", sarifJSON.begin());
+                fprintf(stderr, "=== Attempting SARIF parsing ===\n");
+            }
+
+            // Attempt SARIF parsing
+            if (SLANG_SUCCEEDED(parseSARIFOutput(sarifJSON, diagnostics)))
+            {
+                if (s_debugEnabled)
+                {
+                    fprintf(stderr, "=== SARIF parsing succeeded ===\n");
+                    fprintf(
+                        stderr,
+                        "Extracted %d diagnostics from SARIF\n\n",
+                        int(diagnostics->getCount()));
+                }
+
+                // Set result based on diagnostics
+                if (diagnostics->hasOfAtLeastSeverity(ArtifactDiagnostic::Severity::Error) ||
+                    exeRes.resultCode != 0)
+                {
+                    diagnostics->setResult(SLANG_FAIL);
+                }
+
+                return SLANG_OK;
+            }
+
+            // SARIF parsing failed, fall back to text parsing
+            if (s_debugEnabled)
+            {
+                fprintf(stderr, "=== SARIF parsing failed, falling back to text parser ===\n\n");
+            }
+
+            // Reset diagnostics for text parsing
+            diagnostics->reset();
+            diagnostics->setRaw(SliceUtil::asCharSlice(exeRes.standardError));
+        }
+    }
+
+    // Text parsing path (original logic)
     if (s_debugEnabled)
     {
         // Debug output: show raw compiler output
@@ -1247,6 +1642,67 @@ static SlangResult _parseGCCFamilyLine(
         set->addCompiler(compiler);
     }
     return SLANG_OK;
+}
+
+// ============================================================================
+// GCCDownstreamCompiler Implementation
+// ============================================================================
+
+SlangResult GCCDownstreamCompiler::compile(const CompileOptions& options, IArtifact** outArtifact)
+{
+    // Check if SARIF should be used
+    // Thread-safe environment variable check (cached)
+    static std::once_flag s_sarifCheckFlag;
+    static int s_sarifSetting = -1; // -1=auto, 0=force off, 1=force on
+
+    std::call_once(
+        s_sarifCheckFlag,
+        []()
+        {
+            StringBuilder envValue;
+            if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                    UnownedStringSlice("SLANG_USE_SARIF_DIAGNOSTICS"),
+                    envValue)))
+            {
+                UnownedStringSlice value = envValue.getUnownedSlice();
+                if (value == "0" || value == "false" || value == "FALSE")
+                    s_sarifSetting = 0;
+                else if (value == "1" || value == "true" || value == "TRUE")
+                    s_sarifSetting = 1;
+            }
+        });
+
+    // Determine if SARIF should be used
+    bool useSARIF = false;
+    if (s_sarifSetting == 1)
+    {
+        useSARIF = true; // Force on
+    }
+    else if (s_sarifSetting == -1)
+    {
+        useSARIF =
+            supportsSARIF(m_desc, m_cmdLine.m_executableLocation); // Auto-detect with runtime test
+    }
+    // s_sarifSetting == 0: force off, useSARIF stays false
+
+    // Inject SARIF flag temporarily if enabled
+    CommandLine originalCmdLine = m_cmdLine;
+    if (useSARIF)
+    {
+        const char* sarifFlag = getSARIFFlag(m_desc);
+        if (sarifFlag)
+        {
+            m_cmdLine.addArg(sarifFlag);
+        }
+    }
+
+    // Call parent compile implementation
+    SlangResult result = Super::compile(options, outArtifact);
+
+    // Restore original command line
+    m_cmdLine = originalCmdLine;
+
+    return result;
 }
 
 } // namespace Slang
