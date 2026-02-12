@@ -3,7 +3,7 @@
 // value, the associated types cannot be statically determined, so the compiler
 // must reject the specialization with error 33180.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 #lang slang 2025
 

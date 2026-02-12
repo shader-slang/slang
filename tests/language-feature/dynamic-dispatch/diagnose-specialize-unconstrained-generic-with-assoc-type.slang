@@ -4,7 +4,7 @@
 // currently produces an internal compiler error (99999) instead.
 
 // Disabled: ICE -- should emit error 33180 but crashes with error 99999
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 #lang slang 2025
 
