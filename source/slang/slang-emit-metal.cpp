@@ -1197,7 +1197,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_RayQueryType:
         {
-            m_writer->emit("raytracing::intersection_query<raytracing::triangle_data, raytracing::instancing>");
+            m_writer->emit("raytracing::intersection_query<raytracing::triangle_data, "
+                           "raytracing::instancing>");
             return;
         }
     case kIROp_ParameterBlockType:
