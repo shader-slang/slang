@@ -53,7 +53,8 @@ SlangResult SlangCTool::innerMain(
     for (int i = 1; i < argc; i++)
         args.add(argv[i]);
 
-    SLANG_RETURN_ON_FAIL(compileRequest->processCommandLineArguments(args.getBuffer(), (int)args.getCount()));
+    SLANG_RETURN_ON_FAIL(
+        compileRequest->processCommandLineArguments(args.getBuffer(), (int)args.getCount()));
 
     SlangResult compileRes = SLANG_OK;
 

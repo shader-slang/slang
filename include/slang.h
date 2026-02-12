@@ -913,9 +913,9 @@ typedef uint32_t SlangSizeT;
 
     enum SlangDiagnosticColor
     {
-        SLANG_DIAGNOSTIC_COLOR_AUTO = 0,   // Use color if output sink is a tty
-        SLANG_DIAGNOSTIC_COLOR_ALWAYS,     // Always use color
-        SLANG_DIAGNOSTIC_COLOR_NEVER,      // Never use color
+        SLANG_DIAGNOSTIC_COLOR_AUTO = 0, // Use color if output sink is a tty
+        SLANG_DIAGNOSTIC_COLOR_ALWAYS,   // Always use color
+        SLANG_DIAGNOSTIC_COLOR_NEVER,    // Never use color
     };
 
     // All compiler option names supported by Slang.

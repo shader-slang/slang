@@ -22,7 +22,10 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
 {
     // Use the stderr writer directly instead of a callback.
     // This allows the API to correctly detect TTY status for -diagnostic-color auto.
-    spSetWriter(compileRequest, SLANG_WRITER_CHANNEL_DIAGNOSTIC, StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
+    spSetWriter(
+        compileRequest,
+        SLANG_WRITER_CHANNEL_DIAGNOSTIC,
+        StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
     spSetCommandLineCompilerMode(compileRequest);
 
     SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
