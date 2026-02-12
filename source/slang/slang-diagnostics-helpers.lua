@@ -238,7 +238,9 @@ local function warning(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "warning", message, primary_span, ...)
 end
 
-local function note(name, code, message, primary_span, ...)
+-- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
+-- For notes within diagnostics, use the `note` function above (line 37).
+local function note_diagnostic(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
