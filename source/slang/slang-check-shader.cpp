@@ -872,8 +872,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     // via [numthreads] on the entry point itself. GLSL allows each axis to be
     // specified in a separate declaration, so we merge all
     // GLSLLayoutLocalSizeAttribute values into a single NumThreadsAttribute.
-    if (stage == Stage::Compute &&
-        !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+    if (stage == Stage::Compute && !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
         if (parentDecl)
@@ -881,20 +880,17 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             NumThreadsAttribute* numThreads = nullptr;
             for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
             {
-                auto glslAttr =
-                    emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>();
+                auto glslAttr = emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>();
                 if (!glslAttr)
                     continue;
 
                 if (!numThreads)
                 {
-                    numThreads =
-                        getCurrentASTBuilder()->create<NumThreadsAttribute>();
+                    numThreads = getCurrentASTBuilder()->create<NumThreadsAttribute>();
                     for (int i = 0; i < 3; ++i)
                     {
                         numThreads->extents[i] = glslAttr->extents[i];
-                        numThreads->specConstExtents[i] =
-                            glslAttr->specConstExtents[i];
+                        numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                     }
                 }
                 else
@@ -906,17 +902,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                         if (glslAttr->specConstExtents[i])
                         {
                             numThreads->extents[i] = nullptr;
-                            numThreads->specConstExtents[i] =
-                                glslAttr->specConstExtents[i];
+                            numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
                         }
                         else if (glslAttr->extents[i])
                         {
-                            if (auto cint =
-                                    as<ConstantIntVal>(glslAttr->extents[i]))
+                            if (auto cint = as<ConstantIntVal>(glslAttr->extents[i]))
                             {
                                 if (cint->getValue() != 1)
-                                    numThreads->extents[i] =
-                                        glslAttr->extents[i];
+                                    numThreads->extents[i] = glslAttr->extents[i];
                             }
                             else
                             {
