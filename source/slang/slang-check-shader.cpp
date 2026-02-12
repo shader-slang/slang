@@ -867,12 +867,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
-    // For compute entry points using GLSL syntax, the thread group size is
-    // specified via layout(local_size_x = N) on a sibling EmptyDecl rather than
-    // via [numthreads] on the entry point itself. GLSL allows each axis to be
-    // specified in a separate declaration, so we merge all
-    // GLSLLayoutLocalSizeAttribute values into a single NumThreadsAttribute.
-    if (stage == Stage::Compute && !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+    // For compute, mesh, and amplification (task) entry points using GLSL
+    // syntax, the thread group size is specified via layout(local_size_x = N)
+    // on a sibling EmptyDecl rather than via [numthreads] on the entry point
+    // itself. GLSL allows each axis to be specified in a separate declaration,
+    // so we merge all GLSLLayoutLocalSizeAttribute values into a single
+    // NumThreadsAttribute.
+    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification) &&
+        !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
     {
         auto parentDecl = entryPointFuncDecl->parentDecl;
         if (parentDecl)
