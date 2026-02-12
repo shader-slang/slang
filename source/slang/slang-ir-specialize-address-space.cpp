@@ -95,6 +95,7 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         auto specializedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, func));
 
         // Update the parameter types with new address spaces in the specialized function.
+        List<IRInst*> updatedPtrParams;
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
@@ -110,9 +111,16 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
+                updatedPtrParams.add(param);
             }
             paramIndex++;
         }
+
+        // Propagate the new address spaces from the updated parameters through the
+        // function body. Without this, instructions like FieldAddress that were cloned
+        // from the original function retain their old address space (e.g. UserPointer),
+        // causing a mismatch with the specialized parameter address space.
+        propagateAddressSpaceFromInsts(_Move(updatedPtrParams));
 
         // Update the function type.
         fixUpFuncType(specializedFunc);
@@ -412,15 +420,6 @@ void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrS
 void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
 {
     HashSet<IRInst*> visited;
-    auto addUserToWorkList = [&](IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (visited.add(user))
-                workList.add(user);
-        }
-    };
     for (auto item : workList)
     {
         visited.add(item);
@@ -464,7 +463,10 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
                     if (newType != user->getDataType())
                     {
                         user->setFullType(newType);
-                        addUserToWorkList(user);
+                        // Add the updated instruction itself to the worklist so it
+                        // can propagate its new address space to its own users.
+                        if (visited.add(user))
+                            workList.add(user);
                     }
                     break;
                 }
