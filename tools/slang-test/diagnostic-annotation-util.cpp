@@ -387,15 +387,11 @@ static bool checkAnnotations(
 {
     outMissingAnnotations.clear();
 
-    // Track which diagnostics are matched by annotations (for exhaustive checking)
     List<bool> diagnosticMatched;
-    if (exhaustive)
+    diagnosticMatched.setCount(diagnostics.getCount());
+    for (Index i = 0; i < diagnostics.getCount(); ++i)
     {
-        diagnosticMatched.setCount(diagnostics.getCount());
-        for (Index i = 0; i < diagnostics.getCount(); ++i)
-        {
-            diagnosticMatched[i] = false;
-        }
+        diagnosticMatched[i] = false;
     }
 
     for (const auto& annotation : annotations)
@@ -408,52 +404,32 @@ static bool checkAnnotations(
             // Can match against: message, severity, errorCode, or "severity errorCode"
             for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
             {
+                if (diagnosticMatched[diagIdx])
+                    continue;
+
                 const auto& diag = diagnostics[diagIdx];
                 UnownedStringSlice expected = annotation.expectedSubstring.getUnownedSlice();
 
-                // Check message
+                // Check message, severity, errorCode, or "severity errorCode"
+                bool matches = false;
                 if (diag.message.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.severity.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.errorCode.indexOf(expected) != -1)
+                    matches = true;
+                else
                 {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
+                    StringBuilder combined;
+                    combined << diag.severity << " " << diag.errorCode;
+                    if (combined.produceString().indexOf(expected) != -1)
+                        matches = true;
                 }
 
-                // Check severity
-                if (diag.severity.indexOf(expected) != -1)
+                if (matches)
                 {
                     found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check error code
-                if (diag.errorCode.indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check "severity errorCode" combination
-                StringBuilder combined;
-                combined << diag.severity << " " << diag.errorCode;
-                if (combined.produceString().indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
+                    diagnosticMatched[diagIdx] = true;
                     break;
                 }
             }
@@ -528,7 +504,12 @@ static bool checkAnnotations(
                     else
                         diagInfo << diag.beginCol << "-" << diag.endCol;
                     diagInfo << ": \"" << diag.message << "\"";
+                    if (diagnosticMatched[diagIdx])
+                        diagInfo << " (already matched)";
                     candidateDiagnostics.add(diagInfo.produceString());
+
+                    if (diagnosticMatched[diagIdx])
+                        continue;
 
                     // Check if this is a full match
                     if (diag.beginCol == annotation.columnStart &&
@@ -541,35 +522,24 @@ static bool checkAnnotations(
                         // Check message, severity, errorCode, or "severity errorCode"
                         bool matches = false;
                         if (diag.message.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.severity.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.errorCode.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else
                         {
                             StringBuilder combined;
                             combined << diag.severity << " " << diag.errorCode;
                             if (combined.produceString().indexOf(expected) != -1)
-                            {
                                 matches = true;
-                            }
                         }
 
                         if (matches)
                         {
                             messageMatched = true;
                             found = true;
-                            if (exhaustive)
-                            {
-                                diagnosticMatched[diagIdx] = true;
-                            }
+                            diagnosticMatched[diagIdx] = true;
                             break;
                         }
                     }
