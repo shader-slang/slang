@@ -1,5 +1,10 @@
 -- Helper functions for defining diagnostics
 
+-- Set to false to enable uniqueness checking for diagnostic codes.
+-- Currently set to true to allow duplicate codes during the transition period.
+-- See: https://github.com/shader-slang/slang/issues/6736
+local allow_duplicate_diagnostic_codes = true
+
 local diagnostics = {}
 
 -- Helper function to create a span
@@ -491,7 +496,7 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      if seen_codes[diag.code] then
+      if seen_codes[diag.code] and not allow_duplicate_diagnostic_codes then
         table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
       else
         seen_codes[diag.code] = i
