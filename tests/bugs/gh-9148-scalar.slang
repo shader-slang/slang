@@ -10,7 +10,7 @@ struct Foo {
     int val;
 };
 
-// TEST_INPUT:ubuffer(data=[42 7], stride=4):name=buf
+//TEST_INPUT:ubuffer(data=[42 7], stride=4):name=buf
 RWStructuredBuffer<Foo> buf;
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
