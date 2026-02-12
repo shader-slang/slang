@@ -20,20 +20,20 @@
 // There are three types of capability definitions:
 // - `def`: this will introduce an new capability atom. If there is an inheritance clause,
 //    the capability name will expand to all inherited atoms plus the newly introduced atom.
-// - `abstract`: an abstract capability does not introduce an actual atom. Primarily used to 
+// - `abstract`: an abstract capability does not introduce an actual atom. Primarily used to
 //   make disjunctions using the following rules:
 //      1. Each type of abstract atom defines a "keyhole". `target` and `stage` are distinct "keyholes".
-//      2. Any atom immediately derived off of an abstract atom is a "key atom". 
+//      2. Any atom immediately derived off of an abstract atom is a "key atom".
 //      3. Every conjunction may only populate each "keyhole" once, else the set is incompatible.
 //          * If joining ('+') incompatible sets, an invalid capability is made.
 //          * If Inclusive joining ('|') incompatible sets, a disjunction is made.
-//      4. ex: `hlsl + glsl` both populate the same "keyhole" of `target`, this is incompatible. 
+//      4. ex: `hlsl + glsl` both populate the same "keyhole" of `target`, this is incompatible.
 //      5. ex: `hlsl + _sm_6_0` both populate same keyholes of `hlsl` and `hlsl`, this is compatible.
-//      6. ex: `hlsl | glsl` creates a disjunction of 2 sets: `hlsl` and `glsl`. This is due to the 
+//      6. ex: `hlsl | glsl` creates a disjunction of 2 sets: `hlsl` and `glsl`. This is due to the
 //         2 sets being incompatible.
-//      7. Having a not populated "keyhole" means your set is compatible with any "key atom" of 
+//      7. Having a not populated "keyhole" means your set is compatible with any "key atom" of
 //         distinct "keyhole".
-//      8. ex: `vertex + glsl` works because 'vertex' has a unpopulated `target` "keyhole", and 
+//      8. ex: `vertex + glsl` works because 'vertex' has a unpopulated `target` "keyhole", and
 //         therefore is compatible with all `target` "key atoms"
 
 // - `alias`: this defines an alias and does not introduce actual atoms.
@@ -48,21 +48,21 @@
 //    a. "my comment" will be associated with `textualTarget`
 //      ```
 //      /// my comment
-//      def textualTarget; 
+//      def textualTarget;
 //      ```
 //
 //    b. "" will be associated with `textualTarget`
 //      ```
 //      /// my comment
 //      //
-//      def textualTarget; 
+//      def textualTarget;
 //      ```
 //
 //    c. "my comment\n additional info" will be associated with `textualTarget`
 //      ```
 //      /// my comment
 //      /// additional info
-//      def textualTarget; 
+//      def textualTarget;
 //      ```
 //
 // 3. If `[GROUP]` is found apart of a `///[GROUP]` string, this is treated as a "header group".
@@ -73,7 +73,7 @@
 //      ```
 //      /// [Target]
 //      /// my comment
-//      def textualTarget; 
+//      def textualTarget;
 //      ```
 // 4. All 'documentable atoms' must a documentation comment assigned to them. `[GROUP]` does not count as a documentation comment.
 
@@ -1433,7 +1433,7 @@ alias amplification = _amplification + _meshshading;
 // shader stage groups
 /// Collection of all shader stages
 /// [Compound]
-alias any_stage = vertex | fragment | compute | hull | domain | geometry 
+alias any_stage = vertex | fragment | compute | hull | domain | geometry
                  | raygen | intersection | anyhit | closesthit | miss | mesh
                  | amplification | callable
                  ;
@@ -1646,7 +1646,7 @@ alias sm_4_1 = sm_4_1_version
 /// HLSL shader model 5.0 and related capabilities of other targets.
 /// Does not include related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_5_0_version = _sm_5_0 
+alias sm_5_0_version = _sm_5_0
              | _GLSL_330
              | spirv_1_0
              | _cuda_sm_6_0
@@ -1679,7 +1679,7 @@ alias sm_5_1_version = _sm_5_1
 /// HLSL shader model 5.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_5_1 = sm_5_1_version 
+alias sm_5_1 = sm_5_1_version
              | GL_EXT_nonuniform_qualifier + GL_ARB_gpu_shader5
              // previous
              | sm_5_0
@@ -1688,10 +1688,10 @@ alias sm_5_1 = sm_5_1_version
 /// HLSL shader model 6.0 and related capabilities of other targets.
 /// Does not include related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_6_0_version = _sm_6_0 
+alias sm_6_0_version = _sm_6_0
              | _GLSL_450
              | spirv_1_3
-             | _cuda_sm_6_0 
+             | _cuda_sm_6_0
              | metal
              | cpp
              | llvm
@@ -1699,7 +1699,7 @@ alias sm_6_0_version = _sm_6_0
 /// HLSL shader model 6.0 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_6_0 = sm_6_0_version 
+alias sm_6_0 = sm_6_0_version
              |  GL_KHR_shader_subgroup_ballot + GL_KHR_shader_subgroup_shuffle + GL_KHR_shader_subgroup_arithmetic + GL_KHR_shader_subgroup_quad + GL_KHR_shader_subgroup_vote
              // previous
              | sm_5_1
@@ -1708,9 +1708,9 @@ alias sm_6_0 = sm_6_0_version
 /// HLSL shader model 6.1 and related capabilities of other targets.
 /// Does not include related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_6_1_version = _sm_6_1 
-             | _GLSL_450 
-             | spirv_1_3 
+alias sm_6_1_version = _sm_6_1
+             | _GLSL_450
+             | spirv_1_3
              | _cuda_sm_7_0
              | metal
              | cpp
@@ -1719,8 +1719,8 @@ alias sm_6_1_version = _sm_6_1
 /// HLSL shader model 6.1 and related capabilities of other targets.
 /// Includes related GLSL/SPIRV extensions.
 /// [Version]
-alias sm_6_1 = sm_6_1_version 
-             | GL_EXT_fragment_shader_barycentric 
+alias sm_6_1 = sm_6_1_version
+             | GL_EXT_fragment_shader_barycentric
              // previous
              | sm_6_0
              ;
@@ -1748,7 +1748,7 @@ alias sm_6_2 = sm_6_2_version
 /// Does not include related GLSL/SPIRV extensions.
 /// [Version]
 alias sm_6_3_version = _sm_6_3
-             | _GLSL_460 
+             | _GLSL_460
              | spirv_1_4
              | _cuda_sm_7_0
              | metal
@@ -2054,7 +2054,7 @@ alias GLSL_440 = _GLSL_440
                ;
 /// GLSL 450 and related capabilities of other targets.
 /// [Version]
-alias GLSL_450 = _GLSL_450 
+alias GLSL_450 = _GLSL_450
                | _sm_6_0
                | _cuda_sm_6_0
                | spirv_1_3
@@ -2133,6 +2133,15 @@ alias cuda_sm_8_0 = _cuda_sm_8_0 | cuda_sm_7_0;
 /// [Version]
 alias cuda_sm_9_0 = _cuda_sm_9_0 | cuda_sm_8_0 | sm_5_0;
 
+/// Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
+/// On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
+/// [Compound]
+alias atomic_reduce = _cuda_sm_7_0 | glsl | hlsl | metal | spirv | wgsl | cpp | llvm;
+
+/// Atomic operations on BFloat16 types. Requires SM 9.0 (Hopper) or higher on CUDA.
+/// [Compound]
+alias atomic_bfloat16 = _cuda_sm_9_0;
+
 // Metal profile capabilities
 //
 /// Use `metallib_2_3` instead
@@ -2159,19 +2168,19 @@ alias appendstructuredbuffer = sm_5_0_version;
 /// (hlsl only) Capabilities required to use hlsl atomic operations
 /// [Compound]
 alias atomic_hlsl = _sm_4_0;
-/// (hlsl only) Capabilities required to use hlsl NVAPI atomics 
+/// (hlsl only) Capabilities required to use hlsl NVAPI atomics
 /// [Compound]
 alias atomic_hlsl_nvapi = _sm_4_0 + hlsl_nvapi;
-/// (hlsl only) Capabilities required to use hlsl sm_6_6 atomics 
+/// (hlsl only) Capabilities required to use hlsl sm_6_6 atomics
 /// [Compound]
 alias atomic_hlsl_sm_6_6 = _sm_6_6;
-/// Capabilities required to use ByteAddressBuffer 
+/// Capabilities required to use ByteAddressBuffer
 /// [Compound]
 alias byteaddressbuffer = sm_4_0_version;
-/// Capabilities required to use RWByteAddressBuffer 
+/// Capabilities required to use RWByteAddressBuffer
 /// [Compound]
 alias byteaddressbuffer_rw = sm_4_0_version;
-/// Capabilities required to use ConsumeStructuredBuffer 
+/// Capabilities required to use ConsumeStructuredBuffer
 /// [Compound]
 alias consumestructuredbuffer = sm_5_0_version;
 /// Capabilities required to use StructuredBuffer
@@ -2238,7 +2247,7 @@ alias texture_sm_4_1_samplerless = texture_sm_4_1
 
 // Supposedly only works for some shader stages, we support all stages for now since this
 // seems wrong.
-/// Capabilities required to use 'compute/fragment shader only' texture operations. 
+/// Capabilities required to use 'compute/fragment shader only' texture operations.
 /// We do not require 'compute'/'fragment' shader capabilities since this seems to be incorrect behavior despite what official documentation says.
 /// [Compound]
 alias texture_sm_4_1_compute_fragment = texture_sm_4_1;
@@ -2312,10 +2321,10 @@ alias texturefootprint = GL_NV_shader_texture_footprint + GLSL_450 | hlsl_nvapi 
 /// [Compound]
 alias texturefootprintclamp = texturefootprint + GL_ARB_sparse_texture_clamp;
 
-/// Capabilities required to use sm_4_0 features apart of GL_ARB_gpu_shader5 
+/// Capabilities required to use sm_4_0 features apart of GL_ARB_gpu_shader5
 /// [Compound]
 alias shader5_sm_4_0 = GL_ARB_gpu_shader5 | sm_4_0_version;
-/// Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5 
+/// Capabilities required to use sm_5_0 features apart of GL_ARB_gpu_shader5
 /// [Compound]
 alias shader5_sm_5_0 = GL_ARB_gpu_shader5 | sm_5_0_version;
 
@@ -2366,7 +2375,7 @@ alias subgroup_basic_ballot = glsl + GL_KHR_shader_subgroup_basic + subgroup_bal
                             ;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_vote'
 /// [Compound]
-alias subgroup_vote = GL_KHR_shader_subgroup_vote 
+alias subgroup_vote = GL_KHR_shader_subgroup_vote
                     | _sm_6_0
                     | _cuda_sm_7_0
                     | wgsl
@@ -2377,7 +2386,7 @@ alias subgroup_vote = GL_KHR_shader_subgroup_vote
 alias shaderinvocationgroup = subgroup_vote;
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_arithmetic'
 /// [Compound]
-alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic 
+alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic
                           | _sm_6_0
                           | _cuda_sm_7_0
                           | wgsl
@@ -2386,7 +2395,7 @@ alias subgroup_arithmetic = GL_KHR_shader_subgroup_arithmetic
 
 /// Capabilities required to use GLSL-style subgroup operations 'subgroup_shuffle'
 /// [Compound]
-alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle 
+alias subgroup_shuffle = GL_KHR_shader_subgroup_shuffle
                        | _sm_6_0
                        | _cuda_sm_7_0
                        | wgsl
@@ -2420,7 +2429,7 @@ alias subgroup_partitioned = _sm_6_5
 
 /// Capabilities required to use GLSL-style subgroup rotate operations 'subgroup_rotate'
 /// [Compound]
-alias subgroup_rotate = GL_KHR_shader_subgroup_rotate 
+alias subgroup_rotate = GL_KHR_shader_subgroup_rotate
                        | metal
                        | _cuda_sm_5_0
                        ;
