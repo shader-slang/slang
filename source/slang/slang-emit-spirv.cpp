@@ -8024,7 +8024,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return inner;
         }
 
-        maybeRequireCoopMatConversionNV(fromType, toType);
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
         const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
         const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
@@ -8174,7 +8174,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 as<IRMatrixType>(toTypeV));
         }
 
-        maybeRequireCoopMatConversionNV(fromType, toType);
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
         return emitOpFConvert(parent, inst, toTypeV, inst->getOperand(0));
     }
@@ -8192,7 +8192,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (isIntegralType(fromType))
         {
             const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
-            maybeRequireCoopMatConversionNV(fromType, toType);
+            maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
             return fromInfo.isSigned
                        ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
@@ -8266,7 +8266,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        maybeRequireCoopMatConversionNV(fromType, toType);
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
         SLANG_ASSERT(isIntegralType(toType));
 
