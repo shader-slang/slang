@@ -1736,7 +1736,7 @@ Val* FuncCallIntVal::tryFoldImpl(
         LOGICAL_OPERATOR_CASE(&&)
         LOGICAL_OPERATOR_CASE(||)
         // Special cases need their "operator" names quoted.
-        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() != 0) ? 1 : 0);)
+        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() == 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
         SPECIAL_OPERATOR_CASE("?:",
                               resultValue = constArgs[0]->getValue() != 0

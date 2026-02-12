@@ -14,7 +14,7 @@ suitable for building multi-layer perceptrons (MLPs) and similar architectures.
 
 1. **Construction:** Create a layer with weight/bias addresses pointing into your storage:
    ```
-   let layer = FFLayer<float, Vec4, Vec2, Storage, ReLU<float>>(weightAddr, biasAddr);
+   let layer = FFLayer<float, Vec4, Vec2, Storage, LinearLayout, ReLU<float>>(weightAddr, biasAddr);
    ```
 
 2. **Forward pass:** Call `eval()` with storage and input:
@@ -31,7 +31,7 @@ suitable for building multi-layer perceptrons (MLPs) and similar architectures.
 4. **With custom activation parameters** (e.g., LeakyReLU with custom alpha):
    ```
    let leakyRelu = LeakyReLU<float>(0.2);  // alpha = 0.2
-   let layer = FFLayer<float, Vec4, Vec2, Storage, LeakyReLU<float>>(weightAddr, biasAddr, leakyRelu);
+   let layer = FFLayer<float, Vec4, Vec2, Storage, LinearLayout, LeakyReLU<float>>(weightAddr, biasAddr, leakyRelu);
    ```
 
 ## Parameter Layout
@@ -49,13 +49,15 @@ public struct FFLayer<
     InputVector,
     OutputVector,
     Storage,
+    Layout,
     Activation,
     let HasBias : bool = true
 >
-    : ILayer<T, InputVector, OutputVector, Storage, Activation>
+    : ILayer<T, InputVector, OutputVector, Storage, Layout, Activation>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where Storage : IStorage<T>
+    where Layout : IStorageLayout
     where InputVector : IVector<T>
     where OutputVector : IVector<T>
     where Activation : IActivation<T>
@@ -110,12 +112,12 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<S, LinearLayout, OutputVector>(
+            y = input.linearTransform<S, Layout, OutputVector>(
                 storage, storage, weightAddress, biasAddress);
         }
         else
         {
-            y = input.linearTransform<S, LinearLayout, OutputVector>(
+            y = input.linearTransform<S, Layout, OutputVector>(
                 storage, weightAddress);
         }
         return activation.eval<OutputVector>(y);
@@ -137,13 +139,13 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<S, LinearLayout, OutputVector>(
+            y = input.linearTransform<S, Layout, OutputVector>(
                 weightStorage, biasStorage, weightAddress, biasAddress);
         }
         else
         {
             // Bias is disabled; ignore biasStorage.
-            y = input.linearTransform<S, LinearLayout, OutputVector>(
+            y = input.linearTransform<S, Layout, OutputVector>(
                 weightStorage, weightAddress);
         }
         return activation.eval<OutputVector>(y);
@@ -163,11 +165,11 @@ public struct FFLayer<
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<A, LinearLayout, OutputVector>(weightAddr, biasAddr);
+            y = input.linearTransform<A, Layout, OutputVector>(weightAddr, biasAddr);
         }
         else
         {
-            y = input.linearTransform<A, LinearLayout, OutputVector>(weightAddr);
+            y = input.linearTransform<A, Layout, OutputVector>(weightAddr);
         }
         return act.eval<OutputVector>(y);
     }

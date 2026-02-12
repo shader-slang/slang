@@ -16,6 +16,14 @@ COVERAGE_HTML=1 ./tools/coverage/run-coverage.sh
 open ./coverage-html/index.html
 ```
 
+Wrapper script handles the full workflow on local workspace:
+
+```bash
+./tools/coverage/run-coverage-local.sh
+```
+
+Run `./tools/coverage/run-coverage-local.sh --help` for options.
+
 ## Command-Line Options and Environment Variables
 
 - `--report-only` - Generate reports from existing coverage data without re-running tests. Requires that coverage data was collected previously (i.e., `build/coverage-data/slang-test.profdata` exists).
@@ -38,6 +46,16 @@ All temporary coverage data is stored in `build/coverage-data/` by default to ke
 - `build/coverage-data/slang-test.profdata` - Merged and indexed profile data (kept for reuse)
 - `coverage-html/` - HTML coverage report (if `COVERAGE_HTML=1`, in repo root by default)
 - `coverage.lcov` - LCOV format report (if `COVERAGE_LCOV=1`, in repo root by default)
+
+## Record-Replay Coverage
+
+The coverage script automatically includes record-replay subsystem coverage by running focused smoke tests with `SLANG_RECORD_LAYER=1` enabled after the main test suite. This captures coverage for:
+
+- `source/slang-record-replay/record/` - API recording wrappers
+- `source/slang-record-replay/util/` - Recording utilities
+- Record manager and output stream infrastructure
+
+The record-replay smoke tests (`RecordReplaySmokeCreateSession`, `RecordReplaySmokeCompileModule`, `RecordReplaySmokeEntryPoint`) exercise basic Slang API calls with recording enabled, providing ~8-10% coverage of the record-replay subsystem. All coverage data is merged into a single unified report.
 
 ## Analyzing Coverage
 

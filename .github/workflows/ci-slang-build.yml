@@ -35,6 +35,12 @@ jobs:
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
+    permissions:
+      id-token: write # Required for Workload Identity
+      contents: read
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
 
     defaults:
       run:
@@ -45,6 +51,34 @@ jobs:
         with:
           submodules: "recursive"
           fetch-depth: "2"
+
+      # Restore sccache local cache for fork PRs (unidirectional from master)
+      - name: Restore sccache cache (fork PRs only)
+        if: runner.environment != 'self-hosted' && env.IS_FORK_PR == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
+            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
+
+      # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      # Setup sccache (GCS for internal, local disk for fork PRs)
+      - name: Setup sccache
+        if: runner.environment != 'self-hosted'
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: ${{ inputs.os }}
+          # Only provide GCS bucket for non-fork PRs (empty = local disk backend)
+          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Setup
         uses: ./.github/actions/common-setup
@@ -82,14 +116,17 @@ jobs:
         run: |
           echo "cmake version: $(cmake --version)"
 
-          # Show ccache status if available
-          if command -v ccache &> /dev/null; then
+          # Show cache status (sccache or ccache)
+          if command -v sccache &> /dev/null; then
+            echo "📊 sccache statistics (pre-build):"
+            sccache --show-stats || true
+          elif command -v ccache &> /dev/null; then
             echo "🔧 ccache configuration:"
             ccache --show-config | head -20 || true
             echo "📊 ccache statistics (pre-build):"
             ccache --show-stats || true
           else
-            echo "ℹ️  ccache not available"
+            echo "ℹ️  No cache available"
           fi
 
           if [[ "${{ inputs.platform }}" == "wasm" ]]; then
@@ -111,15 +148,19 @@ jobs:
             [ -f "slang-wasm.js" ]
             node smoke/smoke-test.js smoke/rand_float.slang computeMain
           else
-            # Prepare ccache launcher arguments if ccache is available
+            # Prepare cache launcher arguments (prefer sccache, fall back to ccache)
             cmake_launcher_defines=()
-            if [[ -n "${ccache_symlinks_path:-}" ]]; then
-              echo "🔧 Using ccache with launcher: ${ccache_symlinks_path}"
+            if [[ -n "${sccache_path:-}" ]]; then
+              echo "🔧 Using sccache with GCS: ${sccache_path}"
+              cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+              cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            elif [[ -n "${ccache_symlinks_path:-}" ]]; then
+              echo "🔧 Using ccache (local): ${ccache_symlinks_path}"
               echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"
               cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${ccache_symlinks_path}")
               cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${ccache_symlinks_path}")
             else
-              echo "ℹ️  ccache_symlinks_path not set - building without ccache"
+              echo "ℹ️  No cache compiler launcher available"
             fi
 
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
@@ -153,8 +194,11 @@ jobs:
             fi
           fi
 
-          # Show ccache statistics after build
-          if command -v ccache &> /dev/null; then
+          # Show cache statistics after build
+          if command -v sccache &> /dev/null; then
+            echo "📊 sccache statistics (post-build):"
+            sccache --show-stats
+          elif command -v ccache &> /dev/null; then
             echo "📊 ccache statistics (post-build):"
             ccache --show-stats || true
           fi
@@ -236,3 +280,11 @@ jobs:
           name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}
           path: artifacts-staging/
           retention-days: 1
+
+      # Save sccache local cache for fork PRs to restore from (master only)
+      - name: Save sccache cache (master only)
+        if: runner.environment != 'self-hosted' && github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
