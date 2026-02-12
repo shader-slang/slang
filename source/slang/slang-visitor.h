@@ -181,8 +181,12 @@ struct ExprVisitorWithArg
 /// returns the (possibly-modified) expression. Leaf expressions simply return
 /// themselves unchanged.
 ///
+/// IMPORTANT: This visitor must provide visit methods for all `Expr` subclasses that
+/// have child `Expr*` pointers. When adding new expression types to the AST, ensure
+/// corresponding visit methods are added here. Use `ASTIteratorExprVisitor` in
+/// `slang-ast-iterator.h` as a reference for coverage.
+///
 /// Inherits dispatch machinery from `ExprVisitor<Derived, Expr*>`.
-/// Modeled after `ASTIteratorExprVisitor` in `slang-ast-iterator.h`.
 template<typename Derived>
 struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
 {
@@ -383,6 +387,85 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitAddressOfExpr(AddressOfExpr* e)
     {
         e->arg = dispatchIfNotNull(e->arg);
+        return e;
+    }
+
+    // --- Cast-like (additional) ---
+    Expr* visitBuiltinCastExpr(BuiltinCastExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        return e;
+    }
+
+    // --- SizeOf-like ---
+    Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        return e;
+    }
+
+    // --- Detach ---
+    Expr* visitDetachExpr(DetachExpr* e)
+    {
+        e->inner = dispatchIfNotNull(e->inner);
+        return e;
+    }
+
+    // --- Higher-order invocation (additional) ---
+    Expr* visitDispatchKernelExpr(DispatchKernelExpr* e)
+    {
+        // DispatchKernelExpr inherits from HigherOrderInvokeExpr which has baseFunction
+        e->baseFunction = dispatchIfNotNull(e->baseFunction);
+        e->threadGroupSize = dispatchIfNotNull(e->threadGroupSize);
+        e->dispatchSize = dispatchIfNotNull(e->dispatchSize);
+        return e;
+    }
+
+    // --- Variable/Decl references ---
+    Expr* visitVarExpr(VarExpr* e)
+    {
+        e->originalExpr = dispatchIfNotNull(e->originalExpr);
+        return e;
+    }
+
+    // --- Type expressions ---
+    Expr* visitSharedTypeExpr(SharedTypeExpr* e)
+    {
+        e->base.exp = dispatchIfNotNull(e->base.exp);
+        return e;
+    }
+    Expr* visitAndTypeExpr(AndTypeExpr* e)
+    {
+        e->left.exp = dispatchIfNotNull(e->left.exp);
+        e->right.exp = dispatchIfNotNull(e->right.exp);
+        return e;
+    }
+    Expr* visitModifiedTypeExpr(ModifiedTypeExpr* e)
+    {
+        e->base.exp = dispatchIfNotNull(e->base.exp);
+        return e;
+    }
+    Expr* visitFuncTypeExpr(FuncTypeExpr* e)
+    {
+        for (auto& param : e->parameters)
+            param.exp = dispatchIfNotNull(param.exp);
+        e->result.exp = dispatchIfNotNull(e->result.exp);
+        return e;
+    }
+    Expr* visitTupleTypeExpr(TupleTypeExpr* e)
+    {
+        for (auto& member : e->members)
+            member.exp = dispatchIfNotNull(member.exp);
+        return e;
+    }
+    Expr* visitPointerTypeExpr(PointerTypeExpr* e)
+    {
+        e->base.exp = dispatchIfNotNull(e->base.exp);
         return e;
     }
 };
