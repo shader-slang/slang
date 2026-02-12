@@ -21556,35 +21556,39 @@ $}
         {
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
-        case metal: __intrinsic_asm R"(
-                raytracing::intersection_params params = $0->get_intersection_params();
-                uint flags = 0;
+        case metal: 
+            __requirePrelude(R"(
+                uint _slang_intersection_params_to_ray_flags(raytracing::intersection_params params) {
+                    uint flags = 0;
 
-                const auto forced = params.get_forced_opacity();
-                if (forced == raytracing::forced_opacity::opaque)
-                    flags |= 0x01; /* RAY_FLAG_FORCE_OPAQUE */
-                if (forced == raytracing::forced_opacity::non_opaque)
-                    flags |= 0x02; /* RAY_FLAG_FORCE_NON_OPAQUE */
+                    const auto forced = params.get_forced_opacity();
+                    if (forced == raytracing::forced_opacity::opaque)
+                        flags |= 0x01; /* RAY_FLAG_FORCE_OPAQUE */
+                    if (forced == raytracing::forced_opacity::non_opaque)
+                        flags |= 0x02; /* RAY_FLAG_FORCE_NON_OPAQUE */
 
-                const auto tri_cull = params.get_triangle_cull_mode();
-                if (tri_cull == raytracing::triangle_cull_mode::back)
-                    flags |= 0x10; /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
-                if (tri_cull == raytracing::triangle_cull_mode::front)
-                    flags |= 0x20; /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
+                    const auto tri_cull = params.get_triangle_cull_mode();
+                    if (tri_cull == raytracing::triangle_cull_mode::back)
+                        flags |= 0x10; /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
+                    if (tri_cull == raytracing::triangle_cull_mode::front)
+                        flags |= 0x20; /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
 
-                const auto opac_cull = params.get_opacity_cull_mode();
-                if (opac_cull == raytracing::opacity_cull_mode::opaque)
-                    flags |= 0x40; /* RAY_FLAG_CULL_OPAQUE */
-                if (opac_cull == raytracing::opacity_cull_mode::non_opaque)
-                    flags |= 0x80; /* RAY_FLAG_CULL_NON_OPAQUE */
+                    const auto opac_cull = params.get_opacity_cull_mode();
+                    if (opac_cull == raytracing::opacity_cull_mode::opaque)
+                        flags |= 0x40; /* RAY_FLAG_CULL_OPAQUE */
+                    if (opac_cull == raytracing::opacity_cull_mode::non_opaque)
+                        flags |= 0x80; /* RAY_FLAG_CULL_NON_OPAQUE */
 
-                const auto geo_cull = params.get_geometry_cull_mode();
-                if (geo_cull == raytracing::geometry_cull_mode::triangle)
-                    flags |= 0x100; /* RAY_FLAG_SKIP_TRIANGLES */
-                if (geo_cull == raytracing::geometry_cull_mode::bounding_box)
-                    flags |= 0x200; /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
-                return flags;
-            )";
+                    const auto geo_cull = params.get_geometry_cull_mode();
+                    if (geo_cull == raytracing::geometry_cull_mode::triangle)
+                        flags |= 0x100; /* RAY_FLAG_SKIP_TRIANGLES */
+                    if (geo_cull == raytracing::geometry_cull_mode::bounding_box)
+                        flags |= 0x200; /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
+
+                    return flags;
+                }
+            )");
+            __intrinsic_asm "_slang_intersection_params_to_ray_flags($0->get_intersection_params())";
         case spirv:
             return spirv_asm
             {
