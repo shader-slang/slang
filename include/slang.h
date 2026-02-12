@@ -918,6 +918,7 @@ typedef uint32_t SlangSizeT;
         SLANG_DIAGNOSTIC_COLOR_NEVER,    // Never use color
     };
 
+
     // All compiler option names supported by Slang.
     namespace slang
     {

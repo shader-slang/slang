@@ -307,6 +307,7 @@ public:
     void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
     bool getEnableUnicode() const { return m_enableUnicode; }
 
+
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
