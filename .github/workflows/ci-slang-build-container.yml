@@ -45,7 +45,7 @@ jobs:
 
       # Restore sccache cache for fork PRs or when using local backend
       - name: Restore sccache cache
-        if: env.IS_FORK_PR == 'true' || inputs.use-local-sccache == true
+        if: env.IS_FORK_PR == 'true' || inputs.use-local-sccache
         uses: actions/cache/restore@v4
         with:
           path: /tmp/.cache/sccache
