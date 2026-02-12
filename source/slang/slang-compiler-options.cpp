@@ -1,6 +1,9 @@
 #include "slang-compiler-options.h"
 
+#include "../core/slang-writer.h"
 #include "slang-compiler.h"
+
+#include <cstdio>
 
 namespace Slang
 {
@@ -415,6 +418,27 @@ void applySettingsToDiagnosticSink(
     if (options.shouldEmitMachineReadableDiagnostics())
     {
         targetSink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+    }
+
+    // Handle diagnostic color setting (default is auto)
+    {
+        SlangDiagnosticColor colorMode =
+            (SlangDiagnosticColor)options.getIntOption(CompilerOptionName::DiagnosticColor);
+        bool enableColors = false;
+        switch (colorMode)
+        {
+        case SLANG_DIAGNOSTIC_COLOR_ALWAYS:
+            enableColors = true;
+            break;
+        case SLANG_DIAGNOSTIC_COLOR_NEVER:
+            enableColors = false;
+            break;
+        case SLANG_DIAGNOSTIC_COLOR_AUTO:
+        default:
+            enableColors = targetSink && targetSink->writer && targetSink->writer->isConsole();
+            break;
+        }
+        targetSink->setEnableTerminalColors(enableColors);
     }
 }
 } // namespace Slang
