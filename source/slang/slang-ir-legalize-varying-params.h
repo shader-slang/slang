@@ -20,7 +20,7 @@ struct EntryPointInfo
     IREntryPointDecoration* entryPointDecor;
 };
 
-void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sink);
+void legalizeEntryPointVaryingParamsForCPU(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 void legalizeEntryPointVaryingParamsForCUDA(IRModule* module, DiagnosticSink* sink);
 

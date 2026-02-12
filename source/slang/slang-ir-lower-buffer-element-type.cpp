@@ -2339,14 +2339,18 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                     : kIROp_Std430BufferLayoutType;
             return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
-    case kIROp_PtrType:
-        {
-            auto ptrType = as<IRPtrType>(bufferType);
-            auto layoutTypeOp = ptrType->getDataLayout()
-                                    ? ptrType->getDataLayout()->getOp()
-                                    : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
-        }
+    }
+    if (auto ptrType = as<IRPtrTypeBase>(bufferType))
+    {
+        auto layoutTypeOp = ptrType->getDataLayout()
+                                ? ptrType->getDataLayout()->getOp()
+                                : kIROp_DefaultBufferLayoutType;
+
+        IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        if (isCPUTargetViaLLVM(targetReq))
+            defaultRule = IRTypeLayoutRuleName::LLVM;
+
+        return getTypeLayoutRulesFromOp(layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }
@@ -2354,21 +2358,6 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType)
 {
     auto ruleName = getTypeLayoutRuleNameForBuffer(target, bufferType);
-    return IRTypeLayoutRules::get(ruleName);
-}
-
-IRTypeLayoutRules* getTypeLayoutRuleForPointer(TargetProgram*, IRType* pointerType)
-{
-    IRInst* dataLayout = nullptr;
-    if (auto paramGroup = as<IRUniformParameterGroupType>(pointerType))
-        dataLayout = paramGroup->getDataLayout();
-    else if (auto ptrType = as<IRPtrTypeBase>(pointerType))
-        dataLayout = ptrType->getDataLayout();
-
-    IRTypeLayoutRuleName ruleName = IRTypeLayoutRuleName::Natural;
-    if (dataLayout)
-        ruleName = getTypeLayoutRulesFromOp(dataLayout->getOp(), ruleName);
-
     return IRTypeLayoutRules::get(ruleName);
 }
 

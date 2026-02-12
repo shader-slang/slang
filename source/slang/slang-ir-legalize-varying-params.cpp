@@ -2143,6 +2143,12 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     IRStructKey* groupIDKey = nullptr;
     IRStructKey* groupThreadIDKey = nullptr;
 
+    TargetProgram* target;
+
+    CPUEntryPointVaryingParamLegalizeContext(TargetProgram* target): target(target)
+    {
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         IRBuilder builder(m_module);
@@ -2158,7 +2164,11 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         // coming from the "prelude" file that already defines this type.
 
         varyingInputStructType = builder.createStructType();
-        varyingInputStructPtrType = builder.getPtrType(varyingInputStructType);
+        auto dataLayout = isCPUTargetViaLLVM(target->getTargetReq()) ?
+            (IRType*)builder.getLLVMBufferLayoutType() :
+            (IRType*)builder.getCBufferLayoutType();
+        varyingInputStructPtrType = builder.getPtrType(
+            varyingInputStructType, AccessQualifier::Read, AddressSpace::Generic, dataLayout);
 
         builder.addTargetIntrinsicDecoration(
             varyingInputStructType,
@@ -2270,9 +2280,9 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     }
 };
 
-void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sink)
+void legalizeEntryPointVaryingParamsForCPU(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
 {
-    CPUEntryPointVaryingParamLegalizeContext context;
+    CPUEntryPointVaryingParamLegalizeContext context(target);
     context.processModule(module, sink);
 }
 
