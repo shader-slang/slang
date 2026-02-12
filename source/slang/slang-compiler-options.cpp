@@ -1,9 +1,6 @@
 #include "slang-compiler-options.h"
 
-#include "../core/slang-writer.h"
 #include "slang-compiler.h"
-
-#include <cstdio>
 
 namespace Slang
 {
