@@ -3565,8 +3565,7 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 
         auto lambdaScope = lambdaExpr->paramScopeDecl;
         bool isDefinedInLambdaScope = false;
-        for (auto parentDecl = srcDecl->parentDecl; parentDecl;
-             parentDecl = parentDecl->parentDecl)
+        for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
         {
             if (parentDecl == lambdaScope)
             {

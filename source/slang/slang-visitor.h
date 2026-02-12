@@ -186,10 +186,7 @@ struct ExprVisitorWithArg
 template<typename Derived>
 struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
 {
-    Expr* dispatchIfNotNull(Expr* expr)
-    {
-        return expr ? this->dispatch(expr) : nullptr;
-    }
+    Expr* dispatchIfNotNull(Expr* expr) { return expr ? this->dispatch(expr) : nullptr; }
 
     // --- Leaf / default ---
     Expr* visitExpr(Expr* e) { return e; }
