@@ -238,6 +238,10 @@ local function warning(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "warning", message, primary_span, ...)
 end
 
+local function note(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "note", message, primary_span, ...)
+end
+
 -- Helper function to parse interpolated message strings
 -- Converts "text ~param more text" or "text ~param:Type more text" into structured format
 -- Also supports member access: ~param.member
