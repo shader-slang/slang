@@ -1936,7 +1936,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
-    
+
     LoweredValInfo visitBuiltinTypeCoercionWitness(BuiltinTypeCoercionWitness* witness)
     {
         auto irBuilder = getBuilder();
@@ -1945,7 +1945,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
         IRFunc* irFunc = irBuilder->createFunc();
         irFunc->setFullType(funcType);
-        
+
         IRBuilderInsertLocScope insertScope(irBuilder);
         irBuilder->setInsertInto(irFunc);
         irBuilder->emitBlock();
@@ -1957,13 +1957,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitDeclRefTypeCoercionWitness(DeclRefTypeCoercionWitness* witness)
     {
+        if (!witness->getDeclRef())
+            return LoweredValInfo();
+
         auto fromType = lowerType(context, witness->getFromType());
         auto toType = lowerType(context, witness->getToType());
         auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
-        return emitDeclRef(
-            context,
-            witness->getDeclRef(),
-            funcType);
+        return emitDeclRef(context, witness->getDeclRef(), funcType);
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)

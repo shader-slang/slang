@@ -1,5 +1,5 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_1): -vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_2): -vk -shaderobj
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_1): -vk -shaderobj
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_2): -vk -shaderobj
 
 //TEST_INPUT:ubuffer(data=[1 0 0 0], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
@@ -13,7 +13,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 #ifdef POSITIVE_CHECK_1
 int castableConstraint1<ToType, FromType>(FromType input) where ToType(FromType) implicit
-#else
+#else // POSITIVE_CHECK_2
 int castableConstraint1<ToType, FromType>(FromType input) where ToType(FromType)
 #endif
 {
@@ -54,8 +54,11 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
     uint index = threadId.x;
     //POSITIVE_CHECK_1: 1
     //POSITIVE_CHECK_2: 1
-    outputBuffer[0] = (true
-                 && castableConstraint1<CustomStruct2, CustomStruct1>(CustomStruct1(1)) == 1
-                 && castableConstraint1<CustomStruct2, CustomStruct2>(CustomStruct2(1)) == 1
-                ) ? 1 : 0;
+    outputBuffer[0] = (
+        true
+        // Test user defined coerce, `DeclRefTypeCoercionWitness`
+        && castableConstraint1<CustomStruct2, CustomStruct1>(CustomStruct1(1)) == 1
+        // test builtin coerce, `BuiltinTypeCoercionWitness`
+        && castableConstraint1<CustomStruct2, CustomStruct2>(CustomStruct2(1)) == 1
+    ) ? 1 : 0;
 }

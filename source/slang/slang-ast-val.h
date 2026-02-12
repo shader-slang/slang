@@ -683,10 +683,7 @@ FIDDLE()
 class BuiltinTypeCoercionWitness : public TypeCoercionWitness
 {
     FIDDLE(...)
-    BuiltinTypeCoercionWitness(Type* fromType, Type* toType)
-    {
-        setOperands(fromType, toType);
-    }
+    BuiltinTypeCoercionWitness(Type* fromType, Type* toType) { setOperands(fromType, toType); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -710,7 +707,7 @@ class DeclRefTypeCoercionWitness : public TypeCoercionWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
 };
-  
+
 // A witness that one type is a subtype of another
 // because some in-scope declaration says so
 FIDDLE()

@@ -747,7 +747,6 @@ public:
             return m_linkage->isInLanguageServer();
         return false;
     }
-
     /// Get the list of extension declarations that appear to apply to `decl` in this context
     List<ExtensionDecl*> const& getCandidateExtensionsForTypeDecl(AggTypeDecl* decl);
 
@@ -1798,10 +1797,11 @@ public:
     ///
     /// If `outWitnessOfConversion` is non-null and a conversion is found,
     /// `outWitnessOfConversion` will either be set to:
-    /// (1) BuiltinTypeCoercionWitness* to signify that Slang casts without
+    /// (1) `BuiltinTypeCoercionWitness*` to signify that Slang casts without
     /// a user-definition.
-    /// (2) DeclRefTypeCoercionWitness* to signify that Slang will cast
+    /// (2) `DeclRefTypeCoercionWitness*` to signify that Slang will cast
     /// via a user-definition.
+    /// (3) `nullptr` to signify that the case is unhandled and should be handled
     ///
     bool _coerce(
         CoercionSite site,
@@ -3355,5 +3355,25 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
+
+// Returns `false` if coerce fails.
+// * `constraintDecl` is the constraint we need to satisfy
+// * `genericDeclRef` is the generic decl we are operating on
+// * `maybeContext` is the contect for our current operation. This variable must be filled if
+// `shouldEmitError == true`.
+// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
+// and current context.
+//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
+//   succeeds.
+// * `args` are the current arguments relative to `genericDeclRef`.
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
 
 } // namespace Slang

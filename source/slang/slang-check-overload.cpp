@@ -1028,7 +1028,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    List<Val*> newArgs;
+    ShortList<Val*> newArgs;
     for (auto arg : substArgs)
         newArgs.add(arg);
 
@@ -1040,7 +1040,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                 m_astBuilder
                     ->getGenericAppDeclRef(
                         genericDeclRef,
-                        newArgs.getArrayView(),
+                        newArgs.getArrayView().arrayView,
                         genericTypeConstraintDecl)
                     .as<GenericTypeConstraintDecl>();
 
@@ -1075,93 +1075,23 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                 return false;
             }
         }
-        else if (as<TypeCoercionConstraintDecl>(constraintDecl))
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
         {
-            // This logic closely mirrors logic from `trySolveConstraintSystem`
-            DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-                m_astBuilder
-                    ->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView(), constraintDecl)
-                    .as<TypeCoercionConstraintDecl>();
-            auto fromType = getFromType(m_astBuilder, constraintDeclRef);
-            auto toType = getToType(m_astBuilder, constraintDeclRef);
-            auto conversionCost = getConversionCost(toType, fromType);
-
-            if (constraintDecl->findModifier<ImplicitConversionModifier>())
-            {
-                // If the arguments are not implicitly convertible, return failure.
-                if (conversionCost > kConversionCost_GeneralConversion)
-                {
-                    TypeCoercionWitness* typeCoercionWitness{};
-                    _coerce(
-                        CoercionSite::General,
-                        toType,
-                        nullptr,
-                        fromType,
-                        nullptr,
-                        getSink(),
-                        nullptr,
-                        &typeCoercionWitness);
-
-                    if (context.mode != OverloadResolveContext::Mode::JustTrying)
-                    {
-                        getSink()->diagnose(
-                            context.loc,
-                            Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
-                            fromType,
-                            toType);
-                        if (auto declRefTypeCoercionWitness = as<DeclRefTypeCoercionWitness>(
-                                typeCoercionWitness))
-                        {
-                            getSink()->diagnose(
-                                declRefTypeCoercionWitness->getDeclRef(),
-                                Diagnostics::seeDefinitionOf,
-                                "the non implicit conversion function");
-                        }
-                        getSink()->diagnose(
-                            constraintDecl,
-                            Diagnostics::seeDefinitionOf,
-                            "the unsatisfied constraint");
-                    }
-
-                    return false;
-                }
-            }
-            else
-            {
-                // The type arguments are not convertible, return failure.
-                if (conversionCost == kConversionCost_Impossible)
-                {
-                    if (context.mode != OverloadResolveContext::Mode::JustTrying)
-                    {
-                        getSink()->diagnose(
-                            context.loc,
-                            Diagnostics::TypeCoerceConstraintMissingConversion,
-                            fromType,
-                            toType);
-                        getSink()->diagnose(
-                            constraintDecl,
-                            Diagnostics::seeDefinitionOf,
-                            genericDeclRef.getDecl()->inner);
-                    }
-                    return false;
-                }
-            }
-            TypeCoercionWitness* typeCoercionWitness{};
-            _coerce(
-                CoercionSite::General,
-                toType,
-                nullptr,
-                fromType,
-                nullptr,
-                getSink(),
-                nullptr,
-                &typeCoercionWitness);
-            newArgs.add(typeCoercionWitness);
+            if (!addTypeCoercionWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    typeCoercionConstraintDecl,
+                    genericDeclRef,
+                    &context,
+                    nullptr,
+                    newArgs,
+                    context.mode != OverloadResolveContext::Mode::JustTrying))
+                return false;
         }
     }
 
-    candidate.subst =
-        SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));
+    candidate.subst = SubstitutionSet(
+        m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView().arrayView));
 
     // Done checking all the constraints, hooray.
     return true;

@@ -1196,8 +1196,13 @@ bool SemanticsVisitor::_coerce(
     ConversionCost* outCost,
     TypeCoercionWitness** outWitnessOfConversion)
 {
-    if (outWitnessOfConversion)
-        *outWitnessOfConversion = nullptr;
+    auto setWitnessOfConversionToBuiltinConversion = [&]()
+    {
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion =
+                getASTBuilder()->getBuiltinTypeCoercionWitness(fromType, toType);
+    };
+
 
     // If we are about to try and coerce an overloaded expression,
     // then we should start by trying to resolve the ambiguous reference
@@ -1267,9 +1272,7 @@ bool SemanticsVisitor::_coerce(
             *outToExpr = fromExpr;
         if (outCost)
             *outCost = kConversionCost_None;
-        if (outWitnessOfConversion)
-            *outWitnessOfConversion =
-                getASTBuilder()->getBuiltinTypeCoercionWitness(fromType, toType);
+        setWitnessOfConversionToBuiltinConversion();
         return true;
     }
 
@@ -1319,6 +1322,7 @@ bool SemanticsVisitor::_coerce(
                                 *outToExpr = fromExpr;
                             if (outCost)
                                 *outCost = kConversionCost_None;
+                            setWitnessOfConversionToBuiltinConversion();
                             return true;
                         }
                     }
@@ -1334,6 +1338,7 @@ bool SemanticsVisitor::_coerce(
             *outToExpr = fromExpr;
         if (outCost)
             *outCost = kConversionCost_None;
+        setWitnessOfConversionToBuiltinConversion();
         return true;
     }
 
@@ -1475,6 +1480,7 @@ bool SemanticsVisitor::_coerce(
             {
                 *outCost = kConversionCost_None;
             }
+            setWitnessOfConversionToBuiltinConversion();
 
             return true;
         }

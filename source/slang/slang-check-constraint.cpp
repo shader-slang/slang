@@ -339,6 +339,118 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError)
+{
+    // To emit an error, `maybeContext` must be provided.
+    SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext);
+
+    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+        astBuilder
+            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
+            .as<TypeCoercionConstraintDecl>();
+    auto fromType = getFromType(astBuilder, constraintDeclRef);
+    auto toType = getToType(astBuilder, constraintDeclRef);
+    auto conversionCost = visitor->getConversionCost(toType, fromType);
+    if (constraintDecl->findModifier<ImplicitConversionModifier>())
+    {
+        // The viable conversion is not an implicit conversion, but implicit was requested, fail
+        if (conversionCost > kConversionCost_GeneralConversion)
+        {
+            if (shouldEmitError)
+            {
+                TypeCoercionWitness* typeCoercionWitness{};
+                visitor->_coerce(
+                    CoercionSite::General,
+                    toType,
+                    nullptr,
+                    fromType,
+                    nullptr,
+                    visitor->getSink(),
+                    nullptr,
+                    &typeCoercionWitness);
+
+                visitor->getSink()->diagnose(
+                    maybeContext->loc,
+                    Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
+                    fromType,
+                    toType);
+
+                if (auto declRefTypeCoercionWitness =
+                        as<DeclRefTypeCoercionWitness>(typeCoercionWitness))
+                {
+                    visitor->getSink()->diagnose(
+                        declRefTypeCoercionWitness->getDeclRef(),
+                        Diagnostics::seeDefinitionOf,
+                        "the non implicit conversion function");
+                }
+                visitor->getSink()->diagnose(
+                    constraintDecl,
+                    Diagnostics::seeDefinitionOf,
+                    "the unsatisfied constraint");
+            }
+            return false;
+        }
+    }
+
+    // The type arguments are not convertible, return failure.
+    if (conversionCost == kConversionCost_Impossible)
+    {
+        if (shouldEmitError)
+        {
+            visitor->getSink()->diagnose(
+                maybeContext->loc,
+                Diagnostics::TypeCoerceConstraintMissingConversion,
+                fromType,
+                toType);
+            visitor->getSink()->diagnose(
+                constraintDecl,
+                Diagnostics::seeDefinitionOf,
+                genericDeclRef.getDecl()->inner);
+        }
+        return false;
+    }
+
+    if (maybeConstrainedGenericParams)
+    {
+        if (auto fromDecl = isDeclRefTypeOf<Decl>(constraintDecl->fromType))
+        {
+            maybeConstrainedGenericParams->add(fromDecl.getDecl());
+        }
+        if (auto toDecl = isDeclRefTypeOf<Decl>(constraintDecl->toType))
+        {
+            maybeConstrainedGenericParams->add(toDecl.getDecl());
+        }
+    }
+
+    TypeCoercionWitness* typeCoercionWitness{};
+    DeclRef<Decl> declRefUsedToConvert{};
+    visitor->_coerce(
+        CoercionSite::General,
+        toType,
+        nullptr,
+        fromType,
+        nullptr,
+        visitor->getSink(),
+        nullptr,
+        &typeCoercionWitness);
+
+    // Unhandled case in `_coerce`
+    if (!typeCoercionWitness)
+        typeCoercionWitness =
+            astBuilder->getDeclRefTypeCoercionWitness(fromType, toType, DeclRef<Decl>());
+
+    args.add(typeCoercionWitness);
+    return true;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -757,52 +869,16 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDecl :
          genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
     {
-        DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView,
-                    constraintDecl)
-                .as<TypeCoercionConstraintDecl>();
-        auto fromType = getFromType(m_astBuilder, constraintDeclRef);
-        auto toType = getToType(m_astBuilder, constraintDeclRef);
-        auto conversionCost = getConversionCost(toType, fromType);
-        if (constraintDecl->findModifier<ImplicitConversionModifier>())
-        {
-            if (conversionCost > kConversionCost_GeneralConversion)
-            {
-                // The type arguments are not implicitly convertible, return failure.
-                return DeclRef<Decl>();
-            }
-        }
-        else
-        {
-            if (conversionCost == kConversionCost_Impossible)
-            {
-                // The type arguments are not convertible, return failure.
-                return DeclRef<Decl>();
-            }
-        }
-        if (auto fromDecl = isDeclRefTypeOf<Decl>(constraintDecl->fromType))
-        {
-            constrainedGenericParams.add(fromDecl.getDecl());
-        }
-        if (auto toDecl = isDeclRefTypeOf<Decl>(constraintDecl->toType))
-        {
-            constrainedGenericParams.add(toDecl.getDecl());
-        }
-        TypeCoercionWitness* typeCoercionWitness{};
-        DeclRef<Decl> declRefUsedToConvert{};
-        _coerce(
-            CoercionSite::General,
-            toType,
-            nullptr,
-            fromType,
-            nullptr,
-            getSink(),
-            nullptr,
-            &typeCoercionWitness);
-        args.add(typeCoercionWitness);
+        if (!addTypeCoercionWitnessToArgs(
+                getASTBuilder(),
+                this,
+                constraintDecl,
+                genericDeclRef,
+                nullptr,
+                &constrainedGenericParams,
+                args,
+                false))
+            return DeclRef<Decl>();
     }
 
     // Add a flat cost to all unconstrained generic params.
