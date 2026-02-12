@@ -171,6 +171,225 @@ struct ExprVisitorWithArg
 #endif // FIDDLE END
 };
 
+/// A CRTP expression visitor that recursively walks and **mutates** child expression
+/// pointers. Derived classes override specific `visitXXX` methods (returning the
+/// replacement `Expr*`) and rely on the base for plain recursive traversal of all
+/// other node types.
+///
+/// The default implementation for each expression type recurses into its child
+/// expressions, reassigning each child pointer with the dispatch result, and
+/// returns the (possibly-modified) expression. Leaf expressions simply return
+/// themselves unchanged.
+///
+/// Inherits dispatch machinery from `ExprVisitor<Derived, Expr*>`.
+/// Modeled after `ASTIteratorExprVisitor` in `slang-ast-iterator.h`.
+template<typename Derived>
+struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
+{
+    Expr* dispatchIfNotNull(Expr* expr)
+    {
+        return expr ? this->dispatch(expr) : nullptr;
+    }
+
+    // --- Leaf / default ---
+    Expr* visitExpr(Expr* e) { return e; }
+
+    // --- Member / field access ---
+    Expr* visitMemberExpr(MemberExpr* e)
+    {
+        e->baseExpression = dispatchIfNotNull(e->baseExpression);
+        return e;
+    }
+    Expr* visitStaticMemberExpr(StaticMemberExpr* e)
+    {
+        e->baseExpression = dispatchIfNotNull(e->baseExpression);
+        return e;
+    }
+
+    // --- Subscript ---
+    Expr* visitIndexExpr(IndexExpr* e)
+    {
+        e->baseExpression = dispatchIfNotNull(e->baseExpression);
+        for (auto& arg : e->indexExprs)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+
+    // --- Call / generic application ---
+    // AppExprBase is the common base for InvokeExpr, GenericAppExpr, TypeCastExpr,
+    // OperatorExpr, etc. All share functionExpr + arguments.
+    Expr* visitAppExprBase(AppExprBase* e)
+    {
+        e->functionExpr = dispatchIfNotNull(e->functionExpr);
+        for (auto& arg : e->arguments)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+
+    // --- Unary-like ---
+    Expr* visitDerefExpr(DerefExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitSwizzleExpr(SwizzleExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitMatrixSwizzleExpr(MatrixSwizzleExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitOpenRefExpr(OpenRefExpr* e)
+    {
+        e->innerExpr = dispatchIfNotNull(e->innerExpr);
+        return e;
+    }
+    Expr* visitParenExpr(ParenExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitTryExpr(TryExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* e)
+    {
+        e->baseFunction = dispatchIfNotNull(e->baseFunction);
+        return e;
+    }
+    Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* e)
+    {
+        e->innerExpr = dispatchIfNotNull(e->innerExpr);
+        return e;
+    }
+
+    // --- Binary ---
+    Expr* visitAssignExpr(AssignExpr* e)
+    {
+        e->left = dispatchIfNotNull(e->left);
+        e->right = dispatchIfNotNull(e->right);
+        return e;
+    }
+
+    // --- Let bindings ---
+    Expr* visitLetExpr(LetExpr* e)
+    {
+        if (e->decl && e->decl->initExpr)
+            e->decl->initExpr = dispatchIfNotNull(e->decl->initExpr);
+        e->body = dispatchIfNotNull(e->body);
+        return e;
+    }
+
+    // --- Cast-like ---
+    Expr* visitCastToSuperTypeExpr(CastToSuperTypeExpr* e)
+    {
+        e->valueArg = dispatchIfNotNull(e->valueArg);
+        return e;
+    }
+    Expr* visitModifierCastExpr(ModifierCastExpr* e)
+    {
+        e->valueArg = dispatchIfNotNull(e->valueArg);
+        return e;
+    }
+
+    // --- Overloaded exprs ---
+    Expr* visitOverloadedExpr(OverloadedExpr* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        return e;
+    }
+    Expr* visitOverloadedExpr2(OverloadedExpr2* e)
+    {
+        e->base = dispatchIfNotNull(e->base);
+        for (auto& candidate : e->candidateExprs)
+            candidate = dispatchIfNotNull(candidate);
+        return e;
+    }
+
+    // --- Tuple / initializer list ---
+    Expr* visitTupleExpr(TupleExpr* e)
+    {
+        for (auto& elem : e->elements)
+            elem = dispatchIfNotNull(elem);
+        return e;
+    }
+    Expr* visitInitializerListExpr(InitializerListExpr* e)
+    {
+        for (auto& arg : e->args)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+
+    // --- Type check / cast exprs ---
+    Expr* visitIsTypeExpr(IsTypeExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        return e;
+    }
+    Expr* visitAsTypeExpr(AsTypeExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        e->typeExpr = dispatchIfNotNull(e->typeExpr);
+        return e;
+    }
+    Expr* visitMakeOptionalExpr(MakeOptionalExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        e->typeExpr = dispatchIfNotNull(e->typeExpr);
+        return e;
+    }
+
+    // --- Existential ---
+    Expr* visitExtractExistentialValueExpr(ExtractExistentialValueExpr* e) { return e; }
+
+    // --- Pack / expand ---
+    Expr* visitPackExpr(PackExpr* e)
+    {
+        for (auto& arg : e->args)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+    Expr* visitExpandExpr(ExpandExpr* e)
+    {
+        e->baseExpr = dispatchIfNotNull(e->baseExpr);
+        return e;
+    }
+    Expr* visitEachExpr(EachExpr* e)
+    {
+        e->baseExpr = dispatchIfNotNull(e->baseExpr);
+        return e;
+    }
+
+    // --- Misc ---
+    Expr* visitPartiallyAppliedGenericExpr(PartiallyAppliedGenericExpr* e)
+    {
+        e->originalExpr = dispatchIfNotNull(e->originalExpr);
+        return e;
+    }
+    Expr* visitSPIRVAsmExpr(SPIRVAsmExpr* e) { return e; }
+    Expr* visitAggTypeCtorExpr(AggTypeCtorExpr* e)
+    {
+        for (auto& arg : e->arguments)
+            arg = dispatchIfNotNull(arg);
+        return e;
+    }
+    Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* e)
+    {
+        e->arrayExpr = dispatchIfNotNull(e->arrayExpr);
+        return e;
+    }
+    Expr* visitAddressOfExpr(AddressOfExpr* e)
+    {
+        e->arg = dispatchIfNotNull(e->arg);
+        return e;
+    }
+};
+
 //
 // Statement Visitors
 //
