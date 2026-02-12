@@ -1216,19 +1216,10 @@ SlangResult File::writeAllTextIfChanged(const String& fileName, UnownedStringSli
 /* static */ SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
 {
     FILE* file = nullptr;
-#ifdef _WIN32
-    errno_t err = fopen_s(&file, path.getBuffer(), "w");
-    if (err != 0 || !file)
+    if (fopen_s(&file, path.getBuffer(), "w") != 0 || !file)
     {
         return SLANG_FAIL;
     }
-#else
-    file = fopen(path.getBuffer(), "w");
-    if (!file)
-    {
-        return SLANG_FAIL;
-    }
-#endif
 
     const auto count = fwrite(data, size, 1, file);
     fclose(file);

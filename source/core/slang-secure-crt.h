@@ -2,6 +2,7 @@
 #ifndef SLANG_CORE_SECURE_CRT_H
 #define SLANG_CORE_SECURE_CRT_H
 #include <assert.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,9 +19,18 @@ inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* s
 #define _TRUNCATE ((size_t)-1)
 #define _stricmp strcasecmp
 
-inline void fopen_s(FILE** f, const char* fileName, const char* mode)
+inline error_t fopen_s(FILE** f, const char* fileName, const char* mode)
 {
+    if (f == nullptr || fileName == nullptr || mode == nullptr)
+    {
+        return EINVAL;
+    }
     *f = fopen(fileName, mode);
+    if (*f == nullptr)
+    {
+        return errno;
+    }
+    return 0;
 }
 
 inline size_t fread_s(

@@ -191,8 +191,8 @@ SlangResult FileWriter::setMode(SlangWriterMode mode)
 {
     flags &= ~WriterFlag::IsUnowned;
 
-    FILE* file = fopen(filePath, writeOptions);
-    if (!file)
+    FILE* file = nullptr;
+    if (fopen_s(&file, filePath, writeOptions) != 0 || !file)
     {
         return SLANG_E_CANNOT_OPEN;
     }
