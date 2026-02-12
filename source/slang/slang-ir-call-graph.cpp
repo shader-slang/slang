@@ -98,7 +98,8 @@ void buildEntryPointReferenceGraph(
     for (auto globalInst : module->getGlobalInsts())
     {
         if (globalInst->getOp() == kIROp_Func &&
-            globalInst->findDecoration<IREntryPointDecoration>())
+            (globalInst->findDecoration<IREntryPointDecoration>() ||
+             globalInst->findDecoration<IRCudaKernelDecoration>()))
         {
             visit(as<IRFunc>(globalInst), globalInst);
         }
