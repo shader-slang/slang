@@ -13,13 +13,13 @@ void func1(Optional<Optional<int>> a)
     unused(b);
 }
 
-// FUNC2: OpConstantComposite %_slang_Optional__slang_Optional_int %{{.+}} %false
+// FUNC2: OpConstantComposite %_slang_Optional__slang_Optional_int %{{.+}} %true
 // FUNC2: %func2 = OpFunction
 // FUNC2: OpCompositeExtract %_slang_Optional_int %{{.+}} 0
 [shader("vertex")]
 void func2()
 {
-    Optional<Optional<int>> a = Optional<Optional<int>>();
+    Optional<Optional<int>> a = Optional<Optional<int>>(0);
     unused(a);
     Optional<int> b = a.value;
     unused(b);
@@ -30,7 +30,7 @@ void func2()
 [shader("vertex")]
 void func3()
 {
-    int a = Optional<Optional<int>>().value.value;
+    int a = Optional<Optional<int>>(0).value.value;
     unused(a);
 }
 
@@ -39,7 +39,7 @@ void func3()
 [shader("vertex")]
 void func4()
 {
-    Optional<Optional<int>> a = Optional<Optional<int>>();
+    Optional<Optional<int>> a = Optional<Optional<int>>(0);
     Optional<int> b = a.value;
     int c = b.value;
     unused(c);
