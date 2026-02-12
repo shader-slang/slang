@@ -680,6 +680,46 @@ struct TypeFlowSpecializationContext
             cast<IRTypeSet>(builder.getSet(kIROp_TypeSet, typeSet)));
     }
 
+    // Check if a witness table set references a [Specialize]-only interface.
+    // If so, emit error 52008 — the compiler has determined that dynamic dispatch
+    // is needed, but the interface was explicitly marked for specialization only.
+    //
+    // Returns true if the interface is specialize-only (caller should bail out).
+    //
+    bool diagnoseSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
+    {
+        if (!sink)
+            return false;
+
+        IRInst* conformanceType = nullptr;
+        forEachInSet(
+            tableSet,
+            [&](IRInst* table)
+            {
+                if (conformanceType)
+                    return;
+                auto witnessTable = as<IRWitnessTable>(table);
+                if (!witnessTable)
+                    return;
+                auto witnessTableType = as<IRWitnessTableType>(witnessTable->getDataType());
+                if (!witnessTableType)
+                    return;
+                auto ifaceType = witnessTableType->getConformanceType();
+                if (ifaceType && ifaceType->findDecoration<IRSpecializeDecoration>())
+                    conformanceType = ifaceType;
+            });
+
+        if (conformanceType)
+        {
+            sink->diagnose(
+                callSiteLoc,
+                Diagnostics::dynamicDispatchOnSpecializeOnlyInterface,
+                conformanceType);
+            return true;
+        }
+        return false;
+    }
+
     // Creates an 'empty' inst (denoted by nullptr), that
     // can be used to denote one of two things:
     //
@@ -4344,6 +4384,10 @@ struct TypeFlowSpecializationContext
 
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
+
+                    if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                        return false;
+
                     IRBuilder builder(module);
 
                     callee = builder.emitGetDispatcher(
@@ -4364,6 +4408,9 @@ struct TypeFlowSpecializationContext
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
+
+                    if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                        return false;
 
                     List<IRInst*> specArgs;
                     for (UInt argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
