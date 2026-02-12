@@ -87,7 +87,7 @@ jobs:
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
       - name: Setup LLVM from GCS
-        if: inputs.build-llvm == 'true'
+        if: inputs.build-llvm
         uses: ./.github/actions/setup-llvm-from-gcs
         with:
           os: ${{ inputs.os }}
