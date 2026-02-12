@@ -1236,6 +1236,86 @@ struct LoweredElementTypeContext
                                         ShortList<IRInst*> newArgs;
                                         for (UInt i = 1; i < user->getOperandCount(); i++)
                                             newArgs.add(user->getOperand(i));
+
+                                        // When pushing a FieldAddress through a CastStorageToLogical,
+                                        // the field key from the logical type may not exist in the
+                                        // storage type (e.g., array wrapper structs lowered with
+                                        // different layout rules use different field keys).
+                                        // Map the field key by position from the logical struct to
+                                        // the storage struct.
+                                        if (user->getOp() == kIROp_FieldAddress)
+                                        {
+                                            auto storageBasePtrType =
+                                                as<IRPtrTypeBase>(storageBaseAddr->getDataType());
+                                            auto storageStructType =
+                                                storageBasePtrType
+                                                    ? as<IRStructType>(
+                                                          storageBasePtrType->getValueType())
+                                                    : nullptr;
+                                            auto logicalStructType =
+                                                as<IRPtrTypeBase>(castInst->getDataType())
+                                                    ? as<IRStructType>(
+                                                          as<IRPtrTypeBase>(castInst->getDataType())
+                                                              ->getValueType())
+                                                    : nullptr;
+                                            if (storageStructType && logicalStructType)
+                                            {
+                                                for (Index ai = 0; ai < newArgs.getCount(); ai++)
+                                                {
+                                                    auto fieldKey = as<IRStructKey>(newArgs[ai]);
+                                                    if (!fieldKey)
+                                                        continue;
+                                                    // Check if the field key exists in the storage
+                                                    // struct.
+                                                    bool found = false;
+                                                    for (auto child :
+                                                         storageStructType->getChildren())
+                                                    {
+                                                        if (auto field = as<IRStructField>(child))
+                                                        {
+                                                            if (field->getKey() == fieldKey)
+                                                            {
+                                                                found = true;
+                                                                break;
+                                                            }
+                                                        }
+                                                    }
+                                                    if (!found)
+                                                    {
+                                                        // Map by field position from logical to
+                                                        // storage struct.
+                                                        Index fieldIndex = 0;
+                                                        for (auto child :
+                                                             logicalStructType->getChildren())
+                                                        {
+                                                            if (auto field =
+                                                                    as<IRStructField>(child))
+                                                            {
+                                                                if (field->getKey() == fieldKey)
+                                                                    break;
+                                                                fieldIndex++;
+                                                            }
+                                                        }
+                                                        Index storageFieldIndex = 0;
+                                                        for (auto child :
+                                                             storageStructType->getChildren())
+                                                        {
+                                                            if (auto field =
+                                                                    as<IRStructField>(child))
+                                                            {
+                                                                if (storageFieldIndex == fieldIndex)
+                                                                {
+                                                                    newArgs[ai] = field->getKey();
+                                                                    break;
+                                                                }
+                                                                storageFieldIndex++;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         storageGEP = builder.emitElementAddress(
                                             storageBaseAddr,
                                             newArgs.getArrayView().arrayView);
