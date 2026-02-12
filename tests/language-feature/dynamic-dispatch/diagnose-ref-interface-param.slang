@@ -3,11 +3,9 @@
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
-// Test that __ref and __constref parameters with interface types
-// in dynamic dispatch contexts produce diagnostic errors.
-//
-// Dynamic dispatch uses a tagged union (AnyValue) representation
-// which is incompatible with reference semantics.
+// __ref and __constref parameters with interface types are not supported
+// in dynamic dispatch contexts. This test checks that the compiler
+// reports diagnostic 52010 for such parameters.
 
 [anyValueSize(16)]
 interface IFoo

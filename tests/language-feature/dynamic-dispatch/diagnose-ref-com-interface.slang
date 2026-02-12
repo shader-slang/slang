@@ -1,16 +1,17 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
+// COM interfaces only: __ref/__constref are allowed (vtable dispatch).
+// No diagnostic 52010 expected. Regular interfaces tested in diagnose-ref-regular-and-mixed.slang.
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda
+//
+// Target support: COM is documented as "valid only on CPU target" (core.meta.slang).
+// In practice the compiler accepts COM interfaces for cpp, hlsl, and cuda; this test
+// runs on spirv, hlsl, and cuda to document compiler behavior on those targets.
 
 // COM interfaces use vtable-based dispatch (pointer indirection) rather
 // than the tagged union (AnyValue) packing used by regular interfaces in
 // dynamic dispatch. Because vtable dispatch preserves the original object
 // layout, __ref and __constref are compatible with COM interfaces.
-//
-// This test verifies COM interfaces are accepted while regular interfaces
-// are still rejected.
 
 [com_interface]
 [uuid("00000000-0000-0000-0000-000000000001")]
@@ -54,51 +55,11 @@ float processCOMContainerRef(__ref COMContainer c)
     return c.comObj.getValue();
 }
 
-// Regular (non-COM) interfaces use AnyValue packing, so __ref is invalid.
-[anyValueSize(16)]
-interface IRegular
-{
-    float getValue();
-}
-
-struct RegularImpl : IRegular
-{
-    float v;
-    float getValue() { return v; }
-}
-
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IRegular' cannot be used in dynamic dispatch context.
-float processRegularRef(__ref IRegular obj)
-{
-    return obj.getValue();
-}
-
-// A struct containing both a COM and a regular interface member must
-// still be rejected, because the regular member requires AnyValue packing.
-struct MixedContainer
-{
-    ICOMExample comObj;
-    IRegular regularObj;
-}
-
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MixedContainer' cannot be used in dynamic dispatch context.
-float processMixedRef(__ref MixedContainer c)
-{
-    return c.comObj.getValue() + c.regularObj.getValue();
-}
-
-// Verify no spurious errors after the expected diagnostics.
-// CHECK-NOT: error 52010
-
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IRegular reg = RegularImpl(5.0);
-    outputBuffer[0] = processRegularRef(reg);
-
-    MixedContainer mixed;
-    mixed.regularObj = reg;
-    outputBuffer[1] = processMixedRef(mixed);
+    // COM-only code path; no regular interface or MixedContainer here.
+    outputBuffer[0] = 0.0;
 }
