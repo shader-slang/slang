@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
   pull-requests: write # For PR comments (if needed)
-  id-token: write # Required for GCS OIDC authentication in reusable workflow
 
 jobs:
   coverage-linux:
