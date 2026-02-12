@@ -18,6 +18,13 @@ using namespace Slang;
 #define MAIN main
 #endif
 
+static void _diagnosticCallback(char const* message, void* /*userData*/)
+{
+    auto stdError = StdWriters::getError();
+    stdError.put(message);
+    stdError.flush();
+}
+
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char* const* argv)
 {
     // Use the stderr writer directly instead of a callback.
@@ -60,7 +67,7 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-static bool shouldEmbedPrelude(const char* const* argv, int argc)
+bool shouldEmbedPrelude(const char* const* argv, int argc)
 {
     for (int i = 0; i < argc; i++)
     {

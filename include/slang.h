@@ -1119,8 +1119,6 @@ typedef uint32_t SlangSizeT;
         EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
                                           // (implies EnableRichDiagnostics)
 
-        DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
-
         CountOf,
     };
 
