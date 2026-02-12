@@ -9,6 +9,10 @@ on:
       runs-on:
         required: true
         type: string
+      use-local-sccache:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
@@ -44,7 +48,7 @@ jobs:
         if: env.IS_FORK_PR == 'true'
         uses: actions/cache/restore@v4
         with:
-          path: /github/home/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-linux-gcc-x86_64-${{ inputs.config }}-
@@ -58,12 +62,12 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
-      # Setup sccache (GCS for internal, local disk for fork PRs)
+      # Setup sccache (GCS for internal, local disk for fork PRs or when use-local-sccache is true)
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
         with:
           platform: linux
-          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
+          gcs-bucket: ${{ (env.IS_FORK_PR != 'true' && inputs.use-local-sccache != true) && 'slang-ci-cache' || '' }}
 
       - name: Setup LLVM from GCS
         uses: ./.github/actions/setup-llvm-from-gcs
@@ -165,7 +169,7 @@ jobs:
         if: github.ref == 'refs/heads/master'
         uses: actions/cache/save@v4
         with:
-          path: /github/home/.cache/sccache
+          path: /tmp/.cache/sccache
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v4

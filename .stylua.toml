@@ -1,0 +1,3 @@
+indent_type = "Spaces"
+indent_width = 4
+call_parentheses = "NoSingleTable"
