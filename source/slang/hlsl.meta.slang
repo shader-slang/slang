@@ -20721,7 +20721,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     [require(metal, rayquery)]
     [mutating]
-    void __reset(
+    internal void __reset(
         float3 origin,
         float3 direction,
         float tMin,
