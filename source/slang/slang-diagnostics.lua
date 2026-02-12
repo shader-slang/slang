@@ -235,6 +235,7 @@ err(
     span { loc = "location", message = "unknown stage '~stage_name'" }
 )
 
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

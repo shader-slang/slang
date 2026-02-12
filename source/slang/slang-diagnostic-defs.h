@@ -736,7 +736,6 @@ DIAGNOSTIC(
     "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
-DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
 DIAGNOSTIC(
     30202,
     Error,
