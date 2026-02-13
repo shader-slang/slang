@@ -1,12 +1,19 @@
 // Test for issue #9836: Interface implementation containing pointer to interface
 //
 // This test verifies:
-// 1. A struct implementing IFoo can have IFoo* field (compiles)
-// 2. TRUE dynamic dispatch works when concrete type is runtime-determined
+// 1. A struct implementing IFoo can have an IFoo* field (compiles)
+// 2. True dynamic dispatch works when concrete type is runtime-determined
 // 3. The IFoo* field participates correctly in existential packing/dispatch
 //
-// Dynamic dispatch is forced by selecting concrete type based on runtime data
-// (input buffer value), not compile-time constants.
+// Unlike circular-pointer-breaks-cycle.slang (which tests cycle-breaking on
+// CPU only), this test validates multi-backend support (CPU, CUDA, Vulkan, LLVM)
+// with explicit type_conformance registration and runtime type selection.
+//
+// Note: The IFoo* pointer is only initialized to nullptr here. Testing actual
+// pointer dereferencing (ptr->foo()) requires slang-test infrastructure to
+// embed device addresses in buffer data. See #10015 for follow-up.
+//
+// anyValueSize is intentionally omitted to test the auto-computation path.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type -cpu
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
