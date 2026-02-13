@@ -685,7 +685,7 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
-  	["SetBase.TypeSet"] = 684,
+	["SetBase.TypeSet"] = 684,
 	["SetBase.FuncSet"] = 685,
 	["SetBase.WitnessTableSet"] = 686,
 	["SetBase.GenericSet"] = 687,
@@ -736,4 +736,5 @@ return {
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
 	["SPIRVLoadTexelPointerFromHeap"] = 736,
+	["LateRequireCapability"] = 737,
 }
