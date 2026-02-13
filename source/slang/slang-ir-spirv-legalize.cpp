@@ -1467,12 +1467,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             builder.setInsertBefore(inst);
             auto uint32Type = builder.getUIntType();
             auto zero = builder.getIntValue(uint32Type, 0);
-            auto vecType = builder.getVectorType(
-                uint32Type, builder.getIntValue(builder.getIntType(), 2));
-            auto zeroVec = builder.emitIntrinsicInst(
-                vecType, kIROp_MakeVectorFromScalar, 1, &zero);
-            auto castInst = builder.emitIntrinsicInst(
-                type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+            auto vecType =
+                builder.getVectorType(uint32Type, builder.getIntValue(builder.getIntType(), 2));
+            auto zeroVec = builder.emitIntrinsicInst(vecType, kIROp_MakeVectorFromScalar, 1, &zero);
+            auto castInst =
+                builder.emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
             inst->replaceUsesWith(castInst);
             inst->removeAndDeallocate();
         }

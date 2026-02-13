@@ -749,8 +749,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                         // TODO: vector<U,2> atomicAdd needs to be added to IPointerLikeAddress
                         vector<U, 2> sum_v2 = vector<U, 2>(U(sum0), U(sum1));
                         let addr = biasAddress.getOffset(elemIdx0);
-                        addr.atomicAdd(0u, U(sum0));
-                        addr.atomicAdd(1u, U(sum1));
+                        addr.atomicAdd(0u, sum_v2);
                     }
                     else if (elemIdx0 < M)
                     {
