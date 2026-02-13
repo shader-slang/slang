@@ -2389,8 +2389,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Also update the current sink so command-line diagnostic colors work
+                // Update both the current sink and parent sink so colors work correctly
                 m_sink->setDiagnosticColorMode(colorValue);
+                if (m_sink->getParentSink())
+                    m_sink->getParentSink()->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:

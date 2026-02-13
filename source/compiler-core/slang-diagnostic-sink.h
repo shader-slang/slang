@@ -297,13 +297,8 @@ public:
             return false;
         case SLANG_DIAGNOSTIC_COLOR_AUTO:
         default:
-            // Check our writer first, then fall back to parent's writer for AUTO mode.
-            // This handles cases where a child sink accumulates to a buffer but the
-            // parent has the actual console writer.
             if (writer)
                 return writer->isConsole();
-            if (m_parentSink)
-                return m_parentSink->shouldEnableTerminalColors();
             return false;
         }
     }
@@ -361,6 +356,9 @@ protected:
 
     // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+
+    // Overload that allows specifying a source manager (used when routing to parent sinks)
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, SourceManager* sourceManager);
 
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(

@@ -627,25 +627,57 @@ bool DiagnosticSink::diagnoseImpl(
 
 bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
 {
+    return diagnoseRichImpl(diagnostic, getSourceManager());
+}
+
+bool DiagnosticSink::diagnoseRichImpl(
+    const GenericDiagnostic& diagnostic,
+    SourceManager* sourceManager)
+{
+    if (diagnostic.severity >= Severity::Error)
+    {
+        m_errorCount++;
+    }
+
     String message;
     if (isFlagSet(Flag::MachineReadableDiagnostics))
     {
-        message = renderDiagnosticMachineReadable(getSourceManager(), diagnostic);
+        message = renderDiagnosticMachineReadable(sourceManager, diagnostic);
     }
     else
     {
         message = renderDiagnostic(
             getSourceLocationLexer(),
-            getSourceManager(),
+            sourceManager,
             {.enableTerminalColors = shouldEnableTerminalColors(),
              .enableUnicode = m_enableUnicode},
             diagnostic);
     }
 
-    DiagnosticInfo info;
-    info.id = diagnostic.code;
-    info.severity = diagnostic.severity;
-    return diagnoseImpl(info, message.getUnownedSlice());
+    if (writer)
+    {
+        writer->write(message.begin(), message.getLength());
+    }
+    else
+    {
+        outputBuffer.append(message);
+    }
+
+    // Route to parent sink - let it render with its own settings but using the same source manager.
+    // The source manager must be passed because the parent may have a different source manager
+    // that cannot resolve the locations in this diagnostic (e.g., command line source locations
+    // are in a separate source manager from the main compilation source manager).
+    if (m_parentSink)
+    {
+        m_parentSink->diagnoseRichImpl(diagnostic, sourceManager);
+    }
+
+    if (diagnostic.severity >= Severity::Fatal)
+    {
+        std::string msg(message.begin(), message.end());
+        SLANG_ABORT_COMPILATION(msg.c_str());
+    }
+    return true;
 }
 
 // Fallback to diagnose from the old diagnostic messages
