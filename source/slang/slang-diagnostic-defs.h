@@ -62,7 +62,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
-DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
+// DIAGNOSTIC(15, Error, unknownStage, ...) - Converted to slang-diagnostics.lua as "unknown stage"
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
 DIAGNOSTIC(

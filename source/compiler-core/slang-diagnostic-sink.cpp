@@ -627,11 +627,6 @@ bool DiagnosticSink::diagnoseImpl(
 
 bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
 {
-    if (diagnostic.severity >= Severity::Error)
-    {
-        m_errorCount++;
-    }
-
     String message;
     if (isFlagSet(Flag::MachineReadableDiagnostics))
     {
@@ -647,26 +642,10 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
             diagnostic);
     }
 
-    if (writer)
-    {
-        writer->write(message.begin(), message.getLength());
-    }
-    else
-    {
-        outputBuffer.append(message);
-    }
-
-    if (m_parentSink)
-    {
-        m_parentSink->diagnoseRichImpl(diagnostic);
-    }
-
-    if (diagnostic.severity >= Severity::Fatal)
-    {
-        // TODO: figure out a better policy for aborting compilation
-        SLANG_ABORT_COMPILATION("fatal error encountered");
-    }
-    return true;
+    DiagnosticInfo info;
+    info.id = diagnostic.code;
+    info.severity = diagnostic.severity;
+    return diagnoseImpl(info, message.getUnownedSlice());
 }
 
 // Fallback to diagnose from the old diagnostic messages
