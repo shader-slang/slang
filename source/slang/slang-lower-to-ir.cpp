@@ -38,6 +38,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-parameter-binding.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -2590,7 +2591,13 @@ void addVarDecorations(IRGenContext* context, IRInst* inst, Decl* decl)
         }
         else if (auto hlslSemantic = as<HLSLSimpleSemantic>(mod))
         {
-            builder->addSemanticDecoration(inst, hlslSemantic->name.getContent());
+            UnownedStringSlice semanticText = hlslSemantic->name.getContent();
+            UnownedStringSlice baseName;
+            UnownedStringSlice indexDigits;
+            if (splitNameAndIndex(semanticText, baseName, indexDigits))
+                builder->addSemanticDecoration(inst, baseName, stringToInt(String(indexDigits)));
+            else
+                builder->addSemanticDecoration(inst, semanticText);
         }
         else if (as<DynamicUniformModifier>(mod))
         {
@@ -10463,9 +10470,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
         if (auto semanticModifier = fieldDecl->findModifier<HLSLSimpleSemantic>())
         {
-            builder->addSemanticDecoration(
-                irFieldKey,
-                semanticModifier->name.getName()->text.getUnownedSlice());
+            UnownedStringSlice semanticText =
+                semanticModifier->name.getName()->text.getUnownedSlice();
+            UnownedStringSlice baseName;
+            UnownedStringSlice indexDigits;
+            if (splitNameAndIndex(semanticText, baseName, indexDigits))
+                builder->addSemanticDecoration(
+                    irFieldKey,
+                    baseName,
+                    stringToInt(String(indexDigits)));
+            else
+                builder->addSemanticDecoration(irFieldKey, semanticText);
         }
 
         if (auto readModifier = fieldDecl->findModifier<RayPayloadReadSemantic>())
