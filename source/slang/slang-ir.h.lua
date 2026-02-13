@@ -171,12 +171,17 @@ local function getAllOtherInstStructsData()
 					for i, operand in ipairs(value.operands) do
 						local operandName = operand[1]
 						local operandType = operand[2]
+						local optional = false
+						if operand.optional then
+							optional = true
+						end
 						table.insert(inst_data.operands, {
 							name = operandName,
 							type = operandType,
 							getter_name = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2),
 							index = i - 1,
 							has_type = operandType ~= nil,
+							optional = optional,
 						})
 					end
 				elseif type(value.operands[1]) == "string" then
@@ -190,6 +195,7 @@ local function getAllOtherInstStructsData()
 						index = 0,
 						has_type = operandType ~= nil,
 						variadic = value.operands.variadic,
+						optional = false,
 					})
 				end
 			end
