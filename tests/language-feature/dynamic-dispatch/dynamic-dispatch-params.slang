@@ -57,7 +57,8 @@ struct MulCombiner : ICombiner
     {
         // Nested dynamic dispatch: foo.eval() and bar.weight()
         return foo.eval() * bar.weight();
-        // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}FooA, FooB
+        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}BarA, BarB
     }
 }
 
@@ -69,7 +70,8 @@ struct AddCombiner : ICombiner
     {
         // Different combiner implementation
         return foo.eval() + bar.weight();
-        // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}FooA, FooB
+        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}BarA, BarB
     }
 }
 
@@ -100,7 +102,7 @@ float testCombine(uint combinerId, uint fooId, float fooData, uint barId, float 
     // 2. Inside combine(), dispatch foo.eval()
     // 3. Inside combine(), dispatch bar.weight()
     return c.combine(f, b);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}MulCombiner, AddCombiner
 }
 
 //TEST_INPUT: type_conformance FooA:IFoo = 0
