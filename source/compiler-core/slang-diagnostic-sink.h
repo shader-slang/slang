@@ -297,8 +297,13 @@ public:
             return false;
         case SLANG_DIAGNOSTIC_COLOR_AUTO:
         default:
+            // Check our writer first, then fall back to parent's writer for AUTO mode.
+            // This handles cases where a child sink accumulates to a buffer but the
+            // parent has the actual console writer.
             if (writer)
                 return writer->isConsole();
+            if (m_parentSink)
+                return m_parentSink->shouldEnableTerminalColors();
             return false;
         }
     }
