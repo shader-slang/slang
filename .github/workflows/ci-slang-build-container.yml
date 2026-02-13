@@ -39,15 +39,13 @@ jobs:
         run: |
           echo "=== Disk space before cleanup ==="
           df -h /host_root || true
-          # Remove large pre-installed software from the GitHub runner host
+          # Remove large pre-installed software from the GitHub runner host.
+          # NOTE: Do NOT remove /opt/hostedtoolcache - it is used by GitHub
+          # Actions (e.g. setup-gcloud) for tool caching and removal breaks steps.
           rm -rf /host_root/usr/share/dotnet || true
           rm -rf /host_root/usr/local/lib/android || true
           rm -rf /host_root/opt/ghc || true
           rm -rf /host_root/usr/share/swift || true
-          rm -rf /host_root/opt/hostedtoolcache || true
-          # Remove pre-cached Docker images on the host
-          rm -rf /host_root/usr/local/share/powershell || true
-          rm -rf /host_root/usr/local/share/chromium || true
           echo "=== Disk space after cleanup ==="
           df -h /host_root || true
 
