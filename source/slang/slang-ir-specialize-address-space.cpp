@@ -95,7 +95,6 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         auto specializedFunc = as<IRFunc>(cloneInst(&cloneEnv, &builder, func));
 
         // Update the parameter types with new address spaces in the specialized function.
-        List<IRInst*> updatedPtrParams;
         Index paramIndex = 0;
         for (auto param : specializedFunc->getParams())
         {
@@ -111,49 +110,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     paramAddrSpace);
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
-                updatedPtrParams.add(param);
             }
             paramIndex++;
-        }
-
-        // Propagate the new address spaces from the updated parameters through the
-        // function body. Without this, instructions like FieldAddress that were cloned
-        // from the original function retain their old address space (e.g. UserPointer),
-        // causing a mismatch with the specialized parameter address space.
-        propagateAddressSpaceFromInsts(_Move(updatedPtrParams));
-
-        // Update debug variable types to match the specialized parameter types.
-        // IRDebugVar instructions have their own type that represents the variable's
-        // type, and they are linked to parameters via getArgIndex(). After specializing
-        // parameter types, we must update the corresponding debug vars so that the
-        // backing local variable type matches the actual parameter type.
-        for (auto block : specializedFunc->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto debugVar = as<IRDebugVar>(inst);
-                if (!debugVar)
-                    continue;
-                auto argIndexInst = debugVar->getArgIndex();
-                if (!argIndexInst)
-                    continue;
-                auto argIndexLit = as<IRIntLit>(argIndexInst);
-                if (!argIndexLit)
-                    continue;
-                auto argIndex = (Index)argIndexLit->getValue();
-                Index paramIdx = 0;
-                for (auto param : specializedFunc->getParams())
-                {
-                    if (paramIdx == argIndex)
-                    {
-                        // The debug var type is Ptr<paramType> (see emitDebugVar),
-                        // so wrap the new parameter type in an additional pointer.
-                        debugVar->setFullType(builder.getPtrType(param->getFullType()));
-                        break;
-                    }
-                    paramIdx++;
-                }
-            }
         }
 
         // Update the function type.
@@ -454,6 +412,15 @@ void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrS
 void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
 {
     HashSet<IRInst*> visited;
+    auto addUserToWorkList = [&](IRInst* inst)
+    {
+        for (auto use = inst->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (visited.add(user))
+                workList.add(user);
+        }
+    };
     for (auto item : workList)
     {
         visited.add(item);
@@ -497,10 +464,7 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
                     if (newType != user->getDataType())
                     {
                         user->setFullType(newType);
-                        // Add the updated instruction itself to the worklist so it
-                        // can propagate its new address space to its own users.
-                        if (visited.add(user))
-                            workList.add(user);
+                        addUserToWorkList(user);
                     }
                     break;
                 }
