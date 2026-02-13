@@ -9,29 +9,30 @@ import neural;
 
 // Parameters: FFLayer<float, 4, 2, ..., HasBias=true>
 // weights = 2x4 matrix, bias = 2
-//TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0  5.0 6.0 7.0 8.0  9.0 10.0], stride=4):name=parametersFloat
-RWStructuredBuffer<float> parametersFloat;
+//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0  5.0 6.0 7.0 8.0  9.0 10.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=params
-RWStructuredBuffer<float> params;
+//TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle params;
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-typealias Storage = StructuredBufferStorage<float>;
+typealias Address = BindlessAddress<float>;
 typealias XVec = InlineVector<float, 4>;
 typealias YVec = InlineVector<float, 2>;
 typealias Act = ReLU<float>;
-typealias Layer = FFLayer<float, XVec, YVec, Storage, LinearLayout, Act, true>;
+typealias Layer = FFLayer<float, XVec, YVec, Address, LinearLayout, Act, true>;
 
 // Test: evaluate layer through ILayer constraint
 InlineVector<float, 2> evalAsLayer<L>(
     L layer,
-    Storage storage,
+    Address weightAddr,
+    Address biasAddr,
     InlineVector<float, 4> input)
-    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Storage, LinearLayout, Act>
+    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Address, LinearLayout, Act>
 {
-    return layer.eval<Storage>(storage, input);
+    return layer.eval<Address>(weightAddr, biasAddr, input);
 }
 
 bool forwardTest()
@@ -39,16 +40,20 @@ bool forwardTest()
     // Copy parametersFloat -> params
     for(int i=0;i<10;i++) params[i] = parametersFloat[i];
 
-    let storage = Storage(params);
+    let baseAddr = Address(params);
     // Weights at offset 0 (8 floats: 2x4), bias at offset 8 (2 floats)
-    let layer = Layer(0, 8);
+    let layer = Layer(int(0), int(8));
+
+    // Compute weight/bias addresses
+    let weightAddr = baseAddr.getOffset(0);
+    let biasAddr = baseAddr.getOffset(8);
 
     // Input x = [1,2,3,4]
     float[4] xArr = {1.0, 2.0, 3.0, 4.0};
     let x = InlineVector<float, 4>(xArr);
 
     // Layer: y = ReLU(W*x + b)
-    let y = evalAsLayer<Layer>(layer, storage, x);
+    let y = evalAsLayer<Layer>(layer, weightAddr, biasAddr, x);
 
     // Expected: W*x + b = [1*1+2*2+3*3+4*4 + 9, 5*1+6*2+7*3+8*4 + 10] = [39, 80]
     // ReLU([39, 80]) = [39, 80]

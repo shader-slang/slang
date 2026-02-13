@@ -18,38 +18,44 @@ import neural;
 //
 // Total params: (2*2 + 2) + (1*2 + 1) = 9
 
-//TEST_INPUT: ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4):name=parametersFloat
-RWStructuredBuffer<float> parametersFloat;
+//TEST_INPUT: set parametersFloat = ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4)
+uniform RWStructuredBuffer<float>.Handle parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=params
-RWStructuredBuffer<float> params;
+//TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle params;
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
-typealias Storage = StructuredBufferStorage<float>;
+typealias Address = BindlessAddress<float>;
 typealias V2 = InlineVector<float, 2>;
 typealias V1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer1 = FFLayer<float, V2, V2, Storage, LinearLayout, Act, true>;
-typealias Layer2 = FFLayer<float, V2, V1, Storage, LinearLayout, Act, true>;
+typealias Layer1 = FFLayer<float, V2, V2, Address, LinearLayout, Act, true>;
+typealias Layer2 = FFLayer<float, V2, V1, Address, LinearLayout, Act, true>;
 
-static const uint Base0 = 0;
+static const int Base0 = 0;
 
 bool forwardCheck()
 {
-    let storage = Storage(params);
+    let baseAddr = Address(params);
 
     float[2] xArr = { 1.5, -2.0 };
     let x = V2(xArr);
 
     // Layer1: weights at 0 (4 floats: 2x2), bias at 4 (2 floats)
-    let layer1 = Layer1(0, 4);
+    let layer1 = Layer1(int(0), int(4));
     // Layer2: weights at 6 (2 floats: 1x2), bias at 8 (1 float)
-    let layer2 = Layer2(6, 8);
+    let layer2 = Layer2(int(6), int(8));
 
-    let h = layer1.eval<Storage>(storage, x);
-    let y = layer2.eval<Storage>(storage, h);
+    // Compute weight/bias addresses for each layer
+    let w1Addr = baseAddr.getOffset(0);
+    let b1Addr = baseAddr.getOffset(4);
+    let w2Addr = baseAddr.getOffset(6);
+    let b2Addr = baseAddr.getOffset(8);
+
+    let h = layer1.eval<Address>(w1Addr, b1Addr, x);
+    let y = layer2.eval<Address>(w2Addr, b2Addr, h);
 
     // Expected:
     // h = W1*x + b1
@@ -73,7 +79,7 @@ bool parameterCountCheck()
     // Total: 9
     bool layer1Ok = (Layer1.ParameterCount == 6);
     bool layer2Ok = (Layer2.ParameterCount == 3);
-    bool addressOk = (Layer1.nextAddress(Base0) == 6);
+    bool addressOk = (Layer1.nextOffset(Base0) == 6);
     return layer1Ok && layer2Ok && addressOk;
 }
 

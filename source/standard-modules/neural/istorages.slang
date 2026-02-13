@@ -51,4 +51,27 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value);
 
+    /**
+    Atomically adds a vector of 2 values using packed atomic operations where available.
+    @param[in] index The element index (must be aligned to 2 elements).
+    @param[in] value The vector of 2 values to add.
+    */
+    public void atomicAdd(uint index, vector<T, 2> value);
+
+    /**
+    Reads sequential elements starting from the given offset address, packed into a uint4.
+    */
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType;
+
+    /**
+    Atomically writes unpacked uint4 values back to storage.
+    */
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType;
+
 }

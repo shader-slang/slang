@@ -10,20 +10,20 @@ typealias ElementType = float;
 
 // set up a 2x4 matrix for input parameters, the last 2 elements are for bias
 // W = [[1,2,3,4],[5,6,7,8]], b = [9, 10]
-//TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4):name=parametersFloat
-RWStructuredBuffer<float> parametersFloat;
+//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):name=parameters
-RWStructuredBuffer<ElementType> parameters;
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
+uniform RWStructuredBuffer<ElementType>.Handle parameters;
 
 // Create a buffer to store the test result
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):name=dParameters
-RWStructuredBuffer<ElementType> dParameters;
+//TEST_INPUT: set dParameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
+uniform RWStructuredBuffer<ElementType>.Handle dParameters;
 
-typealias Storage = StructuredBufferStorage<ElementType>;
+typealias Address = BindlessAddress<ElementType>;
 
 static const int InputSize = 4;
 static const int OutputSize = 2;
@@ -38,13 +38,13 @@ typealias InVec = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupS
 typealias OutVec = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
 // FFLayer with WaveTangledVector and LinearLayout
-typealias Layer = FFLayer<ElementType, InVec, OutVec, Storage, LinearLayout, IdentityActivation<ElementType>, true>;
+typealias Layer = FFLayer<ElementType, InVec, OutVec, Address, LinearLayout, IdentityActivation<ElementType>, true>;
 
 // Wrapper function for autodiff
 [Differentiable]
-OutVec computeLayerOutput(Storage storage, InVec input, Layer layer)
+OutVec computeLayerOutput(Address weightAddr, Address biasAddr, InVec input, Layer layer)
 {
-    return layer.eval<Storage>(storage, input);
+    return layer.eval<Address>(weightAddr, biasAddr, input);
 }
 
 // Test FFLayer forward pass with WaveTangledVector
@@ -57,13 +57,17 @@ void testFFLayerForward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
     
-    Storage storage = Storage(parameters);
+    let baseAddr = Address(parameters);
     
     // Create layer with weights at offset 0, bias at offset 8
-    let layer = Layer(0, 8);
+    let layer = Layer(int(0), int(8));
+    
+    // Compute weight/bias addresses
+    let weightAddr = baseAddr.getOffset(0);
+    let biasAddr = baseAddr.getOffset(8);
     
     // Forward pass
-    let output = layer.eval<Storage>(storage, input);
+    let output = layer.eval<Address>(weightAddr, biasAddr, input);
     
     // Verify output: [39, 80]
     bool isPassed = true;
@@ -83,20 +87,27 @@ void testFFLayerBackward(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
     
-    Storage storage = Storage(parameters);
-    Storage dStorage = Storage(dParameters);
+    let baseAddr = Address(parameters);
+    let dBaseAddr = Address(dParameters);
     
-    let layer = Layer(0, 8);
+    let layer = Layer(int(0), int(8));
     
-    // Set up differential pair for storage
-    var storagePair = DifferentialPtrPair<Storage>(storage, dStorage);
+    // Compute weight/bias addresses outside differentiable function
+    let weightAddr = baseAddr.getOffset(0);
+    let biasAddr = baseAddr.getOffset(8);
+    let dWeightAddr = dBaseAddr.getOffset(0);
+    let dBiasAddr = dBaseAddr.getOffset(8);
+    
+    // Set up differential pairs for weight and bias addresses
+    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
+    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
     var inputPair = diffPair(input);
     
     // dOutput = [1, 1]
     let dOutput = OutVec(1.0);
     
     // Backward pass
-    bwd_diff(computeLayerOutput)(storagePair, inputPair, layer, dOutput);
+    bwd_diff(computeLayerOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
     
     // Verify input gradient: dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
     bool isPassed = true;

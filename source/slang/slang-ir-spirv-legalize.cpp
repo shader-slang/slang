@@ -1454,6 +1454,30 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->insertAtEnd(m_module->getModuleInst());
     }
 
+    void processDefaultConstruct(IRInst* inst)
+    {
+        // Handle DefaultConstruct for DescriptorHandleType.
+        // In SPIRV, DescriptorHandle is lowered to uint2 or uint64.
+        // A default-constructed handle should be a zero value, created via
+        // CastUInt2ToDescriptorHandle(uint2(0,0)).
+        auto type = inst->getDataType();
+        if (type && type->getOp() == kIROp_DescriptorHandleType)
+        {
+            IRBuilder builder(m_module);
+            builder.setInsertBefore(inst);
+            auto uint32Type = builder.getUIntType();
+            auto zero = builder.getIntValue(uint32Type, 0);
+            auto vecType = builder.getVectorType(
+                uint32Type, builder.getIntValue(builder.getIntType(), 2));
+            auto zeroVec = builder.emitIntrinsicInst(
+                vecType, kIROp_MakeVectorFromScalar, 1, &zero);
+            auto castInst = builder.emitIntrinsicInst(
+                type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+            inst->replaceUsesWith(castInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
     void processConstructor(IRInst* inst)
     {
         maybeHoistConstructInstToGlobalScope(inst);
@@ -1870,6 +1894,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
             case kIROp_PtrLit:
                 processPtrLit(inst);
+                break;
+            case kIROp_DefaultConstruct:
+                processDefaultConstruct(inst);
                 break;
             // kIROp_UnconditionalBranch is handled in default case that only
             // adds children inst and not target inst to work list.

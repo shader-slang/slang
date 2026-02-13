@@ -19,10 +19,10 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// TEST_INPUT: ubuffer(stride=4, count=4096):name=outputBuffer
-RWStructuredBuffer<DType> outputBuffer;
+//TEST_INPUT: set outputBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle outputBuffer;
 
-typealias BufferStorage = StructuredBufferStorage<DType>;
+typealias Address = BindlessAddress<DType>;
 
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
@@ -42,9 +42,9 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    BufferStorage storage = BufferStorage(outputBuffer);
+    Address address = Address(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 
@@ -67,7 +67,7 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
 
     // perform dOut OPA Input
-    MMA.outerProductAccumulate<DType, BufferStorage, DType, DType[OutSize], DType, DType[InSize]>(ptrA, ptrB, dOutVector, inputVector, storage, 0);
+    MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(ptrA, ptrB, dOutVector, inputVector, address);
 
     // serialRead<32, DType>(tid, ptrB);
     // serialRead<OutputSize, InputSize>(tid, outputBuffer);
