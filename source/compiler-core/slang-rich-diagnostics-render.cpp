@@ -305,8 +305,8 @@ private:
                 if (view)
                 {
                     // Get the line content and trim end-of-line characters and trailing whitespace
-                    UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
-                        view->getSourceFile()->getLineAtIndex(span.line - 1));
+                    UnownedStringSlice rawLine =
+                        StringUtil::trimEndOfLine(view->getSourceFile()->getLineAtIndex(span.line - 1));
                     // Trim trailing whitespace but preserve leading whitespace (indentation)
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
