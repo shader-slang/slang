@@ -38,8 +38,8 @@ static const float EPSILON = 0.1f;  // Allow for floating-point precision differ
 
 // Feature table buffer: will be initialized by threads with value[i] = i
 // Total size: 1024 * 2 = 2048 floats
-//TEST_INPUT:ubuffer(count=2048, stride=4):name=gFeatureTable
-RWStructuredBuffer<float> gFeatureTable;
+//TEST_INPUT: set gFeatureTable = ubuffer(count=2048, stride=4)
+uniform RWStructuredBuffer<float>.Handle gFeatureTable;
 
 // Output buffer: store all results (N_POSITIONS * N_FEATURES = 2048 floats)
 //TEST_INPUT:ubuffer(count=2048, stride=4):name=gOutputBuffer
@@ -61,7 +61,7 @@ void initFeatureTable(uint threadIdx)
         uint idx = baseIdx + i;
         if (idx < FEATURE_TABLE_SIZE)
         {
-            gFeatureTable[idx] = float(idx);
+            gFeatureTable[idx] = idx;
         }
     }
 }
@@ -121,8 +121,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     position[0] = (float(x) + 0.5f) / float(GRID_SIZE);
     position[1] = (float(y) + 0.5f) / float(GRID_SIZE);
 
-    // Create storage for feature table
-    StructuredBufferStorage<float> featureStorage = StructuredBufferStorage<float>(gFeatureTable);
+    // Create address for feature table
+    BindlessAddress<float> featureAddress = BindlessAddress<float>(gFeatureTable);
 
     // Initialize output array
     OutArray result;
@@ -137,11 +137,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
         // Encode - writes to result at offset level * FEATURE_DIM_PER_ENTRY
-        Encoder.encodePerLevel<StructuredBufferStorage<float>>(
+        Encoder.encodePerLevel<BindlessAddress<float>>(
             params,
             position,
-            featureStorage,
-            0u,  // base address
+            featureAddress,
             result
         );
     }
