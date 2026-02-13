@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //
 // Limitation: Direct Cast to Concrete Type
@@ -53,6 +55,6 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     obj.Element x = obj.get();
 
     // Cannot cast associated type value to float directly
-    // CHECK: error
+    // CHECK: ([[# @LINE+1]]): error 30019
     outputBuffer[0] = float(x);
 }

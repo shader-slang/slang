@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //
 // Limitation: Cross-Object Data Passing
@@ -59,6 +61,6 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     obj1.Data d = obj1.make();
 
     // Cannot pass obj1.Data to obj2.process(), even though both are the same type
-    // CHECK: error 30019
+    // CHECK: ([[# @LINE+1]]): error 30019
     outputBuffer[0] = obj2.process(d);
 }

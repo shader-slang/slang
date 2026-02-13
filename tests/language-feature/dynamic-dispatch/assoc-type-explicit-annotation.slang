@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 //
 // Limitation: Explicit Type Annotation
