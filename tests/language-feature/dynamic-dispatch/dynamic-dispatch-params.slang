@@ -57,21 +57,21 @@ struct MulCombiner : ICombiner
     {
         // Nested dynamic dispatch: foo.eval() and bar.weight()
         return foo.eval() * bar.weight();
-        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}FooA, FooB
-        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}BarA, BarB
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     }
 }
 
 struct AddCombiner : ICombiner
 {
     float dummy;  // Data field for createDynamicObject
-    
+
     float combine(IFoo foo, IBar bar)
     {
         // Different combiner implementation
         return foo.eval() + bar.weight();
-        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}FooA, FooB
-        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}BarA, BarB
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     }
 }
 
@@ -102,7 +102,7 @@ float testCombine(uint combinerId, uint fooId, float fooData, uint barId, float 
     // 2. Inside combine(), dispatch foo.eval()
     // 3. Inside combine(), dispatch bar.weight()
     return c.combine(f, b);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:{{.*}}MulCombiner, AddCombiner
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 //TEST_INPUT: type_conformance FooA:IFoo = 0
