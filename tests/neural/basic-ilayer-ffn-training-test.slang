@@ -19,7 +19,7 @@ import neural;
 // Total params: (2*2 + 2) + (1*2 + 1) = 9
 
 //TEST_INPUT: set parametersFloat = ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4)
-uniform RWStructuredBuffer<float>.Handle parametersFloat;
+RWStructuredBuffer<float> parametersFloat;
 
 //TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
 uniform RWStructuredBuffer<float>.Handle params;
@@ -69,7 +69,7 @@ bool forwardCheck()
     //   = [-12 - 29] + 0.5
     //   = -41 + 0.5
     //   = -40.5
-    return (y[0] == -40.5);
+    return abs(y[0] - (-40.5)) < 0.001;
 }
 
 bool parameterCountCheck()

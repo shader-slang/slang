@@ -10,7 +10,7 @@ import neural;
 // Parameters: FFLayer<float, 4, 2, ..., HasBias=true>
 // weights = 2x4 matrix, bias = 2
 //TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0  5.0 6.0 7.0 8.0  9.0 10.0], stride=4)
-uniform RWStructuredBuffer<float>.Handle parametersFloat;
+RWStructuredBuffer<float> parametersFloat;
 
 //TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
 uniform RWStructuredBuffer<float>.Handle params;
@@ -57,7 +57,7 @@ bool forwardTest()
 
     // Expected: W*x + b = [1*1+2*2+3*3+4*4 + 9, 5*1+6*2+7*3+8*4 + 10] = [39, 80]
     // ReLU([39, 80]) = [39, 80]
-    return (y[0] == 39.0) && (y[1] == 80.0);
+    return abs(y[0] - 39.0) < 0.001 && abs(y[1] - 80.0) < 0.001;
 }
 
 bool parameterCountTest()

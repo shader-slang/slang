@@ -11,7 +11,7 @@ import neural;
 // For 2x2 -> 2: W = [[1,0],[0,1]], b = [0,0]
 // This makes W*x + b = x (for 2D input/output)
 //TEST_INPUT: set identityParams = ubuffer(data=[1.0 0.0 0.0 1.0 0.0 0.0], stride=4)
-uniform RWStructuredBuffer<float>.Handle identityParams;
+RWStructuredBuffer<float> identityParams;
 
 // Params buffer (will be copied from identityParams)
 //TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
