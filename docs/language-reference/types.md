@@ -6,6 +6,7 @@ Slang types:
 * [Structures](types-struct.md) and [Classes](types-class.md)
   * [Extensions](types-extension.md)
 * [Array Types](types-array.md)
+* [Pointers](types-pointer.md)
 * [Interfaces](types-interface.md)
 * [Special Types](types-special.md)
 
@@ -31,19 +32,19 @@ into two categories:
   specifier is a subset of the full type specifier. A type specifier is a part of the
   [variable declaration](declarations.md) syntax, which is used to declare variables, as the name suggests.
 
-### Syntax
+### Syntax {#syntax}
 
 Simple type specifier:
 > *`simple-type-spec`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(*`simple-type-id-spec`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;|*`simple-type-func-spec`*)
 
-Type specifier for named non-array and array types:
+Type specifier for named non-array, array, non-pointer, and pointer types:
 > *`simple-type-id-spec`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`type-identifier`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`**)*
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )*
 
 Type specifier for function types:
 > *`simple-type-func-spec`* =<br>
@@ -58,7 +59,7 @@ Full type specifier, possibly declaring a new type:
 > *`type-spec`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;(*`struct-decl`* | *`class-decl`* | *`enum-decl`*)<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** )*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )*<br>
 
 #### Parameters
 
@@ -70,6 +71,7 @@ Full type specifier, possibly declaring a new type:
 - *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
 - **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
   optional constant integral expression specifying the dimension length.
+- **`'*'`** is a [pointer declaration](types-pointer.md).
 - *`param-list`* is a function parameter list. See [function parameter list (TODO)](TODO).
 - *`struct-decl`* is a [structure](types-struct.md) type declaration, possibly also defining the type.
 - *`class-decl`* is a [class (TODO)](types-class.md) type declaration, possibly also defining the type.
