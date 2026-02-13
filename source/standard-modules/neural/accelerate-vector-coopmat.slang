@@ -1224,6 +1224,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         set { this.data[index] = newValue; }
     }
 
+    [ForceInline]
     private OutputVector linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
         Address weightAddress,
         Optional<Address> biasAddress)
@@ -1241,6 +1242,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         return OutputVector(outputArray);
     }
 
+    [ForceInline]
     private static void linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dWeightAddress,
@@ -1295,6 +1297,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     }
 
     // Linear transformation without bias
+    [ForceInline]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
@@ -1313,6 +1316,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     }
 
     // Backward of linear transformation without bias
+    [ForceInline]
     static void linearTransformBwd<Address, Layout, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dWeightAddress,
@@ -1333,6 +1337,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         }
     }
 
+    [ForceInline]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
@@ -1351,6 +1356,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     }
 
     // Backward of linear transformation with bias
+    [ForceInline]
     static void linearTransformBwd<Address, Layout, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dWeightAddress,

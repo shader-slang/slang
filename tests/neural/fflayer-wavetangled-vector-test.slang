@@ -2,6 +2,7 @@
 // This verifies that FFLayer works with non-InlineVector types using Layout parameter.
 //
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=1 -emit-spirv-directly
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1
 
@@ -60,27 +61,27 @@ void testFFLayerForward(int tid, int resIndex)
     // Input: x = [1, 2, 3, 4]
     // W = [[1,2,3,4],[5,6,7,8]], b = [9, 10]
     // Output: W*x + b = [1*1+2*2+3*3+4*4+9, 5*1+6*2+7*3+8*4+10] = [39, 80]
-    
+
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
-    
+
     let baseAddr = Address(parameters);
-    
+
     // Create layer with weights at offset 0, bias at offset 8
     let layer = Layer(int(0), int(8));
-    
+
     // Compute weight/bias addresses
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(8);
-    
+
     // Forward pass
     let output = layer.eval<Address>(weightAddr, biasAddr, input);
-    
+
     // Verify output: [39, 80]
     bool isPassed = true;
     isPassed = isPassed && (output[0] == ElementType(39.0));
     isPassed = isPassed && (output[1] == ElementType(80.0));
-    
+
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
@@ -93,36 +94,36 @@ void testFFLayerBackward(int tid, int resIndex)
 {
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVec input = InVec(inputData);
-    
+
     let baseAddr = Address(parameters);
     let dBaseAddr = Address(dParameters);
-    
+
     let layer = Layer(int(0), int(8));
-    
+
     // Compute weight/bias addresses outside differentiable function
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(8);
     let dWeightAddr = dBaseAddr.getOffset(0);
     let dBiasAddr = dBaseAddr.getOffset(8);
-    
+
     // Set up differential pairs for weight and bias addresses
     var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
     var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
     var inputPair = diffPair(input);
-    
+
     // dOutput = [1, 1]
     let dOutput = OutVec(1.0);
-    
+
     // Backward pass
     bwd_diff(computeLayerOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
-    
+
     // Verify input gradient: dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
     bool isPassed = true;
     isPassed = isPassed && (inputPair.d[0] == ElementType(6.0));
     isPassed = isPassed && (inputPair.d[1] == ElementType(8.0));
     isPassed = isPassed && (inputPair.d[2] == ElementType(10.0));
     isPassed = isPassed && (inputPair.d[3] == ElementType(12.0));
-    
+
     // Weight gradients are accumulated across 32 threads
     // dW = dOutput * input^T = [1,1]^T * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
     // Accumulated: 32 * [[1,2,3,4],[1,2,3,4]]
@@ -134,11 +135,11 @@ void testFFLayerBackward(int tid, int resIndex)
     isPassed = isPassed && (dParameters[5] == ElementType(64.0));
     isPassed = isPassed && (dParameters[6] == ElementType(96.0));
     isPassed = isPassed && (dParameters[7] == ElementType(128.0));
-    
+
     // Bias gradients: dBias = dOutput = [1, 1], accumulated: [32, 32]
     isPassed = isPassed && (dParameters[8] == ElementType(32.0));
     isPassed = isPassed && (dParameters[9] == ElementType(32.0));
-    
+
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
@@ -151,7 +152,7 @@ void testFFLayerParameterCount(int tid, int resIndex)
 {
     // For 4->2 layer with bias: 4*2 + 2 = 10
     bool isPassed = (Layer.ParameterCount == 10);
-    
+
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
     {
@@ -184,13 +185,13 @@ void computeMain(uint tid : SV_DispatchThreadID)
 {
     setupParameters(tid);
     GroupMemoryBarrierWithWaveSync();
-    
+
     testFFLayerParameterCount(tid, 0);
     // BUFFER: 1
-    
+
     testFFLayerForward(tid, 1);
     // BUFFER: 1
-    
+
     cleanupDParameters();
     testFFLayerBackward(tid, 2);
     // BUFFER: 1

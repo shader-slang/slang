@@ -28,10 +28,31 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         set { handle[baseIndex + index] = newValue; }
     }
 
+    [ForceInline]
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
+    {
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = handle[baseIndex + index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(handle[baseIndex + index], compareValue, newValue) == compareValue;
+        } while (!success);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_reduce_add(handle[baseIndex + index], value);
+        __target_switch
+        {
+        case hlsl:
+            atomicAddForHLSL(index, value);
+        default:
+            __atomic_reduce_add(handle[baseIndex + index], value);
+        }
     }
 
     [ForceInline]
@@ -108,10 +129,31 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         return This(ptr + elements);
     }
 
+    [ForceInline]
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
+    {
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = ptr[index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(ptr[index], compareValue, newValue) == compareValue;
+        } while (!success);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_reduce_add(ptr[index], value);
+        __target_switch
+        {
+        case hlsl:
+            atomicAddForHLSL(index, value);
+        default:
+            __atomic_reduce_add(ptr[index], value);
+        }
     }
 
     [ForceInline]
@@ -179,8 +221,31 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         return This(this + elements);
     }
 
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
+    {
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = this[index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(this[index], compareValue, newValue) == compareValue;
+        } while (!success);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-    internal void atomicAdd(uint index, T value) {__atomic_reduce_add(this[index], value);}
+    internal void atomicAdd(uint index, T value)
+    {
+        __target_switch
+        {
+        case hlsl:
+            atomicAddForHLSL(index, value);
+        default:
+            __atomic_reduce_add(this[index], value);
+        }
+    }
 
     [ForceInline]
     internal void atomicAdd(uint index, vector<T, 2> value)

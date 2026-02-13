@@ -92,6 +92,7 @@ public struct FFLayer<
     /// @param input Input vector.
     /// @return Output vector after linear transform and activation.
     [Differentiable]
+    [ForceInline]
     public OutputVector eval<A>(A weightAddr, A biasAddr, InputVector input)
         where A : IPointerLikeAddress<T>
         where A.Differential : IPointerLikeAddress<T.Differential>
