@@ -1,22 +1,31 @@
 // Test FFLayer backward pass via autodiff.
 // Verifies that autodiff correctly computes gradients through eval<A>().
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1
 
 import neural;
 
 // Weights: W = [[1,2],[3,4]], bias = [0.5, -0.5]
 //TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0 0.5 -0.5], stride=4)
-uniform RWStructuredBuffer<float>.Handle params;
 
 // Gradient buffer for weight gradients
 //TEST_INPUT: set gradParams = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
-uniform RWStructuredBuffer<float>.Handle gradParams;
+
+#if TEST_POINTER
+    uniform float* params;
+    uniform float* gradParams;
+    typealias Address = PointerAddress<float>;
+#else
+    uniform RWStructuredBuffer<float>.Handle params;
+    uniform RWStructuredBuffer<float>.Handle gradParams;
+    typealias Address = BindlessAddress<float>;
+#endif
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-typealias Address = BindlessAddress<float>;
 typealias Vec2 = InlineVector<float, 2>;
 typealias Act = IdentityActivation<float>;
 typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, Act, true>;

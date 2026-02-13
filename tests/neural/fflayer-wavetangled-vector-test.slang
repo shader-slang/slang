@@ -1,8 +1,9 @@
 // Test FFLayer with WaveTangledVector (CooperativeMatrix accelerated).
 // This verifies that FFLayer works with non-InlineVector types using Layout parameter.
 //
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1
 
 import neural;
 
@@ -14,16 +15,22 @@ typealias ElementType = float;
 uniform RWStructuredBuffer<float>.Handle parametersFloat;
 
 //TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
-uniform RWStructuredBuffer<ElementType>.Handle parameters;
 
 // Create a buffer to store the test result
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
 //TEST_INPUT: set dParameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
-uniform RWStructuredBuffer<ElementType>.Handle dParameters;
 
-typealias Address = BindlessAddress<ElementType>;
+#if TEST_POINTER
+    uniform ElementType* parameters;
+    uniform ElementType* dParameters;
+    typealias Address = PointerAddress<ElementType>;
+#else
+    uniform RWStructuredBuffer<ElementType>.Handle parameters;
+    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
+    typealias Address = BindlessAddress<ElementType>;
+#endif
 
 static const int InputSize = 4;
 static const int OutputSize = 2;
