@@ -92,6 +92,7 @@
 #include "slang-ir-metal-legalize.h"
 #include "slang-ir-missing-return.h"
 #include "slang-ir-optix-entry-point-uniforms.h"
+#include "slang-ir-process-late-require-cap-insts.h"
 #include "slang-ir-pytorch-cpp-binding.h"
 #include "slang-ir-redundancy-removal.h"
 #include "slang-ir-resolve-texture-format.h"
@@ -1832,6 +1833,9 @@ Result linkAndOptimizeIR(
     // We run DCE pass again to clean things up.
     //
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+
+    // Check the remaining LateRequireCapability IR insts
+    SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
     SLANG_PASS(cleanUpVoidType);
 

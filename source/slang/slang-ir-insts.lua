@@ -2958,6 +2958,13 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ LateRequireCapability = {
+                -- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+                --
+                -- Parameters are a list of string constants that name capabilities. The semantics are the same as in
+                -- [require(capname, capname, ...)]
+        } }
 }
 
 -- A function to calculate some useful properties and put it in the table,
