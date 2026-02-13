@@ -12,7 +12,7 @@
 // Requires SM 9.0 (Hopper) or newer GPU architecture.
 
 // TODO: this will need PR for slang-rhi
-//DISABLED_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -render-feature atomic-bfloat16
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -render-feature atomic-bfloat16
 
 // BFloat16 add reduction target
 //TEST_INPUT:ubuffer(data=[0], stride=4):name=bf16AddTarget
