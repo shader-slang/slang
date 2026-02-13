@@ -6,6 +6,8 @@
 // is not specialized away by the compiler.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
 
 interface IHandler
 {
