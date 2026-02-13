@@ -2389,6 +2389,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
+                // Also update the current sink so command-line diagnostic colors work
+                m_sink->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:
@@ -4224,6 +4226,9 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+        // Copy color and unicode settings from the request sink
+        m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
+        m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
 
     // All diagnostics will also be sent to requestSink
