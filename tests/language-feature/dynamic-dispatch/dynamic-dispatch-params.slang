@@ -1,4 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1" -conformance "BarA:IBar=0" -conformance "BarB:IBar=1" -conformance "MulCombiner:ICombiner=0" -conformance "AddCombiner:ICombiner=1"
 
 // Test for GitHub issue #9838: Dynamic Dispatch with Dynamic Dispatch Parameters
@@ -109,7 +111,7 @@ float testCombine(uint combinerId, uint fooId, float fooData, uint barId, float 
 //TEST_INPUT: type_conformance AddCombiner:ICombiner = 1
 
 [numthreads(1, 1, 1)]
-void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
+void computeMain()
 {
     // Test 1: MulCombiner(0) with FooA(0, 1.0) * BarA(0, 0.5) = 1.0 * 0.5 = 0.5
     outputBuffer[0] = testCombine(0, 0, 1.0, 0, 0.5);
