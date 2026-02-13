@@ -51,10 +51,4 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value);
 
-    /**
-    Advances the pointer by a number of elements.
-    @param[in] elements Number of elements to advance by.
-    */
-    [mutating]
-    public void advance(int elements) {}
 }

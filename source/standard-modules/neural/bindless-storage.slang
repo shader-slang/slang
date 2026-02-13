@@ -43,11 +43,6 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         return address;
     }
 
-    [mutating]
-    override public void advance(int elements)
-    {
-        baseIndex += elements;
-    }
 }
 
 public struct PointerAddress<T> : IPointerLikeAddress<T>

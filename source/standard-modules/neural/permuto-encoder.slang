@@ -190,16 +190,18 @@ public struct PermutoEncoder<T,
     // =========================================================================
 
     /// Reads feature values at a given lattice position from the feature table.
+    /// @param levelBaseOffset Base offset into the feature table for this level (in number of elements).
     [BackwardDerivative(readFeatureValueBwd)]
     static void readFeatureValue<Address>(
         Address featureTableAddress,
+        uint levelBaseOffset,
         uint hashmapSize,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
     {
-        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
+        uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
         [ForceUnroll]
         for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
@@ -210,13 +212,14 @@ public struct PermutoEncoder<T,
 
     static void readFeatureValueBwd<Address>(
         DifferentialPtrPair<Address> featureTableAddress,
+        uint levelBaseOffset,
         uint hashmapSize,
         uvec<Dimensions> key,
         T.Differential[FeatureDimensionPerEntry] result)
             where Address : IPointerLikeAddress<T>
             where Address.Differential : IPointerLikeAddress<T.Differential>
     {
-        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
+        uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
         [ForceUnroll]
         for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
@@ -224,23 +227,6 @@ public struct PermutoEncoder<T,
             featureTableAddress.d.atomicAdd(index + f, result[f]);
         }
     }
-
-    // [ForceInline]
-    // [BackwardDerivative(getOffsetBwd)]
-    // internal static Address getOffset<Address>(Address address, int offset)
-    //     where Address : IPointerLikeAddress<T>
-    //     where Address.Differential : IPointerLikeAddress<T.Differential>
-    // {
-    //     address.advance(offset);
-    //     return address;
-    // }
-
-    // internal static void getOffsetBwd<Address>(DifferentialPtrPair<Address> address, int offset, Address.Differential result)
-    //     where Address : IPointerLikeAddress<T>
-    //     where Address.Differential : IPointerLikeAddress<T.Differential>
-    // {
-    //     address.d.advance(offset);
-    // }
 
     /// Main forward pass: encodes positions using the permutohedral lattice for a single level.
     /// Writes results to the appropriate offset in the full output array.
@@ -280,10 +266,10 @@ public struct PermutoEncoder<T,
         uint levelOffset = params.levelInfo.offsetOfFeatureTable;
         uint hashmapSize = params.levelInfo.featureTableSize;
 
-        // Offset feature table address to the start of this level
-        // Address levelFeatureAddress = featureTableAddress.getOffset(int(levelOffset * FeatureDimensionPerEntry));
-        // Address levelFeatureAddress = getOffset(featureTableAddress, int(levelOffset * FeatureDimensionPerEntry));
-        featureTableAddress.advance(int(levelOffset * FeatureDimensionPerEntry));
+        // Compute the base offset for this level's features (as integer, not address offset).
+        // We pass this as an integer to readFeatureValue so that the DifferentialPtrPair
+        // stays at the base address — both .p and .d remain correctly paired.
+        uint levelBaseOffset = levelOffset * FeatureDimensionPerEntry;
 
         // Elevate D-dimension vector to (D+1)-dimension homogeneous vector on hyperplane H_d
         float elevated[Dimensions + 1];
@@ -316,7 +302,7 @@ public struct PermutoEncoder<T,
 
             // Read feature value at this vertex
             T featureVal[FeatureDimensionPerEntry];
-            readFeatureValue(featureTableAddress, hashmapSize, key, featureVal);
+            readFeatureValue(featureTableAddress, levelBaseOffset, hashmapSize, key, featureVal);
 
             // Accumulate with barycentric weight
             float weight = barycentric[k];
