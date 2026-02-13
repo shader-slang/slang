@@ -231,20 +231,6 @@ struct ShaderInputLayoutParser
                     if (negate)
                         value = uint32_t(-int32_t(value));
                     val->bufferData.add(value);
-                    offset += 1;
-                }
-                else if (parser.NextToken().Type == Misc::TokenType::Identifier)
-                {
-                    // This is a buffer name reference - store it for later address resolution
-                    String bufferName = parser.ReadWord();
-                    ShaderInputLayout::BufferAddressReference ref;
-                    ref.bufferName = bufferName;
-                    ref.offsetInData = offset;
-                    val->pendingAddressRefs.add(ref);
-                    // Reserve 2 uint32 slots for 64-bit address (placeholder values)
-                    val->bufferData.add(0);
-                    val->bufferData.add(0);
-                    offset += 2;
                 }
                 else
                 {
@@ -252,8 +238,8 @@ struct ShaderInputLayoutParser
                     if (negate)
                         floatNum = -floatNum;
                     val->bufferData.add(*(unsigned int*)&floatNum);
-                    offset += 1;
                 }
+                offset += 4;
             }
             parser.Read("]");
         }
@@ -960,12 +946,6 @@ struct ShaderInputLayoutParser
         field.name = parseName(parser);
         parser.Read(Misc::TokenType::OpAssign);
         field.val = parseValExpr(parser);
-
-        // If this is a buffer, store it in namedBuffers for potential address references
-        if (auto bufferVal = as<ShaderInputLayout::BufferVal>(field.val))
-        {
-            layout->namedBuffers[field.name] = bufferVal;
-        }
 
         parentForNewVal->addField(field);
     }
