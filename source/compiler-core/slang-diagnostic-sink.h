@@ -396,10 +396,6 @@ protected:
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
-
-    // Rich diagnostics rendering options
-    SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
-    bool m_enableUnicode = true; // Enable unicode unconditionally
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.
