@@ -1,5 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=DIAG): -target spirv -O3
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -emit-spirv-directly -output-using-type
 
 // Test for issue #9148: passing a pointer to a buffer element as a function
 // parameter should not assert due to mismatched address spaces between
