@@ -1,214 +1,35 @@
-# CodeRabbit configuration for Slang shader compiler
-# Complements the existing Claude PR review (claude-pr-review.yml) by adding
-# static analysis, linting, and automated PR summaries.
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
-language: en-US
-tone_instructions: >-
-  Be direct and technical. This is a compiler project — prioritize correctness,
-  performance, and cross-platform consistency over style preferences.
-early_access: false
+language: "en-US"
+
 reviews:
-  profile: assertive
-  request_changes_workflow: false
-  high_level_summary: true
-  high_level_summary_instructions: >-
-    Summarize what this PR changes in the Slang shader compiler. Highlight:
-    which compiler stages are affected (lexer, parser, semantic, IR, codegen),
-    which target backends may be impacted (SPIRV, HLSL, GLSL, Metal, CUDA, WGSL),
-    and whether public API headers (include/slang.h, slang-com-helper.h) are modified.
-  poem: false
-  review_status: true
-  commit_status: true
+  high_level_summary: false
+  poem: true
+  in_progress_fortune: false
   collapse_walkthrough: true
-  sequence_diagrams: false
-  estimate_code_review_effort: true
-  assess_linked_issues: true
-  related_issues: true
-  related_prs: true
-  suggested_labels: true
-  auto_apply_labels: false
-  suggested_reviewers: true
+  sequence_diagrams: true
+  review_effort: false
+  issue_assessment: false
+  related_issues: false
+  related_pull_requests: false
+  labels: false
+  auto_label: false
+  reviewers: false
   auto_assign_reviewers: false
-  abort_on_close: true
 
-  auto_review:
-    enabled: true
-    auto_incremental_review: true
-    drafts: false
-    ignore_title_keywords:
-      - "WIP"
-      - "DO NOT MERGE"
-      - "wip"
-    base_branches:
-      - master
-    ignore_usernames:
-      - "dependabot[bot]"
-      - "github-actions[bot]"
-
-  # Exclude generated/vendored/build files from review
   path_filters:
     - "!build/**"
     - "!external/**"
-    - "!docs/stdlib-reference/**"
-    - "!**/generated/**"
-    - "!**/*.gen.*"
 
-  # Path-specific review instructions
-  path_instructions:
-    - path: "source/slang/**"
-      instructions: >-
-        This is the core compiler. Review for:
-        (1) IR pass correctness — ensure SSA form and type invariants are maintained.
-        (2) Proper use of FIDDLE macros for AST/IR node definitions.
-        (3) Emit logic should stay simple; heavy transforms belong in IR passes.
-        (4) Check that new IR instructions are registered in slang-ir-insts.lua.
-        (5) Null pointer safety and proper error handling via diagnostics.
+  auto_review:
+    enabled: true
+    drafts: false
 
-    - path: "source/core/**"
-      instructions: >-
-        Core utilities shared across the compiler. Check for:
-        (1) Thread safety if the utility may be used concurrently.
-        (2) Memory management — Slang uses reference counting (RefPtr/ComPtr).
-        (3) Platform portability (Windows, Linux, macOS).
-
-    - path: "source/compiler-core/**"
-      instructions: >-
-        Compiler infrastructure (diagnostics, source locations, codegen utilities).
-        Ensure diagnostic messages are clear and include source locations.
-
-    - path: "include/**"
-      instructions: >-
-        PUBLIC API HEADERS. Changes here are potentially breaking for all downstream
-        users. Flag any modification to existing function signatures, struct layouts,
-        or enum values. New additions should follow existing naming conventions.
-        Check COM interface compatibility (ISlang* interfaces).
-
-    - path: "tests/**"
-      instructions: >-
-        Verify test correctness. Tests use //TEST directives:
-        COMPARE_COMPUTE for GPU compute tests, INTERPRET for CPU interpreter tests.
-        Ensure new features have corresponding tests. Check that expected outputs
-        match the intended behavior, not just current behavior.
-
-    - path: "prelude/**"
-      instructions: >-
-        Built-in language definitions and intrinsics. Changes here affect all
-        Slang programs. Verify backward compatibility and check that all target
-        backends handle new intrinsics.
-
-    - path: "cmake/**"
-      instructions: >-
-        Build system changes. Verify cross-platform compatibility (Windows/Linux/macOS).
-        Check for proper target dependency declarations and generator expressions.
-
-    - path: "CMakeLists.txt"
-      instructions: >-
-        Root build configuration. Verify minimum CMake version compatibility (3.22+).
-        Check that new targets are properly linked and installed.
-
-    - path: ".github/workflows/**"
-      instructions: >-
-        CI/CD workflow changes. Verify correct trigger conditions, proper secret
-        handling, and that matrix configurations cover all required platforms.
-
-    - path: "tools/**"
-      instructions: >-
-        Development tools (slang-test, slangd LSP, render-test, etc.).
-        Ensure command-line interface changes are backward compatible.
-
-  # Static analysis tools
-  tools:
-    # C++ analysis
-    cppcheck:
-      enabled: true
-    clang:
-      enabled: true
-
-    # Script and config linting
-    shellcheck:
-      enabled: true
-    yamllint:
-      enabled: true
-    luacheck:
-      enabled: true
-
-    # Security
-    gitleaks:
-      enabled: true
-
-    # CI linting
-    actionlint:
-      enabled: true
-
-    # GitHub checks integration (see CI results in review)
-    github-checks:
-      enabled: true
-      timeout_ms: 600000
-
-    # General static analysis
-    semgrep:
-      enabled: true
-
-    # Disable irrelevant tools
-    ruff:
-      enabled: false
-    markdownlint:
-      enabled: false
-    biome:
-      enabled: false
-    hadolint:
-      enabled: false
-    eslint:
-      enabled: false
-    phpstan:
-      enabled: false
-    phpmd:
-      enabled: false
-    phpcs:
-      enabled: false
-    golangci-lint:
-      enabled: false
-    tflint:
-      enabled: false
-    detekt:
-      enabled: false
-    flake8:
-      enabled: false
-    rubocop:
-      enabled: false
-    clippy:
-      enabled: false
-    sqlfluff:
-      enabled: false
-    trivy:
-      enabled: false
-    pylint:
-      enabled: false
-    oxc:
-      enabled: false
-    checkov:
-      enabled: false
-    swiftlint:
-      enabled: false
-    buf:
-      enabled: false
-
-  finishing_touches:
-    docstrings:
-      enabled: false
-    unit_tests:
-      enabled: false
+  prompts_for_ai_agents: false
 
 chat:
-  auto_reply: true
+  auto_reply: false
+  art: false
 
 knowledge_base:
-  opt_out: false
-  web_search:
-    enabled: true
-  learnings:
-    scope: auto
-  issues:
-    scope: auto
-  pull_requests:
-    scope: auto
+  opt_out: true
