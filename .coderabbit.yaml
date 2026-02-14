@@ -4,6 +4,7 @@ language: "en-US"
 
 reviews:
   high_level_summary: false
+  auto_title_placeholder: ""
   poem: true
   in_progress_fortune: false
   collapse_walkthrough: true
