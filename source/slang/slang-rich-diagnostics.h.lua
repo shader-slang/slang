@@ -24,6 +24,7 @@ end
 local cpp_type_map = {
 	string = "String",
 	type = "Type*",
+	qualtype = "QualType",
 	int = "int",
 	name = "Name*",
 	decl = "Decl*",

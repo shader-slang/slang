@@ -1,5 +1,10 @@
 -- Helper functions for defining diagnostics
 
+-- Set to false to enable uniqueness checking for diagnostic codes.
+-- Currently set to true to allow duplicate codes during the transition period.
+-- See: https://github.com/shader-slang/slang/issues/6736
+local allow_duplicate_diagnostic_codes = true
+
 local diagnostics = {}
 
 -- Helper function to create a span
@@ -231,6 +236,12 @@ end
 -- Helper function to add a warning diagnostic
 local function warning(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "warning", message, primary_span, ...)
+end
+
+-- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
+-- For notes within diagnostics, use the `note` function above (line 37).
+local function note_diagnostic(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
 -- Helper function to parse interpolated message strings
@@ -491,7 +502,7 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      if seen_codes[diag.code] then
+      if seen_codes[diag.code] and not allow_duplicate_diagnostic_codes then
         table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
       else
         seen_codes[diag.code] = i

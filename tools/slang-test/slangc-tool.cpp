@@ -45,7 +45,16 @@ SlangResult SlangCTool::innerMain(
 
     compileRequest->setCommandLineCompilerMode();
 
-    SLANG_RETURN_ON_FAIL(compileRequest->processCommandLineArguments(&argv[1], argc - 1));
+    // Build argument list with -diagnostic-color never prepended.
+    // Test output should be deterministic and not depend on terminal state.
+    List<const char*> args;
+    args.add("-diagnostic-color");
+    args.add("never");
+    for (int i = 1; i < argc; i++)
+        args.add(argv[i]);
+
+    SLANG_RETURN_ON_FAIL(
+        compileRequest->processCommandLineArguments(args.getBuffer(), (int)args.getCount()));
 
     SlangResult compileRes = SLANG_OK;
 

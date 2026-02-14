@@ -11,6 +11,7 @@
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 #include "../compiler-core/slang-name-convention-util.h"
+#include "slang-rich-diagnostics.h"
 #include "../compiler-core/slang-source-embed-util.h"
 #include "../core/slang-castable.h"
 #include "../core/slang-char-util.h"
@@ -995,6 +996,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-machine-readable-diagnostics",
          nullptr,
          "Enable machine-readable diagnostic output in tab-separated format"},
+        {OptionKind::DiagnosticColor,
+         "-diagnostic-color",
+         "-diagnostic-color <always|never|auto>",
+         "Control colored diagnostic output (auto uses color if stderr is a tty)"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2364,6 +2369,32 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
             linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
             break;
+        case OptionKind::DiagnosticColor:
+            {
+                CommandLineArg colorArg;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(colorArg));
+                SlangDiagnosticColor colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
+                if (colorArg.value == "always")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_ALWAYS;
+                else if (colorArg.value == "never")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_NEVER;
+                else if (colorArg.value == "auto")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
+                else
+                {
+                    m_sink->diagnose(
+                        colorArg.loc,
+                        Diagnostics::unknownCommandLineValue,
+                        "always, never, auto");
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(optionKind, (int)colorValue);
+                // Update both the current sink and parent sink so colors work correctly
+                m_sink->setDiagnosticColorMode(colorValue);
+                if (m_sink->getParentSink())
+                    m_sink->getParentSink()->setDiagnosticColorMode(colorValue);
+                break;
+            }
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
             linkage->m_optionSet.setMatrixLayoutMode(
@@ -2756,7 +2787,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Stage stage = findStageByName(name.value);
                 if (stage == Stage::Unknown)
                 {
-                    m_sink->diagnose(name.loc, Diagnostics::unknownStage, name.value);
+                    m_sink->diagnose(Diagnostics::UnknownStage{
+                        .stage_name = name.value,
+                        .location = name.loc});
                     return SLANG_FAIL;
                 }
                 else
@@ -4195,6 +4228,9 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+        // Copy color and unicode settings from the request sink
+        m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
+        m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
 
     // All diagnostics will also be sent to requestSink
