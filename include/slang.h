@@ -4363,7 +4363,7 @@ struct ISession : public ISlangUnknown
         SlangInt column = -1;
     };
     virtual SLANG_NO_THROW SourceLocation SLANG_MCALL
-    getDeclSourceLocation(slang::DeclReflection* Decl) = 0;
+    getDeclSourceLocation(slang::DeclReflection* decl) = 0;
 
     /** Load a module from a string.
      */
