@@ -114,6 +114,42 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
             paramIndex++;
         }
 
+        // Propagate address space from specialized parameters to derived instructions
+        // in the cloned body, so that e.g. FieldAddress/GetElementPtr instructions
+        // have types consistent with the updated parameter types.
+        // This mirrors what the inliner does after cloning a callee body.
+        {
+            List<IRInst*> ptrParams;
+            for (auto param : specializedFunc->getParams())
+            {
+                if (as<IRPtrTypeBase>(param->getFullType()))
+                    ptrParams.add(param);
+            }
+            propagateAddressSpaceFromInsts(_Move(ptrParams));
+        }
+
+        // Also update any DebugVar instructions associated with specialized parameters.
+        // DebugVar types are Ptr<paramType>, so they become stale when the parameter
+        // type changes. We find them via DebugValue instructions that link params to
+        // their debug vars.
+        for (auto param : specializedFunc->getParams())
+        {
+            auto ptrType = as<IRPtrTypeBase>(param->getFullType());
+            if (!ptrType)
+                continue;
+            for (auto use = param->firstUse; use; use = use->nextUse)
+            {
+                auto debugValue = as<IRDebugValue>(use->getUser());
+                if (!debugValue)
+                    continue;
+                auto debugVar = as<IRDebugVar>(debugValue->getDebugVar());
+                if (!debugVar)
+                    continue;
+                debugVar->setFullType(builder.getPtrType(param->getFullType()));
+                break;
+            }
+        }
+
         // Update the function type.
         fixUpFuncType(specializedFunc);
 

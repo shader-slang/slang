@@ -7102,6 +7102,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         handleRequiredCapabilities(funcValue);
         requireVariableBufferCapabilityIfNeeded(inst->getDataType());
 
+        // If any argument is a StorageBuffer pointer, we need VariablePointersStorageBuffer.
+        for (UInt i = 0; i < inst->getArgCount(); i++)
+        {
+            auto ptrType = as<IRPtrTypeBase>(inst->getArg(i)->getDataType());
+            if (!ptrType)
+                continue;
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+            {
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_variable_pointers"));
+                requireSPIRVCapability(SpvCapabilityVariablePointersStorageBuffer);
+            }
+        }
+
         // We want to detect any call to an intrinsic operation, and inline
         // the SPIRV snippet directly at the call site.
         if (auto targetIntrinsic = Slang::findBestTargetIntrinsicDecoration(
