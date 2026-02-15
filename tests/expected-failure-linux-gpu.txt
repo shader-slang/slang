@@ -59,5 +59,10 @@ tests/metal/texture.slang.5 (vk)
 # Pointer to groupshared - Missing VK features on T4
 tests/language-feature/pointer/ptr-to-groupshared-1.slang (vk)
 
+# Neural tests - Flaky on T4 GPU runner, already in skip-list-debug.txt
+# These tests intermittently fail with JSON RPC timeouts on the Linux GPU runner
+tests/neural/outerproduct-accumulate-test.slang (vk)
+tests/neural/outerproduct-accumulate-test.slang.1 (cuda)
+
 # Ray tracing tests - CUDA/OptiX issues on T4
 tests/pipeline/ray-tracing/raygen.slang (cuda)
