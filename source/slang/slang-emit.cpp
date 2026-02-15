@@ -44,6 +44,7 @@
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
 #include "slang-ir-eliminate-multilevel-break.h"
+#include "slang-ir-lower-switch-to-reconverged-switches.h"
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-entry-point-raw-ptr-params.h"
@@ -73,6 +74,7 @@
 #include "slang-ir-link.h"
 #include "slang-ir-liveness.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-simplify-cfg.h"
 #include "slang-ir-lower-append-consume-structured-buffer.h"
 #include "slang-ir-lower-binding-query.h"
 #include "slang-ir-lower-bit-cast.h"
@@ -1934,6 +1936,21 @@ Result linkAndOptimizeIR(
     if (emitSpirvDirectly)
     {
         SLANG_PASS(performIntrinsicFunctionInlining);
+    }
+
+    // Lower switch statements with fallthrough to use reconverged control flow.
+    // This is needed for SPIR-V and Metal targets which have reconvergence issues
+    // with switch fallthrough containing wave operations.
+    // Must run before eliminateMultiLevelBreak. See GitHub issue #6441.
+    //
+    // We eliminate phis first so the switch lowering pass sees a cleaner IR
+    // without block parameters. Then simplifyCFG fuses empty switch case blocks
+    // that just branch to shared blocks.
+    if (isSPIRV(target) || isMetalTarget(targetRequest))
+    {
+        SLANG_PASS(eliminatePhis, LivenessMode::Disabled, PhiEliminationOptions::getFast());
+        SLANG_PASS(simplifyCFG, CFGSimplificationOptions::getFast());
+        SLANG_PASS(lowerSwitchToReconvergedSwitches, targetProgram);
     }
 
     SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
