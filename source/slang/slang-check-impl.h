@@ -712,6 +712,8 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
+    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
     HashSet<String> m_reportedDiagnosticKeys;
@@ -1619,6 +1621,12 @@ public:
     Expr* CheckTerm(Expr* term);
 
     Expr* _CheckTerm(Expr* term);
+
+    /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
+    /// references an outer-scope variable that needs to be captured into the lambda struct.
+    /// This handles the case where an expression was already checked by the parser's
+    /// two-phase generic disambiguation before the lambda capture context was established.
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
 
     Expr* CreateErrorExpr(Expr* expr);
 
@@ -3062,6 +3070,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr);
     Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
@@ -3107,7 +3116,6 @@ public:
 
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
-    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to

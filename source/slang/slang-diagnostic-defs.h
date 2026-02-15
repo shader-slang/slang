@@ -1032,16 +1032,18 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(30099, Error, sizeOfArgumentIsInvalid, "argument to sizeof is invalid")
 DIAGNOSTIC(
-    30100,
-    Error,
-    sizeOfDescriptorHandleNotAllowed,
-    "sizeof/alignof of 'DescriptorHandle' is not allowed because its size is target-dependent; "
-    "use reflection API to query size at runtime")
-DIAGNOSTIC(
     30083,
     Error,
     countOfArgumentIsInvalid,
     "argument to countof can only be a type pack or tuple")
+
+DIAGNOSTIC(30084, Error, floatBitCastTypeMismatch, "'$0' requires a $1 argument")
+
+DIAGNOSTIC(
+    30085,
+    Error,
+    floatBitCastRequiresConstant,
+    "'__floatAsInt' requires a compile-time constant floating-point expression")
 
 
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
@@ -1800,6 +1802,11 @@ DIAGNOSTIC(
     varWithoutTypeMustHaveInitializer,
     "a variable declaration without an initial-value expression must be given an explicit type")
 DIAGNOSTIC(
+    30621,
+    Error,
+    paramWithoutTypeMustHaveInitializer,
+    "a parameter declaration without an initial-value expression must be given an explicit type")
+DIAGNOSTIC(
     30622,
     Error,
     ambiguousDefaultInitializerForType,
@@ -1822,6 +1829,16 @@ DIAGNOSTIC(
     Error,
     outputParameterCannotHaveDefaultValue,
     "an 'out' or 'inout' parameter cannot have a default-value expression")
+DIAGNOSTIC(
+    30701,
+    Error,
+    systemValueSemanticInvalidType,
+    "type '$0' is not valid for system value semantic '$1'; expected '$2'")
+DIAGNOSTIC(
+    30702,
+    Error,
+    systemValueSemanticInvalidDirection,
+    "system value semantic '$0' cannot be used as $1 in '$2' shader stage")
 
 // 308xx: inheritance
 DIAGNOSTIC(
@@ -2395,6 +2412,11 @@ DIAGNOSTIC(
     Warning,
     requestedBindlessSpaceIndexUnavailable,
     "requested bindless space index '$0' is unavailable, using the next available index '$1'.")
+DIAGNOSTIC(
+    39029,
+    Error,
+    targetDoesNotSupportDescriptorHandle,
+    "the current compilation target does not support 'DescriptorHandle' types.")
 DIAGNOSTIC(
     39013,
     Warning,
@@ -3252,4 +3274,13 @@ DIAGNOSTIC(
     Error,
     cooperativeMatrixInvalidShape,
     "Invalid shape ['$0', '$1'] for cooperative matrix'$2'.")
+
+DIAGNOSTIC(
+    51701,
+    Fatal,
+    cooperativeMatrixUnsupportedCapture,
+    "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque "
+    "type values. Consider pre-loading the content of any referenced buffers into a local variable "
+    "before calling 'CoopMat.MapElement', or moving any referenced resources to global scope.")
+
 #undef DIAGNOSTIC

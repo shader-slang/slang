@@ -1,5 +1,20 @@
 implementing neural;
 
+public enum LayoutType : uint32_t
+{
+    Linear = 0,
+}
+
+internal interface IStorageLayout
+{
+    internal static const LayoutType Layout;
+}
+
+public struct LinearLayout : IStorageLayout
+{
+    internal static const LayoutType Layout = LayoutType.Linear;
+}
+
 /**
 Storage interface for accessing neural network parameters.
 Provides an abstraction for reading/writing parameters from various storage backends
@@ -29,12 +44,33 @@ public interface IStorage<T> : IDifferentiablePtrType
     public T read(Address address);
 
     /**
+    Reads sequential 4 elements starting from the given address and packed into a uint4.
+    */
+
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType;
+
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType;
+
+    /**
     Atomically adds a value to storage (for gradient accumulation).
     @param[in] address The address to add to.
     @param[in] value The value to add.
     */
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(Address address, T value);
+
+    /**
+    Atomically adds a vector of 2 values to storage using packed atomic operations where available.
+    On CUDA, this uses optimized PTX `red` instruction (e.g., red.relaxed.gpu.global.add.noftz.f16x2 for half2).
+    On other targets, falls back to two scalar atomicAdd calls.
+    @param[in] address The address to add to (must be aligned to 2 elements).
+    @param[in] value The vector of 2 values to add.
+    */
+    public void atomicAdd(Address address, vector<T, 2> value);
 
     /**
     Writes a value to storage.

@@ -11,6 +11,7 @@
 //
 // * `slang-check-conversion.cpp` is responsible for the logic of handling type conversion/coercion
 
+#include "../core/slang-math.h"
 #include "core/slang-char-util.h"
 #include "slang-ast-decl.h"
 #include "slang-ast-natural-layout.h"
@@ -19,6 +20,7 @@
 #include "slang-ast-synthesis.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2105,11 +2107,23 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (opName == getName("!"))
         {
-            resultValue = constArgVals[0] != 0;
+            resultValue = constArgVals[0] == 0;
         }
         else if (opName == getName("~"))
         {
             resultValue = ~constArgVals[0];
+        }
+        else if (opName == getName("&&"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) && (constArgVals[1] != 0);
+        }
+        else if (opName == getName("||"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
         // simple binary operators
@@ -2425,6 +2439,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     {
         return tryFoldIndexExpr(indexExpr.getExpr(), kind, circularityInfo);
     }
+    // Note: FloatBitCastExpr (__floatAsInt) is folded directly in visitFloatBitCastExpr
+    // and replaced with an IntegerLiteralExpr, so we don't need to handle it here.
     return nullptr;
 }
 
@@ -2704,7 +2720,17 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         if (!diagnosed)
         {
             if (!maybeDiagnoseAmbiguousReference(baseExpr))
-                getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+            {
+                if (getOptionSet().shouldEmitRichDiagnostics())
+                {
+                    getSink()->diagnose(
+                        Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
+                }
+                else
+                {
+                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
+                }
+            }
         }
         return CreateErrorExpr(subscriptExpr);
     }
@@ -2838,6 +2864,7 @@ Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
 Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
 {
     auto checkedTerm = CheckTerm(uncheckedExpr);
+    checkedTerm = maybeRegisterLambdaCapture(checkedTerm);
 
     // First, we want to do any disambiguation that is needed in order
     // to turn the `term` into an expression that names a single
@@ -3500,99 +3527,126 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     return resultExpr;
 }
 
-Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
+/// Visitor that walks an expression tree and rewrites `VarExpr`/`ThisExpr` references
+/// to outer-scope variables into `MemberExpr(this_lambda, capturedField)` references.
+/// Inherits plain recursive traversal from `ModifyingExprVisitor` and only overrides
+/// the leaf cases that need capture logic.
+struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 {
-    if (auto memberExpr = as<MemberExpr>(exprIn))
-    {
-        memberExpr->baseExpression = maybeRegisterLambdaCapture(memberExpr->baseExpression);
-        return memberExpr;
-    }
-    else if (auto subscriptExpr = as<IndexExpr>(exprIn))
-    {
-        subscriptExpr->baseExpression = maybeRegisterLambdaCapture(subscriptExpr->baseExpression);
-        return subscriptExpr;
-    }
-    auto thisExpr = as<ThisExpr>(exprIn);
-    auto varExpr = as<VarExpr>(exprIn);
-    if (!thisExpr && !varExpr)
-        return exprIn;
+    LambdaExpr* lambdaExpr;
+    LambdaDecl* lambdaDecl;
+    Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedDecl;
+    ASTBuilder* astBuilder;
+    DiagnosticSink* sink;
 
-    Decl* srcDecl = nullptr;
-    if (varExpr)
-        srcDecl = as<VarDeclBase>(varExpr->declRef.getDecl());
-    else
+    LambdaCaptureVisitor(
+        LambdaExpr* inLambdaExpr,
+        LambdaDecl* inLambdaDecl,
+        Dictionary<Decl*, VarDeclBase*>* inMap,
+        ASTBuilder* inAstBuilder,
+        DiagnosticSink* inSink)
+        : lambdaExpr(inLambdaExpr)
+        , lambdaDecl(inLambdaDecl)
+        , mapSrcDeclToCapturedDecl(inMap)
+        , astBuilder(inAstBuilder)
+        , sink(inSink)
     {
-        // If we see a `this` expression inside a lambda, it is referencing the
-        // `this` value of the parent type of the outer function, not the lambda struct
-        // itself. Since we don't have a VarDecl representing `this`, we will just use
-        // the AggTypeDecl as the key to register in the lambda capture map.
-        auto thisTypeDecl = isDeclRefTypeOf<Decl>(thisExpr->type.type);
-        if (!thisTypeDecl)
+    }
+
+    /// Try to capture an outer-scope declaration referenced by a VarExpr or ThisExpr.
+    /// Returns a MemberExpr on the lambda struct if capture is needed, or the original expr.
+    Expr* maybeCaptureDecl(Expr* exprIn, Decl* srcDecl)
+    {
+        if (!srcDecl)
             return exprIn;
-        srcDecl = thisTypeDecl.getDecl();
-    }
 
-    if (!srcDecl)
-        return exprIn;
+        if (as<VarDeclBase>(srcDecl) && isGlobalDecl(srcDecl))
+            return exprIn;
 
-    if (as<VarDeclBase>(srcDecl) && isGlobalDecl(srcDecl))
-        return exprIn;
-
-    auto lambdaScope = m_parentLambdaExpr->paramScopeDecl;
-    bool isDefinedInLambdaScope = false;
-    for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
-    {
-        if (parentDecl == lambdaScope)
+        auto lambdaScope = lambdaExpr->paramScopeDecl;
+        bool isDefinedInLambdaScope = false;
+        for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
         {
-            isDefinedInLambdaScope = true;
-            break;
+            if (parentDecl == lambdaScope)
+            {
+                isDefinedInLambdaScope = true;
+                break;
+            }
         }
+        if (isDefinedInLambdaScope)
+            return exprIn;
+
+        // We are referencing something that doesn't belong to the lambda scope,
+        // we need to capture it in the current lambda function.
+
+        VarDeclBase* capturedVarDecl = nullptr;
+        if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
+        {
+            capturedVarDecl = astBuilder->create<VarDecl>();
+            capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            SLANG_ASSERT(exprIn->type.type);
+            capturedVarDecl->type.type = exprIn->type.type;
+            mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
+            lambdaDecl->addMember(capturedVarDecl);
+
+            if (isNonCopyableType(capturedVarDecl->type.type))
+            {
+                if (sink)
+                {
+                    sink->diagnose(
+                        exprIn,
+                        Diagnostics::nonCopyableTypeCapturedInLambda,
+                        capturedVarDecl->type.type);
+                }
+            }
+        }
+
+        auto thisLambdaExpr = astBuilder->create<ThisExpr>();
+        thisLambdaExpr->scope = lambdaDecl->ownedScope;
+        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
+        thisLambdaExpr->checked = true;
+
+        auto resultMemberExpr = astBuilder->create<MemberExpr>();
+        resultMemberExpr->declRef = capturedVarDecl;
+        resultMemberExpr->baseExpression = thisLambdaExpr;
+        resultMemberExpr->type = exprIn->type;
+        resultMemberExpr->loc = exprIn->loc;
+        resultMemberExpr->type.isLeftValue = false;
+        resultMemberExpr->checked = true;
+        return resultMemberExpr;
     }
-    if (isDefinedInLambdaScope)
+
+    Expr* visitVarExpr(VarExpr* expr)
+    {
+        auto srcDecl = as<VarDeclBase>(expr->declRef.getDecl());
+        return maybeCaptureDecl(expr, srcDecl);
+    }
+
+    Expr* visitThisExpr(ThisExpr* expr)
+    {
+        auto thisTypeDecl = isDeclRefTypeOf<Decl>(expr->type.type);
+        if (!thisTypeDecl)
+            return expr;
+        // Don't capture `this` references that already point to the lambda struct
+        // itself (these are created by the capture mechanism).
+        if (thisTypeDecl.getDecl() == lambdaDecl)
+            return expr;
+        return maybeCaptureDecl(expr, thisTypeDecl.getDecl());
+    }
+};
+
+Expr* SemanticsVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
+{
+    if (!m_parentLambdaExpr)
         return exprIn;
 
-    // We are referencing something that doesn't belong to the lambda scope, we need to
-    // capture it in the current lambda function.
-
-    // If we have already captured the variable, just return the captured variable.
-    VarDeclBase* capturedVarDecl = nullptr;
-    if (!m_mapSrcDeclToCapturedLambdaDecl->tryGetValue(srcDecl, capturedVarDecl))
-    {
-        // If not already captured, create a captured variable in the lambda struct decl.
-        capturedVarDecl = m_astBuilder->create<VarDecl>();
-        capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
-        SLANG_ASSERT(exprIn->type.type);
-        capturedVarDecl->type.type = exprIn->type.type;
-        m_mapSrcDeclToCapturedLambdaDecl->add(srcDecl, capturedVarDecl);
-        m_parentLambdaDecl->addMember(capturedVarDecl);
-
-        // Is captured value NonCopyable? If so, it needs to be an error.
-        if (isNonCopyableType(capturedVarDecl->type.type))
-        {
-            getSink()->diagnose(
-                exprIn,
-                Diagnostics::nonCopyableTypeCapturedInLambda,
-                capturedVarDecl->type.type);
-        }
-    }
-
-    // Return a VarExpr referencing the capturedVarDecl.
-    auto thisLambdaExpr = m_astBuilder->create<ThisExpr>();
-    thisLambdaExpr->scope = m_parentLambdaDecl->ownedScope;
-    thisLambdaExpr->type = QualType(DeclRefType::create(m_astBuilder, m_parentLambdaDecl));
-    thisLambdaExpr->checked = true;
-
-    auto resultMemberExpr = m_astBuilder->create<MemberExpr>();
-    resultMemberExpr->declRef = capturedVarDecl;
-    resultMemberExpr->baseExpression = thisLambdaExpr;
-    resultMemberExpr->type = exprIn->type;
-    resultMemberExpr->loc = exprIn->loc;
-
-    // For captured variables, we need to set the type to be a non-lvalue to prevent
-    // lambda expression body from mutating their values.
-    resultMemberExpr->type.isLeftValue = false;
-    resultMemberExpr->checked = true;
-    return resultMemberExpr;
+    LambdaCaptureVisitor visitor(
+        m_parentLambdaExpr,
+        m_parentLambdaDecl,
+        m_mapSrcDeclToCapturedLambdaDecl,
+        m_astBuilder,
+        getSink());
+    return visitor.dispatch(exprIn);
 }
 
 Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
@@ -4221,20 +4275,147 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             return sizeOfLikeExpr;
         }
 
-        // DescriptorHandle size is target-dependent, so sizeof/alignof cannot be
-        // evaluated at compile-time. Users should use reflection API instead.
-        if (as<DescriptorHandleType>(type))
-        {
-            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfDescriptorHandleNotAllowed);
-
-            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
-            return sizeOfLikeExpr;
-        }
+        // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
+        // uint2 otherwise). The size calculation is deferred to IR level where target
+        // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
     }
 
     sizeOfLikeExpr->sizedType = type;
 
     return sizeOfLikeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
+{
+    if (!expr->value)
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    // Visit the value expression
+    auto valueExpr = dispatch(expr->value);
+    expr->value = valueExpr;
+
+    // Determine the floating-point type from the expression
+    auto valueType = valueExpr->type.type;
+    BaseType floatBaseType = BaseType::Void;
+    Type* resultType = nullptr;
+
+    if (auto basicType = as<BasicExpressionType>(valueType))
+    {
+        switch (basicType->getBaseType())
+        {
+        case BaseType::Half:
+            floatBaseType = BaseType::Half;
+            resultType = m_astBuilder->getInt16Type();
+            break;
+        case BaseType::Float:
+            floatBaseType = BaseType::Float;
+            resultType = m_astBuilder->getIntType(); // int32
+            break;
+        case BaseType::Double:
+            floatBaseType = BaseType::Double;
+            resultType = m_astBuilder->getInt64Type();
+            break;
+        default:
+            break;
+        }
+    }
+
+    if (floatBaseType == BaseType::Void)
+    {
+        getSink()->diagnose(
+            expr,
+            Diagnostics::floatBitCastTypeMismatch,
+            "__floatAsInt",
+            "half, float, or double");
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    expr->type = resultType;
+
+    // Try to constant fold - __floatAsInt must be evaluated at compile time
+    FloatingPointLiteralExpr* floatLitExpr = nullptr;
+
+    // Check if it's a direct floating-point literal
+    if (auto lit = as<FloatingPointLiteralExpr>(valueExpr))
+    {
+        floatLitExpr = lit;
+    }
+    // Check if it's a type cast like float(x), half(x), double(x)
+    else if (auto invokeExpr = as<InvokeExpr>(valueExpr))
+    {
+        if (invokeExpr->arguments.getCount() == 1)
+        {
+            floatLitExpr = as<FloatingPointLiteralExpr>(invokeExpr->arguments[0]);
+            if (!floatLitExpr)
+            {
+                // Also check for integer literal being cast to float
+                if (auto intLitExpr = as<IntegerLiteralExpr>(invokeExpr->arguments[0]))
+                {
+                    double floatVal = (double)intLitExpr->value;
+                    IntegerLiteralValue resultValue = 0;
+
+                    switch (floatBaseType)
+                    {
+                    case BaseType::Half:
+                        resultValue = (int16_t)FloatToHalf((float)floatVal);
+                        break;
+                    case BaseType::Float:
+                        resultValue = FloatAsInt((float)floatVal);
+                        break;
+                    case BaseType::Double:
+                        resultValue = DoubleAsInt64(floatVal);
+                        break;
+                    default:
+                        break;
+                    }
+
+                    // Create the folded integer literal expression
+                    auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
+                    foldedExpr->loc = expr->loc;
+                    foldedExpr->type = QualType(resultType);
+                    foldedExpr->value = resultValue;
+                    return foldedExpr;
+                }
+            }
+        }
+    }
+
+    if (floatLitExpr)
+    {
+        double floatVal = floatLitExpr->value;
+        IntegerLiteralValue resultValue = 0;
+
+        switch (floatBaseType)
+        {
+        case BaseType::Half:
+            resultValue = (int16_t)FloatToHalf((float)floatVal);
+            break;
+        case BaseType::Float:
+            resultValue = FloatAsInt((float)floatVal);
+            break;
+        case BaseType::Double:
+            resultValue = DoubleAsInt64(floatVal);
+            break;
+        default:
+            break;
+        }
+
+        // Create the folded integer literal expression
+        auto foldedExpr = m_astBuilder->create<IntegerLiteralExpr>();
+        foldedExpr->loc = expr->loc;
+        foldedExpr->type = QualType(resultType);
+        foldedExpr->value = resultValue;
+        return foldedExpr;
+    }
+
+    // Could not constant fold - emit error
+    getSink()->diagnose(expr, Diagnostics::floatBitCastRequiresConstant);
+    expr->type = m_astBuilder->getErrorType();
+    return expr;
 }
 
 // Determines if we have a valid `AddressOf` target.
@@ -4807,7 +4988,6 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     LambdaDecl* lambdaStructDecl = m_astBuilder->create<LambdaDecl>();
     auto subContext = withParentLambdaExpr(lambdaExpr, lambdaStructDecl, &mapSrcDeclToCapturedDecl);
     addModifier(lambdaStructDecl, m_astBuilder->create<SynthesizedModifier>());
-    m_parentFunc->addMember(lambdaStructDecl);
     synthesizer.pushScopeForContainer(lambdaStructDecl);
     lambdaStructDecl->loc = lambdaExpr->loc;
     StringBuilder nameBuilder;
@@ -4817,6 +4997,11 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
         nameBuilder << getText(m_parentFunc->getName());
         nameBuilder << "_";
         nameBuilder << m_parentFunc->getDirectMemberDeclCount();
+        m_parentFunc->addMember(lambdaStructDecl);
+    }
+    else
+    {
+        m_outerScope->containerDecl->addMember(lambdaStructDecl);
     }
     auto name = getName(nameBuilder.getBuffer());
     lambdaStructDecl->nameAndLoc.name = name;
@@ -4826,6 +5011,7 @@ Expr* SemanticsExprVisitor::visitLambdaExpr(LambdaExpr* lambdaExpr)
     synthesizer.pushScopeForContainer(funcDecl);
     funcDecl->loc = lambdaExpr->loc;
     funcDecl->nameAndLoc.name = getName("()");
+    funcDecl->nameAndLoc.loc = lambdaExpr->loc;
     lambdaStructDecl->addMember(funcDecl);
     lambdaStructDecl->funcDecl = funcDecl;
     addModifier(funcDecl, m_astBuilder->create<SynthesizedModifier>());

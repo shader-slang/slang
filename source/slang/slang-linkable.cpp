@@ -396,6 +396,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType** outSpecializedComponentType,
     ISlangBlob** outDiagnostics)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
     List<SpecializationArg> expandedArgs;
@@ -547,6 +548,30 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetCompileResult(
     *outCompileResult = static_cast<slang::ICompileResult*>(artifact);
     (*outCompileResult)->addRef();
     return SLANG_OK;
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::getTargetHostCallable(
+    int targetIndex,
+    ISlangSharedLibrary** outSharedLibrary,
+    slang::IBlob** outDiagnostics)
+{
+    auto linkage = getLinkage();
+    if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
+        return SLANG_E_INVALID_ARG;
+    auto target = linkage->targets[targetIndex];
+
+    auto targetProgram = getTargetProgram(target);
+
+    DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
+    IArtifact* artifact = targetProgram->getOrCreateWholeProgramResult(&sink);
+    sink.getBlobIfNeeded(outDiagnostics);
+
+    if (artifact == nullptr)
+        return SLANG_FAIL;
+
+    return artifact->loadSharedLibrary(ArtifactKeep::Yes, outSharedLibrary);
 }
 
 /// Visitor used by `ComponentType::enumerateModules`
@@ -921,6 +946,7 @@ Expr* ComponentType::findDeclFromString(String const& name, DiagnosticSink* sink
     SemanticsVisitor visitor(context);
 
     auto checkedExpr = visitor.CheckTerm(expr);
+    checkedExpr = visitor.maybeResolveOverloadedExpr(checkedExpr, LookupMask::Default, nullptr);
 
     if (as<DeclRefExpr>(checkedExpr) || as<OverloadedExpr>(checkedExpr))
     {

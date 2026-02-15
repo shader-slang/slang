@@ -502,6 +502,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
             // This is a reference to an entry point
             return SLANG_TYPE_KIND_STRUCT;
         }
+        else if (declRef.is<EnumDecl>())
+        {
+            return SLANG_TYPE_KIND_ENUM;
+        }
     }
     else if (const auto specializedType = as<ExistentialSpecializedType>(type))
     {
@@ -536,6 +540,10 @@ SLANG_API unsigned int spReflectionType_GetFieldCount(SlangReflectionType* inTyp
                        MemberFilterStyle::Instance)
                 .getCount();
         }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            return (unsigned int)enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>().getCount();
+        }
     }
 
     return 0;
@@ -562,6 +570,12 @@ SLANG_API SlangReflectionVariable* spReflectionType_GetFieldByIndex(
                 MemberFilterStyle::Instance);
             auto fieldDeclRef = fields[index];
             return convert(fieldDeclRef);
+        }
+        else if (auto enumDeclRef = declRef.as<EnumDecl>())
+        {
+            auto cases = enumDeclRef.getDecl()->getMembersOfType<EnumCaseDecl>();
+            auto caseDecl = cases[index];
+            return convert(DeclRef(caseDecl));
         }
     }
 
@@ -637,6 +651,14 @@ SLANG_API SlangReflectionType* spReflectionType_GetElementType(SlangReflectionTy
     else if (auto matrixType = as<MatrixExpressionType>(type))
     {
         return convert(matrixType->getElementType());
+    }
+    else if (auto declRefType = as<DeclRefType>(type))
+    {
+        const auto& declRef = declRefType->getDeclRef();
+        if (auto enumDecl = declRef.as<EnumDecl>())
+        {
+            return convert(enumDecl.getDecl()->tagType);
+        }
     }
     else if (auto streamType = as<HLSLStreamOutputType>(type))
     {
@@ -3258,6 +3280,11 @@ SLANG_API bool spReflectionVariable_HasDefaultValue(SlangReflectionVariable* inV
     {
         return varDecl->initExpr != nullptr;
     }
+    if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal);
+        return constantVal != nullptr;
+    }
 
     return false;
 }
@@ -3291,6 +3318,14 @@ spReflectionVariable_GetDefaultValueInt(SlangReflectionVariable* inVar, int64_t*
                 *rs = (int64_t)floatLit->value;
                 return 0;
             }
+        }
+    }
+    else if (auto enumCaseDecl = as<EnumCaseDecl>(decl))
+    {
+        if (auto constantVal = as<ConstantIntVal>(enumCaseDecl->tagVal))
+        {
+            *rs = constantVal->getValue();
+            return 0;
         }
     }
 
@@ -3835,6 +3870,10 @@ SLANG_API SlangDeclKind spReflectionDecl_getKind(SlangReflectionDecl* decl)
     {
         return SLANG_DECL_KIND_NAMESPACE;
     }
+    else if (as<EnumDecl>(slangDecl))
+    {
+        return SLANG_DECL_KIND_ENUM;
+    }
     else
         return SLANG_DECL_KIND_UNSUPPORTED_FOR_REFLECTION;
 }
@@ -4255,7 +4294,6 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto astBuilder = entryPointLayout->program->getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    // First look for the HLSL case, where we have an attribute attached to the entry point function
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
@@ -4564,6 +4602,14 @@ SLANG_API size_t spReflection_getGlobalConstantBufferSize(SlangReflection* inPro
     if (!uniform)
         return 0;
     return getReflectionSize(uniform->count);
+}
+
+SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* inProgram)
+{
+    auto program = convert(inProgram);
+    if (!program)
+        return -1; // -1 means bindless resource heap is not used.
+    return program->bindlessSpaceIndex;
 }
 
 SLANG_API SlangReflectionType* spReflection_specializeType(

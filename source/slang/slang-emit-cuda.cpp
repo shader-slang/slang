@@ -93,6 +93,12 @@ UnownedStringSlice CUDASourceEmitter::getBuiltinTypeName(IROp op)
         return UnownedStringSlice("float");
     case kIROp_DoubleType:
         return UnownedStringSlice("double");
+    case kIROp_FloatE4M3Type:
+        return UnownedStringSlice("__nv_fp8_e4m3");
+    case kIROp_FloatE5M2Type:
+        return UnownedStringSlice("__nv_fp8_e5m2");
+    case kIROp_BFloat16Type:
+        return UnownedStringSlice("__nv_bfloat16");
     default:
         return UnownedStringSlice();
     }
@@ -137,7 +143,18 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
             return UnownedStringSlice("uint");
 
     case kIROp_HalfType:
+        m_extensionTracker->requireBaseType(BaseType::Half);
         return UnownedStringSlice("__half");
+
+    case kIROp_FloatE4M3Type:
+        m_extensionTracker->requireFp8();
+        return UnownedStringSlice("__nv_fp8_e4m3");
+    case kIROp_FloatE5M2Type:
+        m_extensionTracker->requireFp8();
+        return UnownedStringSlice("__nv_fp8_e5m2");
+    case kIROp_BFloat16Type:
+        m_extensionTracker->requireBfloat16();
+        return UnownedStringSlice("__nv_bfloat16");
 
     case kIROp_FloatType:
         return UnownedStringSlice("float");
@@ -248,6 +265,18 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
             return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
         }
+    case kIROp_FloatE4M3Type:
+        out << "__nv_fp8_e4m3";
+        m_extensionTracker->requireFp8();
+        return SLANG_OK;
+    case kIROp_FloatE5M2Type:
+        out << "__nv_fp8_e5m2";
+        m_extensionTracker->requireFp8();
+        return SLANG_OK;
+    case kIROp_BFloat16Type:
+        out << "__nv_bfloat16";
+        m_extensionTracker->requireBfloat16();
+        return SLANG_OK;
     default:
         {
             if (isNominalOp(type->getOp()))
@@ -726,6 +755,17 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1);\n");
             return true;
         }
+    case kIROp_SetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixSetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
     default:
         return false;
     }
@@ -858,6 +898,16 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
             return true;
         }
+    case kIROp_MakeCoopMatrixFromScalar:
+        {
+            StringBuilder typeSB;
+            emitWMMAFragmentType(as<IRCoopMatrixType>(inst->getDataType()), typeSB);
+            m_writer->emit(typeSB);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     case kIROp_MakeArray:
         {
             IRType* dataType = inst->getDataType();
@@ -929,6 +979,15 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit("((");
             emitType(inst->getDataType());
             m_writer->emit(")optixGetSbtDataPointer())");
+            return true;
+        }
+    case kIROp_GetOptiXPayloadRegister:
+        {
+            auto idxInst = as<IRIntLit>(inst->getOperand(0));
+            IRIntegerValue idx = idxInst->getValue();
+            m_writer->emit("optixGetPayload_");
+            m_writer->emit(idx);
+            m_writer->emit("()");
             return true;
         }
     case kIROp_DispatchKernel:
@@ -1100,7 +1159,8 @@ static bool typeCheck(IROp op, uint32_t matrixUse)
     {
     case 0: // matrixA
     case 1: // matrixB
-        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType;
+        return op == kIROp_UInt8Type || op == kIROp_Int8Type || op == kIROp_HalfType ||
+               op == kIROp_BFloat16Type || op == kIROp_FloatE4M3Type || op == kIROp_FloatE5M2Type;
     case 2: // accumulator
         return op == kIROp_IntType || op == kIROp_HalfType || op == kIROp_FloatType;
     }
@@ -1207,11 +1267,14 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
         (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
     uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
 
-    auto typeOp = coopMatType->getElementType()->getOp();
-    auto typeName = getBuiltinTypeName(typeOp);
+    auto elementType = coopMatType->getElementType();
+    StringBuilder elementTypeSB;
+    calcTypeName(elementType, CodeGenTarget::CUDASource, elementTypeSB);
+    auto typeName = elementTypeSB.toString();
+
     // TODO: We should add a pass in IR to validate the coop matrix types, such that
     // we can provide better diagnostic messages here.
-    if (!typeCheck(typeOp, matrixUse))
+    if (!typeCheck(elementType->getOp(), matrixUse))
     {
         StringBuilder msg;
         getSink()->diagnose(

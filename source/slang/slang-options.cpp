@@ -991,6 +991,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-experimental-rich-diagnostics",
          nullptr,
          "Enable experimental rich diagnostics with enhanced formatting and details"},
+        {OptionKind::EnableMachineReadableDiagnostics,
+         "-enable-machine-readable-diagnostics",
+         nullptr,
+         "Enable machine-readable diagnostic output in tab-separated format"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -1042,6 +1046,10 @@ void initCommandOptions(CommandOptions& options)
          "-loop-inversion",
          nullptr,
          "Enable loop inversion in the code-gen optimization. Default is off"},
+        {OptionKind::GenerateWholeProgram,
+         "-whole-program",
+         nullptr,
+         "Generate code for all entry points in a single output (library mode)."},
     };
     _addOptions(makeConstArrayView(internalOpts), options);
 
@@ -2351,6 +2359,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             // -report-detailed-perf-benchmark implies -report-perf-benchmark
             linkage->m_optionSet.set(OptionKind::ReportPerfBenchmark, true);
             break;
+        case OptionKind::EnableMachineReadableDiagnostics:
+            linkage->m_optionSet.set(optionKind, true);
+            // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
+            linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
+            break;
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
             linkage->m_optionSet.setMatrixLayoutMode(
@@ -2765,6 +2778,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::ForceCLayout:
             {
                 getCurrentTarget()->optionSet.add(CompilerOptionName::ForceCLayout, true);
+                break;
+            }
+        case OptionKind::GenerateWholeProgram:
+            {
+                getCurrentTarget()->optionSet.add(CompilerOptionName::GenerateWholeProgram, true);
                 break;
             }
         case OptionKind::EnableEffectAnnotations:

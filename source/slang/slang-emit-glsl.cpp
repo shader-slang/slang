@@ -1386,6 +1386,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                 case BaseType::IntPtr:
                 case BaseType::Int64:
                     {
+                        _requireBaseType(BaseType::Int64);
                         m_writer->emitInt64(int64_t(litInst->value.intVal));
                         m_writer->emit("L");
                         return;
@@ -1395,6 +1396,7 @@ void GLSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     {
                         SLANG_COMPILE_TIME_ASSERT(
                             sizeof(litInst->value.intVal) >= sizeof(uint64_t));
+                        _requireBaseType(BaseType::UInt64);
                         m_writer->emitUInt64(uint64_t(litInst->value.intVal));
                         m_writer->emit("UL");
                         return;
@@ -3467,7 +3469,22 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
     case kIROp_HitObjectType:
         {
-            m_writer->emit("hitObjectNV");
+            // Emit appropriate HitObject type based on capability
+            // User must explicitly specify which extension to use
+            auto targetCaps = getTargetCaps();
+            if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectEXT");
+            }
+            else if (targetCaps.implies(CapabilityAtom::_GL_NV_shader_invocation_reorder))
+            {
+                m_writer->emit("hitObjectNV");
+            }
+            else
+            {
+                SLANG_UNEXPECTED(
+                    "HitObjectType requires GL_EXT or GL_NV shader_invocation_reorder capability");
+            }
             return;
         }
     case kIROp_TextureFootprintType:

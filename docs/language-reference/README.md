@@ -6,11 +6,14 @@ Slang Language Reference
 Contents
 --------
 
-* [1 - Introduction](01-introduction.md)
-* [2 - Lexical Structure](02-lexical-structure.md)
-* [3 - Preprocessor](03-preprocessor.md)
-* [4 - Types](04-types.md)
-* [5 - Expressions](05-expressions.md)
-* [6 - Statements](06-statements.md)
-* [7 - Declarations](07-declarations.md)
-* [8 - Attributes](08-attributes.md)
+* [Introduction](introduction.md)
+* [Basic Concepts](basics.md)
+* [Lexical Structure](lexical-structure.md)
+* [Preprocessor](preprocessor.md)
+* [Types](types.md)
+* [Expressions](expressions.md)
+* [Statements](statements.md)
+* [Declarations](declarations.md)
+* [Attributes](attributes.md)
+* [Graphics Shaders and Compute Kernels](shaders-and-kernels.md)
+* [Glossary](glossary.md)

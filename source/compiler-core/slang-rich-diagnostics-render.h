@@ -20,6 +20,7 @@ struct DiagnosticNote
 {
     String message;
     DiagnosticSpan span;
+    List<DiagnosticSpan> secondarySpans;
 };
 
 //
@@ -46,5 +47,7 @@ String renderDiagnostic(
     SourceManager* sm,
     DiagnosticRenderOptions opts,
     const GenericDiagnostic& diag);
+
+String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag);
 
 } // namespace Slang

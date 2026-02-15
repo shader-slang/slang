@@ -349,7 +349,7 @@ interface __BuiltinType
 /// To define generic functions that work with both scalar and vector types, use `IInteger` or `IFloat` instead.
 [sealed]
 [builtin]
-interface __BuiltinArithmeticType : __BuiltinType, IArithmetic
+interface __BuiltinArithmeticType : __BuiltinType, IArithmetic, ICoopElement
 {
 }
 
@@ -807,6 +807,21 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 };
 
 
+[sealed]
+[builtin]
+interface ICoopElement
+{
+    [OverloadRank(-1)]
+    __init(int val);
+}
+
+[sealed]
+[builtin]
+interface IFloatingPointCoopElement : ICoopElement
+{
+}
+
+
 /// Represents builtin floating point scalar types.
 /// To define generic functions that work with both scalar and vector types, use `IFloat` instead.
 ///
@@ -814,7 +829,7 @@ struct DifferentialPtrPair : IDifferentiablePtrType
 [sealed]
 [builtin]
 [TreatAsDifferentiable]
-interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat
+interface __BuiltinFloatingPointType : __BuiltinRealType, IFloat, IFloatingPointCoopElement
 {
         /// Get the value of the mathematical constant pi in this type.
     [Differentiable]
@@ -997,6 +1012,11 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
 {
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
 }
+
+// Cast between any two floating point types, including substandard floating point types
+// like FloatE4M3, FloatE5M2, BFloat16, etc.
+__intrinsic_op($(kIROp_FloatCast))
+T floatCast<T:IFloatingPointCoopElement, U:IFloatingPointCoopElement>(U val);
 
 // Allow real-number types to be cast into each other
 //@hidden:
@@ -1589,6 +1609,74 @@ extension uintptr_t : IRangedValue
     static const int size = $(SLANG_PROCESSOR_X86_64?"8":"4");
 }
 
+
+// Packed float types.
+
+/// Represent a 8-bit floating point value with 4 bits of exponent and 3 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE4M3Type))
+__magic_type(FloatE4M3Type)
+struct FloatE4M3 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+/// Represent a 8-bit floating point value with 5 bits of exponent and 2 bits of mantissa.
+[require(spvFloat8EXT)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_FloatE5M2Type))
+__magic_type(FloatE5M2Type)
+struct FloatE5M2 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+/// Represent a 16-bit floating point value with 8 bits of exponent and 7 bits of mantissa.
+[require(spvBFloat16KHR)]
+[require(cuda_sm_8_0)]
+__intrinsic_type($(kIROp_BFloat16Type))
+__magic_type(BFloat16Type)
+struct BFloat16 : IFloatingPointCoopElement
+{
+    __intrinsic_op($(kIROp_CastIntToFloat))
+    __init(int val);
+
+    [OverloadRank(-10)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(U val);
+}
+
+
+extension<T:__BuiltinFloatingPointType> T
+{
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(FloatE4M3 val);
+
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(FloatE5M2 val);
+
+    [OverloadRank(-5)]
+    __intrinsic_op($(kIROp_FloatCast))
+    __init(BFloat16 val);
+}
+
+
 //@hidden:
 
 // TODO(tfoley): This should really map over to `kIROp_PtrType`,
@@ -1694,9 +1782,10 @@ bool operator!=(__none_t noneVal, Optional<T> val)
     return val.hasValue;
 }
 
+__magic_type(ConditionalType)
 struct Conditional<T, bool hasValue>
 {
-    internal T storage[hasValue];
+    internal vector<T, hasValue ? 1 : 0> storage;
 
     __implicit_conversion($(kConversionCost_ValToOptional))
     [__unsafeForceInlineEarly]
@@ -2196,6 +2285,15 @@ extension vector<T,N> : IInteger
     __init(vector<U, N> other);
 }
 
+extension<T:IFloatingPointCoopElement, let N : int> vector<T,N>
+{
+    [OverloadRank(-1)]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:IFloatingPointCoopElement>
+    __init(vector<U, N> other);
+}
+
 __generic<T:__BuiltinFloatingPointType, let N : int>
 extension vector<T,N> : IFloat
 {
@@ -2210,12 +2308,6 @@ extension vector<T,N> : IFloat
     __intrinsic_op($(kIROp_Neg)) This neg();
     [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
     [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
-
-    [OverloadRank(-1)]
-    __implicit_conversion($(kConversionCost_Default))
-    __intrinsic_op($(kIROp_FloatCast))
-    __generic<U:__BuiltinFloatingPointType>
-    __init(vector<U, N> other);
 
     [OverloadRank(-1)]
     __intrinsic_op($(kIROp_CastIntToFloat))
@@ -3610,6 +3702,11 @@ __intrinsic_op($(kIROp_IsFloat))
 bool __isFloat_impl(T t);
 
 __generic<T>
+__intrinsic_op($(kIROp_IsCoopFloat))
+bool __isCoopFloat_impl(T t);
+
+
+__generic<T>
 __intrinsic_op($(kIROp_IsHalf))
 bool __isHalf_impl(T t);
 
@@ -3618,6 +3715,13 @@ __generic<T>
 bool __isFloat()
 {
     return __isFloat_impl(__declVal<T>());
+}
+
+__generic<T>
+[__unsafeForceInlineEarly]
+bool __isCoopFloat()
+{
+    return __isCoopFloat_impl(__declVal<T>());
 }
 
 __generic<T>
@@ -3691,6 +3795,12 @@ int32_t __byteToElemOffset<T>(int32_t byteOffset)
 {
     return byteOffset / __naturalStrideOf<T>();
 }
+
+__intrinsic_op($(kIROp_IRem))
+internal T __irem<T>(T left, T right);
+
+__intrinsic_op($(kIROp_FRem))
+internal T __frem<T>(T left, T right);
 
 __intrinsic_op($(kIROp_TreatAsDynamicUniform))
 T asDynamicUniform<T>(T v);
@@ -3813,6 +3923,63 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMin))
     [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically adds the given value to the stored value without returning
+    /// the original value. On CUDA, maps to the PTX `red` instruction for
+    /// potentially better performance than `add()`.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAdd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+        default: add(value, order);
+        }
+    }
+
+    /// Atomically subtracts the given value from the stored value without
+    /// returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceSub(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+        default: sub(value, order);
+        }
+    }
+
+    /// Atomically computes the maximum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMax(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+        default: max(value, order);
+        }
+    }
+
+    /// Atomically computes the minimum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMin(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+        default: min(value, order);
+        }
+    }
 }
 
 /// These additional members are only available when `T` conforms to `IBitAtomicable`.
@@ -3845,6 +4012,76 @@ extension<T : IBitAtomicable> Atomic<T>
     /// value.
     __intrinsic_op($(kIROp_AtomicDec))
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically performs a bitwise AND without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAnd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+        default: and(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise OR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceOr(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+        default: or(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise XOR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceXor(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+        default: xor(value, order);
+        }
+    }
+
+    /// Atomically increments the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceInc(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+        default: increment(order);
+        }
+    }
+
+    /// Atomically decrements the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceDec(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+        default: decrement(order);
+        }
+    }
 }
 
 //@ hidden:
@@ -4468,3 +4705,444 @@ typealias NodePayloadPtr = Ptr<T, Access::ReadWrite, (AddressSpace)$((uint64_t)A
 __attributeTarget(StructDecl)
 attribute_syntax [raypayload] : RayPayloadAttribute;
 
+//@hidden:
+
+semantic sv_position
+{
+    [require(fragment)]
+    [require(geometry)]
+    get : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float4;
+}
+
+semantic sv_depth
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_depthgreaterequal
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_depthlessequal
+{
+    [require(fragment)]
+    set : float;
+}
+
+semantic sv_clipdistance
+{
+    [require(fragment)]
+    get : float;
+
+    [require(fragment)]
+    get : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float[];
+}
+
+semantic sv_culldistance
+{
+    [require(fragment)]
+    get : float;
+
+    [require(fragment)]
+    get : float[];
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    set : float[];
+}
+
+semantic sv_target
+{
+    // SV_Target accepts any type - structs are flattened to multiple render targets
+}
+
+semantic sv_stencilref
+{
+    [require(fragment)]
+    set : uint;
+}
+
+semantic sv_coverage
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(fragment)]
+    set : uint;
+}
+
+semantic sv_innercoverage
+{
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_dispatchthreadid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_groupid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components. See dispatch-thread-id-extraction.slang.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_groupindex
+{
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_groupthreadid
+{
+    // uint and uint2 overloads allow convenient access for 1D/2D dispatches.
+    // HLSL requires uint3, but other backends (CUDA, SPIRV) extract appropriate
+    // components.
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint2;
+
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint3;
+}
+
+semantic sv_vertexid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_instanceid
+{
+    [require(vertex)]
+    get : uint;
+
+    // Vertex output + fragment input enables passing instance ID as a varying
+    // Only works on SPIRV/GLSL, where we legalize it to a flat-interpolated user varying
+    // See tests/bugs/gh-3087.slang for an example
+    [require(vertex)]
+    set : uint;
+
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_isfrontface
+{
+    [require(fragment)]
+    get : bool;
+
+    [require(geometry)]
+    set : bool;
+}
+
+semantic sv_sampleindex
+{
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_pointcoord
+{
+    [require(fragment)]
+    get : float2;
+}
+
+semantic sv_primitiveid
+{
+    [require(fragment)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    get : uint;
+
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_viewportarrayindex
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_rendertargetarrayindex
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_domainlocation
+{
+    [require(domain)]
+    get : float2;
+
+    [require(domain)]
+    get : float3;
+}
+
+semantic sv_outputcontrolpointid
+{
+    [require(hull)]
+    get : uint;
+}
+
+semantic sv_tessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_insidetessfactor
+{
+    [require(hull)]
+    set : float;
+
+    [require(hull)]
+    set : float[];
+
+    [require(domain)]
+    get : float;
+
+    [require(domain)]
+    get : float[];
+}
+
+semantic sv_gsinstanceid
+{
+    [require(geometry)]
+    get : uint;
+}
+
+semantic sv_pointsize
+{
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : float;
+}
+
+
+semantic sv_drawindex
+{
+    [require(vertex)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_deviceindex
+{
+    [require(vertex)]
+    [require(fragment)]
+    [require(compute)]
+    get : uint;
+}
+
+semantic sv_viewid
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(mesh)]
+    [require(fragment)]
+    get : uint;
+}
+
+semantic sv_wavelanecount
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_wavelaneindex
+{
+    [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
+    [require(fragment)]
+    [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
+    get : uint;
+}
+
+semantic sv_barycentrics
+{
+    [require(fragment)]
+    get : float3;
+}
+
+semantic sv_startvertexlocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_startinstancelocation
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_raypayload
+{
+    // Ray payload can be any user-defined type
+}
+
+semantic sv_intersectionattributes
+{
+    // Intersection attributes can be any user-defined type
+}
+
+semantic sv_cullprimitive
+{
+    [require(mesh)]
+    set : bool;
+}
+
+semantic sv_fragsize
+{
+    [require(fragment)]
+    get : int2;
+}
+
+semantic sv_fraginvocationcount
+{
+    [require(fragment)]
+    get : int;
+}
+
+semantic sv_shadingrate
+{
+    [require(fragment)]
+    get : uint;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(mesh)]
+    set : uint;
+}
+
+semantic sv_vulkanvertexid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkaninstanceid
+{
+    [require(vertex)]
+    get : uint;
+}
+
+semantic sv_vulkansampleposition
+{
+    [require(fragment)]
+    get : float2;
+}

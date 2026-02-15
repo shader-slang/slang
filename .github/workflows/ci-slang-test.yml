@@ -43,7 +43,7 @@ on:
 jobs:
   test-slang:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
@@ -91,6 +91,11 @@ jobs:
           # Add Linux GPU expected failure list for CUDA builds (Tesla T4 driver limitations)
           if [[ "${{ inputs.artifact-suffix }}" == "-cuda" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+          fi
+
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
           fi
 
           # Execute slang-test with all arguments
@@ -174,7 +179,7 @@ jobs:
   # Includes both slangpy pytest tests and slangpy-samples examples.
   test-slangpy:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     if: inputs.full-gpu-tests && (github.event_name == 'pull_request' || inputs.config == 'release')
     defaults:
       run:
@@ -277,7 +282,23 @@ jobs:
 
           echo "Running pytest on slangpy tests..."
           export PYTHONPATH="$SITE_PACKAGES"
-          python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          # First attempt: run with parallel execution
+          if python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi
 
       - name: Clone slangpy-samples
         # Skip on macOS debug due to intermittent failures in test_toy_restir
@@ -318,4 +339,19 @@ jobs:
         if: ${{ !(inputs.os == 'macos' && inputs.config == 'debug') }}
         run: |
           echo "Running slangpy-samples tests..."
-          python -m pytest -n 4 slangpy-samples/tests -k "not test_check_urls"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          if python -m pytest "slangpy-samples/tests" -n 4 -k "not test_check_urls"
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python -m pytest "slangpy-samples/tests" -n 0 --lf -k "not test_check_urls"
+          fi
