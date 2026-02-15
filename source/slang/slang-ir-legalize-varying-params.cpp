@@ -3004,15 +3004,26 @@ private:
                 continue;
             }
             SLANG_ASSERT(typeLayout);
-            typeLayout->getFieldLayout(index);
-            auto fieldLayout = typeLayout->getFieldLayout(index);
-            if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
+            // Check bounds before accessing field layout to prevent crash
+            if (UInt(index) >= typeLayout->getFieldCount())
             {
-                UInt varOffset = 0;
-                if (auto varOffsetAttr = varLayout->findOffsetAttr(K))
-                    varOffset = varOffsetAttr->getOffset();
-                varOffset += offsetAttr->getOffset();
-                builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
+                // If we're out of bounds, skip this field.
+                // This can happen when struct flattening creates fields that don't have
+                // corresponding layout information.
+                index++;
+                continue;
+            }
+            auto fieldLayout = typeLayout->getFieldLayout(index);
+            if (fieldLayout)
+            {
+                if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
+                {
+                    UInt varOffset = 0;
+                    if (auto varOffsetAttr = varLayout->findOffsetAttr(K))
+                        varOffset = varOffsetAttr->getOffset();
+                    varOffset += offsetAttr->getOffset();
+                    builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
+                }
             }
             index++;
         }
