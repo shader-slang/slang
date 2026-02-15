@@ -92,6 +92,11 @@ jobs:
             "-ignore-abort-msg"
           )
 
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
+          fi
+
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
