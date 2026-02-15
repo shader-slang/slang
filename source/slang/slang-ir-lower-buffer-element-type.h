@@ -43,8 +43,7 @@ void lowerBufferElementTypeToStorageType(
 // Returns the type layout rules should be used for a buffer resource type.
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType);
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType);
-
-IRPtrType* getPointerTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType, IRType* elementType);
+IRPtrType* copyBufferLayoutToPointer(TargetProgram* target, IRBuilder& builder, IRType* bufferType, IRPtrTypeBase* pointerType);
 
 } // namespace Slang
 

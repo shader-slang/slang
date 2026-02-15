@@ -337,6 +337,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
 
+IROp getOpFromTypeLayoutRules(IRTypeLayoutRuleName ruleName);
+
 IRInst* ConversionMethod::apply(IRBuilder& builder, IRType* resultType, IRInst* operandAddr)
 {
     if (!*this)
@@ -969,7 +971,7 @@ struct LoweredElementTypeContext
             {
                 auto elementType = tryGetPointedToOrBufferElementType(&builder, baseAddr->getDataType());
                 return builder.emitRWStructuredBufferGetElementPtr(
-                    getPointerTypeForBuffer(target, builder, baseAddr->getDataType(), elementType),
+                    getPointerTypeWithBufferLayout(builder, baseAddr->getDataType(), elementType),
                     baseAddr,
                     loadStoreInst->getOperand(1));
             }
@@ -1112,7 +1114,7 @@ struct LoweredElementTypeContext
             {
                 auto elementType = tryGetPointedToOrBufferElementType(&builder, newBasePtr->getDataType());
                 return builder.emitRWStructuredBufferGetElementPtr(
-                    getPointerTypeForBuffer(target, builder, newBasePtr->getDataType(), elementType),
+                    getPointerTypeWithBufferLayout(builder, newBasePtr->getDataType(), elementType),
                     newBasePtr,
                     loadInst->getOperand(1));
             }
@@ -2040,13 +2042,40 @@ struct LoweredElementTypeContext
             materializeStorageToLogicalCastsImpl(inst);
     }
 
+    IRType* getBufferTypeLayoutType(IRBuilder& builder, IRType* bufferType)
+    {
+        TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+        IROp layoutOp = getOpFromTypeLayoutRules(loweringConfig.layoutRuleName);
+        return as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
+    }
+
+    IRPtrType* getPointerTypeWithBufferLayout(IRBuilder& builder, IRType* bufferType, IRType* elementType)
+    {
+        IRType* layoutType = getBufferTypeLayoutType(builder, bufferType);
+        return builder.getPtrType(elementType, AccessQualifier::ReadWrite, AddressSpace::Generic, layoutType);
+    }
+
+    IRPtrType* copyBufferLayoutToPointer(IRBuilder& builder, IRType* bufferType, IRPtrTypeBase* pointerType)
+    {
+        IRType* layoutType = getBufferTypeLayoutType(builder, bufferType);
+
+        AccessQualifier access = AccessQualifier::ReadWrite;
+        AddressSpace addressSpace = AddressSpace::Generic;
+
+        if (pointerType)
+        {
+            access = pointerType->getAccessQualifier();
+            addressSpace = pointerType->getAddressSpace();
+        }
+
+        return builder.getPtrType(pointerType->getValueType(), access, addressSpace, layoutType);
+    }
+
     void fixBufferAccessPointerTypes(IRInst* root)
     {
         IRBuilder builder(root);
         OrderedHashSet<IRInst*> workList;
         workList.add(root);
-
-        List<IRInst*> replaceInsts;
 
         while (workList.getCount() != 0)
         {
@@ -2055,45 +2084,31 @@ struct LoweredElementTypeContext
             workList.removeLast();
 
             if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
-                replaceInsts.add(sgep);
+            {
+                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
+                auto bufferType = sgep->getBase()->getDataType();
+                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                builder.setDataType(inst, ptrType);
+            }
             else if (auto fa = as<IRFieldAddress>(inst))
-                replaceInsts.add(fa);
+            {
+                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
+                auto bufferType = fa->getBase()->getDataType();
+                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                builder.setDataType(inst, ptrType);
+            }
             else if (auto gep = as<IRGetElementPtr>(inst))
-                replaceInsts.add(gep);
+            {
+                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
+                auto bufferType = gep->getBase()->getDataType();
+                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                builder.setDataType(inst, ptrType);
+            }
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
             {
                 workList.add(child);
             }
-        }
-
-        for (auto inst: replaceInsts)
-        {
-            IRType* newType = inst->getDataType();
-
-            if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
-            {
-                // Remove the old RWStructuredBufferGetElementPtr and insert new one
-                // with the corrected, target-specific return type.
-                auto bufferType = sgep->getBase()->getDataType();
-                auto elementType = tryGetPointedToOrBufferElementType(&builder, bufferType);
-                newType = getPointerTypeForBuffer(target, builder, bufferType, elementType);
-            }
-            else if (auto fa = as<IRFieldAddress>(inst))
-            {
-                auto bufferType = fa->getBase()->getDataType();
-                auto fieldPtrType = fa->getDataType();
-                auto elementType = tryGetPointedToOrBufferElementType(&builder, fieldPtrType);
-                newType = getPointerTypeForBuffer(target, builder, bufferType, elementType);
-            }
-            else if (auto gep = as<IRGetElementPtr>(inst))
-            {
-                auto bufferType = gep->getBase()->getDataType();
-                auto fieldPtrType = gep->getDataType();
-                auto elementType = tryGetPointedToOrBufferElementType(&builder, fieldPtrType);
-                newType = getPointerTypeForBuffer(target, builder, bufferType, elementType);
-            }
-            builder.setDataType(inst, newType);
         }
     }
 
@@ -2379,18 +2394,12 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
     return IRTypeLayoutRules::get(ruleName);
 }
 
-IRPtrType* getPointerTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType, IRType* elementType)
+IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType)
 {
     TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
-
     IROp layoutOp = getOpFromTypeLayoutRules(loweringConfig.layoutRuleName);
     IRType* layoutType = as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
-
-    AccessQualifier access = AccessQualifier::ReadWrite;
-    if (as<IRUniformParameterGroupType>(bufferType))
-        access = AccessQualifier::Immutable;
-
-    return builder.getPtrType(elementType, access, loweringConfig.addressSpace, layoutType);
+    return layoutType;
 }
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType)
