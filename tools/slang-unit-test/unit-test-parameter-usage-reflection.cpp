@@ -106,3 +106,88 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflection)
     metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 1, isUsed);
     SLANG_CHECK(isUsed);
 }
+
+// Test that the isParameterLocationUsed API works for WGSL target.
+// This is a regression test for the issue where m_usedBindings stayed empty for WGSL output.
+// Note: For WGSL, all fields in the packed input struct are reported as used because
+// the metadata is collected from struct type layouts, which include all fields.
+// This is different from SPIRV where individual global params can be removed by DCE.
+SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
+{
+    const char* userSourceBody = R"(
+        struct VertexInput {
+            float3 position : POSITION;
+            float2 texCoord : TEXCOORD0;
+        };
+        struct VertexOutput {
+            float4 position : SV_Position;
+            float2 texCoord : TEXCOORD0;
+        };
+        [shader("vertex")]
+        VertexOutput vertexMain(VertexInput input)
+        {
+            VertexOutput output;
+            output.position = float4(input.position, 1.0);
+            output.texCoord = input.texCoord;
+            return output;
+        }
+        )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_WGSL;
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targetCount = 1;
+    sessionDesc.targets = &targetDesc;
+    ComPtr<slang::ISession> session;
+    SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+    ComPtr<slang::IBlob> diagnosticBlob;
+    auto module = session->loadModuleFromSourceString(
+        "m",
+        "m.slang",
+        userSourceBody,
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(module != nullptr);
+
+    ComPtr<slang::IEntryPoint> entryPoint;
+    module->findAndCheckEntryPoint(
+        "vertexMain",
+        SLANG_STAGE_VERTEX,
+        entryPoint.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(entryPoint != nullptr);
+
+    ComPtr<slang::IComponentType> compositeProgram;
+    slang::IComponentType* components[] = {module, entryPoint.get()};
+    session->createCompositeComponentType(
+        components,
+        2,
+        compositeProgram.writeRef(),
+        diagnosticBlob.writeRef());
+    SLANG_CHECK(compositeProgram != nullptr);
+
+    ComPtr<slang::IComponentType> linkedProgram;
+    compositeProgram->link(linkedProgram.writeRef(), nullptr);
+
+    ComPtr<slang::IMetadata> metadata;
+    linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
+
+    bool isUsed = false;
+
+    // For WGSL, verify that bindings are now populated (regression test for the fix).
+    // All fields in the packed struct are reported as used.
+
+    // location 0 = position, should be used
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 0, isUsed);
+    SLANG_CHECK(isUsed);
+
+    // location 1 = texCoord, should be used
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 1, isUsed);
+    SLANG_CHECK(isUsed);
+
+    // location 2 is not defined in the struct, should NOT be used
+    metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 2, isUsed);
+    SLANG_CHECK(!isUsed);
+}
