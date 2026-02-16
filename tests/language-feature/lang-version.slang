@@ -28,9 +28,9 @@
 #ifdef VER_ILLEGAL
 #lang slang illegal
 /*DIAG1:
+ ^ unknown language
  ^ unknown language 'illegal'
- ^ unknown language 'illegal'
- ^ unknown language version '0'
+ ^ unknown language version
  ^ unknown language version '0'
 */
 #endif
@@ -38,7 +38,7 @@
 #ifdef VER_ILLEGAL2
 #lang 9987
 /*DIAG2:
- ^ unknown language version '9987'
+ ^ unknown language version
  ^ unknown language version '9987'
 */
 #endif
@@ -46,9 +46,9 @@
 #ifdef LANG_ILLEGAL
 #lang illegal
 /*DIAG3:
+ ^ unknown language
  ^ unknown language 'illegal'
- ^ unknown language 'illegal'
- ^ unknown language version '0'
+ ^ unknown language version
  ^ unknown language version '0'
 */
 #endif

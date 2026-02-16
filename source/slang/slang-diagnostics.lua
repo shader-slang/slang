@@ -671,14 +671,14 @@ err(
 err(
     "expected token in preprocessor directive",
     15102,
-    "expected '~expected_token'",
+    "preprocessor parse error",
     span { loc = "location", message = "expected '~expected_token' in '~directive' directive" }
 )
 
 err(
     "expected 2 tokens in preprocessor directive",
     15102,
-    "expected '~token1' or '~token2'",
+    "preprocessor parse error",
     span { loc = "location", message = "expected '~token1' or '~token2' in '~directive' directive" }
 )
 
@@ -693,15 +693,15 @@ err(
 err(
     "expected token in preprocessor expression",
     15200,
-    "expected '~expected_token'",
+    "preprocessor parse error",
     span { loc = "location", message = "expected '~expected_token' in preprocessor expression" },
-    note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
+    span { loc = "opening_loc", message = "opening '~opening_token'" }
 )
 
 err(
     "syntax error in preprocessor expression",
     15201,
-    "syntax error",
+    "preprocessor parse error",
     span { loc = "location", message = "syntax error in preprocessor expression" }
 )
 
@@ -715,9 +715,9 @@ err(
 err(
     "expected token in defined expression",
     15203,
-    "expected '~expected_token'",
+    "preprocessor parse error",
     span { loc = "location", message = "expected '~expected_token' in 'defined' expression" },
-    note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
+    span { loc = "opening_loc", message = "opening '~opening_token'" }
 )
 
 warning(
@@ -760,13 +760,6 @@ err(
     15209,
     "language version mismatch",
     span { loc = "location", message = "the source file declares a different language version than the including module" }
-)
-
--- Standalone note for seeOpeningToken - used by multiple diagnostics
-standalone_note(
-    "see opening token",
-    -1,
-    "see opening '$0'"
 )
 
 -- Standalone note for includeOutput - used to output include hierarchy
@@ -838,7 +831,7 @@ warning(
 err(
     "expected token in macro parameters",
     15403,
-    "macro parameter syntax error",
+    "preprocessor parse error",
     span { loc = "location", message = "expected '~expected_token' in macro parameters" }
 )
 
