@@ -46,101 +46,59 @@ DIAGNOSTIC(-1, Note, includeOutput, "include $0")
 DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
 
 //
-// 0xxxx -  Command line and interaction with host platform APIs.
+// 0xxxx - Command line and interaction with host platform APIs.
 //
+// The following diagnostics have been converted to slang-diagnostics.lua:
+// - cannotOpenFile (1)
+// - cannotFindFile (2)
+// - cannotWriteOutputFile (4)
+// - failedToLoadDynamicLibrary (5)
+// - tooManyOutputPathsSpecified (6)
+// - cannotDeduceSourceLanguage (12)
+// - unknownCodeGenerationTarget (13)
+// - unknownProfile (14)
+// - unknownStage (15)
+// - unknownPassThroughTarget (16)
+// - unknownCommandLineOption (17)
+// - separateDebugInfoUnsupportedForTarget (18)
+// - unknownSourceLanguage (19)
+// - entryPointsNeedToBeAssociatedWithTranslationUnits (20)
+// - unknownDownstreamCompiler (22)
+// - unableToGenerateCodeForTarget (28)
+// - sameStageSpecifiedMoreThanOnce (30)
+// - conflictingStagesForEntryPoint (31)
+// - explicitStageDoesntMatchImpliedStage (32)
+// - stageSpecificationIgnoredBecauseNoEntryPoints (33)
+// - stageSpecificationIgnoredBecauseBeforeAllEntryPoints (34)
+// - noStageSpecifiedInPassThroughMode (35)
+// - expectingAnInteger (36)
+// - sameProfileSpecifiedMoreThanOnce (40)
+// - conflictingProfilesSpecifiedForTarget (41)
+// - profileSpecificationIgnoredBecauseNoTargets (42)
+// - profileSpecificationIgnoredBecauseBeforeAllTargets (43)
+// - duplicateTargets (50)
+// - unhandledLanguageForSourceEmbedding (51)
+// - cannotDeduceOutputFormatFromPath (60)
+// - cannotMatchOutputFileToTarget (61)
+// - unknownCommandLineValue (62)
+// - unknownHelpCategory (63)
+// - cannotMatchOutputFileToEntryPoint (70)
+// - invalidTypeConformanceOptionString (71)
+// - invalidTypeConformanceOptionNoType (72)
+// - cannotCreateTypeConformance (73)
+// - duplicateOutputPathsForEntryPointAndTarget (80)
+// - duplicateOutputPathsForTarget (81)
+// - duplicateDependencyOutputPaths (82)
+// - unableToWriteReproFile (82)
+// - unableToCreateModuleContainer (86)
+// - unableToSetDefaultDownstreamCompiler (87)
+// - expectingSlangRiffContainer (89)
+// - incompatibleRiffSemanticVersion (90)
+// - riffHashMismatch (91)
 
-DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
-DIAGNOSTIC(2, Error, cannotFindFile, "cannot find file '$0'.")
-DIAGNOSTIC(4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
-DIAGNOSTIC(5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
-DIAGNOSTIC(
-    6,
-    Error,
-    tooManyOutputPathsSpecified,
-    "$0 output paths specified, but only $1 entry points given")
-
-DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
-DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
-DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
-DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
-DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
-DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(
-    18,
-    Warning,
-    separateDebugInfoUnsupportedForTarget,
-    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
-    "SPIR-V binary targets.")
-DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
-
-DIAGNOSTIC(
-    20,
-    Error,
-    entryPointsNeedToBeAssociatedWithTranslationUnits,
-    "when using multiple source files, entry points must be specified after their corresponding "
-    "source file(s)")
-
-DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
-
-DIAGNOSTIC(28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
-
-DIAGNOSTIC(
-    30,
-    Warning,
-    sameStageSpecifiedMoreThanOnce,
-    "the stage '$0' was specified more than once for entry point '$1'")
-DIAGNOSTIC(
-    31,
-    Error,
-    conflictingStagesForEntryPoint,
-    "conflicting stages have been specified for entry point '$0'")
-DIAGNOSTIC(
-    32,
-    Warning,
-    explicitStageDoesntMatchImpliedStage,
-    "the stage specified for entry point '$0' ('$1') does not match the stage implied by the "
-    "source file name ('$2')")
-DIAGNOSTIC(
-    33,
-    Error,
-    stageSpecificationIgnoredBecauseNoEntryPoints,
-    "one or more stages were specified, but no entry points were specified with '-entry'")
-DIAGNOSTIC(
-    34,
-    Error,
-    stageSpecificationIgnoredBecauseBeforeAllEntryPoints,
-    "when compiling multiple entry points, any '-stage' options must follow the '-entry' option "
-    "that they apply to")
-DIAGNOSTIC(
-    35,
-    Error,
-    noStageSpecifiedInPassThroughMode,
-    "no stage was specified for entry point '$0'; when using the '-pass-through' option, stages "
-    "must be fully specified on the command line")
-DIAGNOSTIC(36, Error, expectingAnInteger, "expecting an integer value")
-
-DIAGNOSTIC(
-    40,
-    Warning,
-    sameProfileSpecifiedMoreThanOnce,
-    "the '$0' was specified more than once for target '$0'")
-DIAGNOSTIC(
-    41,
-    Error,
-    conflictingProfilesSpecifiedForTarget,
-    "conflicting profiles have been specified for target '$0'")
-
-DIAGNOSTIC(
-    42,
-    Error,
-    profileSpecificationIgnoredBecauseNoTargets,
-    "a '-profile' option was specified, but no target was specified with '-target'")
-DIAGNOSTIC(
-    43,
-    Error,
-    profileSpecificationIgnoredBecauseBeforeAllTargets,
-    "when using multiple targets, any '-profile' option must follow the '-target' it applies to")
-
+// Note: targetFlagsIgnoredBecauseNoTargets (42) and targetFlagsIgnoredBecauseBeforeAllTargets (43)
+// share codes with profileSpecificationIgnoredBecauseNoTargets and
+// profileSpecificationIgnoredBecauseBeforeAllTargets - these need to be deduplicated
 DIAGNOSTIC(
     42,
     Error,
@@ -151,79 +109,6 @@ DIAGNOSTIC(
     Error,
     targetFlagsIgnoredBecauseBeforeAllTargets,
     "when using multiple targets, any target options must follow the '-target' they apply to")
-
-DIAGNOSTIC(50, Error, duplicateTargets, "the target '$0' has been specified more than once")
-
-DIAGNOSTIC(
-    51,
-    Error,
-    unhandledLanguageForSourceEmbedding,
-    "unhandled source language for source embedding")
-
-DIAGNOSTIC(
-    60,
-    Error,
-    cannotDeduceOutputFormatFromPath,
-    "cannot infer an output format from the output path '$0'")
-DIAGNOSTIC(
-    61,
-    Error,
-    cannotMatchOutputFileToTarget,
-    "no specified '-target' option matches the output path '$0', which implies the '$1' format")
-
-DIAGNOSTIC(62, Error, unknownCommandLineValue, "unknown value for option. Valid values are '$0'")
-DIAGNOSTIC(63, Error, unknownHelpCategory, "unknown help category")
-
-DIAGNOSTIC(
-    70,
-    Error,
-    cannotMatchOutputFileToEntryPoint,
-    "the output path '$0' is not associated with any entry point; a '-o' option for a compiled "
-    "kernel must follow the '-entry' option for its corresponding entry point")
-DIAGNOSTIC(
-    71,
-    Error,
-    invalidTypeConformanceOptionString,
-    "syntax error in type conformance option '$0'.")
-DIAGNOSTIC(
-    72,
-    Error,
-    invalidTypeConformanceOptionNoType,
-    "invalid conformance option '$0', type '$0' is not found.")
-DIAGNOSTIC(73, Error, cannotCreateTypeConformance, "cannot create type conformance '$0'.")
-
-DIAGNOSTIC(
-    80,
-    Error,
-    duplicateOutputPathsForEntryPointAndTarget,
-    "multiple output paths have been specified entry point '$0' on target '$1'")
-DIAGNOSTIC(
-    81,
-    Error,
-    duplicateOutputPathsForTarget,
-    "multiple output paths have been specified for target '$0'")
-DIAGNOSTIC(
-    82,
-    Error,
-    duplicateDependencyOutputPaths,
-    "the -dep argument can only be specified once")
-
-DIAGNOSTIC(82, Error, unableToWriteReproFile, "unable to write repro file '%0'")
-DIAGNOSTIC(86, Error, unableToCreateModuleContainer, "unable to create module container")
-
-DIAGNOSTIC(
-    87,
-    Error,
-    unableToSetDefaultDownstreamCompiler,
-    "unable to set default downstream compiler for source language '%0' to '%1'")
-
-DIAGNOSTIC(89, Error, expectingSlangRiffContainer, "expecting a slang riff container")
-DIAGNOSTIC(
-    90,
-    Error,
-    incompatibleRiffSemanticVersion,
-    "incompatible riff semantic version %0 expecting %1")
-DIAGNOSTIC(91, Error, riffHashMismatch, "riff hash mismatch - incompatible riff")
 DIAGNOSTIC(92, Error, unableToCreateDirectory, "unable to create directory '$0'")
 DIAGNOSTIC(93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
 DIAGNOSTIC(94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")

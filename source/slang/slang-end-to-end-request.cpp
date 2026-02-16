@@ -11,6 +11,7 @@
 #include "slang-options.h"
 #include "slang-reflection-json.h"
 #include "slang-repro.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
 
 // TODO: The "artifact" system is a scourge.
@@ -571,7 +572,7 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
         SlangResult res = writeContainerToStream(&stream);
         if (SLANG_FAILED(res))
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
+            getSink()->diagnose(Diagnostics::UnableToCreateModuleContainer{});
             return res;
         }
 
@@ -1555,7 +1556,7 @@ SlangResult EndToEndCompileRequest::compile()
             SlangResult saveRes = ReproUtil::saveState(this, dumpRepro);
             if (SLANG_FAILED(saveRes))
             {
-                getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, dumpRepro);
+                getSink()->diagnose(Diagnostics::UnableToWriteReproFile{.path = dumpRepro});
                 return saveRes;
             }
         }
@@ -1572,10 +1573,7 @@ SlangResult EndToEndCompileRequest::compile()
 
             if (SLANG_FAILED(saveRes))
             {
-                getSink()->diagnose(
-                    SourceLoc(),
-                    Diagnostics::unableToWriteReproFile,
-                    reproFileName);
+                getSink()->diagnose(Diagnostics::UnableToWriteReproFile{.path = reproFileName});
             }
         }
     }
