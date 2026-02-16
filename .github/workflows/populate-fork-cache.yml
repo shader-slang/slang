@@ -125,7 +125,7 @@ jobs:
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
-            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=true
           cmake --build --preset release -j"$(sysctl -n hw.ncpu)"
 
       - name: Save sccache cache for fork PRs
@@ -179,7 +179,7 @@ jobs:
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
-            -DCMAKE_COMPILE_WARNING_AS_ERROR=false
+            -DCMAKE_COMPILE_WARNING_AS_ERROR=true
           cmake --build --preset debug -j"$(sysctl -n hw.ncpu)"
 
       - name: Save sccache cache for fork PRs
