@@ -11,6 +11,44 @@ namespace Slang
 namespace Diagnostics
 {
 
+// Generate DiagnosticInfo entries for all rich diagnostics.
+// These are needed for the warning suppression system (-Wno-xxx flags).
+// The 'name' field uses lowerCamelCase which matches the convention expected
+// by DiagnosticsLookup::findDiagnosticByName (which converts from kebab-case).
+#if 0 // FIDDLE TEMPLATE:
+% local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
+% local diagnostics = lua_module.getDiagnostics()
+% for _, diagnostic in ipairs(diagnostics) do
+%     local camel_name = lua_module.toLowerCamelCase(diagnostic.name)
+%     local class_name = lua_module.toPascalCase(diagnostic.name)
+%     -- Escape quotes and backslashes in the message
+%     local escaped_message = diagnostic.message:gsub('\\', '\\\\'):gsub('"', '\\"')
+const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)"};
+const DiagnosticInfo* $(class_name)::getInfo() { return &$(camel_name)Info; }
+% end
+
+static const DiagnosticInfo* const kRichDiagnostics[] = {
+% for _, diagnostic in ipairs(diagnostics) do
+%     local camel_name = lua_module.toLowerCamelCase(diagnostic.name)
+    &$(camel_name)Info,
+% end
+};
+
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-rich-diagnostics.cpp.fiddle"
+#endif // FIDDLE END
+
+const DiagnosticInfo* const* getRichDiagnosticsInfo()
+{
+    return kRichDiagnostics;
+}
+
+Index getRichDiagnosticsInfoCount()
+{
+    return SLANG_COUNT_OF(kRichDiagnostics);
+}
+
 UnownedStringSlice nameToPrintableString(Name* name)
 {
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
@@ -341,7 +379,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 
 % end
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 0
+#define FIDDLE_GENERATED_OUTPUT_ID 1
 #include "slang-rich-diagnostics.cpp.fiddle"
 #endif // FIDDLE END
 
