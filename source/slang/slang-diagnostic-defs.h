@@ -95,49 +95,25 @@ DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
 // - expectingSlangRiffContainer (89)
 // - incompatibleRiffSemanticVersion (90)
 // - riffHashMismatch (91)
-
-// Note: targetFlagsIgnoredBecauseNoTargets (42) and targetFlagsIgnoredBecauseBeforeAllTargets (43)
-// share codes with profileSpecificationIgnoredBecauseNoTargets and
-// profileSpecificationIgnoredBecauseBeforeAllTargets - these need to be deduplicated
-DIAGNOSTIC(
-    42,
-    Error,
-    targetFlagsIgnoredBecauseNoTargets,
-    "target options were specified, but no target was specified with '-target'")
-DIAGNOSTIC(
-    43,
-    Error,
-    targetFlagsIgnoredBecauseBeforeAllTargets,
-    "when using multiple targets, any target options must follow the '-target' they apply to")
-DIAGNOSTIC(92, Error, unableToCreateDirectory, "unable to create directory '$0'")
-DIAGNOSTIC(93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
-DIAGNOSTIC(94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
-
-DIAGNOSTIC(95, Error, unknownLibraryKind, "unknown library kind '$0'")
-DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
-DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
-DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
-DIAGNOSTIC(
-    104,
-    Error,
-    needToEnableExperimentFeature,
-    "'$0' is an experimental module, need to enable"
-    "'-experimental-feature' to load this module")
-DIAGNOSTIC(105, Error, nullComponentType, "componentTypes[$0] is `nullptr`")
-
+// - unableToCreateDirectory (92)
+// - unableExtractReproToDirectory (93)
+// - unableToReadRiff (94)
+// - unknownLibraryKind (95)
+// - kindNotLinkable (96)
+// - libraryDoesNotExist (97)
+// - cannotAccessAsBlob (98)
+// - targetFlagsIgnoredBecauseNoTargets (44)
+// - targetFlagsIgnoredBecauseBeforeAllTargets (45)
+// - needToEnableExperimentFeature (104)
+// - nullComponentType (105)
 //
 // 001xx - Downstream Compilers
-//
-
-DIAGNOSTIC(100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
-DIAGNOSTIC(
-    101,
-    Error,
-    downstreamCompilerDoesntSupportWholeProgramCompilation,
-    "downstream compiler '$0' doesn't support whole program compilation")
-DIAGNOSTIC(102, Note, downstreamCompileTime, "downstream compile time: $0s")
-DIAGNOSTIC(103, Note, performanceBenchmarkResult, "compiler performance benchmark:\n$0")
-DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
+// The following diagnostics have been converted to slang-diagnostics.lua:
+// - failedToLoadDownstreamCompiler (100)
+// - downstreamCompilerDoesntSupportWholeProgramCompilation (101)
+// - downstreamCompileTime (102)
+// - performanceBenchmarkResult (103)
+// - noteFailedToLoadDynamicLibrary (99999)
 
 //
 // 15xxx - Preprocessing

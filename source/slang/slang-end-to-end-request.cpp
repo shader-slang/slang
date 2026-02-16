@@ -1529,7 +1529,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
-        getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
+        getSink()->diagnose(Diagnostics::DownstreamCompileTime{.time = downstreamTimeStr});
     }
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportPerfBenchmark))
     {
@@ -1537,9 +1537,7 @@ SlangResult EndToEndCompileRequest::compile()
         PerformanceProfiler::getProfiler()->getResult(perfResult);
         perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::performanceBenchmarkResult,
-            perfResult.produceString());
+            Diagnostics::PerformanceBenchmarkResult{.benchmark_output = perfResult.produceString()});
     }
 
     // Repro dump handling

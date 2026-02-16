@@ -362,7 +362,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
         auto componentType = componentTypes[0];
         if (componentType == nullptr)
         {
-            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, 0);
+            sink.diagnose(Diagnostics::NullComponentType{.index = 0});
             sink.getBlobIfNeeded(outDiagnostics);
             return SLANG_E_INVALID_ARG;
         }
@@ -376,7 +376,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     {
         if (componentTypes[cc] == nullptr)
         {
-            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, cc);
+            sink.diagnose(Diagnostics::NullComponentType{.index = int(cc)});
             sink.getBlobIfNeeded(outDiagnostics);
             return SLANG_E_INVALID_ARG;
         }
@@ -1675,10 +1675,9 @@ RefPtr<Module> Linkage::findOrImportModule(
                                 ->findDecoration<IRExperimentalModuleDecoration>() &&
                             !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
                         {
-                            sink->diagnose(
-                                requestingLoc,
-                                Diagnostics::needToEnableExperimentFeature,
-                                moduleName);
+                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
+                                .module = getText(moduleName),
+                                .loc = requestingLoc});
                         }
                     }
                     return module;

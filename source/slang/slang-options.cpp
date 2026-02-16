@@ -1918,7 +1918,7 @@ SlangResult createArtifactFromReferencedModule(
 
     if (desc.kind == ArtifactKind::Unknown)
     {
-        sink->diagnose(loc, Diagnostics::unknownLibraryKind, Path::getPathExt(path));
+        sink->diagnose(Diagnostics::UnknownLibraryKind{.kind = Path::getPathExt(path)});
         return SLANG_FAIL;
     }
 
@@ -1936,7 +1936,7 @@ SlangResult createArtifactFromReferencedModule(
 
     if (!ArtifactDescUtil::isLinkable(desc))
     {
-        sink->diagnose(loc, Diagnostics::kindNotLinkable, Path::getPathExt(path));
+        sink->diagnose(Diagnostics::KindNotLinkable{.kind = Path::getPathExt(path)});
         return SLANG_FAIL;
     }
 
@@ -1967,7 +1967,7 @@ SlangResult createArtifactFromReferencedModule(
             nullptr);
         if (!fileRep->exists())
         {
-            sink->diagnose(loc, Diagnostics::libraryDoesNotExist, path);
+            sink->diagnose(Diagnostics::LibraryDoesNotExist{.path = path});
             return SLANG_FAIL;
         }
     }
@@ -2524,9 +2524,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     if (SLANG_FAILED(res))
                     {
                         m_sink->diagnose(
-                            reproName.loc,
-                            Diagnostics::unableExtractReproToDirectory,
-                            reproName.value);
+                            Diagnostics::UnableToExtractReproToDirectory{.path = reproName.value});
                         return res;
                     }
                 }
@@ -3817,13 +3815,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 if (m_rawTargets.getCount() == 0)
                 {
-                    m_sink->diagnose(SourceLoc(), Diagnostics::targetFlagsIgnoredBecauseNoTargets);
+                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseNoTargets{});
                 }
                 else
                 {
-                    m_sink->diagnose(
-                        SourceLoc(),
-                        Diagnostics::targetFlagsIgnoredBecauseBeforeAllTargets);
+                    m_sink->diagnose(Diagnostics::TargetFlagsIgnoredBecauseBeforeAllTargets{});
                 }
             }
         }

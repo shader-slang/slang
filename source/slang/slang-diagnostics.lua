@@ -118,6 +118,7 @@
 local helpers = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-helpers.lua")
 local span = helpers.span
 local note = helpers.note
+local standalone_note = helpers.standalone_note
 local variadic_span = helpers.variadic_span
 local variadic_note = helpers.variadic_note
 local err = helpers.err
@@ -407,6 +408,18 @@ err(
 )
 
 err(
+    "target flags ignored because no targets",
+    44,
+    "target options were specified, but no target was specified with '-target'"
+)
+
+err(
+    "target flags ignored because before all targets",
+    45,
+    "when using multiple targets, any target options must follow the '-target' they apply to"
+)
+
+err(
     "duplicate targets",
     50,
     "the target '~target' has been specified more than once"
@@ -518,6 +531,91 @@ err(
     "riff hash mismatch",
     91,
     "riff hash mismatch - incompatible riff"
+)
+
+err(
+    "unable to create directory",
+    92,
+    "unable to create directory '~path'"
+)
+
+err(
+    "unable to extract repro to directory",
+    93,
+    "unable to extract repro to directory '~path'"
+)
+
+err(
+    "unable to read riff",
+    94,
+    "unable to read as 'riff'/not a 'riff' file"
+)
+
+err(
+    "unknown library kind",
+    95,
+    "unknown library kind '~kind'"
+)
+
+err(
+    "kind not linkable",
+    96,
+    "not a known linkable kind '~kind'"
+)
+
+err(
+    "library does not exist",
+    97,
+    "library '~path' does not exist"
+)
+
+err(
+    "cannot access as blob",
+    98,
+    "cannot access as a blob"
+)
+
+err(
+    "failed to load downstream compiler",
+    100,
+    "failed to load downstream compiler '~compiler'"
+)
+
+err(
+    "downstream compiler doesnt support whole program compilation",
+    101,
+    "downstream compiler '~compiler' doesn't support whole program compilation"
+)
+
+standalone_note(
+    "downstream compile time",
+    102,
+    "downstream compile time: ~time"
+)
+
+standalone_note(
+    "performance benchmark result",
+    103,
+    "compiler performance benchmark:\\n~benchmark_output"
+)
+
+err(
+    "need to enable experiment feature",
+    104,
+    "'~module' is an experimental module, need to enable '-experimental-feature' to load this module",
+    span { loc = "loc" }
+)
+
+err(
+    "null component type",
+    105,
+    "componentTypes[~index:Int] is `nullptr`"
+)
+
+standalone_note(
+    "note failed to load dynamic library",
+    99999,
+    "failed to load dynamic library '~path'"
 )
 
 -- Process and validate all diagnostics
