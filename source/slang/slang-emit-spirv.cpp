@@ -2,6 +2,7 @@
 
 #include "../core/slang-memory-arena.h"
 #include "slang-compiler.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-decorations.h"
@@ -9979,7 +9980,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto fromVector = cast<IRVectorType>(unwrapAttributedType(fromType));
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if (toVectorSize > fromVectorSize)
-                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
+                        m_sink->diagnose(
+                            Diagnostics::SpirvInvalidTruncate{.location = inst->sourceLoc});
                     last = emitInstCustomOperandFunc(
                         parent,
                         isLast ? as<IRInst>(inst) : spvInst,

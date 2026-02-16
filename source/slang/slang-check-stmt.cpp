@@ -1,6 +1,7 @@
 // slang-check-stmt.cpp
 #include "slang-check-impl.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related to statements.
 
@@ -463,9 +464,8 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             if (isStage)
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::targetSwitchCaseCannotBeAStage);
+                getSink()->diagnose(Diagnostics::TargetSwitchCaseCannotBeAStage{
+                    .location = caseStmt->capabilityToken.loc});
             }
             else if (
                 caseStmt->capabilityToken.getContentLength() != 0 &&

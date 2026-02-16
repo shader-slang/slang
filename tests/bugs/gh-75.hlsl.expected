@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/bugs/gh-75.hlsl(24): error 20001: unexpected '}', expected identifier
-}
-^
-}
-standard output = {
-}

@@ -1,6 +1,7 @@
 // slang-check-modifier.cpp
 #include "../core/slang-char-util.h"
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking behavior for
 // modifiers.
@@ -1727,7 +1728,8 @@ Modifier* SemanticsVisitor::checkModifier(
             if (as<PointerTypeExpr>(varDeclBase->type.exp))
             {
                 // Disallow `const T*` syntax.
-                getSink()->diagnose(m, Diagnostics::constNotAllowedOnCStylePtrDecl);
+                getSink()->diagnose(
+                    Diagnostics::ConstNotAllowedOnCStylePtrDecl{.location = m->loc});
                 return nullptr;
             }
         }
@@ -2260,7 +2262,8 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
         else
         {
-            getSink()->diagnose(glslOffsetAttribute, Diagnostics::missingLayoutBindingModifier);
+            getSink()->diagnose(
+                Diagnostics::MissingLayoutBindingModifier{.location = glslOffsetAttribute->loc});
         }
     }
 

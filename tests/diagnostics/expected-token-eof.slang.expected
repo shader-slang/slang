@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/expected-token-eof.slang(6): error 20001: unexpected end of file, expected ';'
-}
-standard output = {
-}

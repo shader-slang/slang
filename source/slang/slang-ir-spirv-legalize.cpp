@@ -27,6 +27,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2464,7 +2465,9 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     snippet = SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition());
     if (!snippet)
     {
-        m_sink->diagnose(intrinsic, Diagnostics::snippetParsingFailed, intrinsic->getDefinition());
+        m_sink->diagnose(Diagnostics::SnippetParsingFailed{
+            .snippet = intrinsic->getDefinition(),
+            .location = intrinsic->sourceLoc});
         return nullptr;
     }
     m_parsedSpvSnippets[intrinsic] = snippet;

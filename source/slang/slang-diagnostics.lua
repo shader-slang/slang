@@ -985,6 +985,10 @@ warning(
     span { loc = "location", message = "#warning: ~message" }
 )
 
+-- Include parsing diagnostics module
+local parsing_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-parsing.lua")
+parsing_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

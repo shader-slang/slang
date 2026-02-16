@@ -38,6 +38,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -4931,7 +4932,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             i = addr.val;
                         else
                         {
-                            context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
+                            context->getSink()->diagnose(
+                                Diagnostics::NoSuchAddress{.location = operand.expr->loc});
                             return nullptr;
                         }
                     }
