@@ -1,0 +1,4 @@
+[submodule "external/slang-playground"]
+	path = external/slang-playground
+	url = https://github.com/shader-slang/slang-playground.git
+	branch = main
