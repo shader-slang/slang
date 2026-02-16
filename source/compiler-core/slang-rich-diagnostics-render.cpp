@@ -612,8 +612,9 @@ private:
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
         String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
+        Int64 padLen = 5 - codeStr.getLength();
+        if (padLen > 0)
+            codeStr = repeat('0', padLen) + codeStr;
         ss << "[E" << codeStr << "]"
            << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
 
@@ -659,17 +660,25 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
     // Format:
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-    // Format the error code as E#### (e.g., E0001, E1234)
+    // Format the error code as E##### (e.g., E00001, E12345)
     String codeStr = String(diag.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
+    Int64 padLen = 5 - codeStr.getLength();
+    if (padLen > 0)
+    {
+        String padding;
+        padding.appendRepeatedChar('0', padLen);
+        codeStr = padding + codeStr;
+    }
 
     // Helper lambda to output a span in the machine-readable format
     // Returns false if the span was skipped (0,0 location with no message)
@@ -677,6 +686,30 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
     {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
+        {
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
+        }
 
         // Check for locationless span (0,0)
         bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);

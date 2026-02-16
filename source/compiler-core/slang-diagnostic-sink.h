@@ -219,7 +219,7 @@ public:
     template<typename D>
     bool diagnose(D const& d)
     {
-        return diagnoseRichImpl(d.toGenericDiagnostic());
+        return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
@@ -354,11 +354,15 @@ protected:
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
-    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
-    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal.
+    // The info parameter is used for severity override lookup (e.g., -Wno-xxx flags).
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, const DiagnosticInfo* info);
 
     // Overload that allows specifying a source manager (used when routing to parent sinks)
-    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, SourceManager* sourceManager);
+    bool diagnoseRichImpl(
+        const GenericDiagnostic& diagnostic,
+        const DiagnosticInfo* info,
+        SourceManager* sourceManager);
 
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(
@@ -386,7 +390,10 @@ protected:
 
     SourceLocationLexer m_sourceLocationLexer;
 
-    // Configuration that allows the user to control the severity of certain diagnostic messages
+    // Configuration that allows the user to control the severity of certain diagnostic messages.
+    // Currently keyed by diagnostic code (int). This means diagnostics with duplicate codes
+    // will share the same override. TODO: Consider keying by DiagnosticInfo* instead for
+    // more precise per-diagnostic control.
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
