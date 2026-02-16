@@ -2754,6 +2754,8 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
             {
                 if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
                 {
+                    if (basicType->getOp() == kIROp_BoolType)
+                        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
                     auto elementCount = getIntVal(vectorType->getElementCount());
                     if (elementCount >= 2 && elementCount <= 4)
                     {
@@ -2779,6 +2781,8 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
             {
                 if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
                 {
+                    if (basicType->getOp() == kIROp_BoolType)
+                        return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
                     auto elementCount = getIntVal(vectorType->getElementCount());
                     if (elementCount >= 2 && elementCount <= 4)
                     {
