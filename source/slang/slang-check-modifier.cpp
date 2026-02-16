@@ -122,7 +122,7 @@ DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* exp
     if (IsErrorExpr(expr))
         return DeclRef<VarDeclBase>();
 
-    if (!isScalarIntegerType(expr->type))
+    if (!isScalarIntegerType(expr->type) && !isEnumType(expr->type))
         return DeclRef<VarDeclBase>();
 
     auto specConstVar = as<VarExpr>(expr);
