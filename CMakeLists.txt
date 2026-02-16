@@ -129,7 +129,10 @@ option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
-option(SLANG_ENABLE_TIME_TRACE "Enable Clang time trace profiling for build analysis")
+option(
+    SLANG_ENABLE_TIME_TRACE
+    "Enable Clang time trace profiling for build analysis"
+)
 option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" ON)
 
 option(
