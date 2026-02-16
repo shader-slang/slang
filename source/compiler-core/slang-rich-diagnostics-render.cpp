@@ -612,8 +612,9 @@ private:
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
         String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
+        Int64 padLen = 5 - codeStr.getLength();
+        if (padLen > 0)
+            codeStr = repeat('0', padLen) + codeStr;
         ss << "[E" << codeStr << "]"
            << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
 
@@ -666,10 +667,15 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
     // Format:
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-    // Format the error code as E#### (e.g., E0001, E1234)
+    // Format the error code as E##### (e.g., E00001, E12345)
     String codeStr = String(diag.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
+    Int64 padLen = 5 - codeStr.getLength();
+    if (padLen > 0)
+    {
+        String padding;
+        padding.appendRepeatedChar('0', padLen);
+        codeStr = padding + codeStr;
+    }
 
     // Helper lambda to output a span in the machine-readable format
     // Returns false if the span was skipped (0,0 location with no message)
