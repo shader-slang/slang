@@ -2627,19 +2627,21 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg(input.filePath);
     }
 
+    // Enable machine-readable diagnostics if diag option is specified
+    // This must come BEFORE other test options so that diagnostics emitted
+    // during option parsing are properly formatted
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
+    }
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
         if (arg == kPreserveEmbeddedSourceOption)
             continue;
         cmdLine.addArg(arg);
-    }
-
-    // Enable machine-readable diagnostics if diag option is specified
-    String diagPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix))
-    {
-        cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
     // If we can't set up for simple compilation, it's because some external resource isn't

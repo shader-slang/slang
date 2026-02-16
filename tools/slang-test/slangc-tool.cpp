@@ -45,8 +45,6 @@ SlangResult SlangCTool::innerMain(
 
     compileRequest->setCommandLineCompilerMode();
 
-    // Build argument list with -diagnostic-color never prepended.
-    // Test output should be deterministic and not depend on terminal state.
     List<const char*> args;
     for (int i = 1; i < argc; i++)
         args.add(argv[i]);
