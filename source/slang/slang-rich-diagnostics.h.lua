@@ -93,8 +93,6 @@ function M.getLocationExpr(location_name, location_type)
 		for k in pairs(location_extractors) do
 			table.insert(valid_types, k)
 		end
-		-- Add SourceLoc-like names for suggestion (use plain location name without type)
-		local sourceloc_variants = { "SourceLoc", "sourceloc", "Sourceloc", "sourceLoc" }
 
 		-- Find similar types
 		local similar = find_similar(location_type, valid_types, 3)

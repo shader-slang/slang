@@ -1049,8 +1049,8 @@ Result spawnAndWaitSharedLibrary(
         rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
-        StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
-        StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+        StringWriter stdError(&stdErrorString, WriterFlag::IsStatic);
+        StringWriter stdOut(&stdOutString, WriterFlag::IsStatic);
 
         StdWriters* prevStdWriters = StdWriters::getSingleton();
 

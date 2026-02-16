@@ -231,7 +231,8 @@ private:
     String repeat(char c, Int64 n) const
     {
         String ret;
-        ret.appendRepeatedChar(c, n);
+        if (n > 0)
+            ret.appendRepeatedChar(c, n);
         return ret;
     }
 
@@ -611,12 +612,12 @@ private:
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
-        String codeStr = String(layout.header.code);
-        Int64 padLen = 5 - codeStr.getLength();
-        if (padLen > 0)
-            codeStr = repeat('0', padLen) + codeStr;
-        ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
+        if (layout.header.code >= 0)
+        {
+            String codeStr = String(layout.header.code);
+            ss << "[E" << repeat('0', 5 - codeStr.getLength()) << codeStr << "]";
+        }
+        ss << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
 
         // Skip location and source snippet for diagnostics without meaningful locations
         // (line 0 indicates SourceLoc() was used, meaning no source location)
@@ -668,13 +669,14 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
     // Format the error code as E##### (e.g., E00001, E12345)
-    String codeStr = String(diag.code);
-    Int64 padLen = 5 - codeStr.getLength();
-    if (padLen > 0)
+    // Use empty string for negative codes (-1 is used as placeholder for no code)
+    String codeStr;
+    if (diag.code >= 0)
     {
+        String numStr = String(diag.code);
         String padding;
-        padding.appendRepeatedChar('0', padLen);
-        codeStr = padding + codeStr;
+        padding.appendRepeatedChar('0', std::max(Int64{0}, 5 - numStr.getLength()));
+        codeStr = padding + numStr;
     }
 
     // Helper lambda to output a span in the machine-readable format
