@@ -41,7 +41,7 @@ void CommandLineArgs::setArgs(const char* const* args, size_t argCount)
     }
 
     SourceFile* sourceFile =
-        sourceManager->createSourceFileWithString(PathInfo::makeUnknown(), buf.produceString());
+        sourceManager->createSourceFileWithString(PathInfo::makeCommandLine(), buf.produceString());
     SourceView* sourceView =
         sourceManager->createSourceView(sourceFile, nullptr, SourceLoc::fromRaw(0));
 

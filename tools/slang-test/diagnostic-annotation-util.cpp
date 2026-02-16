@@ -296,6 +296,29 @@ static void generateSuggestedAnnotations(
 {
     sb << "  ⋮\n"; // Vertical ellipsis (indented)
 
+    // Check if any diagnostic has column 0 (no valid location)
+    // These should use caretless format since position-based matching won't work
+    bool hasLocationlessDiagnostic = false;
+    for (const auto* diag : diagnostics)
+    {
+        if (diag->beginCol == 0)
+        {
+            hasLocationlessDiagnostic = true;
+            break;
+        }
+    }
+
+    // For locationless diagnostics (column 0), use simple caretless format
+    if (hasLocationlessDiagnostic)
+    {
+        for (const auto* diag : diagnostics)
+        {
+            sb << "//" << prefix << " " << diag->message << "\n";
+        }
+        sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
+        return;
+    }
+
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
@@ -306,7 +329,7 @@ static void generateSuggestedAnnotations(
     }
 
     // Calculate the prefix length: "//" + prefix
-    int linePrefixLength = 2 + prefix.getLength();
+    int linePrefixLength = 2 + int(prefix.getLength());
 
     // Check if we should use block comment
     bool useBlockComment = false;
