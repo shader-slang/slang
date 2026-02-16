@@ -2359,8 +2359,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
-            linkage->m_optionSet.set(optionKind, true);
-            break;
         case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
             // Update the sink and all ancestor sinks so diagnostics emitted during option
