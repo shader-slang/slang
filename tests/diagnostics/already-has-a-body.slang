@@ -3,11 +3,11 @@
 // Test that function redefinition produces the expected error and note
 
 int foo(){ /* original */ }
-/*CHECK
+/*CHECK:
     ^ see previous definition of 'foo'
 */
 int foo(){ /* redefinition */ }
-/*CHECK
+/*CHECK:
     ^ function 'foo' already has a body
     ^ redeclared here
 */
