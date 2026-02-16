@@ -53,6 +53,16 @@ public:
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
+
+        // If we're skipping the source snippet (no valid location), ensure the span message
+        // is empty - otherwise we would be silently dropping important diagnostic information
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (!hasValidLocation)
+        {
+            SLANG_ASSERT(diag.primarySpan.message.getLength() == 0);
+        }
+
         return renderFromLayout(layout);
     }
 
@@ -153,6 +163,7 @@ private:
             Int64 line = 0;
             Int64 col = 0;
             Int64 gutterIndent = 0;
+            PathInfo::Type pathType = PathInfo::Type::Unknown;
         } primaryLoc;
 
         SectionLayout primarySection;
@@ -290,10 +301,16 @@ private:
             {
                 SourceView* view = m_sourceManager->findSourceView(span.startLoc);
                 if (view)
-                    line.content = StringUtil::trimEndOfLine(
+                {
+                    // Get the line content and trim end-of-line characters and trailing whitespace
+                    UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
+                    // Trim trailing whitespace but preserve leading whitespace (indentation)
+                    line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                }
             }
-            if (m_lexer && span.length <= 0)
+            if (m_lexer && span.length <= 0 && line.content.getLength() > 0 && span.col > 0 &&
+                span.col - 1 < line.content.getLength())
                 span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
             line.spans.add({span.col, span.length, span.label, span.isPrimary});
         }
@@ -357,14 +374,18 @@ private:
         for (const auto& span : line.spans)
         {
             Int64 start = span.column - indent;
-            if (start > cursor)
+            if (start > cursor && cursor - 1 < content.getLength())
                 ss << content.subString(cursor - 1, start - cursor);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            ss << color(c, String(content.subString(std::max(Int64{0}, start - 1), span.length)));
+            Int64 startIdx = std::max(Int64{0}, start - 1);
+            Int64 safeLen =
+                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
+            if (safeLen > 0)
+                ss << color(c, String(content.subString(startIdx, safeLen)));
             cursor = start + span.length;
         }
-        if (cursor - 1 < content.getLength())
+        if (cursor - 1 >= 0 && cursor - 1 < content.getLength())
             ss << content.tail(cursor - 1);
     }
 
@@ -511,6 +532,7 @@ private:
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
+        layout.primaryLoc.pathType = humaneLoc.pathInfo.type;
 
         List<LayoutSpan> allSpans;
         allSpans.add(makeLayoutSpan(diag.primarySpan, true));
@@ -528,6 +550,7 @@ private:
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
+            noteEntry.loc.pathType = noteHumane.pathInfo.type;
 
             List<LayoutSpan> noteSpans;
             noteSpans.add(makeLayoutSpan(note.span, false));
@@ -553,6 +576,34 @@ private:
             span.range.begin};
     }
 
+    void renderLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.arrow) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
+    void renderNoteLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.noteDash) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
     String renderFromLayout(const DiagnosticLayout& layout)
     {
         StringBuilder ss;
@@ -565,22 +616,26 @@ private:
             codeStr = "0" + codeStr;
         ss << "[E" << codeStr << "]"
            << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
-        ss << repeat(' ', layout.primaryLoc.gutterIndent)
-           << color(TerminalColor::Cyan, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
-           << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
 
-        if (layout.primarySection.blocks.getCount() > 0)
+        // Skip location and source snippet for diagnostics without meaningful locations
+        // (line 0 indicates SourceLoc() was used, meaning no source location)
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (hasValidLocation)
         {
-            ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-               << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-            renderSectionBody(ss, layout.primarySection);
+            renderLocation(ss, layout.primaryLoc);
+
+            if (layout.primarySection.blocks.getCount() > 0)
+            {
+                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                renderSectionBody(ss, layout.primarySection);
+            }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            ss << repeat(' ', note.loc.gutterIndent)
-               << color(TerminalColor::Cyan, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
-               << note.loc.line << ":" << note.loc.col << "\n";
+            renderNoteLocation(ss, note.loc);
             if (note.section.blocks.getCount() > 0)
             {
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
@@ -617,10 +672,26 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         codeStr = "0" + codeStr;
 
     // Helper lambda to output a span in the machine-readable format
+    // Returns false if the span was skipped (0,0 location with no message)
     auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
     {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        // Check for locationless span (0,0)
+        bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
+        if (isLocationless)
+        {
+            // Assert that locationless spans don't have span messages (primary diagnostic
+            // message is fine, but span-specific messages shouldn't appear for locationless
+            // diagnostics)
+            if (strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0)
+            {
+                SLANG_ASSERT(message.getLength() == 0);
+                // Skip outputting 0,0 spans with no message
+                return false;
+            }
+        }
 
         sb << "E" << codeStr << "\t";
         sb << severity << "\t";
@@ -630,12 +701,13 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         sb << endLoc.line << "\t";
         sb << endLoc.column << "\t";
         sb << message << "\n";
+        return true;
     };
 
     // Output primary diagnostic
     outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
 
-    // Output primary span message
+    // Output primary span message (if it has a valid location or message)
     outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
 
     // Output secondary spans

@@ -297,7 +297,9 @@ public:
             return false;
         case SLANG_DIAGNOSTIC_COLOR_AUTO:
         default:
-            return writer && writer->isConsole();
+            if (writer)
+                return writer->isConsole();
+            return false;
         }
     }
 
@@ -354,6 +356,9 @@ protected:
 
     // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+
+    // Overload that allows specifying a source manager (used when routing to parent sinks)
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, SourceManager* sourceManager);
 
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(

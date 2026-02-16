@@ -25,6 +25,7 @@
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
@@ -2388,6 +2389,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
+                // Update the current sink and all parent sinks so colors work correctly
+                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                    sink->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:
@@ -4221,6 +4225,9 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+        // Copy color and unicode settings from the request sink
+        m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
+        m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
 
     // All diagnostics will also be sent to requestSink
