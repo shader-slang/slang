@@ -4,6 +4,8 @@
 #include "../core/slang-char-util.h"
 #include "../core/slang-hash.h"
 #include "../core/slang-performance-profiler.h"
+#include "../core/slang-string-util.h"
+#include "../core/slang-crypto.h"
 #include "../core/slang-random-generator.h"
 #include "slang-check.h"
 #include "slang-ir-autodiff.h"
@@ -12830,6 +12832,41 @@ static void ensureAllDeclsRec(IRGenContext* context, Decl* decl)
     }
 }
 
+// Generate a build identifier string for a translation unit based only on source file content
+String generateBuildIdentifierForTranslationUnit(TranslationUnitRequest* translationUnit)
+{
+    // Create a hash based only on the source files content
+    // This ensures the build identifier is consistent regardless of compile options
+
+    // Start with the module name as a base
+    StringBuilder sb;
+    sb << getText(translationUnit->getModuleDecl()->getName());
+
+    // Add the actual content of each source file
+    for (auto source : translationUnit->getSourceFiles())
+    {
+        // Include the actual source content only
+        auto content = source->getContent();
+        if (content.getLength() > 0)
+            sb << "_" << content;
+    }
+
+    // Generate a hash of the combined string
+    String combinedString = sb.produceString();
+
+    // Use SHA1 to generate a 20-byte hash
+    DigestBuilder<SHA1> builder;
+    builder.append(combinedString.getUnownedSlice());
+    auto digest = builder.finalize();
+
+    // Convert each byte to hex string
+    StringBuilder hashSb;
+    for (size_t i = 0; i < sizeof(digest.data) / sizeof(digest.data[0]); i++)
+        hashSb << StringUtil::makeStringWithFormat("%02x", digest.data[i]);
+    String result = hashSb.produceString();
+    return result;
+}
+
 RefPtr<IRModule> generateIRForTranslationUnit(
     ASTBuilder* astBuilder,
     TranslationUnitRequest* translationUnit)
@@ -12885,6 +12922,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
     }
+
+    // Always emit DebugBuildIdentifier instruction for all compiles
+    // Generate a build identifier based on the translation unit's content
+    builder->setInsertInto(module->getModuleInst());
+    String buildIdentifier = generateBuildIdentifierForTranslationUnit(translationUnit);
+    int buildIdentifierFlags = 0;
+    builder->emitDebugBuildIdentifier(buildIdentifier.getUnownedSlice(), buildIdentifierFlags);
 
     // For now, we will assume that *all* global-scope declarations
     // represent public/exported symbols.
