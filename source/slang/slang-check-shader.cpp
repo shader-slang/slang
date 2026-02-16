@@ -9,6 +9,7 @@
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1580,9 +1581,7 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         if (!parseTypeConformanceArgString(stringValue, typeName, interfaceName, sequentialId))
         {
             compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionString,
-                stringValue);
+                Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
         auto concreteType = globalComponentType->getTypeFromString(
@@ -1590,11 +1589,9 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             compileRequest->getSink());
         if (!concreteType)
         {
-            compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionNoType,
-                stringValue,
-                typeName);
+            compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
+                .option = stringValue,
+                .type_name = typeName});
             continue;
         }
         auto interfaceType = globalComponentType->getTypeFromString(
@@ -1602,11 +1599,9 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             compileRequest->getSink());
         if (!interfaceType)
         {
-            compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionNoType,
-                stringValue,
-                interfaceName);
+            compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
+                .option = stringValue,
+                .type_name = interfaceName});
             continue;
         }
         ComPtr<slang::ITypeConformance> conformanceComponent;
@@ -1623,9 +1618,7 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             // we should report the diagnostics that were generated.
             //
             compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotCreateTypeConformance,
-                stringValue);
+                Diagnostics::CannotCreateTypeConformance{.conformance = stringValue});
             if (diagnostics)
             {
                 compileRequest->getSink()->diagnoseRaw(
