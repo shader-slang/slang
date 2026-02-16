@@ -72,6 +72,7 @@ static SlangResult parseAnnotations(
     outAnnotations.clear();
 
     // Build the comment markers we're looking for
+    // The colon after the prefix is required to avoid confusion with substring matching
     StringBuilder lineMarkerBuilder;
     lineMarkerBuilder << "//" << prefix << ":";
     String lineMarker = lineMarkerBuilder.produceString();
