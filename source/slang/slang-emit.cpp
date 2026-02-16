@@ -2065,6 +2065,8 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
+    SLANG_PASS(collectCooperativeMetadata, *metadata);
+
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
         SLANG_PASS(unexportNonEmbeddableIR, target);

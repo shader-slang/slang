@@ -857,6 +857,15 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangScopeIntegral;
+    enum SlangScope : SlangScopeIntegral
+    {
+        SLANG_SCOPE_NONE,
+        SLANG_SCOPE_THREAD,
+        SLANG_SCOPE_WAVE,
+        SLANG_SCOPE_THREAD_GROUP,
+    };
+
     typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
     enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
     {
@@ -4487,6 +4496,123 @@ struct IMetadata : public ISlangCastable
     virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+struct CooperativeMatrixType
+{
+    SlangCooperativeComponentType componentType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    uint32_t rowCount = 0;
+    uint32_t columnCount = 0;
+
+    SlangCooperativeMatrixUse use = SLANG_COOPERATIVE_MATRIX_USE_NONE;
+
+    bool operator==(const CooperativeMatrixType& other) const
+    {
+        return componentType == other.componentType && scope == other.scope &&
+               rowCount == other.rowCount && columnCount == other.columnCount && use == other.use;
+    }
+};
+
+struct CooperativeMatrixCombination
+{
+    uint32_t m = 0;
+    uint32_t n = 0;
+    uint32_t k = 0;
+
+    SlangCooperativeComponentType componentTypeA = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeB = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeC = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeResult = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+
+    SlangBool saturate = false;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    bool operator==(const CooperativeMatrixCombination& other) const
+    {
+        return m == other.m && n == other.n && k == other.k &&
+               componentTypeA == other.componentTypeA && componentTypeB == other.componentTypeB &&
+               componentTypeC == other.componentTypeC &&
+               componentTypeResult == other.componentTypeResult && saturate == other.saturate &&
+               scope == other.scope;
+    }
+};
+
+struct CooperativeVectorType
+{
+    SlangCooperativeComponentType componentType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+
+    // Maximum cooperative vector size seen for this component type. If zero, the type
+    // is used only as accumulation/storage for training-specific operations. See below.
+    // first-class cooperative vector type.
+    uint32_t maxSize = 0;
+
+    // Indicates this component type is used as the accumulation/storage type for the cooperative
+    // vector training operations like SPIR-V `OpCooperativeVectorOuterProductAccumulateNV` and
+    // `OpCooperativeVectorReduceSumAccumulateNV`.
+    SlangBool usedForTrainingOp = false;
+};
+
+struct CooperativeVectorCombination
+{
+    SlangCooperativeComponentType inputType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType inputInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType matrixInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    // `NONE` means the operation has no bias operand/matrix.
+    SlangCooperativeComponentType biasInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType resultType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangBool transpose = false;
+
+    bool operator==(const CooperativeVectorCombination& other) const
+    {
+        return inputType == other.inputType && inputInterpretation == other.inputInterpretation &&
+               matrixInterpretation == other.matrixInterpretation &&
+               biasInterpretation == other.biasInterpretation && resultType == other.resultType &&
+               transpose == other.transpose;
+    }
+};
+
+/** Cooperative matrix and vector metadata.
+
+This interface reports the cooperative matrix/vector type information that a compiled target uses,
+including both types and certain type combinations required to execute some operations (like matrix
+multiplication).
+
+Applications can use this metadata to compare shader requirements against the capabilities exposed
+by the target API/driver (for example Vulkan cooperative matrix/vector property queries).
+
+Lists are exposed using `get*Count()` plus `get*ByIndex()` methods, where the count returns the
+number of elements currently available and valid indices are in the range `[0, count)`.
+
+Cast from an `IMetadata*` using `castAs()`.
+*/
+struct ICooperativeTypesMetadata : public ISlangCastable
+{
+    SLANG_COM_INTERFACE(
+        0x64c4d536,
+        0xd949,
+        0x49c3,
+        {0x9f, 0xde, 0x3f, 0x0f, 0x9c, 0x6f, 0x01, 0x31})
+
+    virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
+    virtual SlangResult SLANG_MCALL
+    getCooperativeMatrixTypeByIndex(SlangUInt index, CooperativeMatrixType* outType) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        CooperativeMatrixCombination* outCombination) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
+    virtual SlangResult SLANG_MCALL
+    getCooperativeVectorTypeByIndex(SlangUInt index, CooperativeVectorType* outType) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        CooperativeVectorCombination* outCombination) = 0;
+};
+    #define SLANG_UUID_ICooperativeTypesMetadata ICooperativeTypesMetadata::getTypeGuid()
 
 /** Compile result for storing and retrieving multiple output blobs.
     This is needed for features such as separate debug compilation which
