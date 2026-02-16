@@ -1,5 +1,53 @@
 -- Helper functions for defining diagnostics
 
+-- Calculate Levenshtein edit distance between two strings
+local function edit_distance(s1, s2)
+  local len1, len2 = #s1, #s2
+  if len1 == 0 then return len2 end
+  if len2 == 0 then return len1 end
+
+  local matrix = {}
+  for i = 0, len1 do
+    matrix[i] = { [0] = i }
+  end
+  for j = 0, len2 do
+    matrix[0][j] = j
+  end
+
+  for i = 1, len1 do
+    for j = 1, len2 do
+      local cost = (s1:sub(i, i) == s2:sub(j, j)) and 0 or 1
+      matrix[i][j] = math.min(
+        matrix[i-1][j] + 1,      -- deletion
+        matrix[i][j-1] + 1,      -- insertion
+        matrix[i-1][j-1] + cost  -- substitution
+      )
+    end
+  end
+
+  return matrix[len1][len2]
+end
+
+-- Find similar strings from a list based on edit distance
+-- Returns array of {name, distance} sorted by distance (ascending)
+local function find_similar(target, candidates, max_distance)
+  max_distance = max_distance or 3
+  local similar = {}
+  local target_lower = target:lower()
+
+  for _, candidate in ipairs(candidates) do
+    local dist = edit_distance(target_lower, candidate:lower())
+    if dist <= max_distance then
+      table.insert(similar, { name = candidate, distance = dist })
+    end
+  end
+
+  -- Sort by distance (ascending)
+  table.sort(similar, function(a, b) return a.distance < b.distance end)
+
+  return similar
+end
+
 -- Set to false to enable uniqueness checking for diagnostic codes.
 -- Currently set to true to allow duplicate codes during the transition period.
 -- See: https://github.com/shader-slang/slang/issues/6736
@@ -843,4 +891,7 @@ return {
   err = err,
   warning = warning,
   process_diagnostics = process_diagnostics,
+  -- Utility functions for typo suggestions
+  edit_distance = edit_distance,
+  find_similar = find_similar,
 }
