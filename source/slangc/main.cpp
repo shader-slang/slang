@@ -18,16 +18,11 @@ using namespace Slang;
 #define MAIN main
 #endif
 
-static void _diagnosticCallback(char const* message, void* /*userData*/)
-{
-    auto stdError = StdWriters::getError();
-    stdError.put(message);
-    stdError.flush();
-}
-
 static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const char* const* argv)
 {
-    spSetDiagnosticCallback(compileRequest, &_diagnosticCallback, nullptr);
+    // Use the stderr writer directly instead of a callback.
+    // This allows the API to correctly detect TTY status for -diagnostic-color auto.
+    spSetWriter(compileRequest, SLANG_WRITER_CHANNEL_DIAGNOSTIC, StdWriters::getSingleton()->getWriter(SLANG_WRITER_CHANNEL_STD_ERROR));
     spSetCommandLineCompilerMode(compileRequest);
 
     SlangResult res = spProcessCommandLineArguments(compileRequest, &argv[1], argc - 1);
@@ -62,7 +57,7 @@ static SlangResult _compile(SlangCompileRequest* compileRequest, int argc, const
     return res;
 }
 
-bool shouldEmbedPrelude(const char* const* argv, int argc)
+static bool shouldEmbedPrelude(const char* const* argv, int argc)
 {
     for (int i = 0; i < argc; i++)
     {

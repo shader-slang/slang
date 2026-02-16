@@ -61,14 +61,23 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
+    // Colors safe on both dark and light terminal color schemes
+    // See https://blog.xoria.org/terminal-colors/
     enum class TerminalColor
     {
+        Regular,
+        BoldRegular,
         Red,
+        Green,
         Yellow,
+        Magenta,
         Cyan,
-        Blue,
-        Bold,
-        Reset
+        BrightRed,
+        BrightMagenta,
+        BoldRed,
+        BoldBrightRed,
+        BoldMagenta,
+        BoldBrightMagenta,
     };
 
     struct Glyphs
@@ -165,26 +174,45 @@ private:
         const char* code = "";
         switch (c)
         {
-        case TerminalColor::Red:
-            code = "\x1B[31;1m";
-            break;
-        case TerminalColor::Yellow:
-            code = "\x1B[33;1m";
-            break;
-        case TerminalColor::Cyan:
-            code = "\x1B[36;1m";
-            break;
-        case TerminalColor::Blue:
-            code = "\x1B[34;1m";
-            break;
-        case TerminalColor::Bold:
-            code = "\x1B[1m";
-            break;
-        case TerminalColor::Reset:
+        case TerminalColor::Regular:
             code = "\x1B[0m";
             break;
-        default:
-            return text;
+        case TerminalColor::BoldRegular:
+            code = "\x1B[1m";
+            break;
+        case TerminalColor::Red:
+            code = "\x1B[31m";
+            break;
+        case TerminalColor::Green:
+            code = "\x1B[32m";
+            break;
+        case TerminalColor::Yellow:
+            code = "\x1B[33m";
+            break;
+        case TerminalColor::Magenta:
+            code = "\x1B[35m";
+            break;
+        case TerminalColor::Cyan:
+            code = "\x1B[36m";
+            break;
+        case TerminalColor::BrightRed:
+            code = "\x1B[91m";
+            break;
+        case TerminalColor::BrightMagenta:
+            code = "\x1B[95m";
+            break;
+        case TerminalColor::BoldRed:
+            code = "\x1B[1;31m";
+            break;
+        case TerminalColor::BoldBrightRed:
+            code = "\x1B[1;91m";
+            break;
+        case TerminalColor::BoldMagenta:
+            code = "\x1B[1;35m";
+            break;
+        case TerminalColor::BoldBrightMagenta:
+            code = "\x1B[1;95m";
+            break;
         }
         return String(code) + text + "\x1B[0m";
     }
@@ -458,15 +486,15 @@ private:
             {
                 String label = String(line.number);
                 ss << repeat(' ', section.maxGutterWidth - label.getLength())
-                   << color(TerminalColor::Bold, label) << " "
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
+                   << color(TerminalColor::BoldRegular, label) << " "
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << " ";
                 renderSourceLine(ss, line, section.commonIndent);
                 ss << "\n";
 
                 auto rows = buildAnnotationRows(line, section.commonIndent);
                 for (const auto& row : rows)
                     ss << repeat(' ', section.maxGutterWidth + 1)
-                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << " " << row << "\n";
             }
         }
     }
@@ -536,27 +564,27 @@ private:
         while (codeStr.getLength() < 4)
             codeStr = "0" + codeStr;
         ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::Bold, layout.header.message) << "\n";
+           << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
         ss << repeat(' ', layout.primaryLoc.gutterIndent)
-           << color(TerminalColor::Blue, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
+           << color(TerminalColor::Cyan, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
            << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
 
         if (layout.primarySection.blocks.getCount() > 0)
         {
             ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-               << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+               << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
             renderSectionBody(ss, layout.primarySection);
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
             ss << repeat(' ', note.loc.gutterIndent)
-               << color(TerminalColor::Blue, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
+               << color(TerminalColor::Cyan, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
                << note.loc.line << ":" << note.loc.col << "\n";
             if (note.section.blocks.getCount() > 0)
             {
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
             }
         }
