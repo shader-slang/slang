@@ -3,14 +3,17 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
-// Verify pointer-to-pointer cast uses C-style cast, not as_type
-// CHECK: (uint device*)(inputPtr)
+// Verify pointer-to-pointer cast uses C-style cast, not as_type.
+// Allow generated symbol renaming (e.g. inputPtr -> inputPtr_0).
+// CHECK: (uint device*)({{.*}}inputPtr{{.*}})
 
-// Verify pointer-to-integer cast uses C-style cast, not as_type
-// CHECK: (ulong)(inputPtr)
+// Verify pointer-to-integer cast uses C-style cast, not as_type.
+// Allow generated symbol renaming (e.g. inputPtr -> inputPtr_0).
+// CHECK: (ulong)({{.*}}inputPtr{{.*}})
 
-// Verify integer-to-pointer cast uses C-style cast, not as_type
-// CHECK: (int device*)(ptrValue)
+// Verify integer-to-pointer cast uses C-style cast, not as_type.
+// Allow generated symbol renaming (e.g. ptrValue -> ptrValue_0).
+// CHECK: (int device*)({{.*}}ptrValue{{.*}})
 
 // Make sure as_type is NOT used for any pointer conversions
 // CHECK-NOT: as_type<{{.*}}device{{.*}}\*>
