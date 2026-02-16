@@ -7,6 +7,7 @@
 
 #include "../core/slang-type-text-util.h"
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -33,7 +34,7 @@ public:
             }
             else
             {
-                m_sink->diagnose(SourceLoc(), Diagnostics::noteFailedToLoadDynamicLibrary, path);
+                m_sink->diagnose(Diagnostics::NoteFailedToLoadDynamicLibrary{.path = path});
             }
         }
         return res;
@@ -141,7 +142,8 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
             //
             if (sink)
             {
-                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
+                sink->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+                    .compiler = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(type))});
             }
             SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
             locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);

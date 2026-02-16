@@ -1219,7 +1219,7 @@ struct LoadContext
         auto result = StreamUtil::readAll(stream, streamData);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+            sink->diagnose(Diagnostics::UnableToReadRiff{});
             return result;
         }
     }
@@ -1236,7 +1236,7 @@ struct LoadContext
     auto rootChunk = RIFF::RootChunk::getFromBlob(data, dataSize);
     if (!rootChunk)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
         return SLANG_FAIL;
     }
     if (rootChunk->getType() != kSlangStateFileFourCC)
@@ -1342,7 +1342,7 @@ struct LoadContext
 
     if (!Path::createDirectory(dirPath))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToCreateDirectory, dirPath);
+        sink->diagnose(Diagnostics::UnableToCreateDirectory{.path = dirPath});
         return SLANG_FAIL;
     }
 

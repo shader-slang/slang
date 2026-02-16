@@ -158,7 +158,7 @@ static SlangResult _requireBlob(
     const auto res = artifact->loadBlob(ArtifactKeep::No, outBlob.writeRef());
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::cannotAccessAsBlob);
+        sink->diagnose(Diagnostics::CannotAccessAsBlob{});
         return res;
     }
     return SLANG_OK;
