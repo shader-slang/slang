@@ -320,7 +320,6 @@ static void generateSuggestedAnnotations(
         return;
     }
 
-
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
