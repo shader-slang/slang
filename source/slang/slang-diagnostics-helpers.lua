@@ -240,7 +240,7 @@ end
 
 -- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
 -- For notes within diagnostics, use the `note` function above (line 37).
-local function note_diagnostic(name, code, message, primary_span, ...)
+local function standalone_note(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
@@ -388,11 +388,18 @@ end
 -- Helper function to validate diagnostic schema
 local function validate_diagnostic(diag, index)
   local errors = {}
-  local diagnostic_name = diag.name or ("diagnostic[" .. index .. "]")
+
+  -- Determine diagnostic_name safely for error messages
+  local diagnostic_name
+  if type(diag.name) == "string" then
+    diagnostic_name = diag.name
+  else
+    diagnostic_name = "diagnostic[" .. index .. "]"
+  end
 
   -- 1. Validate mandatory 'name' field
   if not diag.name or type(diag.name) ~= "string" then
-    table.insert(errors, "diagnostic[" .. index .. "].name must be a string")
+    table.insert(errors, "diagnostic[" .. index .. "].name must be a string (got " .. type(diag.name) .. ")")
   end
 
   -- 2. Validate mandatory 'code' field
@@ -403,8 +410,8 @@ local function validate_diagnostic(diag, index)
   -- 3. Validate mandatory 'severity' field and allowed values
   if not diag.severity or type(diag.severity) ~= "string" then
     table.insert(errors, diagnostic_name .. ".severity must be a string")
-  elseif not (diag.severity == "error" or diag.severity == "warning") then
-    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning")
+  elseif not (diag.severity == "error" or diag.severity == "warning" or diag.severity == "note") then
+    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning, note")
   end
 
   -- 4. Validate mandatory 'message' field
@@ -490,7 +497,7 @@ local function process_diagnostics(diagnostics_table)
   local seen_codes = {}
 
   for i, diag in ipairs(diagnostics_table) do
-    local diagnostic_name = diag.name or ("diagnostic[" .. i .. "]")
+    local diagnostic_name = type(diag.name) == "string" and diag.name or ("diagnostic[" .. i .. "]")
     local errors = validate_diagnostic(diag, i)
 
     if #errors > 0 then
@@ -830,6 +837,7 @@ return {
   diagnostics = diagnostics,
   span = span,
   note = note,
+  standalone_note = standalone_note,
   variadic_span = variadic_span,
   variadic_note = variadic_note,
   err = err,
