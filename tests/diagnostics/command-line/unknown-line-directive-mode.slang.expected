@@ -1,8 +1,0 @@
-result code = 1
-standard error = {
-(1): error 62: unknown value for option. Valid values are 'none, source-map, default, standard, glsl'
-tests/diagnostics/command-line/unknown-line-directive-mode.slang -line-directive-mode quizzical
-                                                                                      ^
-}
-standard output = {
-}
