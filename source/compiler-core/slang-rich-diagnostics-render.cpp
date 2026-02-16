@@ -53,6 +53,16 @@ public:
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
+
+        // If we're skipping the source snippet (no valid location), ensure the span message
+        // is empty - otherwise we would be silently dropping important diagnostic information
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (!hasValidLocation)
+        {
+            SLANG_ASSERT(diag.primarySpan.message.getLength() == 0);
+        }
+
         return renderFromLayout(layout);
     }
 
@@ -605,13 +615,20 @@ private:
             codeStr = "0" + codeStr;
         ss << "[E" << codeStr << "]"
            << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
-        renderLocation(ss, layout.primaryLoc);
 
-        if (layout.primarySection.blocks.getCount() > 0)
+        // Skip location and source snippet for diagnostics without meaningful locations
+        // (line 0 indicates SourceLoc() was used, meaning no source location)
+        bool hasValidLocation = layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (hasValidLocation)
         {
-            ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-               << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-            renderSectionBody(ss, layout.primarySection);
+            renderLocation(ss, layout.primaryLoc);
+
+            if (layout.primarySection.blocks.getCount() > 0)
+            {
+                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                renderSectionBody(ss, layout.primarySection);
+            }
         }
         for (const auto& note : layout.notes)
         {
@@ -653,10 +670,26 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         codeStr = "0" + codeStr;
 
     // Helper lambda to output a span in the machine-readable format
+    // Returns false if the span was skipped (0,0 location with no message)
     auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
     {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        // Check for locationless span (0,0)
+        bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
+        if (isLocationless)
+        {
+            // Assert that locationless spans don't have span messages (primary diagnostic
+            // message is fine, but span-specific messages shouldn't appear for locationless
+            // diagnostics)
+            if (strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0)
+            {
+                SLANG_ASSERT(message.getLength() == 0);
+                // Skip outputting 0,0 spans with no message
+                return false;
+            }
+        }
 
         sb << "E" << codeStr << "\t";
         sb << severity << "\t";
@@ -666,12 +699,13 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         sb << endLoc.line << "\t";
         sb << endLoc.column << "\t";
         sb << message << "\n";
+        return true;
     };
 
     // Output primary diagnostic
     outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
 
-    // Output primary span message
+    // Output primary span message (if it has a valid location or message)
     outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
 
     // Output secondary spans

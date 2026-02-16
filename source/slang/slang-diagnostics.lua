@@ -85,8 +85,9 @@
 --                        Typed locations can be used as parameters in interpolations
 --
 -- Available functions:
---   err(name, code, message, primary_span, ...) - Define an error diagnostic
---   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
+--   err(name, code, message, [primary_span], ...) - Define an error diagnostic
+--   warning(name, code, message, [primary_span], ...) - Define a warning diagnostic
+--   Note: primary_span is optional for locationless diagnostics (e.g., command-line errors)
 --
 --   span(location, message?) - Create a span (message defaults to empty string)
 --     Positional: span("location:Type", "message text")
@@ -276,8 +277,7 @@ err(
 err(
     "cannot deduce source language",
     12,
-    "can't deduce language for input file '~path'",
-    span { loc = "location", message = "can't deduce language for input file '~path'" }
+    "can't deduce language for input file '~path'"
 )
 
 err(
@@ -311,8 +311,7 @@ err(
 warning(
     "separate debug info unsupported for target",
     18,
-    "'-separate-debug-info' is not supported for target '~target'",
-    span { loc = "location", message = "'-separate-debug-info' is not supported for target '~target'. This option is only supported for SPIR-V binary targets." }
+    "'-separate-debug-info' is not supported for target '~target'"
 )
 
 err(
@@ -325,8 +324,7 @@ err(
 err(
     "entry points need to be associated with translation units",
     20,
-    "when using multiple source files, entry points must be specified after their corresponding source file(s)",
-    span { loc = "location", message = "when using multiple source files, entry points must be specified after their corresponding source file(s)" }
+    "when using multiple source files, entry points must be specified after their corresponding source file(s)"
 )
 
 err(
@@ -339,22 +337,19 @@ err(
 err(
     "unable to generate code for target",
     28,
-    "unable to generate code for target '~target'",
-    span { loc = "location", message = "unable to generate code for target '~target'" }
+    "unable to generate code for target '~target'"
 )
 
 warning(
     "same stage specified more than once",
     30,
-    "the stage '~stage' was specified more than once for entry point '~entry_point'",
-    span { loc = "location", message = "the stage '~stage' was specified more than once for entry point '~entry_point'" }
+    "the stage '~stage' was specified more than once for entry point '~entry_point'"
 )
 
 err(
     "conflicting stages for entry point",
     31,
-    "conflicting stages have been specified for entry point '~entry_point'",
-    span { loc = "location", message = "conflicting stages have been specified for entry point '~entry_point'" }
+    "conflicting stages have been specified for entry point '~entry_point'"
 )
 
 -- Process and validate all diagnostics

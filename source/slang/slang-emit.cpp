@@ -2187,8 +2187,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     if (!sourceEmitter)
     {
         sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
-            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
-            .location = SourceLoc()});
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2870,8 +2869,7 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     if (!library)
     {
         codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
-            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
-            .location = SourceLoc()});
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

@@ -412,10 +412,12 @@ local function validate_diagnostic(diag, index)
     table.insert(errors, diagnostic_name .. ".message must be a string")
   end
 
-  -- 5. Validate mandatory 'primary_span' structure
-  local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
-  for _, err in ipairs(primary_errors) do
-    table.insert(errors, err)
+  -- 5. Validate optional 'primary_span' structure (nil allowed for locationless diagnostics)
+  if diag.primary_span then
+    local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
+    for _, err in ipairs(primary_errors) do
+      table.insert(errors, err)
+    end
   end
 
   -- 6. Validate optional 'secondary_spans' array
@@ -550,8 +552,10 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- Collect locations from primary span
-      collect_location(diag.primary_span)
+      -- Collect locations from primary span (if present)
+      if diag.primary_span then
+        collect_location(diag.primary_span)
+      end
 
       -- Collect locations from secondary spans
       if diag.secondary_spans then
@@ -688,30 +692,32 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- 2. Process primary span
-      process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
-
-      -- Extract required params from primary span for assertions (only pointer types)
+      -- 2. Process primary span (if present)
       local primary_span_required = {}
-      if diag.primary_span.location_name and diag.primary_span.location_type then
-        table.insert(primary_span_required, diag.primary_span.location_name)
-      end
-      if diag.primary_span.message_parts then
-        for _, part in ipairs(diag.primary_span.message_parts) do
-          if part.type == "interpolation" and not part.member_name then
-            local param_type = seen_params[part.param_name]
-            -- Only add pointer types (not string or int)
-            if param_type and param_type ~= "string" and param_type ~= "int" then
-              -- Avoid duplicates
-              local found = false
-              for _, existing in ipairs(primary_span_required) do
-                if existing == part.param_name then
-                  found = true
-                  break
+      if diag.primary_span then
+        process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
+
+        -- Extract required params from primary span for assertions (only pointer types)
+        if diag.primary_span.location_name and diag.primary_span.location_type then
+          table.insert(primary_span_required, diag.primary_span.location_name)
+        end
+        if diag.primary_span.message_parts then
+          for _, part in ipairs(diag.primary_span.message_parts) do
+            if part.type == "interpolation" and not part.member_name then
+              local param_type = seen_params[part.param_name]
+              -- Only add pointer types (not string or int)
+              if param_type and param_type ~= "string" and param_type ~= "int" then
+                -- Avoid duplicates
+                local found = false
+                for _, existing in ipairs(primary_span_required) do
+                  if existing == part.param_name then
+                    found = true
+                    break
+                  end
                 end
-              end
-              if not found then
-                table.insert(primary_span_required, part.param_name)
+                if not found then
+                  table.insert(primary_span_required, part.param_name)
+                end
               end
             end
           end

@@ -1516,7 +1516,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_requestImpl->getSink()->diagnose(
-            Diagnostics::CannotDeduceSourceLanguage{.path = inPath, .location = SourceLoc()});
+            Diagnostics::CannotDeduceSourceLanguage{.path = inPath});
         return SLANG_FAIL;
     }
 
@@ -3442,6 +3442,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
     }
 
+    // Apply diagnostic sink settings early so that any diagnostics emitted during
+    // option post-processing (e.g., entry point validation) use the correct settings
+    // such as rich diagnostics and machine-readable output.
+    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
+
     if (m_compileCoreModule)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
@@ -3542,7 +3547,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (anyEntryPointWithoutTranslationUnit)
             {
                 m_sink->diagnose(
-                    Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{.location = SourceLoc()});
+                    Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
                 return SLANG_FAIL;
             }
         }
@@ -3583,15 +3588,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (rawEntryPoint.conflictingStagesSet)
             {
                 m_sink->diagnose(Diagnostics::ConflictingStagesForEntryPoint{
-                    .entry_point = rawEntryPoint.name,
-                    .location = SourceLoc()});
+                    .entry_point = rawEntryPoint.name});
             }
             else if (rawEntryPoint.redundantStageSet)
             {
                 m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
                     .stage = getStageName(rawEntryPoint.stage),
-                    .entry_point = rawEntryPoint.name,
-                    .location = SourceLoc()});
+                    .entry_point = rawEntryPoint.name});
             }
             else if (rawEntryPoint.translationUnitIndex != -1)
             {
@@ -4160,8 +4163,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
                 m_sink->diagnose(Diagnostics::SeparateDebugInfoUnsupportedForTarget{
-                    .target = targetName,
-                    .location = SourceLoc()});
+                    .target = targetName});
             }
         }
 
@@ -4174,8 +4176,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
                 m_sink->diagnose(Diagnostics::SeparateDebugInfoUnsupportedForTarget{
-                    .target = targetName,
-                    .location = SourceLoc()});
+                    .target = targetName});
             }
         }
     }

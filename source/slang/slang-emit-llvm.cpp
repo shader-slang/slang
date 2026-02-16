@@ -784,8 +784,7 @@ struct LLVMEmitter
         {
             codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
                 .target = TypeTextUtil::getCompileTargetName(
-                    SlangCompileTarget(codeGenContext->getTargetFormat())),
-                .location = SourceLoc()});
+                    SlangCompileTarget(codeGenContext->getTargetFormat()))});
             return SLANG_FAIL;
         }
 
