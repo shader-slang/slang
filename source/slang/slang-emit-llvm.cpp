@@ -9,7 +9,6 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
 #include "slang-llvm/slang-llvm-builder.h"
-#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -782,9 +781,11 @@ struct LLVMEmitter
         ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
         if (!library)
         {
-            codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
-                .target = TypeTextUtil::getCompileTargetName(
-                    SlangCompileTarget(codeGenContext->getTargetFormat()))});
+            codeGenContext->getSink()->diagnose(
+                SourceLoc(),
+                Diagnostics::unableToGenerateCodeForTarget,
+                TypeTextUtil::getCompileTargetName(
+                    SlangCompileTarget(codeGenContext->getTargetFormat())));
             return SLANG_FAIL;
         }
 

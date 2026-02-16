@@ -10,7 +10,6 @@
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
@@ -1703,8 +1702,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // list of the file names that were tried, if
     // nothing was even found via the include system).
     //
-    sink->diagnose(
-        Diagnostics::CannotOpenFile{.path = defaultSourceFileName, .location = requestingLoc});
+    sink->diagnose(requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
 
     // If the attempt to import the module failed, then
     // we will stick a null pointer into the map of loaded
@@ -1840,7 +1838,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     auto sourceFile = findFile(name, loc, includeSystem);
     if (!sourceFile)
     {
-        sink->diagnose(Diagnostics::CannotOpenFile{.path = getText(name), .location = loc});
+        sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
         return result;
     }
 

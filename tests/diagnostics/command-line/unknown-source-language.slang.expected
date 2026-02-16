@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 12: can't deduce language for input file 'batmobile.car'
+}
+standard output = {
+}

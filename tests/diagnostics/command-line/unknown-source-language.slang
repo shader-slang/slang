@@ -2,4 +2,4 @@
 
 // Unknown source file extension (can't deduce language)
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):batmobile.car
+//DIAGNOSTIC_TEST:SIMPLE:batmobile.car

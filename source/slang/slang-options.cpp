@@ -1524,7 +1524,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
     {
         m_requestImpl->getSink()->diagnose(
-            Diagnostics::CannotDeduceSourceLanguage{.path = inPath});
+            SourceLoc(),
+            Diagnostics::cannotDeduceSourceLanguage,
+            inPath);
         return SLANG_FAIL;
     }
 
@@ -2230,8 +2232,7 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
     SlangProfileID profileID = SlangProfileID(Slang::Profile::lookUp(profileName).raw);
     if (profileID == SLANG_PROFILE_UNKNOWN)
     {
-        m_sink->diagnose(
-            Diagnostics::UnknownProfile{.profile = profileName, .location = operand.loc});
+        m_sink->diagnose(operand.loc, Diagnostics::unknownProfile, profileName);
         return SLANG_FAIL;
     }
     else
@@ -2256,8 +2257,7 @@ SlangResult OptionsParser::_parseProfile(const CommandLineArg& arg)
         CapabilityName atom = findCapabilityName(atomName);
         if (atom == CapabilityName::Invalid)
         {
-            m_sink->diagnose(
-                Diagnostics::UnknownProfile{.profile = atomName, .location = operand.loc});
+            m_sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
             return SLANG_FAIL;
         }
 
@@ -2311,8 +2311,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
         if (optionIndex < 0)
         {
-            m_sink->diagnose(
-                Diagnostics::UnknownCommandLineOption{.option = argValue, .location = arg.loc});
+            m_sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
             _outputMinimalUsage();
             return SLANG_FAIL;
         }
@@ -2687,9 +2686,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 if (format == CodeGenTarget::Unknown)
                 {
-                    m_sink->diagnose(Diagnostics::UnknownCodeGenerationTarget{
-                        .target = name.value,
-                        .location = name.loc});
+                    m_sink->diagnose(
+                        name.loc,
+                        Diagnostics::unknownCodeGenerationTarget,
+                        name.value);
                     return SLANG_FAIL;
                 }
 
@@ -2773,8 +2773,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     CapabilityName atom = findCapabilityName(atomName);
                     if (atom == CapabilityName::Invalid)
                     {
-                        m_sink->diagnose(
-                            Diagnostics::UnknownProfile{.profile = atomName, .location = operand.loc});
+                        m_sink->diagnose(operand.loc, Diagnostics::unknownProfile, atomName);
                         return SLANG_FAIL;
                     }
 
@@ -2888,8 +2887,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
 
                 if (sourceLanguage == SourceLanguage::Unknown)
                 {
-                    m_sink->diagnose(
-                        Diagnostics::UnknownSourceLanguage{.language = name.value, .location = name.loc});
+                    m_sink->diagnose(name.loc, Diagnostics::unknownSourceLanguage, name.value);
                     return SLANG_FAIL;
                 }
                 else
@@ -2913,8 +2911,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 if (SLANG_FAILED(
                         TypeTextUtil::findPassThrough(name.value.getUnownedSlice(), passThrough)))
                 {
-                    m_sink->diagnose(
-                        Diagnostics::UnknownPassThroughTarget{.target = name.value, .location = name.loc});
+                    m_sink->diagnose(name.loc, Diagnostics::unknownPassThroughTarget, name.value);
                     return SLANG_FAIL;
                 }
 
@@ -3150,9 +3147,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     TypeTextUtil::findSourceLanguage(sourceLanguageArg.value.getUnownedSlice());
                 if (sourceLanguage == SLANG_SOURCE_LANGUAGE_UNKNOWN)
                 {
-                    m_sink->diagnose(Diagnostics::UnknownSourceLanguage{
-                        .language = sourceLanguageArg.value,
-                        .location = sourceLanguageArg.loc});
+                    m_sink->diagnose(
+                        sourceLanguageArg.loc,
+                        Diagnostics::unknownSourceLanguage,
+                        sourceLanguageArg.value);
                     return SLANG_FAIL;
                 }
 
@@ -3161,9 +3159,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         compilerArg.value.getUnownedSlice(),
                         compiler)))
                 {
-                    m_sink->diagnose(Diagnostics::UnknownPassThroughTarget{
-                        .target = compilerArg.value,
-                        .location = compilerArg.loc});
+                    m_sink->diagnose(
+                        compilerArg.loc,
+                        Diagnostics::unknownPassThroughTarget,
+                        compilerArg.value);
                     return SLANG_FAIL;
                 }
 
@@ -3199,9 +3198,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     }
                     else
                     {
-                        m_sink->diagnose(Diagnostics::UnknownDownstreamCompiler{
-                            .compiler = passThroughSlice,
-                            .location = arg.loc});
+                        m_sink->diagnose(
+                            arg.loc,
+                            Diagnostics::unknownDownstreamCompiler,
+                            passThroughSlice);
                         return SLANG_FAIL;
                     }
                 }
@@ -3274,8 +3274,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         FileAccess::Read,
                         FileShare::None)))
                 {
-                    m_sink->diagnose(
-                        Diagnostics::CannotOpenFile{.path = fileName.value, .location = arg.loc});
+                    m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
                     return SLANG_FAIL;
                 }
 
@@ -3353,8 +3352,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                         FileAccess::Read,
                         FileShare::None)))
                 {
-                    m_sink->diagnose(
-                        Diagnostics::CannotOpenFile{.path = fileName.value, .location = arg.loc});
+                    m_sink->diagnose(arg.loc, Diagnostics::cannotOpenFile, fileName.value);
                     return SLANG_FAIL;
                 }
 
@@ -3453,19 +3451,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             {
                 // Hmmm, we looked up and produced a valid enum, but it wasn't handled in the
                 // switch...
-                m_sink->diagnose(
-                    Diagnostics::UnknownCommandLineOption{.option = argValue, .location = arg.loc});
+                m_sink->diagnose(arg.loc, Diagnostics::unknownCommandLineOption, argValue);
 
                 _outputMinimalUsage();
                 return SLANG_FAIL;
             }
         }
     }
-
-    // Apply diagnostic sink settings early so that any diagnostics emitted during
-    // option post-processing (e.g., entry point validation) use the correct settings
-    // such as rich diagnostics and machine-readable output.
-    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
     if (m_compileCoreModule)
     {
@@ -3567,7 +3559,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (anyEntryPointWithoutTranslationUnit)
             {
                 m_sink->diagnose(
-                    Diagnostics::EntryPointsNeedToBeAssociatedWithTranslationUnits{});
+                    SourceLoc(),
+                    Diagnostics::entryPointsNeedToBeAssociatedWithTranslationUnits);
                 return SLANG_FAIL;
             }
         }
@@ -3607,14 +3600,18 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         {
             if (rawEntryPoint.conflictingStagesSet)
             {
-                m_sink->diagnose(Diagnostics::ConflictingStagesForEntryPoint{
-                    .entry_point = rawEntryPoint.name});
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::conflictingStagesForEntryPoint,
+                    rawEntryPoint.name);
             }
             else if (rawEntryPoint.redundantStageSet)
             {
-                m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
-                    .stage = getStageName(rawEntryPoint.stage),
-                    .entry_point = rawEntryPoint.name});
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::sameStageSpecifiedMoreThanOnce,
+                    rawEntryPoint.stage,
+                    rawEntryPoint.name);
             }
             else if (rawEntryPoint.translationUnitIndex != -1)
             {
@@ -4182,8 +4179,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Get the target name for the warning message
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(rawTarget.format));
-                m_sink->diagnose(Diagnostics::SeparateDebugInfoUnsupportedForTarget{
-                    .target = targetName});
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
             }
         }
 
@@ -4195,8 +4194,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 // Get the target name for the warning message
                 UnownedStringSlice targetName =
                     TypeTextUtil::getCompileTargetName(asExternal(m_defaultTarget.format));
-                m_sink->diagnose(Diagnostics::SeparateDebugInfoUnsupportedForTarget{
-                    .target = targetName});
+                m_sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::separateDebugInfoUnsupportedForTarget,
+                    targetName);
             }
         }
     }

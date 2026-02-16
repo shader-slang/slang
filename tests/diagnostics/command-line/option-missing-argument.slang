@@ -2,6 +2,6 @@
 
 // Missing argument for an option:
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target -profile ps_4_0
+//DIAGNOSTIC_TEST:SIMPLE:-target -profile ps_4_0
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-profile ps_4_0 -target
+//DIAGNOSTIC_TEST:SIMPLE:-profile ps_4_0 -target
