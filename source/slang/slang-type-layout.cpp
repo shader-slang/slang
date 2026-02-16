@@ -938,8 +938,8 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
         // Metal aligns vectors to 2/4 element boundaries.
-        size_t size = alignedElementCount * elementSize;
-        size_t alignment = alignedElementCount * elementSize;
+        size_t size = elementCount * elementSize;
+        size_t alignment = elementSize;
 
         SimpleLayoutInfo vectorInfo;
         vectorInfo.kind = elementInfo.kind;
