@@ -320,6 +320,7 @@ static void generateSuggestedAnnotations(
         return;
     }
 
+
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
@@ -330,7 +331,7 @@ static void generateSuggestedAnnotations(
     }
 
     // Calculate the prefix length: "//" + prefix + ":"
-    int linePrefixLength = 3 + int(prefix.getLength());
+    int linePrefixLength = 3 + prefix.getLength();
 
     // Check if we should use block comment
     bool useBlockComment = false;

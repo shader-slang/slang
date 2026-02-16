@@ -1,13 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(): 
 
-// Test that function redefinition produces the expected error and note
+// Use a regular test here rather than a DIAGNOSTIC_TEST because the test
+// runner can't yet parse the new diagnostic style
+//TEST:SIMPLE(): -enable-experimental-rich-diagnostics
 
 int foo(){ /* original */ }
-/*CHECK:
-    ^ see previous definition of 'foo'
-*/
 int foo(){ /* redefinition */ }
-/*CHECK:
-    ^ function 'foo' already has a body
-    ^ redeclared here
-*/
