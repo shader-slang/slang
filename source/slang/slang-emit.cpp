@@ -2262,6 +2262,10 @@ Result linkAndOptimizeIR(
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 
+    // Runs after target-specific lowering so it only captures cooperative types that remain
+    // as native constructs visible to the driver (see ICooperativeTypesMetadata docs).
+    SLANG_PASS(collectCooperativeMetadata, *metadata);
+
     if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmbedDownstreamIR))
     {
         SLANG_PASS(unexportNonEmbeddableIR, target);
