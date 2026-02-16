@@ -101,6 +101,8 @@ Typed locations can be used as parameters in interpolations.
 
 it doesn't have to be called location, it can also be one of the other interpolants if the context makes it clear that that location is being used.
 
+SourceLoc fields are always default initialized to SourceLoc() so no need to specify that explicitly when constructing the diagnostic objects.
+
 ---
 
 ## Example: Error + Note Pattern

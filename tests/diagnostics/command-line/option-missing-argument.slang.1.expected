@@ -1,6 +1,0 @@
-result code = 1
-standard error = {
-(0): error 100001: expected an argument for command-line option '-target'
-}
-standard output = {
-}

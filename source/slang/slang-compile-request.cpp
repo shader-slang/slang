@@ -10,6 +10,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
 
 namespace Slang
@@ -663,7 +664,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     if (SLANG_FAILED(existsRes))
     {
         // Emit a diagnostic!
-        getSink()->diagnose(SourceLoc(), Diagnostics::cannotOpenFile, path);
+        getSink()->diagnose(Diagnostics::CannotOpenFile{.path = path, .location = SourceLoc()});
         return;
     }
 
