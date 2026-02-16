@@ -70,10 +70,10 @@ runs:
         echo "SCCACHE_DIR=/tmp/.cache/sccache" >> $GITHUB_ENV
         echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
 
-        # Limit cache size to prevent unbounded growth in GitHub Actions cache
+        # Limit local cache size to avoid disk space issues on runners
         # Only applies to local disk backend (GCS has unlimited storage)
         if [[ -z "${{ inputs.gcs-bucket }}" ]]; then
-          echo "SCCACHE_CACHE_SIZE=5G" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
         fi
 
         # Get sccache path for CMake

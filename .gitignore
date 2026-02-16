@@ -133,3 +133,8 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+
+# act local testing (secrets, vars, event payloads)
+.secrets
+.vars
+.github/test-events/

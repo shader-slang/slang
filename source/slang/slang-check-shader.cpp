@@ -867,6 +867,65 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         }
     }
 
+    // For compute, mesh, and amplification (task) entry points using GLSL
+    // syntax, the thread group size is specified via layout(local_size_x = N)
+    // on a sibling EmptyDecl rather than via [numthreads] on the entry point
+    // itself. GLSL allows each axis to be specified in a separate declaration,
+    // so we merge all GLSLLayoutLocalSizeAttribute values into a single
+    // NumThreadsAttribute.
+    if ((stage == Stage::Compute || stage == Stage::Mesh || stage == Stage::Amplification) &&
+        !entryPointFuncDecl->findModifier<NumThreadsAttribute>())
+    {
+        auto parentDecl = entryPointFuncDecl->parentDecl;
+        if (parentDecl)
+        {
+            NumThreadsAttribute* numThreads = nullptr;
+            for (auto emptyDecl : parentDecl->getMembersOfType<EmptyDecl>())
+            {
+                auto glslAttr = emptyDecl->findModifier<GLSLLayoutLocalSizeAttribute>();
+                if (!glslAttr)
+                    continue;
+
+                if (!numThreads)
+                {
+                    numThreads = getCurrentASTBuilder()->create<NumThreadsAttribute>();
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        numThreads->extents[i] = glslAttr->extents[i];
+                        numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
+                    }
+                }
+                else
+                {
+                    // Merge: for each axis, take the non-default value.
+                    // GLSL defaults unspecified axes to 1.
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        if (glslAttr->specConstExtents[i])
+                        {
+                            numThreads->extents[i] = nullptr;
+                            numThreads->specConstExtents[i] = glslAttr->specConstExtents[i];
+                        }
+                        else if (glslAttr->extents[i])
+                        {
+                            if (auto cint = as<ConstantIntVal>(glslAttr->extents[i]))
+                            {
+                                if (cint->getValue() != 1)
+                                    numThreads->extents[i] = glslAttr->extents[i];
+                            }
+                            else
+                            {
+                                numThreads->extents[i] = glslAttr->extents[i];
+                            }
+                        }
+                    }
+                }
+            }
+            if (numThreads)
+                addModifier(entryPointFuncDecl, numThreads);
+        }
+    }
+
     bool canHaveVaryingInput = false;
     bool shouldWarnOnNonUniformParam = true;
     switch (stage)
