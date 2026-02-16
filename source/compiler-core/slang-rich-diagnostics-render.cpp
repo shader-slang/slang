@@ -663,7 +663,7 @@ String renderDiagnosticMachineReadable(
     {
         String numStr = String(diag.code);
         String padding;
-        padding.appendRepeatedChar('0', std::max<Int64>(0, 5 - numStr.getLength()));
+        padding.appendRepeatedChar('0', std::max(Int64{0}, 5 - numStr.getLength()));
         codeStr = padding + numStr;
     }
 
