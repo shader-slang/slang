@@ -1457,21 +1457,36 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     void processDefaultConstruct(IRInst* inst)
     {
         // Handle DefaultConstruct for DescriptorHandleType.
-        // In SPIRV, DescriptorHandle is lowered to uint2 or uint64.
-        // A default-constructed handle should be a zero value, created via
-        // CastUInt2ToDescriptorHandle(uint2(0,0)).
+        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV) or uint2.
+        // A default-constructed handle should be a zero value.
         auto type = inst->getDataType();
         if (type && type->getOp() == kIROp_DescriptorHandleType)
         {
             IRBuilder builder(m_module);
             builder.setInsertBefore(inst);
-            auto uint32Type = builder.getUIntType();
-            auto zero = builder.getIntValue(uint32Type, 0);
-            auto vecType =
-                builder.getVectorType(uint32Type, builder.getIntValue(builder.getIntType(), 2));
-            auto zeroVec = builder.emitIntrinsicInst(vecType, kIROp_MakeVectorFromScalar, 1, &zero);
-            auto castInst =
-                builder.emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+            auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+
+            IRInst* castInst = nullptr;
+            if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+            {
+                // spvBindlessTextureNV: DescriptorHandle is uint64_t
+                auto uint64Type = builder.getUInt64Type();
+                auto zero64 = builder.getIntValue(uint64Type, 0);
+                castInst = builder.emitIntrinsicInst(
+                    type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
+            }
+            else
+            {
+                // Default: DescriptorHandle is uint2
+                auto uint32Type = builder.getUIntType();
+                auto zero = builder.getIntValue(uint32Type, 0);
+                auto vecType = builder.getVectorType(
+                    uint32Type, builder.getIntValue(builder.getIntType(), 2));
+                auto zeroVec = builder.emitIntrinsicInst(
+                    vecType, kIROp_MakeVectorFromScalar, 1, &zero);
+                castInst = builder.emitIntrinsicInst(
+                    type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+            }
             inst->replaceUsesWith(castInst);
             inst->removeAndDeallocate();
         }
