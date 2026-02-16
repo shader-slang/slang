@@ -13460,9 +13460,8 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
         {
-            // Specialization constant.
-            // Check that type is basic type.
-            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            if (!as<BasicExpressionType>(varDecl->getType()) && !isEnumType(varDecl->getType()) &&
+                !as<ErrorType>(varDecl->getType()))
             {
                 getSink()->diagnose(modifier, Diagnostics::specializationConstantMustBeScalar);
             }
