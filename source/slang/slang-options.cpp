@@ -2405,9 +2405,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Update the current sink and all parent sinks so colors work correctly
-                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
-                    sink->setDiagnosticColorMode(colorValue);
+                // Update both the current sink and parent sink so colors work correctly
+                m_sink->setDiagnosticColorMode(colorValue);
+                if (m_sink->getParentSink())
+                    m_sink->getParentSink()->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:
@@ -3451,6 +3452,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
     }
+
+    // Apply diagnostic sink settings early so that any diagnostics emitted during
+    // option post-processing (e.g., entry point validation) use the correct settings
+    // such as rich diagnostics and machine-readable output.
+    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
     if (m_compileCoreModule)
     {
