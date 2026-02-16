@@ -1,8 +1,0 @@
-result code = 1
-standard error = {
-(1): error 14: unknown profile 'thunder_kiss_65'
-tests/diagnostics/command-line/unknown-profile.slang -profile thunder_kiss_65
-                                                              ^
-}
-standard output = {
-}

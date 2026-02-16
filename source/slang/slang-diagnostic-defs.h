@@ -46,54 +46,27 @@ DIAGNOSTIC(-1, Note, includeOutput, "include $0")
 DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
 
 //
-// 0xxxx -  Command line and interaction with host platform APIs.
+// 0xxxx - Command line and interaction with host platform APIs.
 //
-
-DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
-DIAGNOSTIC(2, Error, cannotFindFile, "cannot find file '$0'.")
-DIAGNOSTIC(4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
-DIAGNOSTIC(5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
-DIAGNOSTIC(
-    6,
-    Error,
-    tooManyOutputPathsSpecified,
-    "$0 output paths specified, but only $1 entry points given")
-
-DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
-DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
-DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
-// DIAGNOSTIC(15, Error, unknownStage, ...) - Converted to slang-diagnostics.lua as "unknown stage"
-DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
-DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(
-    18,
-    Warning,
-    separateDebugInfoUnsupportedForTarget,
-    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
-    "SPIR-V binary targets.")
-DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
-
-DIAGNOSTIC(
-    20,
-    Error,
-    entryPointsNeedToBeAssociatedWithTranslationUnits,
-    "when using multiple source files, entry points must be specified after their corresponding "
-    "source file(s)")
-
-DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
-
-DIAGNOSTIC(28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
-
-DIAGNOSTIC(
-    30,
-    Warning,
-    sameStageSpecifiedMoreThanOnce,
-    "the stage '$0' was specified more than once for entry point '$1'")
-DIAGNOSTIC(
-    31,
-    Error,
-    conflictingStagesForEntryPoint,
-    "conflicting stages have been specified for entry point '$0'")
+// The following diagnostics have been converted to slang-diagnostics.lua:
+// - cannotOpenFile (1)
+// - cannotFindFile (2)
+// - cannotWriteOutputFile (4)
+// - failedToLoadDynamicLibrary (5)
+// - tooManyOutputPathsSpecified (6)
+// - cannotDeduceSourceLanguage (12)
+// - unknownCodeGenerationTarget (13)
+// - unknownProfile (14)
+// - unknownStage (15)
+// - unknownPassThroughTarget (16)
+// - unknownCommandLineOption (17)
+// - separateDebugInfoUnsupportedForTarget (18)
+// - unknownSourceLanguage (19)
+// - entryPointsNeedToBeAssociatedWithTranslationUnits (20)
+// - unknownDownstreamCompiler (22)
+// - unableToGenerateCodeForTarget (28)
+// - sameStageSpecifiedMoreThanOnce (30)
+// - conflictingStagesForEntryPoint (31)
 DIAGNOSTIC(
     32,
     Warning,

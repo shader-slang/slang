@@ -1,8 +1,0 @@
-result code = 1
-standard error = {
-(1): error 13: unknown code generation target 'z80'
-tests/diagnostics/command-line/unknown-codegen-target.slang -target z80
-                                                                    ^
-}
-standard output = {
-}

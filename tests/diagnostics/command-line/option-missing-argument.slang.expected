@@ -1,8 +1,0 @@
-result code = 1
-standard error = {
-(1): error 13: unknown code generation target '-profile'
-tests/diagnostics/command-line/option-missing-argument.slang -target -profile ps_4_0
-                                                                     ^
-}
-standard output = {
-}
