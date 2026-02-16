@@ -200,15 +200,9 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 
     result.message = $(buildMessage(diagnostic.message_parts));
 
-%     if diagnostic.primary_span then
     // Set primary span
     result.primarySpan.range = SourceRange{$(lua_module.getLocationExpr(diagnostic.primary_span.location_name, diagnostic.primary_span.location_type))};
     result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
-%     else
-    // No primary span (locationless diagnostic)
-    result.primarySpan.range = SourceRange{SourceLoc()};
-    result.primarySpan.message = String();
-%     end
 
 %     if diagnostic.secondary_spans and #diagnostic.secondary_spans > 0 then
     // Set secondary spans

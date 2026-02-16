@@ -1,3 +1,3 @@
 // unknown-profile.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-profile thunder_kiss_65
+//DIAGNOSTIC_TEST:SIMPLE:-profile thunder_kiss_65
