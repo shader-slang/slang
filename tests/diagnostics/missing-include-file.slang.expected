@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/missing-include-file.slang(4): error 15300: failed to find include file 'does-not-exist.h'
-#include "does-not-exist.h"
-         ^~~~~~~~~~~~~~~~~~
-}
-standard output = {
-}

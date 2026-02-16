@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-parser.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
@@ -1513,7 +1514,9 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     if (!module)
     {
         if (_sink)
-            _sink->diagnose(_requestingSourceLoc, Diagnostics::importFailed, moduleName);
+            _sink->diagnose(Diagnostics::ImportFailed{
+                .path = moduleName ? moduleName->text : String(),
+                .location = _requestingSourceLoc});
         return nullptr;
     }
     return module->getModuleDecl();
@@ -1561,11 +1564,10 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        _sink->diagnose(
-            SourceLoc(),
-            Diagnostics::cannotResolveImportedDecl,
-            mangledName,
-            importedFromModule->getName());
+        _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
+            .decl_name = mangledName,
+            .module_name = importedFromModule->getName(),
+            .location = SourceLoc()});
     }
     return importedDecl;
 }

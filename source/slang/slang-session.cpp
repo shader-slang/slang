@@ -1903,9 +1903,8 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {
-        sink->diagnose(
-            tokens.begin()->getLoc(),
-            Diagnostics::languageVersionDiffersFromIncludingModule);
+        sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{
+            .location = tokens.begin()->getLoc()});
     }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
