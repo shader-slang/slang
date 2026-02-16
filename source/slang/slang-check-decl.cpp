@@ -9432,12 +9432,32 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                if (!hasConflict)
+                if (getOptionSet().shouldEmitRichDiagnostics())
                 {
-                    diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
+                    if (!hasConflict)
+                    {
+                        diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
+                    }
+                    auto prevDecl = *found;
+                    diagnostic.original = prevDecl;
                 }
-                auto prevDecl = *found;
-                diagnostic.original = prevDecl;
+                else
+                {
+                    // Redefinition
+                    if (!hasConflict)
+                    {
+                        getSink()->diagnose(
+                            newDecl,
+                            Diagnostics::functionRedefinition,
+                            newDecl->getName());
+                    }
+
+                    auto prevDecl = *found;
+                    getSink()->diagnose(
+                        prevDecl,
+                        Diagnostics::seePreviousDefinitionOf,
+                        prevDecl->getName());
+                }
 
                 hasConflict = true;
             }

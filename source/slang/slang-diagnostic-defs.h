@@ -62,7 +62,7 @@ DIAGNOSTIC(
 DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
-// DIAGNOSTIC(15, Error, unknownStage, ...) - Converted to slang-diagnostics.lua as "unknown stage"
+DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
 DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
 DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
 DIAGNOSTIC(
@@ -736,6 +736,7 @@ DIAGNOSTIC(
     "static function cannot refer to non-static member `$0` via `this`")
 
 DIAGNOSTIC(30200, Error, redeclaration, "declaration of '$0' conflicts with existing declaration")
+DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
 DIAGNOSTIC(
     30202,
     Error,
