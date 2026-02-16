@@ -2360,14 +2360,10 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             break;
         case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
-            // Update the sink immediately so diagnostics emitted during option parsing
-            // are properly formatted
-            m_sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
-            if (m_sink->getParentSink())
-            {
-                m_sink->getParentSink()->setFlag(
-                    DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
-            }
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
             break;
         case OptionKind::ReportDetailedPerfBenchmark:
             linkage->m_optionSet.set(optionKind, true);
@@ -2378,15 +2374,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.set(optionKind, true);
             // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
             linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
-            // Update the sink immediately so diagnostics emitted during option parsing
-            // are properly formatted
-            m_sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
-            m_sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
-            if (m_sink->getParentSink())
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
             {
-                m_sink->getParentSink()->setFlag(
-                    DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
-                m_sink->getParentSink()->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
+                sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
             }
             break;
         case OptionKind::DiagnosticColor:
@@ -2409,10 +2402,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Update both the current sink and parent sink so colors work correctly
-                m_sink->setDiagnosticColorMode(colorValue);
-                if (m_sink->getParentSink())
-                    m_sink->getParentSink()->setDiagnosticColorMode(colorValue);
+                // Update the sink and all ancestor sinks so colors work correctly
+                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                    sink->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:
