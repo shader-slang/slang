@@ -608,3 +608,92 @@ The `TypeMismatch` struct in this codebase uses `Type*` for expected and `QualTy
 Please insert newly converted diagnostics at the end of the definitions in the new lua file. This is essential in preserving the order. Also make sure to preserve the comments in the diagnostic def file
 
 Some diagnostics have many call sites, you will have to read all of these and the context before processing the diagnostic. the old diagnostic can only be removed once the new diagnostic is implemented and all the call sites converted. It's critical that the old diagnostic isn't left in the old file, each job must be completed.
+
+---
+
+## Locationless Diagnostics
+
+Some diagnostics don't have meaningful source locations - they are emitted with `SourceLoc()` (the default empty location). Examples include:
+
+- Command-line option errors (`unknownCommandLineOption`, `unknownProfile`, etc.)
+- Entry point validation errors (`conflictingStagesForEntryPoint`, `sameStageSpecifiedMoreThanOnce`)
+- File-level errors that occur before parsing (`cannotDeduceSourceLanguage`)
+
+### Defining Locationless Diagnostics
+
+For diagnostics without meaningful source locations, **do not include a span message**. The span message would be silently dropped when rendered (the renderer asserts that span messages are empty for locationless diagnostics).
+
+**Correct:**
+
+```lua
+err(
+    "conflicting stages for entry point",
+    31,
+    "conflicting stages have been specified for entry point '~entry_point'",
+    span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
+)
+```
+
+**Incorrect:**
+
+```lua
+err(
+    "conflicting stages for entry point",
+    31,
+    "conflicting stages have been specified for entry point '~entry_point'",
+    span { loc = "location", message = "conflicting stages have been specified for entry point '~entry_point'" }  -- WRONG: message will trigger assertion
+)
+```
+
+### Renderer Behavior
+
+The rich diagnostic renderer (`slang-rich-diagnostics-render.cpp`) checks if a diagnostic has a valid location:
+- If `line > 0` or `fileName` is non-empty, it renders the source snippet with span markers
+- If `line == 0` and `fileName` is empty, it skips the source snippet entirely and only shows the header message
+- An assertion verifies that the span message is empty when skipping rendering
+
+### Testing Locationless Diagnostics
+
+Locationless diagnostics appear at "line 0" in the test infrastructure. The `diag=` position-based matching (using `^` markers) cannot match line 0 diagnostics.
+
+**Use `filecheck=` instead of `diag=` for locationless diagnostics:**
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK1):-stage vertex -stage fragment
+// CHECK1: error[E0031]: conflicting stages have been specified for entry point 'main'
+
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK2):-entry vsMain -stage compute -stage vertex
+// CHECK2: error[E0031]: conflicting stages have been specified for entry point 'vsMain'
+```
+
+**Important:** When a test file has multiple test configurations, use unique check prefixes (CHECK1, CHECK2, etc.) to avoid conflicts.
+
+### Diagnostics with Command-Line Locations
+
+Some command-line diagnostics DO have valid locations - the location points to the specific argument on the command line. These diagnostics can use `diag=` with position-based matching because the location is valid (line 1, column N of the "command line" source).
+
+Examples: `unknownCodeGenerationTarget`, `unknownProfile`, `unknownPassThroughTarget`, `unknownCommandLineOption`
+
+For these diagnostics, use `diag=` with standard position-based matching. The diagnostic will show the command line as source context.
+
+---
+
+## Multiple Test Configurations
+
+When a test file contains multiple `DIAGNOSTIC_TEST` lines (testing different scenarios), always use unique check prefixes:
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK1):-target spirv
+// CHECK1: error message for spirv
+
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK2):-target hlsl
+// CHECK2: error message for hlsl
+
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG1):-some-option
+//DIAG1  ^^^^^ expected diagnostic here
+
+//DIAGNOSTIC_TEST:SIMPLE(diag=DIAG2):-other-option
+//DIAG2  ^^^^^ different diagnostic here
+```
+
+Using the same prefix (e.g., `CHECK` for all tests) can cause conflicts where one test's check patterns match another test's output.
