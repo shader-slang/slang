@@ -1435,10 +1435,10 @@ IRInst* mergeCandidateParentsForHoistableInst(IRInst* left, IRInst* right)
     // because otherwise we'd be violating the basic dominance
     // assumptions.
     //
-    SLANG_ASSERT(parentNonBlock);
-
-    // As a fallback, try to use the left parent as a default
-    // in case things go badly.
+    // However, in some cases involving transitive witnesses for
+    // associated types from inherited interfaces, we may not find
+    // a common ancestor. In such cases, we fallback to using
+    // the left parent as a reasonable default.
     //
     if (!parentNonBlock)
     {
