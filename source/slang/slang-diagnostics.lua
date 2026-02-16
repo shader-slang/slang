@@ -192,7 +192,7 @@ err(
 warning(
     "macro redefinition",
     15400,
-    "macro '~name:Name' is being redefined",
+    "macro redefined",
     span { loc = "location", message = "redefinition of macro '~name:Name'" },
     note { message = "see previous definition of '~name'", span { loc = "original_location" } }
 )
@@ -616,6 +616,364 @@ standalone_note(
     "note failed to load dynamic library",
     99999,
     "failed to load dynamic library '~path'"
+)
+
+--
+-- 15xxx - Preprocessing
+--
+
+-- 150xx - conditionals
+err(
+    "end of file in preprocessor conditional",
+    15000,
+    "end of file encountered during preprocessor conditional",
+    span { loc = "location" },
+    note { message = "see '~directive' directive", span { loc = "directive_loc" } }
+)
+
+err(
+    "directive without if",
+    15001,
+    "'~directive' directive without '#if'",
+    span { loc = "location", message = "'~directive' directive without '#if'" }
+)
+
+err(
+    "directive after else",
+    15002,
+    "'~directive' directive after '#else'",
+    span { loc = "location", message = "'~directive' directive after '#else'" },
+    note { message = "see '~else_directive' directive", span { loc = "else_loc" } }
+)
+
+-- Standalone note for seeDirective - used by multiple diagnostics
+standalone_note(
+    "see directive",
+    -1,
+    "see '$0' directive"
+)
+
+-- 151xx - directive parsing
+err(
+    "expected preprocessor directive name",
+    15100,
+    "expected preprocessor directive name",
+    span { loc = "location", message = "expected preprocessor directive name" }
+)
+
+err(
+    "unknown preprocessor directive",
+    15101,
+    "unknown preprocessor directive '~directive'",
+    span { loc = "location", message = "unknown preprocessor directive '~directive'" }
+)
+
+err(
+    "expected token in preprocessor directive",
+    15102,
+    "expected '~expected_token' in '~directive' directive",
+    span { loc = "location", message = "expected '~expected_token' in '~directive' directive" }
+)
+
+err(
+    "expected 2 tokens in preprocessor directive",
+    15102,
+    "expected '~token1' or '~token2' in '~directive' directive",
+    span { loc = "location", message = "expected '~token1' or '~token2' in '~directive' directive" }
+)
+
+err(
+    "unexpected tokens after directive",
+    15103,
+    "unexpected tokens following '~directive' directive",
+    span { loc = "location", message = "unexpected tokens following '~directive' directive" }
+)
+
+-- 152xx - preprocessor expressions
+err(
+    "expected token in preprocessor expression",
+    15200,
+    "expected '~expected_token' in preprocessor expression",
+    span { loc = "location", message = "expected '~expected_token' in preprocessor expression" },
+    note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
+)
+
+err(
+    "syntax error in preprocessor expression",
+    15201,
+    "syntax error in preprocessor expression",
+    span { loc = "location", message = "syntax error in preprocessor expression" }
+)
+
+err(
+    "divide by zero in preprocessor expression",
+    15202,
+    "division by zero in preprocessor expression",
+    span { loc = "location", message = "division by zero in preprocessor expression" }
+)
+
+err(
+    "expected token in defined expression",
+    15203,
+    "expected '~expected_token' in 'defined' expression",
+    span { loc = "location", message = "expected '~expected_token' in 'defined' expression" },
+    note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
+)
+
+warning(
+    "directive expects expression",
+    15204,
+    "'~directive' directive requires an expression",
+    span { loc = "location", message = "'~directive' directive requires an expression" }
+)
+
+warning(
+    "undefined identifier in preprocessor expression",
+    15205,
+    "undefined identifier in preprocessor",
+    span { loc = "location", message = "undefined identifier '~identifier' in preprocessor expression will evaluate to zero" }
+)
+
+err(
+    "expected integral version number",
+    15206,
+    "Expected integer for #version number",
+    span { loc = "location", message = "Expected integer for #version number" }
+)
+
+err(
+    "unknown language version",
+    15207,
+    "unknown language version '~version'",
+    span { loc = "location", message = "unknown language version '~version'" }
+)
+
+err(
+    "unknown language",
+    15208,
+    "unknown language '~language'",
+    span { loc = "location", message = "unknown language '~language'" }
+)
+
+err(
+    "language version differs from including module",
+    15209,
+    "the source file declares a different language version than the including module",
+    span { loc = "location", message = "the source file declares a different language version than the including module" }
+)
+
+-- Standalone note for seeOpeningToken - used by multiple diagnostics
+standalone_note(
+    "see opening token",
+    -1,
+    "see opening '$0'"
+)
+
+-- 153xx - #include
+err(
+    "include failed",
+    15300,
+    "include file not found",
+    span { loc = "location", message = "failed to find include file '~path'" }
+)
+
+err(
+    "import failed",
+    15301,
+    "failed to find imported file '~path'",
+    span { loc = "location", message = "failed to find imported file '~path'" }
+)
+
+err(
+    "cyclic include",
+    15302,
+    "cyclic `#include` of file '~path'",
+    span { loc = "location", message = "cyclic `#include` of file '~path'" }
+)
+
+err(
+    "no include handler specified",
+    -1,
+    "no `#include` handler was specified",
+    span { loc = "location", message = "no `#include` handler was specified" }
+)
+
+err(
+    "no unique identity",
+    15302,
+    "`#include` handler didn't generate a unique identity for file '~path'",
+    span { loc = "location", message = "`#include` handler didn't generate a unique identity for file '~path'" }
+)
+
+err(
+    "cannot resolve imported decl",
+    15303,
+    "cannot resolve imported declaration '~decl_name' from precompiled module '~module_name'. Make sure module '~module_name' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance",
+    span { loc = "location" }
+)
+
+-- 154xx - macro definition
+warning(
+    "macro not defined",
+    15401,
+    "undefined macro",
+    span { loc = "location", message = "macro '~name' is not defined" }
+)
+
+err(
+    "expected token in macro parameters",
+    15403,
+    "macro parameter syntax error",
+    span { loc = "location", message = "expected '~expected_token' in macro parameters" }
+)
+
+warning(
+    "builtin macro redefinition",
+    15404,
+    "builtin macro redefined",
+    span { loc = "location", message = "Redefinition of builtin macro '~name'" }
+)
+
+err(
+    "token paste at start",
+    15405,
+    "invalid '##' position",
+    span { loc = "location", message = "'##' is not allowed at the start of a macro body" }
+)
+
+err(
+    "token paste at end",
+    15406,
+    "invalid '##' position",
+    span { loc = "location", message = "'##' is not allowed at the end of a macro body" }
+)
+
+err(
+    "expected macro parameter after stringize",
+    15407,
+    "invalid '#' usage",
+    span { loc = "location", message = "'#' in macro body must be followed by the name of a macro parameter" }
+)
+
+err(
+    "duplicate macro parameter name",
+    15408,
+    "duplicate parameter",
+    span { loc = "location", message = "redefinition of macro parameter '~name'" }
+)
+
+err(
+    "variadic macro parameter must be last",
+    15409,
+    "variadic parameter must be last",
+    span { loc = "location", message = "a variadic macro parameter is only allowed at the end of the parameter list" }
+)
+
+-- 155xx - macro expansion
+warning(
+    "expected token in macro arguments",
+    15500,
+    "macro invocation syntax error",
+    span { loc = "location", message = "expected '~expected_token' in macro invocation" }
+)
+
+err(
+    "wrong number of arguments to macro",
+    15501,
+    "wrong macro argument count",
+    span { loc = "location", message = "wrong number of arguments to macro (expected ~expected:Int, got ~got:Int)" }
+)
+
+err(
+    "error parsing to macro invocation argument",
+    15502,
+    "macro argument parse error",
+    span { loc = "location", message = "error parsing macro '~arg_index:Int' invocation argument to '~macro_name:Name'" }
+)
+
+warning(
+    "invalid token paste result",
+    15503,
+    "token paste failure",
+    span { loc = "location", message = "token pasting with '##' resulted in the invalid token '~token'" }
+)
+
+-- 156xx - pragmas
+err(
+    "expected pragma directive name",
+    15600,
+    "expected a name after '#pragma'",
+    span { loc = "location", message = "expected a name after '#pragma'" }
+)
+
+warning(
+    "unknown pragma directive ignored",
+    15601,
+    "ignoring unknown directive '#pragma ~directive'",
+    span { loc = "location", message = "ignoring unknown directive '#pragma ~directive'" }
+)
+
+warning(
+    "pragma once ignored",
+    15602,
+    "pragma once was ignored - this is typically because it is not placed in an include",
+    span { loc = "location", message = "pragma once was ignored - this is typically because it is not placed in an include" }
+)
+
+warning(
+    "pragma warning pop empty",
+    15611,
+    "unmatched #pragma warning(pop)",
+    span { loc = "location", message = "Detected #pragma warning(pop) with no corresponding #pragma warning(push)" }
+)
+
+warning(
+    "pragma warning push not popped",
+    15612,
+    "unmatched #pragma warning(push)",
+    span { loc = "location", message = "Detected #pragma warning(push) with no corresponding #pragma warning(pop)" }
+)
+
+warning(
+    "pragma warning unknown specifier",
+    15613,
+    "unknown pragma warning specifier",
+    span { loc = "location", message = "Unknown #pragma warning specifier '~specifier'" }
+)
+
+warning(
+    "pragma warning suppress cannot identify next line",
+    15614,
+    "Cannot identify the next line to suppress in #pragma warning suppress",
+    span { loc = "location", message = "Cannot identify the next line to suppress in #pragma warning suppress" }
+)
+
+warning(
+    "pragma warning cannot insert here",
+    15615,
+    "Cannot insert #pragma warning here for id '~id'",
+    span { loc = "location", message = "Cannot insert #pragma warning here for id '~id'" }
+)
+
+standalone_note(
+    "pragma warning point suppress",
+    15616,
+    "#pragma warning for id '$0' was suppressed here"
+)
+
+-- 159xx - user-defined error/warning
+err(
+    "user defined error",
+    15900,
+    "preprocessor error",
+    span { loc = "location", message = "#error: ~message" }
+)
+
+warning(
+    "user defined warning",
+    15901,
+    "preprocessor warning",
+    span { loc = "location", message = "#warning: ~message" }
 )
 
 -- Process and validate all diagnostics

@@ -1,8 +1,10 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 // #undef support
 
 // warning: undef of something not defined
 #undef FOO
+//diag:^ undefined macro
+//diag:^ macro 'FOO' is not defined
 
 #define BAR 1.0f
 
