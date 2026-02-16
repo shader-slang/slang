@@ -1472,20 +1472,20 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // spvBindlessTextureNV: DescriptorHandle is uint64_t
                 auto uint64Type = builder.getUInt64Type();
                 auto zero64 = builder.getIntValue(uint64Type, 0);
-                castInst = builder.emitIntrinsicInst(
-                    type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
+                castInst =
+                    builder.emitIntrinsicInst(type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
             }
             else
             {
                 // Default: DescriptorHandle is uint2
                 auto uint32Type = builder.getUIntType();
                 auto zero = builder.getIntValue(uint32Type, 0);
-                auto vecType = builder.getVectorType(
-                    uint32Type, builder.getIntValue(builder.getIntType(), 2));
-                auto zeroVec = builder.emitIntrinsicInst(
-                    vecType, kIROp_MakeVectorFromScalar, 1, &zero);
-                castInst = builder.emitIntrinsicInst(
-                    type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+                auto vecType =
+                    builder.getVectorType(uint32Type, builder.getIntValue(builder.getIntType(), 2));
+                auto zeroVec =
+                    builder.emitIntrinsicInst(vecType, kIROp_MakeVectorFromScalar, 1, &zero);
+                castInst =
+                    builder.emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
             }
             inst->replaceUsesWith(castInst);
             inst->removeAndDeallocate();
