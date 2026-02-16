@@ -9116,10 +9116,9 @@ List<Val*> getDefaultSubstitutionArgs(
     {
         if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
         {
-            args.add(
-                DeclRefType::create(
-                    astBuilder,
-                    astBuilder->getDirectDeclRef(genericTypeParamDecl)));
+            args.add(DeclRefType::create(
+                astBuilder,
+                astBuilder->getDirectDeclRef(genericTypeParamDecl)));
         }
         else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
         {
@@ -12463,9 +12462,8 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
         }
         else
         {
-            SLANG_UNEXPECTED(
-                "Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
-                "Use getCanonicalGenericConstraints2(...) instead.");
+            SLANG_UNEXPECTED("Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
+                             "Use getCanonicalGenericConstraints2(...) instead.");
         }
     }
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;

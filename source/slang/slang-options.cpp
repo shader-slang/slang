@@ -11,7 +11,6 @@
 #include "../compiler-core/slang-command-line-args.h"
 #include "../compiler-core/slang-core-diagnostics.h"
 #include "../compiler-core/slang-name-convention-util.h"
-#include "slang-rich-diagnostics.h"
 #include "../compiler-core/slang-source-embed-util.h"
 #include "../core/slang-castable.h"
 #include "../core/slang-char-util.h"
@@ -26,6 +25,7 @@
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
@@ -2787,9 +2787,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Stage stage = findStageByName(name.value);
                 if (stage == Stage::Unknown)
                 {
-                    m_sink->diagnose(Diagnostics::UnknownStage{
-                        .stage_name = name.value,
-                        .location = name.loc});
+                    m_sink->diagnose(
+                        Diagnostics::UnknownStage{.stage_name = name.value, .location = name.loc});
                     return SLANG_FAIL;
                 }
                 else

@@ -303,8 +303,8 @@ private:
                 if (view)
                 {
                     // Get the line content and trim end-of-line characters and trailing whitespace
-                    UnownedStringSlice rawLine =
-                        StringUtil::trimEndOfLine(view->getSourceFile()->getLineAtIndex(span.line - 1));
+                    UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                        view->getSourceFile()->getLineAtIndex(span.line - 1));
                     // Trim trailing whitespace but preserve leading whitespace (indentation)
                     line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
                 }
@@ -379,7 +379,8 @@ private:
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
             Int64 startIdx = std::max(Int64{0}, start - 1);
-            Int64 safeLen = std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
+            Int64 safeLen =
+                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
             if (safeLen > 0)
                 ss << color(c, String(content.subString(startIdx, safeLen)));
             cursor = start + span.length;
@@ -618,7 +619,8 @@ private:
 
         // Skip location and source snippet for diagnostics without meaningful locations
         // (line 0 indicates SourceLoc() was used, meaning no source location)
-        bool hasValidLocation = layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
         if (hasValidLocation)
         {
             renderLocation(ss, layout.primaryLoc);
