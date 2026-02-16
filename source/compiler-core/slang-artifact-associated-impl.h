@@ -174,7 +174,9 @@ struct ShaderBindingRange
     }
 };
 
-class ArtifactPostEmitMetadata : public ComBaseObject, public IArtifactPostEmitMetadata
+class ArtifactPostEmitMetadata : public ComBaseObject,
+                                 public IArtifactPostEmitMetadata,
+                                 public slang::ICooperativeTypesMetadata
 {
 public:
     typedef ArtifactPostEmitMetadata ThisType;
@@ -201,6 +203,31 @@ public:
 
     SLANG_NO_THROW virtual const char* SLANG_MCALL getDebugBuildIdentifier() SLANG_OVERRIDE;
 
+    // ICooperativeTypesMetadata
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixTypeByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixType* outType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeMatrixCombination* outCombination) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorTypeByIndex(
+        SlangUInt index,
+        SlangCooperativeComponentType* outComponentType) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        slang::CooperativeVectorCombination* outCombination) SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangUInt SLANG_MCALL getCooperativeVectorTrainingTypeCount()
+        SLANG_OVERRIDE;
+    SLANG_NO_THROW virtual SlangResult SLANG_MCALL getCooperativeVectorTrainingTypeByIndex(
+        SlangUInt index,
+        SlangCooperativeComponentType* outComponentType) SLANG_OVERRIDE;
+
     void* getInterface(const Guid& uuid);
     void* getObject(const Guid& uuid);
 
@@ -211,6 +238,11 @@ public:
 
     List<ShaderBindingRange> m_usedBindings;
     List<String> m_exportedFunctionMangledNames;
+    List<slang::CooperativeMatrixType> m_cooperativeMatrixTypes;
+    List<slang::CooperativeMatrixCombination> m_cooperativeMatrixCombinations;
+    List<SlangCooperativeComponentType> m_cooperativeVectorTypes;
+    List<slang::CooperativeVectorCombination> m_cooperativeVectorCombinations;
+    List<SlangCooperativeComponentType> m_cooperativeVectorTrainingTypes;
     String m_debugBuildIdentifier;
 };
 
