@@ -857,6 +857,46 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangScopeIntegral;
+    enum SlangScope : SlangScopeIntegral
+    {
+        SLANG_SCOPE_NONE,
+        SLANG_SCOPE_THREAD,
+        SLANG_SCOPE_WAVE,
+        SLANG_SCOPE_THREAD_GROUP,
+    };
+
+    typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
+    enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
+    {
+        SLANG_COOPERATIVE_MATRIX_USE_NONE,
+        SLANG_COOPERATIVE_MATRIX_USE_A,
+        SLANG_COOPERATIVE_MATRIX_USE_B,
+        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR,
+    };
+
+    typedef SlangUInt32 SlangCooperativeComponentTypeIntegral;
+    enum SlangCooperativeComponentType : SlangCooperativeComponentTypeIntegral
+    {
+        SLANG_COOPERATIVE_COMPONENT_TYPE_NONE,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT16,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT32,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT64,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_INT8,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_INT16,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_INT32,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_INT64,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_UINT16,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_UINT32,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_UINT64,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_BFLOAT16,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E4M3,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E5M2,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_INT8_PACKED,
+        SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8_PACKED,
+    };
+
     typedef SlangUInt32 SlangDebugInfoLevelIntegral;
     enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
@@ -4445,6 +4485,103 @@ struct IMetadata : public ISlangCastable
     virtual const char* SLANG_MCALL getDebugBuildIdentifier() = 0;
 };
     #define SLANG_UUID_IMetadata IMetadata::getTypeGuid()
+
+struct CooperativeMatrixType
+{
+    SlangCooperativeComponentType componentType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    uint32_t rowCount = 0;
+    uint32_t columnCount = 0;
+
+    SlangCooperativeMatrixUse use = SLANG_COOPERATIVE_MATRIX_USE_NONE;
+
+    bool operator==(const CooperativeMatrixType& other) const
+    {
+        return componentType == other.componentType && scope == other.scope &&
+               rowCount == other.rowCount && columnCount == other.columnCount && use == other.use;
+    }
+};
+
+struct CooperativeMatrixCombination
+{
+    uint32_t m = 0;
+    uint32_t n = 0;
+    uint32_t k = 0;
+
+    SlangCooperativeComponentType componentTypeA = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeB = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeC = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType componentTypeResult = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+
+    SlangBool saturate = false;
+    SlangScope scope = SLANG_SCOPE_NONE;
+
+    bool operator==(const CooperativeMatrixCombination& other) const
+    {
+        return m == other.m && n == other.n && k == other.k &&
+               componentTypeA == other.componentTypeA && componentTypeB == other.componentTypeB &&
+               componentTypeC == other.componentTypeC &&
+               componentTypeResult == other.componentTypeResult && saturate == other.saturate &&
+               scope == other.scope;
+    }
+};
+
+struct CooperativeVectorCombination
+{
+    SlangCooperativeComponentType inputType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType inputInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType matrixInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType biasInterpretation = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangCooperativeComponentType resultType = SLANG_COOPERATIVE_COMPONENT_TYPE_NONE;
+    SlangBool transpose = false;
+
+    bool operator==(const CooperativeVectorCombination& other) const
+    {
+        return inputType == other.inputType && inputInterpretation == other.inputInterpretation &&
+               matrixInterpretation == other.matrixInterpretation &&
+               biasInterpretation == other.biasInterpretation && resultType == other.resultType &&
+               transpose == other.transpose;
+    }
+};
+
+/** Cooperative matrix and vector metadata extension.
+
+Query this interface from an `IMetadata*`.
+*/
+struct ICooperativeTypesMetadata : public ISlangUnknown
+{
+    SLANG_COM_INTERFACE(
+        0x463aa531,
+        0x9e98,
+        0x4386,
+        {0x92, 0x93, 0x96, 0xe8, 0x11, 0xb7, 0x3c, 0x94})
+
+    virtual SlangUInt SLANG_MCALL getCooperativeMatrixTypeCount() = 0;
+    virtual SlangResult SLANG_MCALL
+    getCooperativeMatrixTypeByIndex(SlangUInt index, CooperativeMatrixType* outType) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeMatrixCombinationCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeMatrixCombinationByIndex(
+        SlangUInt index,
+        CooperativeMatrixCombination* outCombination) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeVectorTypeCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeVectorTypeByIndex(
+        SlangUInt index,
+        SlangCooperativeComponentType* outComponentType) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeVectorCombinationCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeVectorCombinationByIndex(
+        SlangUInt index,
+        CooperativeVectorCombination* outCombination) = 0;
+
+    virtual SlangUInt SLANG_MCALL getCooperativeVectorTrainingTypeCount() = 0;
+    virtual SlangResult SLANG_MCALL getCooperativeVectorTrainingTypeByIndex(
+        SlangUInt index,
+        SlangCooperativeComponentType* outComponentType) = 0;
+};
+    #define SLANG_UUID_ICooperativeTypesMetadata ICooperativeTypesMetadata::getTypeGuid()
 
 /** Compile result for storing and retrieving multiple output blobs.
     This is needed for features such as separate debug compilation which

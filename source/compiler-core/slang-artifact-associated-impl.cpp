@@ -287,6 +287,10 @@ void* ArtifactPostEmitMetadata::getInterface(const Guid& guid)
     {
         return static_cast<IArtifactPostEmitMetadata*>(this);
     }
+    if (guid == slang::IMetadata::getTypeGuid())
+        return static_cast<slang::IMetadata*>(this);
+    if (guid == slang::ICooperativeTypesMetadata::getTypeGuid())
+        return static_cast<slang::ICooperativeTypesMetadata*>(this);
     return nullptr;
 }
 
@@ -342,6 +346,101 @@ SlangResult ArtifactPostEmitMetadata::isParameterLocationUsed(
 const char* ArtifactPostEmitMetadata::getDebugBuildIdentifier()
 {
     return m_debugBuildIdentifier.getBuffer();
+}
+
+SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixTypeCount()
+{
+    return SlangUInt(m_cooperativeMatrixTypes.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getCooperativeMatrixTypeByIndex(
+    SlangUInt index,
+    slang::CooperativeMatrixType* outType)
+{
+    if (!outType)
+        return SLANG_E_INVALID_ARG;
+
+    if (index >= SlangUInt(m_cooperativeMatrixTypes.getCount()))
+        return SLANG_E_INVALID_ARG;
+
+    *outType = m_cooperativeMatrixTypes[Index(index)];
+    return SLANG_OK;
+}
+
+SlangUInt ArtifactPostEmitMetadata::getCooperativeMatrixCombinationCount()
+{
+    return SlangUInt(m_cooperativeMatrixCombinations.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getCooperativeMatrixCombinationByIndex(
+    SlangUInt index,
+    slang::CooperativeMatrixCombination* outCombination)
+{
+    if (!outCombination)
+        return SLANG_E_INVALID_ARG;
+
+    if (index >= SlangUInt(m_cooperativeMatrixCombinations.getCount()))
+        return SLANG_E_INVALID_ARG;
+
+    *outCombination = m_cooperativeMatrixCombinations[Index(index)];
+    return SLANG_OK;
+}
+
+SlangUInt ArtifactPostEmitMetadata::getCooperativeVectorTypeCount()
+{
+    return SlangUInt(m_cooperativeVectorTypes.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getCooperativeVectorTypeByIndex(
+    SlangUInt index,
+    SlangCooperativeComponentType* outComponentType)
+{
+    if (!outComponentType)
+        return SLANG_E_INVALID_ARG;
+
+    if (index >= SlangUInt(m_cooperativeVectorTypes.getCount()))
+        return SLANG_E_INVALID_ARG;
+
+    *outComponentType = m_cooperativeVectorTypes[Index(index)];
+    return SLANG_OK;
+}
+
+SlangUInt ArtifactPostEmitMetadata::getCooperativeVectorCombinationCount()
+{
+    return SlangUInt(m_cooperativeVectorCombinations.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getCooperativeVectorCombinationByIndex(
+    SlangUInt index,
+    slang::CooperativeVectorCombination* outCombination)
+{
+    if (!outCombination)
+        return SLANG_E_INVALID_ARG;
+
+    if (index >= SlangUInt(m_cooperativeVectorCombinations.getCount()))
+        return SLANG_E_INVALID_ARG;
+
+    *outCombination = m_cooperativeVectorCombinations[Index(index)];
+    return SLANG_OK;
+}
+
+SlangUInt ArtifactPostEmitMetadata::getCooperativeVectorTrainingTypeCount()
+{
+    return SlangUInt(m_cooperativeVectorTrainingTypes.getCount());
+}
+
+SlangResult ArtifactPostEmitMetadata::getCooperativeVectorTrainingTypeByIndex(
+    SlangUInt index,
+    SlangCooperativeComponentType* outComponentType)
+{
+    if (!outComponentType)
+        return SLANG_E_INVALID_ARG;
+
+    if (index >= SlangUInt(m_cooperativeVectorTrainingTypes.getCount()))
+        return SLANG_E_INVALID_ARG;
+
+    *outComponentType = m_cooperativeVectorTrainingTypes[Index(index)];
+    return SLANG_OK;
 }
 
 
