@@ -664,28 +664,28 @@ err(
 err(
     "unknown preprocessor directive",
     15101,
-    "unknown preprocessor directive '~directive'",
+    "unknown directive",
     span { loc = "location", message = "unknown preprocessor directive '~directive'" }
 )
 
 err(
     "expected token in preprocessor directive",
     15102,
-    "expected '~expected_token' in '~directive' directive",
+    "expected '~expected_token'",
     span { loc = "location", message = "expected '~expected_token' in '~directive' directive" }
 )
 
 err(
     "expected 2 tokens in preprocessor directive",
     15102,
-    "expected '~token1' or '~token2' in '~directive' directive",
+    "expected '~token1' or '~token2'",
     span { loc = "location", message = "expected '~token1' or '~token2' in '~directive' directive" }
 )
 
 err(
     "unexpected tokens after directive",
     15103,
-    "unexpected tokens following '~directive' directive",
+    "unexpected tokens after directive",
     span { loc = "location", message = "unexpected tokens following '~directive' directive" }
 )
 
@@ -693,7 +693,7 @@ err(
 err(
     "expected token in preprocessor expression",
     15200,
-    "expected '~expected_token' in preprocessor expression",
+    "expected '~expected_token'",
     span { loc = "location", message = "expected '~expected_token' in preprocessor expression" },
     note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
 )
@@ -701,21 +701,21 @@ err(
 err(
     "syntax error in preprocessor expression",
     15201,
-    "syntax error in preprocessor expression",
+    "syntax error",
     span { loc = "location", message = "syntax error in preprocessor expression" }
 )
 
 err(
     "divide by zero in preprocessor expression",
     15202,
-    "division by zero in preprocessor expression",
+    "division by zero",
     span { loc = "location", message = "division by zero in preprocessor expression" }
 )
 
 err(
     "expected token in defined expression",
     15203,
-    "expected '~expected_token' in 'defined' expression",
+    "expected '~expected_token'",
     span { loc = "location", message = "expected '~expected_token' in 'defined' expression" },
     note { message = "see opening '~opening_token'", span { loc = "opening_loc" } }
 )
@@ -723,7 +723,7 @@ err(
 warning(
     "directive expects expression",
     15204,
-    "'~directive' directive requires an expression",
+    "missing expression",
     span { loc = "location", message = "'~directive' directive requires an expression" }
 )
 
@@ -737,28 +737,28 @@ warning(
 err(
     "expected integral version number",
     15206,
-    "Expected integer for #version number",
-    span { loc = "location", message = "Expected integer for #version number" }
+    "expected integer version",
+    span { loc = "location", message = "expected integer for #version number" }
 )
 
 err(
     "unknown language version",
     15207,
-    "unknown language version '~version'",
+    "unknown language version",
     span { loc = "location", message = "unknown language version '~version'" }
 )
 
 err(
     "unknown language",
     15208,
-    "unknown language '~language'",
+    "unknown language",
     span { loc = "location", message = "unknown language '~language'" }
 )
 
 err(
     "language version differs from including module",
     15209,
-    "the source file declares a different language version than the including module",
+    "language version mismatch",
     span { loc = "location", message = "the source file declares a different language version than the including module" }
 )
 
@@ -767,6 +767,21 @@ standalone_note(
     "see opening token",
     -1,
     "see opening '$0'"
+)
+
+-- Standalone note for includeOutput - used to output include hierarchy
+standalone_note(
+    "include output",
+    -1,
+    "include ~content"
+)
+
+-- Note for genericSignatureTried - used by overload resolution to point at the declaration
+standalone_note(
+    "generic signature tried",
+    -1,
+    "see declaration of ~signature",
+    span { loc = "location" }
 )
 
 -- 153xx - #include
@@ -780,28 +795,28 @@ err(
 err(
     "import failed",
     15301,
-    "failed to find imported file '~path'",
+    "import file not found",
     span { loc = "location", message = "failed to find imported file '~path'" }
 )
 
 err(
     "cyclic include",
     15302,
-    "cyclic `#include` of file '~path'",
+    "cyclic include",
     span { loc = "location", message = "cyclic `#include` of file '~path'" }
 )
 
 err(
     "no include handler specified",
     -1,
-    "no `#include` handler was specified",
+    "no include handler",
     span { loc = "location", message = "no `#include` handler was specified" }
 )
 
 err(
     "no unique identity",
     15302,
-    "`#include` handler didn't generate a unique identity for file '~path'",
+    "no unique file identity",
     span { loc = "location", message = "`#include` handler didn't generate a unique identity for file '~path'" }
 )
 
@@ -902,63 +917,64 @@ warning(
 err(
     "expected pragma directive name",
     15600,
-    "expected a name after '#pragma'",
+    "expected pragma name",
     span { loc = "location", message = "expected a name after '#pragma'" }
 )
 
 warning(
     "unknown pragma directive ignored",
     15601,
-    "ignoring unknown directive '#pragma ~directive'",
+    "unknown pragma ignored",
     span { loc = "location", message = "ignoring unknown directive '#pragma ~directive'" }
 )
 
 warning(
     "pragma once ignored",
     15602,
-    "pragma once was ignored - this is typically because it is not placed in an include",
+    "pragma once ignored",
     span { loc = "location", message = "pragma once was ignored - this is typically because it is not placed in an include" }
 )
 
 warning(
     "pragma warning pop empty",
     15611,
-    "unmatched #pragma warning(pop)",
-    span { loc = "location", message = "Detected #pragma warning(pop) with no corresponding #pragma warning(push)" }
+    "unmatched pop",
+    span { loc = "location", message = "detected #pragma warning(pop) with no corresponding #pragma warning(push)" }
 )
 
 warning(
     "pragma warning push not popped",
     15612,
-    "unmatched #pragma warning(push)",
-    span { loc = "location", message = "Detected #pragma warning(push) with no corresponding #pragma warning(pop)" }
+    "unmatched push",
+    span { loc = "location", message = "detected #pragma warning(push) with no corresponding #pragma warning(pop)" }
 )
 
 warning(
     "pragma warning unknown specifier",
     15613,
-    "unknown pragma warning specifier",
-    span { loc = "location", message = "Unknown #pragma warning specifier '~specifier'" }
+    "unknown specifier",
+    span { loc = "location", message = "unknown #pragma warning specifier '~specifier'" }
 )
 
 warning(
     "pragma warning suppress cannot identify next line",
     15614,
-    "Cannot identify the next line to suppress in #pragma warning suppress",
-    span { loc = "location", message = "Cannot identify the next line to suppress in #pragma warning suppress" }
+    "cannot identify suppress target",
+    span { loc = "location", message = "cannot identify the next line to suppress in #pragma warning suppress" }
 )
 
 warning(
     "pragma warning cannot insert here",
     15615,
-    "Cannot insert #pragma warning here for id '~id'",
-    span { loc = "location", message = "Cannot insert #pragma warning here for id '~id'" }
+    "cannot insert pragma here",
+    span { loc = "location", message = "cannot insert #pragma warning here for id '~id'" }
 )
 
 standalone_note(
     "pragma warning point suppress",
     15616,
-    "#pragma warning for id '$0' was suppressed here"
+    "#pragma warning for id '~id' was suppressed here",
+    span { loc = "location" }
 )
 
 -- 159xx - user-defined error/warning

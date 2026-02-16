@@ -156,7 +156,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // Perhaps I output in two sections, one the hierarchy and the other the locations of the
     // includes?
 
-    sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+    sink->diagnose(Diagnostics::IncludeOutput{.content = buf.toString()});
 }
 
 static void _outputIncludesRec(

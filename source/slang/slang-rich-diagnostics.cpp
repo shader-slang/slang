@@ -343,8 +343,22 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
     }
 %             else
 %                 local null_check = generateNullCheck(note.required_params, nil, nil)
-%                 if null_check then
-    if ($(null_check))
+%                 -- For notes with untyped locations (plain SourceLoc), check validity
+%                 local validity_check = nil
+%                 if not note.location_type then
+%                     validity_check = note.location_name .. ".isValid()"
+%                 end
+%                 -- Combine checks
+%                 local combined_check = nil
+%                 if validity_check and null_check then
+%                     combined_check = validity_check .. " && " .. null_check
+%                 elseif validity_check then
+%                     combined_check = validity_check
+%                 elseif null_check then
+%                     combined_check = null_check
+%                 end
+%                 if combined_check then
+    if ($(combined_check))
 %                 end
     {
         DiagnosticNote note;
