@@ -177,6 +177,7 @@ local function getAllOtherInstStructsData()
 							getter_name = "get" .. operandName:sub(1, 1):upper() .. operandName:sub(2),
 							index = i - 1,
 							has_type = operandType ~= nil,
+							optional = operand.optional == true,
 						})
 					end
 				elseif type(value.operands[1]) == "string" then
@@ -190,6 +191,7 @@ local function getAllOtherInstStructsData()
 						index = 0,
 						has_type = operandType ~= nil,
 						variadic = value.operands.variadic,
+						optional = value.operands.optional == true,
 					})
 				end
 			end
