@@ -8767,6 +8767,11 @@ bool SemanticsVisitor::isHalfType(Type* type)
     return baseType == BaseType::Half;
 }
 
+bool SemanticsVisitor::isValidSpecializationConstantType(Type* type)
+{
+    return as<BasicExpressionType>(type) || isEnumType(type);
+}
+
 bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
 {
     return isScalarIntegerType(type) || isEnumType(type);
@@ -14016,12 +14021,11 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
         {
-            // Specialization constant.
-            // Check that type is basic type.
-            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            if (!isValidSpecializationConstantType(varDecl->getType()) &&
+                !as<ErrorType>(varDecl->getType()))
             {
                 getSink()->diagnose(
-                    Diagnostics::SpecializationConstantMustBeScalar{.modifier = modifier});
+                    Diagnostics::SpecializationConstantMustBeScalarOrEnum{.modifier = modifier});
             }
             hasSpecConstAttr = true;
         }

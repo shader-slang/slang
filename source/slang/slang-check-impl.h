@@ -1926,7 +1926,7 @@ public:
 
     void visitModifier(Modifier*);
 
-    DeclRef<VarDeclBase> tryGetIntSpecializationConstant(Expr* expr);
+    DeclRef<VarDeclBase> tryGetIntOrEnumSpecializationConstant(Expr* expr);
 
     AttributeDecl* lookUpAttributeDecl(Name* attributeName, Scope* scope);
 
@@ -2312,6 +2312,9 @@ public:
 
     /// Is `type` a scalar half type.
     bool isHalfType(Type* type);
+
+    /// Is `type` something we allow for specialization constants, i.e. scalar and enum types.
+    bool isValidSpecializationConstantType(Type* type);
 
     /// Is `type` something we allow as compile time constants, i.e. scalar integer and enum types.
     bool isValidCompileTimeConstantType(Type* type);
