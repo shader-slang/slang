@@ -1512,8 +1512,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 // spvBindlessTextureNV: DescriptorHandle is uint64_t
                 auto uint64Type = builder.getUInt64Type();
                 auto zero64 = builder.getIntValue(uint64Type, 0);
-                castInst = builder.emitIntrinsicInst(
-                    type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
+                castInst =
+                    builder.emitIntrinsicInst(type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
             }
             else
             {
