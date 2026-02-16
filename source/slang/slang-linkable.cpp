@@ -2,6 +2,7 @@
 #include "slang-linkable.h"
 
 #include "compiler-core/slang-artifact-container-util.h"
+#include "slang-rich-diagnostics.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
@@ -793,7 +794,7 @@ Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
     Expr* expr = linkage->parseTermString(exprStr, scope);
     if (!expr || as<IncompleteExpr>(expr))
-        sink->diagnose(SourceLoc(), Diagnostics::syntaxError);
+        sink->diagnose(Diagnostics::SyntaxError{.location = SourceLoc()});
     return expr;
 }
 

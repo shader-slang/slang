@@ -4308,7 +4308,12 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     auto directiveLoc = GetDirectiveLoc(context);
     SLANG_UNUSED(subDirectiveToken)
     SLANG_UNUSED(directiveLoc);
-    Expect(context, TokenType::LParent, Diagnostics::syntaxError);
+    if (PeekTokenType(context) != TokenType::LParent)
+    {
+        GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = PeekLoc(context)});
+        return;
+    }
+    AdvanceToken(context);
     Token tk = PeekToken(context);
     auto finish = [&]() -> void { SkipToEndOfLine(context); };
     if (tk.type == TokenType::Identifier)
@@ -4347,7 +4352,12 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 // So we need the raw token location.
                 SourceLoc specifierLocation = PeekRawToken(context).loc;
                 Token id;
-                Expect(context, TokenType::Identifier, Diagnostics::syntaxError, &id);
+                if (PeekTokenType(context) != TokenType::Identifier)
+                {
+                    GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = specifierLocation});
+                    return finish();
+                }
+                id = AdvanceToken(context);
                 PragmaWarningSpecifier specifier;
                 SourceLoc nextLineEnd = {}; // Needed for suppress
                 if (id.getContent() == "default")
@@ -4387,7 +4397,12 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                         .location = specifierLocation});
                     return finish();
                 }
-                Expect(context, TokenType::Colon, Diagnostics::syntaxError);
+                if (PeekTokenType(context) != TokenType::Colon)
+                {
+                    GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = PeekLoc(context)});
+                    return finish();
+                }
+                AdvanceToken(context);
                 // Read the id list
                 while (true)
                 {
@@ -4424,10 +4439,9 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 }
                 else
                 {
-                    GetSink(context)->diagnose(
-                        endLoc,
-                        Diagnostics::unexpectedToken,
-                        end.getContent());
+                    GetSink(context)->diagnose(Diagnostics::UnexpectedToken{
+                        .token_type = end.getContent(),
+                        .location = endLoc});
                     return finish();
                 }
             }
@@ -4435,10 +4449,15 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
     }
     else
     {
-        GetSink(context)->diagnose(tk, Diagnostics::syntaxError);
+        GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = tk.loc});
         return finish();
     }
-    Expect(context, TokenType::RParent, Diagnostics::syntaxError);
+    if (PeekTokenType(context) != TokenType::RParent)
+    {
+        GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = PeekLoc(context)});
+        return;
+    }
+    AdvanceToken(context);
 }
 
 // Information about a specific `#pragma` directive

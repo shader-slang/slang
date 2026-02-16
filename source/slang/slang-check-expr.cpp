@@ -6309,7 +6309,7 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     }
     else if (as<ConstModifier>(modifier))
     {
-        getSink()->diagnose(modifier, Diagnostics::constNotAllowedOnType);
+        getSink()->diagnose(Diagnostics::ConstNotAllowedOnType{.location = modifier->loc});
         return nullptr;
     }
     else
@@ -6387,11 +6387,10 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
             failed = true;
-            getSink()->diagnose(
-                inst.opcode.token,
-                Diagnostics::spirvInstructionWithTooManyOperands,
-                inst.opcode.token,
-                0);
+            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+                .opcode = inst.opcode.token.getContent(),
+                .max_operands = 0,
+                .location = inst.opcode.token.loc});
             continue;
         }
         int resultIdIndex = -1;
@@ -6422,10 +6421,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             if (inst.operands.getCount() <= resultIdIndex)
             {
                 failed = true;
-                getSink()->diagnose(
-                    inst.opcode.token,
-                    Diagnostics::spirvInstructionWithNotEnoughOperands,
-                    inst.opcode.token);
+                getSink()->diagnose(Diagnostics::SpirvInstructionWithNotEnoughOperands{
+                    .opcode = inst.opcode.token.getContent(),
+                    .location = inst.opcode.token.loc});
                 continue;
             }
             auto& resultIdOperand = inst.operands[resultIdIndex];
@@ -6433,10 +6431,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             if (!definedIds.add(resultIdOperand.token.getName()))
             {
                 failed = true;
-                getSink()->diagnose(
-                    inst.opcode.token,
-                    Diagnostics::spirvIdRedefinition,
-                    inst.opcode.token);
+                getSink()->diagnose(Diagnostics::SpirvIdRedefinition{
+                    .id = resultIdOperand.token.getContent(),
+                    .location = inst.opcode.token.loc});
                 continue;
             }
         }
@@ -6491,10 +6488,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     // does have forward references for decorations and such
                     if (!isLast)
                     {
-                        getSink()->diagnose(operand.token, Diagnostics::misplacedResultIdMarker);
-                        getSink()->diagnoseWithoutSourceView(
-                            expr,
-                            Diagnostics::considerOpCopyObject);
+                        getSink()->diagnose(
+                            Diagnostics::MisplacedResultIdMarker{.location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::ConsiderOpCopyObject{});
                     }
                 }
                 else if (operand.flavor == SPIRVAsmOperand::NamedValue)
@@ -6523,10 +6519,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     if (!enumValue)
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            operand.token,
-                            Diagnostics::spirvUnableToResolveName,
-                            operand.token.getContent());
+                        getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
+                            .name = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
 
@@ -6543,10 +6538,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     if (!builtinVarKind)
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            operand.token,
-                            Diagnostics::spirvUnableToResolveName,
-                            operand.token.getContent());
+                        getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
+                            .name = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
@@ -6556,10 +6550,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     if (!definedIds.contains(operand.token.getName()))
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            operand.token,
-                            Diagnostics::spirvUndefinedId,
-                            operand.token);
+                        getSink()->diagnose(Diagnostics::SpirvUndefinedId{
+                            .id = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
                 }
@@ -6568,7 +6561,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     operand.flavor != SPIRVAsmOperand::NamedValue)
                 {
                     failed = true;
-                    getSink()->diagnose(operand.token, Diagnostics::spirvNonConstantBitwiseOr);
+                    getSink()->diagnose(
+                        Diagnostics::SpirvNonConstantBitwiseOr{.location = operand.token.loc});
                 }
                 for (auto& o : operand.bitwiseOrWith)
                 {
@@ -6576,7 +6570,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                         o.flavor != SPIRVAsmOperand::NamedValue)
                     {
                         failed = true;
-                        getSink()->diagnose(operand.token, Diagnostics::spirvNonConstantBitwiseOr);
+                        getSink()->diagnose(
+                            Diagnostics::SpirvNonConstantBitwiseOr{.location = operand.token.loc});
                     }
                     go(go, o);
                     operand.knownValue |= o.knownValue;

@@ -1,7 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct Type
 {
-    // CHECK: ([[# @LINE+1]]): error 30102:
     namespace ns {}
+//CHECK:      ^ declaration not allowed here
+//CHECK:      ^ namespace is not allowed here.
 }

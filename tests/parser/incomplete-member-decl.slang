@@ -1,6 +1,6 @@
 // incomplete-member-decl.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Regresion test to ensure parser doesn't go into infinite loop
 // on incomplete/malformed member decalration
@@ -17,4 +17,6 @@ struct Outer
     // instead.
     //
     int MyType<X> inner;
+//CHECK:          ^ unexpected token
+//CHECK:          ^ unexpected identifier, expected '('
 }
