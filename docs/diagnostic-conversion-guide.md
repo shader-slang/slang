@@ -2,6 +2,65 @@
 
 This document describes how to convert diagnostics from the old system (`slang-diagnostic-defs.h`) to the new Lua-based system (`slang-diagnostics.lua`).
 
+## CRITICAL: Updating Test Files
+
+When converting diagnostics, you will need to update test files. Follow these rules:
+
+### Remove `.expected` files and use `diag=` annotations
+
+**Delete any `.expected` files** and convert tests to use the `diag=` annotation system:
+
+```
+// Old format (REMOVE the .expected file):
+//TEST:SIMPLE:
+
+// New format (USE THIS):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+```
+
+### Use caret-based position checks
+
+**Always prefer caret (`^`) annotations** that verify both position and message:
+
+```slang
+void test() {
+    if (1);
+//CHECK:  ^ potentially unintended empty statement
+}
+```
+
+### Let the test runner tell you what to write
+
+**If you're unsure what CHECK annotations to add:**
+
+1. Write the test with `diag=CHECK` but NO check annotations
+2. Run the test - it will fail
+3. The test runner outputs **exact suggested annotations** you can copy-paste
+4. Copy the suggested annotations into your test file
+
+Example test runner output:
+```
+Suggested annotations you can copy:
+  ⋮
+    if (1);
+//CHECK:  ^ potentially unintended empty statement
+  ⋮
+```
+
+### When to use `non-exhaustive`
+
+**Only use `non-exhaustive` when there are cascading AND unrelated diagnostics.**
+
+For example, if your test triggers:
+1. The specific error you're testing (related)
+2. Additional cascading errors caused by #1 (unrelated to what you're testing)
+
+```
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+```
+
+**Do NOT use `non-exhaustive` as a convenience** to avoid annotating all diagnostics. If the diagnostics are all related to what you're testing, annotate all of them.
+
 ## Essential Reading
 
 Before working on diagnostic conversions, familiarize yourself with these key files:
