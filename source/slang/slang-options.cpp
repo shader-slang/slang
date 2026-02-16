@@ -1003,10 +1003,6 @@ void initCommandOptions(CommandOptions& options)
          "-enable-machine-readable-diagnostics",
          nullptr,
          "Enable machine-readable diagnostic output in tab-separated format"},
-        {OptionKind::DiagnosticColor,
-         "-diagnostic-color",
-         "-diagnostic-color <always|never|auto>",
-         "Control colored diagnostic output (auto uses color if stderr is a tty)"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 

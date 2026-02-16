@@ -71,23 +71,14 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
-    // Colors safe on both dark and light terminal color schemes
-    // See https://blog.xoria.org/terminal-colors/
     enum class TerminalColor
     {
-        Regular,
-        BoldRegular,
         Red,
-        Green,
         Yellow,
-        Magenta,
         Cyan,
-        BrightRed,
-        BrightMagenta,
-        BoldRed,
-        BoldBrightRed,
-        BoldMagenta,
-        BoldBrightMagenta,
+        Blue,
+        Bold,
+        Reset
     };
 
     struct Glyphs
@@ -185,45 +176,26 @@ private:
         const char* code = "";
         switch (c)
         {
-        case TerminalColor::Regular:
-            code = "\x1B[0m";
-            break;
-        case TerminalColor::BoldRegular:
-            code = "\x1B[1m";
-            break;
         case TerminalColor::Red:
-            code = "\x1B[31m";
-            break;
-        case TerminalColor::Green:
-            code = "\x1B[32m";
+            code = "\x1B[31;1m";
             break;
         case TerminalColor::Yellow:
-            code = "\x1B[33m";
-            break;
-        case TerminalColor::Magenta:
-            code = "\x1B[35m";
+            code = "\x1B[33;1m";
             break;
         case TerminalColor::Cyan:
-            code = "\x1B[36m";
+            code = "\x1B[36;1m";
             break;
-        case TerminalColor::BrightRed:
-            code = "\x1B[91m";
+        case TerminalColor::Blue:
+            code = "\x1B[34;1m";
             break;
-        case TerminalColor::BrightMagenta:
-            code = "\x1B[95m";
+        case TerminalColor::Bold:
+            code = "\x1B[1m";
             break;
-        case TerminalColor::BoldRed:
-            code = "\x1B[1;31m";
+        case TerminalColor::Reset:
+            code = "\x1B[0m";
             break;
-        case TerminalColor::BoldBrightRed:
-            code = "\x1B[1;91m";
-            break;
-        case TerminalColor::BoldMagenta:
-            code = "\x1B[1;35m";
-            break;
-        case TerminalColor::BoldBrightMagenta:
-            code = "\x1B[1;95m";
-            break;
+        default:
+            return text;
         }
         return String(code) + text + "\x1B[0m";
     }
@@ -509,15 +481,15 @@ private:
             {
                 String label = String(line.number);
                 ss << repeat(' ', section.maxGutterWidth - label.getLength())
-                   << color(TerminalColor::BoldRegular, label) << " "
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << " ";
+                   << color(TerminalColor::Bold, label) << " "
+                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
                 renderSourceLine(ss, line, section.commonIndent);
                 ss << "\n";
 
                 auto rows = buildAnnotationRows(line, section.commonIndent);
                 for (const auto& row : rows)
                     ss << repeat(' ', section.maxGutterWidth + 1)
-                       << color(TerminalColor::Cyan, m_glyphs.vertical) << " " << row << "\n";
+                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
             }
         }
     }
@@ -654,7 +626,7 @@ private:
             if (note.section.blocks.getCount() > 0)
             {
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
             }
         }

@@ -297,13 +297,8 @@ public:
             return false;
         case SLANG_DIAGNOSTIC_COLOR_AUTO:
         default:
-            // Check our writer first, then fall back to parent's writer for AUTO mode.
-            // This handles cases where a child sink accumulates to a buffer but the
-            // parent has the actual console writer.
             if (writer)
                 return writer->isConsole();
-            if (m_parentSink)
-                return m_parentSink->shouldEnableTerminalColors();
             return false;
         }
     }
@@ -311,7 +306,6 @@ public:
     /// Set whether to enable unicode in rich diagnostics
     void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
     bool getEnableUnicode() const { return m_enableUnicode; }
-
 
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
@@ -396,6 +390,9 @@ protected:
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
+    bool m_enableUnicode = true; // Enable unicode unconditionally
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.
