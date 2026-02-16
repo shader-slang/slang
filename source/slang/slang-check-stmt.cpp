@@ -68,7 +68,14 @@ void SemanticsStmtVisitor::visitDeclStmt(DeclStmt* stmt)
     //
     ensureDeclBase(stmt->decl, DeclCheckState::DefinitionChecked, this);
     if (auto decl = as<Decl>(stmt->decl))
+    {
         decl->hiddenFromLookup = false;
+        if (auto varDecl = as<VarDeclBase>(decl))
+        {
+            if (varDecl->initExpr)
+                varDecl->initExpr = maybeRegisterLambdaCapture(varDecl->initExpr);
+        }
+    }
 }
 
 void SemanticsStmtVisitor::visitBlockStmt(BlockStmt* stmt)
@@ -253,6 +260,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
     }
     Expr* e = expr;
     e = CheckTerm(e);
+    e = maybeRegisterLambdaCapture(e);
     e = coerce(CoercionSite::General, m_astBuilder->getBoolType(), e, getSink());
     return e;
 }
@@ -569,7 +577,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
     }
     else
     {
-        stmt->expression = CheckTerm(stmt->expression);
+        stmt->expression = CheckExpr(stmt->expression);
         returnType = stmt->expression->type.type;
         if (!stmt->expression->type->equals(m_astBuilder->getErrorType()))
         {
@@ -620,7 +628,7 @@ void SemanticsStmtVisitor::visitDeferStmt(DeferStmt* stmt)
 
 void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
 {
-    stmt->expression = CheckTerm(stmt->expression);
+    stmt->expression = CheckExpr(stmt->expression);
     Stmt* catchStmt = findMatchingCatchStmt(stmt->expression->type);
 
     auto parentFunc = getParentFunc();
