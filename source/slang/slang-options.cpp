@@ -2779,7 +2779,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     TypeTextUtil::findLanguageVersion(name.value.getUnownedSlice());
                 if (stdRevision == SLANG_LANGUAGE_VERSION_UNKNOWN)
                 {
-                    m_sink->diagnose(name.loc, Diagnostics::unknownLanguageVersion, name.value);
+                    m_sink->diagnose(Diagnostics::UnknownLanguageVersion{
+                        .version = name.value,
+                        .location = name.loc});
                     return SLANG_FAIL;
                 }
                 else

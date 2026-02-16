@@ -1159,10 +1159,9 @@ struct WarningTimeline
                 const Entry* prevEntry = findEntry(location);
                 if (prevEntry && prevEntry->specifier == PragmaWarningSpecifier::Suppress)
                 {
-                    sink->diagnose(
-                        SourceLoc::fromRaw(prevEntry->debugLocation),
-                        Diagnostics::pragmaWarningPointSuppress,
-                        id);
+                    sink->diagnose(Diagnostics::PragmaWarningPointSuppress{
+                        .id = String(id),
+                        .location = SourceLoc::fromRaw(prevEntry->debugLocation)});
                 }
             }
         }
@@ -2760,6 +2759,7 @@ static SourceLoc FindNextEndOfLine(
     return inputStream->findNextLineEnd(from, lineCount);
 }
 
+// Legacy helper functions for diagnostics not yet converted to rich format
 static bool ExpectRaw(
     PreprocessorDirectiveContext* context,
     TokenType tokenType,
@@ -2768,7 +2768,6 @@ static bool ExpectRaw(
 {
     if (PeekRawTokenType(context) != tokenType)
     {
-        // Only report the first parse error within a directive
         if (!context->m_parseError)
         {
             GetSink(context)
@@ -2791,7 +2790,6 @@ static bool Expect(
 {
     if (PeekTokenType(context) != tokenType)
     {
-        // Only report the first parse error within a directive
         if (!context->m_parseError)
         {
             GetSink(context)
@@ -2806,6 +2804,123 @@ static bool Expect(
     return true;
 }
 
+// Enum for preprocessor expect diagnostics (used with rich diagnostic system)
+enum class PreprocessorExpectDiag
+{
+    TokenInDirective,      // expectedTokenInPreprocessorDirective - uses directive name
+    TokenInExpression,     // expectedTokenInPreprocessorExpression - with opening token note
+    TokenInDefinedExpr,    // expectedTokenInDefinedExpression - with opening token note
+    TokenInMacroParams,    // expectedTokenInMacroParameters
+};
+
+// ExpectRaw using rich diagnostics
+// For TokenInExpression and TokenInDefinedExpr, pass openingToken to include the note
+static bool ExpectRaw(
+    PreprocessorDirectiveContext* context,
+    TokenType tokenType,
+    PreprocessorExpectDiag diagKind,
+    Token* outToken = nullptr,
+    const Token* openingToken = nullptr)
+{
+    if (PeekRawTokenType(context) != tokenType)
+    {
+        if (!context->m_parseError)
+        {
+            auto sink = GetSink(context);
+            auto loc = PeekLoc(context);
+            auto tokenStr = TokenTypeToString(tokenType);
+
+            switch (diagKind)
+            {
+            case PreprocessorExpectDiag::TokenInDirective:
+                sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorDirective{
+                    .expected_token = tokenStr,
+                    .directive = GetDirectiveName(context),
+                    .location = loc});
+                break;
+            case PreprocessorExpectDiag::TokenInExpression:
+                sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
+                    .expected_token = tokenStr,
+                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .location = loc,
+                    .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
+                break;
+            case PreprocessorExpectDiag::TokenInDefinedExpr:
+                sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
+                    .expected_token = tokenStr,
+                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .location = loc,
+                    .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
+                break;
+            case PreprocessorExpectDiag::TokenInMacroParams:
+                sink->diagnose(Diagnostics::ExpectedTokenInMacroParameters{
+                    .expected_token = tokenStr,
+                    .location = loc});
+                break;
+            }
+        }
+        context->m_parseError = true;
+        return false;
+    }
+    Token const& token = AdvanceRawToken(context);
+    if (outToken)
+        *outToken = token;
+    return true;
+}
+
+// Expect using rich diagnostics (with macro expansion)
+static bool Expect(
+    PreprocessorDirectiveContext* context,
+    TokenType tokenType,
+    PreprocessorExpectDiag diagKind,
+    Token* outToken = nullptr,
+    const Token* openingToken = nullptr)
+{
+    if (PeekTokenType(context) != tokenType)
+    {
+        if (!context->m_parseError)
+        {
+            auto sink = GetSink(context);
+            auto loc = PeekLoc(context);
+            auto tokenStr = TokenTypeToString(tokenType);
+
+            switch (diagKind)
+            {
+            case PreprocessorExpectDiag::TokenInDirective:
+                sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorDirective{
+                    .expected_token = tokenStr,
+                    .directive = GetDirectiveName(context),
+                    .location = loc});
+                break;
+            case PreprocessorExpectDiag::TokenInExpression:
+                sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
+                    .expected_token = tokenStr,
+                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .location = loc,
+                    .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
+                break;
+            case PreprocessorExpectDiag::TokenInDefinedExpr:
+                sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
+                    .expected_token = tokenStr,
+                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .location = loc,
+                    .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
+                break;
+            case PreprocessorExpectDiag::TokenInMacroParams:
+                sink->diagnose(Diagnostics::ExpectedTokenInMacroParameters{
+                    .expected_token = tokenStr,
+                    .location = loc});
+                break;
+            }
+            context->m_parseError = true;
+        }
+        return false;
+    }
+    Token const& token = AdvanceToken(context);
+    if (outToken)
+        *outToken = token;
+    return true;
+}
 
 //
 // Preprocessor Conditionals
@@ -2927,13 +3042,12 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
         {
             Token leftParen = token;
             PreprocessorExpressionValue value = _parseAndEvaluateExpression(context);
-            if (!Expect(
-                    context,
-                    TokenType::RParent,
-                    Diagnostics::expectedTokenInPreprocessorExpression))
-            {
-                GetSink(context)->diagnose(leftParen.loc, Diagnostics::seeOpeningToken, leftParen);
-            }
+            Expect(
+                context,
+                TokenType::RParent,
+                PreprocessorExpectDiag::TokenInExpression,
+                nullptr,
+                &leftParen);
             return value;
         }
 
@@ -2958,7 +3072,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                 if (!ExpectRaw(
                         context,
                         TokenType::Identifier,
-                        Diagnostics::expectedTokenInDefinedExpression,
+                        PreprocessorExpectDiag::TokenInDefinedExpr,
                         &nameToken))
                 {
                     return 0;
@@ -2971,12 +3085,10 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                     if (!ExpectRaw(
                             context,
                             TokenType::RParent,
-                            Diagnostics::expectedTokenInDefinedExpression))
+                            PreprocessorExpectDiag::TokenInDefinedExpr,
+                            nullptr,
+                            &leftParen))
                     {
-                        GetSink(context)->diagnose(
-                            leftParen.loc,
-                            Diagnostics::seeOpeningToken,
-                            leftParen);
                         return 0;
                     }
                 }
@@ -2999,7 +3111,7 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                 if (!ExpectRaw(
                         context,
                         TokenType::Identifier,
-                        Diagnostics::expectedTokenInDefinedExpression,
+                        PreprocessorExpectDiag::TokenInDefinedExpr,
                         &nameToken))
                 {
                     return 0;
@@ -3011,12 +3123,10 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
                     if (!ExpectRaw(
                             context,
                             TokenType::RParent,
-                            Diagnostics::expectedTokenInDefinedExpression))
+                            PreprocessorExpectDiag::TokenInDefinedExpr,
+                            nullptr,
+                            &leftParen))
                     {
-                        GetSink(context)->diagnose(
-                            leftParen.loc,
-                            Diagnostics::seeOpeningToken,
-                            leftParen);
                         return 0;
                     }
                 }
@@ -3289,7 +3399,7 @@ static void HandleIfDefDirective(PreprocessorDirectiveContext* context)
     if (!ExpectRaw(
             context,
             TokenType::Identifier,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &nameToken))
         return;
     Name* name = nameToken.getName();
@@ -3306,7 +3416,7 @@ static void HandleIfNDefDirective(PreprocessorDirectiveContext* context)
     if (!ExpectRaw(
             context,
             TokenType::Identifier,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &nameToken))
         return;
     Name* name = nameToken.getName();
@@ -3533,7 +3643,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         Expect(
             context,
             TokenType::OpLess,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &pathToken);
         while (PeekRawTokenType(context) != TokenType::OpGreater &&
                PeekRawTokenType(context) != TokenType::EndOfFile)
@@ -3543,7 +3653,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         if (!Expect(
                 context,
                 TokenType::OpGreater,
-                Diagnostics::expectedTokenInPreprocessorDirective))
+                PreprocessorExpectDiag::TokenInDirective))
             return;
         path = pathSB.produceString();
         includeMode = IncludeSystem::Mode::System;
@@ -3553,7 +3663,7 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         Expect(
             context,
             TokenType::StringLiteral,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &pathToken);
         path = getFileNameTokenValue(pathToken);
     }
@@ -3779,7 +3889,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
     if (!ExpectRaw(
             context,
             TokenType::Identifier,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &nameToken))
         return;
     Name* name = nameToken.getName();
@@ -3843,7 +3953,7 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                     if (!ExpectRaw(
                             context,
                             TokenType::Identifier,
-                            Diagnostics::expectedTokenInMacroParameters,
+                            PreprocessorExpectDiag::TokenInMacroParams,
                             &paramNameToken))
                         break;
                 }
@@ -3918,11 +4028,11 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
                 if (PeekRawTokenType(context) == TokenType::RParent)
                     break;
 
-                ExpectRaw(context, TokenType::Comma, Diagnostics::expectedTokenInMacroParameters);
+                ExpectRaw(context, TokenType::Comma, PreprocessorExpectDiag::TokenInMacroParams);
             }
         }
 
-        ExpectRaw(context, TokenType::RParent, Diagnostics::expectedTokenInMacroParameters);
+        ExpectRaw(context, TokenType::RParent, PreprocessorExpectDiag::TokenInMacroParams);
 
         // Once we have parsed the macro parameters, we can perform the additional validation
         // step of checking that any parameters before the last parameter are not variadic.
@@ -3990,7 +4100,7 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     if (!ExpectRaw(
             context,
             TokenType::Identifier,
-            Diagnostics::expectedTokenInPreprocessorDirective,
+            PreprocessorExpectDiag::TokenInDirective,
             &nameToken))
         return;
     Name* name = nameToken.getName();
@@ -4081,12 +4191,11 @@ static void _handleDefaultLineDirective(PreprocessorDirectiveContext* context)
 
 static void _diagnoseInvalidLineDirective(PreprocessorDirectiveContext* context)
 {
-    GetSink(context)->diagnose(
-        PeekLoc(context),
-        Diagnostics::expected2TokensInPreprocessorDirective,
-        TokenType::IntegerLiteral,
-        "default",
-        GetDirectiveName(context));
+    GetSink(context)->diagnose(Diagnostics::Expected2TokensInPreprocessorDirective{
+        .token1 = TokenTypeToString(TokenType::IntegerLiteral),
+        .token2 = "default",
+        .directive = GetDirectiveName(context),
+        .location = PeekLoc(context)});
     context->m_parseError = true;
 }
 
@@ -4148,7 +4257,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         Expect(
             context,
             TokenType::StringLiteral,
-            Diagnostics::expectedTokenInPreprocessorDirective);
+            PreprocessorExpectDiag::TokenInDirective);
         return;
     }
 
