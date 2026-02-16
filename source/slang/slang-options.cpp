@@ -2405,7 +2405,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Update the sink and all ancestor sinks so colors work correctly
+                // Update the current sink and all parent sinks so colors work correctly
                 for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
                     sink->setDiagnosticColorMode(colorValue);
                 break;
@@ -2802,8 +2802,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 Stage stage = findStageByName(name.value);
                 if (stage == Stage::Unknown)
                 {
-                    m_sink->diagnose(
-                        Diagnostics::UnknownStage{.stage_name = name.value, .location = name.loc});
+                    m_sink->diagnose(name.loc, Diagnostics::unknownStage, name.value);
                     return SLANG_FAIL;
                 }
                 else
