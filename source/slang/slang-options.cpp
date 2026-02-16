@@ -25,7 +25,6 @@
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
@@ -2403,10 +2402,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Update both the current sink and parent sink so colors work correctly
-                m_sink->setDiagnosticColorMode(colorValue);
-                if (m_sink->getParentSink())
-                    m_sink->getParentSink()->setDiagnosticColorMode(colorValue);
                 break;
             }
         case OptionKind::MatrixLayoutRow:
@@ -3451,11 +3446,6 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
     }
 
-    // Apply diagnostic sink settings early so that any diagnostics emitted during
-    // option post-processing (e.g., entry point validation) use the correct settings
-    // such as rich diagnostics and machine-readable output.
-    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
-
     if (m_compileCoreModule)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
@@ -4245,9 +4235,6 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
-        // Copy color and unicode settings from the request sink
-        m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
-        m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
 
     // All diagnostics will also be sent to requestSink
