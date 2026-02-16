@@ -3578,8 +3578,11 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
             return compareDecls(subAncestor, supAncestor);
         }
 
-        auto subIndex = ancestor->getMembers().binarySearch(subAncestor);
-        auto supIndex = ancestor->getMembers().binarySearch(supAncestor);
+        auto subIndex = ancestor->getMembers().indexOf(subAncestor);
+        auto supIndex = ancestor->getMembers().indexOf(supAncestor);
+
+        SLANG_ASSERT(subIndex >= 0);
+        SLANG_ASSERT(supIndex >= 0);
 
         return int(supIndex - subIndex);
     };
