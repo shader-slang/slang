@@ -2308,6 +2308,55 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                     SLANG_ASSERT(argVal);
                     operands.add(argVal);
                 });
+
+        auto findThisTypeWitness = [](IRInst* inst) -> IRThisTypeWitness*
+        {
+            for (;;)
+            {
+                if (auto thisTypeWitness = as<IRThisTypeWitness>(inst))
+                    return thisTypeWitness;
+                if (auto lookup = as<IRLookupWitnessMethod>(inst))
+                {
+                    inst = lookup->getWitnessTable();
+                    continue;
+                }
+                return nullptr;
+            }
+        };
+
+        for (Index i = 0; i < operands.getCount(); i++)
+        {
+            if (auto thisTypeWitness = findThisTypeWitness(operands[i]))
+            {
+                // Check if thisTypeWitness is already in scope at current insert location
+                auto currentInsertLoc = getBuilder()->getInsertLoc().getParent();
+                auto parentOfThisTypeWitness = thisTypeWitness->parent;
+                bool needsClone = true;
+
+                while (currentInsertLoc != nullptr)
+                {
+                    if (parentOfThisTypeWitness == currentInsertLoc)
+                    {
+                        needsClone = false;
+                        break;
+                    }
+                    currentInsertLoc = currentInsertLoc->parent;
+                }
+
+                if (needsClone)
+                {
+                    // Clone the ThisTypeWitness at current insert location
+                    // because it exists in the interface scope that is not accessible from here.
+                    auto witnessTableType =
+                        as<IRWitnessTableTypeBase>(thisTypeWitness->getDataType());
+                    SLANG_ASSERT(witnessTableType);
+                    auto constraintType = (IRType*)witnessTableType->getConformanceType();
+                    auto newThisTypeWitness = getBuilder()->createThisTypeWitness(constraintType);
+                    operands[i] = newThisTypeWitness;
+                }
+            }
+        }
+
         return getBuilder()->getType(
             op,
             static_cast<UInt>(operands.getCount()),
