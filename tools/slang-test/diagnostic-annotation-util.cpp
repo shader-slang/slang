@@ -73,11 +73,11 @@ static SlangResult parseAnnotations(
 
     // Build the comment markers we're looking for
     StringBuilder lineMarkerBuilder;
-    lineMarkerBuilder << "//" << prefix;
+    lineMarkerBuilder << "//" << prefix << ":";
     String lineMarker = lineMarkerBuilder.produceString();
 
     StringBuilder blockStartBuilder;
-    blockStartBuilder << "/*" << prefix;
+    blockStartBuilder << "/*" << prefix << ":";
     String blockStart = blockStartBuilder.produceString();
 
     // Split source into lines
@@ -313,7 +313,7 @@ static void generateSuggestedAnnotations(
     {
         for (const auto* diag : diagnostics)
         {
-            sb << "//" << prefix << " " << diag->message << "\n";
+            sb << "//" << prefix << ": " << diag->message << "\n";
         }
         sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
         return;
@@ -328,8 +328,8 @@ static void generateSuggestedAnnotations(
             sb << "\n";
     }
 
-    // Calculate the prefix length: "//" + prefix
-    int linePrefixLength = 2 + int(prefix.getLength());
+    // Calculate the prefix length: "//" + prefix + ":"
+    int linePrefixLength = 3 + int(prefix.getLength());
 
     // Check if we should use block comment
     bool useBlockComment = false;
@@ -345,7 +345,7 @@ static void generateSuggestedAnnotations(
     if (useBlockComment)
     {
         // Generate block comment format (no indentation)
-        sb << "/*" << prefix << "\n";
+        sb << "/*" << prefix << ":\n";
         for (const auto* diag : diagnostics)
         {
             // Generate spacing to align caret with column
@@ -392,7 +392,7 @@ static void generateSuggestedAnnotations(
                 caretBuilder << "^";
             }
 
-            sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+            sb << "//" << prefix << ":" << spacingBuilder.getUnownedSlice()
                << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
         }
     }
