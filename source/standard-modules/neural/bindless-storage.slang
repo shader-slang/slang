@@ -31,7 +31,7 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_add(handle[baseIndex + index], value);
+        __atomic_reduce_add(handle[baseIndex + index], value);
     }
 
     public This getOffset(int elements)
@@ -74,7 +74,7 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_add(ptr[index], value);
+        __atomic_reduce_add(ptr[index], value);
     }
 }
 
@@ -107,7 +107,7 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     }
 
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-    internal void atomicAdd(uint index, T value) {__atomic_add(this[index], value);}
+    internal void atomicAdd(uint index, T value) {__atomic_reduce_add(this[index], value);}
 }
 
 /**
@@ -145,6 +145,27 @@ public struct BindlessBufferStorage<T> : IStorage<T>
         static_assert(false, "Not implemented");
     }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
+
+    [ForceInline]
+    public void atomicAdd(Address address, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
+            if (let handle = address.handle as RWStructuredBuffer<T>.Handle)
+            {
+                let scalarPtr = &handle[address.baseIndex];
+                let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
+                __atomic_reduce_add(vecPtr[0], value);
+            }
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            address.atomicAdd(0, value[0]);
+            address.atomicAdd(1, value[1]);
+        }
+    }
+
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
 }
@@ -173,6 +194,24 @@ public struct PointerStorage<T> : IStorage<T>
         static_assert(false, "Not implemented");
     }
     public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
+
+    [ForceInline]
+    public void atomicAdd(Address address, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
+            // address.ptr is already a T*, cast to vector<T, 2>* and dereference.
+            let vecPtr = reinterpret<vector<T, 2>*>(address.ptr);
+            __atomic_reduce_add(vecPtr[0], value);
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            address.atomicAdd(0, value[0]);
+            address.atomicAdd(1, value[1]);
+        }
+    }
+
     public void write(Address address, T value) {address[0] = value;}
     public static Address getOffset(Address base, int elements) {return base.getOffset(elements);}
 }

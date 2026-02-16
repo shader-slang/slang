@@ -87,7 +87,34 @@ public struct StructuredBufferStorage<T> : IStorage<T>
         __target_switch
         {
         case hlsl: atomicAddForHLSL(address, value);
-        default: __atomic_add(m_buffer[address + m_baseAddress], value);
+        default: __atomic_reduce_add(m_buffer[address + m_baseAddress], value);
+        }
+    }
+
+    /**
+    Atomically adds a vector of 2 values using packed atomic operations where available.
+    On CUDA, uses optimized PTX `red` instruction (e.g., red.relaxed.gpu.global.add.noftz.f16x2 for half2).
+    On other targets, falls back to two scalar atomic add calls.
+    @param[in] address The address relative to base address (must be aligned to 2 elements).
+    @param[in] value The vector of 2 values to add.
+    @remarks For optimal performance on CUDA with half type, this performs a single packed atomic
+    operation on two consecutive half values. The address must be aligned to 2 elements.
+    */
+    [ForceInline]
+    public void atomicAdd(Address address, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
+            // Reinterpret the scalar pointer as a vector<T, 2> pointer, then dereference.
+            let scalarPtr = &m_buffer[address + m_baseAddress];
+            let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
+            __atomic_reduce_add(vecPtr[0], value);
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            atomicAdd(address, value[0]);
+            atomicAdd(address + 1, value[1]);
         }
     }
 

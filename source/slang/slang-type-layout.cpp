@@ -3461,6 +3461,37 @@ bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
     return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
 }
 
+/// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
+/// types are encountered, but only when no specific profile or capability was requested
+/// by the user (auto-promotion mode).
+static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
+{
+    if (!targetReq)
+        return;
+
+    auto& targetOptionSet = targetReq->getOptionSet();
+    bool specificProfileRequested =
+        targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+        (targetOptionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
+    bool specificCapabilityRequested = false;
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        if ((atomVal.kind == CompilerOptionValueKind::Int &&
+             atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
+            atomVal.kind == CompilerOptionValueKind::String)
+        {
+            specificCapabilityRequested = true;
+            break;
+        }
+    }
+    if (!specificProfileRequested && !specificCapabilityRequested)
+    {
+        auto targetCaps = targetReq->getTargetCaps();
+        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+        targetReq->setTargetCaps(targetCaps);
+    }
+}
+
 static bool isD3D11Target(TargetRequest*)
 {
     // We aren't officially supporting D3D11 right now
@@ -5363,6 +5394,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (as<TensorViewType>(type))
+    {
+        // TensorView<T> is a __magic_type whose layout is defined in the CUDA prelude
+        // (slang-cuda-prelude.h) as: uint8_t* data (8) + uint32_t strides[5] (20) +
+        // uint32_t sizes[5] (20) + uint32_t dimensionCount (4) + padding (4) = 56 bytes.
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::Uniform, 56, 8),
+            type,
+            rules);
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
@@ -5539,6 +5580,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        maybePromoteDescriptorHandleCapability(context.targetReq);
+
         // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
         if (context.targetReq &&
             context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
@@ -6201,6 +6244,8 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
+        maybePromoteDescriptorHandleCapability(context.targetReq);
+
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type; // Preserve the original DescriptorHandle type
         typeLayout->rules = rules;

@@ -1039,7 +1039,10 @@ void EndToEndCompileRequest::setDiagnosticCallback(
     SlangDiagnosticCallback callback,
     void const* userData)
 {
-    ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, WriterFlag::IsConsole));
+    // Don't set IsConsole flag - the callback destination is unknown.
+    // Command-line tools should handle TTY detection themselves and
+    // set DiagnosticColor to ALWAYS or NEVER explicitly.
+    ComPtr<ISlangWriter> writer(new CallbackWriter(callback, userData, 0));
     setWriter(WriterChannel::Diagnostic, writer);
 }
 
