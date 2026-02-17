@@ -4294,7 +4294,6 @@ SLANG_API void spReflectionEntryPoint_getComputeThreadGroupSize(
     auto astBuilder = entryPointLayout->program->getLinkage()->getASTBuilder();
     SLANG_AST_BUILDER_RAII(astBuilder);
 
-    // First look for the HLSL case, where we have an attribute attached to the entry point function
     auto numThreadsAttribute = entryPointFunc.getDecl()->findModifier<NumThreadsAttribute>();
     if (numThreadsAttribute)
     {
