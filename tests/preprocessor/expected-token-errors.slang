@@ -14,16 +14,12 @@
 
 // Test 15203: expected token in defined expression (missing closing paren)
 #if defined(FOO
-/*diag:
-               ^ preprocessor parse error
-               ^ expected '')'' in 'defined' expression
-           ^ opening '('
-*/
+//diag:        ^ preprocessor parse error
+//diag:        ^ expected '')'' in 'defined' expression
+//diag:    ^ opening '('
 #endif
 
 // Test 15403: expected token in macro parameters (missing closing paren)
 #define BROKEN_MACRO(a,
-/*diag:
-                       ^ preprocessor parse error
-                       ^ expected 'identifier' in macro parameters
-*/
+//diag:                ^ preprocessor parse error
+//diag:                ^ expected 'identifier' in macro parameters

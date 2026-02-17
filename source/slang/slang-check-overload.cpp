@@ -125,12 +125,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateClassNewMatchUp(
 
     if (isNewExpr && !isClassType)
     {
-        getSink()->diagnose(context.originalExpr, Diagnostics::newCanOnlyBeUsedToInitializeAClass);
+        getSink()->diagnose(
+            Diagnostics::NewCanOnlyBeUsedToInitializeAClass{.expr = context.originalExpr});
         return false;
     }
     if (!isNewExpr && isClassType && context.originalExpr)
     {
-        getSink()->diagnose(context.originalExpr, Diagnostics::classCanOnlyBeInitializedWithNew);
+        getSink()->diagnose(
+            Diagnostics::ClassCanOnlyBeInitializedWithNew{.expr = context.originalExpr});
         return false;
     }
     return true;
@@ -345,10 +347,9 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     {
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::cannotSpecializeGeneric,
-                candidate.item.declRef);
+            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
+                .generic = candidate.item.declRef.getDecl(),
+                .location = context.loc});
         }
     };
     List<QualType> paramTypes;
@@ -784,12 +785,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     else
                         name.append(paramIndex, 10);
 
-                    getSink()->diagnose(
-                        context.loc,
-                        Diagnostics::concreteArgumentToOutputInterface,
-                        name,
-                        arg.type,
-                        paramType.type);
+                    getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
+                        .param_name = name,
+                        .arg_type = arg.type,
+                        .param_type = paramType.type,
+                        .location = context.loc});
                 }
                 return {nullptr, nullptr};
             }
@@ -959,10 +959,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
             {
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
-                    getSink()->diagnose(
-                        context.loc,
-                        Diagnostics::mutatingMethodOnImmutableValue,
-                        funcDeclRef.getName());
+                    getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
+                        .method_name = funcDeclRef.getName(),
+                        .location = context.loc});
                     maybeDiagnoseConstVariableAssignment(context.baseExpr);
                 }
                 return false;
@@ -983,15 +982,22 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 {
                     const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
 
-                    const auto& diagnotic =
-                        isNonCopyable ? Diagnostics::mutatingMethodOnFunctionInputParameterError
-                                      : Diagnostics::mutatingMethodOnFunctionInputParameterWarning;
-
-                    getSink()->diagnose(
-                        context.loc,
-                        diagnotic,
-                        funcDeclRef.getName(),
-                        paramDecl->getName());
+                    if (isNonCopyable)
+                    {
+                        getSink()->diagnose(
+                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
+                                .method = funcDeclRef.getName(),
+                                .param = paramDecl->getName(),
+                                .location = context.loc});
+                    }
+                    else
+                    {
+                        getSink()->diagnose(
+                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                                .method = funcDeclRef.getName(),
+                                .param = paramDecl->getName(),
+                                .location = context.loc});
+                    }
                 }
             }
         }
@@ -2762,7 +2768,7 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
         else
         {
             // Unhandled case for the inner expr.
-            getSink()->diagnose(funcExpr->loc, Diagnostics::expectedFunction, funcExpr->type);
+            getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             funcExpr->type = this->getASTBuilder()->getErrorType();
         }
     }
@@ -3194,7 +3200,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             return CreateErrorExpr(expr);
         }
     }
-    getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
+    getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;
 }
