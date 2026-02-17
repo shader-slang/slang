@@ -190,6 +190,7 @@ public struct PermutoEncoder<T,
     // =========================================================================
 
     /// Reads feature values at a given lattice position from the feature table.
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(readFeatureValueBwd)]
     static void readFeatureValue<Storage>(
         Storage featureTable,
@@ -198,7 +199,7 @@ public struct PermutoEncoder<T,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
     {
         uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
@@ -217,7 +218,7 @@ public struct PermutoEncoder<T,
         uvec<Dimensions> key,
         T.Differential[FeatureDimensionPerEntry] result)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
     {
         uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
@@ -249,7 +250,7 @@ public struct PermutoEncoder<T,
         no_diff in Storage.Address featureTableAddress,
         inout OutArray encodedFeatures)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
     {
         // Compute offset into output array for this level
@@ -321,7 +322,7 @@ public struct PermutoEncoder<T,
     [Differentiable]
     public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
         where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
+        where Storage.Differential : IStorage<T>
         where Storage.Address == Storage.Differential.Address
     {
         OutArray encodedFeatures = OutArray();

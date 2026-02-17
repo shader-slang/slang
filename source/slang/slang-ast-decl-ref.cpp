@@ -851,12 +851,15 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         auto args = getDefaultSubstitutionArgs(astBuilder, semantics, current);
         if (parentDeclRef)
         {
-            parentDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, current);
+            // If the parent is a generic, we can skip directly to creating a generic app decl-ref.
+            if (!parentDeclRef.as<GenericDecl>())
+                parentDeclRef = astBuilder->getMemberDeclRef(parentDeclRef, current);
         }
         else
         {
             parentDeclRef = astBuilder->getDirectDeclRef(current);
         }
+
         parentDeclRef =
             astBuilder->getGenericAppDeclRef(parentDeclRef.as<GenericDecl>(), args.getArrayView());
     }

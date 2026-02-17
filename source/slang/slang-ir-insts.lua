@@ -2478,8 +2478,8 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" } }, hoistable = true } },
+	{ alignOf = { operands = { { "baseOp" } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
@@ -3039,6 +3039,22 @@ local insts = {
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },
 	{ CompilerDictionary = { parent = true } },
 	{ CompilerDictionaryScope = { parent = true } },
+	-- Constexpr arithmetic ops. These are hoistable variants of the regular
+	-- arithmetic ops, used for lowering compile-time integer expressions
+	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.
+	{ constexprAdd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSub = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprMul = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeg = { operands = { { "value" } }, hoistable = true } },
+	{ constexprDiv = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	-- Constexpr cast ops. Hoistable variants of casting ops used for IntVal lowering.
+	{ constexprIntCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToFloat = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastFloatToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
 }
 
 -- A function to calculate some useful properties and put it in the table,

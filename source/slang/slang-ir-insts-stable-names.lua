@@ -762,5 +762,17 @@ return {
 	["CompilerDictionaryScope"] = 765,
 	["Decoration.ReturnValueContextFieldDecoration"] = 766,
 	["Decoration.AllowPreTranslationInlining"] = 767,
-	["DiffTypeInfo"] = 768
+	["DiffTypeInfo"] = 768,
+	["constexprAdd"] = 769,
+	["constexprSub"] = 770,
+	["constexprMul"] = 771,
+	["constexprNeg"] = 772,
+	["constexprIntCast"] = 773,
+	["constexprCastIntToFloat"] = 774,
+	["constexprCastFloatToInt"] = 775,
+	["constexprFloatCast"] = 776,
+	["constexprCastIntToEnum"] = 777,
+	["constexprCastEnumToInt"] = 778,
+	["constexprEnumCast"] = 779,
+	["constexprDiv"] = 780
 }

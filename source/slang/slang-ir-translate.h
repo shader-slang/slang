@@ -40,6 +40,8 @@ public:
 
     TargetProgram* getTargetProgram() const { return targetProgram; }
 
+    DiagnosticSink* getSink() const { return sink; }
+
 private:
     IRModule* irModule;
 

@@ -2740,11 +2740,6 @@ struct DiffTransposePass
             // materialize.
             if (auto fwdGetDiff = as<IRDifferentialPairGetDifferential>(gradient.fwdGradInst))
             {
-                /*
-                auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
-                    builder,
-                    fwdGetDiff->getBase()->getDataType()));
-                */
                 simpleGradients.add(RevGradient(
                     gradient.targetInst,
                     builder->emitMakeDifferentialValuePair(
@@ -2755,11 +2750,6 @@ struct DiffTransposePass
             }
             else if (auto fwdGetPrimal = as<IRDifferentialPairGetPrimal>(gradient.fwdGradInst))
             {
-                /*
-                auto baseType = as<IRDifferentialPairType>(diffTypeContext.getDifferentialForType(
-                    builder,
-                    fwdGetPrimal->getBase()->getDataType()));
-                */
                 simpleGradients.add(RevGradient(
                     gradient.targetInst,
                     builder->emitMakeDifferentialValuePair(
@@ -2817,8 +2807,8 @@ struct DiffTransposePass
         // write into the specific sub-field that is affected without constructing
         // intermediate vars.
         //
-        auto revGradVar = builder->emitVar(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+        auto revGradVar =
+            builder->emitVar((IRType*)diffTypeContext.getDifferentialForType(aggPrimalType));
 
         // Initialize with T.dzero()
         auto zeroValueInst = diffTypeContext.emitDZeroOfDiffInstType(builder, aggPrimalType);
@@ -2887,8 +2877,8 @@ struct DiffTransposePass
         // write into the specific sub-field that is affected without constructing
         // intermediate vars.
         //
-        auto revGradVar = builder->emitVar(
-            (IRType*)diffTypeContext.getDifferentialForType(builder, aggPrimalType));
+        auto revGradVar =
+            builder->emitVar((IRType*)diffTypeContext.getDifferentialForType(aggPrimalType));
 
         // Initialize with T.dzero()
         auto zeroValueInst = diffTypeContext.emitDZeroOfDiffInstType(builder, aggPrimalType);
@@ -3037,7 +3027,7 @@ struct DiffTransposePass
             // If there are no gradients to add up, check the type and emit a 0/null
             // value.
             auto aggDiffType = (aggPrimalType)
-                                   ? diffTypeContext.getDifferentialForType(builder, aggPrimalType)
+                                   ? diffTypeContext.tryGetDifferentiableValueType(aggPrimalType)
                                    : nullptr;
             if (aggDiffType != nullptr)
             {

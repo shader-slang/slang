@@ -1903,6 +1903,15 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
             SLANG_UNEXPECTED("existential differentiable pointer types not supported");
         }
     }
+    else if (isAbstractTypePack(type))
+    {
+        // For now, skip registering this.
+        //
+        // TODO: We will need to handle this properly, or there will be
+        // corner cases that crash (e.g. when a type is passed in within a pack from a
+        // non-differentiable context)
+        //
+    }
     else
     {
         // Lower associated information for a regular type.

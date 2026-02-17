@@ -3663,6 +3663,19 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
+static void _flattenAndType(Type* type, List<Type*>& outTypes)
+{
+    if (auto andType = as<AndType>(type))
+    {
+        _flattenAndType(andType->getLeft(), outTypes);
+        _flattenAndType(andType->getRight(), outTypes);
+    }
+    else
+    {
+        outTypes.add(type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->sub);
@@ -3686,6 +3699,34 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         {
             // Regular checking.
             decl->sup = TranslateTypeNodeForced(decl->sup);
+        }
+    }
+
+    // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
+    // individual GenericTypeConstraintDecls for each element in the conjunction.
+    if (decl->sup.type && !decl->isEqualityConstraint)
+    {
+        List<Type*> flattenedTypes;
+        _flattenAndType(decl->sup.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(decl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's sup to the first type in the flattened list.
+            decl->sup = TypeExp(flattenedTypes[0]);
+
+            // Create new constraint decls for the remaining types.
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
+                newConstraint->sub = decl->sub;
+                newConstraint->sup = TypeExp(flattenedTypes[i]);
+                newConstraint->loc = decl->loc;
+                newConstraint->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newConstraint);
+                ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
+            }
         }
     }
 
@@ -3716,6 +3757,13 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                     decl->sup);
             }
         }
+    }
+
+    if (decl->sub.type && decl->sup.type && decl->isEqualityConstraint)
+    {
+        // Invalidate the inheritance cache for the decls involved in the equality constraint.
+        getShared()->invalidateInheritanceInfo(decl->sub.type);
+        getShared()->invalidateInheritanceInfo(decl->sup.type);
     }
 }
 
@@ -3969,106 +4017,6 @@ struct SemanticsDeclDifferentialConformanceVisitor
             getSink(),
             getOptionSet(),
             inheritanceDecl);
-
-        if (as<InterfaceDecl>(inheritanceDecl->parentDecl))
-            return;
-
-        if (!inheritanceDecl->witnessTable)
-            return;
-        auto baseType = as<DeclRefType>(inheritanceDecl->witnessTable->baseType);
-        if (!baseType)
-            return;
-        if (baseType->getDeclRef().getDecl() !=
-            m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
-            return;
-        RequirementWitness witnessValue;
-        auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-            BuiltinRequirementKind::DifferentialType);
-        if (!inheritanceDecl->witnessTable->getRequirementDictionary().tryGetValue(
-                requirementDecl,
-                witnessValue))
-            return;
-
-        if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
-            return;
-        auto differentialType = as<DeclRefType>(witnessValue.getVal());
-        if (!differentialType)
-            return;
-
-        // Check that the type used as differential type must have itself as its own differential
-        // type.
-        auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
-        if (!differentialType->equals(diffDiffType))
-        {
-            SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
-            getSink()->diagnose(
-                inheritanceDecl,
-                Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType,
-                differentialType,
-                diffDiffType);
-            getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
-        }
-
-        // Check that all [DerivativeMember(...)] attributes have their references checked.
-        for (auto member : inheritanceDecl->parentDecl->getMembersOfType<VarDeclBase>())
-        {
-            if (member->findModifier<NoDiffModifier>())
-                continue;
-            auto derivativeMemberAttr = member->findModifier<DerivativeMemberAttribute>();
-            if (!derivativeMemberAttr)
-                continue;
-            checkDerivativeMemberAttributeReferences(member, derivativeMemberAttr);
-        }
-
-        // Check that either the differential type is the same as the base type, or all fields of
-        // the base type that are differentiable have a corresponding field in the differential type
-        // through the [DerivativeMember(...)] attribute.
-        //
-        // We only need to check the fields of the base type that are differentiable.
-        auto baseDecl = as<AggTypeDecl>(inheritanceDecl->parentDecl);
-        if (!baseDecl)
-            return;
-
-        auto thisType = calcThisType(getDefaultDeclRef(baseDecl));
-
-        bool typeIsSelfDifferential = thisType->equals(differentialType);
-
-        for (auto member : baseDecl->getMembersOfType<VarDeclBase>())
-        {
-            if (member->findModifier<NoDiffModifier>())
-                continue;
-            auto diffType = tryGetDifferentialType(m_astBuilder, member->type.type);
-            if (!diffType)
-                continue;
-
-            if (member->findModifier<DerivativeMemberAttribute>())
-                continue;
-            else if (!typeIsSelfDifferential)
-                getSink()->diagnose(
-                    member,
-                    Diagnostics::differentiableMemberShouldHaveCorrespondingFieldInDiffType,
-                    member->nameAndLoc.name,
-                    differentialType);
-            else
-            {
-                // If the type is its own differential type, we can infer the differential
-                // members from the original type.
-                //
-                // Add a derivative member attribute referencing itself.
-                //
-                auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
-                auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
-                fieldLookupExpr->type.type = diffType;
-                auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
-                baseTypeExpr->base.type = differentialType;
-                auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(differentialType);
-                baseTypeExpr->type.type = baseTypeType;
-                fieldLookupExpr->baseExpression = baseTypeExpr;
-                fieldLookupExpr->declRef = makeDeclRef(member);
-                derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
-                addModifier(member, derivativeMemberModifier);
-            }
-        }
     }
 };
 
@@ -6349,11 +6297,22 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     this->ensureDecl(synFuncDecl, DeclCheckState::ReadyForLookup);
 
-    bool doesSignatureMatch = doesSignatureMatchRequirement(
-        synDeclRef.as<CallableDecl>(),
-        requiredMemberDeclRef.as<CallableDecl>(),
-        witnessTable);
-    SLANG_ASSERT(doesSignatureMatch);
+    if (requiredMemberDeclRef.getParent().as<GenericDecl>())
+    {
+        bool doesSignatureMatch = doesGenericSignatureMatchRequirement(
+            synDeclRef.getParent().as<GenericDecl>(),
+            requiredMemberDeclRef.getParent().as<GenericDecl>(),
+            witnessTable);
+        SLANG_ASSERT(doesSignatureMatch);
+    }
+    else
+    {
+        bool doesSignatureMatch = doesSignatureMatchRequirement(
+            synDeclRef.as<FuncDecl>(),
+            requiredMemberDeclRef,
+            witnessTable);
+        SLANG_ASSERT(doesSignatureMatch);
+    }
 
     return true;
 }
@@ -6840,6 +6799,9 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
             return false;
 
         synAccessorDecl->body = synBodyStmt;
+
+        // TODO: this might not be the best way to do this..
+        addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
 
         synAccesorContainer->addMember(synAccessorDecl);
 
@@ -8050,7 +8012,36 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         resultDeclRef.as<GenericDecl>(),
         specArgs.getArrayView());
 
-    // If `bar_defaultImpl` is a generic method, we need to form an explicit
+    if (resultDeclRef.as<GenericDecl>())
+    {
+        // Test signature and register in witness table.
+        bool doesSignatureMatch = doesGenericSignatureMatchRequirement(
+            resultDeclRef.as<GenericDecl>(),
+            requiredFuncDeclRef.getParent().as<GenericDecl>(),
+            witnessTable);
+
+        // If we try to use a registered default decl and the signature
+        // _doesn't_ match here, then something went wrong well before this
+        //
+        SLANG_ASSERT(doesSignatureMatch);
+        return doesSignatureMatch;
+    }
+    else
+    {
+        // Test signature and register in witness table.
+        bool doesSignatureMatch = doesSignatureMatchRequirement(
+            resultDeclRef.as<CallableDecl>(),
+            requiredFuncDeclRef.as<CallableDecl>(),
+            witnessTable);
+
+        // If we try to use a registered default decl and the signature
+        // _doesn't_ match here, then something went wrong well before this
+        //
+        SLANG_ASSERT(doesSignatureMatch);
+        return doesSignatureMatch;
+    }
+
+    /* If `bar_defaultImpl` is a generic method, we need to form an explicit
     // declref to the inner method decl to stay consistent the existing format of
     // witness table entries.
     if (auto genDeclRef = as<GenericDecl>(resultDeclRef))
@@ -8059,7 +8050,37 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
     // Register the declref to the witness table.
     auto callableDeclRef = as<CallableDecl>(resultDeclRef);
     SLANG_ASSERT(callableDeclRef);
-    _addMethodWitness(witnessTable, requiredFuncDeclRef, callableDeclRef);
+
+    // Does requirement func have "type" constraints? We need to verify that the target function
+    // satisfies the same constraints.
+    //
+    if (requiredFuncDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>().getCount() >
+        0)
+    {
+        // Add the satisfying member to the witness table so that self-references can be resolved.
+        auto requirementWitness = RequirementWitness(callableDeclRef);
+        witnessTable->m_requirementDictionary[requiredFuncDeclRef.getDecl()] = requirementWitness;
+
+        // We need to check that the satisfying member has the same constraints as the requirement.
+        auto satisfyingFuncAsType = DeclRefType::create(m_astBuilder, callableDeclRef);
+        bool conformance = doesTypeSatisfyAssociatedTypeConstraintRequirement(
+            satisfyingFuncAsType,
+            requiredFuncDeclRef,
+            witnessTable);
+
+        if (!conformance)
+        {
+            witnessTable->m_requirementDictionary.remove(requiredFuncDeclRef.getDecl());
+            return false;
+        }
+    }
+    else
+    {
+        // Directly add the satisfying member.
+        _addMethodWitness(witnessTable, requiredFuncDeclRef, callableDeclRef);
+    }
+    */
+
     return true;
 }
 
@@ -8637,6 +8658,110 @@ bool SemanticsVisitor::checkInterfaceConformance(
     return result;
 }
 
+void SemanticsVisitor::_checkDifferentialConformance(
+    ConformanceCheckingContext* context,
+    Type* subType,
+    InheritanceDecl* inheritanceDecl,
+    DeclRef<InterfaceDecl> superInterfaceDeclRef,
+    WitnessTable* witnessTable)
+{
+    // Only perform this check if the super type is IDifferentiable.
+    if (superInterfaceDeclRef.getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
+        return;
+
+    // Don't check for interface decls (they declare requirements, not conformances).
+    if (as<InterfaceDecl>(context->parentDecl))
+        return;
+
+    // Look up the DifferentialType requirement witness.
+    RequirementWitness witnessValue;
+    auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+        BuiltinRequirementKind::DifferentialType);
+    if (!witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
+        return;
+
+    if (witnessValue.getFlavor() != RequirementWitness::Flavor::val)
+        return;
+    auto differentialType = as<DeclRefType>(witnessValue.getVal());
+    if (!differentialType)
+        return;
+
+    // Check that the type used as differential type must have itself as its own differential
+    // type.
+    auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
+    if (!differentialType->equals(diffDiffType))
+    {
+        SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
+        getSink()->diagnose(
+            inheritanceDecl,
+            Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType,
+            differentialType,
+            diffDiffType);
+        getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
+    }
+
+    // Check that all [DerivativeMember(...)] attributes have their references checked.
+    for (auto member : context->parentDecl->getMembersOfType<VarDeclBase>())
+    {
+        if (member->findModifier<NoDiffModifier>())
+            continue;
+        auto derivativeMemberAttr = member->findModifier<DerivativeMemberAttribute>();
+        if (!derivativeMemberAttr)
+            continue;
+        checkDerivativeMemberAttributeReferences(member, derivativeMemberAttr);
+    }
+
+    // Check that either the differential type is the same as the base type, or all fields of
+    // the base type that are differentiable have a corresponding field in the differential type
+    // through the [DerivativeMember(...)] attribute.
+    //
+    // We only need to check the fields of the base type that are differentiable.
+    auto baseDecl = as<AggTypeDecl>(context->parentDecl);
+    if (!baseDecl)
+        return;
+
+    auto thisType = calcThisType(getDefaultDeclRef(baseDecl));
+
+    bool typeIsSelfDifferential = thisType->equals(differentialType);
+
+    for (auto member : baseDecl->getMembersOfType<VarDeclBase>())
+    {
+        if (member->findModifier<NoDiffModifier>())
+            continue;
+        auto diffType = tryGetDifferentialType(m_astBuilder, member->type.type);
+        if (!diffType)
+            continue;
+
+        if (member->findModifier<DerivativeMemberAttribute>())
+            continue;
+        else if (!typeIsSelfDifferential)
+            getSink()->diagnose(
+                member,
+                Diagnostics::differentiableMemberShouldHaveCorrespondingFieldInDiffType,
+                member->nameAndLoc.name,
+                differentialType);
+        else
+        {
+            // If the type is its own differential type, we can infer the differential
+            // members from the original type.
+            //
+            // Add a derivative member attribute referencing itself.
+            //
+            auto derivativeMemberModifier = m_astBuilder->create<DerivativeMemberAttribute>();
+            auto fieldLookupExpr = m_astBuilder->create<StaticMemberExpr>();
+            fieldLookupExpr->type.type = diffType;
+            auto baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = differentialType;
+            auto baseTypeType = m_astBuilder->getOrCreate<TypeType>(differentialType);
+            baseTypeExpr->type.type = baseTypeType;
+            fieldLookupExpr->baseExpression = baseTypeExpr;
+            fieldLookupExpr->declRef = makeDeclRef(member);
+            derivativeMemberModifier->memberDeclRef = fieldLookupExpr;
+            addModifier(member, derivativeMemberModifier);
+        }
+    }
+}
+
 bool SemanticsVisitor::checkConformanceToType(
     ConformanceCheckingContext* context,
     Type* subType,
@@ -8656,7 +8781,7 @@ bool SemanticsVisitor::checkConformanceToType(
             // The type is stating that it conforms to an interface.
             // We need to check that it provides all of the members
             // required by that interface.
-            return checkInterfaceConformance(
+            auto conformanceResult = checkInterfaceConformance(
                 context,
                 subType,
                 superType,
@@ -8664,6 +8789,21 @@ bool SemanticsVisitor::checkConformanceToType(
                 superInterfaceDeclRef,
                 subIsSuperWitness,
                 witnessTable);
+
+            // If the interface is IDifferentiable, perform additional
+            // derivative member checking now that the associated types
+            // (including .Differential) have been resolved.
+            if (conformanceResult)
+            {
+                _checkDifferentialConformance(
+                    context,
+                    subType,
+                    inheritanceDecl,
+                    superInterfaceDeclRef,
+                    witnessTable);
+            }
+
+            return conformanceResult;
         }
         else if (auto superStructDeclRef = superTypeDeclRef.as<StructDecl>())
         {
@@ -9038,7 +9178,13 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
         // If the witness is a LookupDeclRef that points to the same inheritance decl
         // we're currently processing, then this is the canonical/critical path.
         bool isCriticalPath = false;
-        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subIsReqWitness))
+
+        //
+        // TODO: STOPPED HERE (need to expand the critical path test to check all nodes
+        // in the lookup and not just the first one, since there could be a recursive node)
+        //
+        auto currentWitness = subIsReqWitness;
+        while (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
         {
             if (auto lookupDeclRef =
                     as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
@@ -9047,6 +9193,13 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
                 {
                     isCriticalPath = true;
                 }
+
+                currentWitness = lookupDeclRef->getWitness();
+            }
+            else
+            {
+                // If we encounter a witness that isn't a LookupDeclRef, break;
+                break;
             }
         }
 
@@ -9069,7 +9222,7 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
                 reqType,
                 nestedWitnessTable);
         }
-        else
+        else if (!isCriticalPath)
         {
             witnessTable->add(inheritanceDecl, RequirementWitness(subIsReqWitness));
         }
@@ -10946,7 +11099,8 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 // be declared as a pure input parameter to a function (`in` or
                 // `borrow`).
                 //
-                getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
+                if (!as<SynthesizedFuncDecl>(getParentDecl(paramDecl)))
+                    getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
             }
             else if (as<ConstModifier>(modifier))
             {
@@ -13603,6 +13757,18 @@ List<ExtensionDecl*> const& SharedSemanticsContext::getCandidateExtensionsForTyp
     // asked for.
     //
     return _getCandidateExtensionList(decl, m_mapDeclToCandidateExtensions);
+}
+
+void SharedSemanticsContext::invalidateInheritanceInfo(Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        m_mapDeclRefToInheritanceInfo.remove(declRefType->getDeclRef());
+    }
+    else
+    {
+        m_mapTypeToInheritanceInfo.remove(type);
+    }
 }
 
 void SharedSemanticsContext::registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl)

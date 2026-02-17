@@ -24,7 +24,7 @@ public interface ILayer<T, InputVector, OutputVector, Storage, Activation>
     [Differentiable]
     public OutputVector eval<S>(S storage, InputVector input)
         where S : IStorage<T>
-        where S.Differential : IStorage<T.Differential>
+        where S.Differential : IStorage<T>
         where S.Address == S.Differential.Address
         where S.Address == Storage.Address;
 }

@@ -341,19 +341,137 @@ Val* FuncResultType::_resolveImplOverride()
 
 static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
 {
-    if (diffWitness->getSup() == getCurrentASTBuilder()->getDifferentiableInterfaceType())
+    auto astBuilder = getCurrentASTBuilder();
+
+    if (auto concretePack = as<ConcreteTypePack>(primalType))
     {
-        return getCurrentASTBuilder()->getDifferentialPairType(primalType, diffWitness);
+        // The differential pair of a type pack should be a type pack of differential pairs.
+        if (auto witnessPack = as<TypePackSubtypeWitness>(diffWitness))
+        {
+            List<Type*> diffPairTypes;
+            for (Index i = 0; i < concretePack->getTypeCount(); i++)
+            {
+                auto elemType = concretePack->getElementType(i);
+                auto elemWitness = witnessPack->getWitness(i);
+                auto diffPairType = getEffectiveDiffPairType(elemType, elemWitness);
+                diffPairTypes.add(diffPairType);
+            }
+            return astBuilder->getTypePack(diffPairTypes.getArrayView());
+        }
     }
-    else if (diffWitness->getSup() == getCurrentASTBuilder()->getDifferentiableRefInterfaceType())
+
+    if (isAbstractTypePack(primalType))
     {
-        return getCurrentASTBuilder()->getDifferentialPtrPairType(primalType, diffWitness);
+        // The differential pair of an abstract type pack P should be
+        // `expand DiffPair<each P>`.
+        auto eachType = astBuilder->getEachType(primalType);
+        auto eachWitness =
+            astBuilder->getEachSubtypeWitness(eachType, diffWitness->getSup(), diffWitness);
+        auto diffPairEachType = getEffectiveDiffPairType(eachType, eachWitness);
+
+        if (auto expandType = as<ExpandType>(primalType))
+        {
+            List<Type*> capturedTypePacks;
+            for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+                capturedTypePacks.add(expandType->getCapturedTypePack(i));
+            return astBuilder->getExpandType(diffPairEachType, capturedTypePacks.getArrayView());
+        }
+        else
+        {
+            return astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
+        }
+    }
+
+    if (diffWitness->getSup() == astBuilder->getDifferentiableInterfaceType())
+    {
+        return astBuilder->getDifferentialPairType(primalType, diffWitness);
+    }
+    else if (diffWitness->getSup() == astBuilder->getDifferentiableRefInterfaceType())
+    {
+        return astBuilder->getDifferentialPtrPairType(primalType, diffWitness);
     }
     else
     {
         SLANG_UNEXPECTED("Unsupported diff witness for differential pair type");
         return nullptr;
     }
+}
+
+static Type* getDifferentialValueTypeFromWitness(
+    ASTBuilder* astBuilder,
+    Type* primalType,
+    SubtypeWitness* witness)
+{
+    if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
+    {
+        if (auto declRefType = as<DeclRefType>(primalType))
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                return witness->getSup();
+
+        if (auto concretePack = as<ConcreteTypePack>(primalType))
+        {
+            // Construct a concrete type pack out of the .Differential
+            // by going through each witness in the witness pack,
+            // and performing the lookup.
+            //
+            auto differentialTypeRequirement =
+                astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                    BuiltinRequirementKind::DifferentialType);
+            if (auto witnessPack = as<TypePackSubtypeWitness>(witness))
+            {
+                List<Type*> diffTypes;
+                for (Index i = 0; i < concretePack->getTypeCount(); i++)
+                {
+                    auto elemType = concretePack->getElementType(i);
+                    auto elemWitness = witnessPack->getWitness(i);
+                    auto diffType = DeclRefType::create(
+                        astBuilder,
+                        astBuilder
+                            ->getLookupDeclRef(elemType, elemWitness, differentialTypeRequirement));
+                    diffTypes.add(diffType);
+                }
+                return astBuilder->getTypePack(diffTypes.getArrayView());
+            }
+        }
+
+        if (isAbstractTypePack(primalType))
+        {
+            // Use ExpandType over EachSubtypeWitness(baseWitness)
+            // to construct the .Differential type pack, which will expand out to the
+            // correct number of elements
+            //
+            auto differentialTypeRequirement =
+                astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                    BuiltinRequirementKind::DifferentialType);
+            auto eachType = astBuilder->getEachType(primalType);
+            auto eachWitness =
+                astBuilder->getEachSubtypeWitness(eachType, witness->getSup(), witness);
+            auto diffEachType = DeclRefType::create(
+                astBuilder,
+                astBuilder->getLookupDeclRef(eachType, eachWitness, differentialTypeRequirement));
+            if (auto expandType = as<ExpandType>(primalType))
+            {
+                List<Type*> capturedTypePacks;
+                for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+                    capturedTypePacks.add(expandType->getCapturedTypePack(i));
+                return astBuilder->getExpandType(diffEachType, capturedTypePacks.getArrayView());
+            }
+            else
+            {
+                return astBuilder->getExpandType(diffEachType, makeArrayViewSingle(primalType));
+            }
+        }
+
+        // Simple case: we have a witness for a singular, non-existential type.
+        auto differentialTypeRequirement =
+            astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+                BuiltinRequirementKind::DifferentialType);
+        return DeclRefType::create(
+            astBuilder,
+            astBuilder->getLookupDeclRef(primalType, witness, differentialTypeRequirement));
+    }
+
+    return nullptr;
 }
 
 Val* BwdCallableFuncType::_resolveImplOverride()
@@ -375,27 +493,6 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         auto funcType =
             getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
 
-        // Helper function to get the differential value type from a witness.
-        auto getDifferentialValueTypeFromWitness = [&](Type* primalType,
-                                                       SubtypeWitness* witness) -> Type*
-        {
-            if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
-            {
-                if (auto declRefType = as<DeclRefType>(primalType))
-                    if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
-                        return witness->getSup();
-
-                auto differentialTypeRequirement =
-                    astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-                        BuiltinRequirementKind::DifferentialType);
-                return DeclRefType::create(
-                    astBuilder,
-                    astBuilder->getLookupDeclRef(primalType, witness, differentialTypeRequirement));
-            }
-
-            return nullptr;
-        };
-
         // First translate the this-type.
         // Get the differential value type and add it with flipped direction.
         auto thisParamType = diffTypeWitness->getThisParamType();
@@ -403,8 +500,10 @@ Val* BwdCallableFuncType::_resolveImplOverride()
             splitParameterTypeAndDirection(astBuilder, thisParamType);
         if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
         {
-            auto diffThisType =
-                getDifferentialValueTypeFromWitness(thisParamValueType, thisTypeDiffWitness);
+            auto diffThisType = getDifferentialValueTypeFromWitness(
+                astBuilder,
+                thisParamValueType,
+                thisTypeDiffWitness);
             if (diffThisType)
             {
                 // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
@@ -436,7 +535,8 @@ Val* BwdCallableFuncType::_resolveImplOverride()
             auto paramInfo = funcType->getParamInfo(i);
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
-            auto diffValueType = getDifferentialValueTypeFromWitness(paramInfo.type, diffWitness);
+            auto diffValueType =
+                getDifferentialValueTypeFromWitness(astBuilder, paramInfo.type, diffWitness);
 
             if (!diffValueType)
             {
@@ -470,8 +570,10 @@ Val* BwdCallableFuncType::_resolveImplOverride()
         // Add the differential of the result type as a parameter at the end.
         if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
         {
-            auto diffResultType =
-                getDifferentialValueTypeFromWitness(funcType->getResultType(), resultDiffWitness);
+            auto diffResultType = getDifferentialValueTypeFromWitness(
+                astBuilder,
+                funcType->getResultType(),
+                resultDiffWitness);
             if (diffResultType)
             {
                 newParamTypes.add(diffResultType);
@@ -597,28 +699,6 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         auto resultType = astBuilder->getVoidType();
         auto errorType = funcType->getErrorType();
 
-        // Helper function to get the differential value type from a witness.
-        // This looks up the Differential associated type from the witness.
-        auto getDifferentialValueTypeFromWitness = [&](Type* primalType,
-                                                       SubtypeWitness* witness) -> Type*
-        {
-            if (witness && (witness->getSup() == astBuilder->getDifferentiableInterfaceType()))
-            {
-                if (auto declRefType = as<DeclRefType>(primalType))
-                    if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
-                        return witness->getSup();
-
-                auto differentialTypeRequirement =
-                    astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-                        BuiltinRequirementKind::DifferentialType);
-                return DeclRefType::create(
-                    astBuilder,
-                    astBuilder->getLookupDeclRef(primalType, witness, differentialTypeRequirement));
-            }
-
-            return nullptr;
-        };
-
         // Process each parameter according to backward diff rules.
         for (UIndex i = 0; i < funcType->getParamCount(); ++i)
         {
@@ -632,8 +712,10 @@ Val* BwdDiffFuncType::_resolveImplOverride()
             case ParamPassingMode::Out:
                 {
                     // For out params in backward diff, we need the differential value type.
-                    auto diffValueType =
-                        getDifferentialValueTypeFromWitness(paramInfo.type, diffWitness);
+                    auto diffValueType = getDifferentialValueTypeFromWitness(
+                        astBuilder,
+                        paramInfo.type,
+                        diffWitness);
                     if (diffValueType)
                         newParamTypes.add(diffValueType);
                     break;
@@ -703,8 +785,10 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         // Last parameter is the initial derivative of the original return type (dOut).
         if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
         {
-            auto dOutType =
-                getDifferentialValueTypeFromWitness(funcType->getResultType(), resultDiffWitness);
+            auto dOutType = getDifferentialValueTypeFromWitness(
+                astBuilder,
+                funcType->getResultType(),
+                resultDiffWitness);
             if (dOutType)
                 newParamTypes.add(dOutType);
         }

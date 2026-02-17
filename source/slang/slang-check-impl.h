@@ -753,6 +753,9 @@ public:
     /// Register a candidate extension `extDecl` for `typeDecl` encountered during checking.
     void registerCandidateExtension(Decl* typeDecl, ExtensionDecl* extDecl);
 
+    /// Invalidate inheritance info for `type`
+    void invalidateInheritanceInfo(Type* type);
+
     void registerAssociatedDecl(Decl* original, DeclAssociationKind assoc, Decl* declaration);
 
     List<RefPtr<DeclAssociation>> const& getAssociatedDeclsForDecl(Decl* decl);
@@ -2241,6 +2244,13 @@ public:
         InheritanceDecl* inheritanceDecl,
         DeclRef<InterfaceDecl> superInterfaceDeclRef,
         SubtypeWitness* subTypeConformsToSuperInterfaceWitness);
+
+    void _checkDifferentialConformance(
+        ConformanceCheckingContext* context,
+        Type* subType,
+        InheritanceDecl* inheritanceDecl,
+        DeclRef<InterfaceDecl> superInterfaceDeclRef,
+        WitnessTable* witnessTable);
 
     bool checkConformanceToType(
         ConformanceCheckingContext* context,

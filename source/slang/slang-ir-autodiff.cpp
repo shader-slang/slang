@@ -205,6 +205,8 @@ AutoDiffSharedContext::AutoDiffSharedContext(
         if (auto generic = as<IRGeneric>(globalInst))
         {
             auto inner = getGenericReturnVal(generic);
+            if (!inner)
+                continue;
             if (auto decor = inner->findDecoration<IRKnownBuiltinDecoration>())
             {
                 switch (decor->getName())
@@ -462,7 +464,7 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
 
         // Fill in differential method implementations.
         auto elementType = as<IRDifferentialPairTypeBase>(pairType)->getValueType();
-        auto diffType = (IRType*)tryGetDifferentiableValueType(builder, elementType);
+        auto diffType = (IRType*)tryGetDifferentiableValueType(elementType);
         SLANG_ASSERT(diffType);
         auto innerWitness = as<IRDifferentialPairTypeBase>(pairType)->getWitness();
 
@@ -541,7 +543,8 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
     {
         // TODO: This logic is incorrect (will cause infinite loop)
         // Differentiate the pair type to get it's differential (which is itself a pair)
-        auto diffDiffPairType = (IRType*)getDifferentialForType(builder, (IRType*)pairType);
+        auto diffDiffPairType = (IRType*)tryGetDifferentiablePtrType((IRType*)pairType);
+        SLANG_RELEASE_ASSERT(diffDiffPairType);
 
         table = builder->createWitnessTable(
             sharedContext->differentiablePtrInterfaceType,
@@ -592,7 +595,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddOfDiffInstType(
     SLANG_ASSERT(addMethod);
 
     return builder->emitCallInst(
-        (IRType*)this->getDifferentialForType(builder, primalType),
+        (IRType*)this->getDifferentialForType(primalType),
         addMethod,
         List<IRInst*>(op1, op2));
 }
@@ -604,7 +607,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDAddForExistentialType(
     IRInst* op2)
 {
     return builder->emitCallInst(
-        (IRType*)this->getDifferentialForType(builder, primalType),
+        (IRType*)this->getDifferentialForType(primalType),
         this->getOrCreateExistentialDAddMethod(),
         List<IRInst*>({op1, op2}));
 }
@@ -635,7 +638,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     SLANG_ASSERT(zeroMethod);
 
     return builder->emitCallInst(
-        (IRType*)this->getDifferentialForType(builder, primalType),
+        (IRType*)this->getDifferentialForType(primalType),
         zeroMethod,
         List<IRInst*>());
 }
@@ -689,7 +692,6 @@ void DifferentiableTypeConformanceContext::markDiffPairTypeInst(
 {
     SLANG_ASSERT(diffPairInst);
     SLANG_ASSERT(pairType);
-    SLANG_ASSERT(as<IRDifferentialPairTypeBase>(pairType));
 
     if (as<IRDifferentialPairType>(pairType))
     {

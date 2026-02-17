@@ -32,7 +32,7 @@ public interface ITrainableEncoder<T,
     [Differentiable]
     public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
         where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
+        where Storage.Differential : IStorage<T>
         where Storage.Address == Storage.Differential.Address;
 
     [Differentiable]

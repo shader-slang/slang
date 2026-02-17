@@ -2496,12 +2496,6 @@ struct LegalFuncBuilder
         auto newFuncType =
             irBuilder->getFuncType(m_paramTypes.getCount(), m_paramTypes.getBuffer(), m_resultType);
         irBuilder->setDataType(oldFunc, newFuncType);
-        if (auto debugFuncDecoration = oldFunc->findDecoration<IRDebugFuncDecoration>())
-        {
-            auto debugFunc = as<IRDebugFunction>(debugFuncDecoration->getOperand(0));
-            SLANG_ASSERT(as<IRFuncType>(debugFunc->getOperand(4)));
-            debugFunc->setOperand(4, newFuncType);
-        }
 
         // If the function required any new parameters to be created
         // to represent the result/return type, then we need to

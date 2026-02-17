@@ -144,6 +144,9 @@ bool isNoneCallee(IRInst* callee)
         }
     }
 
+    if (as<IRVoidLit>(callee))
+        return true;
+
     return false;
 }
 
@@ -370,6 +373,9 @@ bool isGlobalInst(IRInst* inst)
 //
 bool isConcreteType(IRInst* inst)
 {
+    if (!inst)
+        return false;
+
     bool isInstGlobal = isGlobalInst(inst);
     if (!isInstGlobal)
         return false;
@@ -1179,9 +1185,21 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    void resolveAndReplaceIfGlobal(IRInst* context, IRInst* inst)
+    {
+        SLANG_UNUSED(context);
+        if (isGlobalInst(inst))
+        {
+            translationContext.resolveInst(inst);
+        }
+    }
+
     void processInstForPropagation(IRInst* context, IRInst* inst, WorkQueue& workQueue)
     {
         IRInst* info = nullptr;
+
+        if (inst->getDataType())
+            resolveAndReplaceIfGlobal(context, inst->getDataType());
 
         switch (inst->getOp())
         {
@@ -1281,6 +1299,12 @@ struct TypeFlowSpecializationContext
         case kIROp_DifferentialPairGetPrimal:
             info = analyzeDifferentialPairGetPrimal(context, as<IRDifferentialPairGetPrimal>(inst));
             break;
+        case kIROp_AttributedType:
+            info = analyzeAttributedType(context, as<IRAttributedType>(inst));
+            break;
+            // case kIROp_PtrType:
+            //     info = analyzePtrType(context, as<IRPtrType>(inst));
+            //     break;
         }
 
         // If we didn't get any info from inst-specific analysis, we'll try to get
@@ -1547,7 +1571,9 @@ struct TypeFlowSpecializationContext
             return none();
         }
 
+        resolveAndReplaceIfGlobal(context, inst->getWitnessTable());
         auto witnessTable = inst->getWitnessTable();
+
         // Concrete case.
         if (as<IRWitnessTable>(witnessTable))
             return makeTaggedUnionType(
@@ -2072,6 +2098,46 @@ struct TypeFlowSpecializationContext
             {
                 return this->fieldInfo[structField];
             }
+        }
+        return none();
+    }
+
+    IRInst* analyzeAttributedType(IRInst* context, IRAttributedType* inst)
+    {
+        // An AttributedType wraps a base type with attributes (e.g., unorm, snorm).
+        // Since analysis is only used on instructions in blocks, we're seeing
+        //
+        // this attributed type in a block, and it is by default specialized.
+        //
+        // We need to propagate the info from the base type
+        // wrapped in an attributed type.
+        //
+        auto baseType = inst->getBaseType();
+        if (auto baseInfo = tryGetInfo(context, baseType))
+        {
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : inst->getAllAttrs())
+                attrs.add(attr);
+            auto result = builder.getAttributedType((IRType*)baseInfo, attrs);
+            module->getContainerPool().free(&attrs);
+            return result;
+        }
+        return none();
+    }
+
+    IRInst* analyzePtrType(IRInst* context, IRPtrType* inst)
+    {
+        // A PtrType wraps a value type. If the value type is non-concrete,
+        // we need to propagate the info from the value type wrapped in a pointer type.
+        //
+        auto valueType = inst->getValueType();
+        if (auto valueInfo = tryGetInfo(context, valueType))
+        {
+            IRBuilder builder(module);
+            return makeElementOfSetType(builder.getSingletonSet(
+                kIROp_TypeSet,
+                builder.getPtrTypeWithAddressSpace((IRType*)valueInfo, inst)));
         }
         return none();
     }
@@ -3637,11 +3703,22 @@ struct TypeFlowSpecializationContext
         bool hasChanges = false;
         for (auto block : func->getBlocks())
         {
+            // TODO: This workList is a workaround for the fact that sometimes, we end up with
+            // types that are not global (usually because of arithmetic ops in types)
+            // We should make sure such ops are also resolved during the type-flow pass, but in the
+            // meantime, this allows us to resolve any types that might have been missed.
+            //
+            List<IRInst*>& workList = *module->getContainerPool().getList<IRInst>();
             for (auto inst : block->getChildren())
+                workList.add(inst);
+
+            for (auto inst : workList)
             {
                 if (inst->getDataType())
                     translationContext.resolveInst(inst->getDataType());
             }
+
+            module->getContainerPool().free(&workList);
         }
         return hasChanges;
     }
@@ -3690,7 +3767,10 @@ struct TypeFlowSpecializationContext
         }
 
         for (auto func : funcsToProcess)
+        {
+            hasChanges |= eliminateDeadCode(func);
             hasChanges |= resolveTypesInFunc(func);
+        }
 
         return hasChanges;
     }

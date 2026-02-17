@@ -160,7 +160,7 @@ static bool _canExportDeclSymbol(ASTNodeType type)
 
 static bool _canRecurseExportSymbol(Decl* decl)
 {
-    if (as<FunctionDeclBase>(decl) || as<ScopeDecl>(decl))
+    if (as<ScopeDecl>(decl))
     {
         return false;
     }
@@ -189,6 +189,15 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     if (!_canRecurseExportSymbol(decl))
     {
         // We don't need to recurse any further into this
+        return;
+    }
+
+    if (auto functionDeclBase = as<FunctionDeclBase>(decl))
+    {
+        for (auto constraint : functionDeclBase->getDirectMemberDeclsOfType<TypeConstraintDecl>())
+        {
+            _processFindDeclsExportSymbolsRec(constraint);
+        }
         return;
     }
 

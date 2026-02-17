@@ -21,7 +21,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
 
     /// The differential type for automatic differentiation.
     /// @remarks Ensures the differential is also a vector with the same structure.
-    public associatedtype Differential : IVector<T.Differential>;
+    public associatedtype Differential : IVector<T>;
 
     /// Default constructor - initializes vector to zero.
     public __init();
@@ -70,7 +70,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
@@ -94,7 +94,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     @return The result of the linear transformation, `result = W * this + bias`, whose size is `OutputSize`.
     @remarks Type constraints:
     - `Storage` must conform to `IStorage<T>`
-    - `Storage.Differential` must conform to `IStorage<T.Differential>`
+    - `Storage.Differential` must conform to `IStorage<T>`
     - `Storage.Address` must equal `Storage.Differential.Address` (same address type)
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
@@ -105,7 +105,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
         no_diff Storage.Address weightAddress,
         no_diff Storage.Address biasAddress)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
@@ -124,13 +124,13 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     @remarks Type constraints:
     - `BindlessStorage` must conform to `IStorage<T>`
     - `BindlessStorage.Address` must conform to `IPointerLikeAddress<T>`
-    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
+    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T>`
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
     public OutputVector linearTransform<Address, Layout, OutputVector>(Address weightAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 
@@ -153,14 +153,14 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     @remarks Type constraints:
     - `BindlessStorage` must conform to `IStorage<T>`
     - `BindlessStorage.Address` must conform to `IPointerLikeAddress<T>`
-    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T.Differential>`
+    - `BindlessStorage.Address.Differential` must conform to `IPointerLikeAddress<T>`
     - `OutputVector` must conform to `IVector<T, OutputSize>`
     */
     [Differentiable]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 }

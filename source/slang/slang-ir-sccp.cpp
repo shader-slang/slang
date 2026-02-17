@@ -143,6 +143,18 @@ struct SCCPContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             return true;
         default:
             return false;
@@ -944,9 +956,16 @@ struct SCCPContext
         switch (inst->getOp())
         {
         case kIROp_IntCast:
+        case kIROp_ConstexprIntCast:
         case kIROp_FloatCast:
+        case kIROp_ConstexprFloatCast:
         case kIROp_CastIntToFloat:
+        case kIROp_ConstexprCastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             switch (inst->getOperandCount())
             {
             case 1:
@@ -958,21 +977,25 @@ struct SCCPContext
         case kIROp_DefaultConstruct:
             return evalDefaultConstruct(inst->getDataType());
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             return evalAdd(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             return evalSub(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             return evalMul(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             {
                 // Detect divide by zero error.
                 auto divisor = getLatticeVal(inst->getOperand(1));
@@ -1073,6 +1096,7 @@ struct SCCPContext
         case kIROp_BitCast:
             return evalBitCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Neg:
+        case kIROp_ConstexprNeg:
             return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Lsh:
             return evalLsh(
@@ -1410,26 +1434,35 @@ struct SCCPContext
 
         bool changed = false;
         // Replace the insts with their values.
-        List<IRInst*> instsToRemove;
+
+        List<IRInst*> instsToProcess;
         for (auto child : scopeInst->getChildren())
         {
             if (!isEvaluableOpCode(child->getOp()))
                 continue;
+            instsToProcess.add(child);
+        }
 
+        List<IRInst*> instsToRemove;
+        for (auto child : instsToProcess)
+        {
             auto latticeVal = getLatticeVal(child);
             if (latticeVal.flavor == LatticeVal::Flavor::Constant && latticeVal.value != child)
             {
                 child->replaceUsesWith(latticeVal.value);
-                instsToRemove.add(child);
+                child->removeAndDeallocate();
+                // instsToRemove.add(child);
             }
         }
 
+        /*
         if (instsToRemove.getCount())
         {
             changed = true;
             for (auto inst : instsToRemove)
                 inst->removeAndDeallocate();
         }
+                */
         return changed;
     }
 

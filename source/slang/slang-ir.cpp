@@ -4140,6 +4140,112 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
     return result;
 }
 
+IRInst* IRBuilder::emitConstexprCast(IRType* type, IRInst* value)
+{
+    if (isTypeEqual(type, value->getDataType()))
+        return value;
+
+    auto toStyle = _getTypeStyleId(type);
+    auto fromStyle = _getTypeStyleId(value->getDataType());
+
+    // For constexpr casts, we only handle Int, Float, Bool, and Enum.
+    // Ptr and Void are not expected in IntVal contexts.
+
+    struct OpSeq
+    {
+        IROp op0, op1;
+        OpSeq(IROp op)
+        {
+            op0 = op;
+            op1 = kIROp_Nop;
+        }
+        OpSeq(IROp op, IROp inOp1)
+        {
+            op0 = op;
+            op1 = inOp1;
+        }
+    };
+
+    // Constexpr casting table for Int, Float, Bool, Enum (4x4).
+    // For Float->Bool, we use CastFloatToInt + IntCast instead of Neq.
+    static const OpSeq opMap[4][4] = {
+        /*      To:      Int, Float, Bool, Enum */
+        /* From Int   */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Float */
+        {kIROp_ConstexprCastFloatToInt,
+         kIROp_ConstexprFloatCast,
+         {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprIntCast},
+         {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprCastIntToEnum}},
+        /* From Bool  */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_Nop,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Enum  */
+        {kIROp_ConstexprCastEnumToInt,
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprCastIntToFloat},
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprIntCast},
+         kIROp_ConstexprEnumCast},
+    };
+
+    // Map style to index in our 4x4 table.
+    auto styleToIndex = [](TypeCastStyle style) -> int
+    {
+        switch (style)
+        {
+        case TypeCastStyle::Int:
+            return 0;
+        case TypeCastStyle::Float:
+            return 1;
+        case TypeCastStyle::Bool:
+            return 2;
+        case TypeCastStyle::Enum:
+            return 3;
+        default:
+            return -1;
+        }
+    };
+
+    int fromIndex = styleToIndex(fromStyle);
+    int toIndex = styleToIndex(toStyle);
+
+    // Fall back to regular emitCast for unsupported types (Ptr, Void, Unknown).
+    if (fromIndex < 0 || toIndex < 0)
+        return emitCast(type, value);
+
+    auto op = opMap[fromIndex][toIndex];
+    if (op.op0 == kIROp_Nop)
+        return value;
+
+    auto t = type;
+    if (op.op1 != kIROp_Nop)
+    {
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+    }
+
+    auto result = emitIntrinsicInst(t, op.op0, 1, &value);
+    if (op.op1 != kIROp_Nop)
+    {
+        result = emitIntrinsicInst(type, op.op1, 1, &result);
+    }
+    return result;
+}
+
 IRInst* IRBuilder::emitVectorReshape(IRType* type, IRInst* value)
 {
     auto targetVectorType = as<IRVectorType>(type);
@@ -5283,6 +5389,11 @@ IRInst* IRBuilder::emitElementExtract(IRInst* base, IRInst* index)
         type = (IRType*)tupleType->getOperand(getIntVal(index));
         return emitGetTupleElement(type, base, index);
     }
+    else if (auto typePack = as<IRTypePack>(base->getDataType()))
+    {
+        type = (IRType*)typePack->getOperand(getIntVal(index));
+        return emitGetTupleElement(type, base, index);
+    }
     SLANG_RELEASE_ASSERT(type);
 
     return emitElementExtract(type, base, index);
@@ -6194,6 +6305,41 @@ IRInst* IRBuilder::emitMul(IRType* type, IRInst* left, IRInst* right)
 IRInst* IRBuilder::emitDiv(IRType* type, IRInst* numerator, IRInst* denominator)
 {
     auto inst = createInst<IRInst>(this, kIROp_Div, type, numerator, denominator);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprAdd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprAdd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprSub(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprSub, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprMul(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprMul, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNeg(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNeg, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprDiv(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprDiv, type, left, right);
     addInst(inst);
     return inst;
 }
@@ -8718,6 +8864,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
+    case kIROp_ConstexprAdd:
+    case kIROp_ConstexprSub:
+    case kIROp_ConstexprMul:
+    case kIROp_ConstexprNeg:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Eql:
@@ -8753,6 +8903,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastEnumToInt:
     case kIROp_CastIntToEnum:
     case kIROp_EnumCast:
+    case kIROp_ConstexprIntCast:
+    case kIROp_ConstexprCastIntToFloat:
+    case kIROp_ConstexprCastFloatToInt:
+    case kIROp_ConstexprFloatCast:
+    case kIROp_ConstexprCastIntToEnum:
+    case kIROp_ConstexprCastEnumToInt:
+    case kIROp_ConstexprEnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt64ToDescriptorHandle:
@@ -8798,6 +8955,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_GetTagOfElementInSet:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_WeakUse:
         return false;
 
     case kIROp_UnboundedFuncElement:
@@ -8814,6 +8972,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         return false;
 
     case kIROp_Div:
+    case kIROp_ConstexprDiv:
     case kIROp_IRem:
         if (isIntegralScalarOrCompositeType(getFullType()))
         {

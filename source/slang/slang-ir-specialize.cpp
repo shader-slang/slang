@@ -4,6 +4,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
@@ -107,6 +108,18 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             {
                 if (isSpecConstRateType(inst->getFullType()))
                 {
@@ -1247,10 +1260,8 @@ struct SpecializationContext
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
                 peepholeOptimizeGlobalScope(targetProgram, this->module);
-                applySparseConditionalConstantPropagationForGlobalScope(
-                    this->module,
-                    targetProgram,
-                    this->sink);
+                performMandatoryEarlyInlining(module);
+                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
                 unrollLoopsInModule(module, targetProgram, sink);
             }
 

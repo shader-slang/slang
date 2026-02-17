@@ -244,7 +244,7 @@ struct DifferentiableTypeConformanceContext
                             paramTypes.add(fromDirectionAndType(
                                 builder,
                                 {ParameterDirectionInfo::Kind::In},
-                                (IRType*)getDifferentialForType(builder, paramType)));
+                                (IRType*)getDifferentialForType(paramType)));
                             break;
                         case ParameterDirectionInfo::Kind::BorrowInOut:
                             paramTypes.add(fromDirectionAndType(
@@ -360,26 +360,24 @@ struct DifferentiableTypeConformanceContext
                 {
                     const auto& [paramDirection, paramType] =
                         splitParameterDirectionAndType(innerFnType->getParamType(i));
-                    if (isDifferentiableValueType(paramType))
+                    if (auto diffValueType = tryGetDifferentiableValueType(paramType))
                     {
                         // If the parameter type is a differentiable value type, we replace it with
                         // the differential type.
                         //
-                        auto diffType = getDifferentialForType(builder, paramType);
                         paramTypes.add(fromDirectionAndType(
                             builder,
                             transposeDirection(paramDirection),
-                            (IRType*)diffType));
+                            (IRType*)diffValueType));
                     }
                     else
                         paramTypes.add(builder->getVoidType());
                 }
 
                 // Add the differential of the result type.
-                if (isDifferentiableValueType(innerFnType->getResultType()))
+                if (auto resultDiffType =
+                        tryGetDifferentiableValueType(innerFnType->getResultType()))
                 {
-                    auto resultDiffType =
-                        getDifferentialForType(builder, innerFnType->getResultType());
                     paramTypes.add((IRType*)resultDiffType);
                 }
 
@@ -397,18 +395,61 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
-    IRInst* tryGetDifferentiableValueType(IRBuilder* builder, IRType* origType)
+    IRInst* tryGetDifferentiableValueType(IRType* origType)
     {
+        IRBuilder builder(sharedContext->moduleInst);
+        if (auto typePack = as<IRTypePack>(origType))
+        {
+            List<IRType*> diffTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemDiff = tryGetDifferentiableValueType((IRType*)typePack->getOperand(i));
+                if (!elemDiff)
+                    return nullptr;
+                diffTypes.add((IRType*)elemDiff);
+            }
+            return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
+        }
+
         return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType);
     }
 
-    IRInst* tryGetDifferentiablePtrType(IRBuilder* builder, IRType* origType)
+    IRInst* tryGetDifferentiablePtrType(IRType* origType)
     {
+        IRBuilder builder(sharedContext->moduleInst);
+        if (auto typePack = as<IRTypePack>(origType))
+        {
+            List<IRType*> diffTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemDiff = tryGetDifferentiablePtrType((IRType*)typePack->getOperand(i));
+                if (!elemDiff)
+                    return nullptr;
+                diffTypes.add((IRType*)elemDiff);
+            }
+            return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
+        }
+
         return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
     }
 
-    IRType* tryGetDiffPairType(IRBuilder* builder, IRType* originalType)
+    IRType* tryGetDiffPairType(IRType* originalType)
     {
+        IRBuilder builder(sharedContext->moduleInst);
+
+        if (auto typePack = as<IRTypePack>(originalType))
+        {
+            List<IRType*> pairTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemPair = tryGetDiffPairType((IRType*)typePack->getOperand(i));
+                if (!elemPair)
+                    return nullptr;
+                pairTypes.add(elemPair);
+            }
+            return builder.getTypePack(pairTypes.getCount(), pairTypes.getBuffer());
+        }
+
         // In case we're dealing with a parameter type, we need to split out the direction first.
         // If we're not, then the split & merge are no-ops.
         //
@@ -425,30 +466,38 @@ struct DifferentiableTypeConformanceContext
         if (!basePairType)
             return nullptr;
 
-        return fromDirectionAndType(builder, passingMode, (IRType*)basePairType);
+        return fromDirectionAndType(&builder, passingMode, (IRType*)basePairType);
     }
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
-    // Note that inside a generic block, this will be a witness table lookup instruction
-    // that gets resolved during the specialization pass.
     //
-    IRInst* getDifferentialForType(IRBuilder* builder, IRType* origType)
+    IRInst* tryGetDifferentialForType(IRType* origType)
     {
-        switch (origType->getOp())
-        {
-        default:
-            auto diffValueType =
-                tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType);
-            auto diffPtrType =
-                tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
+        auto diffValueType = tryGetDifferentiableValueType(origType);
+        auto diffPtrType = tryGetDifferentiablePtrType(origType);
 
-            SLANG_ASSERT(
-                !(diffValueType && diffPtrType) &&
-                "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
+        SLANG_ASSERT(
+            !(diffValueType && diffPtrType) &&
+            "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
 
-            return diffValueType ? diffValueType : diffPtrType;
-        }
+        return diffValueType ? diffValueType : diffPtrType;
+    }
+
+    // Lookup and return the 'Differential' type declared in the concrete type
+    // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
+    // Asserts that the differential exists.
+    IRInst* getDifferentialForType(IRType* origType)
+    {
+        auto diffValueType = tryGetDifferentiableValueType(origType);
+        auto diffPtrType = tryGetDifferentiablePtrType(origType);
+
+        SLANG_ASSERT(
+            !(diffValueType && diffPtrType) &&
+            "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
+
+        SLANG_RELEASE_ASSERT(diffValueType || diffPtrType);
+        return diffValueType ? diffValueType : diffPtrType;
     }
 
     bool isDifferentiableType(IRType* origType)
@@ -458,13 +507,12 @@ struct DifferentiableTypeConformanceContext
 
     bool isDifferentiableValueType(IRType* origType)
     {
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType) != nullptr;
+        return tryGetDifferentiableValueType(origType) != nullptr;
     }
 
     bool isDifferentiablePtrType(IRType* origType)
     {
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType) !=
-               nullptr;
+        return tryGetDifferentiablePtrType(origType) != nullptr;
     }
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)

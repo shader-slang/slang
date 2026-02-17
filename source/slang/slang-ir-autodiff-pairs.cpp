@@ -406,7 +406,11 @@ struct DiffPairLoweringPass : InstPassBase
                 }
                 else if (auto typePack = as<IRTypePack>(pairType->getValueType()))
                 {
+                    SLANG_UNEXPECTED("Type-pack differential pairs should not show up anymore");
                     // TODO: Do we need to flatten the packs here?
+                    // TODO: Can be removed once we support type-packs natively
+                    // in auto-diff so results will be type-packs of pairs instead of pairs of
+                    // type-packs.
 
                     // If the type is a type pack, then the value must be in
                     // MakePair(MakeValuePack(p_0, p_1, ...), MakeValuePack(d_0, d_1, ...)) form

@@ -103,7 +103,7 @@ public struct FFLayer<
     [Differentiable]
     public OutputVector eval<S>(S storage, InputVector input)
         where S : IStorage<T>
-        where S.Differential : IStorage<T.Differential>
+        where S.Differential : IStorage<T>
         where S.Address == S.Differential.Address
         where S.Address == Storage.Address
     {
@@ -130,7 +130,7 @@ public struct FFLayer<
         S biasStorage,
         InputVector input)
             where S : IStorage<T>
-            where S.Differential : IStorage<T.Differential>
+            where S.Differential : IStorage<T>
             where S.Address == S.Differential.Address
             where S.Address == Storage.Address
     {
@@ -158,7 +158,7 @@ public struct FFLayer<
     [Differentiable]
     public static OutputVector eval<A>(A weightAddr, A biasAddr, Activation act, InputVector input)
         where A : IPointerLikeAddress<T>
-        where A.Differential : IPointerLikeAddress<T.Differential>
+        where A.Differential : IPointerLikeAddress<T>
     {
         OutputVector y;
         if(HasBias)

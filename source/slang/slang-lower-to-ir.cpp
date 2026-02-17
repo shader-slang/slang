@@ -1743,6 +1743,15 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder(),
             specConstRateType,
             as<IRFuncType>(funcType)->getResultType());
+
+        // Check for division operator and emit constexprDiv instead of a call.
+        auto funcName = val->getFuncDeclRef().getName();
+        if (funcName && funcName->text == toSlice("/") && args.getCount() == 2)
+        {
+            return LoweredValInfo::simple(
+                getBuilder()->emitConstexprDiv(funcResType, args[0], args[1]));
+        }
+
         auto resVal =
             emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
         return resVal;
@@ -1755,7 +1764,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
         type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
-        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitConstexprCast(type, baseVal.val));
         return resVal;
     }
 
@@ -1782,10 +1791,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
+                    termVal =
+                        irBuilder->emitConstexprMul(factorVal->getFullType(), termVal, factorVal);
                 }
             }
-            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
+            resultVal = irBuilder->emitConstexprAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
     }
@@ -3433,7 +3443,9 @@ static Type* _findReplacementThisParamType(IRGenContext* context, DeclRef<Decl> 
             // this-type.
             //
             if (isDeclRefTypeOf<CallableDecl>(targetDeclRefType))
+            {
                 return getThisParamTypeForCallable(context, targetDeclRefType->getDeclRef());
+            }
 
             if (auto replacementType =
                     _findReplacementThisParamType(context, targetDeclRefType->getDeclRef()))
@@ -3512,7 +3524,14 @@ Type* getThisParamTypeForCallable(IRGenContext* context, DeclRef<Decl> callableD
     if (auto genericDeclRef = parentDeclRef.as<GenericDecl>())
         parentDeclRef = genericDeclRef.getParent();
 
-    return getThisParamTypeForContainer(context, parentDeclRef);
+    // The parent's this type could end up without the full substitutions applied, so we need to
+    // apply those substitutions here.
+    //
+    auto thisType = getThisParamTypeForContainer(context, parentDeclRef);
+    if (thisType)
+        return substituteType(SubstitutionSet(callableDeclRef), context->astBuilder, thisType);
+    else
+        return nullptr;
 }
 
 struct StmtLoweringVisitor;
@@ -3947,10 +3966,6 @@ void collectParameterLists(
             paramInfo.actualParamPassingModeToUse = paramDirection;
             paramInfo.intendedParamPassingMode = paramDirection;
 
-            maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
-                paramInfo,
-                callableDeclRef);
-
             ioParameterLists->params.add(paramInfo);
         }
     }
@@ -3963,23 +3978,6 @@ void collectParameterLists(
         for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
         {
             auto paramInfo = getParameterInfo(context, paramDeclRef);
-
-            // One unfortunate wrinkle that arises is that all the downstream
-            // logic in the Slang IR *really* wants the varying input parameters
-            // to a shader entry point to use `ParamPassingMode::BorrowIn`,
-            // so that they don't force copying, but syntactically such parameters
-            // are conventionally declared using `in` (meaning `ParamPassingMode::In`).
-            //
-            // We include logic here to switch up the parameter-passing mode
-            // in the case where we can statically detect that something is
-            // being compiled as an entry point. Note, however, that this logic
-            // is inherently fragile, since not every entry point that a user specifies
-            // is guaranteed to have had a `[shader(...)]` attribute on it.
-            //
-            maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
-                paramInfo,
-                callableDeclRef);
-
             ioParameterLists->params.add(paramInfo);
         }
     }

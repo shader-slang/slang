@@ -927,6 +927,54 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
+    if (as<TypeEqualityWitness>(fst) && as<DeclaredSubtypeWitness>(snd))
+    {
+        if (as<DeclaredSubtypeWitness>(snd)->isEquality())
+        {
+            // Try to unify both the sub and sup types of equality witnesses,
+            // but a failure doesn't mean the unification fails, since
+            // we could have associated type lookups taht aren't used for
+            // inference, but will still be checked for validity in
+            // trySolveConstraintSystem.
+            //
+            TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                as<SubtypeWitness>(snd)->getSub(),
+                as<SubtypeWitness>(fst)->getSub());
+            TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                as<SubtypeWitness>(snd)->getSup(),
+                as<SubtypeWitness>(fst)->getSup());
+            return true;
+        }
+    }
+
+    if (as<DeclaredSubtypeWitness>(fst) && as<TypeEqualityWitness>(snd))
+    {
+        if (as<DeclaredSubtypeWitness>(fst)->isEquality())
+        {
+            // Try to unify both the sub and sup types of equality witnesses,
+            // but a failure doesn't mean the unification fails, since
+            // we could have associated type lookups taht aren't used for
+            // inference, but will still be checked for validity in
+            // trySolveConstraintSystem.
+            //
+            TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                as<SubtypeWitness>(snd)->getSub(),
+                as<SubtypeWitness>(fst)->getSub());
+            TryUnifyTypes(
+                constraints,
+                unifyCtx,
+                as<SubtypeWitness>(snd)->getSup(),
+                as<SubtypeWitness>(fst)->getSup());
+            return true;
+        }
+    }
+
     // Two subtype witnesses can be unified if they exist (non-null) and
     // prove that some pair of types are subtypes of types that can be unified.
     //
@@ -1817,6 +1865,22 @@ bool SemanticsVisitor::TryUnifyTypes(
                 }
             }
         }
+    }
+
+    if (as<ModifiedType>(fst) || as<ModifiedType>(snd))
+    {
+        // We can ignore modifiers for the purpose of unification, but only if the underlying
+        // type unifies.
+        //
+        // Modifiers are usually checked separately for compatibility based on the context.
+        //
+        auto fstModifiedType = as<ModifiedType>(fst);
+        auto sndModifiedType = as<ModifiedType>(snd);
+        return TryUnifyTypes(
+            constraints,
+            unifyCtx,
+            QualType(fstModifiedType ? fstModifiedType->getBase() : fst.type, fst.isLeftValue),
+            QualType(sndModifiedType ? sndModifiedType->getBase() : snd.type, snd.isLeftValue));
     }
     return false;
 }

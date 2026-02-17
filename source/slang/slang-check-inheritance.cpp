@@ -609,10 +609,10 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                             auto thisTypeDecl = baseInterfaceDeclRef.getDecl()->getThisTypeDecl();
                             auto lookupSubstitution = SubstitutionSet(
                                 _getASTBuilder()->getLookupDeclRef(
-                                    baseFacet->subtypeWitness,
+                                    (*base)->facetImpl.subtypeWitness,
                                     thisTypeDecl));
                             auto transitiveWitness =
-                                as<SubtypeWitness>(baseFacet->subtypeWitness->substitute(
+                                as<SubtypeWitness>(facet->subtypeWitness->substitute(
                                     _getASTBuilder(),
                                     lookupSubstitution));
                             additionalSubtypeWitnesses.addIfNotExists(
@@ -1014,6 +1014,43 @@ void SharedSemanticsContext::_mergeFacetLists(
 
                 indirectFacet->setSubtypeWitness(_getASTBuilder(), transitiveWitness);
                 ioMergedFacets.add(indirectFacet);
+            }
+            else if (
+                isDeclRefTypeOf<StructDecl>(baseType) && isDeclRefTypeOf<StructDecl>(facetType))
+            {
+                // TODO: Merge with one of the cases above..
+                if (isDeclRefTypeOf<StructDecl>(selfType))
+                {
+                    // struct -> struct -> struct is fine, but we'll need to construct a transitive
+                    // witness for it.
+                    auto transitiveWitness = astBuilder->getTransitiveSubtypeWitness(
+                        selfIsSubtypeOfBase,
+                        baseIsSubtypeOfFacet);
+                    indirectFacet->setSubtypeWitness(_getASTBuilder(), transitiveWitness);
+                    ioMergedFacets.add(indirectFacet);
+                }
+                else
+                {
+                    // Shouldn't really have a non-struct inherit from a struct...
+                    SLANG_UNEXPECTED("Unexpected witness structure");
+                }
+            }
+            else if (as<AndType>(baseType) && isDeclRefTypeOf<InterfaceDecl>(facetType))
+            {
+
+                // (class | struct | interface) -> interface -> interface
+                // can use the base' witness, with a substitution of self for 'this-type'
+                //
+                auto thisTypeDecl =
+                    as<InterfaceDecl>(as<AndType>(baseType)->getLeft())->getThisTypeDecl();
+                auto lookupSubstitution = SubstitutionSet(
+                    _getASTBuilder()->getLookupDeclRef(selfIsSubtypeOfBase, thisTypeDecl));
+
+                // Substitute 'selfIsSubtypeOfBase' witness in place of the `thisTypeWitness` for
+                // the base
+                //
+                auto transitiveWitness = as<SubtypeWitness>(
+                    baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
             }
         }
 

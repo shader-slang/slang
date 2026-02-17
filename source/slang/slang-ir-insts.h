@@ -4210,6 +4210,14 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitDiv(IRType* type, IRInst* numerator, IRInst* denominator);
+
+    // Constexpr arithmetic ops - hoistable variants used for IntVal lowering
+    IRInst* emitConstexprAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSub(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprDiv(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeg(IRType* type, IRInst* value);
+    IRInst* emitConstexprCast(IRType* type, IRInst* value);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);

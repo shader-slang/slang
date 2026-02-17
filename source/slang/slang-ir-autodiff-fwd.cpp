@@ -50,12 +50,18 @@ static void emitAnnotationsFromWitnessTable(
     builder->addAnnotation(targetInst, ValAssociationKind::DifferentialPairType, diffPairType);
 }
 
-static void addTypeAnnotationsForHigherOrderDiff(
+static void maybeAddTypeAnnotationsForHigherOrderDiff(
     IRBuilder* builder,
     DifferentiableTypeConformanceContext* diffTypeContext,
     IRType* origType,
     IRType* diffType)
 {
+    if (as<IRTypePack>(diffType) || as<IRTypePack>(origType))
+    {
+        // Type packs are not supported for higher-order differentiation at the moment.
+        return;
+    }
+
     // Check if the diffType already has an annotation.
     if (!diffTypeContext->isDifferentiableType(diffType))
     {
@@ -160,7 +166,7 @@ struct ForwardDiffTranslationContext
         {
             auto origType = funcType->getParamType(i);
             origType = (IRType*)findOrTranslatePrimalInst(builder, origType);
-            if (auto diffPairType = diffTypeContext.tryGetDiffPairType(builder, origType))
+            if (auto diffPairType = diffTypeContext.tryGetDiffPairType(origType))
                 newParameterTypes.add(diffPairType);
             else
                 newParameterTypes.add(origType);
@@ -171,7 +177,7 @@ struct ForwardDiffTranslationContext
         //
         auto origResultType =
             (IRType*)findOrTranslatePrimalInst(builder, funcType->getResultType());
-        if (auto returnPairType = diffTypeContext.tryGetDiffPairType(builder, origResultType))
+        if (auto returnPairType = diffTypeContext.tryGetDiffPairType(origResultType))
             diffReturnType = returnPairType;
         else
             diffReturnType = origResultType;
@@ -256,6 +262,67 @@ struct ForwardDiffTranslationContext
         }
 
         return String("");
+    }
+
+    // Helper to emit a MakeDifferentialPair that handles TypePack types.
+    // When pairType is a TypePack (of pair types), this extracts each element from the
+    // primal and differential value packs, makes individual pairs, and repacks them.
+    //
+    IRInst* emitMakeDiffPair(IRBuilder* builder, IRType* pairType, IRInst* primal, IRInst* diff)
+    {
+        if (auto typePack = as<IRTypePack>(pairType))
+        {
+            auto elemCount = typePack->getOperandCount();
+            auto primalTypePack = as<IRTypePack>(primal->getDataType());
+            auto diffTypePack = as<IRTypePack>(diff->getDataType());
+
+            bool isMixedDifferential = false;
+            List<IRInst*> pairElements;
+            for (UInt i = 0; i < elemCount; i++)
+            {
+                auto elemPairType = (IRType*)typePack->getOperand(i);
+                auto elemPrimalType =
+                    primalTypePack ? (IRType*)primalTypePack->getOperand(i) : primal->getDataType();
+                auto elemDiffType =
+                    diffTypePack ? (IRType*)diffTypePack->getOperand(i) : diff->getDataType();
+                auto elemPrimal = builder->emitElementExtract(primal, (IRIntegerValue)i);
+                auto elemDiff = builder->emitElementExtract(diff, (IRIntegerValue)i);
+                auto elemPair = emitMakeDiffPair(builder, elemPairType, elemPrimal, elemDiff);
+
+                if (as<IRDifferentialPairType>(elemPairType))
+                    isMixedDifferential = true;
+
+                pairElements.add(elemPair);
+            }
+
+            auto diffPairPackResult = builder->emitMakeValuePack(
+                pairType,
+                (UInt)pairElements.getCount(),
+                pairElements.getBuffer());
+
+            // TODO: Can TypePack be nested? If so, we
+            // can't rely on just testing the element types directly.
+            //
+            if (isMixedDifferential)
+                builder->markInstAsMixedDifferential(diffPairPackResult, pairType);
+            else
+                builder->markInstAsPrimal(diffPairPackResult);
+
+            return diffPairPackResult;
+        }
+
+        auto diffPairResult = builder->emitMakeDifferentialPair(pairType, primal, diff);
+
+        if (as<IRDifferentialPairType>(pairType))
+            builder->markInstAsMixedDifferential(diffPairResult, pairType);
+        else if (as<IRDifferentialPtrPairType>(pairType))
+            builder->markInstAsPrimal(diffPairResult);
+        else
+        {
+            SLANG_UNEXPECTED("unexpected pair type");
+        }
+
+        return diffPairResult;
     }
 
     InstPair translateUndefined(IRBuilder* builder, IRInst* origInst)
@@ -551,7 +618,7 @@ struct ForwardDiffTranslationContext
                     as<IRDifferentialPairType>(primalLocationPtrType->getValueType()))
             {
                 auto valToStore =
-                    builder->emitMakeDifferentialPair(diffPairType, primalStoreVal, diffStoreVal);
+                    emitMakeDiffPair(builder, diffPairType, primalStoreVal, diffStoreVal);
                 builder->markInstAsMixedDifferential(diffStoreVal, diffPairType);
 
                 auto store = builder->emitStore(primalStoreLocation, valToStore);
@@ -1059,7 +1126,7 @@ struct ForwardDiffTranslationContext
                 case ParameterDirectionInfo::In:
                     {
                         auto diffArg = findOrTranslateDiffInst(&argBuilder, origArg);
-                        auto pairType = diffTypeContext.tryGetDiffPairType(&argBuilder, primalType);
+                        auto pairType = diffTypeContext.tryGetDiffPairType(primalType);
 
                         if (!diffArg)
                         {
@@ -1075,14 +1142,11 @@ struct ForwardDiffTranslationContext
                             // potential sub-type relationship.
                             //
                             if (!pairType)
-                                pairType = diffTypeContext.tryGetDiffPairType(
-                                    &argBuilder,
-                                    originalParamBaseType);
+                                pairType =
+                                    diffTypeContext.tryGetDiffPairType(originalParamBaseType);
                         }
 
-                        auto diffPair =
-                            argBuilder.emitMakeDifferentialPair(pairType, primalArg, diffArg);
-                        diffTypeContext.markDiffPairTypeInst(&argBuilder, diffPair, pairType);
+                        auto diffPair = emitMakeDiffPair(&argBuilder, pairType, primalArg, diffArg);
 
                         args.add(diffPair);
                         break;
@@ -1095,8 +1159,7 @@ struct ForwardDiffTranslationContext
                         // The input must be a pointer.
                         SLANG_ASSERT(as<IRPtrTypeBase>(primalType));
                         auto primalValType = as<IRPtrTypeBase>(primalType)->getValueType();
-                        auto basePairType =
-                            diffTypeContext.tryGetDiffPairType(&argBuilder, primalValType);
+                        auto basePairType = diffTypeContext.tryGetDiffPairType(primalValType);
                         auto ptrPairType = builder->getPtrTypeWithAddressSpace(
                             primalValType,
                             as<IRPtrTypeBase>(primalType));
@@ -1124,14 +1187,8 @@ struct ForwardDiffTranslationContext
                                     diffArgVal,
                                     primalValType);
                             }
-                            auto initVal = argBuilder.emitMakeDifferentialPair(
-                                basePairType,
-                                primalVal,
-                                diffArgVal);
-                            diffTypeContext.markDiffPairTypeInst(
-                                &argBuilder,
-                                initVal,
-                                basePairType);
+                            auto initVal =
+                                emitMakeDiffPair(&argBuilder, basePairType, primalVal, diffArgVal);
 
                             auto store = argBuilder.emitStore(srcVar, initVal);
                             diffTypeContext.markDiffPairTypeInst(&argBuilder, store, basePairType);
@@ -1153,9 +1210,7 @@ struct ForwardDiffTranslationContext
                             if (diffArg)
                             {
                                 auto newDiffVal = afterBuilder.emitDifferentialPairGetDifferential(
-                                    (IRType*)diffTypeContext.getDifferentialForType(
-                                        &afterBuilder,
-                                        primalValType),
+                                    (IRType*)diffTypeContext.getDifferentialForType(primalValType),
                                     newVal);
                                 diffTypeContext.markDiffTypeInst(
                                     &afterBuilder,
@@ -1245,7 +1300,11 @@ struct ForwardDiffTranslationContext
         auto primalReturnType =
             (IRType*)findOrTranslatePrimalInst(&argBuilder, origCall->getFullType());
 
-        diffReturnType = diffTypeContext.tryGetDiffPairType(&argBuilder, primalReturnType);
+        bool isDiffReturnPack = false;
+
+        diffReturnType = diffTypeContext.tryGetDiffPairType(primalReturnType);
+        if (as<IRTypePack>(diffReturnType))
+            isDiffReturnPack = true;
 
         if (!diffReturnType)
         {
@@ -1284,6 +1343,36 @@ struct ForwardDiffTranslationContext
             IRInst* diffResultValue =
                 afterBuilder.emitDifferentialPairGetDifferential(diffType, callInst);
             return InstPair(primalResultValue, diffResultValue);
+        }
+        else if (isDiffReturnPack)
+        {
+            // The result is a TypePack(DiffPair1, DiffPair2, ...). We need to extract the
+            // primal/diff pairs for each element and return them as a pack.
+            List<IRInst*> primalElements;
+            List<IRInst*> diffElements;
+            auto typePack = as<IRTypePack>(diffReturnType);
+            SLANG_ASSERT(typePack);
+            UInt elemCount = typePack->getOperandCount();
+            auto diffReturnType = differentiateType(&afterBuilder, primalReturnType);
+            for (UInt i = 0; i < elemCount; ++i)
+            {
+                auto elemType = (IRType*)typePack->getOperand(i);
+                auto primalElem = afterBuilder.emitElementExtract(callInst, i);
+                primalElements.add(primalElem);
+
+                auto diffElemType = differentiateType(&afterBuilder, elemType);
+                auto diffElem = afterBuilder.emitElementExtract(callInst, i);
+                diffElements.add(diffElem);
+            }
+            auto primalPack = afterBuilder.emitMakeValuePack(
+                primalReturnType,
+                primalElements.getCount(),
+                primalElements.getBuffer());
+            auto diffPack = afterBuilder.emitMakeValuePack(
+                diffReturnType,
+                diffElements.getCount(),
+                diffElements.getBuffer());
+            return InstPair(primalPack, diffPack);
         }
         else
         {
@@ -1832,7 +1921,7 @@ struct ForwardDiffTranslationContext
         if (diffBase)
         {
             if (auto diffWrappedType =
-                    diffTypeContext.tryGetDifferentiableValueType(builder, primalWrappedType))
+                    diffTypeContext.tryGetDifferentiableValueType(primalWrappedType))
             {
                 // DiffType : IDifferentiable
                 auto diffTypeDiffWitness =
@@ -2169,7 +2258,7 @@ struct ForwardDiffTranslationContext
                                 primalVal->getFullType());
 
                             valToStore =
-                                builder.emitMakeDifferentialPair(pairValType, primalVal, diffVal);
+                                emitMakeDiffPair(&builder, pairValType, primalVal, diffVal);
 
                             diffTypeContext.markDiffPairTypeInst(&builder, valToStore, pairValType);
                         }
@@ -2866,10 +2955,8 @@ struct ForwardDiffTranslationContext
 
             if (auto arrayType = as<IRArrayType>(originalType))
             {
-                auto diffElementType = (IRType*)diffTypeContext.getDifferentialForType(
-                    builder,
-                    arrayType->getElementType());
-                SLANG_RELEASE_ASSERT(diffElementType);
+                auto diffElementType =
+                    (IRType*)diffTypeContext.getDifferentialForType(arrayType->getElementType());
                 auto diffArrayType =
                     builder->getArrayType(diffElementType, arrayType->getElementCount());
                 auto diffElementZero =
@@ -2987,7 +3074,7 @@ struct ForwardDiffTranslationContext
 
             return InstPair(diffReturn, diffReturn);
         }
-        else if (auto pairType = diffTypeContext.tryGetDiffPairType(builder, funcReturnDataType))
+        else if (auto pairType = diffTypeContext.tryGetDiffPairType(funcReturnDataType))
         {
             IRInst* primalReturnVal = findOrTranslatePrimalInst(builder, origReturnVal);
             IRInst* diffReturnVal = findOrTranslateDiffInst(builder, origReturnVal);
@@ -2997,8 +3084,7 @@ struct ForwardDiffTranslationContext
             // If the pair type can be formed, this must be non-null.
             SLANG_RELEASE_ASSERT(diffReturnVal);
 
-            auto diffPair =
-                builder->emitMakeDifferentialPair(pairType, primalReturnVal, diffReturnVal);
+            auto diffPair = emitMakeDiffPair(builder, pairType, primalReturnVal, diffReturnVal);
             builder->markInstAsMixedDifferential(diffPair, pairType);
 
             IRReturn* pairReturn = as<IRReturn>(builder->emitReturn(diffPair));
@@ -3174,21 +3260,16 @@ struct ForwardDiffTranslationContext
                 return nullptr;
         }
 
-        if (auto diffValueType = diffTypeContext.tryGetAssociationOfKind(
-                origType,
-                ValAssociationKind::DifferentialType))
+        if (auto diffValueType = diffTypeContext.tryGetDifferentiableValueType(origType))
         {
-            addTypeAnnotationsForHigherOrderDiff(
+            maybeAddTypeAnnotationsForHigherOrderDiff(
                 builder,
                 &diffTypeContext,
                 origType,
                 (IRType*)diffValueType);
             return (IRType*)diffValueType;
         }
-        else if (
-            auto diffPtrType = diffTypeContext.tryGetAssociationOfKind(
-                origType,
-                ValAssociationKind::DifferentialPtrType))
+        else if (auto diffPtrType = diffTypeContext.tryGetDifferentiablePtrType(origType))
         {
             // TODO: Handle higher-order ptr types (should just need to add annotations similar to
             // the value case)

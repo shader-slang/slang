@@ -17,7 +17,7 @@ public struct InlineVector<T, int N> : IVector<T>
     where T.Differential == T
 {
     /// The differential type for automatic differentiation.
-    public typealias Differential = InlineVector<T.Differential, N>;
+    public typealias Differential = InlineVector<T, N>;
 
     /// The compile-time size of the vector.
     public static const int Size = N;
@@ -27,7 +27,7 @@ public struct InlineVector<T, int N> : IVector<T>
     Internal storage for vector elements.
     @remarks Marked as derivative member to enable automatic differentiation.
     */
-    [DerivativeMember(Differential.data)]
+    // [DerivativeMember(Differential.data)]
     internal T[N] data;
 
     /// Default constructor - initializes all elements to zero.
@@ -86,7 +86,7 @@ public struct InlineVector<T, int N> : IVector<T>
         Storage weightStorage,
         no_diff Storage.Address weightAddress)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
@@ -119,7 +119,7 @@ public struct InlineVector<T, int N> : IVector<T>
         no_diff Storage.Address weightAddress,
         no_diff Storage.Address biasAddress)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
@@ -145,7 +145,7 @@ public struct InlineVector<T, int N> : IVector<T>
         no_diff Storage.Address dWeightAddress,
         OutputVector.Differential doutput)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
@@ -156,15 +156,15 @@ public struct InlineVector<T, int N> : IVector<T>
         [MaxIters(OutputVector.Size)]
         for (int j = 0; j < OutputVector.Size; j++)
         {
-            T.Differential dy = doutput[j];
+            T dy = doutput[j];
 
             [ForceUnroll]
             // N is the column count of the weight matrix.
             for (int i = 0; i < N; i++)
             {
                 Storage.Address elementOffset = Storage.getOffset(dWeightAddress, i + j * N);
-                T.Differential prod = __realCast<T.Differential, T>(dWeightStorage.p.read(elementOffset)) * dy;
-                d[i] = T.Differential.dadd(d[i], prod);
+                T prod = dWeightStorage.p.read(elementOffset) * dy;
+                d[i] = d[i] + prod;
             }
         }
 
@@ -174,14 +174,14 @@ public struct InlineVector<T, int N> : IVector<T>
         for (int row = 0; row < OutputVector.Size; row++)
         {
             let rowOffset = Storage.getOffset(dWeightAddress, row * N);
-            T.Differential dy = doutput[row];
+            T dy = doutput[row];
             [ForceUnroll]
             for (int col = 0; col < N; col++)
             {
                 let x = dthis.p[col];
                 let elementOffset = Storage.getOffset(rowOffset, col);
-                //T.Differential prod = T.Differential.dmul(x, dy);
-                T.Differential prod = __realCast<T.Differential, T>(x) * dy;
+                //T prod = T.dmul(x, dy);
+                T prod = x * dy;
                 dWeightStorage.d.atomicAdd(elementOffset, prod);
             }
         }
@@ -198,7 +198,7 @@ public struct InlineVector<T, int N> : IVector<T>
         no_diff Storage.Address dBiasAddress,
         OutputVector.Differential doutput)
             where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
+            where Storage.Differential : IStorage<T>
             where Storage.Address == Storage.Differential.Address
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
@@ -221,7 +221,7 @@ public struct InlineVector<T, int N> : IVector<T>
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
@@ -249,7 +249,7 @@ public struct InlineVector<T, int N> : IVector<T>
         Address weightAddress,
         Address biasAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
@@ -269,10 +269,9 @@ public struct InlineVector<T, int N> : IVector<T>
         DifferentialPtrPair<Address> dparameters,
         OutputVector.Differential doutput)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
     {
         // dInput = dW^T * dOutput
         This.Differential d = {};
@@ -283,8 +282,8 @@ public struct InlineVector<T, int N> : IVector<T>
             [ForceUnroll]
             for (int i = 0; i < N; i++)
             {
-                T.Differential prod = __realCast<T.Differential, T>(dparameters.p[i + j * N]) * dy;
-                d[i] = T.Differential.dadd(d[i], prod);
+                T prod = dparameters.p[i + j * N] * dy;
+                d[i] = d[i] + prod;
             }
         }
 
@@ -294,12 +293,12 @@ public struct InlineVector<T, int N> : IVector<T>
         for (int row = 0; row < OutputVector.Size; row++)
         {
             let rowAddr = dparameters.d.getOffset(row * N);
-            T.Differential dy = doutput[row];
+            T dy = doutput[row];
             [ForceUnroll]
             for (int col = 0; col < N; col++)
             {
                 let x = dthis.p[col];
-                T.Differential prod = __realCast<T.Differential, T>(x) * dy;
+                T prod = x * dy;
                 rowAddr.atomicAdd(col, prod);
             }
         }
@@ -314,7 +313,7 @@ public struct InlineVector<T, int N> : IVector<T>
         DifferentialPtrPair<Address> dBiasAddress,
         OutputVector.Differential doutput)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {

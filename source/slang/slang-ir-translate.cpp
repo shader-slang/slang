@@ -359,24 +359,6 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return inst;
     }
 
-    SLANG_ASSERT(as<IRModuleInst>(inst->getParent()));
-
-    if (isEvaluableOpCode(inst->getOp()))
-    {
-        if (auto constFoldedResult =
-                tryConstantFoldInst(ctx->getModule(), ctx->getTargetProgram(), inst))
-        {
-            inst->replaceUsesWith(constFoldedResult);
-            return constFoldedResult;
-        }
-        else
-        {
-            SLANG_UNEXPECTED(
-                "Something went wrong.. a global inst with evaluable opcode should have been "
-                "constant folded");
-        }
-    }
-
     // Otherwise we'll fall back to recreating the instruction
 
     List<IRInst*> operands;
@@ -396,6 +378,32 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
     // Extract effective inst post-resolution. (the inst may have changed).
     IRInst* instWithCanonicalOperands = instRef->getOperand(0);
+
+    if (isEvaluableOpCode(instWithCanonicalOperands->getOp()))
+    {
+        if (auto constFoldedResult = tryConstantFoldInst(
+                ctx->getModule(),
+                ctx->getTargetProgram(),
+                instWithCanonicalOperands))
+        {
+            instWithCanonicalOperands->replaceUsesWith(constFoldedResult);
+            return constFoldedResult;
+        }
+        else
+        {
+            SLANG_UNEXPECTED(
+                "Something went wrong.. a global inst with evaluable opcode should have been "
+                "constant folded");
+        }
+    }
+
+    // At this point, we've resolved anything that can be translated & not in the global scope (i.e.
+    // things like arithmetic operations)
+    //
+    // If we still have something that's not in the global scope, then something went wrong.
+    // since all operations after this point require this.
+    //
+    SLANG_ASSERT(as<IRModuleInst>(instWithCanonicalOperands->getParent()));
 
     if (as<IRTranslateBase>(instWithCanonicalOperands) ||
         as<IRTranslatedTypeBase>(instWithCanonicalOperands))
@@ -430,6 +438,13 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             {
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
                 auto specResult = specializeGeneric(specInst);
+
+                // TODO: We might need to do other things like loop-unrolling...
+                applySparseConditionalConstantPropagation(
+                    specResult,
+                    ctx->getTargetProgram(),
+                    ctx->getSink());
+
                 specInst->replaceUsesWith(specResult);
                 return memoize(specResult);
             }

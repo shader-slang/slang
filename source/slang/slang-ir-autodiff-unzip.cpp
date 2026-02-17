@@ -279,8 +279,7 @@ struct UnzippingContext
         {
             const auto& [paramDirection, paramType] =
                 splitParameterDirectionAndType(baseFuncType->getParamType(ii));
-            if (auto diffType =
-                    diffTypeContext.tryGetDifferentiableValueType(diffBuilder, paramType))
+            if (auto diffType = diffTypeContext.tryGetDifferentiableValueType(paramType))
             {
                 fwdPropFuncParamTypes.add(
                     fromDirectionAndType(diffBuilder, paramDirection, (IRType*)diffType));
@@ -292,9 +291,8 @@ struct UnzippingContext
         }
 
         IRType* fwdPropFuncResultType = nullptr;
-        if (auto diffType = diffTypeContext.tryGetDifferentiableValueType(
-                diffBuilder,
-                baseFuncType->getResultType()))
+        if (auto diffType =
+                diffTypeContext.tryGetDifferentiableValueType(baseFuncType->getResultType()))
         {
             fwdPropFuncResultType = (IRType*)diffType;
         }
@@ -357,7 +355,7 @@ struct UnzippingContext
         auto pairType =
             as<IRDifferentialPairType>(as<IRPtrTypeBase>(mixedVar->getDataType())->getValueType());
         auto primalType = pairType->getValueType();
-        auto diffType = (IRType*)diffTypeContext.getDifferentialForType(primalBuilder, primalType);
+        auto diffType = (IRType*)diffTypeContext.getDifferentialForType(primalType);
         auto primalVar = primalBuilder->emitVar(primalType);
         auto diffVar = diffBuilder->emitVar(diffType);
         diffBuilder->markInstAsDifferential(diffVar, diffBuilder->getPtrType(primalType));
