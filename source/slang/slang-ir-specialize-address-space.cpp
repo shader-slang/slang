@@ -448,15 +448,6 @@ void specializeAddressSpace(IRModule* module, InitialAddressSpaceAssigner* addrS
 void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
 {
     HashSet<IRInst*> visited;
-    auto addUserToWorkList = [&](IRInst* inst)
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (visited.add(user))
-                workList.add(user);
-        }
-    };
     for (auto item : workList)
     {
         visited.add(item);
@@ -500,7 +491,8 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
                     if (newType != user->getDataType())
                     {
                         user->setFullType(newType);
-                        addUserToWorkList(user);
+                        if (visited.add(user))
+                            workList.add(user);
                     }
                     break;
                 }
