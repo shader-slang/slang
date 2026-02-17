@@ -7,10 +7,9 @@ so it does not imply dynamic dispatch.
 
 @category neural
 */
-public interface ILayer<T, InputVector, OutputVector, Address, Layout, Activation>
+public interface ILayer<T, InputVector, OutputVector, Layout, Activation>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where Address : IPointerLikeAddress<T>
     where Layout : IStorageLayout
     where InputVector : IVector<T>
     where OutputVector : IVector<T>
@@ -18,12 +17,12 @@ public interface ILayer<T, InputVector, OutputVector, Address, Layout, Activatio
 {
     /// Forward evaluation: y = f(x).
     /// Address is passed as parameter to enable autodiff gradient routing.
-    /// @param weightAddress Weight address (pointer-like).
-    /// @param biasAddress Bias address (pointer-like).
     /// @param input Input vector.
+    /// @param weightAddress Weight address (pointer-like).
+    /// @param biasAddress Bias address (pointer-like). Pass `none` if no bias.
     /// @return Output vector.
     [Differentiable]
-    public OutputVector eval<A>(A weightAddress, A biasAddress, InputVector input)
+    public OutputVector eval<A>(InputVector input, A weightAddress, Optional<A> biasAddress = none)
         where A : IPointerLikeAddress<T>
         where A.Differential : IPointerLikeAddress<T.Differential>;
 }

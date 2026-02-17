@@ -31,8 +31,8 @@ typealias Address = BindlessAddress<float>;
 typealias V2 = InlineVector<float, 2>;
 typealias V1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer1 = FFLayer<float, V2, V2, Address, LinearLayout, Act, true>;
-typealias Layer2 = FFLayer<float, V2, V1, Address, LinearLayout, Act, true>;
+typealias Layer1 = FFLayer<float, V2, V2, LinearLayout, Act, true>;
+typealias Layer2 = FFLayer<float, V2, V1, LinearLayout, Act, true>;
 
 static const int Base0 = 0;
 
@@ -43,10 +43,8 @@ bool forwardCheck()
     float[2] xArr = { 1.5, -2.0 };
     let x = V2(xArr);
 
-    // Layer1: weights at 0 (4 floats: 2x2), bias at 4 (2 floats)
-    let layer1 = Layer1(int(0), int(4));
-    // Layer2: weights at 6 (2 floats: 1x2), bias at 8 (1 float)
-    let layer2 = Layer2(int(6), int(8));
+    let layer1 = Layer1();
+    let layer2 = Layer2();
 
     // Compute weight/bias addresses for each layer
     let w1Addr = baseAddr.getOffset(0);
@@ -54,8 +52,8 @@ bool forwardCheck()
     let w2Addr = baseAddr.getOffset(6);
     let b2Addr = baseAddr.getOffset(8);
 
-    let h = layer1.eval<Address>(w1Addr, b1Addr, x);
-    let y = layer2.eval<Address>(w2Addr, b2Addr, h);
+    let h = layer1.eval<Address>(x, w1Addr, b1Addr);
+    let y = layer2.eval<Address>(h, w2Addr, b2Addr);
 
     // Expected:
     // h = W1*x + b1

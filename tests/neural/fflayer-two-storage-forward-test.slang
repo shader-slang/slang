@@ -22,7 +22,7 @@ typealias Address = BindlessAddress<float>;
 typealias Vec2 = InlineVector<float, 2>;
 typealias Vec1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer = FFLayer<float, Vec2, Vec1, Address, LinearLayout, Act, true>;
+typealias Layer = FFLayer<float, Vec2, Vec1, LinearLayout, Act, true>;
 
 bool approxEqual(float a, float b, float eps = 0.001)
 {
@@ -34,13 +34,12 @@ bool testTwoStorageForward()
     let weightAddr = Address(weights);
     let biasAddr = Address(bias);
 
-    // weightOffset=0 in weights buffer, biasOffset=0 in bias buffer
-    let layer = Layer(int(0), int(0));
+    let layer = Layer();
 
     float[2] xArr = { 1.0, 2.0 };
     let x = Vec2(xArr);
 
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
 
     // Expected: 3*1 + 4*2 + 0.5 = 11.5
     return approxEqual(y[0], 11.5);

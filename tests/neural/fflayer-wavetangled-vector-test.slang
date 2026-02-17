@@ -46,13 +46,13 @@ typealias InVec = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupS
 typealias OutVec = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
 
 // FFLayer with WaveTangledVector and LinearLayout
-typealias Layer = FFLayer<ElementType, InVec, OutVec, Address, LinearLayout, IdentityActivation<ElementType>, true>;
+typealias Layer = FFLayer<ElementType, InVec, OutVec, LinearLayout, IdentityActivation<ElementType>, true>;
 
 // Wrapper function for autodiff
 [Differentiable]
 OutVec computeLayerOutput(Address weightAddr, Address biasAddr, InVec input, Layer layer)
 {
-    return layer.eval<Address>(weightAddr, biasAddr, input);
+    return layer.eval<Address>(input, weightAddr, biasAddr);
 }
 
 // Test FFLayer forward pass with WaveTangledVector
@@ -67,15 +67,14 @@ void testFFLayerForward(int tid, int resIndex)
 
     let baseAddr = Address(parameters);
 
-    // Create layer with weights at offset 0, bias at offset 8
-    let layer = Layer(int(0), int(8));
+    let layer = Layer();
 
     // Compute weight/bias addresses
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(8);
 
     // Forward pass
-    let output = layer.eval<Address>(weightAddr, biasAddr, input);
+    let output = layer.eval<Address>(input, weightAddr, biasAddr);
 
     // Verify output: [39, 80]
     bool isPassed = true;
@@ -98,7 +97,7 @@ void testFFLayerBackward(int tid, int resIndex)
     let baseAddr = Address(parameters);
     let dBaseAddr = Address(dParameters);
 
-    let layer = Layer(int(0), int(8));
+    let layer = Layer();
 
     // Compute weight/bias addresses outside differentiable function
     let weightAddr = baseAddr.getOffset(0);

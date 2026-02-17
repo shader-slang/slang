@@ -42,8 +42,8 @@ bool testFFLayerReLU()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, ReLU<float>, true>;
-    let layer = Layer(int(0), int(4));  // weights at 0, bias at 4
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ReLU<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -51,7 +51,7 @@ bool testFFLayerReLU()
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // ReLU([-1, 2]) = [0, 2]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 2.0);
@@ -64,9 +64,9 @@ bool testFFLayerLeakyReLU()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, LeakyReLU<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, LeakyReLU<float>, true>;
     let leakyRelu = LeakyReLU<float>(0.1);  // alpha = 0.1
-    let layer = Layer(int(0), int(4), leakyRelu);
+    let layer = Layer(leakyRelu);
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -74,7 +74,7 @@ bool testFFLayerLeakyReLU()
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // LeakyReLU([-1, 2], 0.1) = [-0.1, 2]
     return approxEqual(y[0], -0.1) && approxEqual(y[1], 2.0);
@@ -87,8 +87,8 @@ bool testFFLayerSigmoid()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, Sigmoid<float>, true>;
-    let layer = Layer(int(0), int(4));
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, Sigmoid<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -96,7 +96,7 @@ bool testFFLayerSigmoid()
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // Sigmoid([0, 0]) = [0.5, 0.5]
     return approxEqual(y[0], 0.5) && approxEqual(y[1], 0.5);
@@ -109,8 +109,8 @@ bool testFFLayerTanh()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, TanhActivation<float>, true>;
-    let layer = Layer(int(0), int(4));
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, TanhActivation<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -118,7 +118,7 @@ bool testFFLayerTanh()
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // Tanh([0, 0]) = [0, 0]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 0.0);
@@ -131,8 +131,8 @@ bool testFFLayerExp()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, ExpActivation<float>, true>;
-    let layer = Layer(int(0), int(4));
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ExpActivation<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -140,7 +140,7 @@ bool testFFLayerExp()
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // Exp([0, 0]) = [1, 1]
     return approxEqual(y[0], 1.0) && approxEqual(y[1], 1.0);
@@ -153,8 +153,8 @@ bool testFFLayerIdentity()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, IdentityActivation<float>, true>;
-    let layer = Layer(int(0), int(4));
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, IdentityActivation<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -162,7 +162,7 @@ bool testFFLayerIdentity()
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // Identity([-1, 2]) = [-1, 2]
     return approxEqual(y[0], -1.0) && approxEqual(y[1], 2.0);
@@ -175,8 +175,8 @@ bool testFFLayerSine()
     setupParams();
     let baseAddr = Address(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Address, LinearLayout, SineActivation<float>, true>;
-    let layer = Layer(int(0), int(4));
+    typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, SineActivation<float>, true>;
+    let layer = Layer();
     
     let weightAddr = baseAddr.getOffset(0);
     let biasAddr = baseAddr.getOffset(4);
@@ -185,7 +185,7 @@ bool testFFLayerSine()
     float[2] arr = {0.0, pi / 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(weightAddr, biasAddr, x);
+    let y = layer.eval<Address>(x, weightAddr, biasAddr);
     
     // Sin([0, pi/2]) = [0, 1]
     return approxEqual(y[0], 0.0, 0.001) && approxEqual(y[1], 1.0, 0.001);

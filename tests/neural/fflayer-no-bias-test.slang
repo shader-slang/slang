@@ -1,5 +1,6 @@
-// Test FFLayer backward pass via autodiff.
-// Verifies that autodiff correctly computes gradients through eval<A>().
+// Test FFLayer with HasBias=false (forward and backward).
+// Verifies that y = Activation(W*x) works correctly without bias,
+// and that autodiff computes correct weight and input gradients.
 //
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0
@@ -7,11 +8,11 @@
 
 import neural;
 
-// Weights: W = [[1,2],[3,4]], bias = [0.5, -0.5]
-//TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0 0.5 -0.5], stride=4)
+// Weights only (no bias): W = [[1,2],[3,4]]
+//TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0], stride=4)
 
 // Gradient buffer for weight gradients
-//TEST_INPUT: set gradParams = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
+//TEST_INPUT: set gradParams = ubuffer(data=[0.0 0.0 0.0 0.0], stride=4)
 
 #if TEST_POINTER
     uniform float* params;
@@ -23,75 +24,78 @@ import neural;
     typealias Address = BindlessAddress<float>;
 #endif
 
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
+//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
 typealias Vec2 = InlineVector<float, 2>;
 typealias Act = IdentityActivation<float>;
-typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, Act, true>;
+typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, Act, false>;
 
 bool approxEqual(float a, float b, float eps = 0.001)
 {
     return abs(a - b) < eps;
 }
 
-// Test forward pass
+// Test forward pass: y = W*x (no bias)
 bool testForwardPass()
 {
     let baseAddr = Address(params);
     let layer = Layer();
 
     let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
 
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
 
-    // W = [[1,2],[3,4]], b = [0.5, -0.5]
-    // y = W*x + b = [1*1+2*2, 3*1+4*2] + [0.5, -0.5] = [5, 11] + [0.5, -0.5] = [5.5, 10.5]
-    return approxEqual(y[0], 5.5) && approxEqual(y[1], 10.5);
+    // Call eval without bias address (uses default none)
+    let y = layer.eval<Address>(x, weightAddr);
+
+    // W = [[1,2],[3,4]]
+    // y = W*x = [1*1+2*2, 3*1+4*2] = [5, 11]
+    return approxEqual(y[0], 5.0) && approxEqual(y[1], 11.0);
 }
 
-// Wrapper function for autodiff - takes DifferentialPtrPair for weight and bias addresses
-[Differentiable]
-Vec2 computeOutput(Address weightAddr, Address biasAddr, Vec2 input, Layer layer)
+// Test ParameterCount: should be 2*2 = 4 (no bias terms)
+bool testParameterCount()
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return Layer.ParameterCount == 4;
+}
+
+// Wrapper function for autodiff (no bias address needed)
+[Differentiable]
+Vec2 computeOutput(Address weightAddr, Vec2 input, Layer layer)
+{
+    return layer.eval<Address>(input, weightAddr);
 }
 
 // Test backward pass using autodiff
 bool testBackwardPass()
 {
     // Reset gradient buffer
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 4; i++)
         gradParams[i] = 0.0;
 
     let baseAddr = Address(params);
     let gradBaseAddr = Address(gradParams);
     let layer = Layer();
 
-    // Compute weight/bias addresses outside the differentiable function
     let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
     let dWeightAddr = gradBaseAddr.getOffset(0);
-    let dBiasAddr = gradBaseAddr.getOffset(4);
 
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
 
-    // Create DifferentialPtrPair for weight and bias addresses (primal, gradient)
+    // Create DifferentialPtrPair for weight address (primal, gradient)
     var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
-    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
-    
+
     // Create diffPair for input
     var inputPair = diffPair(x);
-    
+
     // Output gradient: dL/dy = [1, 1]
     let dOutput = Vec2(1.0);
 
     // Use bwd_diff to compute gradients
-    bwd_diff(computeOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
+    bwd_diff(computeOutput)(weightAddrPair, inputPair, layer, dOutput);
 
     // Expected weight gradients:
     // dL/dW = dy * x^T where dy = [1, 1], x = [1, 2]
@@ -99,17 +103,17 @@ bool testBackwardPass()
     // dW[0,1] = dy[0] * x[1] = 1 * 2 = 2
     // dW[1,0] = dy[1] * x[0] = 1 * 1 = 1
     // dW[1,1] = dy[1] * x[1] = 1 * 2 = 2
-    // dB[0] = dy[0] = 1
-    // dB[1] = dy[1] = 1
-
     bool w00 = approxEqual(gradParams[0], 1.0);
     bool w01 = approxEqual(gradParams[1], 2.0);
     bool w10 = approxEqual(gradParams[2], 1.0);
     bool w11 = approxEqual(gradParams[3], 2.0);
-    bool b0 = approxEqual(gradParams[4], 1.0);
-    bool b1 = approxEqual(gradParams[5], 1.0);
 
-    return w00 && w01 && w10 && w11 && b0 && b1;
+    // Expected input gradients:
+    // dL/dx = W^T * dy = [[1,3],[2,4]] * [1,1] = [1+3, 2+4] = [4, 6]
+    bool dx0 = approxEqual(inputPair.d[0], 4.0);
+    bool dx1 = approxEqual(inputPair.d[1], 6.0);
+
+    return w00 && w01 && w10 && w11 && dx0 && dx1;
 }
 
 [shader("compute")]
@@ -117,7 +121,9 @@ bool testBackwardPass()
 void computeMain()
 {
     testResult[0] = testForwardPass();
-    testResult[1] = testBackwardPass();
+    testResult[1] = testParameterCount();
+    testResult[2] = testBackwardPass();
+    // BUFFER: 1
     // BUFFER: 1
     // BUFFER: 1
 }

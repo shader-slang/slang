@@ -22,7 +22,7 @@ typealias Address = BindlessAddress<float>;
 typealias XVec = InlineVector<float, 4>;
 typealias YVec = InlineVector<float, 2>;
 typealias Act = ReLU<float>;
-typealias Layer = FFLayer<float, XVec, YVec, Address, LinearLayout, Act, true>;
+typealias Layer = FFLayer<float, XVec, YVec, LinearLayout, Act, true>;
 
 // Test: evaluate layer through ILayer constraint
 InlineVector<float, 2> evalAsLayer<L>(
@@ -30,9 +30,9 @@ InlineVector<float, 2> evalAsLayer<L>(
     Address weightAddr,
     Address biasAddr,
     InlineVector<float, 4> input)
-    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, Address, LinearLayout, Act>
+    where L : ILayer<float, InlineVector<float, 4>, InlineVector<float, 2>, LinearLayout, Act>
 {
-    return layer.eval<Address>(weightAddr, biasAddr, input);
+    return layer.eval<Address>(input, weightAddr, biasAddr);
 }
 
 bool forwardTest()
@@ -41,8 +41,7 @@ bool forwardTest()
     for(int i=0;i<10;i++) params[i] = parametersFloat[i];
 
     let baseAddr = Address(params);
-    // Weights at offset 0 (8 floats: 2x4), bias at offset 8 (2 floats)
-    let layer = Layer(int(0), int(8));
+    let layer = Layer();
 
     // Compute weight/bias addresses
     let weightAddr = baseAddr.getOffset(0);
