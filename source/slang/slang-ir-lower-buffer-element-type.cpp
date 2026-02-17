@@ -1228,91 +1228,105 @@ struct LoweredElementTypeContext
                                 switch (user->getOp())
                                 {
                                 case kIROp_GetElementPtr:
+                                    {
+                                        ShortList<IRInst*> newArgs;
+                                        for (UInt i = 1; i < user->getOperandCount(); i++)
+                                            newArgs.add(user->getOperand(i));
+                                        storageGEP = builder.emitElementAddress(
+                                            storageBaseAddr,
+                                            newArgs.getArrayView().arrayView);
+                                        break;
+                                    }
                                 case kIROp_FieldAddress:
                                     {
-                                        // For standard gep instructions, use the
-                                        // IR builder to auto-deduce result type
-                                        // of the new GEP inst.
                                         ShortList<IRInst*> newArgs;
                                         for (UInt i = 1; i < user->getOperandCount(); i++)
                                             newArgs.add(user->getOperand(i));
 
-                                        // When pushing a FieldAddress through a CastStorageToLogical,
-                                        // the field key from the logical type may not exist in the
-                                        // storage type (e.g., array wrapper structs lowered with
-                                        // different layout rules use different field keys).
-                                        // Map the field key by position from the logical struct to
-                                        // the storage struct.
-                                        if (user->getOp() == kIROp_FieldAddress)
+                                        // When pushing a FieldAddress through a
+                                        // CastStorageToLogical, the field key from the logical type
+                                        // may not exist in the storage type (e.g., array wrapper
+                                        // structs lowered with different layout rules use different
+                                        // field keys). Map the field key by position from the
+                                        // logical struct to the storage struct.
+                                        auto storageBasePtrType =
+                                            as<IRPtrTypeBase>(storageBaseAddr->getDataType());
+                                        auto storageStructType =
+                                            storageBasePtrType
+                                                ? as<IRStructType>(
+                                                      storageBasePtrType->getValueType())
+                                                : nullptr;
+                                        auto logicalStructType =
+                                            as<IRPtrTypeBase>(castInst->getDataType())
+                                                ? as<IRStructType>(
+                                                      as<IRPtrTypeBase>(castInst->getDataType())
+                                                          ->getValueType())
+                                                : nullptr;
+                                        if (storageStructType && logicalStructType)
                                         {
-                                            auto storageBasePtrType =
-                                                as<IRPtrTypeBase>(storageBaseAddr->getDataType());
-                                            auto storageStructType =
-                                                storageBasePtrType
-                                                    ? as<IRStructType>(
-                                                          storageBasePtrType->getValueType())
-                                                    : nullptr;
-                                            auto logicalStructType =
-                                                as<IRPtrTypeBase>(castInst->getDataType())
-                                                    ? as<IRStructType>(
-                                                          as<IRPtrTypeBase>(castInst->getDataType())
-                                                              ->getValueType())
-                                                    : nullptr;
-                                            if (storageStructType && logicalStructType)
+                                            // Returns the positional index of a field key
+                                            // within a struct, or -1 if not found.
+                                            auto findFieldIndex = [](IRStructType* structType,
+                                                                     IRStructKey* key) -> Index
                                             {
-                                                for (Index ai = 0; ai < newArgs.getCount(); ai++)
+                                                Index idx = 0;
+                                                for (auto child : structType->getChildren())
                                                 {
-                                                    auto fieldKey = as<IRStructKey>(newArgs[ai]);
-                                                    if (!fieldKey)
-                                                        continue;
-                                                    // Check if the field key exists in the storage
-                                                    // struct.
-                                                    bool found = false;
-                                                    for (auto child :
-                                                         storageStructType->getChildren())
+                                                    if (auto field = as<IRStructField>(child))
                                                     {
-                                                        if (auto field = as<IRStructField>(child))
-                                                        {
-                                                            if (field->getKey() == fieldKey)
-                                                            {
-                                                                found = true;
-                                                                break;
-                                                            }
-                                                        }
-                                                    }
-                                                    if (!found)
-                                                    {
-                                                        // Map by field position from logical to
-                                                        // storage struct.
-                                                        Index fieldIndex = 0;
-                                                        for (auto child :
-                                                             logicalStructType->getChildren())
-                                                        {
-                                                            if (auto field =
-                                                                    as<IRStructField>(child))
-                                                            {
-                                                                if (field->getKey() == fieldKey)
-                                                                    break;
-                                                                fieldIndex++;
-                                                            }
-                                                        }
-                                                        Index storageFieldIndex = 0;
-                                                        for (auto child :
-                                                             storageStructType->getChildren())
-                                                        {
-                                                            if (auto field =
-                                                                    as<IRStructField>(child))
-                                                            {
-                                                                if (storageFieldIndex == fieldIndex)
-                                                                {
-                                                                    newArgs[ai] = field->getKey();
-                                                                    break;
-                                                                }
-                                                                storageFieldIndex++;
-                                                            }
-                                                        }
+                                                        if (field->getKey() == key)
+                                                            return idx;
+                                                        idx++;
                                                     }
                                                 }
+                                                return -1;
+                                            };
+                                            // Returns the field key at a given positional
+                                            // index within a struct, or nullptr if out of range.
+                                            auto getFieldKeyAtIndex =
+                                                [](IRStructType* structType,
+                                                   Index targetIndex) -> IRStructKey*
+                                            {
+                                                Index idx = 0;
+                                                for (auto child : structType->getChildren())
+                                                {
+                                                    if (auto field = as<IRStructField>(child))
+                                                    {
+                                                        if (idx == targetIndex)
+                                                            return field->getKey();
+                                                        idx++;
+                                                    }
+                                                }
+                                                return nullptr;
+                                            };
+
+                                            for (Index argIdx = 0; argIdx < newArgs.getCount();
+                                                 argIdx++)
+                                            {
+                                                auto fieldKey = as<IRStructKey>(newArgs[argIdx]);
+                                                if (!fieldKey)
+                                                    continue;
+                                                // Key already exists in the storage struct,
+                                                // no remapping needed.
+                                                if (findFieldIndex(storageStructType, fieldKey) >=
+                                                    0)
+                                                    continue;
+                                                // Find the index of this key in
+                                                // the logical struct, then get the
+                                                // corresponding key in the storage struct.
+                                                Index logicalIndex =
+                                                    findFieldIndex(logicalStructType, fieldKey);
+                                                if (logicalIndex < 0)
+                                                    continue;
+                                                // Get the field key at the corresponding
+                                                // index in the storage struct.
+                                                auto storageKey = getFieldKeyAtIndex(
+                                                    storageStructType,
+                                                    logicalIndex);
+                                                // Replace the logical field key with the storage
+                                                // field key at the same index.
+                                                if (storageKey)
+                                                    newArgs[argIdx] = storageKey;
                                             }
                                         }
 
