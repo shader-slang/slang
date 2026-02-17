@@ -2213,7 +2213,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             dataLayout = lowerType(context, dataLayoutType);
         }
 
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)

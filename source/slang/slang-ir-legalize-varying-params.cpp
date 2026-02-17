@@ -2145,7 +2145,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
     TargetProgram* target;
 
-    CPUEntryPointVaryingParamLegalizeContext(TargetProgram* target): target(target)
+    CPUEntryPointVaryingParamLegalizeContext(TargetProgram* target)
+        : target(target)
     {
     }
 
@@ -2164,11 +2165,14 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         // coming from the "prelude" file that already defines this type.
 
         varyingInputStructType = builder.createStructType();
-        auto dataLayout = isCPUTargetViaLLVM(target->getTargetReq()) ?
-            (IRType*)builder.getLLVMBufferLayoutType() :
-            (IRType*)builder.getCBufferLayoutType();
+        auto dataLayout = isCPUTargetViaLLVM(target->getTargetReq())
+                              ? (IRType*)builder.getLLVMBufferLayoutType()
+                              : (IRType*)builder.getCBufferLayoutType();
         varyingInputStructPtrType = builder.getPtrType(
-            varyingInputStructType, AccessQualifier::Read, AddressSpace::Generic, dataLayout);
+            varyingInputStructType,
+            AccessQualifier::Read,
+            AddressSpace::Generic,
+            dataLayout);
 
         builder.addTargetIntrinsicDecoration(
             varyingInputStructType,
@@ -2280,7 +2284,10 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     }
 };
 
-void legalizeEntryPointVaryingParamsForCPU(IRModule* module, TargetProgram* target, DiagnosticSink* sink)
+void legalizeEntryPointVaryingParamsForCPU(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink)
 {
     CPUEntryPointVaryingParamLegalizeContext context(target);
     context.processModule(module, sink);

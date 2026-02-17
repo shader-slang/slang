@@ -1596,10 +1596,7 @@ struct IRPtrTypeBase : IRType
                    : AddressSpace::Generic;
     }
 
-    IRType* getDataLayout()
-    {
-        return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr;
-    }
+    IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
 

@@ -473,9 +473,14 @@ Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
     return res;
 }
 
-PtrType* ASTBuilder::getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace, Type* dataLayout)
+PtrType* ASTBuilder::getPtrType(
+    Type* valueType,
+    Val* accessQualifier,
+    Val* addrSpace,
+    Type* dataLayout)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
+    return dynamicCast<PtrType>(
+        getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
 }
 
 PtrType* ASTBuilder::getPtrType(
@@ -484,7 +489,8 @@ PtrType* ASTBuilder::getPtrType(
     AddressSpace addrSpace,
     Type* dataLayout)
 {
-    return dynamicCast<PtrType>(getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
+    return dynamicCast<PtrType>(
+        getPtrType(valueType, accessQualifier, addrSpace, dataLayout, "PtrType"));
 }
 
 Type* ASTBuilder::getDefaultLayoutType()
@@ -559,7 +565,8 @@ PtrTypeBase* ASTBuilder::getPtrType(
     auto dataLayoutInterface = m_sharedASTBuilder->getIBufferDataLayoutType();
     DeclaredSubtypeWitness* subtypeWitness = nullptr;
 
-    for (auto typeConstraintDeclRef: containerDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeConstraintDecl>())
+    for (auto typeConstraintDeclRef :
+         containerDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeConstraintDecl>())
     {
         if (typeConstraintDeclRef->getSup().type == dataLayoutInterface)
         {
@@ -572,13 +579,7 @@ PtrTypeBase* ASTBuilder::getPtrType(
 
     SLANG_RELEASE_ASSERT(subtypeWitness);
 
-    Val* args[] = {
-        valueType,
-        accessQualifier,
-        addrSpace,
-        dataLayoutType,
-        subtypeWitness
-    };
+    Val* args[] = {valueType, accessQualifier, addrSpace, dataLayoutType, subtypeWitness};
     return as<PtrTypeBase>(getSpecializedBuiltinType(makeArrayView(args), ptrTypeName));
 }
 

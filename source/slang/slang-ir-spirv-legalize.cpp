@@ -236,7 +236,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 builder.setInsertBefore(use->getUser());
                 auto addr = builder.emitFieldAddress(
-                    builder.getPtrType(innerType, AccessQualifier::Read, AddressSpace::Uniform, builder.getDefaultBufferLayoutType()),
+                    builder.getPtrType(
+                        innerType,
+                        AccessQualifier::Read,
+                        AddressSpace::Uniform,
+                        builder.getDefaultBufferLayoutType()),
                     cbParamInst,
                     key);
                 use->set(addr);
@@ -543,7 +547,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(innerType, access, addressSpace, builder.getDefaultBufferLayoutType());
+            ptrType = builder.getPtrType(
+                innerType,
+                access,
+                addressSpace,
+                builder.getDefaultBufferLayoutType());
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -1177,8 +1185,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 return;
             IRBuilder builder(m_sharedContext->m_irModule);
             builder.setInsertBefore(subscript);
-            auto newPtrType =
-                builder.getPtrType(ptrType->getOp(), ptrType->getValueType(), AddressSpace::Image, ptrType->getDataLayout());
+            auto newPtrType = builder.getPtrType(
+                ptrType->getOp(),
+                ptrType->getValueType(),
+                AddressSpace::Image,
+                ptrType->getDataLayout());
             subscript->setFullType(newPtrType);
 
             // HACK: assumes the image operand is a load and replace it with

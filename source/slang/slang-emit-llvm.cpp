@@ -2108,8 +2108,11 @@ struct LLVMEmitter
                 {
                     // emitGEP + emitLoad.
                     auto elemType = arrayType->getElementType();
-                    LLVMInst* ptr =
-                        emitArrayGetElementPtr(llvmVal, findValue(indexInst), elemType, defaultPointerRules);
+                    LLVMInst* ptr = emitArrayGetElementPtr(
+                        llvmVal,
+                        findValue(indexInst),
+                        elemType,
+                        defaultPointerRules);
                     llvmInst = emitLoad(ptr, elemType, defaultPointerRules);
                 }
                 else
@@ -3073,7 +3076,8 @@ struct LLVMEmitter
         {
             IRBuilder irBuilder(irModule);
             defaultPointerRules = getTypeLayoutRuleForBuffer(
-                codeGenContext->getTargetProgram(), irBuilder.getPtrType(irBuilder.getVoidType()));
+                codeGenContext->getTargetProgram(),
+                irBuilder.getPtrType(irBuilder.getVoidType()));
         }
 
         emitGlobalDebugInfo(irModule);

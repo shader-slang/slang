@@ -3452,7 +3452,8 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
                 legalValueType.getSimple(),
                 varPtrType ? varPtrType->getAccessQualifier() : AccessQualifier::ReadWrite,
                 varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global,
-                varPtrType ? varPtrType->getDataLayout() : context->builder->getDefaultBufferLayoutType()));
+                varPtrType ? varPtrType->getDataLayout()
+                           : context->builder->getDefaultBufferLayoutType()));
         return LegalVal::simple(irGlobalVar);
 
     default:

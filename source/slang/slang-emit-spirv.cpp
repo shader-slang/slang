@@ -7742,7 +7742,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             addrSpace = destPtrType->getAddressSpace();
             dataLayout = destPtrType->getDataLayout();
         }
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
+        auto ptrElementType =
+            builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
 
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
@@ -7916,7 +7917,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, AccessQualifier::ReadWrite, addressSpace, bufPtrType->getDataLayout()),
+            builder.getPtrType(
+                arrayType,
+                AccessQualifier::ReadWrite,
+                addressSpace,
+                bufPtrType->getDataLayout()),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }

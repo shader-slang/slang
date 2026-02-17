@@ -1757,8 +1757,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             auto accessQualifier = AccessQualifier::ReadWrite;
             if (kind == LayoutResourceKind::VaryingInput)
                 accessQualifier = AccessQualifier::Immutable;
-            IRType* paramType =
-                builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace, builder->getDefaultBufferLayoutType());
+            IRType* paramType = builder->getPtrType(
+                ptrOpCode,
+                arrayType,
+                accessQualifier,
+                addrSpace,
+                builder->getDefaultBufferLayoutType());
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1826,8 +1830,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // all cases the new parameter will use a pointer type, into the
         // appropriate address space for a varying input/output.
         //
-        IRType* legalizedParamPtrType =
-            builder->getPtrType(ptrOpCode, legalizedParamType, addrSpace, builder->getDefaultBufferLayoutType());
+        IRType* legalizedParamPtrType = builder->getPtrType(
+            ptrOpCode,
+            legalizedParamType,
+            addrSpace,
+            builder->getDefaultBufferLayoutType());
         auto legalizedParamPtr = addGlobalParam(builder->getModule(), legalizedParamPtrType);
         moveValueBefore(legalizedParamPtr, builder->getFunc());
 
@@ -3710,8 +3717,11 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     auto arrayType = builder.getArrayType(
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(
-        builder.getPtrType(arrayType, AccessQualifier::Immutable, AddressSpace::Input, builder.getDefaultBufferLayoutType()));
+    arrayInst = builder.createGlobalParam(builder.getPtrType(
+        arrayType,
+        AccessQualifier::Immutable,
+        AddressSpace::Input,
+        builder.getDefaultBufferLayoutType()));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 

@@ -534,7 +534,11 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace, Type* dataLayout);
+    PtrType* getPtrType(
+        Type* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace,
+        Type* dataLayout);
     PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace, Type* dataLayout);
 
     // Construct the type `OutParam<valueType>`

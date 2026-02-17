@@ -3321,7 +3321,11 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* accessQualifier,
         IRInst* addressSpace,
         IRType* dataLayoutType);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace, IRType* dataLayoutType)
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
         return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace, dataLayoutType);
     }
@@ -3335,7 +3339,11 @@ $(type_info.return_type) $(type_info.method_name)(
     }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace, getDefaultBufferLayoutType());
+        return getPtrType(
+            valueType,
+            AccessQualifier::ReadWrite,
+            addressSpace,
+            getDefaultBufferLayoutType());
     }
     // Copies the op-type of the oldPtrType, access-qualifier and address-space.
     // Does not reuse the same `inst` for access-qualifier and address-space.
@@ -4175,7 +4183,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
-    IRInst* emitRWStructuredBufferGetElementPtr(IRType* pointerType, IRInst* structuredBuffer, IRInst* index);
+    IRInst* emitRWStructuredBufferGetElementPtr(
+        IRType* pointerType,
+        IRInst* structuredBuffer,
+        IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
 

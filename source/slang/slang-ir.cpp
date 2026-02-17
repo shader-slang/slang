@@ -2804,14 +2804,22 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefParamType*)
-        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace, getDefaultBufferLayoutType());
+    return (IRRefParamType*)getPtrType(
+        kIROp_RefParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRBorrowInParamType*)
-        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace, getDefaultBufferLayoutType());
+    return (IRBorrowInParamType*)getPtrType(
+        kIROp_BorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 
@@ -2868,8 +2876,7 @@ IRPtrType* IRBuilder::getPtrType(
         valueType,
         accessQualifier,
         addressSpace,
-        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()
-    };
+        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()};
     return (IRPtrType*)getType(op, addressSpace ? (dataLayoutType ? 4 : 3) : 1, operands);
 }
 
@@ -5133,7 +5140,10 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace, dataLayoutType), basePtr, fieldKey);
+    return emitFieldAddress(
+        getPtrType(resultType, accessQualifier, addrSpace, dataLayoutType),
+        basePtr,
+        fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -6434,7 +6444,10 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer,
     return emitRWStructuredBufferGetElementPtr(t->getCanonicalType(), structuredBuffer, index);
 }
 
-IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRType* pointerType, IRInst* structuredBuffer, IRInst* index)
+IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
+    IRType* pointerType,
+    IRInst* structuredBuffer,
+    IRInst* index)
 {
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     SLANG_ASSERT(sbt);
