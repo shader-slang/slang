@@ -303,7 +303,8 @@ struct LayoutOffset
     {
         if (size.isInfinite() || size.isInvalid())
             *this = LayoutOffset::invalid();
-        raw = size.raw;
+        else
+            raw = size.raw;
     }
 
     static LayoutOffset invalid()
