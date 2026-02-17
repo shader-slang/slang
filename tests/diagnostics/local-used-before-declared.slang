@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:-target dxbc -profile ps_5_0 -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target dxbc -profile ps_5_0 -entry main
 
 // Early versions of the front-end had bugs when local
 // variables were used before their definition, or
@@ -11,6 +11,8 @@ void usedBeforeDeclared()
 {
     // b is used before it is declared
 	float c = d + 1.0;
+//diag:    ^ undefined identifier
+//diag:    ^ undefined identifier 'd'.
 	int d = 0;
 }
 

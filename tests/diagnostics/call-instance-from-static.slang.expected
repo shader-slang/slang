@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/call-instance-from-static.slang(14): error 30100: type 'Test' cannot be used to refer to non-static member 'instanceMethod'
-        instanceMethod();
-        ^~~~~~~~~~~~~~
-}
-standard output = {
-}

@@ -1,5 +1,5 @@
 // extension-full-name.slang
-//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target hlsl
 
 // Define a generic type with a nested struct
 struct GenericType<T>
@@ -183,10 +183,16 @@ extension Container.Nested
 
     // Extension type mismatches - assign value type to extension type
     state1 = 0;    // Error: expected expr of type 'GenericType<half>.State', got 'int'
+//diag:      ^ expected an expression of type 'GenericType<half>.State', got 'int'
     options1 = 0;  // Error: expected expr of type 'GenericType<float>.InnerType.Options', got 'int'
+//diag:        ^ expected an expression of type 'GenericType<float>.InnerType.Options', got 'int'
     config1 = 0;   // Error: expected expr of type 'NonGenericType.Config', got 'int'
+//diag:       ^ expected an expression of type 'NonGenericType.Config', got 'int'
     settings1 = 0; // Error: expected expr of type 'Container.Nested.Settings', got 'int'
+//diag:         ^ expected an expression of type 'Container.Nested.Settings', got 'int'
     record1 = 0;   // Error: expected expr of type 'Container.Nested.DeepNested.Record', got 'int'
+//diag:       ^ expected an expression of type 'Container.Nested.DeepNested.Record', got 'int'
+//diag:       ^ explicit conversion from 'int' to 'Container.Nested.DeepNested.Record' is possible
 
     // Extension type mismatches - assign wrong extension types
     GenericType<int>.InnerType intInner;
@@ -195,6 +201,8 @@ extension Container.Nested
     // This should fail due to different generic parameters
     floatInner.Options floatOpts =
         intInner.getOptions(); // This won't compile as intInner doesn't have getOptions
+//diag:          ^ member not found
+//diag:          ^ 'getOptions' is not a member of 'GenericType<int>.InnerType'.
 
     // Extension member access - valid cases
     state1.value = 1.0h;       // Valid
@@ -225,10 +233,13 @@ extension Container.Nested
     options1 =
         halfType
             .createState(); // Error: expected expr of type 'GenericType<float>.InnerType.Options',
+//diag:                 ^ expected an expression of type 'GenericType<float>.InnerType.Options', got 'GenericType<half>.State'
                             // got 'GenericType<half>.State'
     state1 = nonGenType.createConfig(); // Error: expected expr of type 'GenericType<half>.State',
+//diag:                             ^ expected an expression of type 'GenericType<half>.State', got 'NonGenericType.Config'
                                         // got 'NonGenericType.Config'
     config1 = nested.createSettings();  // Error: expected expr of type 'NonGenericType.Config', got
+//diag:                            ^ expected an expression of type 'NonGenericType.Config', got 'Container.Nested.Settings'
                                         // 'Container.Nested.Settings'
 }
 
@@ -303,6 +314,7 @@ void testArrayExtension()
 
     // Type mismatch errors
     barStats = 0; // Error: expected expr of type 'Bar[3].DataStats', got 'int'
+//diag:        ^ expected an expression of type 'Bar[3].DataStats', got 'int'
 
     // This won't compile - Baz doesn't implement IFoo
     //Array<Baz, 3>.DataStats bazStats;  // This should fail because Baz doesn't implement IFoo
@@ -311,6 +323,7 @@ void testArrayExtension()
     // Type mismatch between different extension instantiations
     Array<Bar, 2>.DataStats bar2Stats;
     bar2Stats = barArray.computeStats(); // Error: expected expr of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
+//diag:                              ^ expected an expression of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
 }
 
 // Test namespace extensions
@@ -354,4 +367,5 @@ void testNamespaceExtensions()
 
     // Generate a type error to check the output format
     config = 0; // Error: expected expr of type 'SimpleBase.NamedConfig', got 'int'
+//diag:      ^ expected an expression of type 'SimpleBase.NamedConfig', got 'int'
 }

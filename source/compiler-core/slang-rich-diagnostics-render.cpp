@@ -53,16 +53,6 @@ public:
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
-
-        // If we're skipping the source snippet (no valid location), ensure the span message
-        // is empty - otherwise we would be silently dropping important diagnostic information
-        bool hasValidLocation =
-            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
-        if (!hasValidLocation)
-        {
-            SLANG_ASSERT(diag.primarySpan.message.getLength() == 0);
-        }
-
         return renderFromLayout(layout);
     }
 

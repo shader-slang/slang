@@ -1,8 +1,0 @@
-result code = 0
-standard error = {
-tests/diagnostics/dangling-comparison.slang(8): warning 30058: result of '==' not used, did you intend '='?
-    a == 2; // warn
-      ^~
-}
-standard output = {
-}

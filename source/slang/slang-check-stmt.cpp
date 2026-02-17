@@ -1,6 +1,7 @@
 // slang-check-stmt.cpp
 #include "slang-check-impl.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related to statements.
 
@@ -174,7 +175,9 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
         auto foundOuterStmt = findOuterStmtWithLabel(stmt->targetLabel.getName());
         if (!foundOuterStmt)
         {
-            getSink()->diagnose(stmt, Diagnostics::breakLabelNotFound, stmt->targetLabel.getName());
+            getSink()->diagnose(Diagnostics::BreakLabelNotFound{
+                .label = stmt->targetLabel.getName(),
+                .stmt = stmt});
         }
         else
         {
@@ -185,10 +188,9 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
             targetOuterStmt = as<BreakableStmt>(foundOuterStmt);
             if (!targetOuterStmt)
             {
-                getSink()->diagnose(
-                    stmt,
-                    Diagnostics::targetLabelDoesNotMarkBreakableStmt,
-                    stmt->targetLabel.getName());
+                getSink()->diagnose(Diagnostics::TargetLabelDoesNotMarkBreakableStmt{
+                    .label = stmt->targetLabel.getName(),
+                    .stmt = stmt});
             }
         }
     }
@@ -201,7 +203,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
         targetOuterStmt = FindOuterStmt<BreakableStmt>();
         if (!targetOuterStmt)
         {
-            getSink()->diagnose(stmt, Diagnostics::breakOutsideLoop);
+            getSink()->diagnose(Diagnostics::BreakOutsideLoop{.stmt = stmt});
         }
     }
 
@@ -235,7 +237,7 @@ void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt* stmt)
     auto targetOuterStmt = FindOuterStmt<LoopStmt>();
     if (!targetOuterStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::continueOutsideLoop);
+        getSink()->diagnose(Diagnostics::ContinueOutsideLoop{.stmt = stmt});
     }
     else
     {
@@ -256,7 +258,7 @@ Expr* SemanticsVisitor::checkPredicateExpr(Expr* expr)
 {
     if (as<AssignExpr>(expr))
     {
-        getSink()->diagnose(expr, Diagnostics::assignmentInPredicateExpr);
+        getSink()->diagnose(Diagnostics::AssignmentInPredicateExpr{.expr = expr});
     }
     Expr* e = expr;
     e = CheckTerm(e);
@@ -572,7 +574,7 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         if (expectedReturnType && !expectedReturnType->equals(m_astBuilder->getVoidType()) &&
             !as<ConstructorDecl>(function))
         {
-            getSink()->diagnose(stmt, Diagnostics::returnNeedsExpression);
+            getSink()->diagnose(Diagnostics::ReturnNeedsExpression{.stmt = stmt});
         }
     }
     else
@@ -684,7 +686,7 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
         {
             if (func->name && func->name->text == "==")
             {
-                getSink()->diagnose(operatorExpr, Diagnostics::danglingEqualityExpr);
+                getSink()->diagnose(Diagnostics::DanglingEqualityExpr{.expr = operatorExpr});
             }
         }
     }

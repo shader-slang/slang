@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/static-ref-to-nonstatic-member.slang(11): error 30100: type 'Color' cannot be used to refer to non-static member 'Red'
-    int x = Color.Red;
-                  ^~~
-}
-standard output = {
-}

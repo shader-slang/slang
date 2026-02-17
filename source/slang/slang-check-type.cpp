@@ -1,5 +1,6 @@
 // slang-check-type.cpp
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking logic related to types
 // and type expressions (aka `TypeRepr`).
@@ -124,7 +125,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         return expr;
     }
 
-    getSink()->diagnose(expr, Diagnostics::expectedAType, expr->type);
+    getSink()->diagnose(Diagnostics::ExpectedAType{.what_we_got = expr->type.type ? String(expr->type.type->toString()) : String("null"), .expr = expr});
     return CreateErrorExpr(expr);
 }
 
@@ -271,10 +272,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 // diagnostic.
 
                 // Get the AST node type info, so we can output a 'got' name
-                diagSink->diagnose(
-                    originalExpr,
-                    Diagnostics::expectedAType,
-                    originalExpr->getClass().getName());
+                diagSink->diagnose(Diagnostics::ExpectedAType{
+                    .what_we_got = originalExpr->getClass().getName(),
+                    .expr = originalExpr});
             }
         }
 
@@ -436,7 +436,7 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         if (basicType->getBaseType() == BaseType::Void)
         {
             // TODO(tfoley): pick the right diagnostic message
-            getSink()->diagnose(result.exp, Diagnostics::invalidTypeVoid);
+            getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = result.exp->loc});
             result.type = m_astBuilder->getErrorType();
             return result;
         }
