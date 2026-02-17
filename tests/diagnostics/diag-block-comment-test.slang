@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test block comment annotations
 
@@ -6,8 +6,10 @@ struct S {};
 
 void test()
 {
-    if (1);
-//CHECK:  ^ potentially unintended empty statement
-    if (2);
-//CHECK:  ^ potentially unintended empty statement
+    if (true);
+//CHECK:     ^ potentially unintended empty statement
+//CHECK:     ^ potentially unintended empty statement at this location; use {} instead.
+    if (true);
+//CHECK:     ^ potentially unintended empty statement
+//CHECK:     ^ potentially unintended empty statement at this location; use {} instead.
 }

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=foo,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=foo):
 
 // Test that use of empty statement after an `if` leads to a warning.
 
@@ -8,6 +8,7 @@ void test()
 {
     if (1+1==2);
 //foo:         ^ potentially unintended empty statement
+//foo:         ^ potentially unintended empty statement at this location; use {} instead.
 
 // the above comment matches the warning diagnostic
 		return;
