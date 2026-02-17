@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/undefined-identifier.slang(6): error 30015: undefined identifier 'b'.
-    int a = b;
-            ^
-}
-standard output = {
-}

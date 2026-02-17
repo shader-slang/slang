@@ -3,8 +3,8 @@
 
 // warning: undef of something not defined
 #undef FOO
-//diag:^ undefined macro
-//diag:^ macro 'FOO' is not defined
+//diag:^^^ undefined macro
+//diag:^^^ macro 'FOO' is not defined
 
 #define BAR 1.0f
 

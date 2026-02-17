@@ -1,8 +1,8 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK,diag=diag):-E
 
 #define CONCAT(a, b) a ## b
-//diag:                ^ token paste failure
-//diag:                ^ token pasting with '##' resulted in the invalid token ')CONCAT'
+//diag:                ^^ token paste failure
+//diag:                ^^ token pasting with '##' resulted in the invalid token ')CONCAT'
 
 #define A a
 #define B b

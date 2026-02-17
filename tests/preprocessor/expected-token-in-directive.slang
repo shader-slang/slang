@@ -5,7 +5,5 @@
 
 // #include without filename
 #include
-/*diag:
-        ^ preprocessor parse error
-        ^ expected 'string literal' in 'include' directive
-*/
+//diag: ^ preprocessor parse error
+//diag: ^ expected 'string literal' in 'include' directive

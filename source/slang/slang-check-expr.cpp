@@ -416,11 +416,10 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->type = type;
             if (getSink() && !isDeclUsableAsStaticMember(declRef.getDecl()))
             {
-                getSink()->diagnose(
-                    loc,
-                    Diagnostics::staticRefToNonStaticMember,
-                    typeType->getType(),
-                    declRef.getName());
+                getSink()->diagnose(Diagnostics::StaticRefToNonStaticMember{
+                    .type = typeType->getType(),
+                    .member = declRef.getName(),
+                    .location = loc});
                 expr->type = m_astBuilder->getErrorType();
             }
 
@@ -470,7 +469,9 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             if (getSink() && m_parentFunc && m_parentFunc->hasModifier<HLSLStaticModifier>() &&
                 !isDeclUsableAsStaticMember(declRef.getDecl()) && as<ThisExpr>(baseExpr))
             {
-                getSink()->diagnose(loc, Diagnostics::staticRefToThis, declRef.getName());
+                getSink()->diagnose(Diagnostics::StaticRefToThis{
+                    .member = declRef.getName(),
+                    .location = loc});
                 expr->type = m_astBuilder->getErrorType();
             }
 
@@ -2664,9 +2665,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             {
                 if (constElementCount->getValue() < 0)
                 {
-                    getSink()->diagnose(
-                        subscriptExpr->indexExprs[0],
-                        Diagnostics::invalidArraySize);
+                    getSink()->diagnose(Diagnostics::InvalidArraySize{
+                        .location = subscriptExpr->indexExprs[0]->loc});
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
@@ -2817,7 +2817,7 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
     // Check if we're trying to assign to a non-l-value (const variable, immutable member, etc.)
     if (!expr->type.isLeftValue)
     {
-        getSink()->diagnoseWithoutSourceView(expr, Diagnostics::attemptingToAssignToConstVariable);
+        getSink()->diagnose(Diagnostics::AttemptingToAssignToConstVariable{.expr = expr});
     }
 }
 
@@ -2846,7 +2846,7 @@ Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
             // Provide a more helpful diagnostic about const variable assignment
             maybeDiagnoseConstVariableAssignment(expr->left);
 
-            getSink()->diagnose(expr, Diagnostics::assignNonLValue);
+            getSink()->diagnose(Diagnostics::AssignNonLvalue{.expr = expr});
         }
     }
     expr->type = type;
@@ -2953,19 +2953,21 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
 
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
-        getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "coherent");
+        getSink()->diagnose(
+            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "coherent", .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
-        getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "readonly");
+        getSink()->diagnose(
+            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "readonly", .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
-        getSink()->diagnose(
-            arg,
-            Diagnostics::argumentHasMoreMemoryQualifiersThanParam,
-            "writeonly");
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "writeonly",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
-        getSink()->diagnose(arg, Diagnostics::argumentHasMoreMemoryQualifiersThanParam, "volatile");
+        getSink()->diagnose(
+            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "volatile", .arg = arg});
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
@@ -3113,29 +3115,30 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                                 (int)KnownBuiltinDeclName::OperatorAddressOf)
                                             {
                                                 getSink()->diagnose(
-                                                    argExpr,
-                                                    Diagnostics::cannotTakeConstantPointers);
+                                                    Diagnostics::CannotTakeConstantPointers{
+                                                        .expr = argExpr});
                                             }
                                         }
                                     }
                                 }
 
-                                getSink()->diagnose(
-                                    argExpr,
-                                    Diagnostics::argumentExpectedLValue,
-                                    pp);
+                                getSink()->diagnose(Diagnostics::ArgumentExpectedLvalue{
+                                    .param = String(pp),
+                                    .arg = argExpr});
 
 
                                 if (implicitCastExpr)
                                 {
-                                    const DiagnosticInfo* diagnostic = nullptr;
-
                                     // Try and determine reason for failure
                                     if (as<RefParamType>(paramType))
                                     {
                                         // Ref types are not allowed to use this mechanism
                                         // because it breaks atomics
-                                        diagnostic = &Diagnostics::implicitCastUsedAsLValueRef;
+                                        getSink()->diagnose(
+                                            Diagnostics::ImplicitCastUsedAsLvalueRef{
+                                                .from = implicitCastExpr->arguments[0]->type.type,
+                                                .to = implicitCastExpr->type.type,
+                                                .expr = argExpr});
                                     }
                                     else if (!_canLValueCoerce(
                                                  implicitCastExpr->arguments[0]->type,
@@ -3144,18 +3147,21 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                         // We restict what types can use this mechanism -
                                         // currently int/uint and same sized matrix/vectors of
                                         // those types.
-                                        diagnostic = &Diagnostics::implicitCastUsedAsLValueType;
+                                        getSink()->diagnose(
+                                            Diagnostics::ImplicitCastUsedAsLvalueType{
+                                                .from = implicitCastExpr->arguments[0]->type.type,
+                                                .to = implicitCastExpr->type.type,
+                                                .expr = argExpr});
                                     }
                                     else
                                     {
                                         // Fall back, in case there are other reasons...
-                                        diagnostic = &Diagnostics::implicitCastUsedAsLValue;
+                                        getSink()->diagnose(
+                                            Diagnostics::ImplicitCastUsedAsLvalue{
+                                                .from = implicitCastExpr->arguments[0]->type.type,
+                                                .to = implicitCastExpr->type.type,
+                                                .expr = argExpr});
                                     }
-                                    getSink()->diagnoseWithoutSourceView(
-                                        argExpr,
-                                        *diagnostic,
-                                        implicitCastExpr->arguments[0]->type,
-                                        implicitCastExpr->type);
                                 }
 
                                 maybeDiagnoseConstVariableAssignment(argExpr);
@@ -3255,12 +3261,13 @@ Expr* SemanticsExprVisitor::visitSelectExpr(SelectExpr* expr)
     {
         // If we are in a differentiable func, issue
         // a diagnostic on use of non short-circuiting select.
-        getSink()->diagnose(expr->loc, Diagnostics::useOfNonShortCircuitingOperatorInDiffFunc);
+        getSink()->diagnose(
+            Diagnostics::UseOfNonShortCircuitingOperatorInDiffFunc{.location = expr->loc});
     }
     else
     {
         // For all other functions, we issue a warning for deprecation of vector-typed ?: operator.
-        getSink()->diagnose(expr->loc, Diagnostics::useOfNonShortCircuitingOperator);
+        getSink()->diagnose(Diagnostics::UseOfNonShortCircuitingOperator{.location = expr->loc});
     }
     return result;
 }
@@ -3404,7 +3411,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         if (!lookupResult.isValid())
         {
             if (!diagnosed)
-                getSink()->diagnose(expr, Diagnostics::callOperatorNotFound, baseType);
+                getSink()->diagnose(Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
             return CreateErrorExpr(expr);
         }
         auto callFuncExpr = createLookupResultExpr(
@@ -3522,7 +3529,7 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     }
 
     if (!diagnosed)
-        getSink()->diagnose(expr, Diagnostics::undefinedIdentifier2, expr->name);
+        getSink()->diagnose(Diagnostics::UndefinedIdentifier2{.name = expr->name, .location = expr->loc});
 
     return resultExpr;
 }
@@ -3907,10 +3914,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
         if (!baseFuncType)
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
-            semantics->getSink()->diagnose(
-                funcExpr,
-                Diagnostics::expectedFunction,
-                funcExpr->type.type);
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
         resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType);
@@ -3948,10 +3952,7 @@ struct BackwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingA
         if (!baseFuncType)
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
-            semantics->getSink()->diagnose(
-                funcExpr,
-                Diagnostics::expectedFunction,
-                funcExpr->type.type);
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
         resultDiffExpr->type = semantics->getBackwardDiffFuncType(baseFuncType);
@@ -3998,10 +3999,7 @@ struct PassthroughHighOrderExprCheckingActionsBase : HigherOrderInvokeExprChecki
         if (!baseFuncType)
         {
             resultDiffExpr->type = semantics->getASTBuilder()->getErrorType();
-            semantics->getSink()->diagnose(
-                funcExpr,
-                Diagnostics::expectedFunction,
-                funcExpr->type.type);
+            semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
         resultDiffExpr->type = baseFuncType;
@@ -4157,7 +4155,7 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
         expr->type = m_astBuilder->getIntType();
         if (arrType->isUnsized())
         {
-            getSink()->diagnose(expr, Diagnostics::invalidArraySize);
+            getSink()->diagnose(Diagnostics::InvalidArraySize{.location = expr->loc});
         }
     }
     else
@@ -4791,7 +4789,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // constraint.
     if (isInterfaceType(expr->typeExpr.type) && !optionalWitness)
     {
-        getSink()->diagnose(expr, Diagnostics::isOperatorCannotUseInterfaceAsRHS);
+        getSink()->diagnose(Diagnostics::IsOperatorCannotUseInterfaceAsRhs{.expr = expr});
         return expr;
     }
 
@@ -4805,7 +4803,7 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
         // For now we can only support the scenario where `expr->value` is an interface type.
         if (!optionalWitness && !isInterfaceType(originalVal->type))
         {
-            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
         return expr;
     }
@@ -4821,7 +4819,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // Check if the right-hand side type is an interface type
     if (isInterfaceType(typeExpr.type))
     {
-        getSink()->diagnose(expr, Diagnostics::asOperatorCannotUseInterfaceAsRHS);
+        getSink()->diagnose(Diagnostics::AsOperatorCannotUseInterfaceAsRhs{.expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
@@ -4851,7 +4849,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
         // For now we can only support the scenario where `expr->value` is an interface type.
         if (!isInterfaceType(expr->value->type.type))
         {
-            getSink()->diagnose(expr, Diagnostics::isOperatorValueMustBeInterfaceType);
+            getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
         }
         expr->value = maybeOpenExistential(expr->value);
         return expr;
@@ -5661,11 +5659,10 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                     else
                     {
                         // Otherwise, it is time to report an error.
-                        getSink()->diagnose(
-                            expr->loc,
-                            Diagnostics::staticRefToNonStaticMember,
-                            type,
-                            expr->name);
+                        getSink()->diagnose(Diagnostics::StaticRefToNonStaticMember{
+                            .type = type,
+                            .member = expr->name,
+                            .location = expr->loc});
                         hasErrors = true;
                         return;
                     }
@@ -5763,7 +5760,8 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
-            getSink()->diagnose(expr, Diagnostics::noMemberOfNameInType, expr->name, baseType);
+            getSink()->diagnose(
+                Diagnostics::NoMemberOfNameInType{.name = expr->name, .type = baseType.type, .expr = expr});
     }
     return expr;
 }
@@ -5920,10 +5918,9 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
         // The user is trying to use the `->` operator on something that can't be
         // dereferenced, so we should diagnose that.
         if (!as<ErrorType>(expr->baseExpression->type))
-            getSink()->diagnose(
-                expr->memberOperatorLoc,
-                Diagnostics::cannotDereferenceType,
-                expr->baseExpression->type);
+            getSink()->diagnose(Diagnostics::CannotDereferenceType{
+                .type = expr->baseExpression->type.type,
+                .location = expr->memberOperatorLoc});
     }
 
     auto baseType = expr->baseExpression->type;

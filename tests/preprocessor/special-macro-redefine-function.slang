@@ -5,8 +5,8 @@
 //
 
 #define __FILE__(x) "Is" x
-//diag: ^ builtin macro redefined
-//diag: ^ Redefinition of builtin macro '__FILE__'
+//diag: ^^^^^^^^ builtin macro redefined
+//diag: ^^^^^^^^ Redefinition of builtin macro '__FILE__'
 
 __FILE__("Anybody")
 __FILE__(There)

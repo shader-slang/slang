@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:REFLECTION:-stage compute -entry main -target hlsl
+//DIAGNOSTIC_TEST:REFLECTION(diag=diag):-stage compute -entry main -target hlsl
 
 [numthreads(1, 1, 1)]
 void main(

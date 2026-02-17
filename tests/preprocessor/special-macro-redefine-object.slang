@@ -5,8 +5,8 @@
 //
 
 #define __LINE__ "Hello"
-//diag: ^ builtin macro redefined
-//diag: ^ Redefinition of builtin macro '__LINE__'
+//diag: ^^^^^^^^ builtin macro redefined
+//diag: ^^^^^^^^ Redefinition of builtin macro '__LINE__'
 
 __LINE__
 

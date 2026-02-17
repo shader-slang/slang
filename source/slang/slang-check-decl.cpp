@@ -1358,7 +1358,8 @@ QualType getTypeForDeclRef(
         // TODO: This code could break if we ever go down this path with
         // an identifier that doesn't have a name.
         //
-        sink->diagnose(loc, Diagnostics::undefinedIdentifier2, declRef.getName());
+        sink->diagnose(
+            Diagnostics::UndefinedIdentifier2{.name = declRef.getName(), .location = loc});
     }
     return QualType(astBuilder->getErrorType());
 }
@@ -2205,7 +2206,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         varDecl->type = typeExp;
         if (varDecl->type.equals(m_astBuilder->getVoidType()))
         {
-            getSink()->diagnose(varDecl, Diagnostics::invalidTypeVoid);
+            getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = varDecl->loc});
         }
 
         // If this is an unsized array variable, then we first want to give
@@ -2414,7 +2415,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         if (auto memoryQualifierSet = varDecl->findModifier<MemoryQualifierSetModifier>())
             if (memoryQualifierSet->getMemoryQualifierBit() &
                 MemoryQualifierSetModifier::Flags::kCoherent)
-                getSink()->diagnose(varDecl, Diagnostics::coherentKeywordOnAPointer);
+                getSink()->diagnose(Diagnostics::CoherentKeywordOnAPointer{.decl = varDecl});
 
     // Check for static const variables without initializers
     if (!varDecl->initExpr)
@@ -2940,7 +2941,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 // that comes *after* the unsized variable declaration, which
                 // means the unsized variable declaration is invalid.
                 //
-                getSink()->diagnose(varDecl, Diagnostics::unsizedMemberMustAppearLast);
+                getSink()->diagnose(Diagnostics::UnsizedMemberMustAppearLast{.decl = varDecl});
                 break;
             }
         }
@@ -2955,7 +2956,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         bool isUnsized = (((int)varTypeTags & (int)TypeTag::Unsized) != 0);
         if (isUnsized)
         {
-            getSink()->diagnose(varDecl, Diagnostics::varCannotBeUnsized);
+            getSink()->diagnose(Diagnostics::VarCannotBeUnsized{.decl = varDecl});
         }
 
         bool isOpaque = (((int)varTypeTags & (int)TypeTag::Opaque) != 0);
@@ -2963,11 +2964,11 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             varDecl->hasModifier<HLSLStaticModifier>())
         {
             // Opaque type global variable must be const.
-            getSink()->diagnose(varDecl, Diagnostics::globalVarCannotHaveOpaqueType);
+            getSink()->diagnose(Diagnostics::GlobalVarCannotHaveOpaqueType{.decl = varDecl});
             if (varDecl->initExpr)
-                getSink()->diagnose(varDecl, Diagnostics::doYouMeanStaticConst);
+                getSink()->diagnose(Diagnostics::DoYouMeanStaticConst{.decl = varDecl});
             else
-                getSink()->diagnose(varDecl, Diagnostics::doYouMeanUniform);
+                getSink()->diagnose(Diagnostics::DoYouMeanUniform{.decl = varDecl});
         }
     }
 
@@ -9370,12 +9371,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     if (!resultType->equals(prevResultType))
     {
         // Bad redeclaration
-        getSink()->diagnose(
-            newDecl,
-            Diagnostics::functionRedeclarationWithDifferentReturnType,
-            newDecl->getName(),
-            resultType,
-            prevResultType);
+        getSink()->diagnose(Diagnostics::FunctionRedeclarationWithDifferentReturnType{
+            .new_return_type = resultType,
+            .prev_return_type = prevResultType,
+            .decl = newDecl});
         getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, newDecl->getName());
 
         // Don't bother emitting other errors at this point
@@ -9538,7 +9537,7 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     // We will diagnose a redeclaration error at the new declaration,
     // and point to the old declaration for context.
     //
-    getSink()->diagnose(newDecl, Diagnostics::redeclaration, newDecl->getName());
+    getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
     getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, oldDecl->getName());
     return SLANG_FAIL;
 }
@@ -9742,7 +9741,7 @@ void SemanticsDeclBodyVisitor::visitParamDecl(ParamDecl* paramDecl)
     if (!as<ArrayExpressionType>(paramDecl->type) &&
         doesTypeHaveTag(paramDecl->type, TypeTag::Unsized))
     {
-        getSink()->diagnose(paramDecl, Diagnostics::paramCannotBeUnsized, paramDecl);
+        getSink()->diagnose(Diagnostics::ParamCannotBeUnsized{.decl = paramDecl});
     }
 
     // The "initializer" expression for a parameter represents
@@ -10440,7 +10439,7 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
     auto elementCount = arrayType->getElementCount();
     if (GetMinBound(elementCount) < 0)
     {
-        getSink()->diagnose(varDecl, Diagnostics::invalidArraySize);
+        getSink()->diagnose(Diagnostics::InvalidArraySize{.location = varDecl->loc});
         return;
     }
 
@@ -10462,7 +10461,10 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
     TypeTag elementTags = getTypeTags(elementType);
     if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        getSink()->diagnose(varDecl, Diagnostics::disallowedArrayOfNonAddressableType, elementType);
+        getSink()->diagnose(
+            Diagnostics::DisallowedArrayOfNonAddressableType{
+                .element_type = elementType,
+                .location = varDecl->loc});
         return;
     }
 }
@@ -11538,7 +11540,7 @@ void SemanticsDeclScopeWiringVisitor::visitUsingDecl(UsingDecl* decl)
     if (!scopesAdded)
     {
         if (!hasValidNamespace)
-            getSink()->diagnose(decl->arg, Diagnostics::expectedANamespace, decl->arg->type);
+            getSink()->diagnose(Diagnostics::ExpectedANamespace{.expr = decl->arg});
         return;
     }
 }
@@ -14954,10 +14956,9 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     TypeTag elementTags = visitor->getTypeTags(elementType);
     if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        visitor->getSink()->diagnose(
-            varDecl->loc,
-            Diagnostics::nonAddressableTypeInStructuredBuffer,
-            elementType);
+        visitor->getSink()->diagnose(Diagnostics::NonAddressableTypeInStructuredBuffer{
+            .type = elementType,
+            .location = varDecl->loc});
     }
 }
 
