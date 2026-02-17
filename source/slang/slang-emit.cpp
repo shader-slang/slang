@@ -1671,13 +1671,6 @@ Result linkAndOptimizeIR(
             validateIRModuleIfEnabled(codeGenContext, irModule);
         }
         break;
-    case CodeGenTarget::Metal:
-    case CodeGenTarget::MetalLib:
-    case CodeGenTarget::MetalLibAssembly:
-        {
-            SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
-        }
-        break;
     case CodeGenTarget::CSource:
     case CodeGenTarget::CPPSource:
     case CodeGenTarget::CPPHeader:
@@ -1804,6 +1797,13 @@ Result linkAndOptimizeIR(
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
     SLANG_PASS(stripLegalizationOnlyInstructions);
+
+    if (isMetalTarget(targetRequest))
+    {
+        // We need to legalize Metal IR after introducing the explicit global context, 
+        // as it depends on entry points which can change during legalization
+        SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
+    }
 
     switch (target)
     {
