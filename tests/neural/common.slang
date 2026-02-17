@@ -6,11 +6,30 @@ public bool equals<T>(T a, T b) where T : __BuiltinFloatingPointType
     return abs(a - b) < T(1e-2f);
 }
 
-public void initBias<T, int Size>(uint tid, RWStructuredBuffer<T> biasBuffer)
+public void initBias<T, int Size, int WorkgroupSize = 32>(uint tid, RWStructuredBuffer<T> biasBuffer)
     where T : __BuiltinFloatingPointType
 {
-    if (tid < Size)
-        biasBuffer[tid] = T(tid);
+    static const int NumIters = (Size + WorkgroupSize - 1) / WorkgroupSize;
+    for (int iter = 0; iter < NumIters; iter++)
+    {
+        int index = iter * WorkgroupSize + tid;
+        if (index < Size)
+            biasBuffer[index] = T(index);
+    }
+
+    AllMemoryBarrierWithGroupSync();
+}
+
+public void initBias<T, int Size, int WorkgroupSize = 32>(uint tid, T* biasBuffer)
+    where T : __BuiltinFloatingPointType
+{
+    static const int NumIters = (Size + WorkgroupSize - 1) / WorkgroupSize;
+    for (int iter = 0; iter < NumIters; iter++)
+    {
+        int index = iter * WorkgroupSize + tid;
+        if (index < Size)
+            biasBuffer[index] = T(index);
+    }
 
     AllMemoryBarrierWithGroupSync();
 }
@@ -45,6 +64,12 @@ public bool collectResults<int BatchSize>(uint tid, bool perThreadResult)
     finalResult = WaveActiveAllTrue(finalResult);
 
     return finalResult;
+}
+
+// Pad a size up to the next multiple of 16 (cooperative matrix tile size).
+public struct PadToTile<int Size>
+{
+    public static const int Value = ((Size + 15) / 16) * 16;
 }
 
 public void setBufferOneValue<int Size, int WorkgroupSize, T>(uint tid, RWStructuredBuffer<T> buffer, T value)
