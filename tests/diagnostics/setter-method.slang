@@ -14,7 +14,7 @@ struct Sphere
     void setCenter(float3 value)
     {
         center = value;
-//diag: ^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//diag: ^^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
 //diag:        ^ left of '=' is not an l-value
 //diag:        ^ left of '=' is not an l-value.
     }
@@ -22,7 +22,7 @@ struct Sphere
     void setRadius(float value)
     {
         this.radius = value;
-//diag:      ^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//diag:      ^^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
 //diag:             ^ left of '=' is not an l-value
 //diag:             ^ left of '=' is not an l-value.
     }

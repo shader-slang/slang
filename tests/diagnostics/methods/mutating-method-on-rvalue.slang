@@ -13,7 +13,7 @@ struct Counter
         increment();
 //diag:          ^ mutating method cannot be called on immutable value
 //diag:          ^ mutating method 'increment' cannot be called on an immutable value
-//diag: ^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//diag: ^^^^^^^^^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
     }
 }
 

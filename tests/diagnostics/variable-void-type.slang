@@ -5,7 +5,7 @@ void foo()
 {
 	void a;
 /*diag:
- ^ invalid type 'void'
- ^ invalid type 'void'.
+ ^^^^ invalid type 'void'
+ ^^^^ invalid type 'void'.
 */
 }

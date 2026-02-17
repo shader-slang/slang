@@ -10,8 +10,8 @@
 
 #error This isn't valid!
 /*diag:
- ^ preprocessor error
- ^ #error: This isn't valid!
+ ^^^^^ preprocessor error
+ ^^^^^ #error: This isn't valid!
 */
 
 #endif

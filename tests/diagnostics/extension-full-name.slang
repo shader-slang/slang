@@ -201,8 +201,8 @@ extension Container.Nested
     // This should fail due to different generic parameters
     floatInner.Options floatOpts =
         intInner.getOptions(); // This won't compile as intInner doesn't have getOptions
-//diag:          ^ member not found
-//diag:          ^ 'getOptions' is not a member of 'GenericType<int>.InnerType'.
+//diag:          ^^^^^^^^^^ member not found
+//diag:          ^^^^^^^^^^ 'getOptions' is not a member of 'GenericType<int>.InnerType'.
 
     // Extension member access - valid cases
     state1.value = 1.0h;       // Valid

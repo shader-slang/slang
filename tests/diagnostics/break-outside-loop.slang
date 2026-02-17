@@ -4,5 +4,5 @@
 // `break` where it isn't allowed
 
 void foo() { break; }
-//diag:      ^ 'break' must appear inside loop or switch constructs
-//diag:      ^ 'break' must appear inside loop or switch constructs.
+//diag:      ^^^^^ 'break' must appear inside loop or switch constructs
+//diag:      ^^^^^ 'break' must appear inside loop or switch constructs.
