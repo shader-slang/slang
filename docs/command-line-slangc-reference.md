@@ -900,6 +900,14 @@ Enable experimental rich diagnostics with enhanced formatting and details
 Enable machine-readable diagnostic output in tab-separated format 
 
 
+<a id="diagnostic-color"></a>
+### -diagnostic-color
+
+**-diagnostic-color &lt;always|never|auto&gt;**
+
+Control colored diagnostic output (auto uses color if stderr is a tty) 
+
+
 
 <a id="Internal"></a>
 ## Internal
