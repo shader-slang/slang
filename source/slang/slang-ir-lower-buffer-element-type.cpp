@@ -2059,14 +2059,8 @@ struct LoweredElementTypeContext
     {
         IRType* layoutType = getBufferTypeLayoutType(builder, bufferType);
 
-        AccessQualifier access = AccessQualifier::ReadWrite;
-        AddressSpace addressSpace = AddressSpace::Generic;
-
-        if (pointerType)
-        {
-            access = pointerType->getAccessQualifier();
-            addressSpace = pointerType->getAddressSpace();
-        }
+        AccessQualifier access = pointerType->getAccessQualifier();
+        AddressSpace addressSpace = pointerType->getAddressSpace();
 
         return builder.getPtrType(pointerType->getValueType(), access, addressSpace, layoutType);
     }
@@ -2083,26 +2077,26 @@ struct LoweredElementTypeContext
 
             workList.removeLast();
 
-            if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
+            if (IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType()))
             {
-                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
-                auto bufferType = sgep->getBase()->getDataType();
-                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
-                builder.setDataType(inst, ptrType);
-            }
-            else if (auto fa = as<IRFieldAddress>(inst))
-            {
-                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
-                auto bufferType = fa->getBase()->getDataType();
-                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
-                builder.setDataType(inst, ptrType);
-            }
-            else if (auto gep = as<IRGetElementPtr>(inst))
-            {
-                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType());
-                auto bufferType = gep->getBase()->getDataType();
-                ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
-                builder.setDataType(inst, ptrType);
+                if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
+                {
+                    auto bufferType = sgep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto fa = as<IRFieldAddress>(inst))
+                {
+                    auto bufferType = fa->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto gep = as<IRGetElementPtr>(inst))
+                {
+                    auto bufferType = gep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
             }
 
             for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
