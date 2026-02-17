@@ -67,6 +67,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     static const int TileStrideInUint4 = CMShape.COLUMN_A / CMShape.ElementCountPerVector; // 2
 
     // Element offset of tile(tileRow, tileCol) from the weight buffer start.
+    // TODO: This just assumes that the tiles are organized in row-major order.
     [ForceInline]
     static int tileElementOffset(int tileRow, int tileCol)
     {
@@ -217,7 +218,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
             [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
-                U bias = biasAddress.value[uint(i)];
+                U bias = biasAddress.value[i];
                 outputVector[i] = __realCast<V>(bias);
             }
         }
