@@ -118,37 +118,13 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
         // in the cloned body, so that e.g. FieldAddress/GetElementPtr instructions
         // have types consistent with the updated parameter types.
         // This mirrors what the inliner does after cloning a callee body.
-        {
-            List<IRInst*> ptrParams;
-            for (auto param : specializedFunc->getParams())
-            {
-                if (as<IRPtrTypeBase>(param->getFullType()))
-                    ptrParams.add(param);
-            }
-            propagateAddressSpaceFromInsts(_Move(ptrParams));
-        }
-
-        // Also update any DebugVar instructions associated with specialized parameters.
-        // DebugVar types are Ptr<paramType>, so they become stale when the parameter
-        // type changes. We find them via DebugValue instructions that link params to
-        // their debug vars.
+        List<IRInst*> ptrParams;
         for (auto param : specializedFunc->getParams())
         {
-            auto ptrType = as<IRPtrTypeBase>(param->getFullType());
-            if (!ptrType)
-                continue;
-            for (auto use = param->firstUse; use; use = use->nextUse)
-            {
-                auto debugValue = as<IRDebugValue>(use->getUser());
-                if (!debugValue)
-                    continue;
-                auto debugVar = as<IRDebugVar>(debugValue->getDebugVar());
-                if (!debugVar)
-                    continue;
-                debugVar->setFullType(builder.getPtrType(param->getFullType()));
-                break;
-            }
+            if (as<IRPtrTypeBase>(param->getFullType()))
+                ptrParams.add(param);
         }
+        propagateAddressSpaceFromInsts(_Move(ptrParams));
 
         // Update the function type.
         fixUpFuncType(specializedFunc);
@@ -494,6 +470,18 @@ void propagateAddressSpaceFromInsts(List<IRInst*>&& workList)
                         if (visited.add(user))
                             workList.add(user);
                     }
+                    break;
+                }
+            case kIROp_DebugValue:
+                {
+                    // When a pointer instruction's address space changes, update the
+                    // associated DebugVar type so debug info stays consistent.
+                    // DebugVar types are Ptr<valueType>, so they must reflect the
+                    // updated address space.
+                    auto debugValue = as<IRDebugValue>(user);
+                    auto debugVar = as<IRDebugVar>(debugValue->getDebugVar());
+                    if (debugVar)
+                        debugVar->setFullType(builder.getPtrType(instPtrType));
                     break;
                 }
             }
