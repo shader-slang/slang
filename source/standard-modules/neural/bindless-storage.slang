@@ -103,6 +103,12 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
     }
 
     [ForceInline]
+    internal T* getPointer(uint offset)
+    {
+        return &handle[baseIndex + offset];
+    }
+
+    [ForceInline]
     internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
         where DstType : __BuiltinFloatingPointType
         where DstType.Differential == DstType
@@ -164,6 +170,12 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         return DifferentialPtrPair<This>(
             self.p.getOffset(elements),
             self.d.getOffset(elements));
+    }
+
+    [ForceInline]
+    internal T* getPointer(uint offset)
+    {
+        return ptr + offset;
     }
 
     [ForceInline]
@@ -254,6 +266,9 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
 
     [ForceInline]
     internal uint getBaseIndex() { return inner.getBaseIndex(); }
+
+    [ForceInline]
+    internal T* getPointer(uint offset) { return inner.getPointer(offset); }
 
     [require(cuda)]
     public __init(TensorView<T> tensor, uint baseAddress = 0U)
@@ -367,6 +382,12 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         return DifferentialPtrPair<This>(
             self.p + elements,
             self.d + elements);
+    }
+
+    [ForceInline]
+    internal T* getPointer(uint offset)
+    {
+        return this + offset;
     }
 
     [require(hlsl, sm_6_6)]

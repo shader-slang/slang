@@ -27,6 +27,7 @@ __include "istorages";
 __include "bindless-storage";
 __include "accelerate-vector-coopmat";
 // __include "mma-new-helper";
+__include "mma-tiled-layout-helper";
 __include "vectorized-reader";
 __include "shared-memory-pool";
 __include "hash-function";

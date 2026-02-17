@@ -6,8 +6,6 @@ implementing neural;
 
 #define Max(A, B) ((A) > (B) ? (A) : (B))
 
-internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
-
 public interface ISharedMemorySize
 {
     static const uint Bytes;
