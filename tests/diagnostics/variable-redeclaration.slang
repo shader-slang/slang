@@ -10,14 +10,14 @@
 // Global variables, including shader parameters
 
 static int gA;
-//diag:    ^ see previous declaration of 'gA'
+//diag:    ^^ see previous declaration of 'gA'
 
 static Texture2D gA;
-//diag:          ^ conflicting declaration
-//diag:          ^ declaration of 'gA' conflicts with existing declaration
-//diag:          ^ global variable cannot have opaque type
-//diag:          ^ global variable cannot have opaque type.
-//diag:          ^ do you intend to define a `uniform` parameter instead?
+//diag:          ^^ conflicting declaration
+//diag:          ^^ declaration of 'gA' conflicts with existing declaration
+//diag:          ^^ global variable cannot have opaque type
+//diag:          ^^ global variable cannot have opaque type.
+//diag:          ^^ do you intend to define a `uniform` parameter instead?
 
 // Local variables
 
@@ -76,16 +76,16 @@ struct S
 int testParameterRedeclaration(
 	int 	size,
 /*diag:
-      ^ see previous declaration of 'size'
-      ^ candidate: int size
+      ^^^^ see previous declaration of 'size'
+      ^^^^ candidate: int size
 */
 	float 	size)
-//diag: ^ conflicting declaration
-//diag: ^ declaration of 'size' conflicts with existing declaration
-//diag: ^ candidate: float size
+//diag: ^^^^ conflicting declaration
+//diag: ^^^^ declaration of 'size' conflicts with existing declaration
+//diag: ^^^^ candidate: float size
 {
 	return size;
 /*diag:
-        ^ ambiguous reference to 'size'
+        ^^^^ ambiguous reference to 'size'
 */
 }

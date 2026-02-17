@@ -13,8 +13,8 @@ struct Test
 	{
 		instanceMethod();
 /*diag:
-  ^ type cannot refer to non-static member
-  ^ type 'Test' cannot be used to refer to non-static member 'instanceMethod'
+  ^^^^^^^^^^^^^^ type cannot refer to non-static member
+  ^^^^^^^^^^^^^^ type 'Test' cannot be used to refer to non-static member 'instanceMethod'
 */
 	}
 }

@@ -9,6 +9,6 @@ struct Color
 void test()
 {
 	int x = Color.Red;
-//diag:        ^ type cannot refer to non-static member
-//diag:        ^ type 'Color' cannot be used to refer to non-static member 'Red'
+//diag:        ^^^ type cannot refer to non-static member
+//diag:        ^^^ type 'Color' cannot be used to refer to non-static member 'Red'
 }

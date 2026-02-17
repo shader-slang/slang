@@ -7,8 +7,8 @@ void main(
     int a = 1;
     a == 2; // warn
 /*diag:
-      ^ result of '==' not used
-      ^ result of '==' not used, did you intend '='?
+      ^^ result of '==' not used
+      ^^ result of '==' not used, did you intend '='?
 */
     (a == 2); // ok.
 }

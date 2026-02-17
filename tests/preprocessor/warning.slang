@@ -8,8 +8,8 @@
 
 #warning You wouldn't like me when I'm angry...
 /*diag:
- ^ preprocessor warning
- ^ #warning: You wouldn't like me when I'm angry...
+ ^^^^^^^ preprocessor warning
+ ^^^^^^^ #warning: You wouldn't like me when I'm angry...
 */
 
 #else
