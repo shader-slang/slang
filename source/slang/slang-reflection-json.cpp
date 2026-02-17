@@ -110,7 +110,16 @@ static void emitReflectionVarBindingInfoJSON(
             CASE(REGISTER_SPACE, registerSpace);
             CASE(SUB_ELEMENT_REGISTER_SPACE, subElementRegisterSpace);
             CASE(GENERIC, generic);
+            CASE(RAY_PAYLOAD, rayPayload);
+            CASE(HIT_ATTRIBUTES, hitAttributes);
+            CASE(CALLABLE_PAYLOAD, callablePayload);
+            CASE(SHADER_RECORD, shaderRecord);
+            CASE(EXISTENTIAL_TYPE_PARAM, existentialTypeParam);
+            CASE(EXISTENTIAL_OBJECT_PARAM, existentialObjectParam);
+            CASE(SUBPASS, inputAttachmentIndex);
             CASE(METAL_ARGUMENT_BUFFER_ELEMENT, metalArgumentBufferElement);
+            CASE(METAL_ATTRIBUTE, metalAttribute);
+            CASE(METAL_PAYLOAD, metalPayload);
 #undef CASE
 
         default:
@@ -493,6 +502,7 @@ static void emitReflectionResourceTypeBaseInfoJSON(
         CASE(STRUCTURED_BUFFER, structuredBuffer);
         CASE(BYTE_ADDRESS_BUFFER, byteAddressBuffer);
         CASE(ACCELERATION_STRUCTURE, accelerationStructure);
+        CASE(TEXTURE_SUBPASS, subpassInput);
 #undef CASE
     }
     writer << "\"";
@@ -582,6 +592,7 @@ static void emitReflectionTypeInfoJSON(PrettyWriter& writer, slang::TypeReflecti
             case SLANG_TEXTURE_2D:
             case SLANG_TEXTURE_3D:
             case SLANG_TEXTURE_CUBE:
+            case SLANG_TEXTURE_SUBPASS:
                 if (auto resultType = type->getResourceResultType())
                 {
                     writer.maybeComma();
