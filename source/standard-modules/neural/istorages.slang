@@ -3,6 +3,7 @@ implementing neural;
 public enum LayoutType : uint32_t
 {
     Linear = 0,
+    Optimal = 1,
 }
 
 internal interface IStorageLayout
@@ -13,6 +14,22 @@ internal interface IStorageLayout
 public struct LinearLayout : IStorageLayout
 {
     internal static const LayoutType Layout = LayoutType.Linear;
+}
+
+/// Storage layout where the weight matrix is pre-tiled into cooperative-matrix-sized tiles.
+///
+/// The M x K weight matrix is divided into ceil(M/16) x ceil(K/16) tiles of 16x16 elements.
+/// **Both M and K must be multiples of 16.**
+/// Tiles are stored in row-major tile order:
+///   tile(tileRow, tileCol) at linear index = tileRow * numTileCols + tileCol
+/// Within each tile, elements are stored contiguously in row-major order:
+///   element(r, c) at offset r * 16 + c within the tile.
+///
+/// This layout enables loading weight tiles directly without shared-memory staging
+/// or zero-padding, and eliminates cross-warp synchronisation for matrix A.
+public struct OptimalLayout : IStorageLayout
+{
+    internal static const LayoutType Layout = LayoutType.Optimal;
 }
 
 /**
@@ -61,6 +78,16 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] value The vector of 2 values to add.
     */
     public void atomicAdd(uint index, vector<T, 2> value);
+
+    /**
+    Returns a raw pointer to the element at the given offset from the current base.
+    This is needed for operations that require a concrete pointer type, such as
+    `CoopMat.Load` from global memory.
+    @param[in] offset Element offset from the current base position.
+    @return A `T*` pointing to the element at the offset.
+    */
+    [ForceInline]
+    internal T* getPointer(uint offset);
 
     /**
     Reads sequential elements starting from the given offset address, packed into a uint4.

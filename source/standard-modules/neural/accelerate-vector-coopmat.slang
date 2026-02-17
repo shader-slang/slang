@@ -92,7 +92,7 @@ internal struct CoopMatShape<T, TargetEnum Target>
     static const uint CoopMatCSizeInVector = (ROW_C * COLUMN_C) / ElementCountPerVectorMatC;
 }
 
-struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = false>
+VISIBILITY_LEVEL struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = false>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -117,8 +117,8 @@ struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = fal
     // `Uint4AlignedK` is the K value that is aligned with the uint4 vector size. Because we always do the vectorized load
     // along K dimension, so we need to align the K value with the vector size.
     // Measured in T.
-    static const int Uint4AlignedK = ((K + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
-    static const int Uint4AlignedM = ((M + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
+    VISIBILITY_LEVEL static const int Uint4AlignedK = ((K + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
+    VISIBILITY_LEVEL static const int Uint4AlignedM = ((M + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
 
     // The height of tile A measure in T and uint4.
     static const uint HeightInElementsTileA = NCoopMatRow * MatShape.ROW_A;
@@ -993,7 +993,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             ptrBOffset[0] = sharedMemoryBOffset;
             ptrBOffset[1] = sharedMemoryBOffset + ShMemInfo.SharedMemSizeInVectorMatB;
             // PreLoad for the first iteration
-            loadShA<U, Address>(ptrAOffset[0], 0, weightAddress);
+            if (subgroupIndex == 0)
+            {
+                loadShA<U, Address>(ptrAOffset[0], 0, weightAddress);
+            }
             loadVectorToShB(ptrBOffset[0], 0, subgroupIndex, inputVector);
         }
 
@@ -1027,7 +1030,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // swap to next buffer to load new data.
                 bufferIndex = bufferIndex ^ 1;
                 // Load the another buffer and do the math so we can hide the latency of the load.
-                loadShA<U, Address>(ptrAOffset[bufferIndex], tileIndex, weightAddress);
+                if (subgroupIndex == 0)
+                {
+                    loadShA<U, Address>(ptrAOffset[bufferIndex], tileIndex, weightAddress);
+                }
                 loadVectorToShB(ptrBOffset[bufferIndex], tileIndex, subgroupIndex, inputVector);
 
                 // swap back to the previous buffer to perform the math.
@@ -1040,16 +1046,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // fused multi-layer kernels) before overwriting with new tile data.
                 GroupMemoryBarrierWithGroupSync();
 
-                loadShA<U, Address>(ptrAOffset[0], tileIndex, weightAddress);
+                if (subgroupIndex == 0)
+                {
+                    loadShA<U, Address>(ptrAOffset[0], tileIndex, weightAddress);
+                }
                 loadVectorToShB(ptrBOffset[0], tileIndex, subgroupIndex, inputVector);
 
-                // The reason that we have to sync the whole workgroup is that for matrix A, the tile is shared by
-                // whole workgroup.
-
-                // TODO:
-                // The alternative solution to duplicate the tile A to each subgroup, so we will only need warp sync here.
-                // But that will waste lots of shared memory and increase memory transactions. We need benchmark to see
-                // which solution is better.
+                // Workgroup sync: ensures sharedMemoryA (written by first warp) is visible
+                // to all warps, and sharedMemoryB writes are also complete.
                 GroupMemoryBarrierWithGroupSync();
             }
 
