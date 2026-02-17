@@ -1,6 +1,6 @@
-// slang-ir-process-late-require-cap-insts.cpp
+// slang-ir-late-require-capability.cpp
 
-#include "slang-ir-process-late-require-cap-insts.h"
+#include "slang-ir-late-require-capability.h"
 
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
@@ -12,16 +12,72 @@
 namespace Slang
 {
 
-struct ProcessLateRequireCapabilityInstsContext
+struct CheckLateRequireCapabilityInstsContext
 {
     IRModule* m_module;
+    DiagnosticSink* m_sink;
+    SlangResult m_status = SLANG_OK;
+
+    void checkFunc(IRFunc* func)
+    {
+        // scan the function for IRLateRequireCapability instructions
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                if (auto lateRequireCap = as<IRLateRequireCapability>(inst))
+                {
+                    for (UInt i = 0; i < lateRequireCap->getOperandCount(); ++i)
+                    {
+                        IRConstant* capConstant = as<IRConstant>(inst->getOperand(i));
+                        if (!capConstant)
+                        {
+                            m_sink->diagnose(
+                                inst,
+                                Diagnostics::expectedAStringLiteral);
+                            m_status = SLANG_FAIL;
+                        }
+                        else
+                        {
+                            UnownedStringSlice capNameStr = capConstant->getStringSlice();
+                            CapabilityName capName = findCapabilityName(capNameStr);
+                            if (capName == CapabilityName::Invalid)
+                            {
+                                m_sink->diagnose(
+                                    inst,
+                                    Diagnostics::unknownCapability,
+                                    capNameStr);
+                                m_status = SLANG_FAIL;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void checkModule()
+    {
+        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
+        {
+            auto func = as<IRFunc>(inst);
+            if (!func)
+                continue;
+
+            checkFunc(func);
+        }
+    }
+};
+
+struct ProcessLateRequireCapabilityInstsContext
+{
+    IRModule* const m_module;
     CapabilitySet m_targetCaps;
     const CodeGenTarget m_target;
-    DiagnosticSink* m_sink;
+    DiagnosticSink* const m_sink;
+    SlangResult m_status = SLANG_OK;
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
-
-    bool m_errorEncountered = false;
 
     ProcessLateRequireCapabilityInstsContext(
         IRModule* module, const CapabilitySet& targetCaps, CodeGenTarget target, DiagnosticSink* sink)
@@ -61,21 +117,14 @@ struct ProcessLateRequireCapabilityInstsContext
                 m_sink->diagnose(
                     inst,
                     Diagnostics::expectedAStringLiteral);
-                m_errorEncountered = true;
+                m_status = SLANG_FAIL;
                 return;
             }
 
-            CapabilityName capName = findCapabilityName(capNameStr->getStringSlice());
-            if (capName == CapabilityName::Invalid)
-            {
-                m_sink->diagnose(
-                    inst,
-                    Diagnostics::unknownCapability,
-                    capNameStr);
-                m_errorEncountered = true;
-                return;
-            }
-
+            // note: capName validity has already been checked by
+            // CheckLateRequireCapabilityInstsContext
+            UnownedStringSlice capNameStr = capConstant->getStringSlice();
+            CapabilityName capName = findCapabilityName(capNameStr);
             capNames.add(capName);
         }
 
@@ -87,7 +136,7 @@ struct ProcessLateRequireCapabilityInstsContext
                 entry,
                 m_target,
                 stage);
-            m_errorEncountered = true;
+            m_status = SLANG_FAIL;
         }
     }
 
@@ -135,11 +184,7 @@ struct ProcessLateRequireCapabilityInstsContext
 
     void processModule()
     {
-        // Collect all functions that need processing.
-        // Process all callee's before callers; otherwise we introduce bugs
-
         buildEntryPointReferenceGraph(m_mapInstToReferencingEntryPoints, m_module);
-        HashSet<IRFunc*> visitedFunctions;
 
         for (auto inst = m_module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
         {
@@ -147,14 +192,19 @@ struct ProcessLateRequireCapabilityInstsContext
             if (!func)
                 continue;
 
-            if (visitedFunctions.contains(func))
-                continue;
-
             processFunc(func);
-            visitedFunctions.add(func);
         }
     }
 };
+
+/// Checks that the named capabilities exist.
+SlangResult checkLateRequireCapabilityArguments(IRModule* module, DiagnosticSink* sink)
+{
+    CheckLateRequireCapabilityInstsContext context(module, sink);
+
+    context.checkModule();
+    return context.m_status;
+}
 
 SlangResult processLateRequireCapabilityInsts(IRModule* module, CodeGenContext* codeGenContext, DiagnosticSink* sink)
 {
@@ -162,7 +212,7 @@ SlangResult processLateRequireCapabilityInsts(IRModule* module, CodeGenContext* 
         module, codeGenContext->getTargetCaps(), codeGenContext->getTargetFormat(), sink);
 
     context.processModule();
-    return context.m_errorEncountered ? SLANG_OK : SLANG_FAIL;
+    return context.m_status;
 }
 
 } // namespace Slang
