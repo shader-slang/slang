@@ -9,6 +9,7 @@
 // focused on `[attributes]`.
 
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -80,7 +81,7 @@ bool SemanticsVisitor::checkLiteralStringVal(Expr* expr, String* outVal)
         return true;
     }
 
-    getSink()->diagnose(expr, Diagnostics::expectedAStringLiteral);
+    getSink()->diagnose(Diagnostics::ExpectedAStringLiteral{.expr = expr});
 
     return false;
 }
@@ -1176,7 +1177,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         else
         {
-            getSink()->diagnose(attr->args[1], Diagnostics::expectedAStringLiteral);
+            getSink()->diagnose(Diagnostics::ExpectedAStringLiteral{.expr = attr->args[1]});
             return nullptr;
         }
         return attr;
@@ -1888,10 +1889,9 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
-                    getSink()->diagnose(
-                        targetIntrinsic->scrutinee.loc,
-                        Diagnostics::undefinedIdentifier2,
-                        targetIntrinsic->scrutinee.name);
+                    getSink()->diagnose(Diagnostics::UndefinedIdentifier2{
+                        .name = targetIntrinsic->scrutinee.name,
+                        .location = targetIntrinsic->scrutinee.loc});
                 }
                 if (scrutineeResults.isOverloaded())
                 {

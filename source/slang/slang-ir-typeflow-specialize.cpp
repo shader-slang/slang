@@ -8,6 +8,7 @@
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 
 namespace Slang
@@ -4422,10 +4423,15 @@ struct TypeFlowSpecializationContext
                     // In Slang 2025 and later, specializing a generic with multiple types is not
                     // allowed, so we'll throw a diagnostic message.
                     //
-                    sink->diagnose(
-                        inst->sourceLoc,
-                        Diagnostics::cannotSpecializeGenericWithExistential,
-                        as<IRSpecialize>(callee)->getBase());
+                    auto genericBase = as<IRSpecialize>(callee)->getBase();
+                    String genericName;
+                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                    else
+                        genericName = "<generic>";
+                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                        .generic = genericName,
+                        .location = inst->sourceLoc});
                     return false;
                 }
                 else

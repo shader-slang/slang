@@ -8,6 +8,7 @@
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -1644,17 +1645,17 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                                                       \
     else
 
-#define DIV_OPERATOR_CASE(op)                                                    \
-    if (opNameSlice == toSlice(#op))                                             \
-    {                                                                            \
-        if (constArgs[1]->getValue() == 0)                                       \
-        {                                                                        \
-            if (sink)                                                            \
-                sink->diagnose(newFuncDecl.getLoc(), Diagnostics::divideByZero); \
-            return nullptr;                                                      \
-        }                                                                        \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();      \
-    }                                                                            \
+#define DIV_OPERATOR_CASE(op)                                                        \
+    if (opNameSlice == toSlice(#op))                                                 \
+    {                                                                                \
+        if (constArgs[1]->getValue() == 0)                                           \
+        {                                                                            \
+            if (sink)                                                                \
+                sink->diagnose(Diagnostics::DivideByZero{.location = newFuncDecl.getLoc()}); \
+            return nullptr;                                                          \
+        }                                                                            \
+        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();          \
+    }                                                                                \
     else
 
 #define LOGICAL_OPERATOR_CASE(op)                                                          \

@@ -2,7 +2,7 @@
 
 // Test that calling an instance method from a static method is an error.
 
-//DIAGNOSTIC_TEST:SIMPLE:-target hlsl -entry main -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):-target hlsl -entry main -stage compute
 
 struct Test
 {
@@ -12,6 +12,10 @@ struct Test
 	static void staticMethod()
 	{
 		instanceMethod();
+/*diag:
+  ^ type cannot refer to non-static member
+  ^ type 'Test' cannot be used to refer to non-static member 'instanceMethod'
+*/
 	}
 }
 
