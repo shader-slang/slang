@@ -19,7 +19,7 @@ inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* s
 #define _TRUNCATE ((size_t)-1)
 #define _stricmp strcasecmp
 
-inline error_t fopen_s(FILE** f, const char* fileName, const char* mode)
+inline int fopen_s(FILE** f, const char* fileName, const char* mode)
 {
     if (f == nullptr || fileName == nullptr || mode == nullptr)
     {
