@@ -2194,6 +2194,32 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
+        // When emitting SPIRV directly, an explicit (non-default) layout type annotation
+        // on the buffer (e.g. CDataLayout, Std430DataLayout) takes precedence over
+        // global compiler options such as forceScalarLayout.
+        {
+            IROp layoutTypeOp = kIROp_DefaultBufferLayoutType;
+            if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+            {
+                if (structBufferType->getDataLayout())
+                    layoutTypeOp = structBufferType->getDataLayout()->getOp();
+            }
+            else if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
+            {
+                if (paramGroupType->getDataLayout())
+                    layoutTypeOp = paramGroupType->getDataLayout()->getOp();
+            }
+            else if (auto storageBufferType = as<IRGLSLShaderStorageBufferType>(bufferType))
+            {
+                if (storageBufferType->getDataLayout())
+                    layoutTypeOp = storageBufferType->getDataLayout()->getOp();
+            }
+            if (layoutTypeOp != kIROp_DefaultBufferLayoutType)
+            {
+                return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+            }
+        }
+
         // If the user specified a C-compatible buffer layout, then do that.
         if (target->getOptionSet().shouldUseCLayout())
             return IRTypeLayoutRuleName::C;

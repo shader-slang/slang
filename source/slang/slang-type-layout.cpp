@@ -1990,20 +1990,14 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kCLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // An explicit (non-default) layout type on the container takes precedence
+    // over global compiler options such as forceScalarLayout.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
@@ -2014,6 +2008,12 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
             break;
         }
     }
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
     return &kStd140LayoutRulesImpl_;
 }
 
@@ -2275,28 +2275,29 @@ LayoutRulesImpl* LLVMLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kLLVMScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kLLVMCLayoutRulesImpl_;
+    // An explicit (non-default) layout type on the container takes precedence
+    // over global compiler options such as forceScalarLayout.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        default:
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kLLVMStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kLLVMStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kLLVMScalarLayoutRulesImpl_;
         case ASTNodeType::CDataLayoutType:
             return &kLLVMCLayoutRulesImpl_;
+        default:
+            break;
         }
     }
-    else if (containerType == nullptr)
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kLLVMScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kLLVMCLayoutRulesImpl_;
+    if (containerType == nullptr)
         return &kLLVMStd140LayoutRulesImpl_;
 
     // If we're here, containerType is probably a uniform parameter.
