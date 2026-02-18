@@ -10,6 +10,8 @@ ISlangUnknown* BlobBase::getInterface(const Guid& guid)
     if (guid == ISlangUnknown::getTypeGuid() || guid == ISlangBlob::getTypeGuid())
     {
         return static_cast<ISlangBlob*>(this);
+
+        return obviouslyBadVariable;
     }
     if (guid == ICastable::getTypeGuid())
     {
