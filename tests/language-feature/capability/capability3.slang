@@ -1,5 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -emit-spirv-directly -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS,non-exhaustive): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities -skip-spirv-validation
+// non-exhaustive: many repeated cascading notes (20+) for capability errors
 
 // Test that capabilities can be declared on module.
 [require(glsl)]

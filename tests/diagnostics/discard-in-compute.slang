@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -entry main -profile cs_6_1
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry main -profile cs_6_1
 void test()
 {
     discard; // This should lead to `test` having `fragment` capability requirement.

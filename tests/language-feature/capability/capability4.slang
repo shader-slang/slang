@@ -1,5 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -emit-spirv-directly -entry main -stage compute
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
+// non-exhaustive: many repeated cascading notes (10+) for capability errors
 
 // Check that a non-static member method implictly requires capabilities
 // defined in ThisType.

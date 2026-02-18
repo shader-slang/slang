@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct PrimaryRayPayload{}
 [require(spvRayTracingKHR)]
@@ -7,6 +7,7 @@ void closestHit(
 /*CHECK:
      ^^^^^^^^^^ dependencies not compatible on stage
      ^^^^^^^^^^ 'closestHit' requires support for stage 'closesthit', but stage is unsupported.
+     ^^^^^^^^^^ see definition of 'closestHit'
 */
     inout PrimaryRayPayload rayData : SV_RayPayload,
     BuiltInTriangleIntersectionAttributes attribs : SV_IntersectionAttributes)
