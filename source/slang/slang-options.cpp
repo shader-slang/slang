@@ -25,6 +25,7 @@
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ir.h"
 #include "slang.h"
 
@@ -1011,6 +1012,10 @@ void initCommandOptions(CommandOptions& options)
          "-enable-machine-readable-diagnostics",
          nullptr,
          "Enable machine-readable diagnostic output in tab-separated format"},
+        {OptionKind::DiagnosticColor,
+         "-diagnostic-color",
+         "-diagnostic-color <always|never|auto>",
+         "Control colored diagnostic output (auto uses color if stderr is a tty)"},
     };
     _addOptions(makeConstArrayView(experimentalOpts), options);
 
@@ -2367,8 +2372,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
+            linkage->m_optionSet.set(optionKind, true);
+            break;
         case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
             break;
         case OptionKind::ReportDetailedPerfBenchmark:
             linkage->m_optionSet.set(optionKind, true);
@@ -2379,7 +2390,39 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.set(optionKind, true);
             // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
             linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+            {
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
+                sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+            }
             break;
+        case OptionKind::DiagnosticColor:
+            {
+                CommandLineArg colorArg;
+                SLANG_RETURN_ON_FAIL(m_reader.expectArg(colorArg));
+                SlangDiagnosticColor colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
+                if (colorArg.value == "always")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_ALWAYS;
+                else if (colorArg.value == "never")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_NEVER;
+                else if (colorArg.value == "auto")
+                    colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
+                else
+                {
+                    m_sink->diagnose(
+                        colorArg.loc,
+                        Diagnostics::unknownCommandLineValue,
+                        "always, never, auto");
+                    return SLANG_FAIL;
+                }
+                linkage->m_optionSet.set(optionKind, (int)colorValue);
+                // Update the sink and all ancestor sinks so colors work correctly
+                for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                    sink->setDiagnosticColorMode(colorValue);
+                break;
+            }
         case OptionKind::MatrixLayoutRow:
         case OptionKind::MatrixLayoutColumn:
             linkage->m_optionSet.setMatrixLayoutMode(
@@ -3422,6 +3465,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         }
     }
 
+    // Apply diagnostic sink settings early so that any diagnostics emitted during
+    // option post-processing (e.g., entry point validation) use the correct settings
+    // such as rich diagnostics and machine-readable output.
+    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
+
     if (m_compileCoreModule)
     {
         SLANG_RETURN_ON_FAIL(m_session->compileCoreModule(m_compileCoreModuleFlags));
@@ -4211,6 +4259,9 @@ SlangResult OptionsParser::parse(
         // Leaving allows for diagnostics to be compatible with other Slang diagnostic parsing.
         // parseSink.resetFlag(DiagnosticSink::Flag::HumaneLoc);
         m_parseSink.setFlag(DiagnosticSink::Flag::SourceLocationLine);
+        // Copy color and unicode settings from the request sink
+        m_parseSink.setDiagnosticColorMode(requestSink->getDiagnosticColorMode());
+        m_parseSink.setEnableUnicode(requestSink->getEnableUnicode());
     }
 
     // All diagnostics will also be sent to requestSink

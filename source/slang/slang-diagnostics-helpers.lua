@@ -1,9 +1,28 @@
 -- Helper functions for defining diagnostics
 
+-- Set to false to enable uniqueness checking for diagnostic codes.
+-- Currently set to true to allow duplicate codes during the transition period.
+-- See: https://github.com/shader-slang/slang/issues/6736
+local allow_duplicate_diagnostic_codes = true
+
 local diagnostics = {}
 
 -- Helper function to create a span
+-- Accepts positional: span(location, message?)
+-- Or named: span({loc = location, message = message})
 local function span(location, message)
+  -- Normalize named arguments to positional
+  -- Detect named argument table by checking it's not an already-built span (which has is_note field)
+  if type(location) == "table" and location.is_note == nil then
+    -- Named argument format
+    local args = location
+    location = args.loc
+    message = args.message
+    if not location then
+      error("span() requires 'loc' field in named argument format")
+    end
+  end
+
   return {
     location = location,
     message = message or "",  -- Default to empty string if not provided
@@ -13,8 +32,25 @@ local function span(location, message)
 end
 
 -- Helper function to create a note with message and spans
+-- Accepts positional: note(message, span1, span2, ...)
+-- Or named: note({message = message, span1, span2, ...})
 local function note(message, ...)
   local all_spans = {...}
+
+  -- Normalize named arguments to positional
+  if type(message) == "table" and not message.is_note then
+    -- Named argument format
+    local args = message
+    message = args.message
+    if not message then
+      error("note() requires 'message' field in named argument format")
+    end
+    -- Extract spans from the table (all non-string-key entries)
+    all_spans = {}
+    for i, v in ipairs(args) do
+      table.insert(all_spans, v)
+    end
+  end
 
   if type(message) ~= "string" then
     error("note() first argument must be a message (string)")
@@ -51,8 +87,28 @@ local function note(message, ...)
 end
 
 -- Helper function to create a variadic span (generates a nested struct and List<>)
--- struct_name: Name for the struct (e.g., "Error" -> struct Error, List<Error> errors)
+-- Accepts positional: variadic_span(struct_name, location, message)
+-- Or named: variadic_span({cpp_name = struct_name, loc = location, message = message})
 local function variadic_span(struct_name, location, message)
+  -- Normalize named arguments to positional
+  -- Detect named argument table by checking it's not an already-built span (which has is_note field)
+  if type(struct_name) == "table" and struct_name.is_note == nil then
+    -- Named argument format
+    local args = struct_name
+    struct_name = args.cpp_name
+    location = args.loc
+    message = args.message
+    if not struct_name then
+      error("variadic_span() requires 'cpp_name' field in named argument format")
+    end
+    if not location then
+      error("variadic_span() requires 'loc' field in named argument format")
+    end
+    if not message then
+      error("variadic_span() requires 'message' field in named argument format")
+    end
+  end
+
   return {
     location = location,
     message = message,
@@ -63,9 +119,29 @@ local function variadic_span(struct_name, location, message)
 end
 
 -- Helper function to create a variadic note (generates a nested struct and List<>)
--- struct_name: Name for the struct (e.g., "Candidate" -> struct Candidate, List<Candidate> candidates)
+-- Accepts positional: variadic_note(struct_name, message, span1, span2, ...)
+-- Or named: variadic_note({cpp_name = struct_name, message = message, span1, span2, ...})
 local function variadic_note(struct_name, message, ...)
   local all_spans = {...}
+
+  -- Normalize named arguments to positional
+  if type(struct_name) == "table" and not struct_name.is_note then
+    -- Named argument format
+    local args = struct_name
+    struct_name = args.cpp_name or args.struct_name
+    message = args.message
+    if not struct_name then
+      error("variadic_note() requires 'cpp_name' or 'struct_name' field in named argument format")
+    end
+    if not message then
+      error("variadic_note() requires 'message' field in named argument format")
+    end
+    -- Extract spans from the table (all non-string-key entries)
+    all_spans = {}
+    for i, v in ipairs(args) do
+      table.insert(all_spans, v)
+    end
+  end
 
   if type(struct_name) ~= "string" then
     error("variadic_note() first argument must be a struct name (string)")
@@ -160,6 +236,12 @@ end
 -- Helper function to add a warning diagnostic
 local function warning(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "warning", message, primary_span, ...)
+end
+
+-- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
+-- For notes within diagnostics, use the `note` function above (line 37).
+local function note_diagnostic(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
 -- Helper function to parse interpolated message strings
@@ -330,10 +412,12 @@ local function validate_diagnostic(diag, index)
     table.insert(errors, diagnostic_name .. ".message must be a string")
   end
 
-  -- 5. Validate mandatory 'primary_span' structure
-  local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
-  for _, err in ipairs(primary_errors) do
-    table.insert(errors, err)
+  -- 5. Validate optional 'primary_span' structure (nil allowed for locationless diagnostics)
+  if diag.primary_span then
+    local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
+    for _, err in ipairs(primary_errors) do
+      table.insert(errors, err)
+    end
   end
 
   -- 6. Validate optional 'secondary_spans' array
@@ -420,7 +504,7 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      if seen_codes[diag.code] then
+      if seen_codes[diag.code] and not allow_duplicate_diagnostic_codes then
         table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
       else
         seen_codes[diag.code] = i
@@ -431,9 +515,11 @@ local function process_diagnostics(diagnostics_table)
       local param_contexts = {}
       local seen_params = {} -- name -> type mapping
       local seen_locations = {} -- name -> {type, variadic, struct_name}
+      local param_order = {} -- Array tracking order of first appearance
 
       -- Variadic structs: struct_name -> { params = {}, locations = {}, container_type = "span"|"note" }
       local variadic_structs = {}
+      local variadic_structs_order = {} -- Array tracking order of variadic struct registration
 
       -- First pass: collect all locations to build the known_params map
       local function collect_location(container)
@@ -456,6 +542,7 @@ local function process_diagnostics(diagnostics_table)
           -- Track context (variadic vs non-variadic)
           if not param_contexts[loc_name] then
             param_contexts[loc_name] = { variadic_structs = {}, non_variadic = false, is_location = true }
+            table.insert(param_order, loc_name) -- Track order of first appearance
           end
           if container.variadic and container.struct_name then
             param_contexts[loc_name].variadic_structs[container.struct_name] = true
@@ -465,8 +552,10 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- Collect locations from primary span
-      collect_location(diag.primary_span)
+      -- Collect locations from primary span (if present)
+      if diag.primary_span then
+        collect_location(diag.primary_span)
+      end
 
       -- Collect locations from secondary spans
       if diag.secondary_spans then
@@ -476,6 +565,7 @@ local function process_diagnostics(diagnostics_table)
           if span.variadic and span.struct_name then
             if not variadic_structs[span.struct_name] then
               variadic_structs[span.struct_name] = { params = {}, locations = {}, container_type = "span", container = span }
+              table.insert(variadic_structs_order, span.struct_name) -- Track order
             end
           end
         end
@@ -489,6 +579,7 @@ local function process_diagnostics(diagnostics_table)
           if note.variadic and note.struct_name then
             if not variadic_structs[note.struct_name] then
               variadic_structs[note.struct_name] = { params = {}, locations = {}, container_type = "note", container = note }
+              table.insert(variadic_structs_order, note.struct_name) -- Track order
             end
           end
           -- Collect locations from spans within notes
@@ -498,6 +589,37 @@ local function process_diagnostics(diagnostics_table)
             end
           end
         end
+      end
+
+      -- Helper to extract all required parameters from a container (for null checking)
+      -- Only includes pointer types (not strings or ints) since those can be null-checked
+      local function extract_required_params(container)
+        local required = {}
+        local required_set = {}
+
+        -- Add location parameter if it's typed (locations are always pointers or SourceLoc)
+        if container.location_name and container.location_type then
+          table.insert(required, container.location_name)
+          required_set[container.location_name] = true
+        end
+
+        -- Add all pointer-type parameters from message (excluding member accesses and non-pointer types)
+        if container.message_parts then
+          for _, part in ipairs(container.message_parts) do
+            if part.type == "interpolation" and not part.member_name then
+              local param_type = seen_params[part.param_name]
+              -- Only add pointer types (type, decl, expr, stmt, val, name - not string or int)
+              if param_type and param_type ~= "string" and param_type ~= "int" then
+                if not required_set[part.param_name] then
+                  table.insert(required, part.param_name)
+                  required_set[part.param_name] = true
+                end
+              end
+            end
+          end
+        end
+
+        return required
       end
 
       -- Second pass: process messages now that we know all the location parameters
@@ -535,6 +657,7 @@ local function process_diagnostics(diagnostics_table)
             if not part.member_name then
               if not param_contexts[param_name] then
                 param_contexts[param_name] = { variadic_structs = {}, non_variadic = false, is_location = false }
+                table.insert(param_order, param_name) -- Track order of first appearance
               end
               if container.variadic and container.struct_name then
                 param_contexts[param_name].variadic_structs[container.struct_name] = true
@@ -554,13 +677,61 @@ local function process_diagnostics(diagnostics_table)
       local main_msg_container = { message = diag.message }
       local main_parts = process_message_container(main_msg_container, diagnostic_name .. ".message")
 
-      -- 2. Process primary span
-      process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
+      -- Extract required params from main message for assertions (only pointer types)
+      main_msg_container.message_parts = main_parts
+      local main_required = {}
+      if main_parts then
+        for _, part in ipairs(main_parts) do
+          if part.type == "interpolation" and not part.member_name then
+            local param_type = seen_params[part.param_name]
+            -- Only add pointer types (not string or int)
+            if param_type and param_type ~= "string" and param_type ~= "int" then
+              table.insert(main_required, part.param_name)
+            end
+          end
+        end
+      end
+
+      -- 2. Process primary span (if present)
+      local primary_span_required = {}
+      if diag.primary_span then
+        process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
+
+        -- Extract required params from primary span for assertions (only pointer types)
+        if diag.primary_span.location_name and diag.primary_span.location_type then
+          table.insert(primary_span_required, diag.primary_span.location_name)
+        end
+        if diag.primary_span.message_parts then
+          for _, part in ipairs(diag.primary_span.message_parts) do
+            if part.type == "interpolation" and not part.member_name then
+              local param_type = seen_params[part.param_name]
+              -- Only add pointer types (not string or int)
+              if param_type and param_type ~= "string" and param_type ~= "int" then
+                -- Avoid duplicates
+                local found = false
+                for _, existing in ipairs(primary_span_required) do
+                  if existing == part.param_name then
+                    found = true
+                    break
+                  end
+                end
+                if not found then
+                  table.insert(primary_span_required, part.param_name)
+                end
+              end
+            end
+          end
+        end
+      end
 
       -- 3. Process secondary spans
       if diag.secondary_spans then
         for j, span in ipairs(diag.secondary_spans) do
           process_message_container(span, diagnostic_name .. ".secondary_spans[" .. j .. "]")
+          -- Extract required params for null checking (skip variadic spans, they're handled per-item)
+          if not span.variadic then
+            span.required_params = extract_required_params(span)
+          end
         end
       end
 
@@ -578,7 +749,13 @@ local function process_diagnostics(diagnostics_table)
           if note.spans then
             for k, span in ipairs(note.spans) do
               process_message_container(span, diagnostic_name .. ".notes[" .. j .. "].spans[" .. k .. "]")
+              -- Extract required params for additional spans
+              span.required_params = extract_required_params(span)
             end
+          end
+          -- Extract required params for null checking (skip variadic notes, they're handled per-item)
+          if not note.variadic then
+            note.required_params = extract_required_params(note)
           end
         end
       end
@@ -589,7 +766,9 @@ local function process_diagnostics(diagnostics_table)
       local direct_params = {}
       local direct_locations = {}
 
-      for param_name, ctx in pairs(param_contexts) do
+      -- Iterate in order of first appearance
+      for _, param_name in ipairs(param_order) do
+        local ctx = param_contexts[param_name]
         local variadic_count = 0
         local single_struct = nil
         for struct_name, _ in pairs(ctx.variadic_structs) do
@@ -615,11 +794,14 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- Convert variadic_structs map to list and add list_name
+      -- Convert variadic_structs map to list and add list_name (in order of registration)
       local variadic_structs_list = {}
-      for struct_name, vs in pairs(variadic_structs) do
+      for _, struct_name in ipairs(variadic_structs_order) do
+        local vs = variadic_structs[struct_name]
         vs.struct_name = struct_name
         vs.list_name = pluralize(struct_name:sub(1,1):lower() .. struct_name:sub(2))
+        -- Extract required params for the variadic container
+        vs.required_params = extract_required_params(vs.container)
         table.insert(variadic_structs_list, vs)
       end
 
@@ -629,6 +811,8 @@ local function process_diagnostics(diagnostics_table)
         severity = diag.severity,
         message = diag.message,
         message_parts = main_parts,
+        message_required_params = main_required,
+        primary_span_required_params = primary_span_required,
         params = direct_params,
         locations = direct_locations,
         variadic_structs = variadic_structs_list,

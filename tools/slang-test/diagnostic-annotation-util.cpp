@@ -72,12 +72,13 @@ static SlangResult parseAnnotations(
     outAnnotations.clear();
 
     // Build the comment markers we're looking for
+    // The colon after the prefix is required to avoid confusion with substring matching
     StringBuilder lineMarkerBuilder;
-    lineMarkerBuilder << "//" << prefix;
+    lineMarkerBuilder << "//" << prefix << ":";
     String lineMarker = lineMarkerBuilder.produceString();
 
     StringBuilder blockStartBuilder;
-    blockStartBuilder << "/*" << prefix;
+    blockStartBuilder << "/*" << prefix << ":";
     String blockStart = blockStartBuilder.produceString();
 
     // Split source into lines
@@ -296,6 +297,29 @@ static void generateSuggestedAnnotations(
 {
     sb << "  ⋮\n"; // Vertical ellipsis (indented)
 
+    // Check if any diagnostic has column 0 (no valid location)
+    // These should use caretless format since position-based matching won't work
+    bool hasLocationlessDiagnostic = false;
+    for (const auto* diag : diagnostics)
+    {
+        if (diag->beginCol == 0)
+        {
+            hasLocationlessDiagnostic = true;
+            break;
+        }
+    }
+
+    // For locationless diagnostics (column 0), use simple caretless format
+    if (hasLocationlessDiagnostic)
+    {
+        for (const auto* diag : diagnostics)
+        {
+            sb << "//" << prefix << ": " << diag->message << "\n";
+        }
+        sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
+        return;
+    }
+
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
@@ -305,8 +329,8 @@ static void generateSuggestedAnnotations(
             sb << "\n";
     }
 
-    // Calculate the prefix length: "//" + prefix
-    int linePrefixLength = 2 + prefix.getLength();
+    // Calculate the prefix length: "//" + prefix + ":"
+    int linePrefixLength = 3 + int(prefix.getLength());
 
     // Check if we should use block comment
     bool useBlockComment = false;
@@ -322,7 +346,7 @@ static void generateSuggestedAnnotations(
     if (useBlockComment)
     {
         // Generate block comment format (no indentation)
-        sb << "/*" << prefix << "\n";
+        sb << "/*" << prefix << ":\n";
         for (const auto* diag : diagnostics)
         {
             // Generate spacing to align caret with column
@@ -369,7 +393,7 @@ static void generateSuggestedAnnotations(
                 caretBuilder << "^";
             }
 
-            sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+            sb << "//" << prefix << ":" << spacingBuilder.getUnownedSlice()
                << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
         }
     }
@@ -387,15 +411,11 @@ static bool checkAnnotations(
 {
     outMissingAnnotations.clear();
 
-    // Track which diagnostics are matched by annotations (for exhaustive checking)
     List<bool> diagnosticMatched;
-    if (exhaustive)
+    diagnosticMatched.setCount(diagnostics.getCount());
+    for (Index i = 0; i < diagnostics.getCount(); ++i)
     {
-        diagnosticMatched.setCount(diagnostics.getCount());
-        for (Index i = 0; i < diagnostics.getCount(); ++i)
-        {
-            diagnosticMatched[i] = false;
-        }
+        diagnosticMatched[i] = false;
     }
 
     for (const auto& annotation : annotations)
@@ -408,52 +428,32 @@ static bool checkAnnotations(
             // Can match against: message, severity, errorCode, or "severity errorCode"
             for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
             {
+                if (diagnosticMatched[diagIdx])
+                    continue;
+
                 const auto& diag = diagnostics[diagIdx];
                 UnownedStringSlice expected = annotation.expectedSubstring.getUnownedSlice();
 
-                // Check message
+                // Check message, severity, errorCode, or "severity errorCode"
+                bool matches = false;
                 if (diag.message.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.severity.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.errorCode.indexOf(expected) != -1)
+                    matches = true;
+                else
                 {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
+                    StringBuilder combined;
+                    combined << diag.severity << " " << diag.errorCode;
+                    if (combined.produceString().indexOf(expected) != -1)
+                        matches = true;
                 }
 
-                // Check severity
-                if (diag.severity.indexOf(expected) != -1)
+                if (matches)
                 {
                     found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check error code
-                if (diag.errorCode.indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check "severity errorCode" combination
-                StringBuilder combined;
-                combined << diag.severity << " " << diag.errorCode;
-                if (combined.produceString().indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
+                    diagnosticMatched[diagIdx] = true;
                     break;
                 }
             }
@@ -528,7 +528,12 @@ static bool checkAnnotations(
                     else
                         diagInfo << diag.beginCol << "-" << diag.endCol;
                     diagInfo << ": \"" << diag.message << "\"";
+                    if (diagnosticMatched[diagIdx])
+                        diagInfo << " (already matched)";
                     candidateDiagnostics.add(diagInfo.produceString());
+
+                    if (diagnosticMatched[diagIdx])
+                        continue;
 
                     // Check if this is a full match
                     if (diag.beginCol == annotation.columnStart &&
@@ -541,35 +546,24 @@ static bool checkAnnotations(
                         // Check message, severity, errorCode, or "severity errorCode"
                         bool matches = false;
                         if (diag.message.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.severity.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.errorCode.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else
                         {
                             StringBuilder combined;
                             combined << diag.severity << " " << diag.errorCode;
                             if (combined.produceString().indexOf(expected) != -1)
-                            {
                                 matches = true;
-                            }
                         }
 
                         if (matches)
                         {
                             messageMatched = true;
                             found = true;
-                            if (exhaustive)
-                            {
-                                diagnosticMatched[diagIdx] = true;
-                            }
+                            diagnosticMatched[diagIdx] = true;
                             break;
                         }
                     }

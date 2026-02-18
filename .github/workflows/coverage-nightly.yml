@@ -11,9 +11,9 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
   pull-requests: write # For PR comments (if needed)
-  # Note: GITHUB_TOKEN automatically has write access to other org repos
 
 jobs:
   coverage-linux:
