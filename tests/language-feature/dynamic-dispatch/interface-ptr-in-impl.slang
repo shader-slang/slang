@@ -99,6 +99,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[2] = callThroughInterface(typeSelector[2], 10.0);  // CHECK: 10.0
     
     // Test 4: SimpleImpl again
-    // typeSelector[3] = 2 → SimpleImpl, value = 5.0, result = 5.0 * 2.0 = 10.0
-    outputBuffer[3] = callThroughInterface(typeSelector[3], 5.0);   // CHECK: 10.0
+    // typeSelector[3] = 2 → SimpleImpl, value = 4.0, result = 4.0 * 2.0 = 8.0
+    outputBuffer[3] = callThroughInterface(typeSelector[3], 4.0);   // CHECK: 8.0
 }
