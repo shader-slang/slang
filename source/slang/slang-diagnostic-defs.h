@@ -22,49 +22,13 @@
 // -1 - Notes that decorate another diagnostic.
 //
 
-DIAGNOSTIC(-1, Note, alsoSeePipelineDefinition, "also see pipeline definition")
-DIAGNOSTIC(
-    -1,
-    Note,
-    implicitParameterMatchingFailedBecauseNameNotAccessible,
-    "implicit parameter matching failed because the component of the same name is not accessible "
-    "from '$0'.\ncheck if you have declared necessary requirements and properly used the 'public' "
-    "qualifier.")
-DIAGNOSTIC(
-    -1,
-    Note,
-    implicitParameterMatchingFailedBecauseShaderDoesNotDefineComponent,
-    "implicit parameter matching failed because shader '$0' does not define component '$1'.")
-DIAGNOSTIC(
-    -1,
-    Note,
-    implicitParameterMatchingFailedBecauseTypeMismatch,
-    "implicit parameter matching failed because the component of the same name does not match "
-    "parameter type '$0'.")
-DIAGNOSTIC(-1, Note, noteShaderIsTargetingPipeine, "shader '$0' is targeting pipeline '$1'")
 DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
 DIAGNOSTIC(-1, Note, seeDefinitionOfStruct, "see definition of struct '$0'")
 DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
-DIAGNOSTIC(-1, Note, seeInterfaceDefinitionOf, "see interface definition of '$0'")
 DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
-DIAGNOSTIC(-1, Note, seeDefinitionOfShader, "see definition of shader '$0'")
-DIAGNOSTIC(-1, Note, seeInclusionOf, "see inclusion of '$0'")
-DIAGNOSTIC(-1, Note, seeModuleBeingUsedIn, "see module '$0' being used in '$1'")
 DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
-DIAGNOSTIC(-1, Note, seePipelineRequirementDefinition, "see pipeline requirement definition")
-DIAGNOSTIC(
-    -1,
-    Note,
-    seePotentialDefinitionOfComponent,
-    "see potential definition of component '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDefinition, "see previous definition")
 DIAGNOSTIC(-1, Note, seePreviousDefinitionOf, "see previous definition of '$0'")
-DIAGNOSTIC(-1, Note, seeRequirementDeclaration, "see requirement declaration")
-DIAGNOSTIC(
-    -1,
-    Note,
-    doYouForgetToMakeComponentAccessible,
-    "do you forget to make component '$0' acessible from '$1' (missing public qualifier)?")
 
 DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
 DIAGNOSTIC(
@@ -77,12 +41,9 @@ DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
-DIAGNOSTIC(-1, Note, declaredHere, "declared here")
-DIAGNOSTIC(-1, Note, seeOtherDeclarationOf, "see other declaration of '$0'")
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
 DIAGNOSTIC(-1, Note, includeOutput, "include $0")
 DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
-DIAGNOSTIC(-1, Note, entryPointCandidate, "see candidate declaration for entry point '$0'")
 
 //
 // 0xxxx -  Command line and interaction with host platform APIs.
@@ -90,7 +51,6 @@ DIAGNOSTIC(-1, Note, entryPointCandidate, "see candidate declaration for entry p
 
 DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
 DIAGNOSTIC(2, Error, cannotFindFile, "cannot find file '$0'.")
-DIAGNOSTIC(2, Error, unsupportedCompilerMode, "unsupported compiler mode.")
 DIAGNOSTIC(4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
 DIAGNOSTIC(5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 DIAGNOSTIC(
@@ -99,24 +59,6 @@ DIAGNOSTIC(
     tooManyOutputPathsSpecified,
     "$0 output paths specified, but only $1 entry points given")
 
-DIAGNOSTIC(
-    7,
-    Error,
-    noOutputPathSpecifiedForEntryPoint,
-    "no output path specified for entry point '$0' (the '-o' option for an entry point must "
-    "precede the corresponding '-entry')")
-
-DIAGNOSTIC(
-    8,
-    Error,
-    outputPathsImplyDifferentFormats,
-    "the output paths '$0' and '$1' require different code-generation targets")
-
-DIAGNOSTIC(
-    10,
-    Error,
-    explicitOutputPathsAndMultipleTargets,
-    "canot use both explicit output paths ('-o') and multiple targets ('-target')")
 DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
 DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
 DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
@@ -139,8 +81,6 @@ DIAGNOSTIC(
     "source file(s)")
 
 DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
-
-DIAGNOSTIC(26, Error, unknownOptimiziationLevel, "unknown optimization level '$0'")
 
 DIAGNOSTIC(28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
 
@@ -269,13 +209,6 @@ DIAGNOSTIC(
     "the -dep argument can only be specified once")
 
 DIAGNOSTIC(82, Error, unableToWriteReproFile, "unable to write repro file '%0'")
-DIAGNOSTIC(83, Error, unableToWriteModuleContainer, "unable to write module container '%0'")
-DIAGNOSTIC(84, Error, unableToReadModuleContainer, "unable to read module container '%0'")
-DIAGNOSTIC(
-    85,
-    Error,
-    unableToAddReferenceToModuleContainer,
-    "unable to add a reference to a module container")
 DIAGNOSTIC(86, Error, unableToCreateModuleContainer, "unable to create module container")
 
 DIAGNOSTIC(
@@ -284,7 +217,6 @@ DIAGNOSTIC(
     unableToSetDefaultDownstreamCompiler,
     "unable to set default downstream compiler for source language '%0' to '%1'")
 
-DIAGNOSTIC(88, Error, unknownArchiveType, "archive type '%0' is unknown")
 DIAGNOSTIC(89, Error, expectingSlangRiffContainer, "expecting a slang riff container")
 DIAGNOSTIC(
     90,
@@ -300,7 +232,6 @@ DIAGNOSTIC(95, Error, unknownLibraryKind, "unknown library kind '$0'")
 DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
 DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
 DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
-DIAGNOSTIC(99, Error, unknownDebugOption, "unknown debug option, known options are ($0)")
 DIAGNOSTIC(
     104,
     Error,
@@ -352,7 +283,6 @@ DIAGNOSTIC(
     Error,
     unexpectedTokensAfterDirective,
     "unexpected tokens following '$0' directive")
-
 
 // 152xx - preprocessor expressions
 DIAGNOSTIC(
@@ -453,7 +383,6 @@ DIAGNOSTIC(
     Warning,
     pragmaOnceIgnored,
     "pragma once was ignored - this is typically because is not placed in an include")
-DIAGNOSTIC(15610, Error, pragmaWarningGenericError, "Error in #pragma warning processing: $0")
 DIAGNOSTIC(
     15611,
     Warning,
@@ -481,7 +410,6 @@ DIAGNOSTIC(
     pragmaWarningPointSuppress,
     "#pragma warning for id '$0' was suppressed here")
 
-
 // 159xx - user-defined error/warning
 DIAGNOSTIC(15900, Error, userDefinedError, "#error: $0")
 DIAGNOSTIC(15901, Warning, userDefinedWarning, "#warning: $0")
@@ -505,17 +433,11 @@ DIAGNOSTIC(20001, Error, typeNameExpectedButEOF, "type name expected but end of 
 DIAGNOSTIC(20001, Error, unexpectedEOF, " Unexpected end of file.")
 DIAGNOSTIC(20002, Error, syntaxError, "syntax error.")
 DIAGNOSTIC(
-    20004,
-    Error,
-    unexpectedTokenExpectedComponentDefinition,
-    "unexpected token '$0', only component definitions are allowed in a shader scope.")
-DIAGNOSTIC(
     20005,
     Error,
     invalidEmptyParenthesisExpr,
     "empty parenthesis '()' is not a valid expression.")
 DIAGNOSTIC(20008, Error, invalidOperator, "invalid operator '$0'.")
-DIAGNOSTIC(20011, Error, unexpectedColon, "unexpected ':'.")
 DIAGNOSTIC(
     20012,
     Error,
@@ -528,12 +450,6 @@ DIAGNOSTIC(
     invalidCUDASMVersion,
     "Expecting CUDA SM version as either 'major.minor', or quoted if has patch (eg for '7.0' or "
     "\"7.0\"')")
-DIAGNOSTIC(
-    20014,
-    Error,
-    classIsReservedKeyword,
-    "'class' is a reserved keyword in this context; use 'struct' instead.")
-DIAGNOSTIC(20015, Error, unknownSPIRVCapability, "unknown SPIR-V capability '$0'.")
 DIAGNOSTIC(
     20016,
     Error,
@@ -635,37 +551,13 @@ DIAGNOSTIC(
 DIAGNOSTIC(30002, Error, divideByZero, "divide by zero")
 DIAGNOSTIC(30003, Error, breakOutsideLoop, "'break' must appear inside loop or switch constructs.")
 DIAGNOSTIC(30004, Error, continueOutsideLoop, "'continue' must appear inside loop constructs.")
-DIAGNOSTIC(30005, Error, whilePredicateTypeError, "'while': expression must evaluate to int.")
-DIAGNOSTIC(30006, Error, ifPredicateTypeError, "'if': expression must evaluate to int.")
 DIAGNOSTIC(30006, Error, returnNeedsExpression, "'return' should have an expression.")
-DIAGNOSTIC(
-    30007,
-    Error,
-    componentReturnTypeMismatch,
-    "expression type '$0' does not match component's type '$1'")
-DIAGNOSTIC(
-    30007,
-    Error,
-    functionReturnTypeMismatch,
-    "expression type '$0' does not match function's return type '$1'")
-DIAGNOSTIC(30008, Error, variableNameAlreadyDefined, "variable $0 already defined.")
 DIAGNOSTIC(30009, Error, invalidTypeVoid, "invalid type 'void'.")
-DIAGNOSTIC(30010, Error, whilePredicateTypeError2, "'while': expression must evaluate to int.")
 DIAGNOSTIC(30011, Error, assignNonLValue, "left of '=' is not an l-value.")
-DIAGNOSTIC(30012, Error, noApplicationUnaryOperator, "no overload found for operator $0 ($1).")
-DIAGNOSTIC(
-    30012,
-    Error,
-    noOverloadFoundForBinOperatorOnTypes,
-    "no overload found for operator $0  ($1, $2).")
 DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for type '$0'")
-DIAGNOSTIC(30014, Error, subscriptIndexNonInteger, "index expression must evaluate to int.")
 DIAGNOSTIC(30016, Error, callOperatorNotFound, "no call operation found for type '$0'")
 DIAGNOSTIC(30015, Error, undefinedIdentifier2, "undefined identifier '$0'.")
 DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got '$1'")
-DIAGNOSTIC(30021, Error, noApplicationFunction, "$0: no overload takes arguments ($1)")
-DIAGNOSTIC(30022, Error, invalidTypeCast, "invalid type cast between \"$0\" and \"$1\".")
-DIAGNOSTIC(30023, Error, typeHasNoPublicMemberOfName, "\"$0\" does not have public member \"$1\".")
 DIAGNOSTIC(
     30024,
     Error,
@@ -688,43 +580,7 @@ DIAGNOSTIC(
     Error,
     arrayIndexOutOfBounds,
     "array index '$0' is out of bounds for array of size '$1'.")
-DIAGNOSTIC(
-    30026,
-    Error,
-    returnInComponentMustComeLast,
-    "'return' can only appear as the last statement in component definition.")
 DIAGNOSTIC(30027, Error, noMemberOfNameInType, "'$0' is not a member of '$1'.")
-DIAGNOSTIC(
-    30028,
-    Error,
-    forPredicateTypeError,
-    "'for': predicate expression must evaluate to bool.")
-DIAGNOSTIC(
-    30030,
-    Error,
-    projectionOutsideImportOperator,
-    "'project': invalid use outside import operator.")
-DIAGNOSTIC(
-    30031,
-    Error,
-    projectTypeMismatch,
-    "'project': expression must evaluate to record type '$0'.")
-DIAGNOSTIC(
-    30033,
-    Error,
-    invalidTypeForLocalVariable,
-    "cannot declare a local variable of this type.")
-DIAGNOSTIC(
-    30035,
-    Error,
-    componentOverloadTypeMismatch,
-    "'$0': type of overloaded component mismatches previous definition.")
-DIAGNOSTIC(30041, Error, bitOperationNonIntegral, "bit operation: operand must be integral type.")
-DIAGNOSTIC(
-    30043,
-    Error,
-    getStringHashRequiresStringLiteral,
-    "getStringHash parameter can only accept a string literal")
 DIAGNOSTIC(
     30047,
     Error,
@@ -749,7 +605,6 @@ DIAGNOSTIC(
     mutatingMethodOnImmutableValue,
     "mutating method '$0' cannot be called on an immutable value")
 
-DIAGNOSTIC(30051, Error, invalidValueForArgument, "invalid value for argument '$0'")
 DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
 DIAGNOSTIC(30053, Error, breakLabelNotFound, "label '$0' used as break target is not found.")
 DIAGNOSTIC(
@@ -1045,7 +900,6 @@ DIAGNOSTIC(
     floatBitCastRequiresConstant,
     "'__floatAsInt' requires a compile-time constant floating-point expression")
 
-
 DIAGNOSTIC(30101, Error, readingFromWriteOnly, "cannot read from writeonly, check modifiers.")
 DIAGNOSTIC(
     30102,
@@ -1165,11 +1019,6 @@ DIAGNOSTIC(
     declCannotHaveHigherVisibility,
     "'$0' cannot have a higher visibility than '$1'.")
 DIAGNOSTIC(
-    30602,
-    Error,
-    satisfyingDeclCannotHaveLowerVisibility,
-    "'$0' is less visible than the interface requirement it satisfies.")
-DIAGNOSTIC(
     30603,
     Error,
     invalidUseOfPrivateVisibility,
@@ -1200,12 +1049,6 @@ DIAGNOSTIC(
     conflictingCapabilityDueToStatementEnclosingFunc,
     "statement requires capability '$0' that is conflicting with the current function's capability "
     "requirement '$1'.")
-DIAGNOSTIC(
-    36103,
-    Warning,
-    missingCapabilityRequirementOnPublicDecl,
-    "public symbol '$0' is missing capability requirement declaration, the symbol is assumed to "
-    "require inferred capabilities '$1'.")
 DIAGNOSTIC(36104, Error, useOfUndeclaredCapability, "'$0' uses undeclared capability '$1'")
 DIAGNOSTIC(
     36104,
@@ -1231,11 +1074,6 @@ DIAGNOSTIC(
     declHasDependenciesNotCompatibleOnTarget,
     "'$0' has dependencies that are not compatible on the required compilation target '$1'.")
 DIAGNOSTIC(36109, Error, invalidTargetSwitchCase, "'$0' cannot be used as a target_switch case.")
-DIAGNOSTIC(
-    36110,
-    Error,
-    stageIsIncompatibleWithCapabilityDefinition,
-    "'$0' is defined for stage '$1', which is incompatible with the declared capability set '$2'.")
 DIAGNOSTIC(36111, Error, unexpectedCapability, "'$0' resolves into a disallowed `$1` Capability.")
 DIAGNOSTIC(
     36112,
@@ -1247,16 +1085,6 @@ DIAGNOSTIC(
     Warning,
     usingInternalCapabilityName,
     "'$0' resolves into a '_Internal' '_$1' Capability, use '$1' instead.")
-DIAGNOSTIC(
-    36114,
-    Warning,
-    incompatibleWithPrecompileLib,
-    "Precompiled library requires '$0', has `$1`, implicitly upgrading capabilities.")
-DIAGNOSTIC(
-    36115,
-    Error,
-    incompatibleWithPrecompileLibRestrictive,
-    "Precompiled library requires '$0', has `$1`.")
 DIAGNOSTIC(
     36116,
     Error,
@@ -1351,7 +1179,6 @@ DIAGNOSTIC(
     "Image format '$0' is not explicitly supported by the $1 backend, using supported format '$2' "
     "instead.")
 
-
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 DIAGNOSTIC(
     31125,
@@ -1414,7 +1241,6 @@ DIAGNOSTIC(
     missingOriginalDefintionOfExternDecl,
     "no original definition found for `extern` decl '$0'.")
 
-DIAGNOSTIC(31145, Error, invalidCustomDerivative, "invalid custom derivative attribute.")
 DIAGNOSTIC(31146, Error, declAlreadyHasAttribute, "'$0' already has attribute '[$1]'.")
 DIAGNOSTIC(
     31147,
@@ -1464,11 +1290,6 @@ DIAGNOSTIC(
     customDerivativeSignatureThisParamMismatch,
     "custom derivative does not match expected signature on `this`. Both original and derivative "
     "function must have the same `this` type.")
-DIAGNOSTIC(
-    31155,
-    Error,
-    customDerivativeNotAllowedForMemberFunctionsOfDifferentiableType,
-    "custom derivative is not allowed for non-static member functions of a differentiable type.")
 DIAGNOSTIC(
     31156,
     Error,
@@ -1712,11 +1533,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    localVariableUsedBeforeDeclared,
-    "local variable '$0' is being used before its declaration.")
-DIAGNOSTIC(
-    39999,
-    Error,
     variableUsedInItsOwnDefinition,
     "the initial-value expression for variable '$0' depends on the value of the variable itself")
 DIAGNOSTIC(
@@ -1763,11 +1579,6 @@ DIAGNOSTIC(
 
 // 305xx: initializer lists
 DIAGNOSTIC(30500, Error, tooManyInitializers, "too many initializers (expected $0, got $1)")
-DIAGNOSTIC(
-    30501,
-    Error,
-    cannotUseInitializerListForArrayOfUnknownSize,
-    "cannot use initializer list for array of statically unknown size '$0'")
 DIAGNOSTIC(
     30502,
     Error,
@@ -1990,11 +1801,6 @@ DIAGNOSTIC(31301, Error, bitFieldNonIntegral, "bit-field type ($0) must be an in
 DIAGNOSTIC(
     39999,
     Error,
-    expectedIntegerConstantWrongType,
-    "expected integer constant (found: '$0')")
-DIAGNOSTIC(
-    39999,
-    Error,
     expectedIntegerConstantNotConstant,
     "expression does not evaluate to a compile-time constant")
 DIAGNOSTIC(
@@ -2098,12 +1904,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(
     39999,
     Error,
-    unableToFindSymbolInModule,
-    "unable to find the mangled symbol '$0' in module '$1'")
-
-DIAGNOSTIC(
-    39999,
-    Error,
     matrixColumnOrRowCountIsOne,
     "matrices with 1 column or row are not supported by the current code generation target")
 
@@ -2114,22 +1914,7 @@ DIAGNOSTIC(
     Error,
     entryPointFunctionNotFound,
     "no function found matching entry point name '$0'")
-DIAGNOSTIC(
-    38001,
-    Error,
-    ambiguousEntryPoint,
-    "more than one function matches entry point name '$0'")
-DIAGNOSTIC(
-    38003,
-    Error,
-    entryPointSymbolNotAFunction,
-    "entry point '$0' must be declared as a function")
 
-DIAGNOSTIC(
-    38004,
-    Error,
-    entryPointTypeParameterNotFound,
-    "no type found matching entry-point type parameter name '$0'")
 DIAGNOSTIC(
     38005,
     Error,
@@ -2226,11 +2011,6 @@ DIAGNOSTIC(
     "cannot use '__return_val' here. '__return_val' is defined only in functions that return a "
     "non-copyable value.")
 DIAGNOSTIC(
-    38020,
-    Error,
-    mismatchEntryPointTypeArgument,
-    "expecting $0 entry-point type arguments, provided $1.")
-DIAGNOSTIC(
     38021,
     Error,
     typeArgumentForGenericParameterDoesNotConformToInterface,
@@ -2248,7 +2028,6 @@ DIAGNOSTIC(
     "the global type parameter '$0' cannot be specialized using another global type parameter "
     "('$1')")
 
-
 DIAGNOSTIC(
     38024,
     Error,
@@ -2256,24 +2035,12 @@ DIAGNOSTIC(
     "parameter with SV_DispatchThreadID must be either scalar or vector (1 to 3) of uint/int but "
     "is $0")
 
-DIAGNOSTIC(-1, Note, noteWhenCompilingEntryPoint, "when compiling entry point '$0'")
-
 DIAGNOSTIC(
     38025,
     Error,
     mismatchSpecializationArguments,
     "expected $0 specialization arguments ($1 provided)")
-DIAGNOSTIC(
-    38026,
-    Error,
-    globalTypeArgumentDoesNotConformToInterface,
-    "type argument `$1` for global generic parameter `$0` does not conform to interface `$2`.")
 
-DIAGNOSTIC(
-    38027,
-    Error,
-    mismatchExistentialSlotArgCount,
-    "expected $0 existential slot arguments ($1 provided)")
 DIAGNOSTIC(
     38028,
     Error,
@@ -2323,7 +2090,6 @@ DIAGNOSTIC(
     Error,
     intValFromNonIntSpecConstEncountered,
     "cannot cast non-integer specialization constant to compile-time integer")
-
 
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(
@@ -2377,30 +2143,6 @@ DIAGNOSTIC(
     parameterBindingsOverlap,
     "explicit binding for parameter '$0' overlaps with parameter '$1'")
 
-
-DIAGNOSTIC(
-    39002,
-    Error,
-    shaderParameterDeclarationsDontMatch,
-    "declarations of shader parameter '$0' in different translation units don't match")
-
-DIAGNOSTIC(
-    39003,
-    Note,
-    shaderParameterTypeMismatch,
-    "type is declared as '$0' in one translation unit, and '$0' in another")
-DIAGNOSTIC(
-    39004,
-    Note,
-    fieldTypeMisMatch,
-    "type of field '$0' is declared as '$1' in one translation unit, and '$2' in another")
-DIAGNOSTIC(
-    39005,
-    Note,
-    fieldDeclarationsDontMatch,
-    "type '$0' is declared with different fields in each translation unit")
-DIAGNOSTIC(39006, Note, usedInDeclarationOf, "used in declaration of '$0'")
-
 DIAGNOSTIC(39007, Error, unknownRegisterClass, "unknown register class: '$0'")
 DIAGNOSTIC(39008, Error, expectedARegisterIndex, "expected a register index after '$0'")
 DIAGNOSTIC(39009, Error, expectedSpace, "expected 'space', got '$0'")
@@ -2436,12 +2178,6 @@ DIAGNOSTIC(
     "'[[vk::binding(0, ...)]]'; the non-zero binding '$1' is not allowed")
 
 DIAGNOSTIC(
-    39016,
-    Warning,
-    hlslToVulkanMappingNotFound,
-    "unable to infer Vulkan binding for '$0', automatic layout will be used")
-
-DIAGNOSTIC(
     39017,
     Error,
     dontExpectOutParametersForStage,
@@ -2467,13 +2203,6 @@ DIAGNOSTIC(
     "can have at most one 'shader record' attributed constant buffer; found $0.")
 
 DIAGNOSTIC(
-    39021,
-    Error,
-    typeParametersNotAllowedOnEntryPointGlobal,
-    "local-root-signature shader parameter '$0' at global scope must not include "
-    "existential/interface types")
-
-DIAGNOSTIC(
     39022,
     Warning,
     vkIndexWithoutVkLocation,
@@ -2485,12 +2214,6 @@ DIAGNOSTIC(
     mixingImplicitAndExplicitBindingForVaryingParams,
     "mixing explicit and implicit bindings for varying parameters is not supported (see '$0' and "
     "'$1')")
-
-DIAGNOSTIC(
-    39024,
-    Warning,
-    cannotInferVulkanBindingWithoutRegisterModifier,
-    "shader parameter '$0' doesn't have a 'register' specified, automatic layout will be used")
 
 DIAGNOSTIC(
     39025,
@@ -2536,28 +2259,6 @@ DIAGNOSTIC(
 
 // 4xxxx - IL code generation.
 //
-DIAGNOSTIC(
-    40001,
-    Error,
-    bindingAlreadyOccupiedByComponent,
-    "resource binding location '$0' is already occupied by component '$1'.")
-DIAGNOSTIC(40002, Error, invalidBindingValue, "binding location '$0' is out of valid range.")
-DIAGNOSTIC(
-    40003,
-    Error,
-    bindingExceedsLimit,
-    "binding location '$0' assigned to component '$1' exceeds maximum limit.")
-DIAGNOSTIC(
-    40004,
-    Error,
-    bindingAlreadyOccupiedByModule,
-    "DescriptorSet ID '$0' is already occupied by module instance '$1'.")
-DIAGNOSTIC(
-    40005,
-    Error,
-    topLevelModuleUsedWithoutSpecifyingBinding,
-    "top level module '$0' is being used without specifying binding location. Use [Binding: "
-    "\"index\"] attribute to provide a binding location.")
 DIAGNOSTIC(40006, Error, unimplementedSystemValueSemantic, "unknown system-value semantic '$0'")
 
 DIAGNOSTIC(49999, Error, unknownSystemValueSemantic, "unknown system-value semantic '$0'")
@@ -2569,20 +2270,6 @@ DIAGNOSTIC(
     Error,
     invalidLValueForRefParameter,
     "the form of this l-value argument is not valid for a `ref` parameter")
-
-DIAGNOSTIC(
-    40009,
-    Error,
-    dynamicInterfaceLacksAnyValueSizeAttribute,
-    "interface '$0' is being used in dynamic dispatch code but has no [anyValueSize] attribute "
-    "defined.")
-DIAGNOSTIC(40010, Note, seeInterfaceUsage, "see usage of interface '$0'.")
-
-DIAGNOSTIC(
-    40011,
-    Error,
-    unconstrainedGenericParameterNotAllowedInDynamicFunction,
-    "unconstrained generic paramter '$0' is not allowed in a dynamic function.")
 
 DIAGNOSTIC(40012, Error, needCompileTimeConstant, "expected a compile-time constant")
 
@@ -2642,11 +2329,6 @@ DIAGNOSTIC(
     returningWithUninitializedOut,
     "returning without initializing out parameter '$0'")
 DIAGNOSTIC(
-    41019,
-    Warning,
-    returningWithPartiallyUninitializedOut,
-    "returning without fully initializing out parameter '$0'")
-DIAGNOSTIC(
     41020,
     Warning,
     constructorUninitializedField,
@@ -2656,12 +2338,6 @@ DIAGNOSTIC(
     Warning,
     fieldNotDefaultInitialized,
     "default initializer for '$0' will not initialize field '$1'")
-DIAGNOSTIC(41022, Warning, inOutNeverStoredInto, "inout parameter '$0' is never written to")
-DIAGNOSTIC(
-    41023,
-    Warning,
-    methodNeverMutates,
-    "method marked `[mutable]` but never modifies `this`")
 DIAGNOSTIC(
     41024,
     Warning,
@@ -2723,16 +2399,6 @@ DIAGNOSTIC(
     "derivative is lost when passing a non-differentiable location to an `out` or `inout` "
     "parameter, consider passing a temporary variable instead.")
 DIAGNOSTIC(
-    41021,
-    Error,
-    differentiableFuncMustHaveOutput,
-    "a differentiable function must have at least one differentiable output.")
-DIAGNOSTIC(
-    41022,
-    Error,
-    differentiableFuncMustHaveInput,
-    "a differentiable function must have at least one differentiable input.")
-DIAGNOSTIC(
     41023,
     Error,
     getStringHashMustBeOnStringLiteral,
@@ -2750,14 +2416,6 @@ DIAGNOSTIC(
     Error,
     unsupportedUseOfLValueForAutoDiff,
     "unsupported use of L-value for auto differentiation.")
-DIAGNOSTIC(
-    41902,
-    Error,
-    cannotDifferentiateDynamicallyIndexedData,
-    "cannot auto-differentiate mixed read/write access to dynamically indexed data in '$0'.")
-
-DIAGNOSTIC(41903, Error, unableToSizeOf, "sizeof could not be performed for type '$0'.")
-DIAGNOSTIC(41904, Error, unableToAlignOf, "alignof could not be performed for type '$0'.")
 
 DIAGNOSTIC(
     42001,
@@ -2786,7 +2444,6 @@ DIAGNOSTIC(
     expectDynamicUniformValue,
     "value stored at this location must be dynamic uniform, use `asDynamicUniform()` to silence "
     "this warning.")
-
 
 DIAGNOSTIC(
     41202,
@@ -2823,8 +2480,6 @@ DIAGNOSTIC(
     "cannot perform atomic operation because destination is neither groupshared nor from a device "
     "buffer.")
 
-DIAGNOSTIC(41404, Error, cannotWriteToReadOnlyPointer, "cannot write to a read-only pointer")
-
 //
 // 5xxxx - Target code generation.
 //
@@ -2840,112 +2495,12 @@ DIAGNOSTIC(
     spirvVersionNotSupported,
     "Slang's SPIR-V backend only supports SPIR-V version 1.3 and later."
     " Use `-emit-spirv-via-glsl` option to produce SPIR-V 1.0 through 1.2.")
-DIAGNOSTIC(50020, Error, invalidTessCoordType, "TessCoord must have vec2 or vec3 type.")
-DIAGNOSTIC(50020, Error, invalidFragCoordType, "FragCoord must be a vec4.")
-DIAGNOSTIC(50020, Error, invalidInvocationIdType, "InvocationId must have int type.")
-DIAGNOSTIC(50020, Error, invalidThreadIdType, "ThreadId must have int type.")
-DIAGNOSTIC(50020, Error, invalidPrimitiveIdType, "PrimitiveId must have int type.")
-DIAGNOSTIC(50020, Error, invalidPatchVertexCountType, "PatchVertexCount must have int type.")
-DIAGNOSTIC(50022, Error, worldIsNotDefined, "world '$0' is not defined.")
-DIAGNOSTIC(50023, Error, stageShouldProvideWorldAttribute, "'$0' should provide 'World' attribute.")
-DIAGNOSTIC(
-    50040,
-    Error,
-    componentHasInvalidTypeForPositionOutput,
-    "'$0': component used as 'loc' output must be of vec4 type.")
-DIAGNOSTIC(50041, Error, componentNotDefined, "'$0': component not defined.")
-
-DIAGNOSTIC(
-    50052,
-    Error,
-    domainShaderRequiresControlPointCount,
-    "'DomainShader' requires attribute 'ControlPointCount'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresControlPointCount,
-    "'HullShader' requires attribute 'ControlPointCount'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresControlPointWorld,
-    "'HullShader' requires attribute 'ControlPointWorld'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresCornerPointWorld,
-    "'HullShader' requires attribute 'CornerPointWorld'.")
-DIAGNOSTIC(50052, Error, hullShaderRequiresDomain, "'HullShader' requires attribute 'Domain'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresInputControlPointCount,
-    "'HullShader' requires attribute 'InputControlPointCount'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresOutputTopology,
-    "'HullShader' requires attribute 'OutputTopology'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresPartitioning,
-    "'HullShader' requires attribute 'Partitioning'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresPatchWorld,
-    "'HullShader' requires attribute 'PatchWorld'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresTessLevelInner,
-    "'HullShader' requires attribute 'TessLevelInner'.")
-DIAGNOSTIC(
-    50052,
-    Error,
-    hullShaderRequiresTessLevelOuter,
-    "'HullShader' requires attribute 'TessLevelOuter'.")
-
-DIAGNOSTIC(
-    50053,
-    Error,
-    invalidTessellationDomian,
-    "'Domain' should be either 'triangles' or 'quads'.")
-DIAGNOSTIC(
-    50053,
-    Error,
-    invalidTessellationOutputTopology,
-    "'OutputTopology' must be one of: 'point', 'line', 'triangle_cw', or 'triangle_ccw'.")
-DIAGNOSTIC(
-    50053,
-    Error,
-    invalidTessellationPartitioning,
-    "'Partitioning' must be one of: 'integer', 'pow2', 'fractional_even', or 'fractional_odd'.")
-DIAGNOSTIC(
-    50053,
-    Error,
-    invalidTessellationDomain,
-    "'Domain' should be either 'triangles' or 'quads'.")
 
 DIAGNOSTIC(
     50060,
     Error,
     invalidMeshStageOutputTopology,
     "Invalid mesh stage output topology '$0' for target '$1', must be one of: $2")
-
-DIAGNOSTIC(
-    50082,
-    Error,
-    importingFromPackedBufferUnsupported,
-    "importing type '$0' from PackedBuffer is not supported by the GLSL backend.")
-DIAGNOSTIC(
-    51090,
-    Error,
-    cannotGenerateCodeForExternComponentType,
-    "cannot generate code for extern component type '$0'.")
-DIAGNOSTIC(51091, Error, typeCannotBePlacedInATexture, "type '$0' cannot be placed in a texture.")
-DIAGNOSTIC(51092, Error, stageDoesntHaveInputWorld, "'$0' doesn't appear to have any input world")
 
 DIAGNOSTIC(
     50100,
@@ -3000,25 +2555,10 @@ DIAGNOSTIC(
     "compiler not defined for transition '$0' to '$1'.")
 
 DIAGNOSTIC(
-    52007,
-    Error,
-    typeCannotBeUsedInDynamicDispatch,
-    "failed to generate dynamic dispatch code for type '$0'.")
-DIAGNOSTIC(
-    52008,
-    Error,
-    dynamicDispatchOnSpecializeOnlyInterface,
-    "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
-DIAGNOSTIC(
     52009,
     Error,
     cannotEmitReflectionWithoutTarget,
     "cannot emit reflection JSON; no compilation target available")
-DIAGNOSTIC(
-    53001,
-    Error,
-    invalidTypeMarshallingForImportedDLLSymbol,
-    "invalid type marshalling in imported func $0.")
 
 DIAGNOSTIC(54001, Warning, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
 DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs must be arrays")
@@ -3090,12 +2630,6 @@ DIAGNOSTIC(
 DIAGNOSTIC(56003, Fatal, useOfUninitializedOpaqueHandle, "use of uninitialized opaque handle '$0'.")
 
 // Metal
-DIAGNOSTIC(
-    56100,
-    Error,
-    constantBufferInParameterBlockNotAllowedOnMetal,
-    "nested 'ConstantBuffer' inside a 'ParameterBlock' is not supported on Metal, use "
-    "'ParameterBlock' instead.")
 DIAGNOSTIC(
     56101,
     Error,
