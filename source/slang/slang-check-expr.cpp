@@ -1071,7 +1071,9 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
     auto result = filterLookupResultByVisibility(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(loc, Diagnostics::declIsNotVisible, lookupResult.item.declRef);
+        getSink()->diagnose(Diagnostics::DeclIsNotVisible{
+            .decl = lookupResult.item.declRef.getDecl(),
+            .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())

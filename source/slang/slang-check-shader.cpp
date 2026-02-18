@@ -1053,11 +1053,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 sink,
                 linkage->m_optionSet,
                 DiagnosticCategory::Capability,
-                entryPointFuncDecl,
-                Diagnostics::entryPointUsesUnavailableCapability,
-                entryPointFuncDecl,
-                compileTarget,
-                stageTarget);
+                Diagnostics::EntryPointUsesUnavailableCapability{
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .target = capabilityNameToString((CapabilityName)compileTarget),
+                    .decl = entryPointFuncDecl});
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
@@ -1161,11 +1160,11 @@ bool resolveStageOfProfileWithEntryPoint(
                     sink,
                     optionSet,
                     DiagnosticCategory::Capability,
-                    entryPointAttr,
-                    Diagnostics::entryPointAndProfileAreIncompatible,
-                    entryPointFuncDecl,
-                    entryPointStage,
-                    targetProfile.getName());
+                    Diagnostics::EntryPointAndProfileAreIncompatible{
+                        .decl = entryPointFuncDecl,
+                        .stage = getStageName(entryPointStage),
+                        .profile = targetProfile.getName(),
+                        .location = entryPointAttr->loc});
         }
         if (entryPointProfileStage == Stage::Unknown)
             entryPointProfile = Profile(entryPointStage);

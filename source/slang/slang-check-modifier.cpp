@@ -102,12 +102,14 @@ bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabi
         outCapabilityName = findCapabilityName(varExpr->name->text.getUnownedSlice());
         if (outCapabilityName == CapabilityName::Invalid)
         {
-            getSink()->diagnose(expr, Diagnostics::unknownCapability, varExpr->name);
+            getSink()->diagnose(Diagnostics::UnknownCapability{
+                .capability = getText(varExpr->name),
+                .location = expr->loc});
             return false;
         }
         return true;
     }
-    getSink()->diagnose(expr, Diagnostics::expectCapability);
+    getSink()->diagnose(Diagnostics::ExpectCapability{.location = expr->loc});
     return false;
 }
 
@@ -667,10 +669,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                     getSink(),
                     this->getOptionSet(),
                     DiagnosticCategory::Capability,
-                    attr,
-                    Diagnostics::usingInternalCapabilityName,
-                    attr,
-                    capName);
+                    Diagnostics::UsingInternalCapabilityName{
+                        .decl = capabilityNameToString((CapabilityName)capName),
+                        .capability = capabilityNameToString((CapabilityName)capName),
+                        .location = attr->loc});
 
             // Ensure this capability only defines 1 stage per target, else diagnose an error.
             // This is a fatal error, do not allow toggling this error off.
@@ -693,18 +695,21 @@ Modifier* SemanticsVisitor::validateAttribute(
                 atomsToPrint.reserve(stageToBeUsed.getCount());
                 for (auto i : stageToBeUsed)
                     atomsToPrint.add(i);
-                getSink()->diagnose(
-                    attr,
-                    Diagnostics::capabilityHasMultipleStages,
-                    capNameString,
-                    atomsToPrint);
+                StringBuilder stagesSb;
+                printDiagnosticArg(stagesSb, atomsToPrint);
+                getSink()->diagnose(Diagnostics::CapabilityHasMultipleStages{
+                    .capability = capNameString,
+                    .stages = stagesSb.produceString(),
+                    .location = attr->loc});
             }
             return entryPointAttr;
         }
         else
         {
             // always diagnose this error since nothing can compile with an invalid capability
-            getSink()->diagnose(attr, Diagnostics::unknownCapability, capNameString);
+            getSink()->diagnose(Diagnostics::UnknownCapability{
+                .capability = capNameString,
+                .location = attr->loc});
             return nullptr;
         }
     }
@@ -1137,10 +1142,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                         getSink(),
                         this->getOptionSet(),
                         DiagnosticCategory::Capability,
-                        attr,
-                        Diagnostics::usingInternalCapabilityName,
-                        attr,
-                        capName);
+                        Diagnostics::UsingInternalCapabilityName{
+                            .decl = capabilityNameToString((CapabilityName)capName),
+                            .capability = capabilityNameToString((CapabilityName)capName),
+                            .location = attr->loc});
             }
         }
         requireCapAttr->capabilitySet = CapabilitySet(capabilityNames).freeze(getASTBuilder());
@@ -1149,10 +1154,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                attr,
-                Diagnostics::unexpectedCapability,
-                attr,
-                CapabilityName::Invalid);
+                Diagnostics::UnexpectedCapability{
+                    .decl = String(),
+                    .capability = capabilityNameToString(CapabilityName::Invalid),
+                    .location = attr->loc});
     }
     else if (auto requirePreludeAttr = as<RequirePreludeAttribute>(attr))
     {
@@ -1913,19 +1918,19 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             if (isGlobalDecl(decl))
             {
-                getSink()->diagnose(
-                    m,
-                    Diagnostics::invalidUseOfPrivateVisibility,
-                    as<Decl>(syntaxNode));
+                getSink()->diagnose(Diagnostics::InvalidUseOfPrivateVisibility{
+                    .decl = as<Decl>(syntaxNode),
+                    .location = m->loc});
                 return m;
             }
         }
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            getSink()->diagnose(
-                m,
-                Diagnostics::invalidVisibilityModifierOnTypeOfDecl,
-                syntaxNode->astNodeType);
+            StringBuilder astTypeSb;
+            printDiagnosticArg(astTypeSb, syntaxNode->astNodeType);
+            getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
+                .ast_node_type = astTypeSb.produceString(),
+                .location = m->loc});
             return m;
         }
         else if (auto decl = as<Decl>(syntaxNode))
@@ -1933,10 +1938,9 @@ Modifier* SemanticsVisitor::checkModifier(
             // Interface requirements can't be private.
             if (isInterfaceRequirement(decl))
             {
-                getSink()->diagnose(
-                    m,
-                    Diagnostics::invalidUseOfPrivateVisibility,
-                    as<Decl>(syntaxNode));
+                getSink()->diagnose(Diagnostics::InvalidUseOfPrivateVisibility{
+                    .decl = as<Decl>(syntaxNode),
+                    .location = m->loc});
             }
         }
     }
@@ -1944,10 +1948,11 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            getSink()->diagnose(
-                m,
-                Diagnostics::invalidVisibilityModifierOnTypeOfDecl,
-                syntaxNode->astNodeType);
+            StringBuilder astTypeSb;
+            printDiagnosticArg(astTypeSb, syntaxNode->astNodeType);
+            getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
+                .ast_node_type = astTypeSb.produceString(),
+                .location = m->loc});
             return m;
         }
     }
@@ -2094,7 +2099,9 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
         DeclVisibility typeVisibility = getTypeVisibility(type);
         if (typeVisibility < thisVisibility)
         {
-            getSink()->diagnose(decl, Diagnostics::useOfLessVisibleType, decl, type);
+            getSink()->diagnose(Diagnostics::UseOfLessVisibleType{
+                .type = type,
+                .decl = decl});
             break;
         }
     }
@@ -2111,7 +2118,9 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     auto parentVisibility = getDeclVisibility(parentDecl);
     if (thisVisibility > parentVisibility)
     {
-        getSink()->diagnose(decl, Diagnostics::declCannotHaveHigherVisibility, decl, parentDecl);
+        getSink()->diagnose(Diagnostics::DeclCannotHaveHigherVisibility{
+            .parent = parentDecl,
+            .decl = decl});
     }
 }
 

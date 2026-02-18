@@ -249,6 +249,20 @@ bool maybeDiagnoseWarningOrError(
     }
 }
 
+// Overload of maybeDiagnose for new struct-based diagnostics
+template<typename DiagnosticStruct>
+bool maybeDiagnose(
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    DiagnosticCategory errorType,
+    DiagnosticStruct const& diag)
+{
+    if ((int)errorType & (int)DiagnosticCategory::Capability &&
+        optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(diag);
+}
+
 bool isValidSlangLanguageVersion(int version);
 bool isValidGLSLVersion(int version);
 

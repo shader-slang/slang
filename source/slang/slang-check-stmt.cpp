@@ -472,10 +472,9 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
                 caseStmt->capabilityToken.getContentLength() != 0 &&
                 (set.getCapabilityTargetSets().getCount() != 1 || set.isInvalid() || set.isEmpty()))
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::invalidTargetSwitchCase,
-                    capabilityNameToString((CapabilityName)caseStmt->capability));
+                getSink()->diagnose(Diagnostics::InvalidTargetSwitchCase{
+                    .capability = capabilityNameToString((CapabilityName)caseStmt->capability),
+                    .location = caseStmt->capabilityToken.loc});
             }
         }
 

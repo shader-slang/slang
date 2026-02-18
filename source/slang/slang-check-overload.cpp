@@ -270,7 +270,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     {
         if (context.mode == OverloadResolveContext::Mode::ForReal)
         {
-            getSink()->diagnose(context.loc, Diagnostics::declIsNotVisible, candidate.item.declRef);
+            getSink()->diagnose(Diagnostics::DeclIsNotVisible{
+                .decl = candidate.item.declRef.getDecl(),
+                .location = context.loc});
         }
         return false;
     }

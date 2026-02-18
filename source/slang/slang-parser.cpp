@@ -3985,10 +3985,9 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
         if (capName != CapabilityName::Invalid)
             capNames.add(capName);
         else
-            parser->sink->diagnose(
-                capNameToken,
-                Diagnostics::unknownCapability,
-                capNameToken.getContent());
+            parser->sink->diagnose(Diagnostics::UnknownCapability{
+                .capability = capNameToken.getContent(),
+                .location = capNameToken.getLoc()});
         if (AdvanceIf(parser, "+") || AdvanceIf(parser, ","))
             continue;
         break;
