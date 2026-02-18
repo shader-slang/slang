@@ -1423,8 +1423,7 @@ struct Ptr<
 typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device, L:IBufferDataLayout = DefaultDataLayout> = Ptr<T, Access.Immutable, addrSpace, L>;
 
 /// Represents a pointer with custom data layout as a shorthand for Ptr<T>.
-/// Such pointers are almost always in the Device address space, as data stored
-/// in other address spaces is currently always in the default layout.
+/// Such pointers are almost always in the Device address space.
 typealias LayoutPtr<T, L:IBufferDataLayout> = Ptr<T, Access.ReadWrite, AddressSpace.Device, L>;
 
 //@hidden:
