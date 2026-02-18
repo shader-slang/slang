@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/size-of.slang(7): error 30099: argument to sizeof is invalid
-    return sizeof(func);
-           ^~~~~~
-}
-standard output = {
-}

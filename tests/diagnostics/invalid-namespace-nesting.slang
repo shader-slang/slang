@@ -3,6 +3,6 @@
 struct Type
 {
     namespace ns {}
-//CHECK:      ^ declaration not allowed here
-//CHECK:      ^ namespace is not allowed here.
+//CHECK:      ^^ declaration not allowed here
+//CHECK:      ^^ namespace is not allowed here.
 }

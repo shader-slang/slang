@@ -53,6 +53,7 @@ local cpp_type_map = {
 	expr = "Expr*",
 	stmt = "Stmt*",
 	val = "Val*",
+	modifier = "Modifier*",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]
@@ -101,6 +102,7 @@ function M.getLocationExpr(location_name, location_type)
 		type = location_name .. "->loc",
 		val = location_name .. "->loc",
 		name = location_name .. "->loc",
+		modifier = location_name .. "->loc",
 	}
 
 	local extractor = location_extractors[location_type]
@@ -167,6 +169,9 @@ local member_access_map = {
 	},
 	name = {
 		text = { expr = function(base) return base .. "->text" end, type = "string" },
+		loc = { expr = function(base) return base .. "->loc" end, type = "sourceloc" },
+	},
+	modifier = {
 		loc = { expr = function(base) return base .. "->loc" end, type = "sourceloc" },
 	},
 }

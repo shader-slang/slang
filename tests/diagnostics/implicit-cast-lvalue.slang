@@ -18,6 +18,7 @@ void b(double y)
 {
 	a(y);
 /*diag:
+   ^ implicit conversion not recommended
    ^ implicit conversion from 'double' to 'float' is not recommended
    ^ argument must be l-value
    ^ argument passed to parameter '0' must be l-value.

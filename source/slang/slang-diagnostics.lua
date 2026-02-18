@@ -993,6 +993,10 @@ parsing_module(helpers)
 local semantic_checking_1_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-1.lua")
 semantic_checking_1_module(helpers)
 
+-- Load semantic checking diagnostics (part 2)
+local semantic_checking_2_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-2.lua")
+semantic_checking_2_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

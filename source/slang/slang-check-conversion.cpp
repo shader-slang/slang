@@ -1,6 +1,7 @@
 // slang-check-conversion.cpp
 #include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 // This file contains semantic-checking logic for dealing
 // with conversion (both implicit and explicit) of expressions
@@ -1916,7 +1917,10 @@ bool SemanticsVisitor::_coerce(
         {
             if (sink)
             {
-                sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+                sink->diagnose(Diagnostics::AmbiguousConversion{
+                    .from_type = fromType.type,
+                    .to_type = toType,
+                    .expr = fromExpr});
                 for (auto candidate : overloadContext.bestCandidates)
                 {
                     sink->diagnose(
@@ -1984,7 +1988,7 @@ bool SemanticsVisitor::_coerce(
                     sink->diagnoseWithoutSourceView(
                         fromExpr,
                         Diagnostics::noteExplicitConversionPossible,
-                        fromType,
+                        fromType.type,
                         toType);
                 }
             }
@@ -2012,11 +2016,10 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (shouldEmitGeneralWarning && sink)
                 {
-                    sink->diagnose(
-                        fromExpr,
-                        Diagnostics::unrecommendedImplicitConversion,
-                        fromType,
-                        toType);
+                    sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
+                        .from_type = fromType.type,
+                        .to_type = toType,
+                        .expr = fromExpr});
                 }
             }
 
@@ -2027,7 +2030,7 @@ bool SemanticsVisitor::_coerce(
                 if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
                 {
                     if (!as<FloatingPointLiteralExpr>(fromExpr))
-                        sink->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
+                        sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
                 }
             }
         }

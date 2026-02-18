@@ -221,7 +221,7 @@ void SemanticsStmtVisitor::visitBreakStmt(BreakStmt* stmt)
     {
         if (FindOuterStmt<DeferStmt>(targetOuterStmt))
         {
-            getSink()->diagnose(stmt, Diagnostics::breakInsideDefer);
+            getSink()->diagnose(Diagnostics::BreakInsideDefer{.stmt = stmt});
         }
 
         // We stash the ID of the target statement in the `break`
@@ -243,7 +243,7 @@ void SemanticsStmtVisitor::visitContinueStmt(ContinueStmt* stmt)
     {
         if (FindOuterStmt<DeferStmt>(targetOuterStmt))
         {
-            getSink()->diagnose(stmt, Diagnostics::continueInsideDefer);
+            getSink()->diagnose(Diagnostics::ContinueInsideDefer{.stmt = stmt});
         }
 
         // We stash the ID of the target statement in the `continue`
@@ -597,17 +597,16 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
             m_parentLambdaDecl->funcDecl->returnType.type = returnType;
         if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
         {
-            getSink()->diagnose(
-                stmt,
-                Diagnostics::returnTypeMismatchInsideLambda,
-                returnType,
-                m_parentLambdaDecl->funcDecl->returnType.type);
+            getSink()->diagnose(Diagnostics::ReturnTypeMismatchInsideLambda{
+                .returned_type = returnType,
+                .previous_type = m_parentLambdaDecl->funcDecl->returnType.type,
+                .stmt = stmt});
         }
     }
 
     if (FindOuterStmt<DeferStmt>())
     {
-        getSink()->diagnose(stmt, Diagnostics::returnInsideDefer);
+        getSink()->diagnose(Diagnostics::ReturnInsideDefer{.stmt = stmt});
     }
 }
 
@@ -635,7 +634,7 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
     auto parentFunc = getParentFunc();
     if (!catchStmt && (!parentFunc || parentFunc->errorType->equals(m_astBuilder->getBottomType())))
     {
-        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInNonThrowFunc);
+        getSink()->diagnose(Diagnostics::UncaughtThrowInNonThrowFunc{.stmt = stmt});
         return;
     }
 
@@ -643,11 +642,10 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
     {
         if (!parentFunc->errorType->equals(stmt->expression->type))
         {
-            getSink()->diagnose(
-                stmt->expression,
-                Diagnostics::throwTypeIncompatibleWithErrorType,
-                stmt->expression->type,
-                parentFunc->errorType);
+            getSink()->diagnose(Diagnostics::ThrowTypeIncompatibleWithErrorType{
+                .throw_type = stmt->expression->type.type,
+                .error_type = parentFunc->errorType,
+                .expr = stmt->expression});
         }
     }
 
@@ -659,7 +657,7 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
         // called and when. Both can't fully run. That kind of goes against the
         // point of 'defer', which is to _always_ run some code when exiting
         // scopes.
-        getSink()->diagnose(stmt, Diagnostics::uncaughtThrowInsideDefer);
+        getSink()->diagnose(Diagnostics::UncaughtThrowInsideDefer{.stmt = stmt});
     }
 }
 
