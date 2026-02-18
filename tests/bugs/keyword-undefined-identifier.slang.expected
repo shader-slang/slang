@@ -1,11 +1,15 @@
 result code = -1
 standard error = {
-tests/bugs/keyword-undefined-identifier.slang(29): error 30015: undefined identifier 'instance'.
-    return instance;
-           ^~~~~~~~
-tests/bugs/keyword-undefined-identifier.slang(34): error 30015: undefined identifier 'triangle'.
-    return triangle;
-           ^~~~~~~~
+error[E30015]: undefined identifier
+   ╭╼ tests/bugs/keyword-undefined-identifier.slang:29:9
+   │
+29 │ return instance;
+   │        ━━━━━━━━ undefined identifier 'instance'.
+error[E30015]: undefined identifier
+   ╭╼ tests/bugs/keyword-undefined-identifier.slang:34:9
+   │
+34 │ return triangle;
+   │        ━━━━━━━━ undefined identifier 'triangle'.
 }
 standard output = {
 }

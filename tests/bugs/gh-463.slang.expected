@@ -1,8 +1,10 @@
 result code = -1
 standard error = {
-tests/bugs/gh-463.slang(7): error 30015: undefined identifier 'COUNT'.
-[instance(COUNT)]
-          ^~~~~
+error[E30015]: undefined identifier
+  ╭╼ tests/bugs/gh-463.slang:7:11
+  │
+7 │ [instance(COUNT)]
+  │           ━━━━━ undefined identifier 'COUNT'.
 }
 standard output = {
 }
