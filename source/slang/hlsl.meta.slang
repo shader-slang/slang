@@ -793,33 +793,45 @@ float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCo
     }
 }
 
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+float __glsl_shadow_lod_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    case glsl:
+        __requireCapability("GL_EXT_texture_shadow_lod");
+        __intrinsic_asm "textureLod($0, $1, $2)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
-    }
-}
-
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability("GL_EXT_texture_shadow_lod");
+        __intrinsic_asm "textureLod($0, $1, $2, $3)";
     }
 }
 
@@ -892,7 +904,16 @@ float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,Samp
 }
 
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+float __glsl150_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
@@ -901,22 +922,26 @@ float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    case glsl:
+        __requireCapability("GL_EXT_texture_shadow_lod");
+        __intrinsic_asm "textureLod($p, $2, $3)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability("GL_EXT_texture_shadow_lod");
+        __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
@@ -1520,23 +1545,47 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+
+            // Anything else requires additional capabilities
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, __makeVector(location, compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -2870,17 +2919,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, s, __makeVector(location,compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
