@@ -17,7 +17,8 @@ using namespace Slang;
 // ContiguousBufferView = { Ptr<float> data; uint strides[1]; }
 //   -> ptr at 0 (8B, align 8), strides at 8 (4B) => raw 12, align 8, C padded = 16
 //
-// ReductionParams = { ContiguousBufferView input; LastDimLayout layout; uint numGroups; Ptr<float> stats; }
+// ReductionParams = { ContiguousBufferView input; LastDimLayout layout; uint numGroups; Ptr<float>
+// stats; }
 //   -> input at 0 (16B), layout at 16 (8B), numGroups at 24 (4B), stats at 32 (8B)
 //   => total = 40, align = 8
 //
@@ -187,9 +188,11 @@ static void _testCDataLayoutReflectionStride(UnitTestContext* context, bool forc
 
     // ReductionParams_c member 1 (layout) must be at Offset 16, not 12.
     // This confirms ContiguousBufferView was padded from 12 to 16.
-    bool hasLayoutAt16 = spirvAsmStr.indexOf("OpMemberDecorate %ReductionParams_c 1 Offset 16") != -1;
+    bool hasLayoutAt16 =
+        spirvAsmStr.indexOf("OpMemberDecorate %ReductionParams_c 1 Offset 16") != -1;
     // ReductionParams_c member 3 (stats) must be at Offset 32.
-    bool hasStatsAt32 = spirvAsmStr.indexOf("OpMemberDecorate %ReductionParams_c 3 Offset 32") != -1;
+    bool hasStatsAt32 =
+        spirvAsmStr.indexOf("OpMemberDecorate %ReductionParams_c 3 Offset 32") != -1;
 
     SLANG_CHECK(hasLayoutAt16);
     SLANG_CHECK(hasStatsAt32);
