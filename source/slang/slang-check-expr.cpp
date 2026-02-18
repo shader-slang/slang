@@ -2826,7 +2826,7 @@ void SemanticsVisitor::maybeDiagnoseConstVariableAssignment(Expr* expr)
 Expr* SemanticsVisitor::checkAssignWithCheckedOperands(AssignExpr* expr)
 {
     if (expr->right->type.isWriteOnly)
-        getSink()->diagnose(expr, Diagnostics::readingFromWriteOnly);
+        getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = expr->right});
 
     expr->left = maybeOpenRef(expr->left);
     auto type = expr->left->type;
@@ -2998,7 +2998,8 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 // If the callee throws, make sure we are inside a try clause.
                 if (m_enclosingTryClauseType == TryClauseType::None)
                 {
-                    getSink()->diagnose(invoke, Diagnostics::mustUseTryClauseToCallAThrowFunc);
+                    getSink()->diagnose(
+                        Diagnostics::MustUseTryClauseToCallAThrowFunc{.invoke = invoke});
                 }
             }
 
@@ -3207,27 +3208,25 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                         if (requiredLevel == FunctionDifferentiableLevel::Forward &&
                             !getShared()->isDifferentiableFunc(funcDecl))
                         {
-                            getSink()->diagnose(
-                                funcDeclExpr,
-                                Diagnostics::functionNotMarkedAsDifferentiable,
-                                funcDecl,
-                                "forward");
+                            getSink()->diagnose(Diagnostics::FunctionNotMarkedAsDifferentiable{
+                                .func = funcDecl,
+                                .kind = "forward",
+                                .expr = funcDeclExpr});
                         }
                         if (requiredLevel == FunctionDifferentiableLevel::Backward &&
                             !getShared()->isBackwardDifferentiableFunc(funcDecl))
                         {
-                            getSink()->diagnose(
-                                funcDeclExpr,
-                                Diagnostics::functionNotMarkedAsDifferentiable,
-                                funcDecl,
-                                "backward");
+                            getSink()->diagnose(Diagnostics::FunctionNotMarkedAsDifferentiable{
+                                .func = funcDecl,
+                                .kind = "backward",
+                                .expr = funcDeclExpr});
                         }
                         if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
                         {
                             getSink()->diagnose(
-                                invoke->functionExpr,
-                                Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand,
-                                funcDecl);
+                                Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
+                                    .func = funcDecl,
+                                    .expr = invoke->functionExpr});
                         }
                     }
                 }
@@ -3602,10 +3601,9 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
             {
                 if (sink)
                 {
-                    sink->diagnose(
-                        exprIn,
-                        Diagnostics::nonCopyableTypeCapturedInLambda,
-                        capturedVarDecl->type.type);
+                    sink->diagnose(Diagnostics::NonCopyableTypeCapturedInLambda{
+                        .type = capturedVarDecl->type.type,
+                        .expr = exprIn});
                 }
             }
         }
@@ -4259,7 +4257,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         if (!_isCountOfType(type))
         {
-            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::countOfArgumentIsInvalid);
+            getSink()->diagnose(Diagnostics::CountOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
 
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
@@ -4269,7 +4267,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
         if (!_isSizeOfType(type))
         {
-            getSink()->diagnose(sizeOfLikeExpr, Diagnostics::sizeOfArgumentIsInvalid);
+            getSink()->diagnose(Diagnostics::SizeOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
 
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
@@ -4325,11 +4323,10 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
 
     if (floatBaseType == BaseType::Void)
     {
-        getSink()->diagnose(
-            expr,
-            Diagnostics::floatBitCastTypeMismatch,
-            "__floatAsInt",
-            "half, float, or double");
+        getSink()->diagnose(Diagnostics::FloatBitCastTypeMismatch{
+            .intrinsic = "__floatAsInt",
+            .expected_type = "half, float, or double",
+            .expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
@@ -4413,7 +4410,7 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     }
 
     // Could not constant fold - emit error
-    getSink()->diagnose(expr, Diagnostics::floatBitCastRequiresConstant);
+    getSink()->diagnose(Diagnostics::FloatBitCastRequiresConstant{.expr = expr});
     expr->type = m_astBuilder->getErrorType();
     return expr;
 }
@@ -4701,14 +4698,14 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     auto base = as<InvokeExpr>(expr->base);
     if (!base)
     {
-        getSink()->diagnose(expr, Diagnostics::tryClauseMustApplyToInvokeExpr);
+        getSink()->diagnose(Diagnostics::TryClauseMustApplyToInvokeExpr{.expr = expr});
         return expr;
     }
 
     auto callee = as<DeclRefExpr>(base->functionExpr);
     if (!callee)
     {
-        getSink()->diagnose(expr, Diagnostics::calleeOfTryCallMustBeFunc);
+        getSink()->diagnose(Diagnostics::CalleeOfTryCallMustBeFunc{.expr = expr});
         return expr;
     }
 
@@ -4718,7 +4715,8 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     {
         if (funcCallee->errorType->equals(m_astBuilder->getBottomType()))
         {
-            getSink()->diagnose(expr, Diagnostics::tryInvokeCalleeShouldThrow, callee->declRef);
+            getSink()->diagnose(
+                Diagnostics::TryInvokeCalleeShouldThrow{.callee = funcCallee, .expr = expr});
             return expr;
         }
         catchStmt = findMatchingCatchStmt(funcCallee->errorType);
@@ -4728,7 +4726,7 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
     {
         // 'try' may jump outside a defer statement, which isn't allowed for
         // now.
-        getSink()->diagnose(expr, Diagnostics::uncaughtTryInsideDefer);
+        getSink()->diagnose(Diagnostics::UncaughtTryInsideDefer{.expr = expr});
         return expr;
     }
 
@@ -4737,22 +4735,21 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         // Uncaught try.
         if (!parentFunc)
         {
-            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            getSink()->diagnose(Diagnostics::UncaughtTryCallInNonThrowFunc{.expr = expr});
             return expr;
         }
         if (parentFunc->errorType->equals(m_astBuilder->getBottomType()))
         {
-            getSink()->diagnose(expr, Diagnostics::uncaughtTryCallInNonThrowFunc);
+            getSink()->diagnose(Diagnostics::UncaughtTryCallInNonThrowFunc{.expr = expr});
             return expr;
         }
         if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
         {
-            getSink()->diagnose(
-                expr,
-                Diagnostics::errorTypeOfCalleeIncompatibleWithCaller,
-                callee->declRef,
-                funcCallee->errorType,
-                parentFunc->errorType);
+            getSink()->diagnose(Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
+                .callee_error_type = funcCallee->errorType,
+                .callee = funcCallee,
+                .caller_error_type = parentFunc->errorType,
+                .expr = expr});
             return expr;
         }
     }
@@ -4886,7 +4883,7 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
     }
     if (subContext.getCapturedTypePacks()->getCount() == 0)
     {
-        getSink()->diagnose(expr, Diagnostics::expandTermCapturesNoTypePacks);
+        getSink()->diagnose(Diagnostics::ExpandTermCapturesNoTypePacks{.expr = expr});
     }
     List<Type*> capturedTypePacks;
     for (auto capturedType : capturedTypePackSet)
@@ -4905,7 +4902,7 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
 {
     if (!m_parentExpandExpr)
     {
-        getSink()->diagnose(expr, Diagnostics::eachExprMustBeInsideExpandExpr);
+        getSink()->diagnose(Diagnostics::EachExprMustBeInsideExpandExpr{.expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
@@ -4973,7 +4970,7 @@ error:;
     expr->type = m_astBuilder->getErrorType();
     if (!as<ErrorType>(baseType))
     {
-        getSink()->diagnose(expr, Diagnostics::expectTypePackAfterEach);
+        getSink()->diagnose(Diagnostics::ExpectTypePackAfterEach{.expr = expr});
     }
     return expr;
 }
