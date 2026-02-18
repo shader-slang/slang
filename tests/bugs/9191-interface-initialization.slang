@@ -1,7 +1,7 @@
 // This test verifies that a warning is emitted if an interface
 // variable is initialized with defaults.
 
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute
 
 //Disabled due to issue 9462
 //DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
@@ -37,10 +37,8 @@ IHelper test(int val)
 {
     // check for the presense of the warning
 
-    //CHECK: result code = 0
-    //CHECK: warning 30506
-
     IHelper ret = { };
+//CHECK:          ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
 
     switch (val % 4)
     {

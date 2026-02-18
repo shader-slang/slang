@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute
 
 // Test if InheritanceDecl fail to conform to parent capabilities
 
@@ -9,8 +9,12 @@ interface IFoo0
 }
 [require(hlsl)]
 [require(spirv)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36108{{.*}}spirv
 struct Foo0 : IFoo0
+/*CHECK:
+       ^^^^ dependencies not compatible on target
+       ^^^^ 'Foo0' has dependencies that are not compatible on the required compilation target 'spirv'.
+              ^^^^^ see declaration of 'IFoo0'
+*/
 {
 }
 
@@ -21,8 +25,12 @@ interface IFoo1
 {
 }
 [require(hlsl)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}spirv
 struct Foo1 : IFoo1
+/*CHECK:
+       ^^^^ subtype missing target/stage support
+       ^^^^ subtype 'Foo1' must have the same target/stage support as the supertype; 'Foo1' is missing 'spirv'
+              ^^^^^ see declaration of 'IFoo1'
+*/
 {
 }
 
@@ -32,8 +40,12 @@ interface IFoo2
 {
 }
 [require(sm_5_0)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36104{{.*}}sm_5_0
 struct Foo2 : IFoo2
+/*CHECK:
+       ^^^^ capability incompatible with supertype
+       ^^^^ 'Foo2' uses capability 'sm_5_0' that is incompatable with the supertype
+              ^^^^^ see declaration of 'IFoo2'
+*/
 {
 }
 
@@ -53,8 +65,12 @@ interface IFoo4
 {
 }
 [require(hlsl, fragment)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}compute
 struct Foo4 : IFoo4
+/*CHECK:
+       ^^^^ subtype missing target/stage support
+       ^^^^ subtype 'Foo4' must have the same target/stage support as the supertype; 'Foo4' is missing 'compute'
+              ^^^^^ see declaration of 'IFoo4'
+*/
 {
 }
 
@@ -65,8 +81,12 @@ interface IFoo5
 {
 }
 [require(fragment)]
-// CHECK-DAG: ([[# @LINE+1]]): error 36118{{.*}}vertex
 struct Foo5 : IFoo5
+/*CHECK:
+       ^^^^ subtype missing target/stage support
+       ^^^^ subtype 'Foo5' must have the same target/stage support as the supertype; 'Foo5' is missing 'vertex'
+              ^^^^^ see declaration of 'IFoo5'
+*/
 {
 }
 

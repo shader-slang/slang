@@ -14,6 +14,7 @@
 
 #include "slang-ast-forward-declarations.h"
 #include "slang-ast-iterator.h"
+#include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
 #include "slang-parser.h"
@@ -1034,9 +1035,16 @@ struct SemanticsDeclCapabilityVisitor : public SemanticsDeclVisitorBase,
 
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl);
 
+    enum class UndeclaredCapabilityDiagnosticKind
+    {
+        UseOfUndeclaredCapability,
+        UseOfUndeclaredCapabilityOfInterfaceRequirement,
+        UseOfUndeclaredCapabilityOfInheritanceDecl
+    };
+
     void diagnoseUndeclaredCapability(
         Decl* decl,
-        const DiagnosticInfo& diagnosticInfo,
+        UndeclaredCapabilityDiagnosticKind diagKind,
         const CapabilityAtomSet& failedAtomsInsideAvailableSet,
         bool printProvenance);
 };
@@ -3998,8 +4006,8 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
             {
                 // A primary module file can't start with an "implementing" declaration.
                 getSink()->diagnose(
-                    firstDeclInModule,
-                    Diagnostics::primaryModuleFileCannotStartWithImplementingDecl);
+                    Diagnostics::PrimaryModuleFileCannotStartWithImplementingDecl{
+                        .decl = firstDeclInModule});
             }
         }
         else if (!as<ModuleDeclarationDecl>(firstDeclInModule))
@@ -4007,7 +4015,7 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
             // A primary module file must start with a `module` declaration.
             // TODO: this warning is disabled for now to free users from massive change for now.
 #if 0
-                getSink()->diagnose(firstMember, Diagnostics::primaryModuleFileMustStartWithModuleDecl);
+                getSink()->diagnose(Diagnostics::PrimaryModuleFileMustStartWithModuleDecl{.decl = firstMember});
 #endif
         }
     }
@@ -11348,11 +11356,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
     {
         // We are trying to include a file that defines a module, the user could mean "import"
         // instead.
-        getSink()->diagnose(
-            decl->moduleNameAndLoc.loc,
-            Diagnostics::includedFileMissingImplementingDoYouMeanImport,
-            name,
-            moduleDeclaration->getName());
+        getSink()->diagnose(Diagnostics::IncludedFileMissingImplementingDoYouMeanImport{
+            .file_name = getText(name),
+            .module_name = getText(moduleDeclaration->getName()),
+            .location = decl->moduleNameAndLoc.loc});
         return;
     }
 
@@ -11401,11 +11408,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
                 if (normalizedName.getUnownedSlice().caseInsensitiveEquals(
                         expectedModuleNameStr.getUnownedSlice()))
                 {
-                    getSink()->diagnose(
-                        implementing->moduleNameAndLoc.loc,
-                        Diagnostics::moduleImplementationHasFileExtension,
-                        moduleNameStr,
-                        normalizedName);
+                    getSink()->diagnose(Diagnostics::ModuleImplementationHasFileExtension{
+                        .module_name = moduleNameStr,
+                        .normalized_name = normalizedName,
+                        .location = implementing->moduleNameAndLoc.loc});
                     return;
                 }
             }
@@ -11413,11 +11419,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
             if (!moduleNameStr.getUnownedSlice().caseInsensitiveEquals(
                     expectedModuleNameStr.getUnownedSlice()))
             {
-                getSink()->diagnose(
-                    decl->moduleNameAndLoc.loc,
-                    Diagnostics::includedFileDoesNotImplementCurrentModule,
-                    expectedModuleName,
-                    moduleName);
+                getSink()->diagnose(Diagnostics::IncludedFileDoesNotImplementCurrentModule{
+                    .expected_module = expectedModuleName,
+                    .actual_module = moduleName,
+                    .location = decl->moduleNameAndLoc.loc});
                 return;
             }
         }
@@ -11425,10 +11430,9 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
         return;
     }
 
-    getSink()->diagnose(
-        decl->moduleNameAndLoc.loc,
-        Diagnostics::includedFileMissingImplementing,
-        name);
+    getSink()->diagnose(Diagnostics::IncludedFileMissingImplementing{
+        .file_name = getText(name),
+        .location = decl->moduleNameAndLoc.loc});
 }
 
 
@@ -11471,9 +11475,8 @@ void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* de
     }
     else if (as<ImplementingDecl>(firstDeclInFile))
     {
-        getSink()->diagnose(
-            decl->moduleNameAndLoc.loc,
-            Diagnostics::implementingMustReferencePrimaryModuleFile);
+        getSink()->diagnose(Diagnostics::ImplementingMustReferencePrimaryModuleFile{
+            .location = decl->moduleNameAndLoc.loc});
         return;
     }
 
@@ -14047,39 +14050,48 @@ static void _propagateRequirement(
         // should diagnose an error.
         if (referencedDecl && decl)
         {
+            StringBuilder nodeCapsSb, oldCapsSb;
+            printDiagnosticArg(nodeCapsSb, nodeCaps);
+            printDiagnosticArg(oldCapsSb, oldCaps);
             maybeDiagnose(
                 visitor->getSink(),
                 visitor->getOptionSet(),
                 DiagnosticCategory::Capability,
-                referenceLoc,
-                Diagnostics::conflictingCapabilityDueToUseOfDecl,
-                referencedDecl,
-                nodeCaps,
-                decl,
-                oldCaps);
+                Diagnostics::ConflictingCapabilityDueToUseOfDecl{
+                    .referenced_decl = referencedDecl,
+                    .required_caps = nodeCapsSb.produceString(),
+                    .context_decl = decl,
+                    .existing_caps = oldCapsSb.produceString(),
+                    .location = referenceLoc});
         }
         else if (decl)
         {
+            StringBuilder nodeCapsSb, oldCapsSb;
+            printDiagnosticArg(nodeCapsSb, nodeCaps);
+            printDiagnosticArg(oldCapsSb, oldCaps);
             maybeDiagnose(
                 visitor->getSink(),
                 visitor->getOptionSet(),
                 DiagnosticCategory::Capability,
-                referenceLoc,
-                Diagnostics::conflictingCapabilityDueToStatement,
-                nodeCaps,
-                decl,
-                oldCaps);
+                Diagnostics::ConflictingCapabilityDueToStatement{
+                    .required_caps = nodeCapsSb.produceString(),
+                    .context = ASTPrinter::getDeclSignatureString(decl, visitor->getASTBuilder()),
+                    .existing_caps = oldCapsSb.produceString(),
+                    .location = referenceLoc});
         }
         else
         {
+            StringBuilder nodeCapsSb, oldCapsSb;
+            printDiagnosticArg(nodeCapsSb, nodeCaps);
+            printDiagnosticArg(oldCapsSb, oldCaps);
             maybeDiagnose(
                 visitor->getSink(),
                 visitor->getOptionSet(),
                 DiagnosticCategory::Capability,
-                referenceLoc,
-                Diagnostics::conflictingCapabilityDueToStatementEnclosingFunc,
-                nodeCaps,
-                oldCaps);
+                Diagnostics::ConflictingCapabilityDueToStatementEnclosingFunc{
+                    .required_caps = nodeCapsSb.produceString(),
+                    .existing_caps = oldCapsSb.produceString(),
+                    .location = referenceLoc});
         }
     }
 
@@ -14220,15 +14232,18 @@ struct CapabilityDeclReferenceVisitor
                     testingForInvalid.join(targetCap);
                     if (testingForInvalid.isInvalid())
                     {
+                        StringBuilder targetCapSb, reqCapSb;
+                        printDiagnosticArg(targetCapSb, targetCap);
+                        printDiagnosticArg(reqCapSb, CapabilitySet{maybeRequireCapability->capabilitySet});
                         maybeDiagnose(
                             Base::getSink(),
                             outerContext.getOptionSet(),
                             DiagnosticCategory::Capability,
-                            stmt->targetCases[targetCaseIndex]->loc,
-                            Diagnostics::conflictingCapabilityDueToStatement,
-                            targetCap,
-                            maybeRequireCapability,
-                            maybeRequireCapability->capabilitySet);
+                            Diagnostics::ConflictingCapabilityDueToStatement{
+                                .required_caps = targetCapSb.produceString(),
+                                .context = String("[require] attribute"),
+                                .existing_caps = reqCapSb.produceString(),
+                                .location = stmt->targetCases[targetCaseIndex]->loc});
                         handleParentDiagnosticFunc(DiagnosticCategory::Capability);
                     }
                 }
@@ -14239,15 +14254,18 @@ struct CapabilityDeclReferenceVisitor
             targetCap.join(bodyCap);
             if (targetCap.isInvalid())
             {
+                StringBuilder bodyCapSb, oldCapSb;
+                printDiagnosticArg(bodyCapSb, bodyCap);
+                printDiagnosticArg(oldCapSb, oldCap);
                 maybeDiagnose(
                     Base::getSink(),
                     outerContext.getOptionSet(),
                     DiagnosticCategory::Capability,
-                    targetCase->body->loc,
-                    Diagnostics::conflictingCapabilityDueToStatement,
-                    bodyCap,
-                    "target_switch",
-                    oldCap);
+                    Diagnostics::ConflictingCapabilityDueToStatement{
+                        .required_caps = bodyCapSb.produceString(),
+                        .context = "target_switch",
+                        .existing_caps = oldCapSb.produceString(),
+                        .location = targetCase->body->loc});
                 handleParentDiagnosticFunc(DiagnosticCategory::Capability);
             }
 
@@ -14318,15 +14336,18 @@ private:
 
         if (!result)
         {
+            StringBuilder newSetSb, currentSetSb;
+            printDiagnosticArg(newSetSb, newSet);
+            printDiagnosticArg(currentSetSb, currentSet);
             maybeDiagnose(
                 Base::getSink(),
                 outerContext.getOptionSet(),
                 DiagnosticCategory::Capability,
-                loc,
-                Diagnostics::targetSwitchCapCasesConflict,
-                caseName,    // arg0
-                newSet,      // arg1
-                currentSet); // arg2
+                Diagnostics::TargetSwitchCapCasesConflict{
+                    .case_name = capabilityNameToString(caseName),
+                    .case_caps = newSetSb.produceString(),
+                    .prev_caps = currentSetSb.produceString(),
+                    .location = loc});
         }
     }
 };
@@ -14540,7 +14561,7 @@ void SemanticsDeclCapabilityVisitor::visitFunctionDeclBase(FunctionDeclBase* fun
                 checkCapabilityResult);
             diagnoseUndeclaredCapability(
                 funcDecl,
-                Diagnostics::useOfUndeclaredCapability,
+                UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapability,
                 failedAvailableCapabilityConjunction,
                 true);
 
@@ -14629,7 +14650,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             {
                 diagnoseUndeclaredCapability(
                     implDecl,
-                    Diagnostics::useOfUndeclaredCapabilityOfInterfaceRequirement,
+                    UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapabilityOfInterfaceRequirement,
                     failedAvailableCapabilityConjunction,
                     false);
                 maybeDiagnose(
@@ -14644,14 +14665,15 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                 checkCapabilityResult ==
                 CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
             {
+                StringBuilder capsSb;
+                printDiagnosticArg(capsSb, failedAvailableCapabilityConjunction);
                 maybeDiagnose(
                     getSink(),
                     getOptionSet(),
                     DiagnosticCategory::Capability,
-                    implDecl,
-                    Diagnostics::requirmentHasSubsetOfAbstractAtomsToImplementation,
-                    implDecl,
-                    failedAvailableCapabilityConjunction);
+                    Diagnostics::RequirmentHasSubsetOfAbstractAtomsToImplementation{
+                        .missing_caps = capsSb.produceString(),
+                        .decl = implDecl});
                 maybeDiagnose(
                     getSink(),
                     getOptionSet(),
@@ -14678,7 +14700,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     {
         diagnoseUndeclaredCapability(
             inheritanceParentDecl,
-            Diagnostics::useOfUndeclaredCapabilityOfInheritanceDecl,
+            UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapabilityOfInheritanceDecl,
             failedAvailableCapabilityConjunction,
             false);
         maybeDiagnose(
@@ -14692,14 +14714,15 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
     else if (
         checkCapabilityResult == CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
     {
+        StringBuilder capsSb;
+        printDiagnosticArg(capsSb, failedAvailableCapabilityConjunction);
         maybeDiagnose(
             getSink(),
             getOptionSet(),
             DiagnosticCategory::Capability,
-            inheritanceParentDecl,
-            Diagnostics::subTypeHasSubsetOfAbstractAtomsToSuperType,
-            inheritanceParentDecl,
-            failedAvailableCapabilityConjunction);
+            Diagnostics::SubTypeHasSubsetOfAbstractAtomsToSuperType{
+                .missing_caps = capsSb.produceString(),
+                .decl = inheritanceParentDecl});
         maybeDiagnose(
             getSink(),
             getOptionSet(),
@@ -15111,7 +15134,7 @@ void diagnoseCapabilityProvenance(
 
 void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     Decl* decl,
-    const DiagnosticInfo& diagnosticInfo,
+    UndeclaredCapabilityDiagnosticKind diagKind,
     const CapabilityAtomSet& failedAtomsInsideAvailableSet,
     bool printProvenance)
 {
@@ -15137,14 +15160,15 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
         CapabilityAtom outFailedAtom{};
         if (hasTargetAtom(failedAtomsInsideAvailableSet, outFailedAtom))
         {
+            StringBuilder targetSb;
+            printDiagnosticArg(targetSb, outFailedAtom);
             maybeDiagnose(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                decl,
-                Diagnostics::declHasDependenciesNotCompatibleOnTarget,
-                decl,
-                outFailedAtom);
+                Diagnostics::DeclHasDependenciesNotCompatibleOnTarget{
+                    .target = targetSb.produceString(),
+                    .decl = decl});
 
             // Anything defined on a non-failed target atom may be the culprit to why we fail
             // having a target capability. Print out all possible culprits.
@@ -15192,6 +15216,8 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
     {
         CapabilityAtom formattedAtom = asAtom(i);
         CapabilityName canonicalName;
+        StringBuilder capsSb;
+        printDiagnosticArg(capsSb, formattedAtom);
         if (isStageAtom((CapabilityName)formattedAtom, canonicalName))
         {
             // Provide a more friendly message if atom is a stage.
@@ -15199,21 +15225,42 @@ void SemanticsDeclCapabilityVisitor::diagnoseUndeclaredCapability(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                decl,
-                Diagnostics::declHasDependenciesNotCompatibleOnStage,
-                decl,
-                formattedAtom);
+                Diagnostics::DeclHasDependenciesNotCompatibleOnStage{
+                    .stage = capsSb.produceString(),
+                    .decl = decl});
         }
         else
         {
-            maybeDiagnose(
-                getSink(),
-                this->getOptionSet(),
-                DiagnosticCategory::Capability,
-                decl,
-                diagnosticInfo,
-                decl,
-                formattedAtom);
+            switch (diagKind)
+            {
+            case UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapability:
+                maybeDiagnose(
+                    getSink(),
+                    this->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    Diagnostics::UseOfUndeclaredCapability{
+                        .caps = capsSb.produceString(),
+                        .decl = decl});
+                break;
+            case UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapabilityOfInterfaceRequirement:
+                maybeDiagnose(
+                    getSink(),
+                    this->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    Diagnostics::UseOfUndeclaredCapabilityOfInterfaceRequirement{
+                        .caps = capsSb.produceString(),
+                        .decl = decl});
+                break;
+            case UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapabilityOfInheritanceDecl:
+                maybeDiagnose(
+                    getSink(),
+                    this->getOptionSet(),
+                    DiagnosticCategory::Capability,
+                    Diagnostics::UseOfUndeclaredCapabilityOfInheritanceDecl{
+                        .caps = capsSb.produceString(),
+                        .decl = decl});
+                break;
+            }
         }
         if (printProvenance)
         {
