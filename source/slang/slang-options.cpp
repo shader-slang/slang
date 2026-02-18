@@ -2356,8 +2356,14 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::PreserveParameters:
         case OptionKind::UseMSVCStyleBitfieldPacking:
         case OptionKind::ExperimentalFeature:
+            linkage->m_optionSet.set(optionKind, true);
+            break;
         case OptionKind::EnableRichDiagnostics:
             linkage->m_optionSet.set(optionKind, true);
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
             break;
         case OptionKind::ReportDetailedPerfBenchmark:
             linkage->m_optionSet.set(optionKind, true);
@@ -2368,6 +2374,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             linkage->m_optionSet.set(optionKind, true);
             // -enable-machine-readable-diagnostics implies -enable-experimental-rich-diagnostics
             linkage->m_optionSet.set(OptionKind::EnableRichDiagnostics, true);
+            // Update the sink and all ancestor sinks so diagnostics emitted during option
+            // parsing are properly formatted
+            for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
+            {
+                sink->setFlag(DiagnosticSink::Flag::AlwaysGenerateRichDiagnostics);
+                sink->setFlag(DiagnosticSink::Flag::MachineReadableDiagnostics);
+            }
             break;
         case OptionKind::DiagnosticColor:
             {
@@ -2389,7 +2402,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
-                // Update the current sink and all parent sinks so colors work correctly
+                // Update the sink and all ancestor sinks so colors work correctly
                 for (DiagnosticSink* sink = m_sink; sink; sink = sink->getParentSink())
                     sink->setDiagnosticColorMode(colorValue);
                 break;
@@ -3435,6 +3448,11 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             }
         }
     }
+
+    // Apply diagnostic sink settings early so that any diagnostics emitted during
+    // option post-processing (e.g., entry point validation) use the correct settings
+    // such as rich diagnostics and machine-readable output.
+    applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
     if (m_compileCoreModule)
     {
