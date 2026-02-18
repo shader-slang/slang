@@ -1054,10 +1054,10 @@ VMExtFunction mapInstToFunction(
         return getCastHandler(instHeader->opcodeExtension);
     case VMOp::CallExt:
         {
-            if (instHeader->getOperand(0).offset >= module->stringCount)
+            if (instHeader->getOperand(1).offset >= module->stringCount)
                 return nullptr;
             auto funcName = (const char*)module->constants +
-                            module->stringOffsets[instHeader->getOperand(0).offset];
+                            module->stringOffsets[instHeader->getOperand(1).offset];
             VMExtFunction handler = nullptr;
             if (!extInstHandlers.tryGetValue(funcName, handler))
                 return nullptr;
