@@ -13,6 +13,9 @@ struct IRModule;
 SlangResult checkLateRequireCapabilityArguments(IRModule* module, DiagnosticSink* sink);
 
 /// Process and eliminate the LateRequireCapability IR insts.
-SlangResult processLateRequireCapabilityInsts(IRModule* module, CodeGenContext* codeGenContext, DiagnosticSink* sink);
+SlangResult processLateRequireCapabilityInsts(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    DiagnosticSink* sink);
 
 } // namespace Slang

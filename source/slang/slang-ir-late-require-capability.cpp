@@ -5,8 +5,8 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "slang-target.h"
 #include "slang-profile.h"
+#include "slang-target.h"
 #include "slang.h"
 
 namespace Slang
@@ -32,9 +32,7 @@ struct CheckLateRequireCapabilityInstsContext
                         IRConstant* capConstant = as<IRConstant>(inst->getOperand(i));
                         if (!capConstant)
                         {
-                            m_sink->diagnose(
-                                inst,
-                                Diagnostics::expectedAStringLiteral);
+                            m_sink->diagnose(inst, Diagnostics::expectedAStringLiteral);
                             m_status = SLANG_FAIL;
                         }
                         else
@@ -43,10 +41,7 @@ struct CheckLateRequireCapabilityInstsContext
                             CapabilityName capName = findCapabilityName(capNameStr);
                             if (capName == CapabilityName::Invalid)
                             {
-                                m_sink->diagnose(
-                                    inst,
-                                    Diagnostics::unknownCapability,
-                                    capNameStr);
+                                m_sink->diagnose(inst, Diagnostics::unknownCapability, capNameStr);
                                 m_status = SLANG_FAIL;
                             }
                         }
@@ -58,7 +53,8 @@ struct CheckLateRequireCapabilityInstsContext
 
     void checkModule()
     {
-        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
+        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst;
+             inst = inst->getNextInst())
         {
             auto func = as<IRFunc>(inst);
             if (!func)
@@ -81,14 +77,24 @@ struct ProcessLateRequireCapabilityInstsContext
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
 
     ProcessLateRequireCapabilityInstsContext(
-        IRModule* module, const CapabilitySet& targetCaps, CodeGenTarget target,
-        CompilerOptionSet& optionSet, DiagnosticSink* sink)
-        : m_module(module), m_targetCaps(targetCaps), m_target(target), m_optionSet(optionSet), m_sink(sink)
+        IRModule* module,
+        const CapabilitySet& targetCaps,
+        CodeGenTarget target,
+        CompilerOptionSet& optionSet,
+        DiagnosticSink* sink)
+        : m_module(module)
+        , m_targetCaps(targetCaps)
+        , m_target(target)
+        , m_optionSet(optionSet)
+        , m_sink(sink)
     {
     }
 
     void checkCapability(
-        IRFunc* entry, IRLateRequireCapability* inst, Profile profile, List<CapabilityName> capNames)
+        IRFunc* entry,
+        IRLateRequireCapability* inst,
+        Profile profile,
+        List<CapabilityName> capNames)
     {
         CapabilitySet targetCaps = m_targetCaps;
         auto stageCapabilitySet = profile.getCapabilityName();
@@ -96,7 +102,8 @@ struct ProcessLateRequireCapabilityInstsContext
         CapabilitySet required(capNames);
 
         // check that we have the required caps for this stage
-        if (targetCaps.atLeastOneSetImpliedInOther(required) == CapabilitySet::ImpliesReturnFlags::Implied)
+        if (targetCaps.atLeastOneSetImpliedInOther(required) ==
+            CapabilitySet::ImpliesReturnFlags::Implied)
             return;
 
         required.join(stageCapabilitySet);
@@ -108,10 +115,7 @@ struct ProcessLateRequireCapabilityInstsContext
         {
             if (auto requiredSet = required.getAtomSets())
             {
-                CapabilityAtomSet::calcSubtract(
-                    addedAtoms,
-                    (*requiredSet),
-                    (*stageCapSet));
+                CapabilityAtomSet::calcSubtract(addedAtoms, (*requiredSet), (*stageCapSet));
             }
         }
 
@@ -140,10 +144,7 @@ struct ProcessLateRequireCapabilityInstsContext
             m_optionSet.getProfile().getName(),
             addedAtoms.getElements<CapabilityAtom>());
 
-        m_sink->diagnose(
-            inst->sourceLoc,
-            Diagnostics::seeCallOfFunc,
-            "__requireCapability()");
+        m_sink->diagnose(inst->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability()");
 
         // we'll fail only if restrictive capability check was requested
         if (m_optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
@@ -170,7 +171,7 @@ struct ProcessLateRequireCapabilityInstsContext
 
     void processFunc(IRFunc* func)
     {
-        List<IRLateRequireCapability *> instsToRemove;
+        List<IRLateRequireCapability*> instsToRemove;
 
         // scan the function for IRLateRequireCapability instructions
         for (auto block : func->getBlocks())
@@ -181,16 +182,20 @@ struct ProcessLateRequireCapabilityInstsContext
                 {
                     instsToRemove.add(lateRequireCap);
 
-                    const HashSet<IRFunc*> *entryPoints =
+                    const HashSet<IRFunc*>* entryPoints =
                         m_mapInstToReferencingEntryPoints.tryGetValue(func);
 
                     if (entryPoints)
                     {
                         for (auto entryPoint : *entryPoints)
                         {
-                            if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
+                            if (auto entryPointDecor =
+                                    entryPoint->findDecoration<IREntryPointDecoration>())
                             {
-                                processCapability(entryPoint, entryPointDecor->getProfile(), lateRequireCap);
+                                processCapability(
+                                    entryPoint,
+                                    entryPointDecor->getProfile(),
+                                    lateRequireCap);
                             }
                         }
                     }
@@ -208,7 +213,8 @@ struct ProcessLateRequireCapabilityInstsContext
     {
         buildEntryPointReferenceGraph(m_mapInstToReferencingEntryPoints, m_module);
 
-        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst; inst = inst->getNextInst())
+        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst;
+             inst = inst->getNextInst())
         {
             auto func = as<IRFunc>(inst);
             if (!func)
@@ -228,10 +234,17 @@ SlangResult checkLateRequireCapabilityArguments(IRModule* module, DiagnosticSink
     return context.m_status;
 }
 
-SlangResult processLateRequireCapabilityInsts(IRModule* module, CodeGenContext* codeGenContext, DiagnosticSink* sink)
+SlangResult processLateRequireCapabilityInsts(
+    IRModule* module,
+    CodeGenContext* codeGenContext,
+    DiagnosticSink* sink)
 {
     ProcessLateRequireCapabilityInstsContext context(
-        module, codeGenContext->getTargetCaps(), codeGenContext->getTargetFormat(), codeGenContext->getTargetReq()->getOptionSet(), sink);
+        module,
+        codeGenContext->getTargetCaps(),
+        codeGenContext->getTargetFormat(),
+        codeGenContext->getTargetReq()->getOptionSet(),
+        sink);
 
     context.processModule();
     return context.m_status;
