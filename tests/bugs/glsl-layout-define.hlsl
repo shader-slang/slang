@@ -1,4 +1,5 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -profile vs_5_0
+// non-exhaustive: cascading "undefined identifier 'main'" and "no function found matching entry point" errors
 
 layout(
 	binding = UNDEFINED_VK_BINDING,
