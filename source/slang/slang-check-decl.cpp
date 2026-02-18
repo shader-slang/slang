@@ -66,14 +66,14 @@ static void validateDynInterfaceUsage(
     {
         if (isAssociatedTypeDecl(m))
         {
-            sink->diagnose(m, Diagnostics::cannotHaveAssociatedTypeInDynInterface);
+            sink->diagnose(Diagnostics::CannotHaveAssociatedTypeInDynInterface{.member = m});
             continue;
         }
         else if (auto genericDecl = as<GenericDecl>(m))
         {
             if (as<FuncDecl>(genericDecl->inner))
             {
-                sink->diagnose(m, Diagnostics::cannotHaveGenericMethodInDynInterface);
+                sink->diagnose(Diagnostics::CannotHaveGenericMethodInDynInterface{.member = m});
             }
             continue;
         }
@@ -84,11 +84,12 @@ static void validateDynInterfaceUsage(
             {
                 if (as<MutatingAttribute>(modifier))
                 {
-                    sink->diagnose(m, Diagnostics::cannotHaveMutatingMethodInDynInterface);
+                    sink->diagnose(Diagnostics::CannotHaveMutatingMethodInDynInterface{.member = m});
                 }
                 else if (as<DifferentiableAttribute>(modifier))
                 {
-                    sink->diagnose(m, Diagnostics::cannotHaveDifferentiableMethodInDynInterface);
+                    sink->diagnose(
+                        Diagnostics::CannotHaveDifferentiableMethodInDynInterface{.member = m});
                 }
             }
             continue;
@@ -103,18 +104,17 @@ static void validateDynInterfaceUsage(
 
             auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
             if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
-                sink->diagnose(
-                    m,
-                    Diagnostics::DynInterfaceCannotInheritNonDynInterface,
-                    decl,
-                    inheritedInterfaceDecl);
+                sink->diagnose(Diagnostics::DynInterfaceCannotInheritNonDynInterface{
+                    .dyn_interface = decl,
+                    .inherited = inheritedInterfaceDecl,
+                    .inheritance = m});
         }
     }
 
     // dyn interface cannot be generic
     if (visitor->GetOuterGeneric(decl))
     {
-        sink->diagnose(decl, Diagnostics::cannotHaveGenericDynInterface, decl);
+        sink->diagnose(Diagnostics::CannotHaveGenericDynInterface{.decl = decl});
     }
 }
 
@@ -138,17 +138,16 @@ static void validateDynInterfaceUseWithInheritanceDecl(
         {
             // not allowed to extend to conform to a 'dyn interface'
             sink->diagnose(
-                extensionDeclParent,
-                Diagnostics::cannotUseExtensionToMakeTypeConformToDynInterface,
-                interfaceDecl);
+                Diagnostics::CannotUseExtensionToMakeTypeConformToDynInterface{
+                    .interface = interfaceDecl,
+                    .extension = extensionDeclParent});
         }
         else if (visitor->GetOuterGeneric(decl->parentDecl))
         {
-            sink->diagnose(
-                decl,
-                Diagnostics::cannotConformGenericToDynInterface,
-                decl->parentDecl,
-                interfaceDecl);
+            sink->diagnose(Diagnostics::CannotConformGenericToDynInterface{
+                .generic = decl->parentDecl,
+                .interface = interfaceDecl,
+                .inheritance = decl});
         }
     }
     if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
@@ -162,27 +161,22 @@ static void validateDynInterfaceUseWithInheritanceDecl(
             if (isNonCopyableType(varDecl->getType()))
             {
                 sink->diagnose(
-                    varDecl,
-                    Diagnostics::cannotHaveNonCopyableMemberWhenInheritingDynInterface,
-                    varDecl,
-                    interfaceDecl);
+                    Diagnostics::CannotHaveNonCopyableMemberWhenInheritingDynInterface{
+                        .interface = interfaceDecl,
+                        .member = varDecl});
             }
 
             int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
             bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
             bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
             if (isUnsized)
-                sink->diagnose(
-                    varDecl,
-                    Diagnostics::cannotHaveUnsizedMemberWhenInheritingDynInterface,
-                    varDecl,
-                    interfaceDecl);
+                sink->diagnose(Diagnostics::CannotHaveUnsizedMemberWhenInheritingDynInterface{
+                    .interface = interfaceDecl,
+                    .member = varDecl});
             if (isOpaque)
-                sink->diagnose(
-                    varDecl,
-                    Diagnostics::cannotHaveOpaqueMemberWhenInheritingDynInterface,
-                    varDecl,
-                    interfaceDecl);
+                sink->diagnose(Diagnostics::CannotHaveOpaqueMemberWhenInheritingDynInterface{
+                    .interface = interfaceDecl,
+                    .member = varDecl});
         }
     }
 }
@@ -2772,7 +2766,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         initExpr = subVisitor.CheckTerm(initExpr);
 
         if (initExpr->type.isWriteOnly)
-            getSink()->diagnose(initExpr, Diagnostics::readingFromWriteOnly);
+            getSink()->diagnose(Diagnostics::ReadingFromWriteOnly{.expr = initExpr});
 
         initExpr = coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
         varDecl->initExpr = initExpr;
@@ -3475,11 +3469,10 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
                 !declaredBeforeConstraint.contains(typeParam))
             {
                 // Found a forward reference, report an error.
-                getSink()->diagnose(
-                    decl->sup.exp,
-                    Diagnostics::forwardReferenceInGenericConstraint,
-                    decl->sub.type,
-                    typeParam);
+                getSink()->diagnose(Diagnostics::ForwardReferenceInGenericConstraint{
+                    .param = decl->sub.type,
+                    .referenced = typeParam,
+                    .expr = decl->sup.exp});
             }
         }
     }
@@ -3770,11 +3763,10 @@ struct SemanticsDeclDifferentialConformanceVisitor
         if (!differentialType->equals(diffDiffType))
         {
             SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
-            getSink()->diagnose(
-                inheritanceDecl,
-                Diagnostics::differentialTypeShouldServeAsItsOwnDifferentialType,
-                differentialType,
-                diffDiffType);
+            getSink()->diagnose(Diagnostics::DifferentialTypeShouldServeAsItsOwnDifferentialType{
+                .type = differentialType,
+                .diff_type = diffDiffType,
+                .inheritance = inheritanceDecl});
             getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
         }
 
@@ -3814,10 +3806,10 @@ struct SemanticsDeclDifferentialConformanceVisitor
                 continue;
             else if (!typeIsSelfDifferential)
                 getSink()->diagnose(
-                    member,
-                    Diagnostics::differentiableMemberShouldHaveCorrespondingFieldInDiffType,
-                    member->nameAndLoc.name,
-                    differentialType);
+                    Diagnostics::DifferentiableMemberShouldHaveCorrespondingFieldInDiffType{
+                        .member = member->nameAndLoc.name,
+                        .diff_type = differentialType,
+                        .location = member->loc});
             else
             {
                 // If the type is its own differential type, we can infer the differential
@@ -9639,7 +9631,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
                 // be declared as a pure input parameter to a function (`in` or
                 // `borrow`).
                 //
-                getSink()->diagnose(modifier, Diagnostics::parameterPackMustBeConst);
+                getSink()->diagnose(Diagnostics::ParameterPackMustBeConst{.modifier = modifier});
             }
             else if (as<ConstModifier>(modifier))
             {
