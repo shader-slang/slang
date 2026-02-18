@@ -2280,8 +2280,7 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// Capabilities required to query shadow texture lod info
 /// [Compound]
-alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
-                        | texture_sm_4_1;
+alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
