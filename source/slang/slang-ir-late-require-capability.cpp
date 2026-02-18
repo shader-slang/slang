@@ -74,52 +74,89 @@ struct ProcessLateRequireCapabilityInstsContext
     IRModule* const m_module;
     CapabilitySet m_targetCaps;
     const CodeGenTarget m_target;
+    CompilerOptionSet& m_optionSet;
     DiagnosticSink* const m_sink;
     SlangResult m_status = SLANG_OK;
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
 
     ProcessLateRequireCapabilityInstsContext(
-        IRModule* module, const CapabilitySet& targetCaps, CodeGenTarget target, DiagnosticSink* sink)
-        : m_module(module), m_targetCaps(targetCaps), m_target(target), m_sink(sink)
+        IRModule* module, const CapabilitySet& targetCaps, CodeGenTarget target,
+        CompilerOptionSet& optionSet, DiagnosticSink* sink)
+        : m_module(module), m_targetCaps(targetCaps), m_target(target), m_optionSet(optionSet), m_sink(sink)
     {
     }
 
-    bool checkCapability(Stage stage, List<CapabilityName> capNames)
+    void checkCapability(
+        IRFunc* entry, IRLateRequireCapability* inst, Profile profile, List<CapabilityName> capNames)
     {
-        const CapabilityAtom targetAtom = m_targetCaps.getCompileTarget();
-        const CapabilityAtom stageAtom = getAtomFromStage(stage);
-
-        // build capability set with target/stage/no-caps (for joining)
-        CapabilitySet stageSet;
-        CapabilityTargetSet &tset = stageSet.getCapabilityTargetSets()[targetAtom];
-        tset.target = targetAtom;
-        tset.shaderStageSets[stageAtom].stage = stageAtom;
-
-        // grab the stage caps from the target caps by joining
-        CapabilitySet stageCaps(m_targetCaps);
-        stageCaps.join(stageSet);
+        CapabilitySet targetCaps = m_targetCaps;
+        auto stageCapabilitySet = profile.getCapabilityName();
+        targetCaps.join(stageCapabilitySet);
         CapabilitySet required(capNames);
 
         // check that we have the required caps for this stage
-        return stageCaps.atLeastOneSetImpliedInOther(required) == CapabilitySet::ImpliesReturnFlags::Implied;
+        if (targetCaps.atLeastOneSetImpliedInOther(required) == CapabilitySet::ImpliesReturnFlags::Implied)
+            return;
+
+        required.join(stageCapabilitySet);
+
+        // figure out the missing delta
+        CapabilityAtomSet addedAtoms{};
+
+        if (auto stageCapSet = targetCaps.getAtomSets())
+        {
+            if (auto requiredSet = required.getAtomSets())
+            {
+                CapabilityAtomSet::calcSubtract(
+                    addedAtoms,
+                    (*requiredSet),
+                    (*stageCapSet));
+            }
+        }
+
+#if 0
+        StringBuilder sb;
+        printDiagnosticArg(sb, stageCapabilitySet);
+        fprintf(stderr, "stageCapabilitySet: %s\n", sb.toString().getBuffer());
+
+        sb.clear();
+        printDiagnosticArg(sb, required);
+        fprintf(stderr, "required:           %s\n", sb.toString().getBuffer());
+
+        sb.clear();
+        printDiagnosticArg(sb, addedAtoms);
+        fprintf(stderr, "difference:         %s\n", sb.toString().getBuffer());
+#endif
+
+        maybeDiagnoseWarningOrError(
+            m_sink,
+            m_optionSet,
+            DiagnosticCategory::Capability,
+            getDiagnosticPos(entry),
+            Diagnostics::profileImplicitlyUpgraded,
+            Diagnostics::profileImplicitlyUpgradedRestrictive,
+            entry,
+            m_optionSet.getProfile().getName(),
+            addedAtoms.getElements<CapabilityAtom>());
+
+        m_sink->diagnose(
+            inst->sourceLoc,
+            Diagnostics::seeCallOfFunc,
+            "__requireCapability()");
+
+        // we'll fail only if restrictive capability check was requested
+        if (m_optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
+            m_status = SLANG_FAIL;
     }
 
-    void processCapability(IRFunc* entry, Stage stage, IRLateRequireCapability* inst)
+    void processCapability(IRFunc* entry, Profile profile, IRLateRequireCapability* inst)
     {
         List<CapabilityName> capNames;
 
         for (UInt i = 0; i < inst->getOperandCount(); ++i)
         {
             IRConstant* capConstant = as<IRConstant>(inst->getOperand(i));
-            if (!capConstant)
-            {
-                m_sink->diagnose(
-                    inst,
-                    Diagnostics::expectedAStringLiteral);
-                m_status = SLANG_FAIL;
-                return;
-            }
 
             // note: capName validity has already been checked by
             // CheckLateRequireCapabilityInstsContext
@@ -128,16 +165,7 @@ struct ProcessLateRequireCapabilityInstsContext
             capNames.add(capName);
         }
 
-        if (!checkCapability(stage, capNames))
-        {
-            m_sink->diagnose(
-                inst,
-                Diagnostics::entryPointUsesUnavailableCapability,
-                entry,
-                m_target,
-                stage);
-            m_status = SLANG_FAIL;
-        }
+        checkCapability(entry, inst, profile, capNames);
     }
 
     void processFunc(IRFunc* func)
@@ -162,13 +190,7 @@ struct ProcessLateRequireCapabilityInstsContext
                         {
                             if (auto entryPointDecor = entryPoint->findDecoration<IREntryPointDecoration>())
                             {
-                                auto stage = entryPointDecor->getProfile().getStage();
-                                processCapability(entryPoint, stage, lateRequireCap);
-                            }
-                            else if (entryPoint->findDecoration<IRCudaKernelDecoration>())
-                            {
-                                // CUDA entrypoint is treated as a compute stage
-                                processCapability(entryPoint, Stage::Compute, lateRequireCap);
+                                processCapability(entryPoint, entryPointDecor->getProfile(), lateRequireCap);
                             }
                         }
                     }
@@ -209,7 +231,7 @@ SlangResult checkLateRequireCapabilityArguments(IRModule* module, DiagnosticSink
 SlangResult processLateRequireCapabilityInsts(IRModule* module, CodeGenContext* codeGenContext, DiagnosticSink* sink)
 {
     ProcessLateRequireCapabilityInstsContext context(
-        module, codeGenContext->getTargetCaps(), codeGenContext->getTargetFormat(), sink);
+        module, codeGenContext->getTargetCaps(), codeGenContext->getTargetFormat(), codeGenContext->getTargetReq()->getOptionSet(), sink);
 
     context.processModule();
     return context.m_status;
