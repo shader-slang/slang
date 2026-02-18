@@ -65,6 +65,7 @@ static void _testCDataLayoutReflectionStride(UnitTestContext* context, bool forc
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
     targetDesc.forceGLSLScalarBufferLayout = forceScalarLayout;
 
     slang::SessionDesc sessionDesc = {};
@@ -140,6 +141,7 @@ static void _testCDataLayoutReflectionStride(UnitTestContext* context, bool forc
     // Compile to SPIRV-ASM so we can inspect the text output.
     slang::TargetDesc spirvAsmTargetDesc = {};
     spirvAsmTargetDesc.format = SLANG_SPIRV_ASM;
+    spirvAsmTargetDesc.profile = globalSession->findProfile("spirv_1_5");
     spirvAsmTargetDesc.forceGLSLScalarBufferLayout = forceScalarLayout;
 
     slang::SessionDesc spirvAsmSessionDesc = {};
