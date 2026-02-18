@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target glsl
+//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -profile glsl_460 -target glsl -capability GL_EXT_texture_shadow_lod
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
 
 // This is a minimal repro for issue 8802
