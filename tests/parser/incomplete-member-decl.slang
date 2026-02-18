@@ -17,6 +17,6 @@ struct Outer
     // instead.
     //
     int MyType<X> inner;
-//CHECK:          ^ unexpected token
-//CHECK:          ^ unexpected identifier, expected '('
+//CHECK:          ^^^^^ unexpected token
+//CHECK:          ^^^^^ unexpected identifier, expected '('
 }
