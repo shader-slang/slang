@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cpu -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
 
 //
 // Limitation: Direct Cast to Concrete Type
