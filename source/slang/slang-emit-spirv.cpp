@@ -8694,6 +8694,23 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
 
         case kIROp_PtrType:
+            // For pointer types with a concrete address space (e.g., UserPointer ->
+            // PhysicalStorageBuffer), the pointer value is stored as a 64-bit address in the
+            // enclosing storage class. The pointed-to type does not affect storage capability
+            // requirements. Only recurse for generic address space pointers, which are logical IR
+            // references.
+            if (auto ptrType = as<IRPtrTypeBase>(type))
+            {
+                if (ptrType->hasAddressSpace() &&
+                    ptrType->getAddressSpace() != AddressSpace::Generic)
+                    break;
+                return checkTypeNeedsStorageCapability(
+                    ptrType->getValueType(),
+                    targets,
+                    found,
+                    visited);
+            }
+            break;
         case kIROp_RefParamType:
         case kIROp_BorrowInParamType:
         case kIROp_OutParamType:
