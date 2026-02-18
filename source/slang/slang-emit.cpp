@@ -130,6 +130,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -2185,10 +2186,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (!sourceEmitter)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2869,10 +2868,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
     if (!library)
     {
-        codeGenContext->getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

@@ -1,5 +1,53 @@
 -- Helper functions for defining diagnostics
 
+-- Calculate Levenshtein edit distance between two strings
+local function edit_distance(s1, s2)
+  local len1, len2 = #s1, #s2
+  if len1 == 0 then return len2 end
+  if len2 == 0 then return len1 end
+
+  local matrix = {}
+  for i = 0, len1 do
+    matrix[i] = { [0] = i }
+  end
+  for j = 0, len2 do
+    matrix[0][j] = j
+  end
+
+  for i = 1, len1 do
+    for j = 1, len2 do
+      local cost = (s1:sub(i, i) == s2:sub(j, j)) and 0 or 1
+      matrix[i][j] = math.min(
+        matrix[i-1][j] + 1,      -- deletion
+        matrix[i][j-1] + 1,      -- insertion
+        matrix[i-1][j-1] + cost  -- substitution
+      )
+    end
+  end
+
+  return matrix[len1][len2]
+end
+
+-- Find similar strings from a list based on edit distance
+-- Returns array of {name, distance} sorted by distance (ascending)
+local function find_similar(target, candidates, max_distance)
+  max_distance = max_distance or 3
+  local similar = {}
+  local target_lower = target:lower()
+
+  for _, candidate in ipairs(candidates) do
+    local dist = edit_distance(target_lower, candidate:lower())
+    if dist <= max_distance then
+      table.insert(similar, { name = candidate, distance = dist })
+    end
+  end
+
+  -- Sort by distance (ascending)
+  table.sort(similar, function(a, b) return a.distance < b.distance end)
+
+  return similar
+end
+
 -- Set to false to enable uniqueness checking for diagnostic codes.
 -- Currently set to true to allow duplicate codes during the transition period.
 -- See: https://github.com/shader-slang/slang/issues/6736
@@ -240,7 +288,7 @@ end
 
 -- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
 -- For notes within diagnostics, use the `note` function above (line 37).
-local function note_diagnostic(name, code, message, primary_span, ...)
+local function standalone_note(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
@@ -388,11 +436,18 @@ end
 -- Helper function to validate diagnostic schema
 local function validate_diagnostic(diag, index)
   local errors = {}
-  local diagnostic_name = diag.name or ("diagnostic[" .. index .. "]")
+
+  -- Determine diagnostic_name safely for error messages
+  local diagnostic_name
+  if type(diag.name) == "string" then
+    diagnostic_name = diag.name
+  else
+    diagnostic_name = "diagnostic[" .. index .. "]"
+  end
 
   -- 1. Validate mandatory 'name' field
   if not diag.name or type(diag.name) ~= "string" then
-    table.insert(errors, "diagnostic[" .. index .. "].name must be a string")
+    table.insert(errors, "diagnostic[" .. index .. "].name must be a string (got " .. type(diag.name) .. ")")
   end
 
   -- 2. Validate mandatory 'code' field
@@ -403,8 +458,8 @@ local function validate_diagnostic(diag, index)
   -- 3. Validate mandatory 'severity' field and allowed values
   if not diag.severity or type(diag.severity) ~= "string" then
     table.insert(errors, diagnostic_name .. ".severity must be a string")
-  elseif not (diag.severity == "error" or diag.severity == "warning") then
-    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning")
+  elseif not (diag.severity == "error" or diag.severity == "warning" or diag.severity == "note") then
+    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning, note")
   end
 
   -- 4. Validate mandatory 'message' field
@@ -490,7 +545,7 @@ local function process_diagnostics(diagnostics_table)
   local seen_codes = {}
 
   for i, diag in ipairs(diagnostics_table) do
-    local diagnostic_name = diag.name or ("diagnostic[" .. i .. "]")
+    local diagnostic_name = type(diag.name) == "string" and diag.name or ("diagnostic[" .. i .. "]")
     local errors = validate_diagnostic(diag, i)
 
     if #errors > 0 then
@@ -830,9 +885,13 @@ return {
   diagnostics = diagnostics,
   span = span,
   note = note,
+  standalone_note = standalone_note,
   variadic_span = variadic_span,
   variadic_note = variadic_note,
   err = err,
   warning = warning,
   process_diagnostics = process_diagnostics,
+  -- Utility functions for typo suggestions
+  edit_distance = edit_distance,
+  find_similar = find_similar,
 }

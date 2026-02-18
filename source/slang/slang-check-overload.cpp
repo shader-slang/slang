@@ -1159,7 +1159,9 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
         getSink()->diagnose(context.loc, Diagnostics::genericArgumentInferenceFailed, callString);
 
         String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-        getSink()->diagnose(candidate.item.declRef, Diagnostics::genericSignatureTried, declString);
+        getSink()->diagnose(Diagnostics::GenericSignatureTried{
+            .signature = declString,
+            .location = candidate.item.declRef.getLoc()});
         goto error;
     }
 

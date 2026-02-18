@@ -231,7 +231,8 @@ private:
     String repeat(char c, Int64 n) const
     {
         String ret;
-        ret.appendRepeatedChar(c, n);
+        if (n > 0)
+            ret.appendRepeatedChar(c, n);
         return ret;
     }
 
@@ -611,11 +612,12 @@ private:
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
-        String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
-        ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
+        if (layout.header.code >= 0)
+        {
+            String codeStr = String(layout.header.code);
+            ss << "[E" << repeat('0', 5 - codeStr.getLength()) << codeStr << "]";
+        }
+        ss << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
 
         // Skip location and source snippet for diagnostics without meaningful locations
         // (line 0 indicates SourceLoc() was used, meaning no source location)
@@ -659,17 +661,26 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
     // Format:
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-    // Format the error code as E#### (e.g., E0001, E1234)
-    String codeStr = String(diag.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
+    // Format the error code as E##### (e.g., E00001, E12345)
+    // Use empty string for negative codes (-1 is used as placeholder for no code)
+    String codeStr;
+    if (diag.code >= 0)
+    {
+        String numStr = String(diag.code);
+        String padding;
+        padding.appendRepeatedChar('0', std::max(Int64{0}, 5 - numStr.getLength()));
+        codeStr = padding + numStr;
+    }
 
     // Helper lambda to output a span in the machine-readable format
     // Returns false if the span was skipped (0,0 location with no message)
@@ -677,6 +688,30 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
     {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
+        {
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
+        }
 
         // Check for locationless span (0,0)
         bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);

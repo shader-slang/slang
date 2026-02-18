@@ -6,6 +6,7 @@
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-visitor.h"
 
 #include <assert.h>
@@ -5523,10 +5524,9 @@ void Parser::parseSourceFile(ContainerDecl* program)
     {
         if (!isValidSlangLanguageVersion(currentModule->languageVersion))
         {
-            sink->diagnose(
-                program->loc,
-                Diagnostics::unknownLanguageVersion,
-                currentModule->languageVersion);
+            sink->diagnose(Diagnostics::UnknownLanguageVersion{
+                .version = String(currentModule->languageVersion),
+                .location = program->loc});
         }
     }
 

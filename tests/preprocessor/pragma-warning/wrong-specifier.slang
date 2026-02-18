@@ -1,7 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK):
-// #ifdef support
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+// Test that #pragma warning emits a warning if the specifier isn't correct
 
-// CHECK: ([[# @LINE+1]]): warning 15613:
 #pragma warning (diasble : 30081)
-
-// Test that #pragma warning emits a warning if the specifier ins't correct
+//diag:          ^ unknown specifier
+//diag:          ^ unknown #pragma warning specifier 'diasble'

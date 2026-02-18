@@ -1,6 +1,0 @@
-result code = 1
-standard error = {
-(0): error 35: no stage was specified for entry point 'main'; when using the '-pass-through' option, stages must be fully specified on the command line
-}
-standard output = {
-}

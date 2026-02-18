@@ -12,6 +12,7 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "slang-compiler.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -157,7 +158,7 @@ static SlangResult _requireBlob(
     const auto res = artifact->loadBlob(ArtifactKeep::No, outBlob.writeRef());
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::cannotAccessAsBlob);
+        sink->diagnose(Diagnostics::CannotAccessAsBlob{});
         return res;
     }
     return SLANG_OK;
@@ -181,7 +182,8 @@ static SlangResult _requireBlob(
     const auto res = write(artifact->getDesc(), blob, writer);
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::cannotWriteOutputFile, writerName);
+        sink->diagnose(
+            Diagnostics::CannotWriteOutputFile{.path = writerName, .location = SourceLoc()});
     }
     return res;
 }
@@ -259,7 +261,7 @@ static SlangResult _requireBlob(
     const auto res = writeToFile(artifact, path);
     if (SLANG_FAILED(res) && sink)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::cannotWriteOutputFile, path);
+        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = path, .location = SourceLoc()});
     }
 
     return res;

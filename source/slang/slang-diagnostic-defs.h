@@ -42,377 +42,38 @@ DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
 // An alternate wording of the above note, emphasing the position rather than content of the
 // declaration.
 DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
-DIAGNOSTIC(-1, Note, includeOutput, "include $0")
-DIAGNOSTIC(-1, Note, genericSignatureTried, "see declaration of $0")
 
 //
-// 0xxxx -  Command line and interaction with host platform APIs.
+// 0xxxx - Command line and interaction with host platform APIs.
 //
-
-DIAGNOSTIC(1, Error, cannotOpenFile, "cannot open file '$0'.")
-DIAGNOSTIC(2, Error, cannotFindFile, "cannot find file '$0'.")
-DIAGNOSTIC(4, Error, cannotWriteOutputFile, "cannot write output file '$0'.")
-DIAGNOSTIC(5, Error, failedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
-DIAGNOSTIC(
-    6,
-    Error,
-    tooManyOutputPathsSpecified,
-    "$0 output paths specified, but only $1 entry points given")
-
-DIAGNOSTIC(12, Error, cannotDeduceSourceLanguage, "can't deduce language for input file '$0'")
-DIAGNOSTIC(13, Error, unknownCodeGenerationTarget, "unknown code generation target '$0'")
-DIAGNOSTIC(14, Error, unknownProfile, "unknown profile '$0'")
-DIAGNOSTIC(15, Error, unknownStage, "unknown stage '$0'")
-DIAGNOSTIC(16, Error, unknownPassThroughTarget, "unknown pass-through target '$0'")
-DIAGNOSTIC(17, Error, unknownCommandLineOption, "unknown command-line option '$0'")
-DIAGNOSTIC(
-    18,
-    Warning,
-    separateDebugInfoUnsupportedForTarget,
-    "'-separate-debug-info' is not supported for target '$0'. This option is only supported for "
-    "SPIR-V binary targets.")
-DIAGNOSTIC(19, Error, unknownSourceLanguage, "unknown source language '$0'")
-
-DIAGNOSTIC(
-    20,
-    Error,
-    entryPointsNeedToBeAssociatedWithTranslationUnits,
-    "when using multiple source files, entry points must be specified after their corresponding "
-    "source file(s)")
-
-DIAGNOSTIC(22, Error, unknownDownstreamCompiler, "unknown downstream compiler '$0'")
-
-DIAGNOSTIC(28, Error, unableToGenerateCodeForTarget, "unable to generate code for target '$0'")
-
-DIAGNOSTIC(
-    30,
-    Warning,
-    sameStageSpecifiedMoreThanOnce,
-    "the stage '$0' was specified more than once for entry point '$1'")
-DIAGNOSTIC(
-    31,
-    Error,
-    conflictingStagesForEntryPoint,
-    "conflicting stages have been specified for entry point '$0'")
-DIAGNOSTIC(
-    32,
-    Warning,
-    explicitStageDoesntMatchImpliedStage,
-    "the stage specified for entry point '$0' ('$1') does not match the stage implied by the "
-    "source file name ('$2')")
-DIAGNOSTIC(
-    33,
-    Error,
-    stageSpecificationIgnoredBecauseNoEntryPoints,
-    "one or more stages were specified, but no entry points were specified with '-entry'")
-DIAGNOSTIC(
-    34,
-    Error,
-    stageSpecificationIgnoredBecauseBeforeAllEntryPoints,
-    "when compiling multiple entry points, any '-stage' options must follow the '-entry' option "
-    "that they apply to")
-DIAGNOSTIC(
-    35,
-    Error,
-    noStageSpecifiedInPassThroughMode,
-    "no stage was specified for entry point '$0'; when using the '-pass-through' option, stages "
-    "must be fully specified on the command line")
-DIAGNOSTIC(36, Error, expectingAnInteger, "expecting an integer value")
-
-DIAGNOSTIC(
-    40,
-    Warning,
-    sameProfileSpecifiedMoreThanOnce,
-    "the '$0' was specified more than once for target '$0'")
-DIAGNOSTIC(
-    41,
-    Error,
-    conflictingProfilesSpecifiedForTarget,
-    "conflicting profiles have been specified for target '$0'")
-
-DIAGNOSTIC(
-    42,
-    Error,
-    profileSpecificationIgnoredBecauseNoTargets,
-    "a '-profile' option was specified, but no target was specified with '-target'")
-DIAGNOSTIC(
-    43,
-    Error,
-    profileSpecificationIgnoredBecauseBeforeAllTargets,
-    "when using multiple targets, any '-profile' option must follow the '-target' it applies to")
-
-DIAGNOSTIC(
-    42,
-    Error,
-    targetFlagsIgnoredBecauseNoTargets,
-    "target options were specified, but no target was specified with '-target'")
-DIAGNOSTIC(
-    43,
-    Error,
-    targetFlagsIgnoredBecauseBeforeAllTargets,
-    "when using multiple targets, any target options must follow the '-target' they apply to")
-
-DIAGNOSTIC(50, Error, duplicateTargets, "the target '$0' has been specified more than once")
-
-DIAGNOSTIC(
-    51,
-    Error,
-    unhandledLanguageForSourceEmbedding,
-    "unhandled source language for source embedding")
-
-DIAGNOSTIC(
-    60,
-    Error,
-    cannotDeduceOutputFormatFromPath,
-    "cannot infer an output format from the output path '$0'")
-DIAGNOSTIC(
-    61,
-    Error,
-    cannotMatchOutputFileToTarget,
-    "no specified '-target' option matches the output path '$0', which implies the '$1' format")
-
-DIAGNOSTIC(62, Error, unknownCommandLineValue, "unknown value for option. Valid values are '$0'")
-DIAGNOSTIC(63, Error, unknownHelpCategory, "unknown help category")
-
-DIAGNOSTIC(
-    70,
-    Error,
-    cannotMatchOutputFileToEntryPoint,
-    "the output path '$0' is not associated with any entry point; a '-o' option for a compiled "
-    "kernel must follow the '-entry' option for its corresponding entry point")
-DIAGNOSTIC(
-    71,
-    Error,
-    invalidTypeConformanceOptionString,
-    "syntax error in type conformance option '$0'.")
-DIAGNOSTIC(
-    72,
-    Error,
-    invalidTypeConformanceOptionNoType,
-    "invalid conformance option '$0', type '$0' is not found.")
-DIAGNOSTIC(73, Error, cannotCreateTypeConformance, "cannot create type conformance '$0'.")
-
-DIAGNOSTIC(
-    80,
-    Error,
-    duplicateOutputPathsForEntryPointAndTarget,
-    "multiple output paths have been specified entry point '$0' on target '$1'")
-DIAGNOSTIC(
-    81,
-    Error,
-    duplicateOutputPathsForTarget,
-    "multiple output paths have been specified for target '$0'")
-DIAGNOSTIC(
-    82,
-    Error,
-    duplicateDependencyOutputPaths,
-    "the -dep argument can only be specified once")
-
-DIAGNOSTIC(82, Error, unableToWriteReproFile, "unable to write repro file '%0'")
-DIAGNOSTIC(86, Error, unableToCreateModuleContainer, "unable to create module container")
-
-DIAGNOSTIC(
-    87,
-    Error,
-    unableToSetDefaultDownstreamCompiler,
-    "unable to set default downstream compiler for source language '%0' to '%1'")
-
-DIAGNOSTIC(89, Error, expectingSlangRiffContainer, "expecting a slang riff container")
-DIAGNOSTIC(
-    90,
-    Error,
-    incompatibleRiffSemanticVersion,
-    "incompatible riff semantic version %0 expecting %1")
-DIAGNOSTIC(91, Error, riffHashMismatch, "riff hash mismatch - incompatible riff")
-DIAGNOSTIC(92, Error, unableToCreateDirectory, "unable to create directory '$0'")
-DIAGNOSTIC(93, Error, unableExtractReproToDirectory, "unable to extract repro to directory '$0'")
-DIAGNOSTIC(94, Error, unableToReadRiff, "unable to read as 'riff'/not a 'riff' file")
-
-DIAGNOSTIC(95, Error, unknownLibraryKind, "unknown library kind '$0'")
-DIAGNOSTIC(96, Error, kindNotLinkable, "not a known linkable kind '$0'")
-DIAGNOSTIC(97, Error, libraryDoesNotExist, "library '$0' does not exist")
-DIAGNOSTIC(98, Error, cannotAccessAsBlob, "cannot access as a blob")
-DIAGNOSTIC(
-    104,
-    Error,
-    needToEnableExperimentFeature,
-    "'$0' is an experimental module, need to enable"
-    "'-experimental-feature' to load this module")
-DIAGNOSTIC(105, Error, nullComponentType, "componentTypes[$0] is `nullptr`")
-
-//
-// 001xx - Downstream Compilers
-//
-
-DIAGNOSTIC(100, Error, failedToLoadDownstreamCompiler, "failed to load downstream compiler '$0'")
-DIAGNOSTIC(
-    101,
-    Error,
-    downstreamCompilerDoesntSupportWholeProgramCompilation,
-    "downstream compiler '$0' doesn't support whole program compilation")
-DIAGNOSTIC(102, Note, downstreamCompileTime, "downstream compile time: $0s")
-DIAGNOSTIC(103, Note, performanceBenchmarkResult, "compiler performance benchmark:\n$0")
-DIAGNOSTIC(99999, Note, noteFailedToLoadDynamicLibrary, "failed to load dynamic library '$0'")
 
 //
 // 15xxx - Preprocessing
 //
 
 // 150xx - conditionals
-DIAGNOSTIC(
-    15000,
-    Error,
-    endOfFileInPreprocessorConditional,
-    "end of file encountered during preprocessor conditional")
-DIAGNOSTIC(15001, Error, directiveWithoutIf, "'$0' directive without '#if'")
-DIAGNOSTIC(15002, Error, directiveAfterElse, "'$0' directive without '#if'")
-
-DIAGNOSTIC(-1, Note, seeDirective, "see '$0' directive")
+// (definitions moved to slang-diagnostics.lua)
 
 // 151xx - directive parsing
-DIAGNOSTIC(15100, Error, expectedPreprocessorDirectiveName, "expected preprocessor directive name")
-DIAGNOSTIC(15101, Error, unknownPreprocessorDirective, "unknown preprocessor directive '$0'")
-DIAGNOSTIC(15102, Error, expectedTokenInPreprocessorDirective, "expected '$0' in '$1' directive")
-DIAGNOSTIC(
-    15102,
-    Error,
-    expected2TokensInPreprocessorDirective,
-    "expected '$0' or '$1' in '$2' directive")
-DIAGNOSTIC(
-    15103,
-    Error,
-    unexpectedTokensAfterDirective,
-    "unexpected tokens following '$0' directive")
+// (definitions moved to slang-diagnostics.lua)
 
 // 152xx - preprocessor expressions
-DIAGNOSTIC(
-    15200,
-    Error,
-    expectedTokenInPreprocessorExpression,
-    "expected '$0' in preprocessor expression")
-DIAGNOSTIC(
-    15201,
-    Error,
-    syntaxErrorInPreprocessorExpression,
-    "syntax error in preprocessor expression")
-DIAGNOSTIC(
-    15202,
-    Error,
-    divideByZeroInPreprocessorExpression,
-    "division by zero in preprocessor expression")
-DIAGNOSTIC(15203, Error, expectedTokenInDefinedExpression, "expected '$0' in 'defined' expression")
-DIAGNOSTIC(15204, Warning, directiveExpectsExpression, "'$0' directive requires an expression")
-DIAGNOSTIC(
-    15205,
-    Warning,
-    undefinedIdentifierInPreprocessorExpression,
-    "undefined identifier '$0' in preprocessor expression will evaluate to zero")
-DIAGNOSTIC(15206, Error, expectedIntegralVersionNumber, "Expected integer for #version number")
-DIAGNOSTIC(15207, Error, unknownLanguageVersion, "unknown language version '$0'.")
-DIAGNOSTIC(15208, Error, unknownLanguage, "unknown language '$0'.")
-DIAGNOSTIC(
-    15208,
-    Error,
-    languageVersionDiffersFromIncludingModule,
-    "the source file declares a different language version than the including module.")
-DIAGNOSTIC(-1, Note, seeOpeningToken, "see opening '$0'")
+// (definitions moved to slang-diagnostics.lua)
 
 // 153xx - #include
-DIAGNOSTIC(15300, Error, includeFailed, "failed to find include file '$0'")
-DIAGNOSTIC(15301, Error, importFailed, "failed to find imported file '$0'")
-DIAGNOSTIC(15302, Error, cyclicInclude, "cyclic `#include` of file '$0'")
-DIAGNOSTIC(-1, Error, noIncludeHandlerSpecified, "no `#include` handler was specified")
-DIAGNOSTIC(
-    15302,
-    Error,
-    noUniqueIdentity,
-    "`#include` handler didn't generate a unique identity for file '$0'")
-DIAGNOSTIC(
-    15303,
-    Error,
-    cannotResolveImportedDecl,
-    "cannot resolve imported declaration '$0' from precompiled module '$1'. Make sure "
-    "module '$1' is up-to-date. If you suspect this to be a compiler bug, file an issue "
-    "on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for "
-    "assistance")
+// (definitions moved to slang-diagnostics.lua)
 
 // 154xx - macro definition
-DIAGNOSTIC(15400, Warning, macroRedefinition, "redefinition of macro '$0'")
-DIAGNOSTIC(15401, Warning, macroNotDefined, "macro '$0' is not defined")
-DIAGNOSTIC(15403, Error, expectedTokenInMacroParameters, "expected '$0' in macro parameters")
-DIAGNOSTIC(15404, Warning, builtinMacroRedefinition, "Redefinition of builtin macro '$0'")
-
-DIAGNOSTIC(15405, Error, tokenPasteAtStart, "'##' is not allowed at the start of a macro body")
-DIAGNOSTIC(15406, Error, tokenPasteAtEnd, "'##' is not allowed at the end of a macro body")
-DIAGNOSTIC(
-    15407,
-    Error,
-    expectedMacroParameterAfterStringize,
-    "'#' in macro body must be followed by the name of a macro parameter")
-DIAGNOSTIC(15408, Error, duplicateMacroParameterName, "redefinition of macro parameter '$0'")
-DIAGNOSTIC(
-    15409,
-    Error,
-    variadicMacroParameterMustBeLast,
-    "a variadic macro parameter is only allowed at the end of the parameter list")
+// (definitions moved to slang-diagnostics.lua)
 
 // 155xx - macro expansion
-DIAGNOSTIC(15500, Warning, expectedTokenInMacroArguments, "expected '$0' in macro invocation")
-DIAGNOSTIC(
-    15501,
-    Error,
-    wrongNumberOfArgumentsToMacro,
-    "wrong number of arguments to macro (expected $0, got $1)")
-DIAGNOSTIC(
-    15502,
-    Error,
-    errorParsingToMacroInvocationArgument,
-    "error parsing macro '$0' invocation argument to '$1'")
-
-DIAGNOSTIC(
-    15503,
-    Warning,
-    invalidTokenPasteResult,
-    "toking pasting with '##' resulted in the invalid token '$0'")
+// (definitions moved to slang-diagnostics.lua)
 
 // 156xx - pragmas
-DIAGNOSTIC(15600, Error, expectedPragmaDirectiveName, "expected a name after '#pragma'")
-DIAGNOSTIC(15601, Warning, unknownPragmaDirectiveIgnored, "ignoring unknown directive '#pragma $0'")
-DIAGNOSTIC(
-    15602,
-    Warning,
-    pragmaOnceIgnored,
-    "pragma once was ignored - this is typically because is not placed in an include")
-DIAGNOSTIC(
-    15611,
-    Warning,
-    pragmaWarningPopEmpty,
-    "Detected #pragma warning(pop) with no corresponding #pragma warning(push)")
-DIAGNOSTIC(
-    15612,
-    Warning,
-    pragmaWarningPushNotPopped,
-    "Detected #pragma warning(push) with no corresponding #pragma warning(pop)")
-DIAGNOSTIC(15613, Warning, pragmaWarningUnknownSpecifier, "Unknown #pragma warning specifier '$0'")
-DIAGNOSTIC(
-    15614,
-    Warning,
-    pragmaWarningSuppressCannotIdentifyNextLine,
-    "Cannot identify the next line to suppress in #pragma warning suppress")
-DIAGNOSTIC(
-    15615,
-    Warning,
-    pragmaWarningCannotInsertHere,
-    "Cannot insert #pragma warning here for id '$0'")
-DIAGNOSTIC(
-    15616,
-    Note,
-    pragmaWarningPointSuppress,
-    "#pragma warning for id '$0' was suppressed here")
+// (definitions moved to slang-diagnostics.lua)
 
 // 159xx - user-defined error/warning
-DIAGNOSTIC(15900, Error, userDefinedError, "#error: $0")
-DIAGNOSTIC(15901, Warning, userDefinedWarning, "#warning: $0")
+// (definitions moved to slang-diagnostics.lua)
 
 //
 // 2xxxx - Parsing

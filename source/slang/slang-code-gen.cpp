@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
+#include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -681,10 +682,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 auto downstreamCompilerName =
                     TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
 
-                sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::downstreamCompilerDoesntSupportWholeProgramCompilation,
-                    downstreamCompilerName);
+                sink->diagnose(Diagnostics::DownstreamCompilerDoesntSupportWholeProgramCompilation{
+                    .compiler = downstreamCompilerName});
                 return SLANG_FAIL;
             }
         }

@@ -1,9 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/preproc-pound-pound-1.slang(8): error 15405: '##' is not allowed at the start of a macro body
-#define POUND_POUND ##
-                    ^~
-}
-standard output = {
-Hello ## There ; 
-}
