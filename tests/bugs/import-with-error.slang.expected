@@ -1,8 +1,10 @@
 result code = -1
 standard error = {
-tests/bugs/import-with-error-extra.slang(10): error 30015: undefined identifier 'b'.
-    int a = b;
-            ^
+error[E30015]: undefined identifier
+   ╭╼ tests/bugs/import-with-error-extra.slang:10:10
+   │
+10 │ int a = b;
+   │         ━ undefined identifier 'b'.
 tests/bugs/import-with-error.slang(6): error 39999: import of module 'import_with_error_extra' failed because of a compilation error
 import import_with_error_extra;
        ^~~~~~~~~~~~~~~~~~~~~~~

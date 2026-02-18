@@ -1,11 +1,15 @@
 result code = -1
 standard error = {
-tests/bugs/glsl-vk-binding-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_BINDING'.
-[[vk::binding(UNDEFINED_VK_BINDING, UNDEFINED_VK_SET)]]
-              ^~~~~~~~~~~~~~~~~~~~
-tests/bugs/glsl-vk-binding-define.hlsl(3): error 30015: undefined identifier 'UNDEFINED_VK_SET'.
-[[vk::binding(UNDEFINED_VK_BINDING, UNDEFINED_VK_SET)]]
-                                    ^~~~~~~~~~~~~~~~
+error[E30015]: undefined identifier
+  ╭╼ tests/bugs/glsl-vk-binding-define.hlsl:3:15
+  │
+3 │ [[vk::binding(UNDEFINED_VK_BINDING, UNDEFINED_VK_SET)]]
+  │               ━━━━━━━━━━━━━━━━━━━━ undefined identifier 'UNDEFINED_VK_BINDING'.
+error[E30015]: undefined identifier
+  ╭╼ tests/bugs/glsl-vk-binding-define.hlsl:3:37
+  │
+3 │ [[vk::binding(UNDEFINED_VK_BINDING, UNDEFINED_VK_SET)]]
+  │                                     ━━━━━━━━━━━━━━━━ undefined identifier 'UNDEFINED_VK_SET'.
 }
 standard output = {
 }
