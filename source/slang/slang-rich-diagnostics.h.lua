@@ -20,6 +20,23 @@ function M.toPascalCase(name)
 	return result
 end
 
+-- Helper function to convert space-separated name to lowerCamelCase
+-- This matches the naming convention used by DiagnosticInfo::name in C++
+-- which is what the -Wno-xxx flag lookup converts from kebab-case to
+function M.toLowerCamelCase(name)
+	local result = ""
+	local first = true
+	for word in name:gmatch("%S+") do
+		if first then
+			result = result .. word:lower()
+			first = false
+		else
+			result = result .. word:sub(1, 1):upper() .. word:sub(2):lower()
+		end
+	end
+	return result
+end
+
 -- Helper function to convert space-separated name to snake_case
 function M.toSnakeCase(name)
 	return name:gsub("%s+", "_"):lower()

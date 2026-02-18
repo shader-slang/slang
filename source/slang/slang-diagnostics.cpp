@@ -7,6 +7,7 @@
 #include "../core/slang-dictionary.h"
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-util.h"
+#include "slang-rich-diagnostics.h"
 namespace Slang
 {
 
@@ -26,16 +27,32 @@ static const DiagnosticInfo* const kCompilerDiagnostics[] = {
 
 static DiagnosticsLookup* _newDiagnosticsLookup()
 {
-    DiagnosticsLookup* lookup =
-        new DiagnosticsLookup(kCompilerDiagnostics, SLANG_COUNT_OF(kCompilerDiagnostics));
+    // Start with rich diagnostics first - they have priority over old-style diagnostics
+    // with the same name since they provide better error messages.
+    DiagnosticsLookup* lookup = new DiagnosticsLookup(
+        Diagnostics::getRichDiagnosticsInfo(),
+        Diagnostics::getRichDiagnosticsInfoCount());
 
-    // Add all the diagnostics in 'core'
+    // Add old-style compiler diagnostics, skipping any that conflict with rich diagnostics
+    for (Index i = 0; i < Index(SLANG_COUNT_OF(kCompilerDiagnostics)); ++i)
+    {
+        const auto* info = kCompilerDiagnostics[i];
+        if (!lookup->findDiagnosticByExactName(UnownedStringSlice(info->name)))
+        {
+            lookup->add(info);
+        }
+    }
+
+    // Add all the diagnostics in 'core', skipping conflicts
     DiagnosticsLookup* coreLookup = getCoreDiagnosticsLookup();
     if (coreLookup)
     {
         for (auto diagnostic : coreLookup->getDiagnostics())
         {
-            lookup->add(diagnostic);
+            if (!lookup->findDiagnosticByExactName(UnownedStringSlice(diagnostic->name)))
+            {
+                lookup->add(diagnostic);
+            }
         }
     }
 

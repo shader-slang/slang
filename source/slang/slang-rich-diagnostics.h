@@ -22,6 +22,12 @@ class Name;
 namespace Diagnostics
 {
 
+// Get the array of DiagnosticInfo entries for rich diagnostics.
+// These are used to register rich diagnostics with the DiagnosticsLookup
+// so that warning suppression flags like -Wno-xxx work correctly.
+const DiagnosticInfo* const* getRichDiagnosticsInfo();
+Index getRichDiagnosticsInfoCount();
+
 // Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
@@ -73,6 +79,7 @@ struct $(class_name)
 %         end
 %     end
     GenericDiagnostic toGenericDiagnostic() const;
+    static const DiagnosticInfo* getInfo();
 };
 
 % end
