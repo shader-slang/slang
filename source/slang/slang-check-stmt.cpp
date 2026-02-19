@@ -454,10 +454,9 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
         {
             if (!isStage && caseStmt->capability != (int32_t)CapabilityName::Invalid)
             {
-                getSink()->diagnose(
-                    caseStmt->capabilityToken.loc,
-                    Diagnostics::unknownStageName,
-                    caseStmt->capabilityToken);
+                getSink()->diagnose(Diagnostics::UnknownStageName{
+                    .stage_name = String(caseStmt->capabilityToken.getContent()),
+                    .location = caseStmt->capabilityToken.loc});
             }
             caseStmt->capability = (int32_t)canonicalStage;
         }

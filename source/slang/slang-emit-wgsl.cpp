@@ -2,6 +2,7 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 // A note on row/column "terminology reversal".
 //
@@ -441,12 +442,11 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32float";
     default:
         const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::imageFormatUnsupportedByBackend,
-            imageFormatInfo.name,
-            "WGSL",
-            "rgba32float");
+        getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+            .format = imageFormatInfo.name,
+            .backend = "WGSL",
+            .replacement = "rgba32float",
+            .location = SourceLoc()});
         return "rgba32float";
     }
 }

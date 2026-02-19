@@ -422,10 +422,9 @@ Modifier* SemanticsVisitor::validateAttribute(
                 {
                     if (constIntVal->getValue() < 1)
                     {
-                        getSink()->diagnose(
-                            attr,
-                            Diagnostics::nonPositiveNumThreads,
-                            constIntVal->getValue());
+                        getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
+                            .value = (int)constIntVal->getValue(),
+                            .attr = attr});
                         return nullptr;
                     }
                     if (intValue->getType() != m_astBuilder->getIntType())
@@ -475,10 +474,9 @@ Modifier* SemanticsVisitor::validateAttribute(
                 }
                 if (!isValidWaveSize)
                 {
-                    getSink()->diagnose(
-                        attr,
-                        Diagnostics::invalidWaveSize,
-                        constIntVal->getValue());
+                    getSink()->diagnose(Diagnostics::InvalidWaveSize{
+                        .value = (int)constIntVal->getValue(),
+                        .attr = attr});
                     return nullptr;
                 }
             }
@@ -510,10 +508,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         const IRIntegerValue kMaxAnyValueSize = 0x7FFF;
         if (value->getValue() > kMaxAnyValueSize)
         {
-            getSink()->diagnose(
-                anyValueSizeAttr->loc,
-                Diagnostics::anyValueSizeExceedsLimit,
-                kMaxAnyValueSize);
+            getSink()->diagnose(Diagnostics::AnyValueSizeExceedsLimit{
+                .max_size = (int)kMaxAnyValueSize,
+                .location = anyValueSizeAttr->loc});
             return nullptr;
         }
 
@@ -720,7 +717,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single string attribute
         if (!hasStringArgs(attr, 1))
         {
-            getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->keywordName);
+            getSink()->diagnose(Diagnostics::ExpectedSingleStringArg{
+                .attr_name = attr->keywordName,
+                .attr = attr});
         }
     }
     else if (auto opAttr = as<SPIRVInstructionOpAttribute>(attr))
@@ -729,27 +728,34 @@ Modifier* SemanticsVisitor::validateAttribute(
         const auto argsCount = opAttr->args.getCount();
         if (argsCount < 1 || argsCount > 2)
         {
-            sink->diagnose(
-                attr,
-                Diagnostics::attributeArgumentCountMismatch,
-                attr->keywordName,
-                "1...2",
-                argsCount);
+            sink->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+                .attr_name = attr->keywordName,
+                .expected = "1...2",
+                .provided = (int)argsCount,
+                .attr = attr});
         }
         else if (!as<IntegerLiteralExpr>(opAttr->args[0]))
         {
-            sink->diagnose(attr, Diagnostics::attributeExpectedIntArg, attr->keywordName, 0);
+            sink->diagnose(Diagnostics::AttributeExpectedIntArg{
+                .attr_name = attr->keywordName,
+                .arg_index = 0,
+                .attr = attr});
         }
         else if (argsCount > 1 && !as<StringLiteralExpr>(opAttr->args[1]))
         {
-            sink->diagnose(attr, Diagnostics::attributeExpectedStringArg, attr->keywordName, 1);
+            sink->diagnose(Diagnostics::AttributeExpectedStringArg{
+                .attr_name = attr->keywordName,
+                .arg_index = 1,
+                .attr = attr});
         }
     }
     else if (as<MaxTessFactorAttribute>(attr))
     {
         if (!hasFloatArgs(attr, 1))
         {
-            getSink()->diagnose(attr, Diagnostics::expectedSingleFloatArg, attr->keywordName);
+            getSink()->diagnose(Diagnostics::ExpectedSingleFloatArg{
+                .attr_name = attr->keywordName,
+                .attr = attr});
         }
     }
     else if (as<OutputControlPointsAttribute>(attr))
@@ -757,7 +763,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single integral attribute
         if (!hasIntArgs(attr, 1))
         {
-            getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
+            getSink()->diagnose(Diagnostics::ExpectedSingleIntArg{
+                .attr_name = attr->keywordName,
+                .attr = attr});
         }
     }
     else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
@@ -766,18 +774,14 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto structDecl = as<StructDecl>(attrTarget);
         if (!structDecl)
         {
-            getSink()->diagnose(
-                attr,
-                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
-                attr->keywordName);
+            getSink()->diagnose(Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{
+                .attr = attr});
             return nullptr;
         }
         if (findNextOuterGeneric(structDecl) != nullptr)
         {
-            getSink()->diagnose(
-                attr,
-                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
-                attr->keywordName);
+            getSink()->diagnose(Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{
+                .attr = attr});
             return nullptr;
         }
         if (attr->args.getCount() == 1)
@@ -789,13 +793,15 @@ Modifier* SemanticsVisitor::validateAttribute(
             }
             else
             {
-                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
+                getSink()->diagnose(Diagnostics::ExpectedSingleIntArg{
+                    .attr_name = attr->keywordName,
+                    .attr = attr});
                 return nullptr;
             }
         }
         if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
         {
-            getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
+            getSink()->diagnose(Diagnostics::InvalidAttributeTarget{.attr = attr});
             return nullptr;
         }
 
@@ -915,14 +921,18 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             if (!findImageFormatByName(formatName.getUnownedSlice(), &format))
             {
-                getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                getSink()->diagnose(Diagnostics::UnknownImageFormatName{
+                    .format_name = formatName,
+                    .location = attr->args[0]});
             }
         }
         else
         {
             if (!findVkImageFormatByName(formatName.getUnownedSlice(), &format))
             {
-                getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
+                getSink()->diagnose(Diagnostics::UnknownImageFormatName{
+                    .format_name = formatName,
+                    .location = attr->args[0]});
             }
         }
 
@@ -941,7 +951,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
         if (!diagnosticInfo)
         {
-            getSink()->diagnose(attr->args[0], Diagnostics::unknownDiagnosticName, diagnosticName);
+            getSink()->diagnose(Diagnostics::UnknownDiagnosticName{
+                .diagnostic_name = diagnosticName,
+                .location = attr->args[0]->loc});
         }
 
         allowAttr->diagnostic = diagnosticInfo;
@@ -1071,14 +1083,14 @@ Modifier* SemanticsVisitor::validateAttribute(
             }
             else
             {
-                getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
+                getSink()->diagnose(Diagnostics::InvalidGuid{.guid = guid, .attr = attr});
                 return nullptr;
             }
         }
         comInterfaceAttr->guid = resultGUID.toString();
         if (comInterfaceAttr->guid.getLength() != 32)
         {
-            getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
+            getSink()->diagnose(Diagnostics::InvalidGuid{.guid = guid, .attr = attr});
             return nullptr;
         }
     }
@@ -1087,7 +1099,9 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto varDecl = as<VarDeclBase>(attrTarget);
         if (!varDecl)
         {
-            getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attr->getKeywordName());
+            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+                .attr_name = attr->getKeywordName(),
+                .attr = attr});
             return nullptr;
         }
     }
@@ -1216,7 +1230,9 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!attrDecl)
     {
-        getSink()->diagnose(uncheckedAttr, Diagnostics::unknownAttributeName, attrName);
+        getSink()->diagnose(Diagnostics::UnknownAttributeName{
+            .attr_name = attrName,
+            .attr = uncheckedAttr});
         return uncheckedAttr;
     }
 
@@ -1291,12 +1307,11 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (mismatch)
     {
-        getSink()->diagnose(
-            attr,
-            Diagnostics::attributeArgumentCountMismatch,
-            attrName,
-            paramCount,
-            argCount);
+        getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
+            .attr_name = attrName,
+            .expected = String(paramCount),
+            .provided = (int)argCount,
+            .attr = attr});
         return uncheckedAttr;
     }
 
@@ -1330,7 +1345,9 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!validTarget)
     {
-        getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attrName);
+        getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+            .attr_name = attrName,
+            .attr = attr});
         return uncheckedAttr;
     }
 
@@ -2026,10 +2043,9 @@ Modifier* SemanticsVisitor::checkModifier(
                     }
                     else if (cintVal->getValue() < 1)
                     {
-                        getSink()->diagnose(
-                            attr,
-                            Diagnostics::nonPositiveNumThreads,
-                            cintVal->getValue());
+                        getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
+                            .value = (int)cintVal->getValue(),
+                            .attr = attr});
                         return nullptr;
                     }
                 }
