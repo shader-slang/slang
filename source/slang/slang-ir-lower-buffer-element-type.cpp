@@ -2674,13 +2674,6 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
     {
     }
 
-    virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
-    {
-        SLANG_UNUSED(matrixType);
-        SLANG_UNUSED(config);
-        return false;
-    }
-
     IRFunc* createVectorUnpackFunc(IRVectorType* vectorType, IRArrayType* arrayType)
     {
         IRBuilder builder(vectorType);
