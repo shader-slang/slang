@@ -3,14 +3,19 @@ implementing neural;
 #include "common-def.slang"
 
 
-internal interface IArrayAccessor<T> : IRWArray<T>
+internal interface IArrayAccessor<T>
 {
     internal void atomicAdd(int index, T value)
     {
         static_assert(false, "atomicAdd is not supported for IArrayAccessor");
     }
-}
 
+    __subscript(int index)->T
+    {
+        get;
+        set;
+    }
+}
 
 internal extension<T> RWStructuredBuffer<T>.Handle : IArrayAccessor<T>
 {
@@ -36,12 +41,6 @@ internal extension<T> Ptr<T> : IArrayAccessor<T>
     override internal void atomicAdd(int index, T value)
     {
         __atomic_reduce_add(this[index], value);
-    }
-
-    [ForceInline]
-    internal int getCount()
-    {
-        return 0;
     }
 }
 

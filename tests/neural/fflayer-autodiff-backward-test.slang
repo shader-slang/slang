@@ -23,7 +23,7 @@ import neural;
     typealias Address = BindlessAddress<float>;
 #endif
 
-//TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
+//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
 typealias Vec2 = InlineVector<float, 2>;
@@ -36,7 +36,7 @@ bool approxEqual(float a, float b, float eps = 0.001)
 }
 
 // Test forward pass
-bool testForwardPass()
+void testForwardPass(inout uint idx)
 {
     let baseAddr = Address(params);
     let layer = Layer();
@@ -50,7 +50,8 @@ bool testForwardPass()
 
     // W = [[1,2],[3,4]], b = [0.5, -0.5]
     // y = W*x + b = [1*1+2*2, 3*1+4*2] + [0.5, -0.5] = [5, 11] + [0.5, -0.5] = [5.5, 10.5]
-    return approxEqual(y[0], 5.5) && approxEqual(y[1], 10.5);
+    testResult[idx++] = approxEqual(y[0], 5.5);   // y[0] == 5.5
+    testResult[idx++] = approxEqual(y[1], 10.5);   // y[1] == 10.5
 }
 
 // Wrapper function for autodiff - takes DifferentialPtrPair for weight and bias addresses
@@ -61,7 +62,7 @@ Vec2 computeOutput(Address weightAddr, Address biasAddr, Vec2 input, Layer layer
 }
 
 // Test backward pass using autodiff
-bool testBackwardPass()
+void testBackwardPass(inout uint idx)
 {
     // Reset gradient buffer
     for (int i = 0; i < 6; i++)
@@ -102,22 +103,33 @@ bool testBackwardPass()
     // dB[0] = dy[0] = 1
     // dB[1] = dy[1] = 1
 
-    bool w00 = approxEqual(gradParams[0], 1.0);
-    bool w01 = approxEqual(gradParams[1], 2.0);
-    bool w10 = approxEqual(gradParams[2], 1.0);
-    bool w11 = approxEqual(gradParams[3], 2.0);
-    bool b0 = approxEqual(gradParams[4], 1.0);
-    bool b1 = approxEqual(gradParams[5], 1.0);
+    testResult[idx++] = approxEqual(gradParams[0], 1.0);  // dW[0,0]
+    testResult[idx++] = approxEqual(gradParams[1], 2.0);  // dW[0,1]
+    testResult[idx++] = approxEqual(gradParams[2], 1.0);  // dW[1,0]
+    testResult[idx++] = approxEqual(gradParams[3], 2.0);  // dW[1,1]
+    testResult[idx++] = approxEqual(gradParams[4], 1.0);  // dB[0]
+    testResult[idx++] = approxEqual(gradParams[5], 1.0);  // dB[1]
 
-    return w00 && w01 && w10 && w11 && b0 && b1;
 }
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    testResult[0] = testForwardPass();
-    testResult[1] = testBackwardPass();
+    // Buffer layout:
+    // [0,1]: fwd y[0]==5.5, y[1]==10.5
+    // [2]: fwd combined
+    // [3..8]: dW[0,0], dW[0,1], dW[1,0], dW[1,1], dB[0], dB[1]
+    // [9]: bwd combined
+    uint idx = 0;
+    testForwardPass(idx);
+    testBackwardPass(idx);
     // BUFFER: 1
-    // BUFFER: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
+    // BUFFER-NEXT: 1
 }
