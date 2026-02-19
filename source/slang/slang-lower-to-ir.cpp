@@ -4331,11 +4331,7 @@ struct ExprLoweringContext
             if (!irArgs[glslRequireShaderInputParameter->parameterNumber]
                      ->findDecoration<IRGlobalInputDecoration>())
             {
-                this->context->getSink()->diagnose(
-                    expr,
-                    Diagnostics::requireInputDecoratedVarForParameter,
-                    decl,
-                    glslRequireShaderInputParameter->parameterNumber);
+                this->context->getSink()->diagnose(Diagnostics::RequireInputDecoratedVarForParameter{.func = decl, .param_number = glslRequireShaderInputParameter->parameterNumber, .expr = expr});
             }
             return;
         }
@@ -6918,10 +6914,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 {
                     if (inferredMaxIters->value < constIntVal->getValue())
                     {
-                        context->getSink()->diagnose(
-                            maxIters,
-                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
-                            inferredMaxIters->value);
+                        context->getSink()->diagnose(Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{.iterations = (int)inferredMaxIters->value, .attr = maxIters});
                     }
                 }
             }

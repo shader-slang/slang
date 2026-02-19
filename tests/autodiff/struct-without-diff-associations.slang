@@ -13,7 +13,7 @@ struct Foo : IDifferentiable
     typealias Differential = Foo2;
 
     float x[3];
-    // CHECK: tests/autodiff/struct-without-diff-associations.slang([[# @LINE-1]]): error 30102: differentiable member 'x' should have a corresponding field in 'Foo2'. Use [DerivativeMember(Foo2.<field-name>)] or mark as no_diff
+    // CHECK: error[E30102]: differentiable member missing in differential type
     // CHECK-NEXT: float x[3];
     // CHECK-NEXT:       ^
 };

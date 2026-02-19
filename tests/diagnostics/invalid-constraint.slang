@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 interface IFoo
 {
@@ -18,8 +18,11 @@ struct Foo : IFoo
 
 RWStructuredBuffer<float> output;
 
-// CHECK: ([[# @LINE+1]]): error 30401
 float compute<T:Foo>(T f) // error, should be IFoo here.
+/*diag:
+                ^^^ invalid constraint type
+                ^^^ type 'Foo' cannot be used as a constraint.
+*/
 {
 }
 

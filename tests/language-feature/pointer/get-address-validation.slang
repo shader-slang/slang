@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):-stage compute -entry computeMain -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive):-stage compute -entry computeMain -target spirv
 
 // Tests for invalid/valid use of `__getAddress`
 
@@ -25,10 +25,9 @@ typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShare
 
 GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[100] ptr)
 {
-    // CHECK: ([[# @LINE+1]]): error 30019
     T* ptr1 = __getAddress(ptr[5]);
+//diag:       ^^^^^^^^^^^^ expected an expression of type 'Ptr<T, Access.ReadWrite, AddressSpace.Device>', got 'Ptr<T, Access.ReadWrite, AddressSpace.GroupShared>'
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<T> ptr2 = __getAddress(ptr[5]);
 
     return ptr2;
@@ -37,36 +36,30 @@ GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[1
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    // CHECK: ([[# @LINE+1]]): error 31160
     int* ptr1 = __getAddress(bufferStorage[id.x]);
+//diag:         ^^^^^^^^^^^^ invalid __getAddress usage
+//diag:         ^^^^^^^^^^^^ '__getAddress' only supports groupshared variables and members of groupshared/device memory.
 
-    // CHECK ([[# @LINE+1]]): error
     int[100]* ptr2 = __getAddress(bufferGroupShared);
+//diag:              ^^^^^^^^^^^^ expected an expression of type 'Ptr<int[100], Access.ReadWrite, AddressSpace.Device>', got 'Ptr<int[100], Access.ReadWrite, AddressSpace.GroupShared>'
 
-    // CHECK: ([[# @LINE+1]]): error
     int* ptr3 = __getAddress(bufferGroupShared[id.x]);
+//diag:         ^^^^^^^^^^^^ expected an expression of type 'Ptr<int, Access.ReadWrite, AddressSpace.Device>', got 'Ptr<int, Access.ReadWrite, AddressSpace.GroupShared>'
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr4 = __getAddress(bufferUserPointer[id.x]);
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<int[100]> ptr5 = __getAddress(bufferGroupShared);
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<int> ptr6 = __getAddress(bufferGroupShared[id.x]);
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     GroupSharedPtr<int> ptr7 = paramGroupShared(bufferGroupShared);
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr8 = __getAddress(bufferUserPointerStruct.data1);
 
     StructPtrInStruct structPtrInStruct;
     structPtrInStruct.ptr = bufferUserPointerStruct;
-    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr9 = __getAddress(structPtrInStruct.ptr[id.x].data1);
 
-    // CHECK-NOT: ([[# @LINE+1]]): error
     int* ptr10 = __getAddress(bufferUserPointerVector[0].x);
 
     output[id] = ptr1[id];

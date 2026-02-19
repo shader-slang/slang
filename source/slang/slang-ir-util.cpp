@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2406,7 +2407,7 @@ void verifyComputeDerivativeGroupModifiers(
 
     if (quadAttr && linearAttr)
     {
-        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+        sink->diagnose(Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
     IRIntegerValue x = 1;
@@ -2422,14 +2423,12 @@ void verifyComputeDerivativeGroupModifiers(
     if (quadAttr)
     {
         if (x % 2 != 0 || y % 2 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+            sink->diagnose(Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(
-                errorLoc,
-                Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{.location = errorLoc});
     }
 }
 

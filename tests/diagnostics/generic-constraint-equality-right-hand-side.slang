@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 interface IGen<A>
 {
     associatedtype TB;
@@ -25,8 +25,9 @@ struct Logic<A1, C1 : IGen<A1>>
 
 extension<A, C1> Logic<A, C1>
     where C1 : IGen<A>
-    //CHECK: ([[# @LINE+1]]): error 30404: 
     where C1.TB == Wrapper<int>
+//diag:            ^^^^^^^ invalid equality constraint type
+//diag:            ^^^^^^^ type 'Wrapper<int>' is not a proper type to use in a generic equality constraint.
 {
     [mutating]
     void setVal(int dataIn)

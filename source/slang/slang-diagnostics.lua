@@ -1009,6 +1009,10 @@ semantic_checking_4_module(helpers)
 local semantic_checking_5_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-5.lua")
 semantic_checking_5_module(helpers)
 
+-- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
+local semantic_checking_6_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-6.lua")
+semantic_checking_6_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

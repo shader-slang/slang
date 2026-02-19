@@ -2,21 +2,27 @@
 
 // Diagnostic messages related to property/subscript accessor declarations.
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 struct Test
 {
 	property p : int
 	{
-		//CHECK: ([[# @LINE+1]]): error 31101: accessors other than 'set' must not have parameters
 		get(a) { return 0; }
-		//CHECK: ([[# @LINE+1]]): error 31102: a 'set' accessor may not have more than one parameter
+/*diag:
+  ^^^ accessors other than 'set' must not have parameters
+      ^ a parameter declaration without an initial-value expression must be given an explicit type
+*/
 		set(a, b) { }
+//diag:  ^ a 'set' accessor may not have more than one parameter
+//diag:  ^ a parameter declaration without an initial-value expression must be given an explicit type
 	}
 
 	property q : float
 	{
-		//CHECK: ([[# @LINE+1]]): error 31102: 'set' parameter 'c' has type 'int' which does not match the expected type 'float'
 		set(c : int) { }
+/*diag:
+      ^ 'set' parameter 'c' has type 'int' which does not match the expected type 'float'
+*/
 	}
 }

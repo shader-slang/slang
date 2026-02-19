@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 interface IThing
 {
     void thing();
@@ -7,5 +7,9 @@ interface IThing
 void f<T>(T t) where optional T: IThing
 {
     // Unchecked optional constraint is an error.
-    t.thing(); // CHECK: error 30403
+    t.thing();
+/*diag:
+      ^^^^^ optional constraint not checked
+      ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage.
+*/
 }
