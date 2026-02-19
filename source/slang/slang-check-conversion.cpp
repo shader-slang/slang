@@ -68,6 +68,11 @@ bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(Type* type)
             return false;
     }
 
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return isEffectivelyScalarForInitializerLists(modifiedType->getBase());
+    }
+
     return true;
 }
 

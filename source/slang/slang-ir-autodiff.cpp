@@ -616,6 +616,7 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
     IRBuilder* builder,
     IRType* primalType)
 {
+    // In case of an existential type, we emit a null differential value
     if (as<IRInterfaceType>(primalType))
     {
         // Pack a null value into an existential type.
@@ -626,11 +627,26 @@ IRInst* DifferentiableTypeConformanceContext::emitDZeroOfDiffInstType(
 
         return existentialZero;
     }
-    else if (as<IRAssociatedType>(primalType))
+
+    // Handle TypePack types by emitting dzero for each element and packing results.
+    if (auto typePackType = as<IRTypePack>(primalType))
     {
-        // Should never see this case.
-        SLANG_UNEXPECTED("unexpected associated type during transposition");
+        List<IRInst*> zeroElements;
+        for (UInt i = 0; i < typePackType->getOperandCount(); i++)
+        {
+            auto elementType = (IRType*)typePackType->getOperand(i);
+            auto elementZero = emitDZeroOfDiffInstType(builder, elementType);
+            zeroElements.add(elementZero);
+        }
+        return builder->emitMakeValuePack(
+            (IRType*)this->getDifferentialForType(primalType),
+            zeroElements.getCount(),
+            zeroElements.getBuffer());
     }
+
+    //
+    // Default case: look up zero method and emit call.
+    //
 
     auto zeroMethod = this->getZeroMethodForType(builder, primalType);
 

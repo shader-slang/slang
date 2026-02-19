@@ -2,6 +2,7 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-ir-sccp.h"
 
 namespace Slang
 {
@@ -93,11 +94,43 @@ public:
             callInst->findDecoration<IRDifferentiableCallDecoration>());
     }
 
-    // If a function call takes all literals as arguments, it will implies that this function will
-    // not be expected to any gradients, in this case, this call should be treated as no_diff even
-    // there is no 'no_diff' decorated on it explicitly. In the actual check, we only need to check
-    // the argument corresponding to the differentiable parameters, because non-differentiable
-    // parameter are not expected to produce any gradients anyway.
+    bool isConstantVal(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_IntLit:
+        case kIROp_FloatLit:
+            return true;
+        case kIROp_MakeValuePack:
+            {
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (!isConstantVal(inst->getOperand(i)))
+                        return false;
+                }
+                return true;
+            }
+        }
+
+        if (isEvaluableOpCode(inst->getOp()))
+        {
+            for (UInt i = 0; i < inst->getOperandCount(); i++)
+            {
+                auto operand = inst->getOperand(i);
+                if (!isConstantVal(operand))
+                    return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    // If a function call takes all literals as arguments, it will implies that this function
+    // will not be expected to any gradients, in this case, this call should be treated as
+    // no_diff even there is no 'no_diff' decorated on it explicitly. In the actual check, we
+    // only need to check the argument corresponding to the differentiable parameters, because
+    // non-differentiable parameter are not expected to produce any gradients anyway.
     bool shouldCallImpliesNoDiff(
         DifferentiableTypeConformanceContext& diffTypeContext,
         IRCall* callInst)
@@ -121,7 +154,7 @@ public:
             if (diffTypeContext.isDifferentiableType(paramBaseType))
             {
                 auto arg = callInst->getArg(paramIndex);
-                if (!as<IRConstant>(arg))
+                if (!isConstantVal(arg))
                 {
                     doesImplyNoDiff = false;
                 }

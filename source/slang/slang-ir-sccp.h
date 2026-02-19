@@ -1,5 +1,6 @@
 // slang-ir-sccp.h
 #pragma once
+#include "slang-ir-insts-enum.h"
 
 namespace Slang
 {
@@ -31,4 +32,7 @@ bool applySparseConditionalConstantPropagation(
     DiagnosticSink* sink);
 
 IRInst* tryConstantFoldInst(IRModule* module, TargetProgram* targetProgram, IRInst* inst);
+
+bool isEvaluableOpCode(IROp op);
+
 } // namespace Slang

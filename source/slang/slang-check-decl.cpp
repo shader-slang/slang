@@ -4764,22 +4764,51 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     DeclRef<GenericDecl> requiredGenericDeclRef,
     RefPtr<WitnessTable> witnessTable)
 {
-    // The signature of a generic is defiend by its members, and we need the
-    // satisfying value to have the same number of members for it to be an
-    // exact match.
-    //
     auto memberCount = requiredGenericDeclRef.getDecl()->getDirectMemberDeclCount();
-    if (satisfyingGenericDeclRef.getDecl()->getDirectMemberDeclCount() != memberCount)
-        return false;
+    auto satisfyingMemberCount = satisfyingGenericDeclRef.getDecl()->getDirectMemberDeclCount();
 
-    // We then want to check that pairwise members match, in order.
+    // We then want to check that the type/value parameters match in order,
+    // and that the constraints match (but constraints can appear in any order,
+    // interleaved with the type/value params).
     //
     auto requiredMemberDeclRefs = getMembers(m_astBuilder, requiredGenericDeclRef);
     auto satisfyingMemberDeclRefs = getMembers(m_astBuilder, satisfyingGenericDeclRef);
+
+    // Separate type/value params from constraints for both required and satisfying generics.
+    // Type/value params must appear in the same relative order, but constraints can be
+    // interleaved freely among them.
     //
-    // We start by performing a superficial "structural" match of the parameters
-    // to ensure that the two generics have an equivalent mix of type, value,
-    // and constraint parameters in the same order.
+    List<DeclRef<Decl>> requiredParams;
+    List<DeclRef<GenericTypeConstraintDecl>> requiredConstraints;
+    for (Index i = 0; i < memberCount; i++)
+    {
+        auto m = requiredMemberDeclRefs[i];
+        if (auto c = m.as<GenericTypeConstraintDecl>())
+            requiredConstraints.add(c);
+        else
+            requiredParams.add(m);
+    }
+
+    List<DeclRef<Decl>> satisfyingParams;
+    List<DeclRef<GenericTypeConstraintDecl>> satisfyingConstraints;
+    for (Index i = 0; i < satisfyingMemberCount; i++)
+    {
+        auto m = satisfyingMemberDeclRefs[i];
+        if (auto c = m.as<GenericTypeConstraintDecl>())
+            satisfyingConstraints.add(c);
+        else
+            satisfyingParams.add(m);
+    }
+
+    // The number of type/value params and constraints must each match.
+    if (requiredParams.getCount() != satisfyingParams.getCount())
+        return false;
+    if (requiredConstraints.getCount() != satisfyingConstraints.getCount())
+        return false;
+
+    //
+    // We start by performing a superficial "structural" match of the type/value parameters
+    // to ensure that the two generics have equivalent parameters in the same order.
     //
     // Note that in this step we do *not* make any checks on the actual types
     // involved in constraints, or on the types of value parameters. The reason
@@ -4797,10 +4826,10 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     // We will deal with this issue after the structural matching is checked, at
     // which point we can actually verify things like types.
     //
-    for (Index i = 0; i < memberCount; i++)
+    for (Index i = 0; i < requiredParams.getCount(); i++)
     {
-        auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
-        auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+        auto requiredMemberDeclRef = requiredParams[i];
+        auto satisfyingMemberDeclRef = satisfyingParams[i];
 
         if (as<GenericTypeParamDecl>(requiredMemberDeclRef))
         {
@@ -4814,16 +4843,6 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         {
             if (auto satisfyingValueParamDeclRef =
                     satisfyingMemberDeclRef.as<GenericValueParamDecl>())
-            {
-            }
-            else
-                return false;
-        }
-        else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
-        {
-            if (auto satisfyingConstraintDeclRef =
-                    satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>())
             {
             }
             else
@@ -4859,10 +4878,11 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     //
     List<Val*> requiredSubstArgs;
 
-    for (Index i = 0; i < memberCount; i++)
+    // Build substitution args from the ordered type/value parameters.
+    for (Index i = 0; i < requiredParams.getCount(); i++)
     {
-        auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
-        auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+        auto requiredMemberDeclRef = requiredParams[i];
+        auto satisfyingMemberDeclRef = satisfyingParams[i];
 
         if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
         {
@@ -4885,24 +4905,21 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             requiredSubstArgs.add(satisfyingVal);
         }
     }
-    for (Index i = 0; i < memberCount; i++)
+
+    // Build substitution args from the constraints.
+    // For this phase we pair them by index (we'll do the unordered matching in the
+    // detailed check below), but we need to add witness args for each required constraint
+    // in order to build the specialization.
+    for (Index i = 0; i < requiredConstraints.getCount(); i++)
     {
-        auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
-        auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+        auto satisfyingConstraintDeclRef = satisfyingConstraints[i];
 
-        if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
-        {
-            auto satisfyingConstraintDeclRef =
-                satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
-            SLANG_ASSERT(satisfyingConstraintDeclRef);
+        auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
+            getSub(m_astBuilder, satisfyingConstraintDeclRef),
+            getSup(m_astBuilder, satisfyingConstraintDeclRef),
+            satisfyingConstraintDeclRef);
 
-            auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
-                getSub(m_astBuilder, satisfyingConstraintDeclRef),
-                getSup(m_astBuilder, satisfyingConstraintDeclRef),
-                satisfyingConstraintDeclRef);
-
-            requiredSubstArgs.add(satisfyingWitness);
-        }
+        requiredSubstArgs.add(satisfyingWitness);
     }
 
     // Now that we have computed a set of specialization arguments that will
@@ -4913,10 +4930,12 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     auto specializedRequiredGenericInnerDeclRef = m_astBuilder->getGenericAppDeclRef(
         requiredGenericDeclRef,
         requiredSubstArgs.getArrayView());
-    for (Index i = 0; i < memberCount; i++)
+
+    // Check ordered type/value parameters in detail.
+    for (Index i = 0; i < requiredParams.getCount(); i++)
     {
-        auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
-        auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+        auto requiredMemberDeclRef = requiredParams[i];
+        auto satisfyingMemberDeclRef = satisfyingParams[i];
 
         if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
         {
@@ -4945,19 +4964,22 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!satisfyingParamType->equals(requiredParamType))
                 return false;
         }
-        else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
-        {
-            auto satisfyingConstraintDeclRef =
-                satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
-            SLANG_ASSERT(satisfyingConstraintDeclRef);
+    }
 
-            // For a generic constraint parameter, we need to check that the sub-type
-            // and super-type in the constraint both match.
-            //
-            // In current code the sub type will always be one of the generic type parameters,
-            // and the super-type will always be an interface, but there should be no
-            // need to make use of those additional details here.
+    // Check constraints in an unordered fashion: each required constraint must have
+    // a matching satisfying constraint (by sub-type and super-type), regardless of
+    // declaration order.
+    {
+        // Track which satisfying constraints have been matched so we don't double-match.
+        List<bool> satisfyingConstraintMatched;
+        satisfyingConstraintMatched.setCount(satisfyingConstraints.getCount());
+        for (Index i = 0; i < satisfyingConstraintMatched.getCount(); i++)
+            satisfyingConstraintMatched[i] = false;
+
+        for (Index ri = 0; ri < requiredConstraints.getCount(); ri++)
+        {
+            auto requiredConstraintDeclRef = requiredConstraints[ri];
+
             auto specializedRequiredConstraintDeclRef = m_astBuilder
                                                             ->getGenericAppDeclRef(
                                                                 requiredGenericDeclRef,
@@ -4965,13 +4987,28 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                                                                 requiredConstraintDeclRef.getDecl())
                                                             .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
-            auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!satisfyingSubType->equals(requiredSubType))
-                return false;
-
             auto requiredSuperType = getSup(m_astBuilder, specializedRequiredConstraintDeclRef);
-            auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!satisfyingSuperType->equals(requiredSuperType))
+
+            bool foundMatch = false;
+            for (Index si = 0; si < satisfyingConstraints.getCount(); si++)
+            {
+                if (satisfyingConstraintMatched[si])
+                    continue;
+
+                auto satisfyingConstraintDeclRef = satisfyingConstraints[si];
+                auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
+                auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
+
+                if (satisfyingSubType->equals(requiredSubType) &&
+                    satisfyingSuperType->equals(requiredSuperType))
+                {
+                    satisfyingConstraintMatched[si] = true;
+                    foundMatch = true;
+                    break;
+                }
+            }
+
+            if (!foundMatch)
                 return false;
         }
     }
@@ -7331,7 +7368,9 @@ static DeclRef<ExtensionDecl> extendContainerDecl(
     {
         outermostDecl = outermostDecl->parentDecl;
     }
-    getModuleDecl(decl)->addMember(outermostDecl);
+
+    auto currentModuleDecl = visitor->getShared()->getModule()->getModuleDecl();
+    currentModuleDecl->addMember(outermostDecl);
 
     outSubstSet = substSet;
     return extDeclRef.as<ExtensionDecl>();
@@ -9179,26 +9218,36 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
         // we're currently processing, then this is the canonical/critical path.
         bool isCriticalPath = false;
 
-        //
-        // TODO: STOPPED HERE (need to expand the critical path test to check all nodes
-        // in the lookup and not just the first one, since there could be a recursive node)
-        //
         auto currentWitness = subIsReqWitness;
-        while (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
+        for (;;)
         {
-            if (auto lookupDeclRef =
-                    as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+            if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
             {
-                if (lookupDeclRef->getDecl() == inheritanceDecl)
+                if (auto lookupDeclRef =
+                        as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
                 {
-                    isCriticalPath = true;
-                }
+                    if (lookupDeclRef->getDecl() == inheritanceDecl)
+                    {
+                        isCriticalPath = true;
+                    }
 
-                currentWitness = lookupDeclRef->getWitness();
+                    currentWitness = lookupDeclRef->getWitness();
+                }
+                else
+                {
+                    break;
+                }
+            }
+            else if (auto expandWitness = as<ExpandSubtypeWitness>(currentWitness))
+            {
+                currentWitness = expandWitness->getPatternTypeWitness();
+            }
+            else if (auto eachWitness = as<EachSubtypeWitness>(currentWitness))
+            {
+                currentWitness = eachWitness->getPatternTypeWitness();
             }
             else
             {
-                // If we encounter a witness that isn't a LookupDeclRef, break;
                 break;
             }
         }
@@ -10192,6 +10241,14 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
         }
         m_parentDifferentiableAttr = oldAttr;
     }
+    else
+    {
+        // If we're not in a differentiable context, ignore any no_diff
+        // modifiers (or anything related to auto-diff, really..)
+        //
+        newContext = newContext.allowDroppingDerivatives();
+    }
+
     return newContext;
 }
 
@@ -11634,6 +11691,37 @@ static InterfaceDecl* getParentInterfaceDecl(Decl* decl)
     return nullptr;
 }
 
+DeclaredSubtypeWitness* SemanticsVisitor::getThisTypeWitness(
+    ASTBuilder* astBuilder,
+    DeclRef<InterfaceDecl> inDeclRef)
+{
+    // Go find the this-type & this-type-witness manually for now. (TODO: This is a hack..)
+
+    auto interfaceDeclRef =
+        createDefaultSubstitutionsIfNeeded(astBuilder, this, inDeclRef.getDecl())
+            .as<InterfaceDecl>();
+    auto interfaceType = DeclRefType::create(astBuilder, interfaceDeclRef);
+    auto thisType = this->calcThisType(interfaceDeclRef);
+    auto thisTypeConstraint = as<DeclRefType>(thisType)
+                                  ->getDeclRef()
+                                  .as<ThisTypeDecl>()
+                                  .getDecl()
+                                  ->getMembersOfType<ThisTypeConstraintDecl>()
+                                  .getFirst();
+    auto thisTypeConstraintRef = createDefaultSubstitutionsIfNeeded(
+        astBuilder,
+        this,
+        thisTypeConstraint->getDefaultDeclRef());
+
+    auto declaredSubtypeWitness = astBuilder->getOrCreate<DeclaredSubtypeWitness>(
+        thisType,
+        interfaceType,
+        thisTypeConstraintRef);
+
+    return as<DeclaredSubtypeWitness>(
+        declaredSubtypeWitness->substitute(astBuilder, SubstitutionSet(inDeclRef)));
+}
+
 DeclRef<Decl> SemanticsVisitor::getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl)
 {
     // Returns an interface requirement as a lookup decl-ref on the ThisType of the
@@ -11892,6 +11980,7 @@ static DeclRef<SynthesizedStructDecl> addSynthesizedStruct(
         {
             outermostDecl = outermostDecl->parentDecl;
         }
+
         getModuleDecl(parentDecl)->addMember(outermostDecl);
     }
 

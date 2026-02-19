@@ -224,8 +224,23 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
     // first item in our linearization will always be a facet for
     // the declaration itself.
     //
-    TypeEqualityWitness* selfIsSelf =
-        selfType ? visitor.createTypeEqualityWitness(selfType) : nullptr;
+    SubtypeWitness* selfIsSelf = nullptr;
+    if (selfType)
+    {
+        if (isDeclRefTypeOf<InterfaceDecl>(selfType))
+        {
+            selfIsSelf = visitor.getThisTypeWitness(
+                astBuilder,
+                as<DeclRefType>(selfType)->getDeclRef().as<InterfaceDecl>());
+        }
+        else
+        {
+            // If we have a `selfType` that isn't already a decl-ref type, then
+            // we need to create a witness that the type of the declaration
+            // inherits from that `selfType`.
+            selfIsSelf = visitor.createTypeEqualityWitness(selfType);
+        }
+    }
     Facet selfFacet = new (arena) Facet::Impl(
         astBuilder,
         selfFacetKind,

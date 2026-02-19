@@ -3142,6 +3142,10 @@ public:
     void checkRayPayloadStructFields(StructDecl* structDecl);
 
     CatchStmt* findMatchingCatchStmt(Type* errorType);
+
+    DeclaredSubtypeWitness* getThisTypeWitness(
+        ASTBuilder* astBuilder,
+        DeclRef<InterfaceDecl> interfaceDeclRef);
 };
 
 

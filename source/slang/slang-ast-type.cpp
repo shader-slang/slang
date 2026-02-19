@@ -868,6 +868,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
                     break;
                 case ParamPassingMode::BorrowIn:
                     newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(paramInfo.type));
+                    break;
                 default:
                     SLANG_UNEXPECTED("Unhandled param passing mode");
                     break;

@@ -2083,7 +2083,7 @@ public:
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
 
-    Dictionary<ValAssociationCacheKey, IRInst*>* getAssociatedInstCache()
+    Dictionary<ValAssociationCacheKey, IRAssociatedInstAnnotation*>* getAssociatedInstCache()
     {
         return &m_associationCache;
     }
@@ -2219,7 +2219,7 @@ private:
     IRCompilerDictionary* m_translationDict = nullptr;
 
     // (inst, association-kind) -> associated-inst
-    Dictionary<ValAssociationCacheKey, IRInst*> m_associationCache;
+    Dictionary<ValAssociationCacheKey, IRAssociatedInstAnnotation*> m_associationCache;
 };
 
 

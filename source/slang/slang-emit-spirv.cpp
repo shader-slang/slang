@@ -797,6 +797,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (irOpCode)
             {
             case kIROp_IntCast:
+            case kIROp_ConstexprIntCast:
                 return SpvOpUConvert;
             case kIROp_FloatCast:
                 return SpvOpFConvert;
@@ -833,15 +834,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (irOpCode)
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
             break;
         case kIROp_IRem:

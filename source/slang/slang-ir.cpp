@@ -3210,10 +3210,15 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
         return nullptr;
 
     ValAssociationCacheKey key = {target, kind};
-    if (IRInst* cachedResult; getModule()->getAssociatedInstCache()->tryGetValue(key, cachedResult))
-        return cachedResult;
+    if (IRAssociatedInstAnnotation* cachedResult;
+        getModule()->getAssociatedInstCache()->tryGetValue(key, cachedResult))
+    {
+        if (!cachedResult)
+            return nullptr;
+        return cachedResult->getInst();
+    }
 
-    IRInst* result = nullptr;
+    IRAssociatedInstAnnotation* result = nullptr;
     for (auto use = target->firstUse; use; use = use->nextUse)
     {
         if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
@@ -3221,14 +3226,14 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
             if (annotation->getConformanceID() == (IRIntegerValue)kind &&
                 annotation->getTarget() == target)
             {
-                result = annotation->getInst();
+                result = annotation;
                 break;
             }
         }
     }
 
     getModule()->getAssociatedInstCache()->add(key, result);
-    return result;
+    return result ? result->getInst() : nullptr;
 }
 
 IRInst* IRBuilder::emitDebugSource(
