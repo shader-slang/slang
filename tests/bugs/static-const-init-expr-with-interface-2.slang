@@ -4,6 +4,7 @@ interface Bug
 {
     static const int badVar = 0;
 //diag:              ^^^^^^ 'badVar' cannot have an initializer because it is an interface requirement
+//diag:              ^^^^^^ 'badVar' cannot have an initializer because it is an interface requirement
 }
 
 RWStructuredBuffer<int> b;

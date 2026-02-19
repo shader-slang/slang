@@ -13,7 +13,7 @@ void f<T, U>(T t, U u)
     {
         // U being IThing doesn't justify using T as such!
         t.thing();
-//diag:   ^^^^^ optional constraint not checked
-//diag:   ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage.
+//diag:   ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
+//diag:   ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
     }
 }

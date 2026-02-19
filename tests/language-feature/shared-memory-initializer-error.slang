@@ -5,6 +5,7 @@ RWStructuredBuffer<uint> outputBuffer;
 
 groupshared uint globalMem = 1;
 //diag:          ^^^^^^^^^ 'globalMem' cannot have an initializer because it is groupshared
+//diag:          ^^^^^^^^^ 'globalMem' cannot have an initializer because it is groupshared
 
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
