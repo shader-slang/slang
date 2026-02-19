@@ -2054,8 +2054,11 @@ struct LoweredElementTypeContext
     {
         TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
         IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
-        return builder
-            .getPtrType(elementType, AccessQualifier::ReadWrite, loweringConfig.addressSpace, layoutType);
+        return builder.getPtrType(
+            elementType,
+            AccessQualifier::ReadWrite,
+            loweringConfig.addressSpace,
+            layoutType);
     }
 
     IRPtrType* copyBufferLayoutToPointer(
