@@ -1,6 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 [BackwardDerivative(__d_f)]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^ expected an expression of type 'float', got 'DifferentialPair<float>'
+ ^^^^^^^^^^^^^^^^^^ custom derivative parameter type mismatch
+ ^^^^^^^^^^^^^^^^^^ invalid custom derivative. parameter type mismatch at position 0. expected 'inout DifferentialPair<float>', got 'float'
+*/
 float f(float x)
 {
     return x * x;

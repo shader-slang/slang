@@ -328,8 +328,17 @@ local function parse_message(message, known_params)
 
     while param_end + 1 <= #message do
       local char = message:sub(param_end + 1, param_end + 1)
-      if char:match("[%w_:.]+") then
+      if char:match("[%w_:]+") then
         param_end = param_end + 1
+      elseif char == "." then
+        -- Only include dot if it's followed by a word character (member access)
+        -- Don't include dot if it's followed by space or end of string (sentence punctuation)
+        local next_char = message:sub(param_end + 2, param_end + 2)
+        if next_char:match("[%w_]") then
+          param_end = param_end + 1
+        else
+          break
+        end
       else
         break
       end
