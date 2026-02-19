@@ -15,7 +15,7 @@ struct Test : IDifferentiable
         {
             return *value;
         }
-        return 0.0;
+        return 1.0;
     }
 }
 
@@ -28,5 +28,7 @@ float foo(Test t) {
 void computeMain(uint3 tid: SV_DispatchThreadID)
 {
     DifferentialPair<Test> dp = DifferentialPair<Test>( {}, {} );
-    outputBuffer[tid.x] = fwd_diff(foo)(dp).d; // CHECK: 0.0
+    let dpOut = fwd_diff(foo)(dp);
+    outputBuffer[tid.x] = dpOut.p; // BUFFER: 1.0
+    outputBuffer[tid.x + 1] = dpOut.d; // BUFFER: 0.0
 }
