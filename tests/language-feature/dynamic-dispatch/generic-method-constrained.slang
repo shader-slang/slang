@@ -84,18 +84,21 @@ float testComputeScaled(int id, float val, float scale)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain()
+void computeMain(int id : SV_DispatchThreadID)
 {
+    // id is a runtime value (== 0 for the single thread) so the compiler cannot
+    // propagate constants into the helper functions and optimize away the dispatch.
+
     // compute<Constant>: AddOneProcessor returns val+1, NegateProcessor returns -val
-    outputBuffer[0] = testComputeConstant(0, 4.0);  // CHECK: 5
-    outputBuffer[1] = testComputeConstant(1, 4.0);  // CHECK: -4
+    outputBuffer[0] = testComputeConstant(id,     4.0);  // CHECK: 5
+    outputBuffer[1] = testComputeConstant(id + 1, 4.0);  // CHECK: -4
 
     // compute<Doubled>: same method, different T — Doubled.get() = val*2
     // AddOneProcessor: 3.0*2 + 1 = 7, NegateProcessor: -(3.0*2) = -6
-    outputBuffer[2] = testComputeDoubled(0, 3.0);   // CHECK: 7
-    outputBuffer[3] = testComputeDoubled(1, 3.0);   // CHECK: -6
+    outputBuffer[2] = testComputeDoubled(id,     3.0);   // CHECK: 7
+    outputBuffer[3] = testComputeDoubled(id + 1, 3.0);   // CHECK: -6
 
     // computeScaled<Constant>: AddOneProcessor returns val*scale+1, NegateProcessor returns -(val*scale)
-    outputBuffer[4] = testComputeScaled(0, 2.0, 3.0); // CHECK: 7
-    outputBuffer[5] = testComputeScaled(1, 2.0, 3.0); // CHECK: -6
+    outputBuffer[4] = testComputeScaled(id,     2.0, 3.0); // CHECK: 7
+    outputBuffer[5] = testComputeScaled(id + 1, 2.0, 3.0); // CHECK: -6
 }

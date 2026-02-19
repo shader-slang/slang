@@ -78,26 +78,29 @@ int testIdentityInt(int id, int x)
 }
 
 [numthreads(1, 1, 1)]
-void computeMain()
+void computeMain(int id : SV_DispatchThreadID)
 {
+    // id is a runtime value (== 0 for the single thread) so the compiler cannot
+    // propagate constants into the helper functions and optimize away the dispatch.
+
     // doubled<float>: IdentitySerializer returns x+x, NegatingSerializer returns -(x+x)
-    outputBuffer[0] = testDoubledFloat(0, 3.0);   // CHECK: 6
-    outputBuffer[1] = testDoubledFloat(1, 3.0);   // CHECK: -6
+    outputBuffer[0] = testDoubledFloat(id,     3.0);   // CHECK: 6
+    outputBuffer[1] = testDoubledFloat(id + 1, 3.0);   // CHECK: -6
 
     // doubled<int>: same method, different type argument — dispatch to same 2 types
-    outputBuffer[2] = float(testDoubledInt(0, 5)); // CHECK: 10
-    outputBuffer[3] = float(testDoubledInt(1, 5)); // CHECK: -10
+    outputBuffer[2] = float(testDoubledInt(id,     5)); // CHECK: 10
+    outputBuffer[3] = float(testDoubledInt(id + 1, 5)); // CHECK: -10
 
     // identity<float>: unconstrained generic method, both implementations return value as-is
-    outputBuffer[4] = testIdentityFloat(0, 7.0);  // CHECK: 7
-    outputBuffer[5] = testIdentityFloat(1, 7.0);  // CHECK: 7
+    outputBuffer[4] = testIdentityFloat(id,     7.0);  // CHECK: 7
+    outputBuffer[5] = testIdentityFloat(id + 1, 7.0);  // CHECK: 7
 
     // identity<int>: same method, different type argument
-    outputBuffer[6] = float(testIdentityInt(0, 9)); // CHECK: 9
-    outputBuffer[7] = float(testIdentityInt(1, 9)); // CHECK: 9
+    outputBuffer[6] = float(testIdentityInt(id,     9)); // CHECK: 9
+    outputBuffer[7] = float(testIdentityInt(id + 1, 9)); // CHECK: 9
 
     // process<T> is void — verify it compiles and can be called through dynamic dispatch
-    ISerializer s = makeSerializer(0);
+    ISerializer s = makeSerializer(id);
     s.process<float>(1.0);
     s.process<int>(42);
 }
