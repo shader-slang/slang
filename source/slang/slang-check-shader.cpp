@@ -736,7 +736,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         {
             if (attr->args.getCount() != 1)
             {
-                sink->diagnose(attr, Diagnostics::badlyDefinedPatchConstantFunc, entryPointName);
+                sink->diagnose(Diagnostics::BadlyDefinedPatchConstantFunc{
+                    .entry_point_name = entryPointName,
+                    .location = attr});
                 return;
             }
 
@@ -745,7 +747,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             if (!stringLit)
             {
-                sink->diagnose(expr, Diagnostics::badlyDefinedPatchConstantFunc, entryPointName);
+                sink->diagnose(Diagnostics::BadlyDefinedPatchConstantFunc{
+                    .entry_point_name = entryPointName,
+                    .location = attr});
                 return;
             }
 
@@ -766,11 +770,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             DeclRef<FuncDecl> patchConstantFuncDeclRef = findFunctionDeclByName(module, name, sink);
             if (!patchConstantFuncDeclRef)
             {
-                sink->diagnose(
-                    expr,
-                    Diagnostics::attributeFunctionNotFound,
-                    name,
-                    "patchconstantfunc");
+                sink->diagnose(Diagnostics::AttributeFunctionNotFound{
+                    .func_name = name,
+                    .attr_name = "patchconstantfunc",
+                    .location = expr});
                 return;
             }
 

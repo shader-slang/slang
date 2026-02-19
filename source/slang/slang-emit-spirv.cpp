@@ -2750,12 +2750,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return SpvImageFormatR64i;
         default:
             const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-            m_sink->diagnose(
-                SourceLoc(),
-                Diagnostics::imageFormatUnsupportedByBackend,
-                imageFormatInfo.name,
-                "SPIRV",
-                "unknown");
+            m_sink->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+                .format = imageFormatInfo.name,
+                .backend = "SPIRV",
+                .replacement = "unknown",
+                .location = SourceLoc()});
             return SpvImageFormatUnknown;
         }
     }

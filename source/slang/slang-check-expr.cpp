@@ -1571,11 +1571,9 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
         }
         if (!varDecl->parentDecl)
         {
-            getSink()->diagnose(
-                derivativeMemberAttr,
-                Diagnostics::attributeNotApplicable,
-                diffType,
-                declRefExpr->type);
+            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+                .attr_name = derivativeMemberAttr->getKeywordName(),
+                .attr = derivativeMemberAttr});
         }
         if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
         {

@@ -95,7 +95,9 @@ SlangResult overrideDiagnostic(
     {
         if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
         {
-            outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            outDiagnostic->diagnose(Diagnostics::UnknownDiagnosticName{
+                .diagnostic_name = String(identifier),
+                .location = SourceLoc()});
             return SLANG_FAIL;
         }
 
@@ -110,7 +112,9 @@ SlangResult overrideDiagnostic(
         diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
         if (!diagnostic)
         {
-            outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            outDiagnostic->diagnose(Diagnostics::UnknownDiagnosticName{
+                .diagnostic_name = String(identifier),
+                .location = SourceLoc()});
             return SLANG_FAIL;
         }
         diagnosticId = diagnostic->id;
@@ -123,7 +127,9 @@ SlangResult overrideDiagnostic(
         // Strictly speaking the diagnostic name is known, but it's not the right severity
         // to be converted from, so it is an 'unknown name' in the context of severity...
         // Or perhaps we want another diagnostic
-        outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+        outDiagnostic->diagnose(Diagnostics::UnknownDiagnosticName{
+            .diagnostic_name = String(identifier),
+            .location = SourceLoc()});
         return SLANG_FAIL;
     }
 

@@ -2,7 +2,7 @@
 
 // Tests reflection of user defined attributes.
 
-//TEST:SIMPLE(filecheck=REFLECTION):-stage compute -entry main -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-stage compute -entry main -target hlsl
 
 [__AttributeUsage(_AttributeTargets.Struct)]
 struct MyStructAttribute
@@ -16,14 +16,19 @@ struct DefaultValueAttribute
     int iParam;
 };
 
-//REFLECTION:([[# @LINE+1]]): error 30019: expected an expression of type 'float', got 'String'
 [MyStruct(0, "stringVal")] // attribute arg type mismatch
+//CHECK:                ^ expected an expression of type 'float', got 'String'
 struct A
 {
-    //REFLECTION:([[# @LINE+1]]): error 31002: attribute 'MyStruct' is not valid here
     [MyStruct(0, 10.0)] // attribute does not apply to this construct
+/*CHECK:
+     ^^^^^^^^ invalid attribute placement
+     ^^^^^^^^ attribute 'MyStruct' is not valid here
+*/
     float x;
     [DefaultValue(2.0)] // attribute arg type mismatch
+//CHECK:          ^^^ implicit conversion not recommended
+//CHECK:          ^^^ implicit conversion from 'float' to 'int' is not recommended
     float y;
 };
 

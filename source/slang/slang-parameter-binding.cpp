@@ -6,6 +6,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang.h"
 
@@ -4202,10 +4203,9 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
                 needDefaultConstantBuffer = true;
                 if (varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() ||
                     varLayout->varDecl.getDecl()->hasModifier<GLSLLocationAttribute>())
-                    sink->diagnose(
-                        varLayout->varDecl,
-                        Diagnostics::explicitUniformLocation,
-                        as<VarDecl>(varLayout->varDecl).getDecl()->getType());
+                    sink->diagnose(Diagnostics::ExplicitUniformLocation{
+                        .type = as<VarDecl>(varLayout->varDecl).getDecl()->getType(),
+                        .var = varLayout->varDecl.getDecl()});
                 diagnoseGlobalUniform(
                     &sharedContext,
                     as<VarDeclBase>(varLayout->varDecl.getDecl()));

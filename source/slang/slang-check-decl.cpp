@@ -7641,16 +7641,14 @@ bool SemanticsVisitor::checkConformance(
                 {
                     if (!subInterfaceDecl->findModifier<ComInterfaceAttribute>())
                     {
-                        getSink()->diagnose(
-                            inheritanceDecl,
-                            Diagnostics::interfaceInheritingComMustBeCom);
+                        getSink()->diagnose(Diagnostics::InterfaceInheritingComMustBeCom{
+                            .decl = inheritanceDecl});
                     }
                 }
                 else if (const auto structDecl = as<StructDecl>(superTypeDecl))
                 {
-                    getSink()->diagnose(
-                        inheritanceDecl,
-                        Diagnostics::structCannotImplementComInterface);
+                    getSink()->diagnose(Diagnostics::StructCannotImplementComInterface{
+                        .decl = inheritanceDecl});
                 }
             }
         }
@@ -8081,7 +8079,8 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         // `associatedtype` declaration is not allowed in a COM interface declaration.
         for (auto associatedType : decl->getMembersOfType<AssocTypeDecl>())
         {
-            getSink()->diagnose(associatedType, Diagnostics::associatedTypeNotAllowInComInterface);
+            getSink()->diagnose(
+                Diagnostics::AssociatedTypeNotAllowedInComInterface{.decl = associatedType});
         }
     }
 }
