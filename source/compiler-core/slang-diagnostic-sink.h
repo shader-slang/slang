@@ -281,6 +281,32 @@ public:
     void setSourceLineMaxLength(Index length) { m_sourceLineMaxLength = length; }
     Index getSourceLineMaxLength() const { return m_sourceLineMaxLength; }
 
+    /// Set the diagnostic color mode for rich diagnostics
+    /// AUTO will check writer->isConsole() to determine if colors should be used
+    void setDiagnosticColorMode(SlangDiagnosticColor mode) { m_diagnosticColorMode = mode; }
+    SlangDiagnosticColor getDiagnosticColorMode() const { return m_diagnosticColorMode; }
+
+    /// Returns true if terminal colors should be enabled based on color mode and writer
+    bool shouldEnableTerminalColors() const
+    {
+        switch (m_diagnosticColorMode)
+        {
+        case SLANG_DIAGNOSTIC_COLOR_ALWAYS:
+            return true;
+        case SLANG_DIAGNOSTIC_COLOR_NEVER:
+            return false;
+        case SLANG_DIAGNOSTIC_COLOR_AUTO:
+        default:
+            if (writer)
+                return writer->isConsole();
+            return false;
+        }
+    }
+
+    /// Set whether to enable unicode in rich diagnostics
+    void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
+    bool getEnableUnicode() const { return m_enableUnicode; }
+
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
     DiagnosticSink* getParentSink() const { return m_parentSink; }
@@ -331,6 +357,9 @@ protected:
     // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
     bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
 
+    // Overload that allows specifying a source manager (used when routing to parent sinks)
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, SourceManager* sourceManager);
+
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(
         SourceLoc const& loc,
@@ -361,6 +390,10 @@ protected:
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
+
+    // Rich diagnostics rendering options
+    SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
+    bool m_enableUnicode = true; // Enable unicode unconditionally
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.

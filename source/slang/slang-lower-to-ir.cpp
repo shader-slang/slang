@@ -7945,21 +7945,54 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
-IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
+IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
-    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
-        return *result;
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto sourceView = sourceManager->findSourceView(loc);
+    if (!sourceView)
+        return nullptr;
 
+    IRInst* debugSourceInst = nullptr;
+
+    // Do a best-effort attempt to retrieve the nominal source file.
+    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
+    String sourcePath = pathInfo.getName();
+
+    // If the source file path corresponds to an existing SourceFile in the source manager, use it.
+    auto source = sourceManager->findSourceFileByPathRecursively(sourcePath);
+    if (!source)
+    {
+        sourcePath = pathInfo.getMostUniqueIdentity();
+        source = sourceManager->findSourceFile(sourcePath);
+    }
+    if (source &&
+        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    if (sourcePath.getLength() == 0)
+    {
+        return nullptr;
+    }
+
+    if (context->shared->mapSourcePathToDebugSourceInst.tryGetValue(sourcePath, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    // If the source manager does not have an entry for the corresponding file name, make sure we
+    // still emit a source file entry in the spirv module.
     ComPtr<ISlangBlob> outBlob;
     UnownedStringSlice content;
 
     // Only embed source content for Standard and Maximal debug level
     if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
-        if (path.hasFileFoundPath())
+        if (pathInfo.hasFileFoundPath())
         {
             context->getLinkage()->getFileSystemExt()->loadFile(
-                path.foundPath.getBuffer(),
+                pathInfo.foundPath.getBuffer(),
                 outBlob.writeRef());
         }
         if (outBlob)
@@ -7969,9 +8002,13 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
-    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
-    return debugSrcInst;
+    debugSourceInst = builder.emitDebugSource(sourcePath.getUnownedSlice(), content, false);
+    context->shared->mapSourcePathToDebugSourceInst[sourcePath] = debugSourceInst;
+    if (source)
+    {
+        context->shared->mapSourceFileToDebugSourceInst.add(source, debugSourceInst);
+    }
+    return debugSourceInst;
 }
 
 void maybeEmitDebugLine(
@@ -7993,31 +8030,13 @@ void maybeEmitDebugLine(
             loc = stmt->loc;
     }
 
-    auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = sourceManager->findSourceView(loc);
-    if (!sourceView)
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, loc);
+    if (!debugSourceInst)
         return;
 
-    IRInst* debugSourceInst = nullptr;
+    auto sourceManager = context->getLinkage()->getSourceManager();
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
 
-    // Do a best-effort attempt to retrieve the nominal source file.
-    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
-
-    // If the source file path correspond to an existing SourceFile in the source manager, use it.
-    auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
-    if (!source)
-        source = sourceManager->findSourceFile(pathInfo.getMostUniqueIdentity());
-    if (source)
-    {
-        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
-    }
-    // If the source manager does not have an entry for the corresponding file name, make sure we
-    // still emit an source file entry in the spirv module.
-    if (!debugSourceInst)
-    {
-        debugSourceInst = getOrEmitDebugSource(context, pathInfo);
-    }
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
     context->irBuilder->emitDebugLine(
@@ -8033,19 +8052,16 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     // Only emit debug location info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
-    if (!sourceView)
+
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
+    if (!debugSourceInst)
         return;
-    auto source = sourceView->getSourceFile();
-    IRInst* debugSourceInst = nullptr;
-    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
-    {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
-            inst->sourceLoc,
-            SourceLocType::Emit);
-        context->irBuilder
-            ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
-    }
+
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+
+    context->irBuilder
+        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
 }
 
 void lowerStmt(IRGenContext* context, Stmt* stmt)
@@ -9740,29 +9756,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         SourceLocType::Emit);
 
                     // Find the debug source for this file
-                    auto sourceView =
-                        context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
-                    if (sourceView)
+                    IRInst* debugSourceInst = getOrEmitDebugSource(context, decl->loc);
+                    if (debugSourceInst)
                     {
-                        auto source = sourceView->getSourceFile();
-                        IRInst* debugSourceInst = nullptr;
-                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
-                                source,
-                                debugSourceInst))
-                        {
-                            auto debugVar = builder->emitDebugVar(
-                                varType,
-                                debugSourceInst,
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.line),
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.column),
-                                nullptr);
+                        auto debugVar = builder->emitDebugVar(
+                            varType,
+                            debugSourceInst,
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                            nullptr);
 
-                            // Copy name hint from the declaration
-                            addNameHint(context, debugVar, decl);
+                        // Copy name hint from the declaration
+                        addNameHint(context, debugVar, decl);
 
-                            // Emit debug value to associate the constant with the debug variable
-                            builder->emitDebugValue(debugVar, initVal.val);
-                        }
+                        // Emit debug value to associate the constant with the debug variable
+                        builder->emitDebugValue(debugVar, initVal.val);
                     }
                 }
 

@@ -1622,6 +1622,12 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
+    /// references an outer-scope variable that needs to be captured into the lambda struct.
+    /// This handles the case where an expression was already checked by the parser's
+    /// two-phase generic disambiguation before the lambda capture context was established.
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
+
     Expr* CreateErrorExpr(Expr* expr);
 
     bool IsErrorExpr(Expr* expr);
@@ -3122,7 +3128,6 @@ public:
 
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
-    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to
