@@ -60,6 +60,7 @@ struct S
 /*diag:
      ^ see previous declaration of 'f'
      ^ ambiguous reference to 'f'
+     ^ ambiguous reference to 'f'
      ^ candidate: int S.f
      ^ candidate: int S.f
 */
@@ -67,6 +68,7 @@ struct S
 //diag:^ conflicting declaration
 //diag:^ declaration of 'f' conflicts with existing declaration
 //diag:^ candidate: float S.f
+//diag:^ ambiguous reference to 'f'
 //diag:^ ambiguous reference to 'f'
 //diag:^ candidate: float S.f
 }
@@ -86,6 +88,7 @@ int testParameterRedeclaration(
 {
 	return size;
 /*diag:
+        ^^^^ ambiguous reference to 'size'
         ^^^^ ambiguous reference to 'size'
 */
 }

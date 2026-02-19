@@ -66,7 +66,7 @@ err(
     "expected integer constant not constant",
     39999,
     "expression does not evaluate to a compile-time constant",
-    span { loc = "expr:Expr", message = "expression does not evaluate to a compile-time constant" }
+    span { loc = "location", message = "expression does not evaluate to a compile-time constant" }
 )
 
 err(

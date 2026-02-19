@@ -46,7 +46,8 @@ struct CacheOfDataToReplaceOps
         }
         else
         {
-            sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = nullptr});
+            sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                .location = payloadVariable->sourceLoc});
         }
 
         IRInst* resultVariable;

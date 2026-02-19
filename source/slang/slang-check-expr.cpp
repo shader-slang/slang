@@ -2533,7 +2533,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
     if (!result && sink)
     {
-        sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = expr});
+        sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
     }
     return result;
 }
@@ -2560,7 +2560,7 @@ IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr, ConstantFoldin
     auto result = tryConstantFoldExpr(expr, kind, nullptr);
     if (!result)
     {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = expr});
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
     }
     return result;
 }
