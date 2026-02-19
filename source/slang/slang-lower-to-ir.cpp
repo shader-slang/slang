@@ -19,6 +19,7 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-late-require-capability.h"
 #include "slang-ir-link.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir-lower-defer.h"
@@ -12947,6 +12948,11 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
+
+    // Before any optimizations, check that the parameters to
+    // IRLateRequireCapability are valid. We don't want to postpone this until
+    // the first dead code elimination.
+    checkLateRequireCapabilityArguments(module, compileRequest->getSink());
 
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:

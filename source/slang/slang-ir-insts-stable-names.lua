@@ -685,7 +685,7 @@ return {
 	["StoreBase.copyLogical"] = 681,
 	["MakeStorageTypeLoweringConfig"] = 682,
 	["Decoration.experimentalModule"] = 683,
-  	["SetBase.TypeSet"] = 684,
+	["SetBase.TypeSet"] = 684,
 	["SetBase.FuncSet"] = 685,
 	["SetBase.WitnessTableSet"] = 686,
 	["SetBase.GenericSet"] = 687,
@@ -726,4 +726,5 @@ return {
 	["IsCoopFloat"] = 724,
 	["Type.OptionalNoneType"] = 725,
 	["ReinterpretOptional"] = 726,
+	["LateRequireCapability"] = 727,
 }

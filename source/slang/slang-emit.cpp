@@ -58,6 +58,7 @@
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-late-require-capability.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
@@ -1832,6 +1833,9 @@ Result linkAndOptimizeIR(
     // We run DCE pass again to clean things up.
     //
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+
+    // Check the remaining LateRequireCapability IR insts
+    SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
     SLANG_PASS(cleanUpVoidType);
 
