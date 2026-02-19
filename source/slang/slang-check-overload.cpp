@@ -1073,11 +1073,10 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             if (context.mode != OverloadResolveContext::Mode::JustTrying)
             {
                 subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
-                getSink()->diagnose(
-                    context.loc,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    sub,
-                    sup);
+                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                    .type_arg = sub,
+                    .interface = sup,
+                    .location = context.loc});
             }
             return false;
         }

@@ -1591,11 +1591,10 @@ Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, Sou
     auto result = tryGetDifferentialType(builder, type);
     if (!result)
     {
-        getSink()->diagnose(
-            loc,
-            Diagnostics::typeDoesntImplementInterfaceRequirement,
-            type,
-            getName("Differential"));
+        getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+            .type = type,
+            .member = "Differential",
+            .location = loc});
         return m_astBuilder->getErrorType();
     }
     return result;
@@ -2226,7 +2225,8 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             // Note that float-to-inst casts for non-`IntVal`s are allowed.
             if (!isValidCompileTimeConstantType(decl->getType()))
             {
-                getSink()->diagnose(declRef, Diagnostics::intValFromNonIntSpecConstEncountered);
+                getSink()->diagnose(Diagnostics::IntValFromNonIntSpecConstEncountered{
+                    .location = declRef.getLoc()});
                 return nullptr;
             }
 
@@ -3459,8 +3459,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                         else
                         {
                             getSink()->diagnose(
-                                m_treatAsDifferentiableExpr,
-                                Diagnostics::useOfNoDiffOnDifferentiableFunc);
+                                Diagnostics::UseOfNoDiffOnDifferentiableFunc{
+                                    .expr = m_treatAsDifferentiableExpr});
                         }
                     }
                 }
@@ -4123,11 +4123,11 @@ Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiable
     }
     if (!as<InvokeExpr>(innerExpr) && !as<IndexExpr>(innerExpr))
     {
-        getSink()->diagnose(expr, Diagnostics::invalidUseOfNoDiff);
+        getSink()->diagnose(Diagnostics::InvalidUseOfNoDiff{.expr = expr});
     }
     else if (!m_parentDifferentiableAttr)
     {
-        getSink()->diagnose(expr, Diagnostics::cannotUseNoDiffInNonDifferentiableFunc);
+        getSink()->diagnose(Diagnostics::CannotUseNoDiffInNonDifferentiableFunc{.expr = expr});
     }
     return expr;
 }
@@ -6083,7 +6083,7 @@ Expr* SemanticsExprVisitor::visitThisExpr(ThisExpr* expr)
     }
 
     if (auto sink = getSink())
-        sink->diagnose(expr, Diagnostics::thisExpressionOutsideOfTypeDecl);
+        sink->diagnose(Diagnostics::ThisExpressionOutsideOfTypeDecl{.expr = expr});
 
     return CreateErrorExpr(expr);
 }
@@ -6111,7 +6111,7 @@ Expr* SemanticsExprVisitor::visitThisTypeExpr(ThisTypeExpr* expr)
         scope = scope->parent;
     }
 
-    getSink()->diagnose(expr, Diagnostics::thisTypeOutsideOfTypeDecl);
+    getSink()->diagnose(Diagnostics::ThisTypeOutsideOfTypeDecl{.expr = expr});
     return CreateErrorExpr(expr);
 }
 
@@ -6162,7 +6162,7 @@ Expr* SemanticsExprVisitor::visitReturnValExpr(ReturnValExpr* expr)
             }
         }
     }
-    getSink()->diagnose(expr, Diagnostics::returnValNotAvailable);
+    getSink()->diagnose(Diagnostics::ReturnValNotAvailable{.expr = expr});
     expr->type = getASTBuilder()->getErrorType();
     return expr;
 }
