@@ -414,6 +414,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
             auto links = options.getLinksForOption(option);
             if (links.getCount() > 0)
             {
+                m_builder << "Links:\n";
                 for (const auto& link : links)
                 {
                     m_builder << "* [" << link.text << "](" << link.url << ")\n";
@@ -624,6 +625,7 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
             auto links = options.getLinksForOption(option);
             if (links.getCount() > 0)
             {
+                m_builder << m_options.indent << m_options.indent << "Links:\n";
                 for (const auto& link : links)
                 {
                     m_builder << m_options.indent << m_options.indent;
