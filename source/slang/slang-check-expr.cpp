@@ -1166,10 +1166,7 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(
-            loc,
-            Diagnostics::requiredConstraintIsNotChecked,
-            lookupResult.item.declRef);
+        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{.decl = lookupResult.item.declRef.getDecl(), .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -2198,7 +2195,7 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
     {
         if (decl == info->decl)
         {
-            getSink()->diagnose(decl, Diagnostics::variableUsedInItsOwnDefinition, decl);
+            getSink()->diagnose(Diagnostics::VariableUsedInItsOwnDefinition{.decl = decl});
             return true;
         }
     }
@@ -2672,7 +2669,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
-            getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
+            getSink()->diagnose(Diagnostics::MultiDimensionalArrayNotSupported{.expr = subscriptExpr});
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);

@@ -256,11 +256,7 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::systemValueSemanticInvalidDirection,
-            baseName,
-            directionStr,
-            stageStr);
+            Diagnostics::SystemValueSemanticInvalidDirection{.semantic = baseName, .direction = directionStr, .stage = stageStr, .location = loc});
     }
     else if (!foundMatchingAccessor)
     {
@@ -276,11 +272,7 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::systemValueSemanticInvalidType,
-            unwrapConditionalType(type),
-            baseName,
-            validTypesStr);
+            Diagnostics::SystemValueSemanticInvalidType{.type = unwrapConditionalType(type), .semantic = baseName, .expected_types = validTypesStr, .location = loc});
     }
 }
 

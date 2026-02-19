@@ -4153,7 +4153,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
-                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
+                parser->diagnose(Diagnostics::SubscriptMustHaveReturnType{.location = decl->loc});
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
