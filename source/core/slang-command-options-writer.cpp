@@ -409,6 +409,7 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
             }
         }
 
+        if (m_hasLinks)
         {
             auto links = options.getLinksForOption(option);
             if (links.getCount() > 0)
