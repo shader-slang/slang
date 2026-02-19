@@ -5087,8 +5087,7 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
             if (!vertexAttributeArgDeclRefExpr)
             {
                 getSink()->diagnose(
-                    invokeExpr,
-                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                    Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{.location = invokeExpr->loc});
                 return;
             }
             auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
@@ -5097,9 +5096,8 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
             if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
                 !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
             {
-                getSink()->diagnose(
-                    vertexAttributeArgDeclRefExpr,
-                    Diagnostics::getAttributeAtVertexMustReferToPerVertexInput);
+                getSink()->diagnose(Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
+                    .location = vertexAttributeArgDeclRefExpr->loc});
                 return;
             }
         }
@@ -6249,10 +6247,9 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
             }
             else
             {
-                getSink()->diagnose(
-                    matrixLayoutModifier,
-                    Diagnostics::matrixLayoutModifierOnNonMatrixType,
-                    baseType);
+                getSink()->diagnose(Diagnostics::MatrixLayoutModifierOnNonMatrixType{
+                    .type = baseType,
+                    .location = matrixLayoutModifier->loc});
             }
             continue;
         }

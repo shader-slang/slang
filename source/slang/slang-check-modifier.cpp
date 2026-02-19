@@ -1872,10 +1872,9 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         if (!packOffsetModifier->registerName.getContent().startsWith("c"))
         {
-            getSink()->diagnose(
-                packOffsetModifier,
-                Diagnostics::unknownRegisterClass,
-                packOffsetModifier->registerName);
+            getSink()->diagnose(Diagnostics::UnknownRegisterClass{
+                .class_name = packOffsetModifier->registerName.getContent(),
+                .location = packOffsetModifier->loc});
             return m;
         }
         auto uniformOffset =
@@ -1897,10 +1896,9 @@ Modifier* SemanticsVisitor::checkModifier(
                 uniformOffset += 12;
                 break;
             default:
-                getSink()->diagnose(
-                    packOffsetModifier,
-                    Diagnostics::invalidComponentMask,
-                    packOffsetModifier->componentMask);
+                getSink()->diagnose(Diagnostics::InvalidComponentMask{
+                    .mask = packOffsetModifier->componentMask.getContent(),
+                    .location = packOffsetModifier->loc});
                 break;
             }
         }

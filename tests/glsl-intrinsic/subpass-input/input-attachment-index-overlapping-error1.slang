@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -stage fragment -entry main -allow-glsl
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -stage fragment -entry main -allow-glsl
 #version 450
-// CHECK: warning 39001
+// CHECK: warning{{.*}}39001
 buffer MyBlockName
 {
     uvec4 idata[2];

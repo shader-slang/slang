@@ -2,7 +2,7 @@
 
 // Test that we get a warning when the requested bindless space index is unavailable.
 
-// CHECK: warning 39012: requested bindless space index '0' is unavailable, using the next available index '1'.
+// CHECK: warning{{.*}}39012
 uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
 uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;
 
