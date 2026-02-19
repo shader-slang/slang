@@ -672,8 +672,10 @@ local function process_diagnostics(diagnostics_table)
           for _, part in ipairs(container.message_parts) do
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
-              -- Only add pointer types (type, decl, expr, stmt, val, name - not string or int)
-              if param_type and param_type ~= "string" and param_type ~= "int" then
+              -- Only add pointer types that don't have null-safe conversion functions.
+              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Include: decl, expr, stmt, val (would crash if null)
+              if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 if not required_set[part.param_name] then
                   table.insert(required, part.param_name)
                   required_set[part.param_name] = true
@@ -748,8 +750,10 @@ local function process_diagnostics(diagnostics_table)
         for _, part in ipairs(main_parts) do
           if part.type == "interpolation" and not part.member_name then
             local param_type = seen_params[part.param_name]
-            -- Only add pointer types (not string or int)
-            if param_type and param_type ~= "string" and param_type ~= "int" then
+            -- Only add pointer types that don't have null-safe conversion functions.
+            -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+            -- Include: decl, expr, stmt, val (would crash if null)
+            if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
               table.insert(main_required, part.param_name)
             end
           end
@@ -769,8 +773,10 @@ local function process_diagnostics(diagnostics_table)
           for _, part in ipairs(diag.primary_span.message_parts) do
             if part.type == "interpolation" and not part.member_name then
               local param_type = seen_params[part.param_name]
-              -- Only add pointer types (not string or int)
-              if param_type and param_type ~= "string" and param_type ~= "int" then
+              -- Only add pointer types that don't have null-safe conversion functions.
+              -- Exclude: string, int (not pointers), type/qualtype/name/modifier (have null-safe converters)
+              -- Include: decl, expr, stmt, val (would crash if null)
+              if param_type and (param_type == "decl" or param_type == "expr" or param_type == "stmt" or param_type == "val") then
                 -- Avoid duplicates
                 local found = false
                 for _, existing in ipairs(primary_span_required) do

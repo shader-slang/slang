@@ -707,13 +707,10 @@ String renderDiagnosticMachineReadable(
         bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
         if (isLocationless)
         {
-            // Assert that locationless spans don't have span messages (primary diagnostic
-            // message is fine, but span-specific messages shouldn't appear for locationless
-            // diagnostics)
-            if (strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0)
+            // Skip outputting 0,0 spans with no message - they provide no value
+            if ((strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0) &&
+                message.getLength() == 0)
             {
-                SLANG_ASSERT(message.getLength() == 0);
-                // Skip outputting 0,0 spans with no message
                 return false;
             }
         }
