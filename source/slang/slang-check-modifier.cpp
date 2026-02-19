@@ -1840,16 +1840,12 @@ Modifier* SemanticsVisitor::checkModifier(
                 else if (filteredResult.isOverloaded())
                 {
                     getSink()->diagnose(
-                        varDecl,
-                        Diagnostics::ambiguousOriginalDefintionOfExternDecl,
-                        varDecl);
+                        Diagnostics::AmbiguousOriginalDefintionOfExternDecl{.decl = varDecl});
                 }
                 else
                 {
                     getSink()->diagnose(
-                        varDecl,
-                        Diagnostics::missingOriginalDefintionOfExternDecl,
-                        varDecl);
+                        Diagnostics::MissingOriginalDefintionOfExternDecl{.decl = varDecl});
                 }
             }
             // The next part of the check is to make sure the type defined here is consistent with
