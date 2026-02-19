@@ -1021,6 +1021,10 @@ semantic_checking_7_module(helpers)
 local semantic_checking_8_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-8.lua")
 semantic_checking_8_module(helpers)
 
+-- Load semantic checking diagnostics (part 9) - Operators, Literals, Entry Points, Specialization
+local semantic_checking_9_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-9.lua")
+semantic_checking_9_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

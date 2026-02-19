@@ -7408,12 +7408,11 @@ static IntegerLiteralValue _fixIntegerLiteral(
         if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
         {
             // Output a warning that number has been altered
-            sink->diagnose(
-                *token,
-                Diagnostics::integerLiteralTruncated,
-                token->getContent(),
-                BaseTypeInfo::asText(baseType),
-                truncatedValue);
+            sink->diagnose(Diagnostics::IntegerLiteralTruncated{
+                .literal = String(token->getContent()),
+                .type = String(BaseTypeInfo::asText(baseType)),
+                .truncated_value = String(truncatedValue),
+                .location = token->loc});
         }
 
         value = truncatedValue;
@@ -7473,7 +7472,7 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
 
         // Decimal integer is too large to be represented as signed.
         // Output warning that it is represented as unsigned instead.
-        sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
+        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
     }
 
     return baseType;
@@ -7924,7 +7923,9 @@ static Expr* parseAtomicExpr(Parser* parser)
 
                 if (unknownCount)
                 {
-                    parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Int;
                 }
                 // `u` or `ul` suffix -> `uint`
@@ -7958,7 +7959,9 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // TODO: do we need suffixes for smaller integer types?
                 else
                 {
-                    parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Int;
                 }
             }
@@ -8036,10 +8039,9 @@ static Expr* parseAtomicExpr(Parser* parser)
 
                 if (unknownCount)
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::invalidFloatingPointLiteralSuffix,
-                        suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Float;
                 }
                 // `f` suffix -> `float`
@@ -8060,10 +8062,9 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // TODO: are there other suffixes we need to handle?
                 else
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::invalidFloatingPointLiteralSuffix,
-                        suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Float;
                 }
             }
@@ -8090,22 +8091,20 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
             case FloatFixKind::Zeroed:
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::floatLiteralTooSmall,
-                        BaseTypeInfo::asText(suffixBaseType),
-                        token.getContent(),
-                        fixedValue);
+                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+                        .literal = String(token.getContent()),
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .converted_value = String(fixedValue),
+                        .location = token.loc});
                     break;
                 }
             case FloatFixKind::Unrepresentable:
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::floatLiteralUnrepresentable,
-                        BaseTypeInfo::asText(suffixBaseType),
-                        token.getContent(),
-                        fixedValue);
+                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .literal = String(token.getContent()),
+                        .converted_value = String(fixedValue),
+                        .location = token.loc});
                     break;
                 }
             }
