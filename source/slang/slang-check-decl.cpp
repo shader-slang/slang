@@ -1840,15 +1840,13 @@ void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttributeParent(
     if (!thisType)
     {
         getSink()->diagnose(
-            derivativeMemberAttr,
-            Diagnostics::derivativeMemberAttributeCanOnlyBeUsedOnMembers);
+            Diagnostics::DerivativeMemberAttributeCanOnlyBeUsedOnMembers{.attr = derivativeMemberAttr->loc});
     }
     auto diffThisType = getDifferentialType(m_astBuilder, thisType, derivativeMemberAttr->loc);
     if (!diffThisType)
     {
         getSink()->diagnose(
-            derivativeMemberAttr,
-            Diagnostics::invalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable);
+            Diagnostics::InvalidUseOfDerivativeMemberAttributeParentTypeIsNotDifferentiable{.attr = derivativeMemberAttr->loc});
     }
 }
 
@@ -1865,10 +1863,8 @@ void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(
             if (!extVarType.type || !extVarType.type->equals(originalType))
             {
                 getSink()->diagnose(
-                    varDecl,
-                    Diagnostics::typeOfExternDeclMismatchesOriginalDefinition,
-                    varDecl,
-                    originalType);
+                    Diagnostics::TypeOfExternDeclMismatchesOriginalDefinition{
+                        .expected_type = originalType, .decl = varDecl});
             }
             else
             {
@@ -1878,9 +1874,7 @@ void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(
         else
         {
             getSink()->diagnose(
-                varDecl,
-                Diagnostics::definitionOfExternDeclMismatchesOriginalDefinition,
-                varDecl);
+                Diagnostics::DefinitionOfExternDeclMismatchesOriginalDefinition{.decl = varDecl});
         }
     }
 }
@@ -12635,8 +12629,7 @@ void checkDerivativeAttributeImpl(
     if (isInterfaceRequirement(funcDecl))
     {
         visitor->getSink()->diagnose(
-            attr,
-            Diagnostics::cannotAssociateInterfaceRequirementWithDerivative);
+            Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{.attr = attr->loc});
         return;
     }
 
@@ -12707,7 +12700,8 @@ void checkDerivativeAttributeImpl(
             visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
         else
         {
-            visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+            visitor->getSink()->diagnose(
+                Diagnostics::CannotResolveDerivativeFunction{.attr = attr->loc});
             return;
         }
     }
@@ -12732,7 +12726,8 @@ void checkDerivativeAttributeImpl(
     }
     else
     {
-        visitor->getSink()->diagnose(attr, Diagnostics::cannotResolveDerivativeFunction);
+        visitor->getSink()->diagnose(
+            Diagnostics::CannotResolveDerivativeFunction{.attr = attr->loc});
         return;
     }
 
@@ -12782,15 +12777,13 @@ void checkDerivativeAttributeImpl(
                 // In this case we issue a diagnostic to ask the user to explicitly provide the
                 // arguments.
                 visitor->getSink()->diagnose(
-                    attr,
-                    Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+                    Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{.attr = attr->loc});
                 return;
             }
             if (isInterfaceRequirement(calleeDeclRef->declRef.getDecl()))
             {
                 visitor->getSink()->diagnose(
-                    attr,
-                    Diagnostics::cannotUseInterfaceRequirementAsDerivative);
+                    Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = attr->loc});
                 return;
             }
             if (funcType->getParamCount() != argList.getCount())
@@ -12807,11 +12800,11 @@ void checkDerivativeAttributeImpl(
                     funcType->getParamPassingMode(ii) != paramDirections[ii])
                 {
                     visitor->getSink()->diagnose(
-                        attr,
-                        Diagnostics::customDerivativeSignatureMismatchAtPosition,
-                        ii,
-                        qualTypeToString(argList[ii]->type),
-                        funcType->getParamTypeWithModeWrapper(ii)->toString());
+                        Diagnostics::CustomDerivativeSignatureMismatchAtPosition{
+                            .position = (int)ii,
+                            .expected_type = qualTypeToString(argList[ii]->type),
+                            .actual_type = funcType->getParamTypeWithModeWrapper(ii)->toString(),
+                            .attr = attr->loc});
                 }
             }
             // The `imaginaryArguments` list does not include the `this` parameter.
@@ -12824,7 +12817,8 @@ void checkDerivativeAttributeImpl(
 
             if (expectStaticFunc && !derivativeFuncIsStatic)
             {
-                visitor->getSink()->diagnose(attr, Diagnostics::customDerivativeExpectedStatic);
+                visitor->getSink()->diagnose(
+                    Diagnostics::CustomDerivativeExpectedStatic{.attr = attr->loc});
                 return;
             }
 
@@ -12849,8 +12843,7 @@ void checkDerivativeAttributeImpl(
                     !areTypesCompatibile(visitor, funcThisType, derivativeFuncThisType))
                 {
                     visitor->getSink()->diagnose(
-                        attr,
-                        Diagnostics::customDerivativeSignatureThisParamMismatch);
+                        Diagnostics::CustomDerivativeSignatureThisParamMismatch{.attr = attr->loc});
                     return;
                 }
             }
@@ -12868,8 +12861,7 @@ void checkDerivativeAttributeImpl(
             {
                 // Diagnostic for when one is generic and the other is not.
                 visitor->getSink()->diagnose(
-                    attr,
-                    Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+                    Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{.attr = attr->loc});
                 return;
             }
 
@@ -12886,8 +12878,8 @@ void checkDerivativeAttributeImpl(
                         &specializedDecl))
                 {
                     visitor->getSink()->diagnose(
-                        attr,
-                        Diagnostics::customDerivativeSignatureMismatch);
+                        Diagnostics::CustomDerivativeSignatureMismatch{
+                            .expected_signature = String{}, .attr = attr->loc});
                     return;
                 }
 
@@ -12925,9 +12917,8 @@ error:;
     builder << ")";
 
     visitor->getSink()->diagnose(
-        attr,
-        Diagnostics::customDerivativeSignatureMismatch,
-        builder.produceString());
+        Diagnostics::CustomDerivativeSignatureMismatch{
+            .expected_signature = builder.produceString(), .attr = attr->loc});
 }
 
 template<typename TDerivativeAttr>
@@ -13180,8 +13171,7 @@ void checkDerivativeOfAttributeImpl(
     if (!checkedHigherOrderFuncExpr)
     {
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            Diagnostics::CannotResolveOriginalFunctionForDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
     List<Expr*> imaginaryArgs =
@@ -13201,8 +13191,8 @@ void checkDerivativeOfAttributeImpl(
             if (!calleeDeclRef && as<OverloadedExpr>(resolvedFuncExpr->baseFunction))
             {
                 visitor->getSink()->diagnose(
-                    derivativeOfAttr,
-                    Diagnostics::overloadedFuncUsedWithDerivativeOfAttributes);
+                    Diagnostics::OverloadedFuncUsedWithDerivativeOfAttributes{
+                        .attr = derivativeOfAttr->loc});
             }
         }
     }
@@ -13210,8 +13200,7 @@ void checkDerivativeOfAttributeImpl(
     if (!calleeDeclRefExpr)
     {
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            Diagnostics::CannotResolveOriginalFunctionForDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
@@ -13237,8 +13226,8 @@ void checkDerivativeOfAttributeImpl(
                 // inference.
                 //
                 visitor->getSink()->diagnose(
-                    derivativeOfAttr,
-                    Diagnostics::cannotResolveGenericArgumentForDerivativeFunction);
+                    Diagnostics::CannotResolveGenericArgumentForDerivativeFunction{
+                        .attr = derivativeOfAttr->loc});
             }
         }
     }
@@ -13246,8 +13235,7 @@ void checkDerivativeOfAttributeImpl(
     if (!calleeFunc)
     {
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::cannotResolveOriginalFunctionForDerivative);
+            Diagnostics::CannotResolveOriginalFunctionForDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
@@ -13261,15 +13249,14 @@ void checkDerivativeOfAttributeImpl(
     if (isInterfaceRequirement(calleeFunc))
     {
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::cannotAssociateInterfaceRequirementWithDerivative);
+            Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{
+                .attr = derivativeOfAttr->loc});
         return;
     }
     if (isInterfaceRequirement(funcDecl))
     {
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::cannotUseInterfaceRequirementAsDerivative);
+            Diagnostics::CannotUseInterfaceRequirementAsDerivative{.attr = derivativeOfAttr->loc});
         return;
     }
 
@@ -13277,10 +13264,10 @@ void checkDerivativeOfAttributeImpl(
     {
         // The primal function already has a `[*Derivative]` attribute, this is invalid.
         visitor->getSink()->diagnose(
-            derivativeOfAttr,
-            Diagnostics::declAlreadyHasAttribute,
-            calleeDeclRef,
-            getDerivativeAttrName<TDerivativeAttr>());
+            Diagnostics::DeclAlreadyHasAttribute{
+                .decl = calleeDeclRef.getDecl(),
+                .attr_name = getDerivativeAttrName<TDerivativeAttr>(),
+                .attr = derivativeOfAttr->loc});
         visitor->getSink()->diagnose(
             existingModifier->loc,
             Diagnostics::seeDeclarationOf,

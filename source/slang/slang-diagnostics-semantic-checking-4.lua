@@ -173,18 +173,7 @@ err(
     span { loc = "attr:Modifier", message = "'~guid' is not a valid GUID" }
 )
 
-err(
-    "struct cannot implement com interface",
-    31124,
-    "struct cannot implement [COM] interface",
-    span { loc = "decl:Decl", message = "a struct type cannot implement a [COM] interface" }
-)
-
-err(
-    "interface inheriting com must be com",
-    31124,
-    "interface inheriting [COM] must be [COM]",
-    span { loc = "decl:Decl", message = "an interface type that inherits from a [COM] interface must itself be a [COM] interface" }
-)
+-- Note: 31124 (structCannotImplementComInterface, interfaceInheritingComMustBeCom)
+-- moved to slang-diagnostics-semantic-checking-5.lua
 
 end

@@ -1588,9 +1588,8 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
         }
     }
     getSink()->diagnose(
-        derivativeMemberAttr,
-        Diagnostics::derivativeMemberAttributeMustNameAMemberInExpectedDifferentialType,
-        diffThisType);
+        Diagnostics::DerivativeMemberAttributeMustNameAMemberInExpectedDifferentialType{
+            .diff_type = diffThisType, .attr = derivativeMemberAttr->loc});
 }
 
 Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
