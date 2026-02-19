@@ -2085,6 +2085,12 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
+        // If the result type has been fully legalized away (e.g., the type contained
+        // only zero-size arrays that were removed), we can safely return a none value.
+        // This handles instructions like rwstructuredBufferGetElementPtr whose result
+        // type becomes none when the element type is completely empty.
+        if (type.flavor == LegalType::Flavor::none)
+            return LegalVal();
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
         break;
