@@ -1,6 +1,7 @@
 #include "slang-rich-diagnostics.h"
 
 #include "../compiler-core/slang-rich-diagnostics-render.h"
+#include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
 
 //
@@ -62,6 +63,18 @@ String typeToPrintableString(Type* type)
 String qualTypeToPrintableString(QualType type)
 {
     return type.type ? type.type->toString() : "<unknown type>";
+}
+
+String modifierToPrintableString(Modifier* modifier)
+{
+    if (!modifier)
+        return "<unknown modifier>";
+    StringBuilder sb;
+    if (modifier->keywordName && modifier->keywordName->text.getLength())
+        sb << modifier->keywordName->text;
+    if (auto hlslSemantic = as<HLSLSemantic>(modifier))
+        sb << hlslSemantic->name.getContent();
+    return sb.produceString();
 }
 
 // Generate member function implementations
@@ -197,6 +210,8 @@ String qualTypeToPrintableString(QualType type)
           qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
           nameToPrintableString($(base_expr)->getName())
+%           elseif ptype == "modifier" then
+          modifierToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else
