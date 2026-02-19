@@ -16,9 +16,14 @@ UnownedStringSlice nameToPrintableString(Name* name)
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
 }
 
-UnownedStringSlice typeToPrintableString(Type* type)
+String typeToPrintableString(Type* type)
 {
-    return type ? type->toString().getUnownedSlice() : UnownedStringSlice{"<unknown type>"};
+    return type ? type->toString() : "<unknown type>";
+}
+
+String qualTypeToPrintableString(QualType type)
+{
+    return type.type ? type.type->toString() : "<unknown type>";
 }
 
 // Generate member function implementations
@@ -110,6 +115,20 @@ UnownedStringSlice typeToPrintableString(Type* type)
 %     return "string"
 %   end
 %
+%   -- Generate null check condition for required params
+%   local generateNullCheck = function(required_params, var_mapping, variadic_struct)
+%     var_mapping = var_mapping or {}
+%     if not required_params or #required_params == 0 then
+%       return nil
+%     end
+%     local checks = {}
+%     for _, param_name in ipairs(required_params) do
+%       local var_expr = var_mapping[param_name] or param_name
+%       table.insert(checks, var_expr)
+%     end
+%     return table.concat(checks, " && ")
+%   end
+%
 %   local buildMessage = function(parts, var_mapping, variadic_struct)
 %     var_mapping = var_mapping or {}
 %     local emitPart = function(part)
@@ -136,6 +155,8 @@ UnownedStringSlice typeToPrintableString(Type* type)
           nameToPrintableString($(base_expr))
 %           elseif ptype == "type" then
           typeToPrintableString($(base_expr))
+%           elseif ptype == "qualtype" then
+          qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
           nameToPrintableString($(base_expr)->getName())
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
@@ -159,6 +180,20 @@ UnownedStringSlice typeToPrintableString(Type* type)
 %   end
 GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 {
+%     -- Generate assertions for required params in main message and primary span
+%     local all_asserted = {}
+%     for _, param_name in ipairs(diagnostic.message_required_params or {}) do
+%       if not all_asserted[param_name] then
+%         all_asserted[param_name] = true
+    SLANG_ASSERT($(param_name));
+%       end
+%     end
+%     for _, param_name in ipairs(diagnostic.primary_span_required_params or {}) do
+%       if not all_asserted[param_name] then
+%         all_asserted[param_name] = true
+    SLANG_ASSERT($(param_name));
+%       end
+%     end
     GenericDiagnostic result;
     result.code = $(diagnostic.code);
     result.severity = $(lua_module.getSeverityEnum(diagnostic.severity));
@@ -184,14 +219,26 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 for _, param in ipairs(vs.params) do
 %                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
+%                 local null_check = generateNullCheck(vs.required_params, var_map, vs)
     for (const auto& $(item_var) : $(vs.list_name))
     {
-        DiagnosticSpan span;
-        span.range = SourceRange{$(lua_module.getLocationExpr(var_map[span.location_name], span.location_type))};
-        span.message = $(buildMessage(span.message_parts, var_map, vs));
-        result.secondarySpans.add(span);
+%                 if null_check then
+        if ($(null_check))
+        {
+%                 end
+            DiagnosticSpan span;
+            span.range = SourceRange{$(lua_module.getLocationExpr(var_map[span.location_name], span.location_type))};
+            span.message = $(buildMessage(span.message_parts, var_map, vs));
+            result.secondarySpans.add(span);
+%                 if null_check then
+        }
+%                 end
     }
 %             else
+%                 local null_check = generateNullCheck(span.required_params, nil, nil)
+%                 if null_check then
+    if ($(null_check))
+%                 end
     {
         DiagnosticSpan span;
         span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
@@ -217,28 +264,44 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 for _, param in ipairs(vs.params) do
 %                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
+%                 local null_check = generateNullCheck(vs.required_params, var_map, vs)
     for (const auto& $(item_var) : $(vs.list_name))
     {
-        DiagnosticNote note;
-        note.span.range = SourceRange{$(lua_module.getLocationExpr(var_map[note.location_name], note.location_type))};
-%                 if note.primary_span_message_parts then
-        note.span.message = $(buildMessage(note.primary_span_message_parts, var_map, vs));
-%                 end
-        note.message = $(buildMessage(note.message_parts, var_map, vs));
-%                 if note.spans and #note.spans > 0 then
-        // Add additional spans to note
-%                     for _, span in ipairs(note.spans) do
+%                 if null_check then
+        if ($(null_check))
         {
-            DiagnosticSpan span;
-            span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
-            span.message = $(buildMessage(span.message_parts));
-            note.secondarySpans.add(span);
-        }
+%                 end
+            DiagnosticNote note;
+            note.span.range = SourceRange{$(lua_module.getLocationExpr(var_map[note.location_name], note.location_type))};
+%                 if note.primary_span_message_parts then
+            note.span.message = $(buildMessage(note.primary_span_message_parts, var_map, vs));
+%                 end
+            note.message = $(buildMessage(note.message_parts, var_map, vs));
+%                 if note.spans and #note.spans > 0 then
+            // Add additional spans to note
+%                     for _, span in ipairs(note.spans) do
+%                         local span_null_check = generateNullCheck(span.required_params, nil, nil)
+%                         if span_null_check then
+            if ($(span_null_check))
+%                         end
+            {
+                DiagnosticSpan span;
+                span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};
+                span.message = $(buildMessage(span.message_parts));
+                note.secondarySpans.add(span);
+            }
 %                     end
 %                 end
-        result.notes.add(note);
+            result.notes.add(note);
+%                 if null_check then
+        }
+%                 end
     }
 %             else
+%                 local null_check = generateNullCheck(note.required_params, nil, nil)
+%                 if null_check then
+    if ($(null_check))
+%                 end
     {
         DiagnosticNote note;
         note.span.range = SourceRange{$(lua_module.getLocationExpr(note.location_name, note.location_type))};
@@ -249,6 +312,10 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 if note.spans and #note.spans > 0 then
         // Add additional spans to note
 %                     for _, span in ipairs(note.spans) do
+%                         local span_null_check = generateNullCheck(span.required_params, nil, nil)
+%                         if span_null_check then
+        if ($(span_null_check))
+%                         end
         {
             DiagnosticSpan span;
             span.range = SourceRange{$(lua_module.getLocationExpr(span.location_name, span.location_type))};

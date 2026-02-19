@@ -1070,6 +1070,11 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
 }
 
+// Cast between any two floating point types, including substandard floating point types
+// like FloatE4M3, FloatE5M2, BFloat16, etc.
+__intrinsic_op($(kIROp_FloatCast))
+T floatCast<T:IFloatingPointCoopElement, U:IFloatingPointCoopElement>(U val);
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
@@ -3966,6 +3971,63 @@ extension<T : IArithmeticAtomicable> Atomic<T>
     /// value, storing the result and returning the original stored value.
     __intrinsic_op($(kIROp_AtomicMin))
     [__ref] T min(T value, MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically adds the given value to the stored value without returning
+    /// the original value. On CUDA, maps to the PTX `red` instruction for
+    /// potentially better performance than `add()`.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAdd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, $1, (int)$2)";
+        default: add(value, order);
+        }
+    }
+
+    /// Atomically subtracts the given value from the stored value without
+    /// returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceSub(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_add($0, -($1), (int)$2)";
+        default: sub(value, order);
+        }
+    }
+
+    /// Atomically computes the maximum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMax(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_max($0, $1, (int)$2)";
+        default: max(value, order);
+        }
+    }
+
+    /// Atomically computes the minimum of the stored value and the given value
+    /// without returning the original value. On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceMin(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_min($0, $1, (int)$2)";
+        default: min(value, order);
+        }
+    }
 }
 
 /// These additional members are only available when `T` conforms to `IBitAtomicable`.
@@ -3998,6 +4060,76 @@ extension<T : IBitAtomicable> Atomic<T>
     /// value.
     __intrinsic_op($(kIROp_AtomicDec))
     [__ref] T decrement(MemoryOrder order = MemoryOrder.Relaxed);
+
+    /// Atomically performs a bitwise AND without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceAnd(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_and($0, $1, (int)$2)";
+        default: and(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise OR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceOr(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_or($0, $1, (int)$2)";
+        default: or(value, order);
+        }
+    }
+
+    /// Atomically performs a bitwise XOR without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceXor(T value, MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_xor($0, $1, (int)$2)";
+        default: xor(value, order);
+        }
+    }
+
+    /// Atomically increments the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceInc(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_inc($0, (int)$1)";
+        default: increment(order);
+        }
+    }
+
+    /// Atomically decrements the stored value without returning the original value.
+    /// On CUDA, maps to the PTX `red` instruction.
+    [require(atomic_reduce)]
+    __cuda_sm_version(7.0)
+    [ForceInline]
+    [__ref] void reduceDec(MemoryOrder order = MemoryOrder.Relaxed)
+    {
+        __target_switch
+        {
+        case cuda: __intrinsic_asm "__slang_atomic_reduce_dec($0, (int)$1)";
+        default: decrement(order);
+        }
+    }
 }
 
 //@ hidden:

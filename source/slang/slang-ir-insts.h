@@ -3022,10 +3022,18 @@ struct IR$(inst.struct_name) : IR$(inst.parent_struct)
     }
 %   end
 %   for _, operand in ipairs(inst.operands) do
-%     if operand.has_type then
-    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     if operand.optional then
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? ($(operand.type)*)getOperand($(operand.index)) : nullptr; }
+%       else
+    IRInst* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? getOperand($(operand.index)) : nullptr; }
+%       end
 %     else
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%       else
     IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%       end
 %     end
 %   end
 };

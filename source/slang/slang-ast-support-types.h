@@ -620,6 +620,7 @@ FIDDLE() namespace Slang
 
         operator Type*() { return type; }
         Type* operator->() { return type; }
+        explicit operator bool() const { return type != nullptr; }
     };
 
     class ASTBuilder;

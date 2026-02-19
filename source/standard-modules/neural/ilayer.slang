@@ -7,10 +7,11 @@ so it does not imply dynamic dispatch.
 
 @category neural
 */
-public interface ILayer<T, InputVector, OutputVector, Storage, Activation>
+public interface ILayer<T, InputVector, OutputVector, Storage, Layout, Activation>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where Storage : IStorage<T>
+    where Layout : IStorageLayout
     where InputVector : IVector<T>
     where OutputVector : IVector<T>
     where Activation : IActivation<T>

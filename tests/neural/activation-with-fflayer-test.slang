@@ -42,7 +42,7 @@ bool testFFLayerReLU()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, ReLU<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, ReLU<float>, true>;
     let layer = Layer(0, 4);  // weights at 0, bias at 4
     
     float[2] arr = {-1.0, 2.0};
@@ -61,7 +61,7 @@ bool testFFLayerLeakyReLU()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LeakyReLU<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, LeakyReLU<float>, true>;
     let leakyRelu = LeakyReLU<float>(0.1);  // alpha = 0.1
     let layer = Layer(0, 4, leakyRelu);
     
@@ -81,7 +81,7 @@ bool testFFLayerSigmoid()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, Sigmoid<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, Sigmoid<float>, true>;
     let layer = Layer(0, 4);
     
     float[2] arr = {0.0, 0.0};
@@ -100,7 +100,7 @@ bool testFFLayerTanh()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, TanhActivation<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, TanhActivation<float>, true>;
     let layer = Layer(0, 4);
     
     float[2] arr = {0.0, 0.0};
@@ -119,7 +119,7 @@ bool testFFLayerExp()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, ExpActivation<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, ExpActivation<float>, true>;
     let layer = Layer(0, 4);
     
     float[2] arr = {0.0, 0.0};
@@ -138,7 +138,7 @@ bool testFFLayerIdentity()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, IdentityActivation<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, IdentityActivation<float>, true>;
     let layer = Layer(0, 4);
     
     float[2] arr = {-1.0, 2.0};
@@ -157,7 +157,7 @@ bool testFFLayerSine()
     setupParams();
     let storage = Storage(params);
     
-    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, SineActivation<float>, true>;
+    typealias Layer = FFLayer<float, Vec2, Vec2, Storage, LinearLayout, SineActivation<float>, true>;
     let layer = Layer(0, 4);
     
     float pi = 3.14159265;

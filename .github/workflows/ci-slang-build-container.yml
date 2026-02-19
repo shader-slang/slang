@@ -9,21 +9,46 @@ on:
       runs-on:
         required: true
         type: string
+      use-local-sccache:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   # Uses nvidia/cuda container for CUDA support.
   build:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
+    permissions:
+      id-token: write # Required for Workload Identity
+      contents: read
+      packages: read # Required to pull container from ghcr.io
     container:
       image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
-      options: --user root
+      options: --user root -v /:/host_root
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
 
     defaults:
       run:
         shell: bash
 
     steps:
+      - name: Free disk space on host
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h /host_root || true
+          # Remove large pre-installed software from the GitHub runner host.
+          # NOTE: Do NOT remove /opt/hostedtoolcache - it is used by GitHub
+          # Actions (e.g. setup-gcloud) for tool caching and removal breaks steps.
+          rm -rf /host_root/usr/share/dotnet || true
+          rm -rf /host_root/usr/local/lib/android || true
+          rm -rf /host_root/opt/ghc || true
+          rm -rf /host_root/usr/share/swift || true
+          echo "=== Disk space after cleanup ==="
+          df -h /host_root || true
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -32,10 +57,50 @@ jobs:
           submodules: "recursive"
           fetch-depth: "2"
 
+      # Restore sccache cache for fork PRs or when using local backend
+      - name: Restore sccache cache
+        if: env.IS_FORK_PR == 'true' || inputs.use-local-sccache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
+          restore-keys: |
+            sccache-linux-gcc-x86_64-${{ inputs.config }}-
+            sccache-linux-gcc-x86_64-
+
+      # Authenticate to Google Cloud (skip for fork PRs)
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      # Setup sccache (GCS for internal, local disk for fork PRs or when use-local-sccache is true)
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+          gcs-bucket: ${{ (env.IS_FORK_PR != 'true' && inputs.use-local-sccache != true) && 'slang-ci-cache' || '' }}
+
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
       - name: Build Slang with CUDA
         run: |
           echo "cmake version: $(cmake --version)"
           echo "CUDA version: $(nvcc --version)"
+
+          # Show sccache status
+          echo "📊 sccache statistics (pre-build):"
+          sccache --show-stats
 
           # Set cmake_config for artifact preparation
           if [[ "${{ inputs.config }}" == "release" ]]; then
@@ -45,13 +110,18 @@ jobs:
           fi
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
-          # Configure with CUDA support, disable LLVM (not needed for GPU tests)
+          # Configure with CUDA support, use LLVM from GCS, use sccache
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
 
           # Build
           cmake --build --preset ${{ inputs.config }} -j$(nproc)
+
+          echo "📊 sccache statistics (post-build):"
+          sccache --show-stats
 
           echo "Build complete. Checking CUDA support in render-test-tool:"
           if ldd build/${cmake_config}/lib/librender-test-tool.so 2>/dev/null | grep -q cuda; then
@@ -107,6 +177,14 @@ jobs:
             ls -la build/ || echo "No build directory found"
             exit 1
           fi
+
+      # Save sccache cache for fork PRs (master only)
+      - name: Save sccache cache (master only)
+        if: github.ref == 'refs/heads/master'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@v4
         with:

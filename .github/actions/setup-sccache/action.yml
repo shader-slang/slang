@@ -1,0 +1,81 @@
+name: Setup sccache
+description: Install and configure sccache with GCS backend (if bucket provided) or local disk backend for Linux and macOS
+
+inputs:
+  gcs-bucket:
+    description: "GCS bucket name for sccache (optional - uses local disk if not provided)"
+    required: false
+  platform:
+    description: "Platform: linux or macos"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Install sccache
+    - name: Install sccache (Linux)
+      if: inputs.platform == 'linux'
+      shell: bash
+      run: |
+        # Detect architecture
+        ARCH=$(uname -m)
+        if [[ "$ARCH" == "x86_64" ]]; then
+          SCCACHE_ARCH="x86_64-unknown-linux-musl"
+        elif [[ "$ARCH" == "aarch64" ]]; then
+          SCCACHE_ARCH="aarch64-unknown-linux-musl"
+        else
+          echo "Unsupported architecture: $ARCH"
+          exit 1
+        fi
+
+        echo "Installing sccache for $ARCH ($SCCACHE_ARCH)"
+        curl -L https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz | tar xz
+
+        # Try with sudo if available, otherwise install directly (for containers running as root)
+        if command -v sudo &> /dev/null; then
+          sudo mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          sudo chmod +x /usr/local/bin/sccache
+        else
+          mv sccache-v0.7.4-${SCCACHE_ARCH}/sccache /usr/local/bin/
+          chmod +x /usr/local/bin/sccache
+        fi
+
+        sccache --version
+
+    - name: Install sccache (macOS)
+      if: inputs.platform == 'macos'
+      shell: bash
+      run: |
+        brew install sccache
+        sccache --version
+
+    # Configure sccache backend (GCS or local disk)
+    - name: Configure sccache
+      shell: bash
+      run: |
+        # Configure backend based on whether GCS bucket is provided
+        if [[ -n "${{ inputs.gcs-bucket }}" ]]; then
+          # GCS backend (internal PRs with authentication)
+          echo "SCCACHE_GCS_BUCKET=${{ inputs.gcs-bucket }}" >> $GITHUB_ENV
+          echo "SCCACHE_GCS_RW_MODE=READ_WRITE" >> $GITHUB_ENV
+          echo "🔧 sccache configured for GCS backend: ${{ inputs.gcs-bucket }}"
+        else
+          # Local disk backend (fork PRs without GCS access)
+          echo "🔧 sccache configured for local disk backend"
+        fi
+
+        echo "SCCACHE_CACHE_ZSTD_LEVEL=3" >> $GITHUB_ENV
+        echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
+        echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
+        echo "SCCACHE_DIR=/tmp/.cache/sccache" >> $GITHUB_ENV
+        echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
+
+        # Limit local cache size to avoid disk space issues on runners
+        # Only applies to local disk backend (GCS has unlimited storage)
+        if [[ -z "${{ inputs.gcs-bucket }}" ]]; then
+          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+        fi
+
+        # Get sccache path for CMake
+        sccache_path=$(which sccache)
+        echo "sccache_path=$sccache_path" >> $GITHUB_ENV

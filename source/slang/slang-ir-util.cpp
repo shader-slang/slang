@@ -609,10 +609,23 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_SubpassInputType:
         {
-            auto textureType = as<IRSubpassInputType>(type);
+            auto subpassInputType = as<IRSubpassInputType>(type);
             sb << "SubpassInput";
-            if (textureType->isMultisample())
-                sb << "MS";
+            // Handle isMultisample individually - if constant, use pretty name; if generic, include
+            // it
+            auto isMS = subpassInputType->getIsMultisampleInst();
+            if (auto isMSLit = as<IRIntLit>(isMS))
+            {
+                if (isMSLit->getValue() != 0)
+                    sb << "MS";
+            }
+            else
+            {
+                // Generic parameter - include in output for uniqueness
+                sb << "<";
+                getTypeNameHint(sb, isMS);
+                sb << ">";
+            }
             break;
         }
     case kIROp_TextureType:
@@ -639,59 +652,103 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             case SLANG_RESOURCE_ACCESS_READ:
                 break;
             }
-            if (textureType->isCombined())
+
+            auto isCombinedInst = textureType->getIsCombinedInst();
+            auto isCombinedLit = as<IRIntLit>(isCombinedInst);
+            if (isCombinedLit)
             {
-                switch (textureType->GetBaseShape())
+                bool isCombined = (isCombinedLit->getValue() != 0);
+                if (isCombined)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Sampler1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Sampler2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Sampler3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "SamplerCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "SamplerBuffer";
-                    break;
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Sampler1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Sampler2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Sampler3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "SamplerCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "SamplerBuffer";
+                        break;
+                    }
+                }
+                else
+                {
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Texture1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Texture2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Texture3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "TextureCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "Buffer";
+                        break;
+                    }
                 }
             }
-            else
+
+            // Handle each boolean flag individually
+            auto isMultisampleInst = textureType->getIsMultisampleInst();
+            if (auto lit = as<IRIntLit>(isMultisampleInst))
             {
-                switch (textureType->GetBaseShape())
+                if (lit->getValue() != 0)
+                    sb << "MS";
+            }
+
+            auto isArrayInst = textureType->getIsArrayInst();
+            if (auto lit = as<IRIntLit>(isArrayInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Array";
+            }
+
+            auto isShadowInst = textureType->getIsShadowInst();
+            if (auto lit = as<IRIntLit>(isShadowInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Shadow";
+            }
+
+            // If any parameters are generic (not constants), append them for uniqueness
+            bool hasGenericParams = !as<IRIntLit>(textureType->getAccessInst()) || !isCombinedLit ||
+                                    !as<IRIntLit>(isMultisampleInst) ||
+                                    !as<IRIntLit>(isArrayInst) || !as<IRIntLit>(isShadowInst);
+
+            if (hasGenericParams)
+            {
+                sb << "<";
+                bool first = true;
+                auto appendParam = [&](IRInst* inst)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Texture1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Texture2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Texture3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "TextureCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "Buffer";
-                    break;
-                }
-            }
-            if (textureType->isMultisample())
-            {
-                sb << "MS";
-            }
-            if (textureType->isArray())
-            {
-                sb << "Array";
-            }
-            if (textureType->isShadow())
-            {
-                sb << "Shadow";
+                    if (!as<IRIntLit>(inst))
+                    {
+                        if (!first)
+                            sb << ",";
+                        getTypeNameHint(sb, inst);
+                        first = false;
+                    }
+                };
+                appendParam(textureType->getAccessInst());
+                appendParam(isCombinedInst);
+                appendParam(isMultisampleInst);
+                appendParam(isArrayInst);
+                appendParam(isShadowInst);
+                sb << ">";
             }
         }
         break;
