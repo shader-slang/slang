@@ -571,7 +571,9 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     if (!entryPointFuncDeclRef)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
-        sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
+        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
+            .name = name->text,
+            .location = translationUnitSyntax->loc});
     }
     return entryPointFuncDeclRef;
 }
@@ -701,11 +703,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         if (hasResourceOrUnsizedTypes)
         {
-            sink->diagnose(
-                entryPointFuncDecl,
-                Diagnostics::entryPointCannotReturnResourceType,
-                entryPointName,
-                returnType);
+            sink->diagnose(Diagnostics::EntryPointCannotReturnResourceType{
+                .entry_point = entryPointName,
+                .return_type = returnType,
+                .location = entryPointFuncDecl->loc});
         }
     }
 
@@ -714,7 +715,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     //
     if (stage == Stage::Unknown)
     {
-        sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointHasNoStage, entryPointName);
+        sink->diagnose(Diagnostics::EntryPointHasNoStage{
+            .entry_point = entryPointName->text,
+            .location = entryPointFuncDecl->loc});
     }
 
     if (stage == Stage::Hull)
@@ -999,35 +1002,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         if (param->findModifier<GLSLBindingAttribute>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "attribute '[[vk::binding(...)]]'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "attribute '[[vk::binding(...)]]'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<PushConstantAttribute>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "attribute '[[vk::push_constant]]'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "attribute '[[vk::push_constant]]'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<HLSLRegisterSemantic>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "keyword 'register'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "keyword 'register'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<HLSLPackOffsetSemantic>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "keyword 'packoffset'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "keyword 'packoffset'",
+                .param = param->getName(),
+                .location = param->loc});
         }
     }
 
@@ -1169,11 +1168,11 @@ bool resolveStageOfProfileWithEntryPoint(
                 sink,
                 optionSet,
                 DiagnosticCategory::Capability,
-                entryPointFuncDecl,
-                Diagnostics::specifiedStageDoesntMatchAttribute,
-                entryPointFuncDecl->getName(),
-                entryPointProfileStage,
-                entryPointStage);
+                Diagnostics::SpecifiedStageDoesntMatchAttribute{
+                    .entry_point = entryPointFuncDecl->getName()->text,
+                    .compiled_stage = getStageName(entryPointProfileStage),
+                    .attribute_stage = getStageName(entryPointStage),
+                    .location = entryPointFuncDecl->loc});
         entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
@@ -1809,10 +1808,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 Type* argType = as<Type>(arg.val);
                 if (!argType)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedTypeForSpecializationArg,
-                        genericTypeParamDecl);
+                    sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
+                        .param = genericTypeParamDecl->getName()->text,
+                        .location = param.loc});
                     argType = getLinkage()->getASTBuilder()->getErrorType();
                 }
 
@@ -1912,10 +1910,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 Type* argType = as<Type>(arg.val);
                 if (!argType)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedTypeForSpecializationArg,
-                        interfaceType);
+                    sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
+                        .param = interfaceType ? interfaceType->toString() : "<unknown type>",
+                        .location = param.loc});
                     argType = getLinkage()->getASTBuilder()->getErrorType();
                 }
 
@@ -1950,11 +1947,10 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 IntVal* intVal = as<IntVal>(arg.val);
                 if (!intVal)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedValueOfTypeForSpecializationArg,
-                        paramDecl->getType(),
-                        paramDecl);
+                    sink->diagnose(Diagnostics::ExpectedValueOfTypeForSpecializationArg{
+                        .type = paramDecl->getType(),
+                        .param = paramDecl->getName()->text,
+                        .location = param.loc});
                     intVal =
                         getLinkage()->getASTBuilder()->getIntVal(m_astBuilder->getIntType(), 0);
                 }

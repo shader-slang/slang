@@ -6,6 +6,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -626,7 +627,7 @@ void validateVectorsAndMatrices(
                 if ((rowCount && (rowCount->getValue() == 1)) ||
                     (colCount && (colCount->getValue() == 1)))
                 {
-                    sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
+                    sink->diagnose(Diagnostics::MatrixColumnOrRowCountIsOne{.location = matrixType->sourceLoc});
                 }
             }
 

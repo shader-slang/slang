@@ -2569,20 +2569,18 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     auto baseExpr = subscriptExpr->baseExpression;
     if (subscriptExpr->indexExprs.getCount() < 1)
     {
-        getSink()->diagnose(
-            subscriptExpr,
-            Diagnostics::notEnoughArguments,
-            subscriptExpr->indexExprs.getCount(),
-            1);
+        getSink()->diagnose(Diagnostics::NotEnoughArguments{
+            .got = subscriptExpr->indexExprs.getCount(),
+            .expected = 1,
+            .location = subscriptExpr->loc});
         return CreateErrorExpr(subscriptExpr);
     }
     else if (subscriptExpr->indexExprs.getCount() > 1)
     {
-        getSink()->diagnose(
-            subscriptExpr,
-            Diagnostics::tooManyArguments,
-            subscriptExpr->indexExprs.getCount(),
-            1);
+        getSink()->diagnose(Diagnostics::TooManyArguments{
+            .got = subscriptExpr->indexExprs.getCount(),
+            .expected = 1,
+            .location = subscriptExpr->loc});
         return CreateErrorExpr(subscriptExpr);
     }
 
