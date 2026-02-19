@@ -1,9 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
-// CHECK: ([[# @LINE+1]]): error 31201
-layout(rgba8);
-Texture2D<float4> tex;
-
-// CHECK: ([[# @LINE+1]]): error 31202
 public internal int v()
+//diag:^^^^^^^^ duplicate modifier
+//diag:^^^^^^^^ modifier 'internal' is redundant or conflicting with existing modifier 'public'
 {}

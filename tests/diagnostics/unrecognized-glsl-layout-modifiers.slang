@@ -1,12 +1,15 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage vertex -entry main -allow-glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -stage vertex -entry main -allow-glsl
 #version 310 es
 layout(location = 0) in highp vec4 a_position;
 layout(location = 1) in highp vec4 a_coords;
 layout(location = 0) out mediump vec3 v_color;
 
 
-// CHECK: error 31216
 layout(std140, not_a_set = 0, binding = 0) uniform buff0 {
+/*diag:
+               ^^^^^^^^^ unrecognized GLSL layout qualifier
+               ^^^^^^^^^ GLSL layout qualifier is unrecognized
+*/
     mediump int ui_zero;
 };
 

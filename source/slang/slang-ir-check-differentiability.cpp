@@ -2,6 +2,7 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -639,7 +640,7 @@ public:
             }
             else
             {
-                sink->diagnose(loop->sourceLoc, Diagnostics::loopInDiffFuncRequireUnrollOrMaxIters);
+                sink->diagnose(Diagnostics::LoopInDiffFuncRequireUnrollOrMaxIters{.location = loop->sourceLoc});
             }
         }
 

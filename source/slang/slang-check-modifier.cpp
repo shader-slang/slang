@@ -1681,7 +1681,7 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     CASE(UncheckedGLSLCallablePayloadInAttribute, VulkanCallablePayloadInAttribute)
     else
     {
-        getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
+        getSink()->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifier{.attr = uncheckedAttr});
     }
 #undef CASE
 
@@ -1737,7 +1737,7 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             if (!ignoreUnallowedModifier)
             {
-                getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
+                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
                 return nullptr;
             }
             return m;
@@ -2208,11 +2208,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
             {
-                getSink()->diagnose(
-                    modifier->loc,
-                    Diagnostics::duplicateModifier,
-                    modifier,
-                    existingModifier);
+                getSink()->diagnose(Diagnostics::DuplicateModifier{.existing_modifier = existingModifier, .modifier = modifier});
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
         }

@@ -228,10 +228,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
                 hasSpecializationConstant = true;
         }
         if (hasExportOrExtern && hasConst != hasStatic)
-            getSink()->diagnose(
-                decl,
-                Diagnostics::ExternAndExportVarDeclMustBeConst,
-                decl->getName());
+            getSink()->diagnose(Diagnostics::ExternAndExportVarDeclMustBeConst{.decl = decl});
 
 
         // Global const or uniform variables with initializers must be static
@@ -246,10 +243,7 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
             auto moduleDecl = getModuleDecl(decl);
             if (!moduleDecl || !moduleDecl->hasModifier<GLSLModuleModifier>())
             {
-                getSink()->diagnose(
-                    decl,
-                    Diagnostics::constGlobalVarWithInitRequiresStatic,
-                    decl->getName());
+                getSink()->diagnose(Diagnostics::ConstGlobalVarWithInitRequiresStatic{.decl = decl});
             }
         }
     }
@@ -1504,7 +1498,7 @@ void SemanticsVisitor::ensureDecl(Decl* decl, DeclCheckState state, SemanticsCon
         // being checked on the stack, so that we can report the full
         // chain that leads from this declaration back to itself.
         //
-        getSink()->diagnose(decl, Diagnostics::cyclicReference, decl);
+        getSink()->diagnose(Diagnostics::CyclicReference{.decl = decl});
         return;
     }
 
@@ -1834,7 +1828,7 @@ void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttributeParent(
     auto diffType = getDifferentialType(m_astBuilder, memberType, varDecl->loc);
     if (as<ErrorType>(diffType))
     {
-        getSink()->diagnose(derivativeMemberAttr, Diagnostics::typeIsNotDifferentiable, memberType);
+        getSink()->diagnose(Diagnostics::TypeIsNotDifferentiable{.type = memberType, .attr = derivativeMemberAttr});
     }
     auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
     if (!thisType)
@@ -2340,13 +2334,13 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             case BaseType::UIntPtr:
                 break;
             default:
-                getSink()->diagnose(varDecl, Diagnostics::staticConstRequirementMustBeIntOrBool);
+                getSink()->diagnose(Diagnostics::StaticConstRequirementMustBeIntOrBool{.decl = varDecl});
                 break;
             }
         }
         if (!varDecl->findModifier<HLSLStaticModifier>() || !varDecl->findModifier<ConstModifier>())
         {
-            getSink()->diagnose(varDecl, Diagnostics::valueRequirementMustBeCompileTimeConst);
+            getSink()->diagnose(Diagnostics::ValueRequirementMustBeCompileTimeConst{.decl = varDecl});
         }
     }
 
@@ -2436,10 +2430,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // Don't error for interface member variables
             !isExtern && !as<InterfaceDecl>(varDecl->parentDecl))
         {
-            getSink()->diagnose(
-                varDecl,
-                Diagnostics::staticConstVariableRequiresInitializer,
-                varDecl);
+            getSink()->diagnose(Diagnostics::StaticConstVariableRequiresInitializer{.decl = varDecl});
         }
     }
 
@@ -2980,10 +2971,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 getTrailingUnsizedArrayElement(elementType, varDecl, trailingArrayType);
             if (trailingArrayField && !isOpaqueHandleType(trailingArrayType->getElementType()))
             {
-                getSink()->diagnose(
-                    trailingArrayField->loc,
-                    Diagnostics::cannotUseUnsizedTypeInConstantBuffer,
-                    trailingArrayType);
+                getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{.type = trailingArrayType, .field = trailingArrayField});
                 getSink()->diagnose(varDecl->loc, Diagnostics::seeConstantBufferDefinition);
             }
         }
@@ -3307,11 +3295,11 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
         {
             if (decl->isEqualityConstraint)
             {
-                sink->diagnose(type.exp, Diagnostics::invalidEqualityConstraintSubType, type);
+                sink->diagnose(Diagnostics::InvalidEqualityConstraintSubTypeNote{.type = type.type, .type_exp = type.exp});
             }
             else
             {
-                sink->diagnose(type.exp, Diagnostics::invalidConstraintSubType, type);
+                sink->diagnose(Diagnostics::InvalidConstraintSubType{.type = type.type, .type_exp = type.exp});
             }
         }
     };
@@ -3509,10 +3497,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             checkGenericTypeEqualityConstraintSubType(decl);
             if (!isProperConstraineeType(decl->sup) && !as<ErrorType>(decl->sup.type))
             {
-                getSink()->diagnose(
-                    decl->sup.exp,
-                    Diagnostics::invalidEqualityConstraintSupType,
-                    decl->sup);
+                getSink()->diagnose(Diagnostics::InvalidEqualityConstraintSupType{.type = decl->sup.type, .sup = decl->sup.exp});
             }
         }
         else
@@ -3520,10 +3505,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             validateGenericConstraintSubType(decl, decl->sub, getSink());
             if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sup.type))
             {
-                getSink()->diagnose(
-                    decl->sup.exp,
-                    Diagnostics::invalidTypeForConstraint,
-                    decl->sup);
+                getSink()->diagnose(Diagnostics::InvalidTypeForConstraint{.type = decl->sup.type, .sup = decl->sup.exp});
             }
         }
     }
@@ -3546,7 +3528,7 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
         }
         else if (!(subOk || supOk))
         {
-            getSink()->diagnose(decl, Diagnostics::noValidEqualityConstraintSubType);
+            getSink()->diagnose(Diagnostics::NoValidEqualityConstraintSubType{.decl = decl});
             // Re-run the validation to emit the diagnostic this time
             validateGenericConstraintSubType(decl, decl->sub, getSink());
             validateGenericConstraintSubType(decl, decl->sup, getSink());
@@ -8373,7 +8355,7 @@ void SemanticsVisitor::validateEnumTagType(Type* type, SourceLoc const& loc)
     // By default, don't allow other types to be used
     // as an `enum` tag type.
     //
-    getSink()->diagnose(loc, Diagnostics::invalidEnumTagType, type);
+    getSink()->diagnose(Diagnostics::InvalidEnumTagType{.type = type, .location = loc});
 }
 
 bool SemanticsVisitor::_hasExplicitConstructor(StructDecl* structDecl, bool checkBaseType)
@@ -8648,7 +8630,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
                 else
                 {
                     // TODO: need to handle other possibilities here
-                    getSink()->diagnose(explicitTagValExpr, Diagnostics::unexpectedEnumTagExpr);
+                    getSink()->diagnose(Diagnostics::UnexpectedEnumTagExpr{.expr = explicitTagValExpr});
                 }
             }
             else
@@ -8751,7 +8733,7 @@ void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamD
     // global generic param only allowed in global scope
     auto program = as<ModuleDecl>(decl->parentDecl);
     if (!program)
-        getSink()->diagnose(decl, Slang::Diagnostics::globalGenParamInGlobalScopeOnly);
+        getSink()->diagnose(Diagnostics::GlobalGenParamInGlobalScopeOnly{.decl = decl});
 }
 
 void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
@@ -8759,7 +8741,7 @@ void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
     // assoctype only allowed in an interface
     auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
     if (!interfaceDecl)
-        getSink()->diagnose(decl, Slang::Diagnostics::assocTypeInInterfaceOnly);
+        getSink()->diagnose(Diagnostics::AssocTypeInInterfaceOnly{.decl = decl});
     checkVisibility(decl);
 }
 
@@ -9662,10 +9644,7 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         if (!MemoryQualifierSet)
             return;
         for (auto mod : MemoryQualifierSet->getModifiers())
-            getSink()->diagnose(
-                paramDecl,
-                Diagnostics::memoryQualifierNotAllowedOnANonImageTypeParameter,
-                mod);
+            getSink()->diagnose(Diagnostics::MemoryQualifierNotAllowedOnANonImageTypeParameter{.modifier = mod, .param = paramDecl});
     }
 }
 
@@ -10036,7 +10015,7 @@ void SemanticsDeclBodyVisitor::visitAggTypeDecl(AggTypeDecl* aggTypeDecl)
 {
     if (aggTypeDecl->hasTag(TypeTag::Incomplete) && aggTypeDecl->hasModifier<HLSLExportModifier>())
     {
-        getSink()->diagnose(aggTypeDecl->loc, Diagnostics::cannotExportIncompleteType, aggTypeDecl);
+        getSink()->diagnose(Diagnostics::CannotExportIncompleteType{.decl = aggTypeDecl});
     }
 
     auto structDecl = as<StructDecl>(aggTypeDecl);
@@ -10289,14 +10268,14 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
         {
             if (!as<FuncDecl>(decl) && funcBase->body != nullptr)
             {
-                getSink()->diagnose(decl, Diagnostics::nonMethodInterfaceRequirementCannotHaveBody);
+                getSink()->diagnose(Diagnostics::NonMethodInterfaceRequirementCannotHaveBody{.decl = decl});
                 return;
             }
         }
         // Interface requirement cannot be `override`.
         if (decl->hasModifier<OverrideModifier>())
         {
-            getSink()->diagnose(decl, Diagnostics::interfaceRequirementCannotBeOverride);
+            getSink()->diagnose(Diagnostics::InterfaceRequirementCannotBeOverride{.decl = decl});
         }
     }
 }
@@ -10344,7 +10323,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     {
         if (decl->returnType.type && !decl->returnType.type->equals(m_astBuilder->getVoidType()))
         {
-            getSink()->diagnose(decl, Diagnostics::cudaKernelMustReturnVoid);
+            getSink()->diagnose(Diagnostics::CudaKernelMustReturnVoid{.decl = decl});
         }
     }
 
@@ -10438,7 +10417,7 @@ void SemanticsVisitor::validateArraySizeForVariable(VarDeclBase* varDecl)
 
     if (elementCount->isLinkTimeVal())
     {
-        getSink()->diagnose(varDecl, Diagnostics::linkTimeConstantArraySize);
+        getSink()->diagnose(Diagnostics::LinkTimeConstantArraySize{.decl = varDecl});
     }
 }
 
@@ -11313,7 +11292,7 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
     auto name = decl->moduleNameAndLoc.name;
 
     if (!getShared()->getTranslationUnitRequest())
-        getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+        getSink()->diagnose(Diagnostics::CannotProcessInclude{.location = decl->moduleNameAndLoc.loc});
 
     auto parentModule = getModule(decl);
     auto moduleDecl = parentModule->getModuleDecl();
@@ -11433,7 +11412,7 @@ void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* de
     auto name = decl->moduleNameAndLoc.name;
 
     if (!getShared()->getTranslationUnitRequest())
-        getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
+        getSink()->diagnose(Diagnostics::CannotProcessInclude{.location = decl->moduleNameAndLoc.loc});
 
     auto [fileDecl, isNew] = getLinkage()->findAndIncludeFile(
         getModule(decl),
@@ -13370,11 +13349,7 @@ static void checkDerivativeAttribute(
             auto currDiffLevel = visitor->getShared()->getFuncDifferentiableLevel(funcDecl);
             if (targetDiffLevel < currDiffLevel)
             {
-                visitor->getSink()->diagnose(
-                    attr->loc,
-                    Diagnostics::primalSubstituteTargetMustHaveHigherDifferentiabilityLevel,
-                    declRefExpr->declRef.getDecl(),
-                    funcDecl);
+                visitor->getSink()->diagnose(Diagnostics::PrimalSubstituteTargetMustHaveHigherDifferentiabilityLevel{.attr = attr});
             }
         }
     }
@@ -13401,9 +13376,7 @@ static void checkCudaKernelAttribute(
             {
                 if (!paramDecl->hasModifier<NoDiffModifier>())
                 {
-                    visitor->getSink()->diagnose(
-                        paramDecl,
-                        Diagnostics::differentiableKernelEntryPointCannotHaveDifferentiableParams);
+                    visitor->getSink()->diagnose(Diagnostics::DifferentiableKernelEntryPointCannotHaveDifferentiableParams{.param = paramDecl});
                 }
             }
         }
@@ -13441,7 +13414,7 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             // Check that type is basic type.
             if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
             {
-                getSink()->diagnose(modifier, Diagnostics::specializationConstantMustBeScalar);
+                getSink()->diagnose(Diagnostics::SpecializationConstantMustBeScalar{.modifier = modifier});
             }
             hasSpecConstAttr = true;
         }
@@ -13456,16 +13429,13 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     }
     if (hasSpecConstAttr && hasPushConstAttr)
     {
-        getSink()->diagnose(
-            varDecl,
-            Diagnostics::variableCannotBePushAndSpecializationConstant,
-            varDecl->getName());
+        getSink()->diagnose(Diagnostics::VariableCannotBePushAndSpecializationConstant{.decl = varDecl});
     }
     if (hasSpecConstAttr || hasPushConstAttr)
     {
         if (varDecl->findModifier<HLSLStaticModifier>())
         {
-            getSink()->diagnose(varDecl, Diagnostics::pushOrSpecializationConstantCannotBeStatic);
+            getSink()->diagnose(Diagnostics::PushOrSpecializationConstantCannotBeStatic{.decl = varDecl});
         }
     }
 }
@@ -13477,10 +13447,7 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     auto registerName = registerSemantic->registerName.getContent();
     if (registerName.getLength() < 1)
     {
-        getSink()->diagnose(
-            registerSemantic->registerName.getLoc(),
-            Diagnostics::invalidHLSLRegisterName,
-            registerSemantic->registerName);
+        getSink()->diagnose(Diagnostics::InvalidHlslRegisterName{.register_name = String(registerName), .location = registerSemantic->registerName.getLoc()});
         return;
     }
 
@@ -13547,11 +13514,7 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     }
     if (!isValid)
     {
-        getSink()->diagnose(
-            registerSemantic->registerName.getLoc(),
-            Diagnostics::invalidHLSLRegisterNameForType,
-            registerName,
-            varType);
+        getSink()->diagnose(Diagnostics::InvalidHlslRegisterNameForType{.register_name = String(registerName), .type = varType, .location = registerSemantic->registerName.getLoc()});
     }
 }
 

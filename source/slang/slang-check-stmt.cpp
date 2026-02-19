@@ -377,7 +377,7 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
                 // uniqueness within the scope of the switch statement.
                 if (!caseStmtVals.add(caseStmt->exprVal))
                 {
-                    sink->diagnose(sStmt, Diagnostics::switchDuplicateCases);
+                    sink->diagnose(Diagnostics::SwitchDuplicateCases{.stmt = sStmt});
                     return;
                 }
             }
@@ -387,7 +387,7 @@ void SemanticsStmtVisitor::validateCaseStmts(SwitchStmt* stmt, DiagnosticSink* s
             // check that there is at most one `default` clause
             if (hasDefaultStmt)
             {
-                sink->diagnose(sStmt, Diagnostics::switchMultipleDefault);
+                sink->diagnose(Diagnostics::SwitchMultipleDefault{.stmt = sStmt});
                 return;
             }
             hasDefaultStmt = true;
@@ -843,11 +843,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             // If the user writes something like `for (int i = 0; i < 5; j++)`,
             // it is most likely a bug, so we issue a warning.
             if (predicateVar == initialVar)
-                getSink()->diagnose(
-                    varExpr,
-                    Diagnostics::forLoopSideEffectChangingDifferentVar,
-                    initialVar,
-                    varExpr->declRef);
+                getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{.init_var = initialVar.getDecl(), .modified_var = varExpr->declRef.getDecl(), .side_effect = varExpr});
             return;
         }
     }
@@ -874,11 +870,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (predicateVar.getDecl() != initialVar.getDecl())
     {
         if (predicateVar)
-            getSink()->diagnose(
-                stmt->predicateExpression,
-                Diagnostics::forLoopPredicateCheckingDifferentVar,
-                initialVar,
-                predicateVar);
+            getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{.init_var = initialVar.getDecl(), .predicate_var = predicateVar.getDecl(), .predicate = stmt->predicateExpression});
         return;
     }
     if (!stepSize)
@@ -888,10 +880,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
         {
-            getSink()->diagnose(
-                stmt->sideEffectExpression,
-                Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection,
-                initialVar);
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
             return;
         }
     }
@@ -900,19 +889,13 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
         {
-            getSink()->diagnose(
-                stmt->sideEffectExpression,
-                Diagnostics::forLoopChangingIterationVariableInOppsoiteDirection,
-                initialVar);
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
             return;
         }
     }
     else
     {
-        getSink()->diagnose(
-            stmt->sideEffectExpression,
-            Diagnostics::forLoopNotModifyingIterationVariable,
-            initialVar);
+        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
         return;
     }
 
@@ -944,7 +927,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     }
     if (iterations == 0)
     {
-        getSink()->diagnose(stmt, Diagnostics::loopRunsForZeroIterations);
+        getSink()->diagnose(Diagnostics::LoopRunsForZeroIterations{.stmt = stmt});
     }
 
     // Note: the inferred max iterations may not be valid if the loop body

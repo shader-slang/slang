@@ -1,7 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 // Check that we can issue diagnostic on invalid left hand side of a type constraint.
 
-// CHECK: ([[# @LINE+1]]): error 30402
 void f<T>() where int : IInteger
+//diag:           ^^^ invalid constraint left-hand side
+//diag:           ^^^ type 'int' is not a valid left hand side of a type constraint.
 {}

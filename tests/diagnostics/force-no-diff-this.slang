@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 struct MyStruct<T> where T: __BuiltinFloatingPointType
 {
@@ -8,15 +8,17 @@ struct MyStruct<T> where T: __BuiltinFloatingPointType
     [Differentiable]
     T eval(T x)
     {
-        //CHECK: ([[# @LINE+1]]): warning 31159
         return exp(x * T(a) * T(a));
+//diag:                  ^ no derivative for member on non-differentiable struct
+//diag:                  ^ There is no derivative calculated for member 'a' because the parent struct is not differentiable.
+//diag:                         ^ no derivative for member on non-differentiable struct
+//diag:                         ^ There is no derivative calculated for member 'a' because the parent struct is not differentiable.
     }
 
     [Differentiable]
     [NoDiffThis]
     T eval1(T x)
     {
-        //CHECK-NOT: ([[# @LINE+1]]): warning 31159
         return exp(x * T(a) * T(a));
     }
 };

@@ -9473,9 +9473,7 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
             if (as<GLSLUnparsedLayoutModifier>(modifier))
             {
-                parser->diagnose(
-                    modifier,
-                    Diagnostics::unrecognizedGLSLLayoutQualifierOrRequiresAssignment);
+                parser->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifierOrRequiresAssignment{.location = modifier->loc});
             }
 
             listBuilder.add(modifier);

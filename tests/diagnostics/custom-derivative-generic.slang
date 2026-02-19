@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive):
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -9,8 +9,11 @@ interface IFoo
 {
     static float bar1(float x);
 
-    // CHECK-DAG: {{.*}}(13): error 31152
     [PrimalSubstitute(bar1)]
+/*diag:
+     ^^^^^^^^^^^^^^^^ interface requirement cannot have derivative
+     ^^^^^^^^^^^^^^^^ cannot associate an interface requirement with a derivative.
+*/
     static float bar(float x);
 
     static DifferentialPair<float> dd(DifferentialPair<float> x);
@@ -22,19 +25,27 @@ float f(float x)
     return N*x*x;
 }
 
-// CHECK-DAG: {{.*}}(26): error 31153
 [ForwardDerivative(IFoo.dd)]
+/*diag:
+ ^^^^^^^^^^^^^^^^^ interface requirement cannot be used as derivative
+ ^^^^^^^^^^^^^^^^^ cannot use an interface requirement as a derivative.
+*/
 float bbb(float x);
 
-// CHECK-DAG: {{.*}}(30): error 31152
 [ForwardDerivativeOf(IFoo.bar)]
+/*diag:
+ ^^^^^^^^^^^^^^^^^^^ interface requirement cannot have derivative
+ ^^^^^^^^^^^^^^^^^^^ cannot associate an interface requirement with a derivative.
+*/
 DifferentialPair<float> dd1(DifferentialPair<float> x)
 {
     return x;
 }
 
-// CHECK-DAG: {{.*}}(37): error 31151
 [BackwardDerivativeOf(f)]
+/*diag:
+ ^^^^^^^^^^^^^^^^^^^^ cannot deduce generic arguments for derivative
+*/
 DifferentialPair<float> df<let N:int>(inout DifferentialPair<float> x, float dOut)
 {
     var primal = x.p * x.p;

@@ -327,11 +327,7 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     }
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
-        getSink()->diagnose(
-            loc,
-            Diagnostics::deprecatedUsage,
-            declRef.getName(),
-            deprecatedAttr->message);
+        getSink()->diagnose(Diagnostics::DeprecatedUsage{.decl_name = declRef.getName(), .message = deprecatedAttr->message, .location = loc});
     }
 }
 
@@ -1166,10 +1162,7 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(
-            loc,
-            Diagnostics::requiredConstraintIsNotChecked,
-            lookupResult.item.declRef);
+        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{.decl_ref = lookupResult.item.declRef.getDecl(), .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -1743,11 +1736,7 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
                 return;
             }
 
-            getSink()->diagnose(
-                memberExpr->loc,
-                Diagnostics::noDerivativeOnNonDifferentiableThisType,
-                memberExpr->declRef.getDecl(),
-                this->m_parentFunc);
+            getSink()->diagnose(Diagnostics::NoDerivativeOnNonDifferentiableThisType{.member_decl = memberExpr->declRef.getDecl(), .func = this->m_parentFunc, .member = memberExpr});
         }
     }
 }
@@ -2198,7 +2187,7 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
     {
         if (decl == info->decl)
         {
-            getSink()->diagnose(decl, Diagnostics::variableUsedInItsOwnDefinition, decl);
+            getSink()->diagnose(Diagnostics::VariableUsedInItsOwnDefinition{.decl = decl});
             return true;
         }
     }
@@ -4567,7 +4556,7 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         getValidTypeForAddressOf(this, m_astBuilder, expr->arg, getType(m_astBuilder, expr->arg));
     if (!expr->type)
     {
-        getSink()->diagnose(expr, Diagnostics::invalidAddressOf);
+        getSink()->diagnose(Diagnostics::InvalidAddressOf{.expr = expr});
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;
