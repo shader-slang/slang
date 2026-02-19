@@ -833,7 +833,10 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (forceUnrollAttr->args.getCount() < 1)
         {
-            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = attr->args.getCount(),
+                .expected = 1,
+                .location = attr->loc});
         }
         auto cint = checkConstantIntVal(attr->args[0]);
         if (cint)
@@ -843,7 +846,10 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (attr->args.getCount() < 1)
         {
-            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = attr->args.getCount(),
+                .expected = 1,
+                .location = attr->loc});
         }
         else
         {
@@ -883,19 +889,17 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         if (params.getCount() < attr->args.getCount())
         {
-            getSink()->diagnose(
-                attr,
-                Diagnostics::tooManyArguments,
-                attr->args.getCount(),
-                params.getCount());
+            getSink()->diagnose(Diagnostics::TooManyArguments{
+                .got = attr->args.getCount(),
+                .expected = params.getCount(),
+                .location = attr->loc});
         }
         else if (params.getCount() > attr->args.getCount())
         {
-            getSink()->diagnose(
-                attr,
-                Diagnostics::notEnoughArguments,
-                attr->args.getCount(),
-                params.getCount());
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = attr->args.getCount(),
+                .expected = params.getCount(),
+                .location = attr->loc});
         }
     }
     else if (auto diffAttr = as<BackwardDifferentiableAttribute>(attr))
@@ -1177,12 +1181,18 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (attr->args.getCount() > 2)
         {
-            getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
+            getSink()->diagnose(Diagnostics::TooManyArguments{
+                .got = attr->args.getCount(),
+                .expected = 0,
+                .location = attr->loc});
             return nullptr;
         }
         else if (attr->args.getCount() < 2)
         {
-            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 2);
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = attr->args.getCount(),
+                .expected = 2,
+                .location = attr->loc});
             return nullptr;
         }
         CapabilityName capName;
@@ -1213,7 +1223,10 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             // We should be special-casing the checking of any attribute
             // with a non-zero number of arguments.
-            getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
+            getSink()->diagnose(Diagnostics::TooManyArguments{
+                .got = attr->args.getCount(),
+                .expected = 0,
+                .location = attr->loc});
             return nullptr;
         }
     }

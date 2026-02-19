@@ -184,20 +184,18 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     {
         if (argCount < paramCounts.required)
         {
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::notEnoughArguments,
-                argCount,
-                paramCounts.required);
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = argCount,
+                .expected = paramCounts.required,
+                .location = context.loc});
         }
         else
         {
             SLANG_ASSERT(argCount > paramCounts.allowed);
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::tooManyArguments,
-                argCount,
-                paramCounts.allowed);
+            getSink()->diagnose(Diagnostics::TooManyArguments{
+                .got = argCount,
+                .expected = paramCounts.allowed,
+                .location = context.loc});
         }
 
         // Add a note showing the candidate signature for context
@@ -231,8 +229,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(context.loc, Diagnostics::expectedPrefixOperator);
-            getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+            getSink()->diagnose(Diagnostics::ExpectedPrefixOperator{
+                .call_loc = context.loc,
+                .decl = decl});
         }
 
         return false;
@@ -244,8 +243,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(context.loc, Diagnostics::expectedPostfixOperator);
-            getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+            getSink()->diagnose(Diagnostics::ExpectedPostfixOperator{
+                .call_loc = context.loc,
+                .decl = decl});
         }
 
         return false;

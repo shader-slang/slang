@@ -689,23 +689,20 @@ void EndToEndCompileRequest::generateOutput(ComponentType* program)
             auto specializationParam = program->getSpecializationParam(ii);
             if (auto decl = as<Decl>(specializationParam.object))
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterOfNameNotSpecialized,
-                    decl);
+                sink->diagnose(Diagnostics::SpecializationParameterOfNameNotSpecialized{
+                    .param = decl->getName()->text,
+                    .location = specializationParam.loc});
             }
             else if (auto type = as<Type>(specializationParam.object))
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterOfNameNotSpecialized,
-                    type);
+                sink->diagnose(Diagnostics::SpecializationParameterOfNameNotSpecialized{
+                    .param = type ? type->toString() : "<unknown type>",
+                    .location = specializationParam.loc});
             }
             else
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterNotSpecialized);
+                sink->diagnose(Diagnostics::SpecializationParameterNotSpecialized{
+                    .location = specializationParam.loc});
             }
         }
 
