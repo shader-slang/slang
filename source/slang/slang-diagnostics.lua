@@ -1025,6 +1025,10 @@ semantic_checking_8_module(helpers)
 local semantic_checking_9_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-9.lua")
 semantic_checking_9_module(helpers)
 
+-- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
+local semantic_checking_10_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-10.lua")
+semantic_checking_10_module(helpers)
+
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
 local semantic_checking_11_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-11.lua")
 semantic_checking_11_module(helpers)

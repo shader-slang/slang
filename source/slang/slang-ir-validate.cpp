@@ -552,9 +552,17 @@ static void validateVectorOrMatrixElementType(
     SourceLoc sourceLoc,
     IRType* elementType,
     uint32_t allowedWidths,
-    const DiagnosticInfo& disallowedElementTypeEncountered,
     TargetRequest* targetRequest)
 {
+    auto emitDisallowedTypeError = [&]()
+    {
+        StringBuilder sb;
+        getTypeNameHint(sb, elementType);
+        sink->diagnose(Diagnostics::VectorWithDisallowedElementTypeEncountered{
+            .type = sb.produceString(),
+            .location = sourceLoc});
+    };
+
     if (!isFloatingType(elementType) && !isPackedFloatType(elementType))
     {
         if (isIntegralType(elementType))
@@ -562,7 +570,7 @@ static void validateVectorOrMatrixElementType(
             IntInfo info = getIntTypeInfo(targetRequest, elementType);
             if (allowedWidths == 0U)
             {
-                sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+                emitDisallowedTypeError();
             }
             else
             {
@@ -577,13 +585,13 @@ static void validateVectorOrMatrixElementType(
                 }
                 if (!widthAllowed)
                 {
-                    sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+                    emitDisallowedTypeError();
                 }
             }
         }
         else if (!as<IRBoolType>(elementType))
         {
-            sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
+            emitDisallowedTypeError();
         }
     }
 }
@@ -599,12 +607,11 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
     const IRIntegerValue maxCount = 4;
     if ((elementCount < minCount) || (elementCount > maxCount))
     {
-        sink->diagnose(
-            vectorType->sourceLoc,
-            Diagnostics::vectorWithInvalidElementCountEncountered,
-            elementCount,
-            "1",
-            maxCount);
+        sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{
+            .count = String(elementCount),
+            .min = "1",
+            .max = String(maxCount),
+            .location = vectorType->sourceLoc});
     }
 }
 
@@ -650,7 +657,6 @@ void validateVectorsAndMatrices(
                 vectorType->sourceLoc,
                 elementType,
                 allowedWidths,
-                Diagnostics::vectorWithDisallowedElementTypeEncountered,
                 targetRequest);
 
             validateVectorElementCount(sink, vectorType);
@@ -735,10 +741,11 @@ void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst*
     // Check if the element type contains any resource/opaque handle types
     if (containsOpaqueHandleTypeCached(elementType))
     {
-        m_sink->diagnose(
-            inst->sourceLoc,
-            Diagnostics::cannotUseResourceTypeInStructuredBuffer,
-            elementType);
+        StringBuilder sb;
+        getTypeNameHint(sb, elementType);
+        m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
+            .type = sb.produceString(),
+            .location = inst->sourceLoc});
         m_hasErrors = true;
     }
 }

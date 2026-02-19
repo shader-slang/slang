@@ -1232,11 +1232,13 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
 {
     for (auto info = m_modulesBeingImported; info; info = info->next)
     {
-        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+        sink->diagnose(Diagnostics::ErrorInImportedModule{
+            .module = info->name->text,
+            .location = info->importLoc});
     }
     if (!isInLanguageServer())
     {
-        sink->diagnose(SourceLoc(), Diagnostics::compilationCeased);
+        sink->diagnose(Diagnostics::CompilationCeased{});
     }
 }
 
@@ -1435,7 +1437,9 @@ RefPtr<Module> Linkage::findOrImportModule(
         if (isBeingImported(previouslyLoadedModule))
         {
             // We seem to be in the middle of loading this module
-            sink->diagnose(requestingLoc, Diagnostics::recursiveModuleImport, moduleName);
+            sink->diagnose(Diagnostics::RecursiveModuleImport{
+                .module = moduleName,
+                .location = requestingLoc});
             return nullptr;
         }
 
@@ -1478,7 +1482,7 @@ RefPtr<Module> Linkage::findOrImportModule(
             // Should built-in modules shadow user modules, even when the
             // built-in module fails to load, for some reason?
             //
-            sink->diagnose(requestingLoc, Diagnostics::glslModuleNotAvailable, moduleName);
+            sink->diagnose(Diagnostics::GlslModuleNotAvailable{.location = requestingLoc});
         }
         return glslModule;
     }
