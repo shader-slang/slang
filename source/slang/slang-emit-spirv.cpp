@@ -7738,10 +7738,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto addrSpace = AddressSpace::Function;
         IRType* dataLayout = builder.getDefaultBufferLayoutType();
         if (destPtrType->hasAddressSpace())
-        {
             addrSpace = destPtrType->getAddressSpace();
+        if (destPtrType->getDataLayout() != nullptr)
             dataLayout = destPtrType->getDataLayout();
-        }
         auto ptrElementType =
             builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
 

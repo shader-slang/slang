@@ -240,7 +240,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         innerType,
                         AccessQualifier::Read,
                         AddressSpace::Uniform,
-                        builder.getDefaultBufferLayoutType()),
+                        getTypeLayoutTypeForBuffer(
+                            m_sharedContext->m_targetProgram,
+                            builder,
+                            cbParamInst->getDataType())),
                     cbParamInst,
                     key);
                 use->set(addr);
@@ -441,11 +444,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Strip any HLSL wrappers
             IRBuilder builder(m_sharedContext->m_irModule);
+            IRType* dataLayout = builder.getDefaultBufferLayoutType();
             auto cbufferType = as<IRConstantBufferType>(innerType);
             auto paramBlockType = as<IRParameterBlockType>(innerType);
             if (cbufferType || paramBlockType)
             {
-                innerType = as<IRUniformParameterGroupType>(innerType)->getElementType();
+                auto uniformParamGroupType = as<IRUniformParameterGroupType>(innerType);
+                innerType = uniformParamGroupType->getElementType();
+                dataLayout = uniformParamGroupType->getDataLayout();
                 if (addressSpace == AddressSpace::ThreadLocal)
                     addressSpace = AddressSpace::Uniform;
                 // Constant buffer is already treated like a pointer type, and
@@ -501,6 +507,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             {
                 innerType = lowerStructuredBufferType(structuredBufferType).structType;
                 addressSpace = getStorageBufferAddressSpace();
+                dataLayout = structuredBufferType->getDataLayout();
                 needLoad = false;
 
                 auto memoryFlags = MemoryQualifierSetModifier::Flags::kNone;
@@ -521,6 +528,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 auto glslShaderStorageBufferType = as<IRGLSLShaderStorageBufferType>(innerType))
             {
                 innerType = glslShaderStorageBufferType->getElementType();
+                dataLayout = glslShaderStorageBufferType->getDataLayout();
                 if (m_sharedContext->isSpirv14OrLater())
                 {
                     builder.addDecorationIfNotExist(innerType, kIROp_SPIRVBlockDecoration);
@@ -547,11 +555,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
 
             // Make a pointer type of storageClass.
             builder.setInsertBefore(inst);
-            ptrType = builder.getPtrType(
-                innerType,
-                access,
-                addressSpace,
-                builder.getDefaultBufferLayoutType());
+            ptrType = builder.getPtrType(innerType, access, addressSpace, dataLayout);
             inst->setFullType(ptrType);
             if (needLoad)
             {
@@ -578,7 +582,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     innerElementType,
                                     ptrType->getAccessQualifier(),
                                     addressSpace,
-                                    builder.getDefaultBufferLayoutType()),
+                                    dataLayout),
                                 inst,
                                 getElement->getIndex());
                             user->replaceUsesWith(newAddr);

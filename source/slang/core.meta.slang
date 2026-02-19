@@ -1363,7 +1363,7 @@ struct Ptr<
     // A user is allowed to explicitly cast between any pointer type of
     // the same address space
     __intrinsic_op($(kIROp_BitCast))
-    __init<U, Access accessOther, L:IBufferDataLayout>(Ptr<U, accessOther, addrSpace, L> ptr);
+    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace, L> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);

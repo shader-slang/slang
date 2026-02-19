@@ -2306,7 +2306,12 @@ ScalarizedVal extractField(
             auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType());
             auto valType = ptrType->getValueType();
             auto fieldType = getFieldType(valType, fieldKey);
-            auto fieldPtrType = builder->getPtrType(ptrType->getOp(), fieldType);
+            auto fieldPtrType = builder->getPtrType(
+                ptrType->getOp(),
+                fieldType,
+                ptrType->getAccessQualifier(),
+                ptrType->getAddressSpace(),
+                ptrType->getDataLayout());
             return ScalarizedVal::address(
                 builder->emitFieldAddress(fieldPtrType, val.irValue, fieldKey));
         }

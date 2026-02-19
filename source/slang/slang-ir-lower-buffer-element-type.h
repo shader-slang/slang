@@ -43,6 +43,7 @@ void lowerBufferElementTypeToStorageType(
 // Returns the type layout rules should be used for a buffer resource type.
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType);
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType);
+IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType);
 IRPtrType* copyBufferLayoutToPointer(
     TargetProgram* target,
     IRBuilder& builder,

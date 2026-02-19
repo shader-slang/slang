@@ -2047,21 +2047,15 @@ struct LoweredElementTypeContext
             materializeStorageToLogicalCastsImpl(inst);
     }
 
-    IRType* getBufferTypeLayoutType(IRBuilder& builder, IRType* bufferType)
-    {
-        TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
-        IROp layoutOp = getOpFromTypeLayoutRules(loweringConfig.layoutRuleName);
-        return as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
-    }
-
     IRPtrType* getPointerTypeWithBufferLayout(
         IRBuilder& builder,
         IRType* bufferType,
         IRType* elementType)
     {
-        IRType* layoutType = getBufferTypeLayoutType(builder, bufferType);
+        TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
         return builder
-            .getPtrType(elementType, AccessQualifier::ReadWrite, AddressSpace::Generic, layoutType);
+            .getPtrType(elementType, AccessQualifier::ReadWrite, loweringConfig.addressSpace, layoutType);
     }
 
     IRPtrType* copyBufferLayoutToPointer(
@@ -2069,7 +2063,7 @@ struct LoweredElementTypeContext
         IRType* bufferType,
         IRPtrTypeBase* pointerType)
     {
-        IRType* layoutType = getBufferTypeLayoutType(builder, bufferType);
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
 
         AccessQualifier access = pointerType->getAccessQualifier();
         AddressSpace addressSpace = pointerType->getAddressSpace();
