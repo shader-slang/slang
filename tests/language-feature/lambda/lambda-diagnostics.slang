@@ -15,15 +15,18 @@ void test()
             return 1;
         else
             return 3.0;
-//diag:     ^^^^^^ lambda return type mismatch
-//diag:     ^^^^^^ returned values must have the same type among all 'return' statements inside a lambda expression: returned 'float' here, but 'int' previously.
-//diag:            ^^^ implicit conversion not recommended
-//diag:            ^^^ implicit conversion from 'float' to 'int' is not recommended
+//diag: ^^^^^^ lambda return type mismatch
+//diag: ^^^^^^ returned values must have the same type among all 'return' statements inside a lambda expression: returned 'float' here, but 'int' previously.
+//diag:        ^^^ implicit conversion not recommended
+//diag:        ^^^ implicit conversion from 'float' to 'int' is not recommended
     };
     RayQuery q;
     let lam2 = (int a) => {
         q.Abort();
 //diag: ^ non-copyable type captured
 //diag: ^ cannot capture non-copyable type 'RayQuery<0>' in a lambda expression.
+//diag: ^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//diag:        ^ mutating method cannot be called on immutable value
+//diag:        ^ mutating method 'Abort' cannot be called on an immutable value
     };
 }

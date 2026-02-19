@@ -8572,7 +8572,7 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
                 // If this happens, then the explicit tag value expression
                 // doesn't seem to be a constant after all.
                 getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
-                    .expr = explicitTagValExpr});
+                    .location = explicitTagValExpr->loc});
             }
         }
         else
