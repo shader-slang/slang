@@ -8,6 +8,6 @@ struct S {};
 void test()
 {
     int x = 5;
-//CHECK ^ unused variable
+//CHECK: ^ unused variable
     // No diagnostic is produced on this line
 }

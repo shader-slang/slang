@@ -8,7 +8,7 @@ struct S {};
 void test()
 {
     if (1);
-//CHECK   ^ empty statement
+//CHECK:  ^ empty statement
     // Note: implicit conversion warning is also produced but not annotated
     // In non-exhaustive mode, this is OK
 }
