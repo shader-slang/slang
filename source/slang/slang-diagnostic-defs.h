@@ -136,110 +136,14 @@ DIAGNOSTIC(
 // 313xx: bit fields - converted to slang-diagnostics-semantic-checking-8.lua
 // 39999: converted to slang-diagnostics-semantic-checking-8.lua
 
-DIAGNOSTIC(
-    39999,
-    Error,
-    expectedPrefixOperator,
-    "function called as prefix operator was not declared `__prefix`")
-DIAGNOSTIC(
-    39999,
-    Error,
-    expectedPostfixOperator,
-    "function called as postfix operator was not declared `__postfix`")
-
-DIAGNOSTIC(39999, Error, notEnoughArguments, "not enough arguments to call (got $0, expected $1)")
-DIAGNOSTIC(39999, Error, tooManyArguments, "too many arguments to call (got $0, expected $1)")
-
-DIAGNOSTIC(39999, Error, invalidIntegerLiteralSuffix, "invalid suffix '$0' on integer literal")
-DIAGNOSTIC(
-    39999,
-    Error,
-    invalidFloatingPointLiteralSuffix,
-    "invalid suffix '$0' on floating-point literal")
-DIAGNOSTIC(
-    39999,
-    Warning,
-    integerLiteralTooLarge,
-    "integer literal is too large to be represented in a signed integer type, interpreting as "
-    "unsigned")
-
-DIAGNOSTIC(
-    39999,
-    Warning,
-    integerLiteralTruncated,
-    "integer literal '$0' too large for type '$1' truncated to '$2'")
-DIAGNOSTIC(
-    39999,
-    Warning,
-    floatLiteralUnrepresentable,
-    "$0 literal '$1' unrepresentable, converted to '$2'")
-DIAGNOSTIC(
-    39999,
-    Warning,
-    floatLiteralTooSmall,
-    "'$1' is smaller than the smallest representable value for type $0, converted to '$2'")
-
-DIAGNOSTIC(
-    39999,
-    Error,
-    matrixColumnOrRowCountIsOne,
-    "matrices with 1 column or row are not supported by the current code generation target")
-
-// 38xxx
-
-DIAGNOSTIC(
-    38000,
-    Error,
-    entryPointFunctionNotFound,
-    "no function found matching entry point name '$0'")
-
-DIAGNOSTIC(
-    38005,
-    Error,
-    expectedTypeForSpecializationArg,
-    "expected a type as argument for specialization parameter '$0'")
-
-DIAGNOSTIC(
-    38006,
-    Warning,
-    specifiedStageDoesntMatchAttribute,
-    "entry point '$0' being compiled for the '$1' stage has a '[shader(...)]' attribute that "
-    "specifies the '$2' stage")
-DIAGNOSTIC(
-    38007,
-    Error,
-    entryPointHasNoStage,
-    "no stage specified for entry point '$0'; use either a '[shader(\"name\")]' function attribute "
-    "or the '-stage <name>' command-line option to specify a stage")
-
-DIAGNOSTIC(
-    38008,
-    Error,
-    specializationParameterOfNameNotSpecialized,
-    "no specialization argument was provided for specialization parameter '$0'")
-DIAGNOSTIC(
-    38008,
-    Error,
-    specializationParameterNotSpecialized,
-    "no specialization argument was provided for specialization parameter")
-
-DIAGNOSTIC(
-    38009,
-    Error,
-    expectedValueOfTypeForSpecializationArg,
-    "expected a constant value of type '$0' as argument for specialization parameter '$1'")
-
-DIAGNOSTIC(
-    38010,
-    Warning,
-    unhandledModOnEntryPointParameter,
-    "$0 on parameter '$1' is unsupported on entry point parameters and will be ignored")
-
-DIAGNOSTIC(
-    38011,
-    Error,
-    entryPointCannotReturnResourceType,
-    "entry point '$0' cannot return type '$1' that contains resource types")
+// Diagnostics 229-333 moved to slang-diagnostics-semantic-checking-9.lua:
+// expectedPrefixOperator, expectedPostfixOperator, notEnoughArguments, tooManyArguments,
+// invalidIntegerLiteralSuffix, invalidFloatingPointLiteralSuffix, integerLiteralTooLarge,
+// integerLiteralTruncated, floatLiteralUnrepresentable, floatLiteralTooSmall,
+// matrixColumnOrRowCountIsOne, entryPointFunctionNotFound, expectedTypeForSpecializationArg,
+// specifiedStageDoesntMatchAttribute, entryPointHasNoStage, specializationParameterOfNameNotSpecialized,
+// specializationParameterNotSpecialized, expectedValueOfTypeForSpecializationArg,
+// unhandledModOnEntryPointParameter, entryPointCannotReturnResourceType
 
 DIAGNOSTIC(
     38100,

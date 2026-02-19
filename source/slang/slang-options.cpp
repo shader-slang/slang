@@ -4090,10 +4090,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             Int entryPointID = entryPoint.entryPointID;
             if (entryPointID == -1)
             {
-                m_sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::entryPointFunctionNotFound,
-                    entryPoint.name);
+                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
+                    .name = entryPoint.name});
                 continue;
             }
             auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];
