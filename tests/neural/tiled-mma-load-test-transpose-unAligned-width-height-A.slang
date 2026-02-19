@@ -79,7 +79,7 @@ void invalidateSharedMemoryA(uint tid)
         if (index >= TileSize * 2)
             break;
 
-        s_sharedMemoryA[index] = uint4(0x3C003C00);
+        TestPool.data[OffsetA + index] = uint4(0x3C003C00);
     }
     GroupMemoryBarrierWithWaveSync();
 }
@@ -87,9 +87,12 @@ void invalidateSharedMemoryA(uint tid)
 static const int SubgroupSize = 32;
 
 static const int TileSize = 4 * 16;
-groupshared uint4 s_sharedMemoryA[TileSize * 2];
 
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (TileSize * 2) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
 
 void testLoadShA<TargetEnum Target, int M, int K>(uint tid, uint tileIndex)
 {
@@ -97,12 +100,11 @@ void testLoadShA<TargetEnum Target, int M, int K>(uint tid, uint tileIndex)
 
     Address address = Address(inputBuffer);
 
-    SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, K, M, SubgroupSize, Target, true>.loadShA<half, Address>(sharedMemoryA, tileIndex, address);
+    MMAHelper<half, K, M, SubgroupSize, Target, TestPool, true>.loadShA<half, Address>(OffsetA, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 
-bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
+bool verifiedOutput<int M, int K>(uint tid, uint sharedMemOffset, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one column of the shared memory.
     // The tile width of A is just 16 for half type.
@@ -122,7 +124,7 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
         for (int i = 0; i < NumVectorsPerColumn; i++)
         {
             uint indexInTile = tid * NumVectorsPerColumn + i;
-            uint4 element = sharedMem[indexInTile];
+            uint4 element = TestPool.data[sharedMemOffset + indexInTile];
             if (indexInTile / NumVectorsPerColumn + tileIndex * WMMA_TileWidth >= M)
             {
                 // Checking paddings are correct for out-of-range elements.
@@ -176,7 +178,7 @@ bool verifiedOutput<int M, int K>(uint tid, SPtr sharedMem, uint tileIndex)
             if (indexInTile >= TileSize * 2)
                 break;
 
-            uint4 values = sharedMem[indexInTile];
+            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
             if (!values.equals(uint4(0x3C003C00)))
             {
                 return false;
@@ -204,9 +206,9 @@ void Test<int M, int K>(uint tid, uint tileIndex, int resIndex)
         testLoadShA<TargetEnum.SPIR_V, M, K>(tid, tileIndex);
         break;
     }
-    // serialRead<K>(tid, __getAddress(s_sharedMemoryA[0]));
+    // serialRead<K>(tid, OffsetA);
 
-    bool res = verifiedOutput<M, K>(tid, __getAddress(s_sharedMemoryA[0]), tileIndex);
+    bool res = verifiedOutput<M, K>(tid, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
@@ -214,7 +216,7 @@ void Test<int M, int K>(uint tid, uint tileIndex, int resIndex)
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<int K>(uint tid, SPtr sharedMem)
+void serialRead<int K>(uint tid, uint sharedMemOffset)
 {
     if (tid > 0)
         return;
@@ -227,7 +229,7 @@ void serialRead<int K>(uint tid, SPtr sharedMem)
         printf("col: %d\n", col);
         for (int i = 0; i < NumVectorsPerColumn; i++)
         {
-            uint4 values = sharedMem[col * NumVectorsPerColumn + i];
+            uint4 values = TestPool.data[sharedMemOffset + col * NumVectorsPerColumn + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {

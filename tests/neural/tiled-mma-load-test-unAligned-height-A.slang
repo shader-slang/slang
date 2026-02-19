@@ -49,10 +49,11 @@ void initWeightMatrix(uint tid)
 static const int InputSize = 32;
 static const int SubgroupSize = 32;
 
-// Tile A is size of 32 * 32 bytes: TileHeight is at least 16.
-groupshared uint4 s_sharedMemoryA[32 * 2];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (32 * 2) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
 
 void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
 {
@@ -60,12 +61,11 @@ void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
 
     Address address = Address(inputBuffer);
 
-    SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, M, SubgroupSize, Target, false>.loadShA<half, Address>(sharedMemoryA, tileIndex, address);
+    MMAHelper<half, InputSize, M, SubgroupSize, Target, TestPool, false>.loadShA<half, Address>(OffsetA, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 
-void invalidateSharedMemory(uint tid, SPtr shmPtr)
+void invalidateSharedMemory(uint tid, uint sharedMemOffset)
 {
     if (tid >= SubgroupSize)
         return;
@@ -79,12 +79,12 @@ void invalidateSharedMemory(uint tid, SPtr shmPtr)
         if (index >= 32 * 2)
             break;
 
-        shmPtr[index] = uint4(0x3C003C00);
+        TestPool.data[sharedMemOffset + index] = uint4(0x3C003C00);
     }
     GroupMemoryBarrierWithWaveSync();
 }
 
-bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
+bool verifiedOutput<int M>(uint tid, uint size, uint sharedMemOffset, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one row/column of the shared memory.
     // So each thread will check 2 uint4 elements (32 bytes/16 half) in the shared memory.
@@ -98,7 +98,7 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
         for (int i = 0; i < 2; i++)
         {
             uint indexInTile = tid * 2 + i;
-            uint4 values = sharedMem[indexInTile];
+            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
             uint4 element = values;
             if (indexInTile / 2 >= M)
             {
@@ -135,7 +135,7 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
         for (int i = 0; i < 2; i++)
         {
             uint indexInTile = tid * 2 + i;
-            uint4 values = sharedMem[indexInTile];
+            uint4 values = TestPool.data[sharedMemOffset + indexInTile];
             if (!values.equals(uint4(0x3C003C00)))
             {
                 return false;
@@ -148,7 +148,7 @@ bool verifiedOutput<int M>(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 
 void Test<int M>(uint tid, int resIndex)
 {
-    invalidateSharedMemory(tid, __getAddress(s_sharedMemoryA[0]));
+    invalidateSharedMemory(tid, OffsetA);
     __target_switch
     {
     case cuda:
@@ -158,9 +158,9 @@ void Test<int M>(uint tid, int resIndex)
         testLoadShA<TargetEnum.SPIR_V, M>(tid, 0);
         break;
     }
-    // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
+    // serialRead(tid, OffsetA);
 
-    bool res = verifiedOutput<M>(tid, M, __getAddress(s_sharedMemoryA[0]), 0);
+    bool res = verifiedOutput<M>(tid, M, OffsetA, 0);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
@@ -168,7 +168,7 @@ void Test<int M>(uint tid, int resIndex)
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, SPtr sharedMem)
+void serialRead(uint tid, uint sharedMemOffset)
 {
     if (tid > 0)
         return;
@@ -178,7 +178,7 @@ void serialRead(uint tid, SPtr sharedMem)
         printf("tid: %d\n", id);
         for (int i = 0; i < 2; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {

@@ -51,26 +51,26 @@ RWStructuredBuffer<uint> outputBuffer;
 static const int OutputSize = 32;
 static const int SubgroupSize = 32;
 
-// Tile A is size of 32 * 32 bytes: TileHeight is at least 16.
-groupshared uint4 s_sharedMemoryB[32 * 2];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (32 * 2) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetB = 0;
 
 void testLoadShB<TargetEnum Target, int K>(uint tid, uint tileIndex)
 {
-    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target>.Uint4AlignedK] = {};
+    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestPool>.Uint4AlignedK] = {};
     for (int i = 0; i < K; i++)
     {
         inputVector[i] = half(tid * 32 + i);
     }
 
-    SPtr sharedMemoryB = __getAddress(s_sharedMemoryB[0]);
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, K, OutputSize, SubgroupSize, Target>.loadVectorToShB(sharedMemoryB, tileIndex, 0, inputVector);
+    MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestPool>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
-void invalidateSharedMemory(uint tid, SPtr shmPtr)
+void invalidateSharedMemory(uint tid, uint sharedMemOffset)
 {
     if (tid >= SubgroupSize)
         return;
@@ -84,12 +84,12 @@ void invalidateSharedMemory(uint tid, SPtr shmPtr)
         if (index >= 32 * 2)
             break;
 
-        shmPtr[index] = uint4(0x3C003C00);
+        TestPool.data[sharedMemOffset + index] = uint4(0x3C003C00);
     }
     GroupMemoryBarrierWithWaveSync();
 }
 
-bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
+bool verifiedOutput<int K>(uint tid, uint sharedMemOffset, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one column of the shared memory.
     // So each thread will check 2 uint4 elements (32 bytes/16 half) in the shared memory.
@@ -100,7 +100,7 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
     for (int i = 0; i < 2; i++)
     {
         uint indexInTile = tid * 2 + i;
-        uint4 values = sharedMem[indexInTile];
+        uint4 values = TestPool.data[sharedMemOffset + indexInTile];
         uint4 element = values;
 
         for (int j = 0; j < 4; j++)
@@ -138,7 +138,7 @@ bool verifiedOutput<int K>(uint tid, SPtr sharedMem, uint tileIndex)
 
 void Test<int K>(uint tid, uint tileIndex, int resIndex)
 {
-    invalidateSharedMemory(tid, __getAddress(s_sharedMemoryB[0]));
+    invalidateSharedMemory(tid, OffsetB);
     __target_switch
     {
     case cuda:
@@ -148,9 +148,9 @@ void Test<int K>(uint tid, uint tileIndex, int resIndex)
         testLoadShB<TargetEnum.SPIR_V, K>(tid, tileIndex);
         break;
     }
-    // serialRead(tid, __getAddress(s_sharedMemoryB[0]));
+    // serialRead(tid, OffsetB);
 
-    bool res = verifiedOutput<K>(tid, __getAddress(s_sharedMemoryB[0]), tileIndex);
+    bool res = verifiedOutput<K>(tid, OffsetB, tileIndex);
     res = WaveActiveAllTrue(res);
 
     if (tid == 0)
@@ -158,7 +158,7 @@ void Test<int K>(uint tid, uint tileIndex, int resIndex)
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, SPtr sharedMem)
+void serialRead(uint tid, uint sharedMemOffset)
 {
     if (tid > 0)
         return;
@@ -168,7 +168,7 @@ void serialRead(uint tid, SPtr sharedMem)
         printf("tid: %d\n", id);
         for (int i = 0; i < 2; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {

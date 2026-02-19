@@ -37,11 +37,12 @@ RWStructuredBuffer<uint> outputBuffer;
 static const int BatchSize = 32;
 static const int SubgroupSize = 32;
 
-// Allocate large enough shared memory in this test.
-groupshared uint4 s_sharedMemoryA[256];
-groupshared uint4 s_sharedMemoryB[256];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (256 + 256) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
+static const uint OffsetB = 256;
 
 // Initialize the weight matrix as identity matrix.
 void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
@@ -84,16 +85,14 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
 #endif
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
     Address address = Address(inputBuffer);
 
-
-
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
     DType inputVector[InSize] = {};
@@ -102,24 +101,18 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
         inputVector[i] = DType(tid + 1);
     }
 
-    SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
-
-    // shared memory B and C can be reused.
-    SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
-
 #if !TEST_BIAS
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, address, none);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>( inputVector, OffsetA, OffsetB, OffsetB, address, none);
 #else
     Address biasAddress = Address(biasBuffer);
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>( inputVector, ptrA, ptrB, ptrC, address, biasAddress);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>( inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
 #endif
 
     return res;
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint rowOrColumnCount)
+void serialRead<T: __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset, uint rowOrColumnCount)
 {
     GroupMemoryBarrierWithGroupSync();
 
@@ -132,7 +125,7 @@ void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint ro
         printf("tid: %d\n", id);
         for (int i = 0; i < 2; i++)
         {
-            uint4 values = sharedMem[id * 2 + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * 2 + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
@@ -145,8 +138,6 @@ void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint ro
 
                     half aa = bit_cast<half>(a);
                     half bb = bit_cast<half>(b);
-                    // debugBuffer[linearIndex++] = aa;
-                    // debugBuffer[linearIndex++] = bb;
                     printf("%.1f %.1f ", float(aa), float(bb));
                 }
                 else
@@ -161,7 +152,7 @@ void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint ro
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] outputVector;
     __target_switch
     {
     case cuda:
