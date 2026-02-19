@@ -1,25 +1,25 @@
 result code = 0
 standard error = {
-warning[E31000]: link-time constant sized arrays warning
+warning[E31000]: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
   ╭╼ tests/library/ambiguous-extern-export-lib1.slang:4:47
   │
 4 │ public extern static const int[call_data_len] call_group_vector;
-  │                                               ━━━━━━━━━━━━━━━━━ Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
-warning[E31000]: link-time constant sized arrays warning
+  │                                               ━━━━━━━━━━━━━━━━━
+warning[E31000]: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
   ╭╼ tests/library/ambiguous-extern-export-lib1.slang:5:34
   │
 5 │ public static int[call_data_len] call_id_1 = {};
-  │                                  ━━━━━━━━━ Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
-warning[E31000]: link-time constant sized arrays warning
+  │                                  ━━━━━━━━━
+warning[E31000]: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
   ╭╼ tests/library/ambiguous-extern-export-lib2.slang:5:47
   │
 5 │ public extern static const int[call_data_len] call_group_vector;
-  │                                               ━━━━━━━━━━━━━━━━━ Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
-warning[E31000]: link-time constant sized arrays warning
+  │                                               ━━━━━━━━━━━━━━━━━
+warning[E31000]: Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
   ╭╼ tests/library/ambiguous-extern-export-lib2.slang:7:34
   │
 7 │ public static int[call_data_len] call_id_2 = {};
-  │                                  ━━━━━━━━━ Link-time constant sized arrays are a work in progress feature, some aspects of the reflection API may not work
+  │                                  ━━━━━━━━━
 }
 standard output = {
 }

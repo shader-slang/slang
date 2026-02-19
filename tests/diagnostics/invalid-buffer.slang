@@ -2,7 +2,7 @@
 
 Buffer b0;
 /*diag:
-^^^^^^ generic type used without arguments
+^^^^^^ generic type 'Buffer' used without argument
 ^^^^^^ generic type 'Buffer' used without argument
 */
 

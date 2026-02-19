@@ -2,7 +2,7 @@
 
 Tuple t0;
 /*diag:
-^^^^^ generic type used without arguments
+^^^^^ generic type 'Tuple' used without argument
 ^^^^^ generic type 'Tuple' used without argument
 */
 

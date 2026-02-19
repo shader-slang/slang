@@ -9,7 +9,7 @@ void f<T>(T t) where optional T: IThing
     // Unchecked optional constraint is an error.
     t.thing();
 /*diag:
-      ^^^^^ optional constraint not checked
-      ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage.
+      ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
+      ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
 */
 }
