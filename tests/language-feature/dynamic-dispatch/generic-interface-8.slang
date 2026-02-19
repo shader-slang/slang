@@ -1,12 +1,21 @@
 // createDynamicObject does not currently support generic interface types.
-// Attempting to use createDynamicObject<ICalculator<float>> fails because
-// the generic specialization cannot be resolved for the dynamic object
-// construction path.
+// This tests three variants that should all produce clean errors (not crashes):
+//   1. Concrete specialization: createDynamicObject<ICalculator<float>>
+//   2. Open type parameter:     createDynamicObject<ICalculator<T>>
+//   3. Interface type argument:  createDynamicObject<ICalculator<IFoo>>
 
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+
+interface IFoo
+{
+    float eval();
+}
 
 interface ICalculator<T>
 {
@@ -23,21 +32,29 @@ struct Multiplier : ICalculator<float>
     float compute(float a, float b) { return a * b; }
 }
 
-ICalculator<float> createCalc(uint id)
+// Case 1: Concrete type specialization
+ICalculator<float> createCalcFloat(uint id)
 {
     // CHECK: ([[# @LINE+1]]): error 39999
     return createDynamicObject<ICalculator<float>>(id);
 }
 
-float test(uint id, float a, float b)
+// Case 2: Open type parameter
+ICalculator<T> createCalcGeneric<T>(uint id)
 {
-    let calc = createCalc(id);
-    return calc.compute(a, b);
+    // CHECK: ([[# @LINE+1]]): error 39999
+    return createDynamicObject<ICalculator<T>>(id);
+}
+
+// Case 3: Interface type as type argument
+ICalculator<IFoo> createCalcInterface(uint id)
+{
+    // CHECK: ([[# @LINE+1]]): error 39999
+    return createDynamicObject<ICalculator<IFoo>>(id);
 }
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    outputBuffer[0] = test(0, 3.0, 4.0);
-    outputBuffer[1] = test(1, 3.0, 4.0);
+    outputBuffer[0] = 0.0;
 }
