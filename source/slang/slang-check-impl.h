@@ -24,6 +24,17 @@ bool diagnoseCapabilityErrors(
     return sink->diagnose(pos, info, args...);
 }
 
+template<typename D>
+bool diagnoseCapabilityErrors(
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    D const& diagnostic)
+{
+    if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(diagnostic);
+}
+
 enum class IsSubTypeOptions
 {
     None = 0,
@@ -1300,6 +1311,21 @@ struct SemanticsVisitor : public SemanticsContext
         if (!getShared()->m_reportedDiagnosticKeys.add(key))
             return; // Already reported
         getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
+    /// Diagnose a rich diagnostic only once per unique key (diagnostic ID + serialized content).
+    template<typename D>
+    void diagnoseOnce(D const& diagnostic)
+    {
+        auto genericDiag = diagnostic.toGenericDiagnostic();
+        StringBuilder keyBuilder;
+        keyBuilder << D::getInfo()->id;
+        keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
+        keyBuilder << "|" << genericDiag.message;
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(diagnostic);
     }
 
 public:
