@@ -1162,7 +1162,7 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{.decl_ref = lookupResult.item.declRef.getDecl(), .location = loc});
+        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{.decl = lookupResult.item.declRef.getDecl(), .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -2661,7 +2661,7 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
-            getSink()->diagnose(subscriptExpr, Diagnostics::multiDimensionalArrayNotSupported);
+            getSink()->diagnose(Diagnostics::MultiDimensionalArrayNotSupported{.expr = subscriptExpr});
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);

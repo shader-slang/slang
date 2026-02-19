@@ -1013,6 +1013,10 @@ semantic_checking_5_module(helpers)
 local semantic_checking_6_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-6.lua")
 semantic_checking_6_module(helpers)
 
+-- Load semantic checking diagnostics (part 7) - Link Time, Cyclic Refs, Generics, Initializers, Variables, Parameters, Inheritance, Extensions, Subscripts
+local semantic_checking_7_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-7.lua")
+semantic_checking_7_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

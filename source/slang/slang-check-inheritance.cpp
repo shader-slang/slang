@@ -67,7 +67,7 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
     {
         if (decl == info->decl)
         {
-            getSink()->diagnose(decl, Diagnostics::circularityInExtension, decl);
+            getSink()->diagnose(Diagnostics::CircularityInExtension{.decl = decl});
             return true;
         }
     }

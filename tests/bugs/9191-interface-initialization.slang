@@ -38,6 +38,7 @@ IHelper test(int val)
     // check for the presense of the warning
 
     IHelper ret = { };
+//CHECK:          ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior
 //CHECK:          ^ initializing an interface variable with defaults is deprecated and may cause unexpected behavior. Please provide a compatible initializer or leave the variable uninitialized
 
     switch (val % 4)
