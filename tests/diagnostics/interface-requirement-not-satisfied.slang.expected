@@ -1,8 +1,10 @@
 result code = -1
 standard error = {
-tests/diagnostics/interface-requirement-not-satisfied.slang(10): error 38100: type 'T' does not provide required interface member 'bar'
-struct T : IFoo
-           ^~~~
+error[E38100]: missing interface member
+   ╭╼ tests/diagnostics/interface-requirement-not-satisfied.slang:10:12
+   │
+10 │ struct T : IFoo
+   │            ━━━━ type 'T' does not provide required interface member 'bar'
 tests/diagnostics/interface-requirement-not-satisfied.slang(7): note: see declaration of 'bar'
     void bar();
          ^~~

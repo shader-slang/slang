@@ -380,11 +380,9 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink);
     if (consumedArgCount != specializationArgCount)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            Math::Max(consumedArgCount, getSpecializationParamCount()),
-            specializationArgCount);
+        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+            .expected = (int)Math::Max(consumedArgCount, getSpecializationParamCount()),
+            .provided = (int)specializationArgCount});
     }
     if (sink->getErrorCount() != 0)
         return nullptr;
