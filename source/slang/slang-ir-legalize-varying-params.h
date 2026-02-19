@@ -34,6 +34,8 @@ void legalizeEntryPointVaryingParamsForWGSL(
     DiagnosticSink* sink,
     List<EntryPointInfo>& entryPoints);
 
+void refreshEntryPointResultLayouts(IRModule* module, List<IRFunc*> const& entryPoints);
+
 void depointerizeInputParams(IRFunc* entryPoint);
 
 // SystemValueSemanticName member definition macro
