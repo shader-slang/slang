@@ -96,7 +96,7 @@ function M.getLocationExpr(location_name, location_type)
 
 	-- Map types to their location extraction methods
 	local location_extractors = {
-		decl = location_name .. "->getNameLoc()",
+		decl = "getDiagnosticPos(" .. location_name .. ")",
 		expr = location_name .. "->loc",
 		stmt = location_name .. "->loc",
 		type = location_name .. "->loc",

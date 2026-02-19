@@ -2,6 +2,12 @@
 
 This document describes how to convert diagnostics from the old system (`slang-diagnostic-defs.h`) to the new Lua-based system (`slang-diagnostics.lua`).
 
+Critical checklist:
+
+- DO NOT use .expected files or filecheck tests if a test you are converting is a DIAGNOSTIC_TEST
+- DO NOT use non-exhaustive unless there are many cascading unrelated errors, if this is the case then clearly document why, it should almost never be used
+- DO NOT change the IDs of diagnostics, even if there are duplicate IDs
+
 ## CRITICAL: Updating Test Files
 
 When converting diagnostics, you will need to update test files. Follow these rules:
@@ -17,6 +23,8 @@ When converting diagnostics, you will need to update test files. Follow these ru
 // New format (USE THIS):
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 ```
+
+DO NOT use filecheck for these tests, unless the test depends on filecheck specific functionality (such as specifically checking the order of diagnostics emitted) please just use the diag= check
 
 ### Use caret-based position checks
 
@@ -39,6 +47,7 @@ void test() {
 4. Copy the suggested annotations into your test file
 
 Example test runner output:
+
 ```
 Suggested annotations you can copy:
   ⋮
@@ -52,6 +61,7 @@ Suggested annotations you can copy:
 **Only use `non-exhaustive` when there are cascading AND unrelated diagnostics.**
 
 For example, if your test triggers:
+
 1. The specific error you're testing (related)
 2. Additional cascading errors caused by #1 (unrelated to what you're testing)
 
@@ -144,12 +154,12 @@ err(
 
 **The main diagnostic message must be as short as possible while remaining accurate.** The span message provides the detailed context.
 
-| Old Diagnostic Message | Main Message (NEW) | Span Message (NEW) |
-|------------------------|--------------------|--------------------|
-| `"token pasting with '##' resulted in the invalid token '$0'"` | `"token paste failure"` | `"token pasting with '##' resulted in the invalid token '~token'"` |
-| `"'##' is not allowed at the start of a macro body"` | `"invalid '##' position"` | `"'##' is not allowed at the start of a macro body"` |
-| `"macro '$0' is not defined"` | `"undefined macro"` | `"macro '~name' is not defined"` |
-| `"redefinition of macro parameter '$0'"` | `"duplicate parameter"` | `"redefinition of macro parameter '~name'"` |
+| Old Diagnostic Message                                         | Main Message (NEW)        | Span Message (NEW)                                                 |
+| -------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------ |
+| `"token pasting with '##' resulted in the invalid token '$0'"` | `"token paste failure"`   | `"token pasting with '##' resulted in the invalid token '~token'"` |
+| `"'##' is not allowed at the start of a macro body"`           | `"invalid '##' position"` | `"'##' is not allowed at the start of a macro body"`               |
+| `"macro '$0' is not defined"`                                  | `"undefined macro"`       | `"macro '~name' is not defined"`                                   |
+| `"redefinition of macro parameter '$0'"`                       | `"duplicate parameter"`   | `"redefinition of macro parameter '~name'"`                        |
 
 **Why this matters:** The main message appears in the diagnostic header (e.g., `error[E15503]: token paste failure`). The span message appears inline with the source code providing detailed context. Having the same long message in both places is redundant and cluttered.
 
@@ -461,14 +471,14 @@ err(
 
 ## Key Differences Summarized
 
-| Aspect           | Old System                              | New System                                                    |
-| ---------------- | --------------------------------------- | ------------------------------------------------------------- |
-| **Name format**  | camelCase                               | space case                                                    |
-| **Interpolants** | `$0`, `$1`, ...                         | `~name:Type`                                                  |
-| **Location**     | First argument in `diagnose()`          | `loc` in primary `span`                                       |
+| Aspect           | Old System                              | New System                                                                        |
+| ---------------- | --------------------------------------- | --------------------------------------------------------------------------------- |
+| **Name format**  | camelCase                               | space case                                                                        |
+| **Interpolants** | `$0`, `$1`, ...                         | `~name:Type`                                                                      |
+| **Location**     | First argument in `diagnose()`          | `loc` in primary `span`                                                           |
 | **Message**      | Single message string                   | Split: diagnostic message (SHORT summary) + span message (original detailed text) |
-| **Notes**        | Separate DIAGNOSTIC call, emitted after | Inline `note { }` attached to main diagnostic                 |
-| **Type safety**  | None                                    | Generated C++ structs with typed members                      |
+| **Notes**        | Separate DIAGNOSTIC call, emitted after | Inline `note { }` attached to main diagnostic                                     |
+| **Type safety**  | None                                    | Generated C++ structs with typed members                                          |
 
 ## Notes Handling
 
@@ -600,6 +610,7 @@ By default, tests are **exhaustive**: all diagnostics must have annotations.
 ```
 
 If you find yourself tempted to use `non-exhaustive` because there are "too many diagnostics", that's a sign you need to:
+
 1. Add annotations for ALL diagnostics (preferred)
 2. Simplify the test case to emit fewer diagnostics
 3. Split into multiple smaller test files
