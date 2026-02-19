@@ -3043,7 +3043,7 @@ static DeclBase* ParseDeclaratorDecl(
         auto result = declGroupBuilder.getResult();
         if (!result)
         {
-            parser->sink->diagnose(startPosition, Diagnostics::declarationDidntDeclareAnything);
+            parser->sink->diagnose(Diagnostics::DeclarationDidntDeclareAnything{.location = startPosition});
         }
         return result;
     }

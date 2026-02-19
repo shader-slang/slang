@@ -413,7 +413,7 @@ void SemanticsStmtVisitor::visitCaseStmt(CaseStmt* stmt)
     auto switchStmt = FindOuterStmt<SwitchStmt>();
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
         return;
     }
 
@@ -496,7 +496,7 @@ void SemanticsStmtVisitor::visitTargetCaseStmt(TargetCaseStmt* stmt)
     }
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::caseOutsideSwitch);
+        getSink()->diagnose(Diagnostics::CaseOutsideSwitch{.stmt = stmt});
     }
     else
     {
@@ -518,7 +518,7 @@ void SemanticsStmtVisitor::visitDefaultStmt(DefaultStmt* stmt)
     auto switchStmt = FindOuterStmt<SwitchStmt>();
     if (!switchStmt)
     {
-        getSink()->diagnose(stmt, Diagnostics::defaultOutsideSwitch);
+        getSink()->diagnose(Diagnostics::DefaultOutsideSwitch{.stmt = stmt});
     }
     else
     {
