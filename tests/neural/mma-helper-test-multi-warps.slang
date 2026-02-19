@@ -55,12 +55,14 @@ static const int BatchSize = 64;
 static const int SubgroupSize = 32;
 
 // Allocate large enough shared memory in this test.
-groupshared uint4 s_sharedMemoryA[256];
-groupshared uint4 s_sharedMemoryB[512];
-
 groupshared bool s_resultMem[BatchSize/32];
 
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (256 + 512) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
+static const uint OffsetB = 256;
 
 // Initialize the weight matrix as identity matrix.
 void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
@@ -92,14 +94,14 @@ void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Storage = StructuredBufferStorage<DType>;
     Storage storage = Storage(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
     DType inputVector[InSize] = {};
@@ -108,17 +110,11 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
         inputVector[i] = DType(tid + 1);
     }
 
-    SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
-    // In this test, we can safely share the shMemB and shMemC, because they are always used at different time.
-    // And they are always the same size.
-    SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = ptrB;
-
 #if !TEST_BIAS
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, OffsetA, OffsetB, OffsetB, storage, 0, none, none);
 #else
     Storage biasStorage = Storage(biasBuffer);
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, storage, 0,
+    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, OffsetA, OffsetB, OffsetB, storage, 0,
                                                                                     biasStorage, Optional<Storage.Address>(0));
 #endif
 
@@ -127,7 +123,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint rowOrColumnCount)
+void serialRead<T: __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset, uint rowOrColumnCount)
 {
     if (tid > 0)
         return;
@@ -139,7 +135,7 @@ void serialRead<T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem, uint ro
         int numVectors = sizeof(uint4) / sizeof(T);
         for (int i = 0; i < numVectors; i++)
         {
-            uint4 values = sharedMem[id * numVectors + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * numVectors + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
@@ -185,7 +181,7 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] outputVector;
 
     __target_switch
     {

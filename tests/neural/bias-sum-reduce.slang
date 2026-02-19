@@ -30,18 +30,15 @@ static const int InputSize = 8;
 static const int MaxOutputSize = 64;
 
 typealias ShMemSize = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
-static const int ShMemSizeInBytes = ShMemSize.OfLayer1<InputSize, MaxOutputSize>.Bytes;
-
-groupshared uint4 s_sharedMemory[ShMemSizeInBytes / sizeof(uint4)];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+typealias Layer1 = ShMemSize.OfLayer1<InputSize, MaxOutputSize>;
+typealias TestPool = SharedMemoryPool<Layer1>;
 
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
 {
     BufferStorage storage = BufferStorage(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 
@@ -52,18 +49,16 @@ void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
         dOutVector[i] = DType((i + 1) * 0.01);
     }
 
-    SPtr shPtr = __getAddress(s_sharedMemory[0]);
-
     uint subgroupId = tid / SubgroupSize;
 
     // perform dOut OPA Input
-    MMA.sumReduceRows<DType, BufferStorage, DType[OutSize]>(shPtr, dOutVector, subgroupId, storage, 0);
+    MMA.sumReduceRows<DType, BufferStorage, DType[OutSize]>(0, dOutVector, subgroupId, storage, 0);
 
-    // serialRead<16, DType>(tid, shPtr);
+    // serialRead<16, DType>(tid, 0);
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, SPtr sharedMem)
+void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset)
 {
     GroupMemoryBarrierWithGroupSync();
 
@@ -76,7 +71,7 @@ void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, SPtr shared
         int strideInVector  = Stride / (sizeof(uint4) / sizeof(T));
         for (int i = 0; i < strideInVector; i++)
         {
-            uint4 values = sharedMem[id * strideInVector + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * strideInVector + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {

@@ -52,13 +52,12 @@ static const int InputSize = 32;
 static const int OutputSize = 32;
 static const int SubgroupSize = 32;
 
-// Tile A is size of OutputSize * 32 bytes
-groupshared uint4 s_sharedMemoryA[OutputSize * 2];
-
-// Tile B is size of 32 x SubgroupSize bytes
-groupshared uint4 s_sharedMemoryB[SubgroupSize * 2];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (OutputSize * 2 + SubgroupSize * 2) * sizeof(uint4);
+}
+typealias TestPool = SharedMemoryPool<TestShMemSize>;
+static const uint OffsetA = 0;
+static const uint OffsetB = OutputSize * 2;
 
 void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
 {
@@ -66,13 +65,12 @@ void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
 
     Storage storage = Storage(inputBuffer);
 
-    SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, true>.loadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestPool, true>.loadShA<half, Storage>(OffsetA, tileIndex, storage, 0);
     GroupMemoryBarrierWithWaveSync();
 }
 
 
-bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
+bool verifiedOutput(uint tid, uint size, uint sharedMemOffset, uint tileIndex)
 {
     // Verify the output is correct, each thread will verify one column of the shared memory.
     // The tile width of A is just 16 for half type.
@@ -92,7 +90,7 @@ bool verifiedOutput(uint tid, uint size, SPtr sharedMem, uint tileIndex)
 
     for (int i = 0; i < NumVectorsPerColumn; i++)
     {
-        uint4 values = sharedMem[indexInTile + i];
+        uint4 values = TestPool.data[sharedMemOffset + indexInTile + i];
         uint4 element = values;
         for (int j = 0; j < 4; j++)
         {
@@ -136,16 +134,16 @@ void test(uint tid, uint tileIndex, uint resIndex)
         testLoadShA<TargetEnum.SPIR_V>(tid, tileIndex);
         break;
     }
-    // serialRead(tid, __getAddress(s_sharedMemoryA[0]));
+    // serialRead(tid, OffsetA);
 
-    bool res = verifiedOutput(tid, OutputSize, __getAddress(s_sharedMemoryA[0]), tileIndex);
+    bool res = verifiedOutput(tid, OutputSize, OffsetA, tileIndex);
     res = WaveActiveAllTrue(res);
     if (tid == 0)
         outputBuffer[resIndex] = res ? 1 : 0;
 }
 
 // This function is just used for debugging, not for verification. So keep it here.
-void serialRead(uint tid, SPtr sharedMem)
+void serialRead(uint tid, uint sharedMemOffset)
 {
     GroupMemoryBarrierWithWaveSync();
 
@@ -158,7 +156,7 @@ void serialRead(uint tid, SPtr sharedMem)
         printf("col: %d\n", id);
         for (int i = 0; i < 4; i++)
         {
-            uint4 values = sharedMem[id * 4 + i];
+            uint4 values = TestPool.data[sharedMemOffset + id * 4 + i];
             uint4 element = values;
             for (int j = 0; j < 4; j++)
             {
