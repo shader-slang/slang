@@ -3215,7 +3215,19 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
     {
         if (!cachedResult)
             return nullptr;
-        return cachedResult->getInst();
+        if (cachedResult->getParent() == nullptr)
+        {
+            // The cached result has been removed from the IR, so we should remove it from the cache
+            // as well.
+            //
+            getModule()->getAssociatedInstCache()->remove(key);
+
+            // Fall through to do a lookup as if it wasn't cached.
+        }
+        else
+        {
+            return cachedResult->getInst();
+        }
     }
 
     IRAssociatedInstAnnotation* result = nullptr;

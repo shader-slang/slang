@@ -1091,7 +1091,7 @@ static bool _canModifierBeAddedDuringCoercion(SemanticsVisitor* ctx, Type* fromT
 /// For example, it is generally safe to convert from a value
 /// of type `const T` to a value of type `T` in C/C++.
 ///
-static bool _canModifierBeDroppedDuringCoercion(SemanticsContext* ctx, Val* modifier)
+static bool _canModifierBeDroppedDuringCoercion(Val* modifier)
 {
     switch (modifier->astNodeType)
     {
@@ -1431,7 +1431,7 @@ bool SemanticsVisitor::_coerce(
                     // then we need to know whether this modifier can be dropped
                     // to the type of an expression as part of coercion.
                     //
-                    if (!_canModifierBeDroppedDuringCoercion(this, modifier))
+                    if (!_canModifierBeDroppedDuringCoercion(modifier))
                     {
                         return _failedCoercion(toType, outToExpr, fromExpr, sink);
                     }

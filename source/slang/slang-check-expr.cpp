@@ -1483,6 +1483,7 @@ Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* t
             return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
         }
     }
+    return nullptr;
 }
 
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
@@ -1528,8 +1529,8 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
             // differentiable type interfaces, then we'll use the differentiable type interface
             // itself as the derivative type.
             //
-            if (auto declRefType = as<DeclRefType>(type))
-                if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+            if (auto innerDeclRefType = as<DeclRefType>(type))
+                if (auto interfaceDeclRef = innerDeclRefType->getDeclRef().as<InterfaceDecl>())
                     return witness->getSup();
 
             auto diffTypeLookupResult = lookUpMember(
@@ -1896,7 +1897,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
             // Leave the rest unregistered for now. The backend will take care of it.
         }
         else if (
-            auto witness = tryGetInterfaceConformanceWitness(
+            auto ptrWitness = tryGetInterfaceConformanceWitness(
                 type,
                 getASTBuilder()->getDifferentiableRefInterfaceType()))
         {
@@ -1922,7 +1923,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 getASTBuilder()->getDifferentiableInterfaceType()))
         {
             hasDiffValueConformance = true;
-            auto diffType = maybeRegisterVal(
+            maybeRegisterVal(
                 this,
                 type,
                 type,
@@ -1932,13 +1933,13 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 type,
                 (SlangInt)ValAssociationKind::DifferentialPairType,
                 getCurrentASTBuilder()->getDifferentialPairType(type, witness));
-            auto dzeroFunc = maybeRegisterVal(
+            maybeRegisterVal(
                 this,
                 type,
                 type,
                 getName("dzero"),
                 ValAssociationKind::DifferentialZero);
-            auto daddFunc = maybeRegisterVal(
+            maybeRegisterVal(
                 this,
                 type,
                 type,
@@ -1959,7 +1960,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                         type);
                 return;
             }
-            auto diffPtrType = maybeRegisterVal(
+            maybeRegisterVal(
                 this,
                 type,
                 type,
@@ -3463,8 +3464,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
             Index paramCount = funcType->getParamCount();
 
-            bool areParamDeclsAvailable =
-                funcDeclBase && funcDeclBase->getMembersOfType<ParamDecl>().getCount() > 0;
             for (Index pp = 0; pp < paramCount; ++pp)
             {
                 auto paramType = funcType->getParamTypeWithModeWrapper(pp);

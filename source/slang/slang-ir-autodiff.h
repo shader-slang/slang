@@ -517,11 +517,13 @@ struct DifferentiableTypeConformanceContext
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
+        SLANG_UNUSED(builder);
         return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialZero);
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
+        SLANG_UNUSED(builder);
         return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialAdd);
     }
 

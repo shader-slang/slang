@@ -1406,11 +1406,6 @@ void applyToInst(
     }
 }
 
-static IRBlock* getParamPreludeBlock(IRGlobalValueWithCode* func)
-{
-    return func->getFirstBlock()->getNextBlock();
-}
-
 void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
@@ -1424,15 +1419,8 @@ void applyCheckpointSet(
         cloneCtx->pendingUses.add(use);
 
     // Go back over the insts and move/clone them accoridngly.
-    auto paramPreludeBlock = getParamPreludeBlock(func);
     for (auto block : func->getBlocks())
     {
-        // Skip parameter block and the param prelude block.
-        // if (block == func->getFirstBlock() || block == paramPreludeBlock)
-        // For AD 2.0, no need for any blocks..
-        // if (block == func->getFirstBlock())
-        //    continue;
-
         if (isDifferentialBlock(block))
             continue;
 
@@ -1564,6 +1552,8 @@ IRVar* emitIndexedLocalVar(
     SourceLoc location,
     bool shouldInitialize = true)
 {
+    SLANG_UNUSED(shouldInitialize);
+
     // Cannot store pointers. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!asRelevantPtrType(baseType));
 
@@ -1578,11 +1568,6 @@ IRVar* emitIndexedLocalVar(
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-
-    /*
-    if (shouldInitialize)
-        varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
-    */
 
     return var;
 }

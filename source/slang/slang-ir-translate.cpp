@@ -77,21 +77,21 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
         break;
     case kIROp_MakeIDifferentiableWitness:
         {
-            IRBuilder builder(autodiffContext.moduleInst);
+            IRBuilder diffPairBuilder(autodiffContext.moduleInst);
             DifferentiableTypeConformanceContext ctx(&autodiffContext);
             auto baseType = inst->getOperand(0);
             SLANG_ASSERT(as<IRDifferentialPairTypeBase>(baseType));
             if (as<IRDifferentialPairType>(baseType))
             {
                 return memoize(ctx.buildDifferentiablePairWitness(
-                    &builder,
+                    &diffPairBuilder,
                     cast<IRDifferentialPairTypeBase>(baseType),
                     DiffConformanceKind::Value));
             }
             else if (as<IRDifferentialPtrPairType>(baseType))
             {
                 return memoize(ctx.buildDifferentiablePairWitness(
-                    &builder,
+                    &diffPairBuilder,
                     cast<IRDifferentialPtrPairType>(baseType),
                     DiffConformanceKind::Ptr));
             }
@@ -429,6 +429,7 @@ IRInst* TranslationContext::resolveInst(IRInst* inst)
 
         inst = resolvedInst;
     }
+    return nullptr;
 }
 
 }; // namespace Slang

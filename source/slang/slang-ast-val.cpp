@@ -919,7 +919,7 @@ Val* DiffTypeInfoWitness::_substituteImplOverride(
     List<Val*> newOperands;
 
     int diff = 0;
-    for (UIndex ii = 0; ii < getOperandCount(); ii++)
+    for (Index ii = 0; ii < (Index)getOperandCount(); ii++)
     {
         auto operand = getOperand(ii);
         auto newOperand = operand ? operand->substituteImpl(astBuilder, subst, &diff) : nullptr;
@@ -941,7 +941,7 @@ Val* DiffTypeInfoWitness::_resolveImplOverride()
 {
     List<Val*> newOperands;
     int diff = 0;
-    for (UIndex ii = 0; ii < getOperandCount(); ii++)
+    for (Index ii = 0; ii < (Index)getOperandCount(); ii++)
     {
         auto operand = getOperand(ii);
         auto newOperand = operand ? operand->resolve() : nullptr;
@@ -988,7 +988,6 @@ Val* HigherOrderDiffTypeTranslationWitness::_substituteImplOverride(
 
 Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
 {
-    int diff = 0;
     auto resolvedWitness = getBaseWitness()->resolve();
 
     if (auto diffTypeInfoWitness = as<DiffTypeInfoWitness>(resolvedWitness))
@@ -2191,8 +2190,7 @@ Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* 
     {
     case RequirementWitness::Flavor::val:
         {
-            auto specializedEntry =
-                specializeLookedUpRec(astBuilder, key, witness, unspecializedEntry);
+            auto specializedEntry = specializeLookedUpRec(astBuilder, witness, unspecializedEntry);
             SLANG_ASSERT(specializedEntry.getFlavor() == RequirementWitness::Flavor::val);
             return specializedEntry.getVal();
         }

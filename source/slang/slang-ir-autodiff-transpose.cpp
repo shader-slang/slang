@@ -540,6 +540,7 @@ struct DiffTransposePass
 
     void transposeDiffBlocksInFunc(IRFunc* revDiffFunc, FuncTranspositionInfo transposeInfo)
     {
+        SLANG_UNUSED(transposeInfo);
         // Note down terminal primal and terminal differential blocks
         // since we need to link them up at the end.
         auto terminalPrimalBlocks = getTerminalPrimalBlocks(revDiffFunc);
@@ -1334,7 +1335,7 @@ struct DiffTransposePass
             bwdPropArgs.add(revValue);
 
         // Emit the call.
-        auto bwdPropCall = builder->emitCallInst(builder->getVoidType(), bwdPropFunc, bwdPropArgs);
+        builder->emitCallInst(builder->getVoidType(), bwdPropFunc, bwdPropArgs);
 
         // Load gradients from the writebacks.
         List<RevGradient> gradients;

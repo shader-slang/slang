@@ -5185,12 +5185,15 @@ bool SemanticsVisitor::doesMemberSatisfyRequirement(
             return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable);
         }
     }
-    else if (auto memberFuncDecl = memberDeclRef.as<FuncAliasDecl>())
+    else if (auto memberFuncAliasDecl = memberDeclRef.as<FuncAliasDecl>())
     {
         if (auto requiredFuncDeclRef = requiredMemberDeclRef.as<FuncDecl>())
         {
             // Check signature match between the pointed to function and the requirement.
-            return doesSignatureMatchRequirement(memberFuncDecl, requiredFuncDeclRef, witnessTable);
+            return doesSignatureMatchRequirement(
+                memberFuncAliasDecl,
+                requiredFuncDeclRef,
+                witnessTable);
         }
     }
     else if (auto synMemberFuncDecl = memberDeclRef.as<SynthesizedFuncDecl>())
@@ -5500,7 +5503,7 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     outSubstitutions = SubstitutionSet(currentDeclRef);
 
     DeclRefBase* newDeclRef = nullptr;
-    for (UIndex i = 0; i < newGenericDecls.getCount(); i++)
+    for (Index i = 0; i < (Index)newGenericDecls.getCount(); i++)
     {
         auto genericDecl = newGenericDecls[i];
         auto origGenericDecl = declsToClone[i];
@@ -8155,6 +8158,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     SubtypeWitness* subTypeConformsToSuperInterfaceWitness)
 {
     SLANG_UNUSED(superInterfaceDeclRef)
+    SLANG_UNUSED(subTypeConformsToSuperInterfaceWitness);
+    SLANG_UNUSED(superInterfaceType);
 
     // The goal of this function is to find a suitable
     // value to satisfy the requirement.
@@ -8704,6 +8709,7 @@ void SemanticsVisitor::_checkDifferentialConformance(
     DeclRef<InterfaceDecl> superInterfaceDeclRef,
     WitnessTable* witnessTable)
 {
+    SLANG_UNUSED(subType);
     // Only perform this check if the super type is IDifferentiable.
     if (superInterfaceDeclRef.getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
         return;
@@ -9490,7 +9496,7 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
     Index inheritanceClauseCounter = 0;
     for (auto inheritanceDecl : decl->getMembersOfType<InheritanceDecl>())
     {
-        Index inheritanceClauseIndex = inheritanceClauseCounter++;
+        inheritanceClauseCounter++;
 
         ensureDecl(inheritanceDecl, DeclCheckState::CanUseBaseOfInheritanceDecl);
         auto baseType = inheritanceDecl->base.type;
@@ -11817,6 +11823,7 @@ static DeclRef<SynthesizedFuncDecl> addSynthesizedFunc(
     FuncType* targetFuncType,
     bool isStatic)
 {
+    SLANG_UNUSED(visitor);
     auto astBuilder = getCurrentASTBuilder();
 
     auto synFunc = astBuilder->create<SynthesizedFuncDecl>();
@@ -11894,7 +11901,7 @@ static DeclRef<SynthesizedStructDecl> addSynthesizedStruct(
         SLANG_ASSERT(extGenericDecls.getCount() == synStructGenericDecls.getCount());
 
         DeclRefBase* newDeclRef = nullptr;
-        for (UIndex i = 0; i < synStructGenericDecls.getCount(); i++)
+        for (Index i = 0; i < (Index)synStructGenericDecls.getCount(); i++)
         {
             auto genericDecl = synStructGenericDecls[i];
             auto origGenericDecl = extGenericDecls[i];
@@ -11927,7 +11934,7 @@ static DeclRef<SynthesizedStructDecl> addSynthesizedStruct(
 
             if (!hasConformance)
             {
-                for (UIndex i = 0; i < extGenericDecls.getCount(); i++)
+                for (Index i = 0; i < (Index)extGenericDecls.getCount(); i++)
                 {
                     auto genericDecl = synStructGenericDecls[i];
                     auto origGenericDecl = extGenericDecls[i];
@@ -12010,7 +12017,7 @@ static DeclRef<Decl> buildQualifiedReference(SemanticsVisitor* visitor, Decl* de
 
     DeclRef<Decl> declRef =
         createDefaultSubstitutionsIfNeeded(astBuilder, visitor, decl->getDefaultDeclRef());
-    for (UIndex i = 0; i < genericDecls.getCount(); i++)
+    for (Index i = 0; i < (Index)genericDecls.getCount(); i++)
     {
         auto genericDecl = fromGenericDecls[i];
         auto origGenericDecl = genericDecls[i];
@@ -12071,7 +12078,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     if (!modifiedType->findModifier<NoDiffModifierVal>())
                     {
                         List<Val*> existingModifiers;
-                        for (UIndex i = 0; i < modifiedType->getModifierCount(); i++)
+                        for (Index i = 0; i < (Index)modifiedType->getModifierCount(); i++)
                         {
                             existingModifiers.add(modifiedType->getModifier(i));
                         }
@@ -15522,22 +15529,20 @@ static void translateBwdDerivativeAttributeToAD2(
         DeclRefType::create(getCurrentASTBuilder(), targetFuncDecl->getDefaultDeclRef());
 
     SubstitutionSet substSet;
-    Val* bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
+    DeclRef<Decl> bwdDiffFunc = as<DeclRefExpr>(attr->funcExpr)->declRef;
+
     auto bwdDiffExtension = extendContainerDecl(
         visitor,
         targetFuncDecl,
         visitor->getBackwardDiffFuncInterfaceType(funcAsType),
         substSet);
 
-
     auto substFuncAsTypeFromExtension =
         as<DeclRefType>(substFuncAsType->substitute(getCurrentASTBuilder(), substSet));
     auto funcAsTypeFromExtension =
         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
-    auto legacyBwdDiffFuncFromExtension = substituteDeclRef(
-        substSet,
-        getCurrentASTBuilder(),
-        as<DeclRefExpr>(attr->funcExpr)->declRef);
+    auto legacyBwdDiffFuncFromExtension =
+        substituteDeclRef(substSet, getCurrentASTBuilder(), bwdDiffFunc);
 
     auto synBwdDiffFunc = addSynthesizedFunc(
         visitor,
@@ -15656,26 +15661,6 @@ static void checkDerivativeAttribute(
         }
 }
 
-static void transferSubstAttribute(
-    SemanticsVisitor* visitor,
-    UserDefinedDerivativeAttribute* attr,
-    FunctionDeclBase* funcDecl)
-{
-    // If the substDecl has any auto-diff attributes, we want to transfer them to
-    // the funcDecl.
-    //
-    if (auto declRefExpr = as<DeclRefExpr>(attr->funcExpr))
-    {
-        if (auto declRef = declRefExpr->declRef)
-        {
-            if (as<ForwardDerivativeAttribute>(attr))
-                translateFwdDerivativeAttributeToAD2(
-                    visitor,
-                    funcDecl,
-                    as<ForwardDerivativeAttribute>(attr));
-        }
-    }
-}
 
 static void checkDerivativeAttribute(
     SemanticsVisitor* visitor,

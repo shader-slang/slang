@@ -276,7 +276,6 @@ RequirementWitness getUnspecializedLookupRec(
 
 RequirementWitness specializeLookedUpRec(
     ASTBuilder* astBuilder,
-    Decl* requirementKey,
     SubtypeWitness* witness,
     RequirementWitness lookedUpVal)
 {
@@ -287,11 +286,8 @@ RequirementWitness specializeLookedUpRec(
         if (auto nestedLookupDeclRef =
                 as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
         {
-            lookedUpVal = specializeLookedUpRec(
-                astBuilder,
-                nestedLookupDeclRef->getDecl(),
-                nestedLookupDeclRef->getWitness(),
-                lookedUpVal);
+            lookedUpVal =
+                specializeLookedUpRec(astBuilder, nestedLookupDeclRef->getWitness(), lookedUpVal);
             return lookedUpVal.specialize(
                 astBuilder,
                 SubstitutionSet(declaredSubtypeWitness->getDeclRef()));
@@ -338,8 +334,7 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         if (lookedUpVal.getFlavor() == RequirementWitness::Flavor::val ||
             lookedUpVal.getFlavor() == RequirementWitness::Flavor::declRef)
         {
-            auto specializedEntry =
-                specializeLookedUpRec(astBuilder, requirementKey, newWitness, lookedUpVal);
+            auto specializedEntry = specializeLookedUpRec(astBuilder, newWitness, lookedUpVal);
             switch (specializedEntry.getFlavor())
             {
             default:

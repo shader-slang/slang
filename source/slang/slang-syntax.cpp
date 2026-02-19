@@ -903,6 +903,7 @@ std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
     ASTBuilder* astBuilder,
     Type* paramTypeWithDirection)
 {
+    SLANG_UNUSED(astBuilder);
     if (as<OutParamType>(paramTypeWithDirection))
     {
         auto outParamType = as<OutParamType>(paramTypeWithDirection);

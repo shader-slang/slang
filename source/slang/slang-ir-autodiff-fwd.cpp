@@ -273,18 +273,12 @@ struct ForwardDiffTranslationContext
         if (auto typePack = as<IRTypePack>(pairType))
         {
             auto elemCount = typePack->getOperandCount();
-            auto primalTypePack = as<IRTypePack>(primal->getDataType());
-            auto diffTypePack = as<IRTypePack>(diff->getDataType());
 
             bool isMixedDifferential = false;
             List<IRInst*> pairElements;
             for (UInt i = 0; i < elemCount; i++)
             {
                 auto elemPairType = (IRType*)typePack->getOperand(i);
-                auto elemPrimalType =
-                    primalTypePack ? (IRType*)primalTypePack->getOperand(i) : primal->getDataType();
-                auto elemDiffType =
-                    diffTypePack ? (IRType*)diffTypePack->getOperand(i) : diff->getDataType();
                 auto elemPrimal = builder->emitElementExtract(primal, (IRIntegerValue)i);
                 auto elemDiff = builder->emitElementExtract(diff, (IRIntegerValue)i);
                 auto elemPair = emitMakeDiffPair(builder, elemPairType, elemPrimal, elemDiff);
@@ -362,8 +356,6 @@ struct ForwardDiffTranslationContext
     {
         auto primalAnnotation =
             as<IRAssociatedInstAnnotation>(maybeCloneForPrimalInst(builder, origInst));
-
-        IRAssociatedInstAnnotation* annotation = as<IRAssociatedInstAnnotation>(origInst);
 
         builder->markInstAsPrimal(primalAnnotation);
 
@@ -869,8 +861,6 @@ struct ForwardDiffTranslationContext
                 cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(1))
                     ->getRequirementKey();
 
-            IRInst* callee = primalCallee;
-
             // Lookup primal.fwd_diff : IForwardDifferentiable
             IRInst* higherOrderFwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
             auto higherOrderFwdDiffTable = _lookupWitness(
@@ -1112,10 +1102,8 @@ struct ForwardDiffTranslationContext
             auto primalArg = findOrTranslatePrimalInst(&argBuilder, origArg);
             SLANG_ASSERT(primalArg);
 
-            auto origType = origCall->getArg(ii)->getDataType();
             auto primalType = primalArg->getDataType();
             auto originalParamType = calleeType->getParamType(ii);
-            auto diffParamType = diffCalleeType->getParamType(ii);
 
             auto [originalParamPassingMode, originalParamBaseType] =
                 splitParameterDirectionAndType(originalParamType);
@@ -1160,9 +1148,6 @@ struct ForwardDiffTranslationContext
                         SLANG_ASSERT(as<IRPtrTypeBase>(primalType));
                         auto primalValType = as<IRPtrTypeBase>(primalType)->getValueType();
                         auto basePairType = diffTypeContext.tryGetDiffPairType(primalValType);
-                        auto ptrPairType = builder->getPtrTypeWithAddressSpace(
-                            primalValType,
-                            as<IRPtrTypeBase>(primalType));
 
                         auto srcVar = argBuilder.emitVar(basePairType);
                         diffTypeContext.markDiffPairTypeInst(
@@ -1353,14 +1338,12 @@ struct ForwardDiffTranslationContext
             auto typePack = as<IRTypePack>(diffReturnType);
             SLANG_ASSERT(typePack);
             UInt elemCount = typePack->getOperandCount();
-            auto diffReturnType = differentiateType(&afterBuilder, primalReturnType);
+            auto diffPackReturnType = differentiateType(&afterBuilder, primalReturnType);
             for (UInt i = 0; i < elemCount; ++i)
             {
-                auto elemType = (IRType*)typePack->getOperand(i);
                 auto primalElem = afterBuilder.emitElementExtract(callInst, i);
                 primalElements.add(primalElem);
 
-                auto diffElemType = differentiateType(&afterBuilder, elemType);
                 auto diffElem = afterBuilder.emitElementExtract(callInst, i);
                 diffElements.add(diffElem);
             }
@@ -1369,7 +1352,7 @@ struct ForwardDiffTranslationContext
                 primalElements.getCount(),
                 primalElements.getBuffer());
             auto diffPack = afterBuilder.emitMakeValuePack(
-                diffReturnType,
+                diffPackReturnType,
                 diffElements.getCount(),
                 diffElements.getBuffer());
             return InstPair(primalPack, diffPack);
@@ -3047,34 +3030,12 @@ struct ForwardDiffTranslationContext
     {
         IRInst* origReturnVal = origReturn->getVal();
 
-        auto returnDataType =
-            (IRType*)findOrTranslatePrimalInst(builder, origReturnVal->getDataType());
-
         IRFunc* parentFunc = getParentFunc(origReturn);
         auto funcReturnDataType = (IRType*)findOrTranslatePrimalInst(
             builder,
             as<IRFuncType>(parentFunc->getDataType())->getResultType());
 
-        if (as<IRFunc>(origReturnVal) || as<IRGeneric>(origReturnVal) ||
-            as<IRStructType>(origReturnVal) || as<IRFuncType>(origReturnVal))
-        {
-            SLANG_UNEXPECTED(
-                "Function, generic, struct, and functype return values should have been handled "
-                "elsewhere.");
-            // If the return value is itself a function, generic or a struct then this
-            // is likely to be a generic scope. In this case, we lookup the differential
-            // and return that.
-            IRInst* primalReturnVal = findOrTranslatePrimalInst(builder, origReturnVal);
-            IRInst* diffReturnVal = findOrTranslateDiffInst(builder, origReturnVal);
-
-            // Neither of these should be nullptr.
-            SLANG_RELEASE_ASSERT(primalReturnVal && diffReturnVal);
-            IRReturn* diffReturn = as<IRReturn>(builder->emitReturn(diffReturnVal));
-            builder->markInstAsMixedDifferential(diffReturn, nullptr);
-
-            return InstPair(diffReturn, diffReturn);
-        }
-        else if (auto pairType = diffTypeContext.tryGetDiffPairType(funcReturnDataType))
+        if (auto pairType = diffTypeContext.tryGetDiffPairType(funcReturnDataType))
         {
             IRInst* primalReturnVal = findOrTranslatePrimalInst(builder, origReturnVal);
             IRInst* diffReturnVal = findOrTranslateDiffInst(builder, origReturnVal);
@@ -3365,6 +3326,7 @@ IRInst* maybeTranslateForwardDerivativeWitness(
     DiagnosticSink* sink,
     IRSynthesizedForwardDerivativeWitnessTable* translateInst)
 {
+    SLANG_UNUSED(sink);
     auto fwdDiffWitnessSynInst = as<IRSynthesizedForwardDerivativeWitnessTable>(translateInst);
     auto fwdDiffFunc = fwdDiffWitnessSynInst->getOperand(0);
 
@@ -3431,6 +3393,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
     DiagnosticSink* sink,
     IRSynthesizedBackwardDerivativeWitnessTable* translateInst)
 {
+    SLANG_UNUSED(sink);
     auto bwdDiffWitnessSynInst = as<IRSynthesizedBackwardDerivativeWitnessTable>(translateInst);
     auto baseFunc = bwdDiffWitnessSynInst->getOperand(0);
     auto baseConformanceType = cast<IRInterfaceType>(

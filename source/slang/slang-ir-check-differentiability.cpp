@@ -185,6 +185,7 @@ public:
         {
             return true;
         }
+        return false;
     }
 
     bool isInstInFunc(IRInst* inst, IRInst* func)

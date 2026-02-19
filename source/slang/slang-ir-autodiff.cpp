@@ -51,7 +51,6 @@ IRInst* _lookupWitness(
         SLANG_ASSERT(resultType);
         return builder->emitLookupInterfaceMethodInst(resultType, witness, requirementKey);
     }
-    return nullptr;
 }
 
 static IRInst* _getDiffTypeFromPairType(
@@ -179,6 +178,7 @@ IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(
     IRInterfaceType* interface,
     UInt index)
 {
+    SLANG_UNUSED(moduleInst);
     if (interface)
     {
         // Assume for now that IDifferentiable has exactly five fields.

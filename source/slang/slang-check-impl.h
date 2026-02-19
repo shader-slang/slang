@@ -779,24 +779,17 @@ public:
         InheritanceCircularityInfo* next = nullptr;
     };
 
-    struct InheritanceContext
-    {
-        bool useSimpleInheritance = false;
-    };
-
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker() { return &m_glslBindingOffsetTracker; }
 
     /// Get the processed inheritance information for `type`, including all its facets
     InheritanceInfo getInheritanceInfo(
         Type* type,
-        InheritanceCircularityInfo* circularityInfo = nullptr,
-        InheritanceContext context = InheritanceContext());
+        InheritanceCircularityInfo* circularityInfo = nullptr);
 
     /// Get the processed inheritance information for `extension`, including all its facets
     InheritanceInfo getInheritanceInfo(
         DeclRef<ExtensionDecl> const& extension,
-        InheritanceCircularityInfo* circularityInfo = nullptr,
-        InheritanceContext context = InheritanceContext());
+        InheritanceCircularityInfo* circularityInfo = nullptr);
 
     /// Prevent an unsupported case of
     /// ```
@@ -868,17 +861,14 @@ private:
     InheritanceInfo _getInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo,
-        InheritanceContext context);
-    InheritanceInfo _calcInheritanceInfo(
-        Type* type,
-        InheritanceCircularityInfo* circularityInfo,
-        InheritanceContext context);
+        InheritanceCircularityInfo* circularityInfo);
+
+    InheritanceInfo _calcInheritanceInfo(Type* type, InheritanceCircularityInfo* circularityInfo);
+
     InheritanceInfo _calcInheritanceInfo(
         DeclRef<Decl> declRef,
         Type* selfType,
-        InheritanceCircularityInfo* circularityInfo,
-        InheritanceContext context);
+        InheritanceCircularityInfo* circularityInfo);
 
     ExtensionDecl* synthesizeExtensionForFunctionBaseType(DeclRefType* funcAsDeclRefType);
 

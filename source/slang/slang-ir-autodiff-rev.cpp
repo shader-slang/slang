@@ -98,14 +98,6 @@ static void generateName(IRBuilder* builder, IRInst* srcInst, IRInst* dstInst, c
     }
 }
 
-static IRInst* maybeHoist(IRBuilder& builder, IRInst* inst)
-{
-    IRInst* specializedVal = nullptr;
-    auto hoistResult = hoistValueFromGeneric(builder, inst, specializedVal, true);
-    return hoistResult; //(as<IRGeneric>(hoistResult)) ? getGenericReturnVal(hoistResult) :
-                        // hoistResult;
-}
-
 static IRInst* maybeHoistAndSpecialize(IRBuilder& builder, IRInst* inst)
 {
     IRInst* specializedVal = nullptr;
@@ -362,6 +354,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     DiagnosticSink* sink,
     IRBackwardFromLegacyBwdDiffFunc* translateInst)
 {
+    SLANG_UNUSED(sink);
     DifferentiableTypeConformanceContext diffTypeContext(sharedContext);
 
     IRInst* primalFunc = translateInst->getOperand(0);
@@ -383,8 +376,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     auto getValFunc = builder.createFunc();
 
     auto legacyBwdDiffFuncType = as<IRFuncType>(legacyBwdDiffFunc->getDataType());
-
-    auto outerParent = as<IRGeneric>(findOuterGeneric(primalFunc));
 
     auto primalFuncType = cast<IRFuncType>(primalFunc->getDataType());
 
@@ -644,7 +635,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
     applyFuncBuilder.emitReturn(applyFuncBuilder.emitLoad(contextVar));
 
-    if (legacyBwdDiffFuncType->getParamCount() > bwdDiffFuncArgs.getCount())
+    if ((Index)legacyBwdDiffFuncType->getParamCount() > bwdDiffFuncArgs.getCount())
     {
         // We have a d_out parameter.
         auto dOutParamType = legacyBwdDiffFuncType->getParamType(bwdDiffFuncArgs.getCount());
@@ -686,8 +677,8 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     DiagnosticSink* sink,
     IRLegacyBackwardDifferentiate* translateInst)
 {
+    SLANG_UNUSED(sink);
     IRInst* applyBwdFunc = translateInst->getOperand(0);
-    IRInst* contextType = translateInst->getOperand(1);
     IRInst* bwdPropFunc = translateInst->getOperand(2);
     IRFuncType* bwdDiffFuncType = cast<IRFuncType>(translateInst->getDataType());
 
@@ -721,7 +712,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     List<IRInst*> bwdPropFuncParams;
 
     // TODO: This logic is annoyingly confusing.. rewrite as a switch-case.
-    UIndex bwdDiffParamIdx = 0;
+    Index bwdDiffParamIdx = 0;
     for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
     {
         // auto applyParamType = this->applyBwdFunc->getParamType(i);
@@ -825,7 +816,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     // Do we have a left over parameter? This should be the
     // d_Out parameter.
     //
-    if (bwdDiffFuncParams.getCount() > bwdDiffParamIdx)
+    if (bwdDiffFuncParams.getCount() > (Index)bwdDiffParamIdx)
     {
         bwdPropFuncParams.add(bwdDiffFuncParams[bwdDiffParamIdx]);
     }

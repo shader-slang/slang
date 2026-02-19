@@ -191,6 +191,7 @@ IRInst* cloneInst(
 
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
+    SLANG_UNUSED(clonedInst);
     traverseUsers<IRAssociatedInstAnnotation>(
         originalInst,
         [&](IRAssociatedInstAnnotation* annotation)
@@ -660,6 +661,7 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
 
 bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
 {
+    SLANG_UNUSED(context);
     for (auto decor : table->getDecorations())
     {
         switch (decor->getOp())

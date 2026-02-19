@@ -206,7 +206,6 @@ struct UnzippingContext
     {
         IRBuilder globalBuilder(autodiffContext->moduleInst->getModule());
 
-        auto fwdCalleeType = mixedCall->getCallee()->getDataType();
         auto baseFn = _getOriginalFunc(mixedCall);
         SLANG_RELEASE_ASSERT(baseFn);
 
@@ -226,7 +225,7 @@ struct UnzippingContext
                 applyFuncArgs.add(arg);
         }
 
-        SLANG_ASSERT(applyFuncArgs.getCount() == applyBwdFuncType->getParamCount());
+        SLANG_ASSERT(applyFuncArgs.getCount() == (Index)applyBwdFuncType->getParamCount());
         auto contextVal = primalBuilder->emitCallInst(
             applyBwdFuncType->getResultType(),
             applyBwdFunc,
@@ -1014,7 +1013,6 @@ struct ExtractPrimalFuncContext
         auto paramBlock = func->getFirstBlock();
         builder.setInsertInto(paramBlock);
 
-        auto firstBlock = *(paramBlock->getSuccessors().begin());
         builder.setInsertBefore(paramBlock->getFirstOrdinaryInst());
         auto outIntermediary = builder.emitVar((IRType*)intermediateType);
 

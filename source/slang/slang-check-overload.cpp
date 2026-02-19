@@ -2645,12 +2645,12 @@ void SemanticsVisitor::AddDeclRefOverloadCandidates(
     }
     else if (auto funcAliasDeclRef = item.declRef.as<FuncAliasDecl>())
     {
-        auto funcDeclRef = substituteDeclRef(
+        auto aliasFuncDeclRef = substituteDeclRef(
                                SubstitutionSet(item.declRef),
                                m_astBuilder,
                                funcAliasDeclRef.getDecl()->targetDeclRef)
                                .as<CallableDecl>();
-        AddFuncOverloadCandidate(item, funcDeclRef, context, baseCost);
+        AddFuncOverloadCandidate(item, aliasFuncDeclRef, context, baseCost);
     }
     else if (auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>())
     {

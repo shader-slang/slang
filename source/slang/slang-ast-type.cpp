@@ -393,7 +393,6 @@ static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitn
     else
     {
         SLANG_UNEXPECTED("Unsupported diff witness for differential pair type");
-        return nullptr;
     }
 }
 
@@ -530,7 +529,7 @@ Val* BwdCallableFuncType::_resolveImplOverride()
 
         // Then, go through and translate all types (parameter & result) to their
         // differential variants, flipping directions.
-        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
@@ -617,7 +616,6 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         auto errorType = funcType->getErrorType();
 
         // Get references to the differentiable interfaces to determine witness type.
-        auto differentiableInterface = astBuilder->getDifferentiableInterfaceType();
         auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
 
         // Helper to check if witness is for IDifferentiablePtrType.
@@ -630,7 +628,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
 
         // Process each parameter.
         // For ApplyForBwd, differentiable params get wrapped in DifferentialPtrPairType.
-        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
@@ -700,10 +698,9 @@ Val* BwdDiffFuncType::_resolveImplOverride()
         auto errorType = funcType->getErrorType();
 
         // Process each parameter according to backward diff rules.
-        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            auto rawParamType = funcType->getParamTypeWithModeWrapper(i);
 
             auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
@@ -842,7 +839,7 @@ Val* FwdDiffFuncType::_resolveImplOverride()
             newParamTypes.add(thisParamType);
         }
 
-        for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
             auto rawParamType = funcType->getParamTypeWithModeWrapper(i);

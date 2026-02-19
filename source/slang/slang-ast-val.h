@@ -1100,7 +1100,6 @@ RequirementWitness getUnspecializedLookupRec(
 
 RequirementWitness specializeLookedUpRec(
     ASTBuilder* astBuilder,
-    Decl* requirementKey,
     SubtypeWitness* witness,
     RequirementWitness lookedUpVal);
 

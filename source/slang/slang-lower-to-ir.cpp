@@ -2076,6 +2076,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitHigherOrderDiffTypeTranslationWitness(
         HigherOrderDiffTypeTranslationWitness* val)
     {
+        SLANG_UNUSED(val);
         return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 
@@ -2204,45 +2205,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitDiffTypeInfoWitness(DiffTypeInfoWitness* val)
     {
+        SLANG_UNUSED(val);
         return LoweredValInfo::simple(getBuilder()->getVoidValue());
-        /*
-        // DiffTypeInfoWitness has a bunch of witnesses as operands. We lower them
-        // to a DiffTypeInfo IR instruction. If any operand is null, use NoneWitness.
-        // The first operand is the effective this-type which is not needed at IR level,
-        // so we skip it.
-        auto builder = getBuilder();
-        List<IRInst*> witnesses;
-
-        // Start from operand 1, skipping operand 0 (the effective this-type)
-        for (UIndex i = 1; i < val->getOperandCount(); i++)
-        {
-            auto operand = val->getOperand(i);
-            IRInst* witnessInst = nullptr;
-            if (operand)
-            {
-                witnessInst = lowerSimpleVal(context, operand);
-            }
-            if (!witnessInst)
-            {
-                // Use NoneWitness if operand is null
-                auto voidType = builder->getVoidType();
-                auto oldLoc = builder->getInsertLoc();
-                builder->setInsertInto(builder->getModule());
-                witnessInst = builder->createWitnessTable(voidType, voidType);
-                builder->setInsertLoc(oldLoc);
-            }
-            witnesses.add(witnessInst);
-        }
-
-        // Create a DiffTypeInfo instruction which is hoistable.
-        // It will be lowered to MakeTuple later in the pipeline.
-        //
-        return LoweredValInfo::simple(builder->emitIntrinsicInst(
-            builder->getVoidType(),
-            kIROp_DiffTypeInfo,
-            (UInt)witnesses.getCount(),
-            witnesses.getBuffer()));
-        */
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -4271,8 +4235,6 @@ void _lowerFuncDeclBaseTypeInfo(
     DeclRef<FunctionDeclBase> declRef,
     FuncDeclBaseTypeInfo& outInfo)
 {
-    auto builder = context->irBuilder;
-
     // If the function is described by a funcType, we'll default
     // to using that to lower the type information.
     //
@@ -5193,15 +5155,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     // pass.
     LoweredValInfo visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr)
     {
-        SLANG_ASSERT("Should not appear in lower-to-ir with AD 2.0 change");
+        SLANG_UNUSED(expr);
+        SLANG_UNEXPECTED("BackwardDifferentiateExpr present during IR lowered");
         return LoweredValInfo();
-        /*auto baseVal = lowerSubExpr(expr->baseFunction);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-
-        return LoweredValInfo::simple(
-            getBuilder()->emitBackwardDifferentiateInst(
-                lowerType(context, expr->type),
-                baseVal.val));*/
     }
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
@@ -9812,8 +9768,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
         else
         {
-            // TODO: Store the op in the modifier
-            IRInst* subTypeInst = irSubType;
             auto synModifier = inheritanceDecl->findModifier<SynthesizedModifier>();
 
             List<Val*> valOperands;
@@ -12367,11 +12321,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     else
                     {
                         // Assume that we have a type here...
-                        LoweredValInfo info =
+                        LoweredValInfo typeInfo =
                             emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
-                        if (info.flavor == LoweredValInfo::Flavor::Simple)
+                        if (typeInfo.flavor == LoweredValInfo::Flavor::Simple)
                         {
-                            irOperands.add(getSimpleVal(subContext, info));
+                            irOperands.add(getSimpleVal(subContext, typeInfo));
                         }
                         else
                         {
@@ -12381,10 +12335,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 }
                 else
                 {
-                    LoweredValInfo info = lowerVal(subContext, operand);
-                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                    LoweredValInfo valInfo = lowerVal(subContext, operand);
+                    if (valInfo.flavor == LoweredValInfo::Flavor::Simple)
                     {
-                        irOperands.add(getSimpleVal(subContext, info));
+                        irOperands.add(getSimpleVal(subContext, valInfo));
                     }
                     else
                     {
