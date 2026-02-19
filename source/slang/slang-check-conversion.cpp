@@ -459,10 +459,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            diagnoseOnce(
-                fromInitializerListExpr->loc,
-                Diagnostics::cannotUseInitializerListForType,
-                toType);
+            diagnoseOnce(Diagnostics::CannotUseInitializerListForType{.type = toType, .init_list = fromInitializerListExpr});
         }
 
         return false;
@@ -586,10 +583,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForVectorOfUnknownSize,
-                    toElementCount);
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForVectorOfUnknownSize{.element_count = toElementCount, .init_list = fromInitializerListExpr});
             }
             return false;
         }
@@ -630,10 +624,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForCoopVectorOfUnknownSize,
-                    toElementCount);
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForCoopVectorOfUnknownSize{.element_count = toElementCount, .init_list = fromInitializerListExpr});
             }
             return false;
         }
@@ -782,10 +773,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForMatrixOfUnknownSize,
-                    toMatrixType->getRowCount());
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForMatrixOfUnknownSize{.row_count = toMatrixType->getRowCount(), .init_list = fromInitializerListExpr});
             }
             return false;
         }
@@ -896,10 +884,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         //
         if (outToExpr)
         {
-            getSink()->diagnose(
-                fromInitializerListExpr,
-                Diagnostics::cannotUseInitializerListForType,
-                inToType);
+            getSink()->diagnose(Diagnostics::CannotUseInitializerListForType{.type = inToType, .init_list = fromInitializerListExpr});
         }
         return false;
     }
@@ -988,11 +973,7 @@ bool SemanticsVisitor::_coerceInitializerList(
     {
         if (outToExpr)
         {
-            getSink()->diagnose(
-                fromInitializerListExpr,
-                Diagnostics::tooManyInitializers,
-                argIndex,
-                argCount);
+            getSink()->diagnose(Diagnostics::TooManyInitializers{.expected = (int)argIndex, .got = (int)argCount, .init_list = fromInitializerListExpr});
         }
     }
     if (outToExpr)

@@ -312,7 +312,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     if (diagSink)
                     {
-                        diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
@@ -322,7 +322,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 if (diagSink)
                 {
-                    diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
                     *outProperType = m_astBuilder->getErrorType();
                 }
                 return false;
@@ -356,13 +356,13 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
             if (!genericTypeParamDecl)
             {
-                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
                 return false;
             }
             auto defaultType = CheckProperType(genericTypeParamDecl->initType);
             if (!defaultType)
             {
-                diagSink->diagnose(typeExp.exp, Diagnostics::genericTypeNeedsArgs, typeExp);
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
                 return false;
             }
             auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
