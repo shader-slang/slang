@@ -1151,7 +1151,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(DTypeMatC);
     internal static const int Uint4AlignedInputSize = ((N + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
-    // [DerivativeMember(Differential.data)]
+    [DerivativeMember(Differential.data)]
     internal T[Uint4AlignedInputSize] data;
     public int getCount() { return N; }
 
