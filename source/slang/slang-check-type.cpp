@@ -369,11 +369,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             if (!witness)
             {
                 // diagnose
-                getSink()->diagnose(
-                    genericTypeParamDecl->initType.exp,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    defaultType,
-                    constraintParam->sup);
+                getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                    .type_arg = defaultType,
+                    .interface = CheckProperType(constraintParam->sup),
+                    .location = genericTypeParamDecl->initType.exp->loc});
                 return false;
             }
             witnessArgs.add(witness);

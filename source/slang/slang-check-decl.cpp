@@ -7174,11 +7174,10 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         }
         else
         {
-            getSink()->diagnose(
-                inheritanceDecl,
-                Diagnostics::typeDoesntImplementInterfaceRequirement,
-                subType,
-                requiredMemberDeclRef);
+            getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+                .type = subType,
+                .member = requiredMemberDeclRef.getName() ? requiredMemberDeclRef.getName()->text : String(),
+                .location = inheritanceDecl->loc});
             getSink()->diagnose(
                 requiredMemberDeclRef,
                 Diagnostics::seeDeclarationOf,
@@ -7273,46 +7272,40 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     if (failureDetails.reason == WitnessSynthesisFailureReason::MethodResultTypeMismatch)
     {
         // Emit specific return type mismatch diagnostic
-        getSink()->diagnose(
-            failureDetails.candidateMethod,
-            Diagnostics::memberReturnTypeMismatch,
-            failureDetails.candidateMethod,
-            failureDetails.actualType,
-            failureDetails.expectedType);
+        getSink()->diagnose(Diagnostics::MemberReturnTypeMismatch{
+            .actual_type = failureDetails.actualType,
+            .expected_type = failureDetails.expectedType,
+            .member = failureDetails.candidateMethod.getDecl()});
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::ParameterDirMismatch)
     {
-        getSink()->diagnose(
-            failureDetails.paramDecl,
-            Diagnostics::parameterDirectionDoesNotMatchRequirement,
-            failureDetails.paramDecl,
-            failureDetails.actualDir,
-            failureDetails.expectedDir);
+        StringBuilder actualDirSb, expectedDirSb;
+        printDiagnosticArg(actualDirSb, failureDetails.actualDir);
+        printDiagnosticArg(expectedDirSb, failureDetails.expectedDir);
+        getSink()->diagnose(Diagnostics::ParameterDirectionDoesNotMatchRequirement{
+            .actual_direction = actualDirSb.produceString(),
+            .expected_direction = expectedDirSb.produceString(),
+            .param = failureDetails.paramDecl});
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::GenericSignatureMismatch)
     {
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::genericSignatureDoesNotMatchRequirement,
-            requiredMemberDeclRef.getDecl()->getName());
+        getSink()->diagnose(Diagnostics::GenericSignatureDoesNotMatchRequirement{
+            .member = requiredMemberDeclRef.getDecl()->getName()});
     }
     else
     {
         // General failure - use existing logic
         if (!lookupResult.isOverloaded() && lookupResult.isValid())
         {
-            getSink()->diagnose(
-                lookupResult.item.declRef,
-                Diagnostics::memberDoesNotMatchRequirementSignature,
-                lookupResult.item.declRef);
+            getSink()->diagnose(Diagnostics::MemberDoesNotMatchRequirementSignature{
+                .member = lookupResult.item.declRef.getDecl()});
         }
         else
         {
-            getSink()->diagnose(
-                inheritanceDecl,
-                Diagnostics::typeDoesntImplementInterfaceRequirement,
-                subType,
-                requiredMemberDeclRef);
+            getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+                .type = subType,
+                .member = requiredMemberDeclRef.getName() ? requiredMemberDeclRef.getName()->text : String(),
+                .location = inheritanceDecl->loc});
 
             for (auto& item : lookupResult)
                 getSink()->diagnose(item.declRef, Diagnostics::seeOverloadConsidered, item.declRef);
@@ -7671,11 +7664,10 @@ bool SemanticsVisitor::checkConformance(
             {
                 if (!as<ErrorType>(aggTypeDecl->aliasedType))
                 {
-                    getSink()->diagnose(
-                        inheritanceDecl,
-                        Diagnostics::typeArgumentDoesNotConformToInterface,
-                        aggTypeDecl->aliasedType,
-                        superType);
+                    getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .type_arg = aggTypeDecl->aliasedType,
+                        .interface = superType,
+                        .location = inheritanceDecl->loc});
                 }
             }
             return witness != nullptr;
@@ -10171,8 +10163,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())
                 {
                     getSink()->diagnose(
-                        modifier,
-                        Diagnostics::cannotUseBorrowInOnDifferentiableParameter);
+                        Diagnostics::CannotUseBorrowInOnDifferentiableParameter{
+                            .modifier = modifier});
                 }
             }
         }
@@ -10184,9 +10176,10 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             {
                 if (isTypeDifferentiable(calcThisType(getParentDecl(decl))))
                 {
+                    Modifier* attr = constrefAttr ? (Modifier*)constrefAttr : (Modifier*)refAttr;
                     getSink()->diagnose(
-                        constrefAttr,
-                        Diagnostics::cannotUseConstRefOnDifferentiableMemberMethod);
+                        Diagnostics::CannotUseConstrefOnDifferentiableMemberMethod{
+                            .attr = attr});
                 }
             }
         }
@@ -10704,7 +10697,7 @@ Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
     auto thisType = calcThisType(makeDeclRef(parent));
     if (!thisType)
     {
-        getSink()->diagnose(decl, Diagnostics::initializerNotInsideType);
+        getSink()->diagnose(Diagnostics::InitializerNotInsideType{.decl = decl});
         thisType = m_astBuilder->getErrorType();
     }
     return thisType;
@@ -14822,10 +14815,9 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     // Check if the element type contains recursive references
     if (containsRecursiveType(visitor, elementType))
     {
-        visitor->getSink()->diagnose(
-            varDecl->loc,
-            Diagnostics::recursiveTypesFoundInStructuredBuffer,
-            elementType);
+        visitor->getSink()->diagnose(Diagnostics::RecursiveTypesFoundInStructuredBuffer{
+            .type = elementType,
+            .location = varDecl->loc});
     }
 
     // Check if the element type is NonAddressable
