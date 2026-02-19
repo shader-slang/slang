@@ -1221,14 +1221,13 @@ bool SemanticsVisitor::_coerce(
                                       : nullptr;
             if (auto declCandidate = as<DeclRefExpr>(firstCandidate))
             {
-                sink->diagnose(
-                    fromExpr->loc,
-                    Diagnostics::ambiguousReference,
-                    declCandidate->declRef);
+                sink->diagnose(Diagnostics::AmbiguousReference{
+                    .name = getText(declCandidate->declRef.getName()),
+                    .location = fromExpr->loc});
             }
             else
             {
-                sink->diagnose(fromExpr->loc, Diagnostics::ambiguousExpression);
+                sink->diagnose(Diagnostics::AmbiguousExpression{.expr = fromExpr});
             }
         }
         return false;

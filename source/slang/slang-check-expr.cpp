@@ -1270,15 +1270,16 @@ void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
 {
-    getSink()->diagnose(
-        overloadedExpr,
-        Diagnostics::ambiguousReference,
-        lookupResult.items[0].declRef.getName());
+    getSink()->diagnose(Diagnostics::AmbiguousReference{
+        .name = getText(lookupResult.items[0].declRef.getName()),
+        .location = overloadedExpr->loc});
 
     for (auto item : lookupResult.items)
     {
         String declString = ASTPrinter::getDeclSignatureString(item, m_astBuilder);
-        getSink()->diagnose(item.declRef, Diagnostics::overloadCandidate, declString);
+        getSink()->diagnose(Diagnostics::OverloadCandidate{
+            .candidate = declString,
+            .location = item.declRef.getLoc()});
     }
 }
 
@@ -1290,7 +1291,7 @@ void SemanticsVisitor::diagnoseAmbiguousReference(Expr* expr)
     }
     else
     {
-        getSink()->diagnose(expr, Diagnostics::ambiguousExpression);
+        getSink()->diagnose(Diagnostics::AmbiguousExpression{.expr = expr});
     }
     expr->type = m_astBuilder->getErrorType();
 }
@@ -2532,7 +2533,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
     if (!result && sink)
     {
-        sink->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+        sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = expr});
     }
     return result;
 }
@@ -2559,7 +2560,7 @@ IntVal* SemanticsVisitor::CheckEnumConstantExpression(Expr* expr, ConstantFoldin
     auto result = tryConstantFoldExpr(expr, kind, nullptr);
     if (!result)
     {
-        getSink()->diagnose(expr, Diagnostics::expectedIntegerConstantNotConstant);
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = expr});
     }
     return result;
 }

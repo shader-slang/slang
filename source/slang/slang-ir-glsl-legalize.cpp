@@ -9,6 +9,7 @@
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 #include <functional>
 #include <spirv/unified1/spirv.h>
@@ -5308,10 +5309,15 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
         }
         else
         {
-            context->getSink()->diagnose(
-                param->firstUse->getUser(),
-                Diagnostics::ambiguousReference,
-                param);
+            // Get the name if available
+            String paramName;
+            if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
+                paramName = nameHint->getName();
+            else
+                paramName = "unnamed parameter";
+            context->getSink()->diagnose(Diagnostics::AmbiguousReference{
+                .name = paramName,
+                .location = param->firstUse->getUser()->sourceLoc});
         }
     }
 }

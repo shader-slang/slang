@@ -8571,9 +8571,8 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             {
                 // If this happens, then the explicit tag value expression
                 // doesn't seem to be a constant after all.
-                getSink()->diagnose(
-                    explicitTagValExpr,
-                    Diagnostics::expectedIntegerConstantNotConstant);
+                getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                    .expr = explicitTagValExpr});
             }
         }
         else
@@ -10814,7 +10813,7 @@ void SemanticsDeclHeaderVisitor::_visitAccessorDeclCommon(AccessorDecl* decl)
     }
     else
     {
-        getSink()->diagnose(decl, Diagnostics::accessorMustBeInsideSubscriptOrProperty);
+        getSink()->diagnose(Diagnostics::AccessorMustBeInsideSubscriptOrProperty{.decl = decl});
     }
 }
 
@@ -10832,7 +10831,7 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     //
     if (decl->getParameters().getCount() != 0)
     {
-        getSink()->diagnose(decl, Diagnostics::nonSetAccessorMustNotHaveParams);
+        getSink()->diagnose(Diagnostics::NonSetAccessorMustNotHaveParams{.decl = decl});
     }
 
     // By default, the return type of an accessor is treated as
@@ -10887,7 +10886,7 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
             // If the user declared more than one explicit
             // parameter, then that is an error.
             //
-            getSink()->diagnose(params[1], Diagnostics::setAccessorMayNotHaveMoreThanOneParam);
+            getSink()->diagnose(Diagnostics::SetAccessorMayNotHaveMoreThanOneParam{.param = params[1]});
         }
     }
     else
@@ -10934,12 +10933,10 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         }
         else
         {
-            getSink()->diagnose(
-                newValueParam,
-                Diagnostics::setAccessorParamWrongType,
-                newValueParam,
-                actualType,
-                newValueType);
+            getSink()->diagnose(Diagnostics::SetAccessorParamWrongType{
+                .actual_type = actualType,
+                .expected_type = newValueType,
+                .param = newValueParam});
         }
     }
     checkDifferentiableCallableCommon(decl);
@@ -13768,14 +13765,14 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         const auto b = as<BasicExpressionType>(t);
         if (!b)
         {
-            getSink()->diagnose(v->loc, Diagnostics::bitFieldNonIntegral, t);
+            getSink()->diagnose(Diagnostics::BitFieldNonIntegral{.type = t, .location = v->loc});
             continue;
         }
         const auto baseType = b->getBaseType();
         const bool isIntegerType = isIntegerBaseType(baseType);
         if (!isIntegerType)
         {
-            getSink()->diagnose(v->loc, Diagnostics::bitFieldNonIntegral, t);
+            getSink()->diagnose(Diagnostics::BitFieldNonIntegral{.type = t, .location = v->loc});
             continue;
         }
 
@@ -13785,12 +13782,11 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         SLANG_ASSERT(thisFieldTypeWidth != 0);
         if (thisFieldWidth > thisFieldTypeWidth)
         {
-            getSink()->diagnose(
-                v->loc,
-                Diagnostics::bitFieldTooWide,
-                thisFieldWidth,
-                t,
-                thisFieldTypeWidth);
+            getSink()->diagnose(Diagnostics::BitFieldTooWide{
+                .field_width = (int)thisFieldWidth,
+                .type = t,
+                .type_width = (int)thisFieldTypeWidth,
+                .location = v->loc});
             // Not much we can do with this field, just ignore it
             continue;
         }

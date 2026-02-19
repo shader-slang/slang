@@ -41,7 +41,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     auto constIntVal = as<ConstantIntVal>(intVal);
     if (!constIntVal)
     {
-        getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
         return nullptr;
     }
     return constIntVal;
@@ -59,7 +59,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
     auto constIntVal = as<ConstantIntVal>(intVal);
     if (!constIntVal)
     {
-        getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
+        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
         return nullptr;
     }
     return constIntVal;
@@ -1915,10 +1915,9 @@ Modifier* SemanticsVisitor::checkModifier(
                 }
                 if (scrutineeResults.isOverloaded())
                 {
-                    getSink()->diagnose(
-                        targetIntrinsic->scrutinee.loc,
-                        Diagnostics::ambiguousReference,
-                        targetIntrinsic->scrutinee.name);
+                    getSink()->diagnose(Diagnostics::AmbiguousReference{
+                        .name = getText(targetIntrinsic->scrutinee.name),
+                        .location = targetIntrinsic->scrutinee.loc});
                 }
                 targetIntrinsic->scrutineeDeclRef = scrutineeResults.item.declRef;
             }

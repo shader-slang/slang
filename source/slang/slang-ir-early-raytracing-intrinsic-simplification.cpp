@@ -4,6 +4,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -45,7 +46,7 @@ struct CacheOfDataToReplaceOps
         }
         else
         {
-            sink->diagnose(payloadVariable, Diagnostics::expectedIntegerConstantNotConstant);
+            sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.expr = nullptr});
         }
 
         IRInst* resultVariable;
@@ -54,10 +55,9 @@ struct CacheOfDataToReplaceOps
             // if somehow the location tied variable is missing and an error was not thrown by the
             // compiler
             resultVariable = builder.getIntValue(builder.getIntType(), 0);
-            sink->diagnose(
-                payloadVariable,
-                Diagnostics::expectedRayTracingPayloadObjectAtLocationButMissing,
-                intLitValue);
+            sink->diagnose(Diagnostics::ExpectedRayTracingPayloadObjectAtLocationButMissing{
+                .payload_location = intLitValue,
+                .location = payloadVariable->sourceLoc});
         }
         else
         {
