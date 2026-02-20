@@ -935,9 +935,10 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
 
         // We checked validity earlier
         const auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
-        auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)elementCount);
 
-        // Metal aligns vectors to 2/4 element boundaries.
+        // Metal by default aligns vectors to 2/4 element boundaries.
+        // We want to used the packed version.
+        // https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf#page=34
         size_t size = elementCount * elementSize;
         size_t alignment = elementSize;
 
@@ -947,6 +948,27 @@ struct MetalLayoutRulesImpl : public CPULayoutRulesImpl
         vectorInfo.alignment = alignment;
 
         return vectorInfo;
+    }
+
+    SimpleArrayLayoutInfo GetMatrixLayout(
+        BaseType elementType,
+        SimpleLayoutInfo elementInfo,
+        size_t rowCount,
+        size_t columnCount) override
+    {
+        SLANG_UNUSED(elementType);
+
+        // https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf#page=36
+        const auto elementSize = elementInfo.size.getFiniteValue().getValidValue();
+        auto alignedElementCount = 1 << Math::Log2Ceil((uint32_t)columnCount);
+        size_t alignment = alignedElementCount * elementSize;
+
+        SimpleArrayLayoutInfo info;
+        info.kind = elementInfo.kind;
+        info.alignment = alignment;
+        info.size = alignment * rowCount;
+        info.elementStride = alignment;
+        return info;
     }
 };
 
