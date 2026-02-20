@@ -80,8 +80,8 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     IRType* getOrCreateAlignedWrapper(IRType* innerType, IRIntegerValue alignment)
     {
         IRSizeAndAlignment naturalSizeAlignment;
-        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), innerType, &naturalSizeAlignment);
-        if (naturalSizeAlignment.alignment >= alignment)
+        if (SLANG_SUCCEEDED(getNaturalSizeAndAlignment(targetProgram->getTargetReq(), innerType, &naturalSizeAlignment))
+            && naturalSizeAlignment.alignment >= alignment)
             return innerType;
 
         auto key = AlignedTypeWrapperKey{innerType, alignment};
