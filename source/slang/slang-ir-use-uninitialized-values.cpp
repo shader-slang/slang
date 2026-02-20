@@ -288,6 +288,15 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // TODO: Ignore branches for now
         return None;
 
+    // Debug info instructions should be ignored - they don't constitute
+    // actual loads or stores of data, they're just metadata.
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugInlinedAt:
+        return None;
+
     case kIROp_Call:
         // Function calls can be either
         // stores or loads depending on
