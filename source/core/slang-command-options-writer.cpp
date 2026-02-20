@@ -352,12 +352,9 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                 }
 
                 m_builder << "### ";
-                if ((option.flags & CommandOptions::Flag::TemplateExpanded) &&
-                    option.usage.getLength())
+                if (option.displayName.getLength())
                 {
-                    auto spaceIdx = option.usage.indexOf(' ');
-                    auto headingName = (spaceIdx >= 0) ? option.usage.head(spaceIdx) : option.usage;
-                    _appendEscapedMarkdown(headingName, m_builder);
+                    _appendEscapedMarkdown(option.displayName, m_builder);
                 }
                 else
                 {

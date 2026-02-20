@@ -46,7 +46,7 @@ struct Option
     const char* name;
     const char* usage = nullptr;
     const char* description = nullptr;
-    CommandOptions::Flags flags = 0;
+    const char* displayName = nullptr;
 };
 
 enum class ValueCategory
@@ -107,7 +107,7 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
             opt.usage,
             opt.description,
             CommandOptions::UserValue(opt.optionKind),
-            opt.flags);
+            opt.displayName);
     }
 }
 
@@ -704,7 +704,7 @@ void initCommandOptions(CommandOptions& options)
          "* [GLSL "
          "wiki](https://github.com/KhronosGroup/glslang/wiki/"
          "HLSL-FAQ#auto-mapped-binding-numbers)\n",
-         CommandOptions::Flag::TemplateExpanded},
+         "-fvk-<vulkan-shift>-shift"},
         {OptionKind::VulkanBindGlobals,
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
@@ -810,7 +810,7 @@ void initCommandOptions(CommandOptions& options)
             "Specify path to a downstream <compiler> "
             "executable or library.\n",
             UserValue(OptionKind::CompilerPath),
-            CommandOptions::Flag::TemplateExpanded);
+            "-<compiler>-path");
     }
 
     const Option downstreamOpts[] = {

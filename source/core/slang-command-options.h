@@ -78,16 +78,17 @@ struct CommandOptions
     {
         enum Enum : Flags
         {
-            CanPrefix = 0x1,        /// Allows -Dfsggf or -D fdsfsd
-            IsPrefix = 0x2,         /// Is an option that can only be a prefix
-            TemplateExpanded = 0x4, /// Names are expansions of a template; prefer usage for display
+            CanPrefix = 0x1, /// Allows -Dfsggf or -D fdsfsd
+            IsPrefix = 0x2,  /// Is an option that can only be a prefix
         };
     };
 
     struct Option
     {
         UnownedStringSlice names; ///< Comma delimited list of names, first name is the default
-        UnownedStringSlice usage; ///< Describes usage, can be empty
+        UnownedStringSlice displayName; ///< Heading override for docs (e.g. template form); empty
+                                        ///< means use names
+        UnownedStringSlice usage;       ///< Describes usage, can be empty
         UnownedStringSlice description; ///< A description of usage
 
         UserValue userValue = kInvalidUserValue;
@@ -120,7 +121,7 @@ struct CommandOptions
         const char* usage,
         const char* description,
         UserValue userValue = kInvalidUserValue,
-        Flags flags = 0);
+        const char* displayName = nullptr);
     void add(
         const UnownedStringSlice* names,
         Count namesCount,
