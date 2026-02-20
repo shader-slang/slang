@@ -350,7 +350,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
 
                 IRBuilder builder(load);
                 builder.setInsertBefore(load);
-
+                auto rootAddr = getRootAddr(load->getPtr());
                 auto alignmentAttr = load->findAttr<IRAlignedAttr>();
                 bool needUnwrap = false;
                 if (alignmentAttr)
@@ -371,7 +371,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                         needUnwrap = true;
                     }
                 }
-                if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
+                if (isPointerToImmutableLocation(rootAddr))
                 {
                     if (auto immutableLoad = emitImmutableLoad(builder, load->getPtr()))
                     {
