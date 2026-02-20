@@ -35,8 +35,17 @@ jobs:
             -DSLANG_ENABLE_GFX=OFF \
             -DSLANG_ENABLE_SLANGD=OFF \
             -DSLANG_EXCLUDE_DAWN=ON \
-            -DSLANG_EXCLUDE_TINT=ON
-          cmake --workflow --preset release
+            -DSLANG_EXCLUDE_TINT=ON \
+            -DSLANG_EMBED_CORE_MODULE=OFF \
+            -DSLANG_ENABLE_SLANGRT=OFF \
+            -DSLANG_ENABLE_SLANGI=OFF \
+            -DSLANG_ENABLE_SLANG_GLSLANG=OFF \
+            -DSLANG_ENABLE_REPLAYER=OFF \
+            -DSLANG_ENABLE_DXIL=OFF \
+            -DSLANG_ENABLE_SLANG_RHI=OFF \
+            -DSLANG_ENABLE_PREBUILT_BINARIES=OFF \
+            -DSLANG_ENABLE_RELEASE_DEBUG_INFO=OFF
+          cmake --build --preset release --target slangc
 
       - name: Generate command line reference
         run: |
