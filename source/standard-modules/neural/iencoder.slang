@@ -30,12 +30,7 @@ public interface ITrainableEncoder<T,
     public associatedtype HyperParameters;
 
     [Differentiable]
-    public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T>
-        where Storage.Address == Storage.Differential.Address;
-
-    [Differentiable]
     public OutArray encode<Address>(in InArray input, Address parametersAddress)
-        where Address : IPointerLikeAddress<T>;
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T>;
 }
