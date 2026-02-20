@@ -4,6 +4,7 @@
 
 // An attempt to declare a global variable that actually declares a
 // global shader parameter should be diagnosed, unless `uniform` was used.
+// CHECK: warning[E39019]
 
 uniform float a;
 

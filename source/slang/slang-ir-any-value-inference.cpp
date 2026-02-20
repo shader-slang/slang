@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -302,13 +303,19 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(implType, Diagnostics::typeDoesNotFitAnyValueSize, implType);
-                sink->diagnoseWithoutSourceView(
-                    implType,
-                    Diagnostics::typeAndLimit,
-                    implType,
-                    sizeAndAlignment.size,
-                    existingMaxSize);
+                StringBuilder typeSb;
+                getTypeNameHint(typeSb, implType);
+                String typeStr = typeSb.produceString();
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = typeStr,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = typeStr,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 

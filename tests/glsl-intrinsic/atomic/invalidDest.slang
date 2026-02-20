@@ -6,20 +6,20 @@ uint notShared;
 
 void computeMain()
 {
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicAdd(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicAnd(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicCompSwap(notShared, 1u, 2u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicExchange(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicMax(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicMin(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicOr(notShared, 1u);
-    // CHECK: ([[# @LINE+1]]): error 41403
+    // CHECK: error[E41403]: invalid atomic destination
     atomicXor(notShared, 1u);
 }

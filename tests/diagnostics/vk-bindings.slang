@@ -1,13 +1,17 @@
 // vk-bindings.slang
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-entry main -target spirv
+// CHECK: warning[E39029]
+// CHECK: error[E39015]
+// CHECK: warning[E39001]
+// CHECK: note:
 
 // D3D `register` without VK binding
 Texture2D t : register(t0);
 /*CHECK:
+          ^ see declaration of 't'
               ^^^^^^^^ D3D register without Vulkan binding or shift
               ^^^^^^^^ shader parameter 't' has a 'register' specified for D3D
-          ^ see declaration of 't'
 */
 
 [[vk::binding(3)]]

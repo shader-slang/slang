@@ -536,7 +536,9 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
         {
             IRInst* destinationPtr = inst->getOperand(0);
             if (!isValidAtomicDest(skipFuncParamValidation, destinationPtr))
-                sink->diagnose(inst->sourceLoc, Diagnostics::invalidAtomicDestinationPointer);
+                sink->diagnose(Diagnostics::InvalidAtomicDestinationPointer{
+                    .location = inst->sourceLoc,
+                });
         }
         break;
 

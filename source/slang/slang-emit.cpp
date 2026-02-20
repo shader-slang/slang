@@ -498,21 +498,25 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     IRInst* msg = inst->getOperand(1);
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
-                        sink->diagnose(
-                            inst,
-                            Diagnostics::staticAssertionFailure,
-                            msgLit->getStringSlice());
+                        sink->diagnose(Diagnostics::StaticAssertionFailure{
+                            .message = String(msgLit->getStringSlice()),
+                            .location = inst->sourceLoc,
+                        });
                     }
                     else
                     {
-                        sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                        sink->diagnose(Diagnostics::StaticAssertionFailureWithoutMessage{
+                            .location = inst->sourceLoc,
+                        });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+                sink->diagnose(Diagnostics::StaticAssertionConditionNotConstant{
+                    .location = condi->sourceLoc,
+                });
             }
 
             return true;

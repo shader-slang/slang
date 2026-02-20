@@ -1,5 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-u-shift 1 2 -no-codegen
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -profile ps_4_0 -entry main -no-codegen
+// CHECK: warning[E39013]
 
 // This tests that combined texture sampler objects which have D3D style register assignments, but no vk::binding,
 // show an appropriate warning.

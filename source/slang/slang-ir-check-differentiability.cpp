@@ -315,7 +315,9 @@ public:
                     auto loc = inst->sourceLoc;
                     if (!loc.isValid())
                         loc = funcInst->sourceLoc;
-                    sink->diagnose(loc, Diagnostics::invalidUseOfTorchTensorTypeInDeviceFunc);
+                    sink->diagnose(Diagnostics::InvalidUseOfTorchTensorTypeInDeviceFunc{
+                        .location = loc,
+                    });
                     return;
                 }
             }
@@ -544,12 +546,13 @@ public:
                         if (!isNeverDiffFuncType(cast<IRFuncType>(callee->getDataType())) &&
                             !shouldCallImpliesNoDiff(diffTypeContext, call))
                         {
-                            sink->diagnose(
-                                inst,
-                                Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction,
-                                getResolvedInstForDecorations(call->getCallee()),
-                                requiredDiffLevel == DifferentiableLevel::Forward ? "forward"
-                                                                                  : "backward");
+                            StringBuilder funcNameSb;
+                            printDiagnosticArg(funcNameSb, getResolvedInstForDecorations(call->getCallee()));
+                            sink->diagnose(Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
+                                .diff_level = requiredDiffLevel == DifferentiableLevel::Forward ? "forward" : "backward",
+                                .func_name = funcNameSb.produceString(),
+                                .location = inst->sourceLoc,
+                            });
                         }
                     }
                 }
@@ -656,9 +659,9 @@ public:
                     if (carryNonTrivialDiffSet.contains(storeInst->getVal()) &&
                         !canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()))
                     {
-                        sink->diagnose(
-                            storeInst->sourceLoc,
-                            Diagnostics::lossOfDerivativeAssigningToNonDifferentiableLocation);
+                        sink->diagnose(Diagnostics::LossOfDerivativeAssigningToNonDifferentiableLocation{
+                            .location = storeInst->sourceLoc,
+                        });
                     }
                 }
                 else if (auto callInst = as<IRCall>(inst))
@@ -680,10 +683,9 @@ public:
                         {
                             if (!canAddressHoldDerivative(diffTypeContext, arg))
                             {
-                                sink->diagnose(
-                                    arg->sourceLoc,
-                                    Diagnostics::
-                                        lossOfDerivativeUsingNonDifferentiableLocationAsOutArg);
+                                sink->diagnose(Diagnostics::LossOfDerivativeUsingNonDifferentiableLocationAsOutArg{
+                                    .location = arg->sourceLoc,
+                                });
                             }
                         }
                     }

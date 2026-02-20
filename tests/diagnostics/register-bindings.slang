@@ -1,5 +1,8 @@
 // register-bindings.slang
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
+// CHECK: error[E39008]
+// CHECK: error[E39009]
+// CHECK: error[E39010]
 
 // Various bad forms for register bindings
 

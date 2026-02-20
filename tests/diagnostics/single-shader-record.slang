@@ -1,5 +1,6 @@
 // single-shader-record.slang
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+// CHECK: error[E39020]
 //CHECK: too many shader record constant buffers
 
 struct ReflectionRay

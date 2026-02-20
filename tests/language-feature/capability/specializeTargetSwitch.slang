@@ -21,7 +21,7 @@ RWTexture1D<int> tex;
 
 //CHECK_METAL: {{.*}}30{{.*}}
 
-//CHECK_WILL_ERROR1: error 36109
+//CHECK_WILL_ERROR1: error[E36109]
 //CHECK_WILL_ERROR2: error 41011
 
 //CHECK_GLSL3: {{.*}}30{{.*}}

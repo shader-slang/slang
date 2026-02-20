@@ -13,6 +13,7 @@
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1565,7 +1566,12 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         if (auto sink = context->shared->sink)
         {
-            sink->diagnose(bestVal->sourceLoc, Diagnostics::unresolvedSymbol, bestVal);
+            StringBuilder symbolSb;
+            printDiagnosticArg(symbolSb, bestVal);
+            sink->diagnose(Diagnostics::UnresolvedSymbol{
+                .symbol = symbolSb.produceString(),
+                .location = bestVal->sourceLoc,
+            });
 
             // Emit notes for all available declarations of this symbol
             for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
@@ -1841,10 +1847,14 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 if (auto constant = as<IRGlobalConstant>(globalSym))
                 {
                     if (constant->getOperandCount() == 0)
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        StringBuilder symbolSb;
+                        printDiagnosticArg(symbolSb, globalSym);
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = symbolSb.produceString(),
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto genericSym = as<IRGeneric>(globalSym))
                 {
@@ -1855,19 +1865,25 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 {
                     if (!doesFuncHaveDefinition(funcSym) &&
                         !doesTargetAllowUnresolvedFuncSymbol(req))
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        StringBuilder symbolSb;
+                        printDiagnosticArg(symbolSb, globalSym);
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = symbolSb.produceString(),
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto witnessSym = as<IRWitnessTable>(globalSym))
                 {
                     if (!doesWitnessTableHaveDefinition(witnessSym))
                     {
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            witnessSym);
+                        StringBuilder symbolSb;
+                        printDiagnosticArg(symbolSb, witnessSym);
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = symbolSb.produceString(),
+                            .location = globalSym->sourceLoc,
+                        });
                         if (auto concreteType = witnessSym->getConcreteType())
                             sink->diagnose(
                                 concreteType->sourceLoc,
