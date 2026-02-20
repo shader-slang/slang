@@ -1223,14 +1223,20 @@ void invokePathConstantFuncInHullShader(
     auto constantFunc = as<IRFunc>(patchConstantFuncDecor->getFunc());
     for (auto param : constantFunc->getParams())
     {
+        auto getParamName = [](IRParam* param) -> String
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, param);
+            return sb.produceString();
+        };
+
         if (as<IRHLSLOutputPatchType>(param->getDataType()))
         {
             if (!outputPatchArg)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = getParamName(param),
+                    .location = param->sourceLoc});
                 return;
             }
             param->setFullType(outputPatchArg->getDataType());
@@ -1240,10 +1246,9 @@ void invokePathConstantFuncInHullShader(
         {
             if (!inputPatchArg)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = getParamName(param),
+                    .location = param->sourceLoc});
                 return;
             }
             auto arrayType = builder.getArrayType(
@@ -1257,19 +1262,17 @@ void invokePathConstantFuncInHullShader(
             auto layout = findVarLayout(param);
             if (!layout)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = getParamName(param),
+                    .location = param->sourceLoc});
                 return;
             }
             auto sysAttr = layout->findSystemValueSemanticAttr();
             if (!sysAttr)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = getParamName(param),
+                    .location = param->sourceLoc});
                 return;
             }
             if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_OutputControlPointID")))
@@ -1284,10 +1287,9 @@ void invokePathConstantFuncInHullShader(
             }
             else
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = getParamName(param),
+                    .location = param->sourceLoc});
                 return;
             }
         }

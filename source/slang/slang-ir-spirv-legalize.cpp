@@ -747,10 +747,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         if (addressSpace == AddressSpace::Generic)
                             addressSpace = argPtrType->getAddressSpace();
                         else if (addressSpace != argPtrType->getAddressSpace())
+                        {
+                            StringBuilder sb;
+                            printDiagnosticArg(sb, inst);
                             m_sharedContext->m_sink->diagnose(
-                                inst,
-                                Diagnostics::inconsistentPointerAddressSpace,
-                                inst);
+                                Diagnostics::InconsistentPointerAddressSpace{
+                                    .inst = sb.produceString(),
+                                    .location = inst->sourceLoc});
+                        }
                     }
                 }
             }

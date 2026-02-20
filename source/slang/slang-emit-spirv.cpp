@@ -5621,10 +5621,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             else if (arg.caseInsensitiveEquals(toSlice("fractional_odd")))
                                 mode = SpvExecutionModeSpacingFractionalOdd;
                             else
-                                m_sink->diagnose(
-                                    partitioningDecor,
-                                    Diagnostics::unknownTessPartitioning,
-                                    arg);
+                                m_sink->diagnose(Diagnostics::UnknownTessPartitioning{
+                                    .partitioning = arg,
+                                    .location = partitioningDecor->sourceLoc});
                         }
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
                     }
@@ -10428,7 +10427,8 @@ SlangResult emitSPIRVFromIR(
 
     if (!symbolsEmitted)
     {
-        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
+        sink->diagnose(Diagnostics::OutputSpvIsEmpty{
+            .location = irModule->getModuleInst()->sourceLoc});
         return SLANG_FAIL;
     }
 

@@ -7,6 +7,7 @@
 #include "../core/slang-type-text-util.h"
 #include "slang-ast-builder.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1520,9 +1521,7 @@ void DocMarkdownWriter::writeCallableOverridable(
             {
                 auto decl = as<Decl>(entry->m_node);
                 m_sink->diagnose(
-                    decl->loc,
-                    Diagnostics::ignoredDocumentationOnOverloadCandidate,
-                    decl);
+                    Diagnostics::IgnoredDocumentationOnOverloadCandidate{.location = decl});
             }
         }
         else

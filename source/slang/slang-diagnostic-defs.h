@@ -301,96 +301,12 @@ DIAGNOSTIC(
 
 DIAGNOSTIC(56003, Fatal, useOfUninitializedOpaqueHandle, "use of uninitialized opaque handle '$0'.")
 
-// Metal
-DIAGNOSTIC(
-    56101,
-    Error,
-    resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal,
-    "nesting a 'ConstantBuffer' containing resource types inside a 'ParameterBlock' is not "
-    "supported on Metal, please use 'ParameterBlock' instead.")
-DIAGNOSTIC(
-    56102,
-    Error,
-    divisionByMatrixNotSupported,
-    "division by matrix is not supported for Metal and WGSL targets.")
-DIAGNOSTIC(
-    56103,
-    Error,
-    int16NotSupportedInWGSL,
-    "16-bit integer type '$0' is not supported by the WGSL backend.")
-DIAGNOSTIC(
-    56104,
-    Error,
-    assignToRefNotSupported,
-    "whole struct must be assiged to mesh output at once for Metal target.")
-
-DIAGNOSTIC(57001, Warning, spirvOptFailed, "spirv-opt failed. $0")
-DIAGNOSTIC(57002, Error, unknownPatchConstantParameter, "unknown patch constant parameter '$0'.")
-DIAGNOSTIC(57003, Error, unknownTessPartitioning, "unknown tessellation partitioning '$0'.")
-DIAGNOSTIC(
-    57004,
-    Error,
-    outputSpvIsEmpty,
-    "output SPIR-V contains no exported symbols. Please make sure to specify at least one "
-    "entrypoint.")
-
-// GLSL Compatibility
-DIAGNOSTIC(
-    58001,
-    Error,
-    entryPointMustReturnVoidWhenGlobalOutputPresent,
-    "entry point must return 'void' when global output variables are present.")
-DIAGNOSTIC(
-    58002,
-    Error,
-    unhandledGLSLSSBOType,
-    "Unhandled GLSL Shader Storage Buffer Object contents, unsized arrays as a final parameter "
-    "must be the only parameter")
-
-DIAGNOSTIC(
-    58003,
-    Error,
-    inconsistentPointerAddressSpace,
-    "'$0': use of pointer with inconsistent address space.")
-
-// Autodiff checkpoint reporting
-DIAGNOSTIC(
-    -1,
-    Note,
-    reportCheckpointIntermediates,
-    "checkpointing context of $1 bytes associated with function: '$0'")
-DIAGNOSTIC(
-    -1,
-    Note,
-    reportCheckpointVariable,
-    "$0 bytes ($1) used to checkpoint the following item:")
-DIAGNOSTIC(-1, Note, reportCheckpointCounter, "$0 bytes ($1) used for a loop counter here:")
-DIAGNOSTIC(-1, Note, reportCheckpointNone, "no checkpoint contexts to report")
-
-// 9xxxx - Documentation generation
-DIAGNOSTIC(
-    90001,
-    Warning,
-    ignoredDocumentationOnOverloadCandidate,
-    "documentation comment on overload candidate '$0' is ignored")
-
-//
-// 8xxxx - Issues specific to a particular library/technology/platform/etc.
-//
-
-// 811xx - NVAPI
-
-DIAGNOSTIC(
-    81110,
-    Error,
-    nvapiMacroMismatch,
-    "conflicting definitions for NVAPI macro '$0': '$1' and '$2'")
-
-DIAGNOSTIC(
-    81111,
-    Error,
-    opaqueReferenceMustResolveToGlobal,
-    "could not determine register/space for a resource or sampler used with NVAPI")
+// Metal (56101-56104) - definitions moved to slang-diagnostics-semantic-checking-15.lua
+// SPIRV (57001-57004) - definitions moved to slang-diagnostics-semantic-checking-15.lua
+// GLSL Compatibility (58001-58003) - definitions moved to slang-diagnostics-semantic-checking-15.lua
+// Autodiff checkpoint reporting notes - definitions moved to slang-diagnostics-semantic-checking-15.lua
+// 9xxxx - Documentation generation (90001) - definitions moved to slang-diagnostics-semantic-checking-15.lua
+// 8xxxx - NVAPI (81110-81111) - definitions moved to slang-diagnostics-semantic-checking-15.lua
 
 // 99999 - Internal compiler errors, and not-yet-classified diagnostics.
 
