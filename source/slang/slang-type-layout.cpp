@@ -2012,29 +2012,39 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kCLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // Explicit layout rule in ConstantBuffer should take precedence over global options.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
         case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+            break;
         default:
             break;
         }
+    }
+    // Default layout types fall through to global options.
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // When no global option is set, use the default for each layout type.
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        if (cbufferType->getLayoutType()->astNodeType ==
+            ASTNodeType::DefaultPushConstantDataLayoutType)
+            return &kStd430LayoutRulesImpl_;
     }
     return &kStd140LayoutRulesImpl_;
 }

@@ -13,9 +13,13 @@ struct CleanUpVoidContext
 
     InstWorkList workList;
     InstHashSet workListSet;
+    InstHashSet m_instsToRemove;
+    // Maps IRDebugVar old argument index -> new argument index after IRFunc void-parameter removal.
+    // A value of -1 means the corresponding IRFunc parameter was a VoidType and removed.
+    Dictionary<IRFunc*, List<Index>> m_debugVarRemappedArgIndices;
 
     CleanUpVoidContext(IRModule* inModule)
-        : module(inModule), workList(inModule), workListSet(inModule)
+        : module(inModule), workList(inModule), workListSet(inModule), m_instsToRemove(inModule)
     {
     }
 
@@ -69,14 +73,27 @@ struct CleanUpVoidContext
             break;
         case kIROp_Func:
             {
-                // Remove void parameter.
+                // Remove void parameters.
+                // To keep the ArgIndex operand of the IRDebugVars
+                // corresponding to the function parameters correct, we build a
+                // map to update the IRDebugVar argument indices later.
                 List<IRParam*> paramsToRemove;
                 auto func = as<IRFunc>(inst);
+                List<Index> argIndexRemap; // Indexed by old ArgIndex, with value of new ArgIndex
+                argIndexRemap.reserve(func->getParamCount());
+                Index nextKeptArgIndex = 0;
                 for (auto param : func->getParams())
                 {
-                    if (param->getDataType()->getOp() == kIROp_VoidType)
+                    bool needToRemove = (param->getDataType()->getOp() == kIROp_VoidType);
+                    argIndexRemap.add(needToRemove ? -1 : nextKeptArgIndex);
+
+                    if (needToRemove)
                     {
                         paramsToRemove.add(param);
+                    }
+                    else
+                    {
+                        nextKeptArgIndex++;
                     }
                 }
                 IRBuilder builder(module);
@@ -86,6 +103,106 @@ struct CleanUpVoidContext
                     auto voidVal = builder.getVoidValue();
                     param->replaceUsesWith(voidVal);
                     param->removeAndDeallocate();
+                }
+
+                if (paramsToRemove.getCount() != 0)
+                {
+                    m_debugVarRemappedArgIndices.add(func, argIndexRemap);
+                }
+            }
+            break;
+        case kIROp_DebugValue:
+            {
+                // Remove void values.
+                if (auto debugValue = as<IRDebugValue>(inst))
+                {
+                    if (auto valueType = debugValue->getValue()->getDataType())
+                    {
+                        if (valueType->getOp() == kIROp_VoidType)
+                        {
+                            m_instsToRemove.add(debugValue);
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_DebugVar:
+            {
+                // 1. Update the DebugVar's ArgIndex operand or mark the
+                // DebugVar for removal if it was a VoidType parameter when the
+                // Func was processed.
+                // 2. Detect VoidType DebugVars
+                // 3. Remove VoidType DebugVars and any DebugValue users of the DebugVar
+                auto debugVar = as<IRDebugVar>(inst);
+                bool removeDebugVar = false;
+
+                // DebugVar corresponding to a function parameter?
+                if (auto argIndexInst = as<IRIntLit>(debugVar->getArgIndex()))
+                {
+                    if (auto parentFunc = getParentFunc(debugVar))
+                    {
+                        if (auto remappedArgIndices =
+                                m_debugVarRemappedArgIndices.tryGetValue(parentFunc))
+                        {
+                            Index oldArgIndex = (Index)argIndexInst->getValue();
+                            if (oldArgIndex >= 0 && oldArgIndex < remappedArgIndices->getCount())
+                            {
+                                Index newArgIndex = (*remappedArgIndices)[oldArgIndex];
+                                if (newArgIndex < 0)
+                                {
+                                    removeDebugVar = true;
+                                }
+                                else if (newArgIndex != oldArgIndex)
+                                {
+                                    // Update the ArgIndex operand
+                                    IRBuilder builder(module);
+                                    builder.setInsertBefore(debugVar);
+                                    debugVar->setArgIndex(
+                                        builder.getIntValue(builder.getUIntType(), newArgIndex));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Detect any VoidType DebugVars, e.g. from locally declared
+                // variables
+                auto debugVarType = debugVar->getDataType();
+                while (auto ptrType = as<IRPtrTypeBase>(debugVarType))
+                {
+                    debugVarType = ptrType->getValueType();
+                }
+                if (debugVarType && debugVarType->getOp() == kIROp_VoidType)
+                {
+                    removeDebugVar = true;
+                }
+
+                // Remove the VoidType DebugVar and any DebugValue users of the DebugVar
+                if (removeDebugVar)
+                {
+                    List<IRInst*> debugValueUsersToRemove;
+                    bool hasOnlyDebugValueUsers =
+                        true; // Keep the DebugVar if there are non-DebugValue users
+                    for (auto use = debugVar->firstUse; use; use = use->nextUse)
+                    {
+                        if (auto debugValue = as<IRDebugValue>(use->getUser()))
+                        {
+                            debugValueUsersToRemove.add(debugValue);
+                        }
+                        else
+                        {
+                            hasOnlyDebugValueUsers = false;
+                        }
+                    }
+
+                    for (auto debugValue : debugValueUsersToRemove)
+                    {
+                        m_instsToRemove.add(debugValue);
+                    }
+                    if (hasOnlyDebugValueUsers)
+                    {
+                        m_instsToRemove.add(debugVar);
+                    }
                 }
             }
             break;
@@ -180,6 +297,11 @@ struct CleanUpVoidContext
             {
                 addToWorkList(child);
             }
+        }
+
+        for (auto inst : m_instsToRemove.getHashSet())
+        {
+            inst->removeAndDeallocate();
         }
     }
 };
