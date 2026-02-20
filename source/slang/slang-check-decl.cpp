@@ -12039,7 +12039,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     // TODO: Need to make this not depend on the attribute, but rather on differentiability
     // in general..
     //
-    if (auto diffAttr = decl->findModifier<DifferentiableAttribute>())
+    if (decl->findModifier<DifferentiableAttribute>())
     {
         // Add `no_diff` modifiers to parameters.
         // This is necessary to preserve no-diff-ness for generic function before and after
@@ -14829,9 +14829,10 @@ void checkDerivativeAttributeImpl(
     {
         if (declRefExpr->declRef)
         {
-            if (auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>())
+            if (auto callableDeclRef = declRefExpr->declRef.template as<CallableDecl>())
             {
-                for (auto paramDecl : callableDeclRef.getDecl()->getMembersOfType<ParamDecl>())
+                for (auto paramDecl :
+                     callableDeclRef.getDecl()->template getMembersOfType<ParamDecl>())
                     visitor->ensureDecl(paramDecl, DeclCheckState::TypesFullyResolved);
             }
             // visitor->ensureDecl(declRefExpr->declRef, DeclCheckState::TypesFullyResolved);
@@ -14847,9 +14848,10 @@ void checkDerivativeAttributeImpl(
         for (auto candidate : overloadedExpr->lookupResult2.items)
         {
             // visitor->ensureDecl(candidate.declRef, DeclCheckState::TypesFullyResolved);
-            if (auto callableDeclRef = candidate.declRef.as<CallableDecl>())
+            if (auto callableDeclRef = candidate.declRef.template as<CallableDecl>())
             {
-                for (auto paramDecl : callableDeclRef.getDecl()->getMembersOfType<ParamDecl>())
+                for (auto paramDecl :
+                     callableDeclRef.getDecl()->template getMembersOfType<ParamDecl>())
                     visitor->ensureDecl(paramDecl, DeclCheckState::TypesFullyResolved);
             }
         }

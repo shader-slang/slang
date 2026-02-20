@@ -1896,10 +1896,9 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 getCurrentASTBuilder()->getDifferentiableInterfaceType());
             // Leave the rest unregistered for now. The backend will take care of it.
         }
-        else if (
-            auto ptrWitness = tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableRefInterfaceType()))
+        else if (tryGetInterfaceConformanceWitness(
+                     type,
+                     getASTBuilder()->getDifferentiableRefInterfaceType()))
         {
             // Unsupported at the moment.
             SLANG_UNEXPECTED("existential differentiable pointer types not supported");
