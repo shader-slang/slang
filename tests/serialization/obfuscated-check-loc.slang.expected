@@ -1,6 +1,0 @@
-result code = -1
-standard error = {
-tests/serialization/obfuscated-check-loc.slang(18): error 40020: loop does not terminate within the limited number of iterations, unrolling is aborted.
-}
-standard output = {
-}

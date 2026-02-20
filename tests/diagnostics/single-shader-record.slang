@@ -1,5 +1,6 @@
 // single-shader-record.slang
-//DIAGNOSTIC_TEST:SIMPLE: -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -profile sm_6_3 -stage closesthit -entry main -target spirv-assembly
+//CHECK: too many shader record constant buffers
 
 struct ReflectionRay
 {
@@ -30,7 +31,7 @@ void main(
 		+ InstanceID()
 		+ PrimitiveIndex()
 		+ HitKind()
-		+ shaderRecordID 
+		+ shaderRecordID
         + shaderRecordID2;
 
 	float4 color = colors[materialID];
