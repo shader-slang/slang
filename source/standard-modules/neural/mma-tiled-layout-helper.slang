@@ -95,22 +95,25 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     {
         uint laneId = WaveGetLaneIndex();
 
+        // No bounds check needed: TotalUint4 is always a multiple of N (SubgroupSize).
+        // Proof: TileSizeInUint4 = ROW_A * COLUMN_A / ElementCountPerVector
+        //      = 16 * 16 / 8 = 32, and N = SubgroupSize = 32.
+        // So TotalUint4 = 32 * NTileRows, and NumLoadsPerThread = NTileRows exactly.
+        // The maximum idx = laneId + (NTileRows - 1) * 32 ≤ 31 + (NTileRows - 1) * 32
+        //                 = NTileRows * 32 - 1 = TotalUint4 - 1, always in bounds.
         static const uint TotalUint4 = TileSizeInUint4 * NTileRows;
-        static const uint NumLoadsPerThread = (TotalUint4 + N - 1) / N;
+        static const uint NumLoadsPerThread = TotalUint4 / N;
 
         [ForceUnroll]
         for (uint i = 0; i < NumLoadsPerThread; i++)
         {
             uint idx = laneId + i * N;
-            if (idx < TotalUint4)
-            {
-                uint tileRow = idx / TileSizeInUint4;
-                uint idxInTile = idx % TileSizeInUint4;
-                int baseOffset = tileElementOffset(tileRow, tileCol);
-                int elemOffset = baseOffset + idxInTile * CMShape.ElementCountPerVector;
-                uint4 value = weightAddress.readUint4<half, true, CMShape.COLUMN_A>(elemOffset);
-                ShMemPool.data[sharedMemoryOffset + idx] = value;
-            }
+            uint tileRow = idx / TileSizeInUint4;
+            uint idxInTile = idx % TileSizeInUint4;
+            int baseOffset = tileElementOffset(tileRow, tileCol);
+            int elemOffset = baseOffset + idxInTile * CMShape.ElementCountPerVector;
+            uint4 value = weightAddress.readUint4<half, true, CMShape.COLUMN_A>(elemOffset);
+            ShMemPool.data[sharedMemoryOffset + idx] = value;
         }
     }
 
@@ -157,19 +160,23 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         uint laneId = WaveGetLaneIndex();
         int baseOffset = tileElementOffset(tileRow, tileCol);
 
+        // No bounds check needed: TileSizeInUint4C is always a multiple of N (SubgroupSize).
+        // Proof: TileSizeInUint4C = ROW_C * COLUMN_C / ElementCountPerVectorMatC
+        //      = 16 * 16 / (sizeof(uint4) / sizeof(T)).
+        //   half:  256 / 8 = 32  → 32 / 32 = 1 store per thread
+        //   float: 256 / 4 = 64  → 64 / 32 = 2 stores per thread
+        // The maximum idx = laneId + (NumStoresPerThread - 1) * 32
+        //                 = TileSizeInUint4C - 1, always in bounds.
         static const int TileSizeInUint4C = TileSizeInElements / CMShape.ElementCountPerVectorMatC;
-        static const uint NumStoresPerThread = (TileSizeInUint4C + N - 1) / N;
+        static const uint NumStoresPerThread = TileSizeInUint4C / N;
 
         [ForceUnroll]
         for (uint i = 0; i < NumStoresPerThread; i++)
         {
             uint idx = laneId + i * N;
-            if (idx < TileSizeInUint4C)
-            {
-                uint4 value = ShMemPool.data[sharedMemoryOffset + idx];
-                int elemOffset = baseOffset + idx * CMShape.ElementCountPerVectorMatC;
-                weightAddress.writeUint4Atomic<T, true, CMShape.COLUMN_C>(elemOffset, value);
-            }
+            uint4 value = ShMemPool.data[sharedMemoryOffset + idx];
+            int elemOffset = baseOffset + idx * CMShape.ElementCountPerVectorMatC;
+            weightAddress.writeUint4Atomic<T, true, CMShape.COLUMN_C>(elemOffset, value);
         }
     }
 
@@ -388,8 +395,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         BaseMMA.sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
 
         // Store result in tiled layout.  Only subgroup 0 writes to global memory.
-        // Each cooperative-matrix tile is stored contiguously to shared memory,
-        // then atomically written to its tiled-layout position.
+        // For each row of tiles: store all columns contiguously to shared memory,
+        // then write all tiles in that row to global memory in one pass.
         if (subgroupIndex == 0)
         {
             static const uint SingleTileStrideInUint4 = CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
@@ -397,11 +404,14 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
             [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
+                // Store one row of CoopMat tiles contiguously into shared memory.
+                // Tile j at offset j * CoopMatCSizeInVector, each tile stored with
+                // its own row stride (SingleTileStrideInUint4).
                 [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(
-                        ShMemPool.data, sharedMemoryBOffset, SingleTileStrideInUint4);
+                        ShMemPool.data, sharedMemoryBOffset + j * CMShape.CoopMatCSizeInVector, SingleTileStrideInUint4);
 
                     GroupMemoryBarrierWithWaveSync();
 
