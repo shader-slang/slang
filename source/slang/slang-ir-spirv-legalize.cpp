@@ -2053,7 +2053,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             // Direct SPIRV backend does not support generating SPIRV before 1.3,
             // we will issue an error message here.
-            m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+            m_sharedContext->m_sink->diagnose(Diagnostics::SpirvVersionNotSupported{});
         }
     }
 

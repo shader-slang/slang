@@ -33,10 +33,8 @@ namespace Slang
     {
         if (sink)
         {
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotDisassemble,
-                ArtifactDescUtil::getText(desc));
+            sink->diagnose(Diagnostics::CannotDisassemble{
+                .target = String(ArtifactDescUtil::getText(desc))});
         }
         return SLANG_FAIL;
     }
@@ -63,7 +61,7 @@ namespace Slang
         {
             auto compilerName =
                 TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)downstreamCompiler);
-            sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
+            sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
         }
         return SLANG_FAIL;
     }

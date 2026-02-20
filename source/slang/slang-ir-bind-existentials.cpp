@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -228,7 +229,7 @@ struct BindExistentialSlots
             // we should be detecting and diagnosing this problem before
             // we make it to back-end code generation.
             //
-            sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
+            sink->diagnose(Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
 
@@ -243,7 +244,7 @@ struct BindExistentialSlots
         UInt slotOperandCount = 2 * slotCount;
         if ((ioSlotOperandOffset + slotOperandCount) > bindOperandCount)
         {
-            sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
+            sink->diagnose(Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
         //

@@ -600,11 +600,10 @@ public:
                     count++;
                 });
 
-            m_sink->diagnose(
-                use->getUser()->sourceLoc,
-                Diagnostics::dynamicDispatchCodeGeneratedHere,
-                count,
-                tableElementsStr.getUnownedSlice());
+            m_sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
         }
     }
 
@@ -651,12 +650,11 @@ public:
                 printDiagnosticArg(specArgsStr, arg);
             }
 
-            m_sink->diagnose(
-                use->getUser()->sourceLoc,
-                Diagnostics::specializedDynamicDispatchCodeGeneratedHere,
-                count,
-                tableElementsStr.getUnownedSlice(),
-                specArgsStr.getUnownedSlice());
+            m_sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .spec_args = specArgsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
         }
     }
 

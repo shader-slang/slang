@@ -9589,7 +9589,7 @@ void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
     // under such strict compatability we can just not warn here.
     if (!varDecl->findModifier<OutModifier>() && modifier)
     {
-        getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeOut);
+        getSink()->diagnose(Diagnostics::MeshOutputMustBeOut{.location = getDiagnosticPos(varDecl)});
     }
 
     //
@@ -9601,20 +9601,20 @@ void SemanticsDeclHeaderVisitor::checkMeshOutputDecl(VarDeclBase* varDecl)
     }
     if (meshOutputType)
     {
-        getSink()->diagnose(modifier, Diagnostics::unnecessaryHLSLMeshOutputModifier);
+        getSink()->diagnose(Diagnostics::UnnecessaryHlslMeshOutputModifier{.location = modifier->loc});
         varDecl->type.type = m_astBuilder->getErrorType();
         return;
     }
     auto indexExpr = as<IndexExpr>(varDecl->type.exp);
     if (!indexExpr)
     {
-        getSink()->diagnose(varDecl, Diagnostics::meshOutputMustBeArray);
+        getSink()->diagnose(Diagnostics::MeshOutputMustBeArray{.location = getDiagnosticPos(varDecl)});
         varDecl->type.type = m_astBuilder->getErrorType();
         return;
     }
     if (indexExpr->indexExprs.getCount() != 1)
     {
-        getSink()->diagnose(varDecl, Diagnostics::meshOutputArrayMustHaveSize);
+        getSink()->diagnose(Diagnostics::MeshOutputArrayMustHaveSize{.location = getDiagnosticPos(varDecl)});
         varDecl->type.type = m_astBuilder->getErrorType();
         return;
     }

@@ -19,6 +19,7 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1975,7 +1976,11 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
         if (!loc.isValid())
             loc = getDiagnosticPos(opaqueType);
 
-        context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, opaqueType);
+        context->m_sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
+            .handle_type = typeStr.produceString(),
+            .location = loc});
     }
 
     // It is not ideal, but this pass legalizes an undefined value to... nothing.

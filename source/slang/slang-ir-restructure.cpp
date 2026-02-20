@@ -265,7 +265,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
             if (block != registeredBlock[(int)ll->op])
             {
                 if (ctx->getSink())
-                    ctx->getSink()->diagnose(block, Diagnostics::multiLevelBreakUnsupported);
+                    ctx->getSink()->diagnose(Diagnostics::MultiLevelBreakUnsupported{.location = block->sourceLoc});
             }
 
             // Now we need to create a structured `break` or `continue` operation
