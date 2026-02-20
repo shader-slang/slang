@@ -1,5 +1,5 @@
-// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -vk -shaderobj -xslang -DPOSITIVE_CHECK_1
-// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -vk -shaderobj -xslang -DPOSITIVE_CHECK_2
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -slang -shaderobj -xslang -DPOSITIVE_CHECK_1
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -slang -shaderobj -xslang -DPOSITIVE_CHECK_2
 
 //TEST_INPUT:ubuffer(data=[1 0 0 0], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;

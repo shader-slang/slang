@@ -155,7 +155,7 @@ public property uint3 gl_WorkGroupSize
     [require(meshshading)]
     get
     {
-        return (uint3)WorkgroupSize();
+        return WorkgroupSize();
     }
 }
 

@@ -1945,6 +1945,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
         IRFunc* irFunc = irBuilder->createFunc();
         irFunc->setFullType(funcType);
+        getBuilder()->addForceInlineDecoration(irFunc);
 
         IRBuilderInsertLocScope insertScope(irBuilder);
         irBuilder->setInsertInto(irFunc);

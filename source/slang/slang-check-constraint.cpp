@@ -358,7 +358,18 @@ bool addTypeCoercionWitnessToArgs(
             .as<TypeCoercionConstraintDecl>();
     auto fromType = getFromType(astBuilder, constraintDeclRef);
     auto toType = getToType(astBuilder, constraintDeclRef);
-    auto conversionCost = visitor->getConversionCost(toType, fromType);
+    TypeCoercionWitness* typeCoercionWitness = nullptr;
+    DeclRef<Decl> declRefUsedToConvert{};
+    ConversionCost conversionCost = kConversionCost_Impossible;
+    visitor->_coerce(
+        CoercionSite::General,
+        toType,
+        nullptr,
+        fromType,
+        nullptr,
+        visitor->getSink(),
+        &conversionCost,
+        &typeCoercionWitness);
     if (constraintDecl->findModifier<ImplicitConversionModifier>())
     {
         // The viable conversion is not an implicit conversion, but implicit was requested, fail
@@ -366,17 +377,6 @@ bool addTypeCoercionWitnessToArgs(
         {
             if (shouldEmitError)
             {
-                TypeCoercionWitness* typeCoercionWitness{};
-                visitor->_coerce(
-                    CoercionSite::General,
-                    toType,
-                    nullptr,
-                    fromType,
-                    nullptr,
-                    visitor->getSink(),
-                    nullptr,
-                    &typeCoercionWitness);
-
                 visitor->getSink()->diagnose(
                     maybeContext->loc,
                     Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
@@ -429,18 +429,6 @@ bool addTypeCoercionWitnessToArgs(
             maybeConstrainedGenericParams->add(toDecl.getDecl());
         }
     }
-
-    TypeCoercionWitness* typeCoercionWitness{};
-    DeclRef<Decl> declRefUsedToConvert{};
-    visitor->_coerce(
-        CoercionSite::General,
-        toType,
-        nullptr,
-        fromType,
-        nullptr,
-        visitor->getSink(),
-        nullptr,
-        &typeCoercionWitness);
 
     // Unhandled case in `_coerce`
     if (!typeCoercionWitness)
