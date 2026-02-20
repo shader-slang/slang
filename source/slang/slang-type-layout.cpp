@@ -1990,29 +1990,39 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kCLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // Explicit layout rule in ConstantBuffer should take precedence over global options.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
         case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+            break;
         default:
             break;
         }
+    }
+    // Default layout types fall through to global options.
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // When no global option is set, use the default for each layout type.
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        if (cbufferType->getLayoutType()->astNodeType ==
+            ASTNodeType::DefaultPushConstantDataLayoutType)
+            return &kStd430LayoutRulesImpl_;
     }
     return &kStd140LayoutRulesImpl_;
 }
@@ -5391,6 +5401,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt16, context),
+            type,
+            rules);
+    }
+    else if (as<TensorViewType>(type))
+    {
+        // TensorView<T> is a __magic_type whose layout is defined in the CUDA prelude
+        // (slang-cuda-prelude.h) as: uint8_t* data (8) + uint32_t strides[5] (20) +
+        // uint32_t sizes[5] (20) + uint32_t dimensionCount (4) + padding (4) = 56 bytes.
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::Uniform, 56, 8),
             type,
             rules);
     }

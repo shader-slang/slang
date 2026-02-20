@@ -30,7 +30,7 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
-__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__intrinsic_type($(kIROp_DefaultPushConstantBufferLayoutType))
 __magic_type(DefaultPushConstantDataLayoutType)
 struct DefaultPushConstantDataLayout : IBufferDataLayout
 {};
@@ -26909,8 +26909,9 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : ICoopElement
-    >(CoopMat<U, S, M, N, R> other)
+        U : ICoopElement,
+        let R1 : CoopMatMatrixUse
+    >(CoopMat<U, S, M, N, R1> other)
     {
         this.copyFrom(other);
     }
@@ -26964,20 +26965,21 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : ICoopElement
-    >(CoopMat<U, S, M, N, R> other)
+        U : ICoopElement,
+        let R1 : CoopMatMatrixUse
+    >(CoopMat<U, S, M, N, R1> other)
     {
         __target_switch
         {
         case spirv:
             if (__isCoopFloat<T>() && __isInt<U>())
-                this = __int_to_float_cast<T>(other);
+                this = __int_to_float_cast<T, R>(other);
             else if (__isInt<T>() && __isCoopFloat<U>())
-                this = __float_to_int_cast<T>(other);
+                this = __float_to_int_cast<T, R>(other);
             else if (__isCoopFloat<T>() && __isCoopFloat<U>())
-                this = __real_cast<T>(other);
+                this = __real_cast<T, R>(other);
             else if (__isInt<T>() && __isInt<U>())
-                this = __int_cast<T>(other);
+                this = __int_cast<T, R>(other);
         case cuda:
             __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
         }
@@ -28445,8 +28447,9 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
-CoopMat<T,S,M,N,R> __int_cast<
+CoopMat<T,S,M,N,R1> __int_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28456,8 +28459,9 @@ CoopMat<T,S,M,N,R> __int_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
-CoopMat<T,S,M,N,R> __real_cast<
+CoopMat<T,S,M,N,R1> __real_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28467,8 +28471,9 @@ CoopMat<T,S,M,N,R> __real_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
-CoopMat<T,S,M,N,R> __int_to_float_cast<
+CoopMat<T,S,M,N,R1> __int_to_float_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28478,8 +28483,9 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
-CoopMat<T,S,M,N,R> __float_to_int_cast<
+CoopMat<T,S,M,N,R1> __float_to_int_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,

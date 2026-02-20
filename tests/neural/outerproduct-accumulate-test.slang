@@ -1,15 +1,25 @@
 
 // On Vulkan, we can only test float type for now because atomicAdd is not supported for half on our CI machine.
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=8
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=16
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=64
 
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=8
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=16
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=32
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_SIZE=64
+
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=8
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=16
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=32
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=64
 
 #pragma warning(disable: 41017)
 import neural;
 import common;
 
-// TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
+// TEST_INPUT: ubuffer(data=[0], stride=4, count=1):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
 
@@ -189,31 +199,7 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 [numthreads(WorkgroupSize, 1, 1)]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    {
-        setBufferOneValue<8 * 8, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
-        test<8, 8>(tid, 0);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        setBufferOneValue<16 * 16, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
-        test<16, 16>(tid, 1);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        setBufferOneValue<32 * 32, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
-        test<32, 32>(tid, 2);
-        AllMemoryBarrierWithGroupSync();
-    }
-
-    {
-        setBufferOneValue<64 * 64, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
-        test<64, 64>(tid, 3);
-        AllMemoryBarrierWithGroupSync();
-    }
+    setBufferOneValue<TEST_SIZE * TEST_SIZE, WorkgroupSize>(tid, outputBuffer, DType(0.0f));
+    test<TEST_SIZE, TEST_SIZE>(tid, 0);
     // BUFFER: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
-    // BUFFER-NEXT: 1
 }
