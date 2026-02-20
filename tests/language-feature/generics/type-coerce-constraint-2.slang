@@ -1,5 +1,5 @@
-// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_1): -vk -shaderobj
-// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK_2): -vk -shaderobj
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -vk -shaderobj -xslang -DPOSITIVE_CHECK_1
+// TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_CHECK): -vk -shaderobj -xslang -DPOSITIVE_CHECK_2
 
 //TEST_INPUT:ubuffer(data=[1 0 0 0], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
@@ -52,8 +52,7 @@ struct CustomStruct2
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     uint index = threadId.x;
-    //POSITIVE_CHECK_1: 1
-    //POSITIVE_CHECK_2: 1
+    //POSITIVE_CHECK: 1
     outputBuffer[0] = (
         true
         // Test user defined coerce, `DeclRefTypeCoercionWitness`
