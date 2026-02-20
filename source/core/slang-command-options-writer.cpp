@@ -601,31 +601,39 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
             _appendWrappedIndented(1, names, toSlice(", "));
         }
 
-        if (option.description.getLength() == 0)
+        if (option.description.getLength() == 0 &&
+            options.getLinksForOption(option).getCount() == 0)
         {
             m_builder << "\n";
             continue;
         }
 
-        m_builder << ": ";
-
-        _appendText(2, option.description);
-
-        if (option.usage.getLength())
+        if (option.description.getLength() > 0)
         {
-            List<Index> usageCategoryIndices;
-            options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
+            m_builder << ": ";
 
-            for (auto usageCategoryIndex : usageCategoryIndices)
+            _appendText(2, option.description);
+
+            if (option.usage.getLength())
             {
-                auto& usageCat = categories[usageCategoryIndex];
+                List<Index> usageCategoryIndices;
+                options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
 
-                m_builder << m_options.indent << m_options.indent;
+                for (auto usageCategoryIndex : usageCategoryIndices)
+                {
+                    auto& usageCat = categories[usageCategoryIndex];
 
-                m_builder << "To get a list of values that can be used for <" << usageCat.name
-                          << ">, ";
-                m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
+                    m_builder << m_options.indent << m_options.indent;
+
+                    m_builder << "To get a list of values that can be used for <" << usageCat.name
+                              << ">, ";
+                    m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
+                }
             }
+        }
+        else
+        {
+            m_builder << "\n";
         }
 
         {
