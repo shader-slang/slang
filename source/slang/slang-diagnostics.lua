@@ -1041,6 +1041,10 @@ semantic_checking_12_module(helpers)
 local semantic_checking_13_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-13.lua")
 semantic_checking_13_module(helpers)
 
+-- Load semantic checking diagnostics (part 14) - Target code generation
+local semantic_checking_14_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-14.lua")
+semantic_checking_14_module(helpers)
+
 -- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
 local semantic_checking_15_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-15.lua")
 semantic_checking_15_module(helpers)

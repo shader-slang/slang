@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-cuda-builtin-types.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -376,10 +377,11 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
     auto hostReturnType = translateToTupleType(builder, func->getResultType());
     if (!hostReturnType)
     {
-        sink->diagnose(
-            func->sourceLoc,
-            Diagnostics::invalidTorchKernelReturnType,
-            func->getResultType());
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, func->getResultType());
+        sink->diagnose(Diagnostics::InvalidTorchKernelReturnType{
+            .type = typeStr.produceString(),
+            .location = func->sourceLoc});
         return;
     }
     List<IRType*> hostParamTypes;
@@ -407,7 +409,11 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         auto newParamType = translateToTupleType(builder, paramType);
         if (!newParamType)
         {
-            sink->diagnose(param->sourceLoc, Diagnostics::invalidTorchKernelParamType, paramType);
+            StringBuilder paramTypeStr;
+            printDiagnosticArg(paramTypeStr, paramType);
+            sink->diagnose(Diagnostics::InvalidTorchKernelParamType{
+                .type = paramTypeStr.produceString(),
+                .location = param->sourceLoc});
             return;
         }
         auto newParam = builder.emitParam(newParamType);
@@ -533,7 +539,16 @@ IRType* translateToHostType(
     }
 
     if (sink)
-        sink->diagnose(type->sourceLoc, Diagnostics::unableToAutoMapCUDATypeToHostType, type, func);
+    {
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, type);
+        StringBuilder funcStr;
+        printDiagnosticArg(funcStr, func);
+        sink->diagnose(Diagnostics::UnableToAutoMapCudaTypeToHostType{
+            .type = typeStr.produceString(),
+            .func = funcStr.produceString(),
+            .location = type->sourceLoc});
+    }
     return nullptr;
 }
 

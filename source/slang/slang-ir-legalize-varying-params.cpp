@@ -2227,9 +2227,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         if (!groupExtents)
         {
-            m_sink->diagnose(
-                m_entryPointFunc,
-                Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                .location = m_entryPointFunc->sourceLoc});
 
             // Fill in placeholder values.
             static const int kAxisCount = 3;
@@ -2540,11 +2539,10 @@ protected:
                 {
                     StringBuilder typeNameSB;
                     getTypeNameHint(typeNameSB, permittedType);
-                    m_sink->diagnose(
-                        var->sourceLoc,
-                        Diagnostics::systemValueTypeIncompatible,
-                        semanticName,
-                        typeNameSB.produceString());
+                    m_sink->diagnose(Diagnostics::SystemValueTypeIncompatible{
+                        .semantic_name = semanticName,
+                        .required_type = typeNameSB.produceString(),
+                        .location = var->sourceLoc});
                 }
             }
         }
@@ -2965,10 +2963,9 @@ private:
 
     void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
     {
-        m_sink->diagnose(
-            param->sourceLoc,
-            Diagnostics::systemValueAttributeNotSupported,
-            semanticName);
+        m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
+            .semantic_name = semanticName,
+            .location = param->sourceLoc});
     }
 
     template<LayoutResourceKind K>
@@ -4206,9 +4203,8 @@ protected:
                 emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, uint3Type);
             if (!computeExtent)
             {
-                m_sink->diagnose(
-                    entryPoint.entryPointFunc,
-                    Diagnostics::unsupportedSpecializationConstantForNumThreads);
+                m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                    .location = entryPoint.entryPointFunc->sourceLoc});
 
                 // Fill in placeholder values.
                 static const int kAxisCount = 3;

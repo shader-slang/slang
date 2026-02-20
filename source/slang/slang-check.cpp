@@ -30,7 +30,7 @@ public:
             String filename = Path::getFileNameWithoutExt(path);
             if (filename == "dxil")
             {
-                m_sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
+                m_sink->diagnose(Diagnostics::DxilNotFound{});
             }
             else
             {

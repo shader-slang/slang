@@ -1579,7 +1579,7 @@ SlangResult EndToEndCompileRequest::compile()
         auto reflection = this->getReflection();
         if (!reflection)
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget);
+            getSink()->diagnose(Diagnostics::CannotEmitReflectionWithoutTarget{});
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
@@ -1591,7 +1591,7 @@ SlangResult EndToEndCompileRequest::compile()
         }
         else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+            getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = String(reflectionPath)});
         }
     }
 

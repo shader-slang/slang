@@ -385,11 +385,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             auto sourceName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(sourceTarget));
             auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
 
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::compilerNotDefinedForTransition,
-                sourceName,
-                targetName);
+            sink->diagnose(Diagnostics::CompilerNotDefinedForTransition{
+                .source_target = sourceName,
+                .dest_target = targetName});
             return SLANG_FAIL;
         }
     }
@@ -401,7 +399,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     if (!compiler)
     {
         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
-        sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
+        sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
         return SLANG_FAIL;
     }
 

@@ -1517,10 +1517,11 @@ struct TypeFlowSpecializationContext
             }
             else
             {
-                sink->diagnose(
-                    inst,
-                    Diagnostics::noTypeConformancesFoundForInterface,
-                    interfaceType);
+                StringBuilder typeStr;
+                printDiagnosticArg(typeStr, interfaceType);
+                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                    .interface_type = typeStr.produceString(),
+                    .location = inst->sourceLoc});
                 module->getContainerPool().free(&tables);
                 return none();
             }
@@ -1763,10 +1764,11 @@ struct TypeFlowSpecializationContext
                         }
                         else
                         {
-                            sink->diagnose(
-                                loadInst,
-                                Diagnostics::noTypeConformancesFoundForInterface,
-                                interfaceType);
+                            StringBuilder typeStr;
+                            printDiagnosticArg(typeStr, interfaceType);
+                            sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                                .interface_type = typeStr.produceString(),
+                                .location = loadInst->sourceLoc});
                             module->getContainerPool().free(&tables);
                             return none();
                         }
@@ -2522,10 +2524,11 @@ struct TypeFlowSpecializationContext
             auto tableSet = taggedUnion->getWitnessTableSet();
             if (auto uninitElement = tableSet->tryGetUninitializedElement())
             {
-                sink->diagnose(
-                    inst->sourceLoc,
-                    Diagnostics::dynamicDispatchOnPotentiallyUninitializedExistential,
-                    uninitElement->getOperand(0));
+                StringBuilder sb;
+                printDiagnosticArg(sb, uninitElement->getOperand(0));
+                sink->diagnose(Diagnostics::DynamicDispatchOnPotentiallyUninitializedExistential{
+                    .object = sb.produceString(),
+                    .location = inst->sourceLoc});
 
                 return none(); // We'll return none so that the analysis doesn't
                                // crash early, before we can detect the error count

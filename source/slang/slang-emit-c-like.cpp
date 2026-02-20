@@ -21,6 +21,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -303,7 +304,7 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     {
         if (id >= 0)
         {
-            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            getSink()->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{.location = decor->sourceLoc});
             break;
         }
     }

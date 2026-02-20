@@ -88,7 +88,11 @@ bool checkFunctionRecursionImpl(
                 continue;
             if (!callStack.add(callee))
             {
-                sink->diagnose(callInst, Diagnostics::unsupportedRecursion, callee);
+                StringBuilder calleeName;
+                printDiagnosticArg(calleeName, callee);
+                sink->diagnose(Diagnostics::UnsupportedRecursion{
+                    .callee = calleeName.produceString(),
+                    .location = callInst->sourceLoc});
                 return false;
             }
             if (checkedFuncs.add(callee))
