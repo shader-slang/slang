@@ -40,6 +40,7 @@ float4 cs_main(uint3 thread_id : SV_DispatchThreadID) {
     Foo foo;
     const let result = process(foo);
 //CHECK2:                     ^ use of uninitialized variable
-//CHECK2:                     ^ use of uninitialized opaque handle
+//CHECK2:                     ^ use of uninitialized variable 'foo'
+//CHECK2:                     ^ use of uninitialized opaque handle 'array<Texture2D,2>'.
     return result.color;
 }

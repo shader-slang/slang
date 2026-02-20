@@ -4,6 +4,7 @@
 #include "slang-ir-reachability.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -541,17 +542,24 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     {
         for (auto field : fields)
         {
+            StringBuilder typeNameSb;
+            printDiagnosticArg(typeNameSb, stype);
+            StringBuilder fieldNameSb;
+            printDiagnosticArg(fieldNameSb, field->getKey());
             if (synthesized)
             {
-                sink->diagnose(
-                    field->getKey(),
-                    Diagnostics::fieldNotDefaultInitialized,
-                    stype,
-                    field->getKey());
+                sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
+                    .type_name = typeNameSb.produceString(),
+                    .field_name = fieldNameSb.produceString(),
+                    .location = field->getKey()->sourceLoc,
+                });
             }
             else
             {
-                sink->diagnose(ret, Diagnostics::constructorUninitializedField, field->getKey());
+                sink->diagnose(Diagnostics::ConstructorUninitializedField{
+                    .field_name = fieldNameSb.produceString(),
+                    .location = ret->sourceLoc,
+                });
             }
         }
     };
@@ -580,11 +588,22 @@ static void checkParameterAsOut(
     auto loads = getUnresolvedParamLoads(reachability, func, param);
     for (auto load : loads)
     {
-        sink->diagnose(
-            load,
-            as<IRTerminatorInst>(load) ? Diagnostics::returningWithUninitializedOut
-                                       : Diagnostics::usingUninitializedOut,
-            param);
+        StringBuilder paramNameSb;
+        printDiagnosticArg(paramNameSb, param);
+        if (as<IRTerminatorInst>(load))
+        {
+            sink->diagnose(Diagnostics::ReturningWithUninitializedOut{
+                .param_name = paramNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::UsingUninitializedOut{
+                .param_name = paramNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
     }
 }
 
@@ -647,12 +666,22 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
 
                 if (hasName)
                 {
-                    sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+                    StringBuilder varNameSb;
+                    printDiagnosticArg(varNameSb, inst);
+                    sink->diagnose(Diagnostics::UsingUninitializedVariable{
+                        .var_name = varNameSb.produceString(),
+                        .location = load->sourceLoc,
+                    });
                 }
                 else
                 {
                     // For poison ops and other unnamed instructions, show type instead
-                    sink->diagnose(load, Diagnostics::usingUninitializedValue, type);
+                    StringBuilder typeNameSb;
+                    printDiagnosticArg(typeNameSb, type);
+                    sink->diagnose(Diagnostics::UsingUninitializedValue{
+                        .type_name = typeNameSb.produceString(),
+                        .location = load->sourceLoc,
+                    });
                 }
             }
         }
@@ -704,7 +733,12 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
 
     for (auto load : loads)
     {
-        sink->diagnose(load, Diagnostics::usingUninitializedGlobalVariable, variable);
+        StringBuilder varNameSb;
+        printDiagnosticArg(varNameSb, variable);
+        sink->diagnose(Diagnostics::UsingUninitializedGlobalVariable{
+            .var_name = varNameSb.produceString(),
+            .location = load->sourceLoc,
+        });
     }
 }
 

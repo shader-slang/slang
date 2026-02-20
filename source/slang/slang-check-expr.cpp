@@ -3363,7 +3363,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             // warning
             if (!getInForLoopSideEffect() && !m_parentExpandExpr)
             {
-                getSink()->diagnose(infixExpr, Diagnostics::commaOperatorUsedInExpression);
+                getSink()->diagnose(Diagnostics::CommaOperatorUsedInExpression{.expr = infixExpr});
             }
         }
     }

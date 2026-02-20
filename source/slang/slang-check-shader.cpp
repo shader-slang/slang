@@ -146,9 +146,7 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::unknownSystemValueSemantic,
-            baseName);
+            Diagnostics::UnknownSystemValueSemantic{.semantic_name = baseName, .location = loc});
         return;
     }
 
@@ -1110,16 +1108,27 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                             (*targetCapSet));
                     }
                 }
+                StringBuilder entryPointNameSb;
+                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
+                auto atoms = addedAtoms.getElements<CapabilityAtom>();
+                StringBuilder capsSb;
+                printDiagnosticArg(capsSb, atoms);
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
                     DiagnosticCategory::Capability,
-                    entryPointFuncDecl->loc,
-                    Diagnostics::profileImplicitlyUpgraded,
-                    Diagnostics::profileImplicitlyUpgradedRestrictive,
-                    entryPointFuncDecl,
-                    target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    Diagnostics::ProfileImplicitlyUpgraded{
+                        .entry_point = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    },
+                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                        .entry_point = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    });
             }
         }
     }

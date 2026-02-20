@@ -60,7 +60,10 @@ void validate(IRValidateContext* context, bool condition, IRInst* inst, char con
     {
         if (context)
         {
-            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
+            context->getSink()->diagnose(Diagnostics::IrValidationFailed{
+                .message = message,
+                .location = inst->sourceLoc,
+            });
         }
         else
         {

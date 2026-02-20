@@ -11,6 +11,7 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-redundancy-removal.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
@@ -658,7 +659,12 @@ SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func
     {
         // The function is ill-formed and never returns (such as having an infinite loop),
         // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
-        getSink()->diagnose(func->sourceLoc, Diagnostics::functionNeverReturnsFatal, func);
+        StringBuilder funcNameSb;
+        printDiagnosticArg(funcNameSb, func);
+        getSink()->diagnose(Diagnostics::FunctionNeverReturnsFatal{
+            .func_name = funcNameSb.produceString(),
+            .location = func->sourceLoc,
+        });
     }
 
     eliminateContinueBlocksInFunc(func->getModule(), func);

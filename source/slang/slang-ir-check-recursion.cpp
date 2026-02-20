@@ -1,6 +1,7 @@
 #include "slang-ir-check-recursion.h"
 
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -15,7 +16,12 @@ bool checkTypeRecursionImpl(
     {
         if (!stack.add(elementType))
         {
-            sink->diagnose(field ? field : type, Diagnostics::recursiveType, type);
+            StringBuilder typeNameSb;
+            printDiagnosticArg(typeNameSb, type);
+            sink->diagnose(Diagnostics::RecursiveType{
+                .type_name = typeNameSb.produceString(),
+                .location = (field ? field : type)->sourceLoc,
+            });
             return false;
         }
         if (checkedTypes.add(elementType))

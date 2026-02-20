@@ -1033,6 +1033,10 @@ semantic_checking_10_module(helpers)
 local semantic_checking_11_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-11.lua")
 semantic_checking_11_module(helpers)
 
+-- Load semantic checking diagnostics (part 12) - IL code generation
+local semantic_checking_12_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-12.lua")
+semantic_checking_12_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

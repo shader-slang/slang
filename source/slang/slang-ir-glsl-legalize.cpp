@@ -983,10 +983,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(
-        varLayout->sourceLoc,
-        Diagnostics::unknownSystemValueSemantic,
-        semanticNameSpelling);
+    context->getSink()->diagnose(Diagnostics::UnknownSystemValueSemantic{
+        .semantic_name = semanticNameSpelling,
+        .location = varLayout->sourceLoc,
+    });
     return nullptr;
 }
 

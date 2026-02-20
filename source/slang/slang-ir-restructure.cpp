@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -683,9 +684,9 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                                 breakLabel,
                                 visited))
                         {
-                            ctx->getSink()->diagnose(
-                                switchInst,
-                                Diagnostics::switchFallthroughRestructured);
+                            ctx->getSink()->diagnose(Diagnostics::SwitchFallthroughRestructured{
+                                .location = switchInst->sourceLoc,
+                            });
                             warnedAboutFallthrough = true;
                         }
                     }

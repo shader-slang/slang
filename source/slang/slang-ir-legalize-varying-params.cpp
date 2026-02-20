@@ -8,6 +8,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
+#include "slang-rich-diagnostics.h"
 
 #include <set>
 
@@ -4053,10 +4054,10 @@ protected:
                 break;
             }
         default:
-            m_sink->diagnose(
-                parentVar,
-                Diagnostics::unimplementedSystemValueSemantic,
-                semanticName);
+            m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
+                .semantic_name = semanticName,
+                .location = parentVar->sourceLoc,
+            });
             return result;
         }
         return result;
@@ -4677,10 +4678,10 @@ protected:
             }
         default:
             {
-                m_sink->diagnose(
-                    parentVar,
-                    Diagnostics::unimplementedSystemValueSemantic,
-                    semanticName);
+                m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
+                    .semantic_name = semanticName,
+                    .location = parentVar->sourceLoc,
+                });
                 return result;
             }
         }
