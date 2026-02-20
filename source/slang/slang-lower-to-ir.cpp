@@ -4834,7 +4834,7 @@ struct ExprLoweringContext
                     //
                     if (auto memberExpr = as<MemberExpr>(baseExpr))
                     {
-                        if (memberExpr->declRef.as<CallableDecl>())
+                        if (memberExpr->declRef.template as<CallableDecl>())
                         {
                             baseExpr = memberExpr->baseExpression;
                         }
@@ -5157,7 +5157,6 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
         SLANG_UNUSED(expr);
         SLANG_UNEXPECTED("BackwardDifferentiateExpr present during IR lowered");
-        return LoweredValInfo();
     }
 
     LoweredValInfo visitDispatchKernelExpr(DispatchKernelExpr* expr)
@@ -9521,7 +9520,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         while (auto specIR = as<IRSpecialize>(satisfyingTargetIR))
                         {
                             List<IRInst*> specializationArgs;
-                            for (auto i = 0; i < specIR->getArgCount(); i++)
+                            for (UInt i = 0; i < specIR->getArgCount(); i++)
                             {
                                 specializationArgs.add(specIR->getArg(i));
                             }
@@ -10753,7 +10752,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             while (auto specIR = as<IRSpecialize>(irTargetRequirement))
                             {
                                 List<IRInst*> specializationArgs;
-                                for (auto i = 0; i < specIR->getArgCount(); i++)
+                                for (UInt i = 0; i < specIR->getArgCount(); i++)
                                 {
                                     specializationArgs.add(specIR->getArg(i));
                                 }
