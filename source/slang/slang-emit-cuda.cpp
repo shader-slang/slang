@@ -1272,9 +1272,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     IRCoopMatrixType* coopMatType,
     StringBuilder& outStr)
 {
-    uint32_t rowCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
-    uint32_t colCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
-    uint32_t matrixUse = (uint32_t)static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+    uint32_t rowCount = (uint32_t) static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    uint32_t colCount =
+        (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
 
     auto elementType = coopMatType->getElementType();
     StringBuilder elementTypeSB;
