@@ -433,7 +433,10 @@ UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(const NameKey& key
     }
 
     StringBuilder buf;
-    buf << String(prefix).toLower();
+    for (char c : prefix)
+    {
+        buf.append(CharUtil::toLower(c));
+    }
 
     const auto bufLen = buf.getLength();
 
