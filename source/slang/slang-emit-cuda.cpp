@@ -346,6 +346,16 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     SLANG_UNUSED(entryPointDecor);
 }
 
+void CUDASourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
+{
+    if (auto alignmentDecor = inst->findDecoration<IRAlignmentDecoration>())
+    {
+        m_writer->emit("__align__(");
+        m_writer->emit(getIntVal(alignmentDecor->getAlignmentOperand()));
+        m_writer->emit(") ");
+    }
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
@@ -1262,10 +1272,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     IRCoopMatrixType* coopMatType,
     StringBuilder& outStr)
 {
-    uint32_t rowCount = (uint32_t) static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
-    uint32_t colCount =
-        (uint32_t) static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
-    uint32_t matrixUse = (uint32_t) static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
+    uint32_t rowCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getRowCount())->getValue();
+    uint32_t colCount = (uint32_t)static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue();
+    uint32_t matrixUse = (uint32_t)static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue();
 
     auto elementType = coopMatType->getElementType();
     StringBuilder elementTypeSB;

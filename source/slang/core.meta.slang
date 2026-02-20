@@ -1426,7 +1426,7 @@ __intrinsic_op($(kIROp_AlignedAttr))
 internal int __align_attr(int alignment);
 
 __intrinsic_op($(kIROp_Load))
-internal T __load_aligned<T>(T* ptr, int alignmentAttr);
+internal T __load_aligned<T, Access access>(Ptr<T, access, AddressSpace.Device> ptr, int alignmentAttr);
 
 __intrinsic_op($(kIROp_Store))
 internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
@@ -1443,7 +1443,7 @@ internal void __store_aligned<T>(T* ptr, T value, int alignmentAttr);
 ///
 [__NoSideEffect]
 [ForceInline]
-T loadAligned<int alignment, T>(T* ptr)
+T loadAligned<int alignment, T, Access access>(Ptr<T, access, AddressSpace.Device> ptr)
 {
     return __load_aligned(ptr, __align_attr(alignment));
 }

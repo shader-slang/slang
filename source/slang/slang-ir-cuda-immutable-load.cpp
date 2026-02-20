@@ -60,6 +60,52 @@ struct LoadMethod
 struct ImmutableBufferLoadLoweringContext : InstPassBase
 {
     Dictionary<IRType*, LoadMethod> loadFuncs;
+
+    struct AlignedTypeWrapperKey
+    {
+        IRType* innerType;
+        IRIntegerValue alignment;
+        HashCode getHashCode() const
+        {
+            return combineHash(Slang::getHashCode(innerType), Slang::getHashCode(alignment));
+        }
+        bool operator==(const AlignedTypeWrapperKey& other) const
+        {
+            return innerType == other.innerType && alignment == other.alignment;
+        }
+    };
+
+    Dictionary<AlignedTypeWrapperKey, IRType*> aligneedWrapperTypes;
+
+    IRType* getOrCreateAlignedWrapper(IRType* innerType, IRIntegerValue alignment)
+    {
+        IRSizeAndAlignment naturalSizeAlignment;
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), innerType, &naturalSizeAlignment);
+        if (naturalSizeAlignment.alignment == alignment)
+            return innerType;
+
+        auto key = AlignedTypeWrapperKey{innerType, alignment};
+        if (auto* wrappedType = aligneedWrapperTypes.tryGetValue(key))
+            return *wrappedType;
+
+        IRBuilder builder(innerType);
+        builder.setInsertAfter(innerType);
+
+        auto structType = builder.createStructType();
+        StringBuilder nameSb;
+        getTypeNameHint(nameSb, innerType);
+        nameSb << "_aligned" << alignment;
+        builder.addNameHintDecoration(structType, nameSb.getUnownedSlice());
+
+        auto fieldKey = builder.createStructKey();
+        builder.addNameHintDecoration(fieldKey, toSlice("val"));
+        builder.createStructField(structType, fieldKey, innerType);
+        builder.addAlignmentDecoration(structType, alignment);
+
+        aligneedWrapperTypes[key] = structType;
+        return structType;
+    }
+
     TargetProgram* targetProgram;
 
     IRFunc* createLoadFunc(IRBuilder& builder, IRType* valueType, IRParam*& outParam)
@@ -300,15 +346,61 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         case kIROp_Load:
             {
                 auto load = as<IRLoad>(inst);
+                IRInst* loadedValue = load;
+
+                IRBuilder builder(load);
+                builder.setInsertBefore(load);
+
+                auto alignmentAttr = load->findAttr<IRAlignedAttr>();
+                bool needUnwrap = false;
+                if (alignmentAttr)
+                {
+                    auto wrappedType = getOrCreateAlignedWrapper(
+                        load->getDataType(),
+                        getIntVal(alignmentAttr->getAlignment()));
+                    if (wrappedType != load->getDataType())
+                    {
+                        auto newPtr = builder.emitBitCast(
+                            builder.getPtrType(
+                                kIROp_PtrType,
+                                wrappedType,
+                                as<IRPtrTypeBase>(load->getPtr()->getDataType())),
+                            load->getPtr());
+                        builder.replaceOperand(load->getPtrOperand(), newPtr);
+                        load->setFullType(wrappedType);
+                        needUnwrap = true;
+                    }
+                }
                 if (isPointerToImmutableLocation(getRootAddr(load->getPtr())))
                 {
-                    IRBuilder builder(load);
-                    builder.setInsertBefore(load);
-                    if (auto newLoad = emitImmutableLoad(builder, load->getPtr()))
+                    if (auto immutableLoad = emitImmutableLoad(builder, load->getPtr()))
                     {
-                        load->replaceUsesWith(newLoad);
-                        load->removeAndDeallocate();
+                        loadedValue = immutableLoad;
                     }
+                }
+
+                if (needUnwrap)
+                {
+                    List<IRUse*> uses;
+                    for (auto use = inst->firstUse; use; use = use->nextUse)
+                    {
+                        uses.add(use);
+                    }
+                    auto wrappedStruct = as<IRStructType>(loadedValue->getDataType());
+                    SLANG_ASSERT(wrappedStruct);
+                    auto firstField = wrappedStruct->getFields().getFirst();
+                    SLANG_ASSERT(firstField);
+                    auto fieldKey = firstField->getKey();
+                    loadedValue = builder.emitFieldExtract(loadedValue, fieldKey);
+                    for (auto use : uses)
+                    {
+                        builder.replaceOperand(use, loadedValue);
+                    }
+                }
+                else if (loadedValue != inst)
+                {
+                    inst->replaceUsesWith(loadedValue);
+                    inst->removeAndDeallocate();
                 }
             }
             break;
@@ -365,7 +457,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     }
 };
 
-void lowerImmutableBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram)
+void lowerImmutableOrAlignedBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram)
 {
     ImmutableBufferLoadLoweringContext context(module);
     context.targetProgram = targetProgram;
