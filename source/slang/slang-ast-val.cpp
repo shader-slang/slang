@@ -850,8 +850,13 @@ void BuiltinTypeCoercionWitness::_toTextOverride(StringBuilder& out)
     out << "BuiltinTypeCoercionWitness(";
     if (getFromType())
         out << getFromType();
+    else
+        out << "<null>";
+    out << ",";
     if (getToType())
         out << getToType();
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -892,10 +897,18 @@ void DeclRefTypeCoercionWitness::_toTextOverride(StringBuilder& out)
     out << "DeclRefTypeCoercionWitness(";
     if (getFromType())
         out << getFromType();
+    else
+        out << "<null>";
+    out << ",";
     if (getToType())
         out << getToType();
+    else
+        out << "<null>";
+    out << ",";
     if (getDeclRef())
         out << getDeclRef();
+    else
+        out << "<null>";
     out << ")";
 }
 

@@ -53,8 +53,8 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
     uint index = threadId.x;
     outputBuffer[0] = (true
-                 // NEGATIVE_CHECK_1-DAG: ([[# @LINE+2]]): error 38042: 'CustomStruct1' is not implicitly convertable to 'CustomStruct2', not satisfying the type coerce constraint 'CustomStruct2(CustomStruct1)'
-                 // NEGATIVE_CHECK_2-DAG: ([[# @LINE+1]]): error 38043: 'CustomStruct1' is not convertable to 'CustomStruct2', not satisfying the type coerce constraint 'CustomStruct2(CustomStruct1)'
+         // NEGATIVE_CHECK_1-DAG: ([[# @LINE+2]]): error 38042: 'CustomStruct1' is not implicitly convertible to 'CustomStruct2', not satisfying the type coerce constraint 'CustomStruct2(CustomStruct1)'
+                  NEGATIVE_CHECK_2-DAG: ([[# @LINE+1]]): error 38043: 'CustomStruct1' is not convertible to 'CustomStruct2', not satisfying the type coerce constraint 'CustomStruct2(CustomStruct1)'
                  && castableConstraint1<CustomStruct2, CustomStruct1>(CustomStruct1(1)).data == 1
                 ) ? 1 : 0;
 
