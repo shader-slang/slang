@@ -30,7 +30,7 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
-__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__intrinsic_type($(kIROp_DefaultPushConstantBufferLayoutType))
 __magic_type(DefaultPushConstantDataLayoutType)
 struct DefaultPushConstantDataLayout : IBufferDataLayout
 {};

@@ -331,6 +331,7 @@ local insts = {
 				},
 			},
 			{ DefaultLayout = { struct_name = "DefaultBufferLayoutType", hoistable = true } },
+			{ DefaultPushConstantLayout = { struct_name = "DefaultPushConstantBufferLayoutType", hoistable = true } },
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
